@@ -3,9 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { access, chmod, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { LOGS_DIR, PANOPTICON_HOME } from './paths.js';
+import { LOGS_DIR, PANOPTICON_HOME, packageRoot } from './paths.js';
 import { loadConfig, type NormalizedTtsDaemonConfig } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
@@ -86,11 +85,6 @@ export type TtsDaemonInstallResult =
   | { status: 'skipped'; reason: string }
   | { status: 'failed'; reason: string };
 
-function repoRoot(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return join(here, '..', '..');
-}
-
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path, constants.F_OK);
@@ -101,10 +95,9 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 export async function resolveQwenTtsPackageDir(): Promise<string> {
-  const root = repoRoot();
   const candidates = [
-    join(root, 'packages', 'qwen-tts-linux-x64'),
-    join(root, 'node_modules', 'qwen-tts-linux-x64'),
+    join(packageRoot, 'packages', 'qwen-tts-linux-x64'),
+    join(packageRoot, 'node_modules', 'qwen-tts-linux-x64'),
   ];
   for (const candidate of candidates) {
     if (await pathExists(candidate)) return candidate;
@@ -114,7 +107,7 @@ export async function resolveQwenTtsPackageDir(): Promise<string> {
 }
 
 export async function resolveTtsDaemonScript(): Promise<string> {
-  const script = join(repoRoot(), 'skills', 'pan-tts', 'scripts', 'tts_daemon.py');
+  const script = join(packageRoot, 'skills', 'pan-tts', 'scripts', 'tts_daemon.py');
   if (await pathExists(script)) return script;
   throw new Error(`Qwen TTS daemon script not found at ${script}`);
 }
