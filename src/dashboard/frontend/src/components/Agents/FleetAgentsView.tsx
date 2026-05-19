@@ -94,7 +94,10 @@ function MetricIcon({ label }: { label: string }) {
 
 function stuckHours(agent: Agent, now: Date) {
   const since = agent.firstFailureInRunAt ?? agent.lastFailureAt ?? agent.lastActivity ?? agent.startedAt;
-  return Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / 3_600_000));
+  if (!since) return 0;
+  const sinceTime = new Date(since).getTime();
+  if (Number.isNaN(sinceTime)) return 0;
+  return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
 }
 
 function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {

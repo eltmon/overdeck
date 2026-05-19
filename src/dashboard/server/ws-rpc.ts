@@ -64,6 +64,27 @@ function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueL
   return lookup;
 }
 
+// ─── Shared agent-issue lookup cache for subscribeIssueEvents ─────────────────
+// Caches the lookup across all issue-event subscribers to avoid N× rebuilds
+// per event when N drawers are open. Refreshes on TTL expiry or agent events.
+const SHARED_AGENT_LOOKUP_TTL_MS = 500;
+let sharedAgentLookup: AgentIssueLookup = new Map();
+let sharedAgentLookupTimestamp = 0;
+
+function getCachedAgentIssueLookup(readModel: ReadModelServiceShape): Effect.Effect<AgentIssueLookup> {
+  const now = Date.now();
+  if (now - sharedAgentLookupTimestamp < SHARED_AGENT_LOOKUP_TTL_MS) {
+    return Effect.succeed(sharedAgentLookup);
+  }
+  return readModel.getSnapshot.pipe(
+    Effect.map((snapshot) => {
+      sharedAgentLookup = buildAgentIssueLookup(snapshot.agents);
+      sharedAgentLookupTimestamp = now;
+      return sharedAgentLookup;
+    }),
+  );
+}
+
 function recordMatchesIssue(record: unknown, issueId: string, agentIssueLookup: AgentIssueLookup = new Map()) {
   if (!record || typeof record !== 'object') return false;
   const data = record as Record<string, unknown>;
@@ -484,8 +505,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
           Stream.mapEffect((event) =>
-            readModel.getSnapshot.pipe(
-              Effect.map((snapshot) => filterDomainEventForIssue(event, input.issueId, buildAgentIssueLookup(snapshot.agents))),
+            getCachedAgentIssueLookup(readModel).pipe(
+              Effect.map((lookup) => filterDomainEventForIssue(event, input.issueId, lookup)),
             ),
           ),
           Stream.filter((event): event is DomainEvent => event !== null),

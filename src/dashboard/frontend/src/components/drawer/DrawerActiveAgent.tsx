@@ -3,6 +3,7 @@ import { getHarness } from '@panctl/contracts';
 
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
+import { useDashboardStore, selectAgentOutput } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
@@ -31,8 +32,11 @@ function formatSpend(cost: number | undefined) {
 }
 
 export default function DrawerActiveAgent() {
-  const { agents, activityRail } = useDrawerData();
+  const { agents } = useDrawerData();
   const activeAgent = agents.find(isActiveAgent) ?? null;
+  const agentOutput = useDashboardStore(
+    activeAgent ? selectAgentOutput(activeAgent.id) : () => [],
+  );
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -47,7 +51,7 @@ export default function DrawerActiveAgent() {
     );
   }
 
-  const streamLines = activityRail.slice(0, 8).map((item) => item.message);
+  const streamLines = agentOutput.slice(-8);
   const meta = `${getFriendlyModelName(activeAgent.model)} · ${getHarness(activeAgent)} · spend ${formatSpend(activeAgent.costSoFar)}`;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {

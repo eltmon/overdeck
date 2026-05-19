@@ -398,7 +398,14 @@ export function useDrawerData(): DrawerData {
         message: entry.message ?? 'Activity update',
         when: entry.timestamp ?? '',
       }))
-      .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime());
+      .sort((a, b) => {
+        const aTime = a.when ? new Date(a.when).getTime() : 0;
+        const bTime = b.when ? new Date(b.when).getTime() : 0;
+        if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+        if (Number.isNaN(aTime)) return 1;
+        if (Number.isNaN(bTime)) return -1;
+        return bTime - aTime;
+      });
 
     return {
       issue,
