@@ -17,6 +17,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { PipelineView } from './components/Pipeline/PipelineView';
+import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
@@ -75,6 +76,7 @@ const TAB_PATHS: Record<Tab, string> = {
   settings: '/settings',
   'god-view': '/god-view',
   sessions: '/sessions',
+  'awaiting-merge': '/awaiting-merge',
 };
 
 const PATH_TO_TAB: Record<string, Tab> = {
@@ -121,29 +123,15 @@ export function serializeConversationViewModes(viewModes: ConversationViewModeMa
     .join(',');
 }
 
-export function normalizeLegacyAwaitingMergeRoute(path = window.location.pathname, search = window.location.search): string | null {
-  if (path !== '/awaiting-merge') return null;
-
-  const params = new URLSearchParams(search);
-  const subview = params.get('subview');
-  params.delete('subview');
-  params.set('phase', 'ship');
-
-  if (subview === 'blocked') {
-    params.set('blocked', '1');
-    params.delete('noPr');
-  } else if (subview === 'no-pr' || subview === 'noPr') {
-    params.set('noPr', '1');
-    params.delete('blocked');
-  }
-
-  const query = params.toString();
-  return query ? `/pipeline?${query}` : '/pipeline?phase=ship';
+export function normalizeLegacyAwaitingMergeRoute(_path = window.location.pathname, _search = window.location.search): string | null {
+  // Awaiting Merge is its own dedicated page again — no redirect to /pipeline.
+  // Kept as a stub so existing imports/tests still resolve.
+  return null;
 }
 
 function normalizeCurrentRoute() {
-  const next = normalizeLegacyAwaitingMergeRoute();
-  if (next) window.history.replaceState(null, '', `${next}${window.location.hash}`);
+  // No legacy route normalization needed currently — Awaiting Merge is a
+  // first-class page at /awaiting-merge again.
 }
 
 /** Extract conversation ID from /conv/:id path, or null if not matching. */
@@ -877,6 +865,11 @@ export default function App() {
         {activeTab === 'pipeline' && (
           <div className="w-full h-full overflow-hidden">
             <PipelineView />
+          </div>
+        )}
+        {activeTab === 'awaiting-merge' && (
+          <div className="w-full h-full overflow-auto">
+            <AwaitingMergePage />
           </div>
         )}
         {activeTab === 'kanban' && (

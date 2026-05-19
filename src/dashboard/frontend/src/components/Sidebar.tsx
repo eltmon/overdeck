@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
-  Zap, Compass, GitBranch, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
+  Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, History, Mic,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,7 +37,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch, title: 'Awaiting Merge → filter on Pipeline' },
+      { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
+      { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
