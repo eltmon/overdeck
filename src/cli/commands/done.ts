@@ -269,8 +269,16 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      // Status updates now live in continue.json statusOverrides (PAN-1124),
-      // so there is no workspace spec to commit.
+      try {
+        const { stdout: postDirty } = await execAsync(
+          'git status --porcelain .pan/',
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        if (postDirty.trim()) {
+          await execAsync('git add .pan/', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
+      } catch { /* non-fatal */ }
     }
   }
 
