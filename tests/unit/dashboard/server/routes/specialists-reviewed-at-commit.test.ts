@@ -111,6 +111,10 @@ vi.mock('../../../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: vi.fn(),
 }));
 
+vi.mock('../../../../../src/lib/cloister/review-agent.js', () => ({
+  spawnReviewRoleForIssue: vi.fn().mockResolvedValue({ success: true, message: 'spawned' }),
+}));
+
 vi.mock('node:fs', async (importActual) => {
   const actual = await importActual<typeof import('node:fs')>();
   return { ...actual, existsSync: vi.fn().mockReturnValue(true) };
