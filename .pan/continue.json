@@ -2,118 +2,118 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T01:29:14.234Z",
+  "updated": "2026-05-19T01:51:51.805Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "e3b5904ea"
+    "sha": "ed0f98ddc"
   },
   "decisions": [
     {
       "id": "D1",
       "summary": "Primitives live in src/dashboard/frontend/src/components/primitives/, NOT packages/contracts.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §6 step 1 allows either location; desktop sharing is out of scope, so co-locate with the only consumer. Avoids packaging churn and contract re-publish."
+      "rationale": "PRD \u00a76 step 1 allows either location; desktop sharing is out of scope, so co-locate with the only consumer. Avoids packaging churn and contract re-publish."
     },
     {
       "id": "D2",
       "summary": "Issue Detail drawer state is a slice on the existing Zustand store (src/dashboard/frontend/src/lib/store.ts), not a new store.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "The drawer needs to react to existing domain events (review status, agents, beads). Adding a separate store would require cross-store synchronization. PRD §4.3 specifies 'owned by a single global store slice'."
+      "rationale": "The drawer needs to react to existing domain events (review status, agents, beads). Adding a separate store would require cross-store synchronization. PRD \u00a74.3 specifies 'owned by a single global store slice'."
     },
     {
       "id": "D3",
-      "summary": "Drawer addressing uses query string ?issue=<id>&tab=<tab>, layered over the existing tab/path routing — not a nested route.",
+      "summary": "Drawer addressing uses query string ?issue=<id>&tab=<tab>, layered over the existing tab/path routing \u2014 not a nested route.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §4.6 + §5.3 explicitly call out ?issue=<id>&tab=<tab>. Layering on top of the existing path-based tab routing keeps the parent surface scroll position when closing (browser back stays on the host page)."
+      "rationale": "PRD \u00a74.6 + \u00a75.3 explicitly call out ?issue=<id>&tab=<tab>. Layering on top of the existing path-based tab routing keeps the parent surface scroll position when closing (browser back stays on the host page)."
     },
     {
       "id": "D4",
       "summary": "Default route flip: '/' renders Pipeline (was Board). '/board' is added as the explicit Board route. Sidebar logo click goes to Pipeline.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §5.3 routes table. Sidebar.tsx line 139 currently routes logo click to 'kanban' tab; that handler needs to point at the new default."
+      "rationale": "PRD \u00a75.3 routes table. Sidebar.tsx line 139 currently routes logo click to 'kanban' tab; that handler needs to point at the new default."
     },
     {
       "id": "D5",
       "summary": "Sidebar Operations group order: Pipeline, Board, Command Deck, Agents. Awaiting Merge entry is removed. AutoPreso stays.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §4.1 information architecture. Pipeline first because it is the new default landing. AutoPreso is out of scope per PRD non-goals and not listed for removal."
+      "rationale": "PRD \u00a74.1 information architecture. Pipeline first because it is the new default landing. AutoPreso is out of scope per PRD non-goals and not listed for removal."
     },
     {
       "id": "D6",
       "summary": "InspectorPanel retirement is gated by a written feature-parity audit. The audit ships as its own bead before any removal bead.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §7 risk row 5 mandates 'audit Inspector Panel usages before deletion; explicit feature parity checklist'. InspectorPanel.tsx is 1387 LOC and used by KanbanBoard, BulkActionBar, AwaitingMergePage and others — silent regressions would be expensive."
+      "rationale": "PRD \u00a77 risk row 5 mandates 'audit Inspector Panel usages before deletion; explicit feature parity checklist'. InspectorPanel.tsx is 1387 LOC and used by KanbanBoard, BulkActionBar, AwaitingMergePage and others \u2014 silent regressions would be expensive."
     },
     {
       "id": "D7",
-      "summary": "Board card swap is a swap, not a rewrite. KanbanBoard.tsx (4268 LOC) retains drag-to-reorder, filters, bulk actions, status counters — only the card render call and the drag-to-phase wiring change.",
+      "summary": "Board card swap is a swap, not a rewrite. KanbanBoard.tsx (4268 LOC) retains drag-to-reorder, filters, bulk actions, status counters \u2014 only the card render call and the drag-to-phase wiring change.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §6 step 4: 'Replace the existing kanban card with the new Issue Card. … Drop drag-to-phase wiring; keep drag-to-reorder within a column.' Limiting scope to the card slot keeps the diff reviewable."
+      "rationale": "PRD \u00a76 step 4: 'Replace the existing kanban card with the new Issue Card. \u2026 Drop drag-to-phase wiring; keep drag-to-reorder within a column.' Limiting scope to the card slot keeps the diff reviewable."
     },
     {
       "id": "D8",
       "summary": "Command Deck right pane reframe reuses existing tab content components from ZoneCOverviewTabs (OverviewTab, BeadsTab, VBriefTab, ActivityTab, DiscussionsTab, CostsTab, PrDiffTab). Only the shell that hosts them changes.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §6 step 5: 'Preserve the existing conversation thread component inside the Conversations tab — no rewrite of conversation rendering.' Tab content is already partitioned; this is a shell reframe, not a content rewrite."
+      "rationale": "PRD \u00a76 step 5: 'Preserve the existing conversation thread component inside the Conversations tab \u2014 no rewrite of conversation rendering.' Tab content is already partitioned; this is a shell reframe, not a content rewrite."
     },
     {
       "id": "D9",
-      "summary": "/awaiting-merge → /pipeline?phase=ship redirect ships in the same bead as the route-table change. AwaitingMergePage.tsx file deletion ships in a follow-up bead once no inbound references remain.",
+      "summary": "/awaiting-merge \u2192 /pipeline?phase=ship redirect ships in the same bead as the route-table change. AwaitingMergePage.tsx file deletion ships in a follow-up bead once no inbound references remain.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "Two-step retirement protects user muscle memory (PRD §7 risk row 3). Splitting the redirect from the file delete also keeps the rollback surface small — a regression in the new Pipeline view can be reverted without restoring the AwaitingMerge component."
+      "rationale": "Two-step retirement protects user muscle memory (PRD \u00a77 risk row 3). Splitting the redirect from the file delete also keeps the rollback surface small \u2014 a regression in the new Pipeline view can be reverted without restoring the AwaitingMerge component."
     },
     {
       "id": "D10",
-      "summary": "Verb badge component does NOT require inspection. The verb→token mapping is fully specified in PRD §4.4 / §4.7.7 and is enforced as a TypeScript discriminated union. Lint/typecheck catches taxonomy drift.",
+      "summary": "Verb badge component does NOT require inspection. The verb\u2192token mapping is fully specified in PRD \u00a74.4 / \u00a74.7.7 and is enforced as a TypeScript discriminated union. Lint/typecheck catches taxonomy drift.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "Per work.inspect criteria, mechanically-spec'd primitives do not earn the inspection cost. Foundation status alone does not warrant inspection — only foundation + judgment-call risk does."
+      "rationale": "Per work.inspect criteria, mechanically-spec'd primitives do not earn the inspection cost. Foundation status alone does not warrant inspection \u2014 only foundation + judgment-call risk does."
     },
     {
       "id": "D11",
       "summary": "Drawer shell+store and drawer subscription contract are the only two beads with requiresInspection=true (both at depth 'deep'). Everything else is requiresInspection=false.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "Drawer shell encodes the single-instance/URL contract that every surface composes — wrong shape here cascades to 5 surfaces. Subscription contract is a cross-cutting protocol other drawer subsections produce/consume. Per the planning template: 'most plans will have 0-2 beads with requiresInspection: true'."
+      "rationale": "Drawer shell encodes the single-instance/URL contract that every surface composes \u2014 wrong shape here cascades to 5 surfaces. Subscription contract is a cross-cutting protocol other drawer subsections produce/consume. Per the planning template: 'most plans will have 0-2 beads with requiresInspection: true'."
     },
     {
       "id": "D12",
       "summary": "Drawer data subscriptions filter at the server side by issueId. The drawer client opens one Effect-managed subscription that is torn down on close.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §5.2: 'server-side filtering by issue id, not new transports'. Client-side filtering of the full domain-event stream would balloon when many issues are active. The contract bead is the place this gets pinned down."
+      "rationale": "PRD \u00a75.2: 'server-side filtering by issue id, not new transports'. Client-side filtering of the full domain-event stream would balloon when many issues are active. The contract bead is the place this gets pinned down."
     },
     {
       "id": "D13",
       "summary": "Styleguide-conformance Playwright test asserts that the SAME primitive class signatures (data-component attributes) appear on Pipeline, Board, Command Deck, and Agents. Existing tests stay; this is one new spec.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §8 success metrics: 'visually unified (verified by a styleguide-conformance Playwright test that asserts component class usage across pages).' Implementation: tag each primitive with data-component=verb-badge|issue-row|issue-card|agent-card and the test asserts presence."
+      "rationale": "PRD \u00a78 success metrics: 'visually unified (verified by a styleguide-conformance Playwright test that asserts component class usage across pages).' Implementation: tag each primitive with data-component=verb-badge|issue-row|issue-card|agent-card and the test asserts presence."
     },
     {
       "id": "D14",
-      "summary": "⌘K command palette result click opens the drawer instead of navigating to a route. Existing CommandPalette.tsx handler is rewired.",
+      "summary": "\u2318K command palette result click opens the drawer instead of navigating to a route. Existing CommandPalette.tsx handler is rewired.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §4.6 explicitly lists ⌘K as a drawer entry: '⌘K command palette is the universal jump: type ID, branch, or fragment of a title to land in the drawer from anywhere.'"
+      "rationale": "PRD \u00a74.6 explicitly lists \u2318K as a drawer entry: '\u2318K command palette is the universal jump: type ID, branch, or fragment of a title to land in the drawer from anywhere.'"
     },
     {
       "id": "D15",
       "summary": "Deacon status UI moves from Agents view to Health page. The component (DeaconStatus.tsx in CommandDeck) is relocated, not duplicated; AgentList.tsx's deacon section is removed.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §4.1 'What's preserved' bullet: 'Deacon status — moved to Health'. Health page (HealthDashboard.tsx) is the natural home; CloisterStatusBar already lives in the sidebar separately."
+      "rationale": "PRD \u00a74.1 'What's preserved' bullet: 'Deacon status \u2014 moved to Health'. Health page (HealthDashboard.tsx) is the natural home; CloisterStatusBar already lives in the sidebar separately."
     },
     {
       "id": "D16",
       "summary": "Where the PRD and the mock HTML disagree, mock wins for visual layout (spacing, color, typography), PRD wins for behavior and data contracts.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "PRD §4.2 establishes this rule explicitly. Encoded here so the work agent does not need to re-derive it."
+      "rationale": "PRD \u00a74.2 establishes this rule explicitly. Encoded here so the work agent does not need to re-derive it."
     },
     {
       "id": "D17",
-      "summary": "Phased delivery is forbidden — every bead in this plan must land before pan done. The PRD's 7-step migration is implementation sequencing, not separate releases.",
+      "summary": "Phased delivery is forbidden \u2014 every bead in this plan must land before pan done. The PRD's 7-step migration is implementation sequencing, not separate releases.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
-      "rationale": "CLAUDE.md 'Deliver Complete Features' rule + PRD §6 opening line: 'a feature is a feature — the redesign ships as one initiative.' Each individual bead may be independently mergeable to keep diffs reviewable, but the issue itself only closes when all 40+ beads ship."
+      "rationale": "CLAUDE.md 'Deliver Complete Features' rule + PRD \u00a76 opening line: 'a feature is a feature \u2014 the redesign ships as one initiative.' Each individual bead may be independently mergeable to keep diffs reviewable, but the issue itself only closes when all 40+ beads ship."
     },
     {
       "id": "D18",
-      "summary": "VerbBadge variants use the PRD literal verb strings as the TypeScript discriminant, including STUCK · Nh for the hours-bearing stuck badge.",
+      "summary": "VerbBadge variants use the PRD literal verb strings as the TypeScript discriminant, including STUCK \u00b7 Nh for the hours-bearing stuck badge.",
       "recordedAt": "2026-05-18T05:42:56.951Z",
       "rationale": "The styleguide-conformance test needs data-variant to match the variant prop exactly, and literal PRD labels make unknown variants fail at compile time."
     },
@@ -148,13 +148,13 @@
     },
     {
       "id": "H4",
-      "summary": "Drawer subscription fan-out — repeatedly opening/closing the drawer or rapidly switching between issues could leak streams or fire redundant subscribe/unsubscribe calls.",
-      "mitigation": "drawer-shell-and-store bead's AC includes: (a) single store-owned drawer instance — opening drawer for issue B while A is open replaces, does not stack, (b) integration test asserting subscription teardown on drawer close, (c) test for rapid open→close→open burst (50 iterations) showing no orphan subscriptions in the Effect runtime."
+      "summary": "Drawer subscription fan-out \u2014 repeatedly opening/closing the drawer or rapidly switching between issues could leak streams or fire redundant subscribe/unsubscribe calls.",
+      "mitigation": "drawer-shell-and-store bead's AC includes: (a) single store-owned drawer instance \u2014 opening drawer for issue B while A is open replaces, does not stack, (b) integration test asserting subscription teardown on drawer close, (c) test for rapid open\u2192close\u2192open burst (50 iterations) showing no orphan subscriptions in the Effect runtime."
     },
     {
       "id": "H5",
       "summary": "/awaiting-merge URL is in operator muscle memory and may be bookmarked. A hard-removal would 404.",
-      "mitigation": "awaiting-merge-redirect bead ships before awaiting-merge-component-removal. Redirect is browser-level (window.history.replaceState) or React Router-level so existing share links resolve to /pipeline?phase=ship. Sidebar tooltip on Pipeline reads 'Awaiting Merge → filter on Pipeline' for one release (added to sidebar-nav-reshuffle bead AC)."
+      "mitigation": "awaiting-merge-redirect bead ships before awaiting-merge-component-removal. Redirect is browser-level (window.history.replaceState) or React Router-level so existing share links resolve to /pipeline?phase=ship. Sidebar tooltip on Pipeline reads 'Awaiting Merge \u2192 filter on Pipeline' for one release (added to sidebar-nav-reshuffle bead AC)."
     },
     {
       "id": "H6",
@@ -163,33 +163,33 @@
     },
     {
       "id": "H7",
-      "summary": "Cost figure (--signal-cost / cyan) is the single style-guide-mandated exception to 'one colored signal per element' (PRD §4.5 / §4.7.5 'Ledger cell'). Reviewers seeing two colored elements on a row may flag this as a violation.",
-      "mitigation": "Verb-badge bead and issue-row bead AC both reference PRD §4.5 explicitly in the implementation file's docstring. styleguide-conformance-playwright-test bead asserts that a row showing both a verb badge AND a cost figure is the only legal multi-color row case."
+      "summary": "Cost figure (--signal-cost / cyan) is the single style-guide-mandated exception to 'one colored signal per element' (PRD \u00a74.5 / \u00a74.7.5 'Ledger cell'). Reviewers seeing two colored elements on a row may flag this as a violation.",
+      "mitigation": "Verb-badge bead and issue-row bead AC both reference PRD \u00a74.5 explicitly in the implementation file's docstring. styleguide-conformance-playwright-test bead asserts that a row showing both a verb badge AND a cost figure is the only legal multi-color row case."
     },
     {
       "id": "H8",
-      "summary": "Default route flip ('/' → Pipeline) breaks anyone who has bookmarked '/' expecting Board. App.tsx TAB_PATHS table (line 62) needs careful coordination with PATH_TO_TAB inverse map and getTabFromPath() fallback (line 86 returns 'command-deck' default — needs update).",
-      "mitigation": "default-route-flip bead's AC covers: (a) TAB_PATHS['kanban'] = '/board' (was '/'), (b) new TAB_PATHS entry for 'pipeline' = '/' (and '/pipeline'), (c) getTabFromPath default updated to 'pipeline', (d) Sidebar.tsx line 139 + 155 logo-click handler updated, (e) test in App.test.tsx for path→tab resolution."
+      "summary": "Default route flip ('/' \u2192 Pipeline) breaks anyone who has bookmarked '/' expecting Board. App.tsx TAB_PATHS table (line 62) needs careful coordination with PATH_TO_TAB inverse map and getTabFromPath() fallback (line 86 returns 'command-deck' default \u2014 needs update).",
+      "mitigation": "default-route-flip bead's AC covers: (a) TAB_PATHS['kanban'] = '/board' (was '/'), (b) new TAB_PATHS entry for 'pipeline' = '/' (and '/pipeline'), (c) getTabFromPath default updated to 'pipeline', (d) Sidebar.tsx line 139 + 155 logo-click handler updated, (e) test in App.test.tsx for path\u2192tab resolution."
     },
     {
       "id": "H9",
-      "summary": "Awaiting Merge has ~3 distinct sub-views in the current page (awaiting / blocked / open merge requests — selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests). The redirect maps to only one filter; some signal may be lost.",
+      "summary": "Awaiting Merge has ~3 distinct sub-views in the current page (awaiting / blocked / open merge requests \u2014 selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests). The redirect maps to only one filter; some signal may be lost.",
       "mitigation": "pipeline-cross-project-filter bead must expose at minimum: phase=ship (default for redirect), phase=ship AND blocked, phase=ship AND no-pr. The redirect bead's AC covers all three legacy views by mapping each to a deeper-link filter combination."
     },
     {
       "id": "H10",
-      "summary": "Drawer interplay with currently-open conversation views in CommandDeck — Command Deck has its own selection/routing (selectedConvId, ZoneCConversation, ZoneCOverview). Opening the drawer from a CommandDeck row should not collide with conversation routing.",
+      "summary": "Drawer interplay with currently-open conversation views in CommandDeck \u2014 Command Deck has its own selection/routing (selectedConvId, ZoneCConversation, ZoneCOverview). Opening the drawer from a CommandDeck row should not collide with conversation routing.",
       "mitigation": "command-deck-drawer-wiring bead AC: tree selection persists, conversation route persists, drawer opens as overlay with ?issue=<id> appended to whatever the existing search params are. Closing the drawer restores both selection and conversation state."
     },
     {
       "id": "H11",
-      "summary": "GodView retains its scoped tokens (PRD §3 explicitly out of scope). Surrounding-surface refresh may make GodView visually drift further.",
-      "mitigation": "Acceptable per PRD §7 risk row 4. styleguide-conformance-playwright-test bead's surface list MUST exclude /god-view. No changes to GodView code in this initiative."
+      "summary": "GodView retains its scoped tokens (PRD \u00a73 explicitly out of scope). Surrounding-surface refresh may make GodView visually drift further.",
+      "mitigation": "Acceptable per PRD \u00a77 risk row 4. styleguide-conformance-playwright-test bead's surface list MUST exclude /god-view. No changes to GodView code in this initiative."
     },
     {
       "id": "H12",
       "summary": "AgentList.tsx serves both the standalone /agents route AND is referenced from App.tsx line 904. The agents-fleet-grid bead must replace BOTH while preserving any selection-handling props that App.tsx passes through (e.g., onSelectAgent for inspector wiring).",
-      "mitigation": "agents-fleet-grid bead AC: (a) new component file FleetAgentsView.tsx is the route content for /agents, (b) App.tsx import swap from AgentList → FleetAgentsView, (c) selection handler swap routes to drawer-open instead of inspector, (d) AgentList.tsx and GodView/AgentGrid.tsx files marked for removal in agents-cleanup sub-step."
+      "mitigation": "agents-fleet-grid bead AC: (a) new component file FleetAgentsView.tsx is the route content for /agents, (b) App.tsx import swap from AgentList \u2192 FleetAgentsView, (c) selection handler swap routes to drawer-open instead of inspector, (d) AgentList.tsx and GodView/AgentGrid.tsx files marked for removal in agents-cleanup sub-step."
     },
     {
       "id": "H13",
@@ -216,7 +216,7 @@
   "sessionHistory": [
     {
       "reason": "planning",
-      "note": "Planning session started for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
+      "note": "Planning session started for PAN-1148: Unified dashboard redesign \u2014 Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
       "timestamp": "2026-05-18T05:07:18.265Z"
     },
     {
@@ -397,6 +397,12 @@
       "reason": "bead",
       "note": "Implemented workspace-9a7q legacy inspector deletion by removing InspectorPanel, components/inspector-only files, AgentList, DetailPanelLayout, and GodView/AgentGrid; moved still-live shared utilities/components to Command Deck or lib locations; rewired legacy issue selections to IssueDrawer; verified deletion greps, frontend suite, typecheck, lint, root tests, and graphify update.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:51:51.805Z",
+      "reason": "feedback",
+      "note": "Completed stale PAN-1148 vBRIEF criteria for Command Deck project metrics, sidebar nav reshuffle, and styleguide conformance after implementing missing shared primitive coverage and tests.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": [],
@@ -469,7 +475,7 @@
     "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac4": "completed",
     "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac5": "completed",
     "i1-inspector-parity-audit": "completed",
-    "t1-styleguide-conformance-test": "running",
+    "t1-styleguide-conformance-test": "completed",
     "r2-awaiting-merge-component-removal": "completed",
     "r2-awaiting-merge-component-removal.ac1": "completed",
     "r2-awaiting-merge-component-removal.ac2": "completed",
@@ -605,6 +611,19 @@
     "i2-inspector-panel-retirement.ac2": "completed",
     "i2-inspector-panel-retirement.ac3": "completed",
     "i2-inspector-panel-retirement.ac4": "completed",
-    "i2-inspector-panel-retirement.ac5": "completed"
+    "i2-inspector-panel-retirement.ac5": "completed",
+    "c2-command-deck-mini-metric-strip.ac2": "completed",
+    "n1-sidebar-nav-reshuffle.ac4": "completed",
+    "t1-styleguide-conformance-test.ac4": "completed",
+    "c2-command-deck-mini-metric-strip": "completed",
+    "t1-styleguide-conformance-test.ac2": "completed",
+    "n1-sidebar-nav-reshuffle.ac3": "completed",
+    "t1-styleguide-conformance-test.ac3": "completed",
+    "n1-sidebar-nav-reshuffle.ac1": "completed",
+    "n1-sidebar-nav-reshuffle": "completed",
+    "t1-styleguide-conformance-test.ac5": "completed",
+    "n1-sidebar-nav-reshuffle.ac2": "completed",
+    "c2-command-deck-mini-metric-strip.ac1": "completed",
+    "t1-styleguide-conformance-test.ac1": "completed"
   }
 }

@@ -30,8 +30,8 @@ export default defineConfig({
       fsModuleCache: true,
     },
     include: includeBenchmarks
-      ? ['tests/**/*.test.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
-      : ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'],
+      ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
+      : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
     coverage: {
       provider: 'v8',

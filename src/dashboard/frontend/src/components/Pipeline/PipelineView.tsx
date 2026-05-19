@@ -10,6 +10,7 @@ import MetricStrip from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import TopBar from '../primitives/TopBar';
+import VerbBadge from '../primitives/VerbBadge';
 
 const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
@@ -165,6 +166,14 @@ function formatCost(value: number) {
 
 function MetricIcon({ label }: { label: string }) {
   return <span aria-hidden="true">{label}</span>;
+}
+
+function verbBadgeForPhase(phase: PipelineIssuePhase) {
+  if (phase === 'ship') return <VerbBadge variant="READY TO MERGE" />;
+  if (phase === 'review') return <VerbBadge variant="REVIEW RUNNING" />;
+  if (phase === 'work') return <VerbBadge variant="WORK RUNNING" />;
+  if (phase === 'plan') return <VerbBadge variant="PLANNING" />;
+  return <VerbBadge variant="QUEUED FOR PLAN" />;
 }
 
 export function PipelineView() {
@@ -399,6 +408,7 @@ export function PipelineView() {
                   title={issue.title}
                   project={issue.project ? { name: issue.project.name } : undefined}
                   labels={issue.labels.slice(0, 3)}
+                  verbBadge={verbBadgeForPhase(phase)}
                   agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
                   assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
                   onOpen={openIssue}

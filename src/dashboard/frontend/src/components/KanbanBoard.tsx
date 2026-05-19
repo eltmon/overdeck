@@ -48,6 +48,7 @@ import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 import IssueCardPrimitive from './primitives/IssueCard';
+import VerbBadge from './primitives/VerbBadge';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -2818,6 +2819,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'in_review' ? (isReadyToMerge ? 'Awaiting merge' : isPipelineStuck ? 'Needs recovery' : 'Review pipeline') :
     canonical === 'done' ? 'Completed' :
     'Canceled';
+  const cardVerbBadge =
+    isTerminal ? <VerbBadge variant="MERGED" /> :
+    isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
+    isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :
+    canonical === 'in_review' ? <VerbBadge variant="REVIEW RUNNING" /> :
+    canonical === 'in_progress' && isRunning ? <VerbBadge variant="WORK RUNNING" /> :
+    canonical === 'todo' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
+    canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
+    null;
   const controlledAgentCompletedStopped = controlledAgent?.status === 'stopped' && controlledAgent.runtimeState === 'completed' && controlledAgent.paused !== true && controlledAgent.troubled !== true;
   const pauseTitle = [
     'Paused',
@@ -3167,6 +3177,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {phaseLabel}
               </span>
+              {cardVerbBadge}
               {issue.source === 'github' && (
                 <span title="GitHub Issue" className="inline-flex items-center">
                   <Github className="w-3 h-3 text-muted-foreground" />

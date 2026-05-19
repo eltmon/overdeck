@@ -2,6 +2,10 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
+import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
+import MetricStrip, { type MetricStripTile } from '../primitives/MetricStrip';
+import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
+import type { PhaseGlyphPhase } from '../primitives/PhaseGlyph';
 import { LiveCounter } from './LiveCounter';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
@@ -66,6 +70,10 @@ const TEST_STUCK_STATUSES = new Set(['failed', 'dispatch_failed']);
 const MERGE_STUCK_STATUSES = new Set(['failed']);
 const VERIFICATION_STUCK_STATUSES = new Set(['failed']);
 const ACTIVE_AGENT_STATUSES = new Set(['active', 'running', 'starting']);
+
+function MetricIcon({ label }: { label: string }) {
+  return <span aria-hidden="true">{label}</span>;
+}
 
 function hasActiveWorkSession(feature: ProjectFeature): boolean {
   return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
@@ -158,6 +166,19 @@ export function ProjectOverview({
   const stuckFeatures = bucketedByStage.get('stuck') ?? [];
   const activeStageCount = BUCKET_STAGES.filter(stage => (bucketedByStage.get(stage)?.length ?? 0) > 0).length;
 
+  const metricTiles = useMemo<MetricStripTile[]>(() => {
+    const reviewRunning = bucketedFeatures.filter(({ stage }) => stage === 'review' || stage === 'tests' || stage === 'buildGate').length;
+    const readyToShip = bucketedFeatures.filter(({ stage }) => stage === 'awaitingMerge' || stage === 'merging').length;
+
+    return [
+      { id: 'active', eyebrow: 'Active issues', value: features.length, sub: projectName, icon: <MetricIcon label="●" />, signal: 'info' },
+      { id: 'work', eyebrow: 'Work running', value: activeAgentCount, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' },
+      { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review gates', icon: <MetricIcon label="◆" />, signal: 'review' },
+      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready or merging', icon: <MetricIcon label="↑" />, signal: 'success' },
+      { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' },
+    ];
+  }, [activeAgentCount, bucketedFeatures, features.length, projectName, totalCost]);
+
   return (
     <section
       aria-label={`${projectName} project overview`}
@@ -176,6 +197,7 @@ export function ProjectOverview({
         totalCost={totalCost}
         activeAgentCount={activeAgentCount}
         activeStageCount={activeStageCount}
+        metricTiles={metricTiles}
       />
 
       {stuckFeatures.length > 0 && (
@@ -213,12 +235,14 @@ function HeroBillboard({
   totalCost,
   activeAgentCount,
   activeStageCount,
+  metricTiles,
 }: {
   projectName: string;
   issueCount: number;
   totalCost: number;
   activeAgentCount: number;
   activeStageCount: number;
+  metricTiles: MetricStripTile[];
 }) {
   return (
     <div
@@ -253,6 +277,12 @@ function HeroBillboard({
           Project pipeline overview
         </p>
       </div>
+
+      <MetricStrip
+        tiles={metricTiles}
+        columns={5}
+        className="border-b-0 px-0 py-0"
+      />
 
       <div
         style={{
@@ -310,9 +340,9 @@ function StuckCallout({
         <CountBadge count={entries.length} color="var(--destructive)" />
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
         {entries.map(entry => (
-          <IssueCard
+          <ProjectIssueRow
             key={entry.feature.issueId}
             entry={entry}
             issueCosts={issueCosts}
@@ -380,9 +410,9 @@ function PipelineSection({
         <CountBadge count={entries.length} color={config.color} />
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
         {entries.map(entry => (
-          <IssueCard
+          <ProjectIssueRow
             key={entry.feature.issueId}
             entry={entry}
             issueCosts={issueCosts}
@@ -396,7 +426,41 @@ function PipelineSection({
   );
 }
 
-function IssueCard({
+function phaseForStage(stage: PipelineStage): PhaseGlyphPhase {
+  if (stage === 'merging' || stage === 'awaitingMerge' || stage === 'stuck') return 'ship';
+  if (stage === 'tests' || stage === 'review' || stage === 'buildGate') return 'review';
+  if (stage === 'working') return 'work';
+  if (stage === 'planning') return 'plan';
+  return 'todo';
+}
+
+function verbBadgePropsForStage(stage: PipelineStage): { variant: Exclude<VerbBadgeVariant, 'STUCK · Nh'> } | { variant: 'STUCK · Nh'; hours: number } {
+  if (stage === 'stuck') return { variant: 'STUCK · Nh', hours: 1 };
+  if (stage === 'merging') return { variant: 'SHIP RUNNING' };
+  if (stage === 'awaitingMerge') return { variant: 'READY TO MERGE' };
+  if (stage === 'tests' || stage === 'review' || stage === 'buildGate') return { variant: 'REVIEW RUNNING' };
+  if (stage === 'working') return { variant: 'WORK RUNNING' };
+  if (stage === 'planning') return { variant: 'PLANNING' };
+  return { variant: 'QUEUED FOR PLAN' };
+}
+
+function priorityForFeature(feature: ProjectFeature): IssueRowPriority {
+  if (feature.readyForMerge) return 'high';
+  if (feature.agentStatus === 'failed') return 'urgent';
+  if (hasActiveAgentSignal(feature)) return 'high';
+  return 'medium';
+}
+
+function agentForFeature(feature: ProjectFeature): { name: string; sub: string } | null {
+  const active = feature.sessions?.find(session => session.presence === 'active') ?? feature.sessions?.[0];
+  if (active?.sessionId) {
+    return { name: active.sessionId, sub: [active.type, active.status].filter(Boolean).join(' · ') };
+  }
+  if (feature.agentStatus) return { name: feature.agentStatus, sub: feature.stateLabel };
+  return null;
+}
+
+function ProjectIssueRow({
   entry,
   issueCosts,
   issueCostDetails,
@@ -411,46 +475,22 @@ function IssueCard({
 }) {
   const cost = issueCosts[entry.feature.issueId];
   const costDetails = issueCostDetails?.[entry.feature.issueId];
+  const agent = agentForFeature(entry.feature);
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelectFeature(entry.feature)}
-      style={{
-        width: 210,
-        minHeight: 92,
-        textAlign: 'left',
-        border: '1px solid var(--border)',
-        borderRadius: 12,
-        padding: 12,
-        background: 'color-mix(in srgb, var(--card) 88%, transparent)',
-        color: 'var(--foreground)',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
-          {entry.feature.issueId}
-        </span>
-        {cost !== undefined && <CostBadge cost={cost} details={costDetails} />}
-      </div>
-      <span
-        title={entry.feature.title}
-        style={{
-          fontSize: 12,
-          color: 'var(--foreground)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {entry.feature.title}
-      </span>
-      {reason && <StatusPill>{reason}</StatusPill>}
-    </button>
+    <IssueRow
+      issueId={entry.feature.issueId}
+      phase={phaseForStage(entry.stage)}
+      priority={priorityForFeature(entry.feature)}
+      title={entry.feature.title}
+      project={{ name: entry.feature.projectName }}
+      labels={reason ? [<StatusPill key="reason">{reason}</StatusPill>] : []}
+      verbBadge={<VerbBadge {...verbBadgePropsForStage(entry.stage)} />}
+      agent={agent ? { name: agent.name, sub: agent.sub } : undefined}
+      ledger={cost !== undefined ? { cost: <CostBadge cost={cost} details={costDetails} /> } : undefined}
+      variant="command-deck"
+      onOpen={() => onSelectFeature(entry.feature)}
+    />
   );
 }
 

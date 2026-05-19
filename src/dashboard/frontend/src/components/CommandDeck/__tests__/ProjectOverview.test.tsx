@@ -180,6 +180,58 @@ describe('bucketFeature', () => {
     expect(screen.getByText('Active agents').parentElement).toHaveTextContent('3');
   });
 
+  it('renders a project-scoped five-tile metric strip that updates with feature state', () => {
+    const { rerender } = render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const strip = screen.getByText('Active issues').closest('[data-component="metric-strip"]') as HTMLElement;
+    expect(strip).toHaveAttribute('data-columns', '5');
+    expect(strip).toHaveTextContent('Active issues2panopticon-cli');
+    expect(strip).toHaveTextContent('Work running1work agents');
+    expect(strip).toHaveTextContent('Spend$3.25');
+
+    rerender(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
+          makeFeature({ issueId: 'PAN-3', agentStatus: 'running' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2, 'PAN-3': 4 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(strip).toHaveTextContent('Active issues3panopticon-cli');
+    expect(strip).toHaveTextContent('Work running3work agents');
+    expect(strip).toHaveTextContent('Spend$7.25');
+  });
+
+  it('renders project issues with shared command-deck IssueRow and VerbBadge primitives', () => {
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1', agentStatus: 'running' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const row = screen.getByText('PAN-1').closest('[data-component="issue-row"]') as HTMLElement;
+    expect(row).toHaveAttribute('data-variant', 'command-deck');
+    expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
+  });
+
   it('renders partial cost breakdown details without crashing', () => {
     render(
       <ProjectOverview
@@ -196,7 +248,7 @@ describe('bucketFeature', () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByText('$1.23'));
+    fireEvent.mouseEnter(screen.getAllByText('$1.23')[1]!);
 
     expect(screen.getAllByText('No cost data')).toHaveLength(2);
   });
