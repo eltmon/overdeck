@@ -2152,7 +2152,34 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       if (currentHead === status.reviewedAtCommit) continue;
 
-      // HEAD moved — new commits since review. Reset review pipeline.
+      // PAN-1213: A tree-identical rebase (ship agent rebasing onto fresh main
+      // for a clean merge, or any pure history rewrite) moves HEAD but leaves
+      // the reviewed tree unchanged. Resetting review/test in this case wipes
+      // a passed verification for no reason and strands the PR at pending forever
+      // (the deacon does not auto-redispatch). Compare tree SHAs — if equal,
+      // there is nothing new to review.
+      try {
+        const [oldTree, newTree] = await Promise.all([
+          execAsync(`git rev-parse ${status.reviewedAtCommit}^{tree}`, { cwd: workspacePath }),
+          execAsync(`git rev-parse ${currentHead}^{tree}`, { cwd: workspacePath }),
+        ]);
+        if (oldTree.stdout.trim() === newTree.stdout.trim()) {
+          // Tree-identical rebase: advance reviewedAtCommit to the new HEAD so
+          // we stop comparing against a SHA the workspace no longer carries,
+          // but preserve review/test/readyForMerge.
+          setReviewStatus(issueId, { reviewedAtCommit: currentHead });
+          console.log(
+            `[deacon] Tree-identical rebase for ${issueId}: ` +
+            `${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} ` +
+            `(same tree) — review/test preserved`,
+          );
+          continue;
+        }
+      } catch {
+        // Fall through to reset if we can't read tree SHAs — safer than skipping
+      }
+
+      // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
       console.log(
         `[deacon] Post-review commit detected for ${issueId}: ` +
         `was ${status.reviewedAtCommit.substring(0, 8)}, now ${currentHead.substring(0, 8)} — resetting review`,
