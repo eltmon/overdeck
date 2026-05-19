@@ -661,16 +661,14 @@ describe('IssueCard', () => {
     return defaultProps;
   }
 
-  it('passes auto mode when Auto-plan is clicked', () => {
-    const onPlan = vi.fn();
+  it('renders queued board cards without legacy launch controls', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
-      onPlan,
     });
 
-    fireEvent.click(screen.getByTestId('action-auto-plan-TEST-123'));
-
-    expect(onPlan).toHaveBeenCalledWith(true);
+    expect(screen.getByText('QUEUED FOR PLAN')).toBeInTheDocument();
+    expect(screen.queryByTestId('action-auto-plan-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
   });
 
   it('does not render Board card launch controls after planning completes', () => {
@@ -684,25 +682,17 @@ describe('IssueCard', () => {
     expect(screen.queryByText('Agent model')).not.toBeInTheDocument();
   });
 
-  it('toggles issue TTS mute from the card without selecting the card', async () => {
+  it('selects the issue when the shared board card is clicked', () => {
     const onSelect = vi.fn();
     renderIssueCard({ onSelect });
 
-    const muteButton = await screen.findByTestId('card-tts-mute-TEST-123');
-    await waitFor(() => expect(muteButton).not.toBeDisabled());
-    fireEvent.click(muteButton);
+    expect(screen.queryByTestId('card-tts-mute-TEST-123')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('issue-card-TEST-123'));
 
-    await waitFor(() => {
-      const putCall = vi.mocked(global.fetch).mock.calls.find(([url, init]) => (
-        url.toString() === '/api/settings' && init?.method === 'PUT'
-      ));
-      expect(putCall).toBeTruthy();
-      expect(JSON.parse(putCall?.[1]?.body as string).tts.mutedIssues).toEqual(['TEST-123']);
-    });
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('shows unhealthy workspace stack state on the card', () => {
+  it('marks unhealthy workspace stack state on the shared card primitive', () => {
     renderIssueCard({
       workspace: {
         exists: true,
@@ -715,12 +705,12 @@ describe('IssueCard', () => {
       },
     });
 
-    const badge = screen.getByTestId('card-stack-health-TEST-123');
-    expect(badge).toHaveTextContent('Workspace unhealthy');
-    expect(badge).toHaveAttribute('title', 'test-stack-server stuck Created for 120s');
+    const card = screen.getByTestId('issue-card-TEST-123');
+    expect(card).toHaveAttribute('data-stuck-card', 'true');
+    expect(card).toHaveClass('border-destructive/60', 'bg-destructive/10');
   });
 
-  it('opens the inspector rather than the planning dialog for planning-only input', () => {
+  it('opens the drawer from the shared card instead of legacy planning input controls', () => {
     const onSelect = vi.fn();
     const onPlan = vi.fn();
     renderIssueCard({
@@ -735,7 +725,8 @@ describe('IssueCard', () => {
       }),
     });
 
-    fireEvent.click(screen.getByTestId('card-input-TEST-123'));
+    expect(screen.queryByTestId('card-input-TEST-123')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('issue-card-TEST-123'));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onPlan).not.toHaveBeenCalled();
@@ -1284,18 +1275,18 @@ describe('CompactChildCard', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('applies selected background when isSelected is true', () => {
+  it('applies selected primitive state when isSelected is true', () => {
     const child = createMockChild();
     const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={true} />);
-    const el = container.querySelector('.bg-primary\\/10');
-    expect(el).toBeTruthy();
+    const el = container.querySelector('[data-component="issue-card"]');
+    expect(el).toHaveClass('ring-2', 'ring-warning/70');
   });
 
-  it('does not apply selected background when isSelected is false', () => {
+  it('does not apply selected primitive state when isSelected is false', () => {
     const child = createMockChild();
     const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={false} />);
-    const el = container.querySelector('.bg-primary\\/10');
-    expect(el).toBeFalsy();
+    const el = container.querySelector('[data-component="issue-card"]');
+    expect(el).not.toHaveClass('ring-2', 'ring-warning/70');
   });
 
   it('shows agent pulse dot when agent is running', () => {

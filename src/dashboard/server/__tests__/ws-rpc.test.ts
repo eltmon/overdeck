@@ -61,6 +61,19 @@ describe('filterDomainEventForIssue', () => {
     expect(filterDomainEventForIssue(event, 'PAN-2')).toBeNull();
   });
 
+  it('keeps agent runtime events using the agent snapshot issue association', () => {
+    const event: DomainEvent = {
+      type: 'agent.activity_changed',
+      sequence: 2,
+      timestamp: '2026-05-19T00:00:00.000Z',
+      payload: { agentId: 'agent-pan-1-review-security', message: 'reviewing' },
+    } as DomainEvent;
+    const lookup = new Map([['agent-pan-1-review-security', 'pan-1']]);
+
+    expect(filterDomainEventForIssue(event, 'PAN-1', lookup)).toBe(event);
+    expect(filterDomainEventForIssue(event, 'PAN-2', lookup)).toBeNull();
+  });
+
   it('filters aggregate snapshot events to matching issue records', () => {
     const issuesSnapshot: DomainEvent = {
       type: 'issues.snapshot',
@@ -80,6 +93,7 @@ describe('filterDomainEventForIssue', () => {
       payload: {
         events: [
           { id: 'a', issueId: 'PAN-1' },
+          { id: 'agent-event', agentId: 'agent-pan-1-review-requirements' },
           { id: 'b', issueId: 'PAN-2' },
         ],
       },
@@ -89,9 +103,11 @@ describe('filterDomainEventForIssue', () => {
       type: 'issues.snapshot',
       payload: { issues: [{ id: 'PAN-1', identifier: 'PAN-1' }] },
     });
-    expect(filterDomainEventForIssue(activity, 'PAN-1')).toMatchObject({
+    const lookup = new Map([['agent-pan-1-review-requirements', 'pan-1']]);
+
+    expect(filterDomainEventForIssue(activity, 'PAN-1', lookup)).toMatchObject({
       type: 'activity.updated',
-      payload: { events: [{ id: 'a', issueId: 'PAN-1' }] },
+      payload: { events: [{ id: 'a', issueId: 'PAN-1' }, { id: 'agent-event', agentId: 'agent-pan-1-review-requirements' }] },
     });
     expect(filterDomainEventForIssue(issuesSnapshot, 'PAN-3')).toBeNull();
     expect(filterDomainEventForIssue(activity, 'PAN-3')).toBeNull();

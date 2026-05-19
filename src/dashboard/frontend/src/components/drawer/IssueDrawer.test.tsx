@@ -248,6 +248,45 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
   });
 
+  it('matches activity rail agent events through store agent issue ownership', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1-review-security': {
+          id: 'agent-pan-1-review-security',
+          issueId: 'PAN-1',
+          role: 'review',
+          status: 'running',
+          runtime: 'claude-code',
+          model: 'claude-opus-4-7',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+        'agent-pan-2-review-security': {
+          id: 'agent-pan-2-review-security',
+          issueId: 'PAN-2',
+          role: 'review',
+          status: 'running',
+          runtime: 'claude-code',
+          model: 'claude-opus-4-7',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+      recentActivity: [
+        { id: 'keep', timestamp: '2026-05-18T00:00:00.000Z', source: 'review', level: 'info', message: 'Security reviewer active', agentId: 'agent-pan-1-review-security' },
+        { id: 'drop', timestamp: '2026-05-18T00:01:00.000Z', source: 'review', level: 'info', message: 'Other reviewer active', agentId: 'agent-pan-2-review-security' },
+      ],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1', 'activity');
+
+    renderDrawer();
+
+    expect(screen.getByText('Security reviewer active')).toBeInTheDocument();
+    expect(screen.queryByText('Other reviewer active')).not.toBeInTheDocument();
+  });
+
   it('renders phase timeline from drawer data with done current and upcoming states', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, hasPlan: true, status: 'In Progress' }],
@@ -394,7 +433,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-action-view-pr')).toHaveClass('border-input');
     expect(screen.getByTestId('drawer-action-merge')).toBeEnabled();
     expect(screen.getByTestId('drawer-action-merge')).toHaveAttribute('data-component', 'shared-button');
-    expect(screen.getByTestId('drawer-action-merge')).toHaveClass('bg-success', 'text-[#000]', 'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]');
+    expect(screen.getByTestId('drawer-action-merge')).toHaveClass('bg-success', 'text-success-foreground', 'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]');
   });
 
   it('confirms action bar reset stop and merge requests', async () => {

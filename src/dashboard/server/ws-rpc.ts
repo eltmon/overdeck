@@ -47,7 +47,24 @@ function normalizedIssueId(value: unknown) {
   return typeof value === 'string' ? value.toLowerCase() : null;
 }
 
-function recordMatchesIssue(record: unknown, issueId: string) {
+type AgentIssueLookup = ReadonlyMap<string, string>;
+
+type AgentIssueRecord = {
+  id?: unknown;
+  issueId?: unknown;
+};
+
+function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
+  const lookup = new Map<string, string>();
+  for (const agent of agents) {
+    const agentId = normalizedIssueId(agent.id);
+    const issueId = normalizedIssueId(agent.issueId);
+    if (agentId && issueId) lookup.set(agentId, issueId);
+  }
+  return lookup;
+}
+
+function recordMatchesIssue(record: unknown, issueId: string, agentIssueLookup: AgentIssueLookup = new Map()) {
   if (!record || typeof record !== 'object') return false;
   const data = record as Record<string, unknown>;
   const target = issueId.toLowerCase();
@@ -58,24 +75,24 @@ function recordMatchesIssue(record: unknown, issueId: string) {
   const currentIssue = normalizedIssueId(data['currentIssue']);
   if (currentIssue === target) return true;
   const agentId = normalizedIssueId(data['agentId']);
-  return agentId === `agent-${target}`;
+  return agentId ? agentIssueLookup.get(agentId) === target : false;
 }
 
-function filterRecordsForIssue(records: unknown, issueId: string) {
-  return Array.isArray(records) ? records.filter((record) => recordMatchesIssue(record, issueId)) : [];
+function filterRecordsForIssue(records: unknown, issueId: string, agentIssueLookup: AgentIssueLookup) {
+  return Array.isArray(records) ? records.filter((record) => recordMatchesIssue(record, issueId, agentIssueLookup)) : [];
 }
 
-export function filterDomainEventForIssue(event: DomainEvent, issueId: string): DomainEvent | null {
+export function filterDomainEventForIssue(event: DomainEvent, issueId: string, agentIssueLookup: AgentIssueLookup = new Map()): DomainEvent | null {
   const payload = event.payload as Record<string, unknown>;
-  if (recordMatchesIssue(payload, issueId)) return event;
+  if (recordMatchesIssue(payload, issueId, agentIssueLookup)) return event;
 
   if (event.type === 'issues.snapshot') {
-    const issues = filterRecordsForIssue(payload['issues'], issueId);
+    const issues = filterRecordsForIssue(payload['issues'], issueId, agentIssueLookup);
     return issues.length > 0 ? { ...event, payload: { ...payload, issues } } as DomainEvent : null;
   }
 
   if (event.type === 'activity.updated') {
-    const events = filterRecordsForIssue(payload['events'], issueId);
+    const events = filterRecordsForIssue(payload['events'], issueId, agentIssueLookup);
     return events.length > 0 ? { ...event, payload: { ...payload, events } } as DomainEvent : null;
   }
 
@@ -466,7 +483,11 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
-          Stream.map((event) => filterDomainEventForIssue(event, input.issueId)),
+          Stream.mapEffect((event) =>
+            readModel.getSnapshot.pipe(
+              Effect.map((snapshot) => filterDomainEventForIssue(event, input.issueId, buildAgentIssueLookup(snapshot.agents))),
+            ),
+          ),
           Stream.filter((event): event is DomainEvent => event !== null),
         );
       },

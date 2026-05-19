@@ -166,10 +166,19 @@ function issueMatches(issue: Issue, issueId: string) {
   return issue.identifier.toLowerCase() === issueId.toLowerCase() || issue.id.toLowerCase() === issueId.toLowerCase();
 }
 
-function activityMatchesIssue(entry: ActivityEntry, issueId: string) {
-  if (entry.issueId) return entry.issueId.toLowerCase() === issueId.toLowerCase();
+function buildAgentIssueLookup(agents: Agent[]) {
+  const lookup = new Map<string, string>();
+  for (const agent of agents) {
+    if (agent.issueId) lookup.set(agent.id.toLowerCase(), agent.issueId.toLowerCase());
+  }
+  return lookup;
+}
+
+function activityMatchesIssue(entry: ActivityEntry, issueId: string, agentIssueLookup: ReadonlyMap<string, string>) {
+  const target = issueId.toLowerCase();
+  if (entry.issueId) return entry.issueId.toLowerCase() === target;
   if (!entry.agentId) return false;
-  return entry.agentId.toLowerCase() === `agent-${issueId.toLowerCase()}`;
+  return agentIssueLookup.get(entry.agentId.toLowerCase()) === target;
 }
 
 function phaseForActivity(entry: ActivityEntry): DrawerActivityPhase {
@@ -376,9 +385,10 @@ export function useDrawerData(): DrawerData {
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
     const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === drawerIssueId.toLowerCase());
+    const agentIssueLookup = buildAgentIssueLookup(agents);
     const byId = new Map<string, ActivityEntry>();
     for (const entry of [...recentActivity, ...detailedActivity]) {
-      if (activityMatchesIssue(entry, drawerIssueId)) byId.set(activityId(entry, byId.size), entry);
+      if (activityMatchesIssue(entry, drawerIssueId, agentIssueLookup)) byId.set(activityId(entry, byId.size), entry);
     }
 
     const activityRail = Array.from(byId.entries())

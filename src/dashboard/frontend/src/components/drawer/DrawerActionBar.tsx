@@ -125,7 +125,7 @@ export default function DrawerActionBar() {
       <Button
         variant="primary"
         data-testid="drawer-action-merge"
-        className="border-success/70 bg-success text-[#000] hover:bg-success/90"
+        className="border-success/70 bg-success text-success-foreground hover:bg-success/90"
         disabled={!issueId || !canMerge || mergeMutation.isPending}
         onClick={() => void handleMerge()}
       >

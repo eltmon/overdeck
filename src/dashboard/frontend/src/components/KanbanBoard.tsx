@@ -623,9 +623,15 @@ export function FeatureCard({
   const planLabelExists = hasPlan || feature.labels?.some(l => l.toLowerCase() === 'planned');
 
   return (
-    <div className={`bg-popover rounded-lg border-l-4 border-l-primary overflow-hidden ${isSelected ? 'ring-2 ring-primary/40' : ''}`}>
+    <IssueCardPrimitive
+      issueId={feature.identifier}
+      priority={feature.priority}
+      selected={isSelected}
+      onClick={onSelect}
+      className="rounded-lg bg-popover hover:translate-y-0"
+    >
       <div
-        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
+        className="relative flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
         <div className="flex items-center gap-1 shrink-0 mt-0.5" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
           {isExpanded ? (
@@ -725,11 +731,11 @@ export function FeatureCard({
       </div>
       {/* Child stories rendered inside the card */}
       {isExpanded && children && (
-        <div className="border-t border-border/50 bg-card/50">
+        <div className="relative border-t border-border/50 bg-card/50">
           {children}
         </div>
       )}
-    </div>
+    </IssueCardPrimitive>
   );
 }
 
@@ -757,26 +763,32 @@ export function CompactChildCard({
   );
 
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded hover:bg-popover/50 transition-colors group cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
+    <IssueCardPrimitive
+      issueId={issue.identifier}
+      priority={issue.priority}
+      selected={isSelected}
+      runningCard={hasAgent}
       onClick={onSelect}
+      className="rounded-none border-0 bg-transparent shadow-none hover:translate-y-0 hover:bg-popover/50"
     >
-      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
-      <a
-        href={issue.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="text-xs font-medium text-primary/70 hover:text-primary shrink-0"
-      >
-        {issue.identifier}
-      </a>
-      <span className="text-xs text-foreground truncate flex-1">{issue.title}</span>
-      <TrackerShadowBadges issue={issue} compact />
-      {hasAgent && (
-        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
-      )}
-    </div>
+      <div className="relative flex items-center gap-2 px-3 py-1.5 transition-colors">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+        <a
+          href={issue.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs font-medium text-primary/70 hover:text-primary shrink-0"
+        >
+          {issue.identifier}
+        </a>
+        <span className="text-xs text-foreground truncate flex-1">{issue.title}</span>
+        <TrackerShadowBadges issue={issue} compact />
+        {hasAgent && (
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
+        )}
+      </div>
+    </IssueCardPrimitive>
   );
 }
 
@@ -857,145 +869,151 @@ export function ListIssueRow({
   const difficulty = parseDifficultyLabel(issue.labels || []);
 
   return (
-    <div
+    <IssueCardPrimitive
       ref={rowRef}
+      testId={`list-issue-card-${issue.identifier}`}
+      issueId={issue.identifier}
+      priority={issue.priority}
+      selected={isSelected}
+      bulkSelected={isBulkSelected}
+      runningCard={isRunning}
       onClick={() => onSelectIssue(isSelected ? null : issue.identifier)}
-      className={`flex items-center gap-3 px-4 py-3 hover:bg-popover/50 transition-colors cursor-pointer ${
-        isSelected ? 'bg-popover' : isBulkSelected ? 'bg-primary/[0.03]' : ''
-      }`}
+      className="rounded-none border-0 border-b border-border/60 bg-transparent shadow-none hover:translate-y-0 hover:bg-popover/50"
     >
-      {/* Bulk selection checkbox */}
-      {onBulkToggle && (
-        <input
-          type="checkbox"
-          checked={isBulkSelected || false}
-          onChange={(e) => {
-            e.stopPropagation();
-            onBulkToggle();
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
-          aria-label={`Select ${issue.identifier}`}
-          data-testid={`card-select-${issue.identifier}`}
-        />
-      )}
-      {/* Status indicator */}
-      <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
+      <div className="relative flex items-center gap-3 px-4 py-3 transition-colors">
+        {/* Bulk selection checkbox */}
+        {onBulkToggle && (
+          <input
+            type="checkbox"
+            checked={isBulkSelected || false}
+            onChange={(e) => {
+              e.stopPropagation();
+              onBulkToggle();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
+            aria-label={`Select ${issue.identifier}`}
+            data-testid={`card-select-${issue.identifier}`}
+          />
+        )}
+        {/* Status indicator */}
+        <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
 
-      {/* Issue identifier — clicking selects the card, use ExternalLink icon to open in tracker */}
-      <span className="text-xs text-muted-foreground shrink-0 font-mono">
-        {issue.identifier}
-      </span>
-
-      {/* Title - dimmed/strikethrough for canceled issues */}
-      <span className={`text-sm truncate flex-1 min-w-0 ${
-        canonical === 'canceled'
-          ? 'text-muted-foreground line-through'
-          : 'text-foreground'
-      }`}>{issue.title}</span>
-
-      {/* Priority indicator */}
-      {issue.priority === 1 && <span className="text-xs text-destructive-foreground font-medium shrink-0">Urgent</span>}
-      {issue.priority === 2 && <span className="text-xs text-warning-foreground font-medium shrink-0">High</span>}
-
-      {/* Difficulty badge */}
-      {difficulty && (
-        <DifficultyBadge level={difficulty} />
-      )}
-
-      {/* Cost */}
-      {costsLoading && !cost && (
-        <span className="w-10 h-4 bg-popover rounded animate-pulse shrink-0" />
-      )}
-      {cost && cost.totalCost > 0 && (
-        <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${getCostColor(cost.totalCost)}`}>
-          {formatCost(cost.totalCost)}
+        {/* Issue identifier — clicking selects the card, use ExternalLink icon to open in tracker */}
+        <span className="text-xs text-muted-foreground shrink-0 font-mono">
+          {issue.identifier}
         </span>
-      )}
 
-      {/* Assignee */}
-      {issue.assignee && (
-        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
-          <User className="w-3 h-3" />
-          {issue.assignee.name.split(' ')[0]}
-        </span>
-      )}
+        {/* Title - dimmed/strikethrough for canceled issues */}
+        <span className={`text-sm truncate flex-1 min-w-0 ${
+          canonical === 'canceled'
+            ? 'text-muted-foreground line-through'
+            : 'text-foreground'
+        }`}>{issue.title}</span>
 
-      {/* Running agent indicator */}
-      {isRunning && (
-        <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
-      )}
-      {hasMultipleWorkAgents && (
-        <span className="rounded-full border border-border/70 bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
-          {workAgents.length} slots
-        </span>
-      )}
+        {/* Priority indicator */}
+        {issue.priority === 1 && <span className="text-xs text-destructive-foreground font-medium shrink-0">Urgent</span>}
+        {issue.priority === 2 && <span className="text-xs text-warning-foreground font-medium shrink-0">High</span>}
 
-      {/* Specialist indicators — PAN-1048 keyed on role primitive */}
-      {issueSpecialists.map((s) => (
-        <span key={s.id} className="text-xs text-primary shrink-0" title={`${s.role} agent`}>
-          {s.role === 'review' ? '👁️' : s.role === 'test' ? '🧪' : s.role === 'ship' ? '🔀' : '🤖'}
-        </span>
-      ))}
+        {/* Difficulty badge */}
+        {difficulty && (
+          <DifficultyBadge level={difficulty} />
+        )}
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-1 shrink-0">
-        {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
-            agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
-        {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
-          <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlan(issue);
-              }}
-              className="p-1 text-muted-foreground hover:text-primary transition-colors"
-              title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
-              data-testid={`list-plan-${issue.identifier}`}
-            >
-              <Play className="w-3.5 h-3.5" />
-            </button>
-            {canonical !== 'in_progress' && (
+        {/* Cost */}
+        {costsLoading && !cost && (
+          <span className="w-10 h-4 bg-popover rounded animate-pulse shrink-0" />
+        )}
+        {cost && cost.totalCost > 0 && (
+          <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${getCostColor(cost.totalCost)}`}>
+            {formatCost(cost.totalCost)}
+          </span>
+        )}
+
+        {/* Assignee */}
+        {issue.assignee && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+            <User className="w-3 h-3" />
+            {issue.assignee.name.split(' ')[0]}
+          </span>
+        )}
+
+        {/* Running agent indicator */}
+        {isRunning && (
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
+        )}
+        {hasMultipleWorkAgents && (
+          <span className="rounded-full border border-border/70 bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
+            {workAgents.length} slots
+          </span>
+        )}
+
+        {/* Specialist indicators — PAN-1048 keyed on role primitive */}
+        {issueSpecialists.map((s) => (
+          <span key={s.id} className="text-xs text-primary shrink-0" title={`${s.role} agent`}>
+            {s.role === 'review' ? '👁️' : s.role === 'test' ? '🧪' : s.role === 'ship' ? '🔀' : '🤖'}
+          </span>
+        ))}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
+              agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
+          {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
+            <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPlan(issue, true);
+                  onPlan(issue);
                 }}
-                className="p-1 text-primary hover:text-primary/80 border-l border-border/70 transition-colors"
-                title="Auto-plan issue"
-                data-testid={`list-auto-plan-${issue.identifier}`}
+                className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
+                data-testid={`list-plan-${issue.identifier}`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5" />
               </button>
-            )}
-          </div>
-        )}
+              {canonical !== 'in_progress' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPlan(issue, true);
+                  }}
+                  className="p-1 text-primary hover:text-primary/80 border-l border-border/70 transition-colors"
+                  title="Auto-plan issue"
+                  data-testid={`list-auto-plan-${issue.identifier}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
 
-        {/* View button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectIssue(issue.identifier);
-          }}
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-          title="View details"
-        >
-          <Eye className="w-3.5 h-3.5" />
-        </button>
+          {/* View button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectIssue(issue.identifier);
+            }}
+            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            title="View details"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
 
-        {/* External link */}
-        <a
-          href={issue.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-          title="Open in tracker"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+          {/* External link */}
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            title="Open in tracker"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
       </div>
-    </div>
+    </IssueCardPrimitive>
   );
 }
 
@@ -2001,7 +2019,7 @@ function ColumnContent({
 
     return (
       <DraggableCardWrapper key={issue.id} issue={issue}>
-        <BoardIssueCard
+        <IssueCard
           issue={issue}
         workAgent={workAgent}
         workAgents={workAgents}
@@ -2640,7 +2658,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-function BoardIssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
