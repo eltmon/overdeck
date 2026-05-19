@@ -436,13 +436,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // HUP-immune so it outlives the (short-lived) tmux session.
       expect(launcher).not.toContain('exec claude');
       expect(launcher).toContain("trap '' HUP");
-      expect(launcher).toContain('timeout 1200 claude --print');
+      expect(launcher).toContain('timeout 1800 claude --print');
       expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
       expect(launcher).toContain('CLAUDE_EXIT=$?');
       expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
       expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');
       expect(launcher).toContain('"REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report"');
-      expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1200s deadline"');
+      expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1800s deadline"');
       expect(launcher).toContain(`touch '${join(agentDir, 'reviewer-signaled')}'`);
       expect(launcher).toContain(`rm -f '${join(agentDir, 'reviewer-launcher.pid')}'`);
 

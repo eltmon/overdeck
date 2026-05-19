@@ -176,7 +176,7 @@ describe('generateLauncherScript', () => {
         outputPath: '/agents/agent-pan-1-review-security/review-security.md',
         signalMarkerPath: '/agents/agent-pan-1-review-security/reviewer-signaled',
         launcherPidPath: '/agents/agent-pan-1-review-security/reviewer-launcher.pid',
-        timeoutSeconds: 1200,
+        timeoutSeconds: 1800,
       },
     });
 
@@ -187,11 +187,11 @@ describe('generateLauncherScript', () => {
     expect(script).toContain("trap '' HUP");
     // Writes its own pid for Deacon's liveness check, removes it after signaling.
     expect(script).toContain("echo $$ > '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
-    expect(script).toContain("timeout 1200 claude --print");
+    expect(script).toContain("timeout 1800 claude --print");
     expect(script).toContain("--session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'");
     expect(script).toContain('CLAUDE_EXIT=$?');
     expect(script).toContain('if [ "$CLAUDE_EXIT" = "124" ]; then');
-    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_TIMEOUT security reviewer exceeded 1200s deadline" || true');
+    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_TIMEOUT security reviewer exceeded 1800s deadline" || true');
     expect(script).toContain('elif [ -s \'/agents/agent-pan-1-review-security/review-security.md\' ]; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true');
