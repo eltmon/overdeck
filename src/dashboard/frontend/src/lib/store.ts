@@ -175,7 +175,7 @@ function memoizeArraySelector<S, K extends keyof S, R>(
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectAgentList = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
+export const selectAgents = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
   'agentsById',
   (agents) => Object.values(agents),
 )
@@ -187,7 +187,7 @@ export const selectAgentById =
 
 /**
  * PAN-1048 — selectSpecialistList retired. Consumers derive role-based lists
- * from `selectAgentList` filtered by `agent.role` (review / test / ship).
+ * from `selectAgents` filtered by `agent.role` (review / test / ship).
  */
 export const selectAgentsByRole =
   (role: 'review' | 'test' | 'ship' | 'work' | 'plan') =>

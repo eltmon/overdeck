@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useDashboardStore } from '../../lib/store';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
@@ -10,6 +11,8 @@ import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
 import PhaseTimeline from './PhaseTimeline';
 import { useDrawerData } from './useDrawerData';
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());

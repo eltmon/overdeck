@@ -1,6 +1,6 @@
 /**
  * WorkspaceStatusOverview — shared workspace status + actions used by both
- * the kanban IssueCard and the InspectorPanel. This ensures both views show
+ * the kanban IssueCard and the Issue Drawer. This ensures both views show
  * the same pipeline status, action buttons, and state badges.
  */
 
@@ -19,10 +19,10 @@ import {
   X,
 } from 'lucide-react';
 import { Issue, Agent, WorkAgentLifecycle, STATUS_LABELS } from '../types';
-import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
-import { ReviewPipelineSection } from './inspector/ReviewPipelineSection';
+import type { ReviewStatus, WorkspaceInfo } from '../lib/workspace-types';
+import { ReviewPipelineSection } from './CommandDeck/ZoneCOverviewTabs/ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
-import { getFriendlyModelName } from './inspector/utils';
+import { getFriendlyModelName } from '../lib/dashboard-utils';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 
 export interface WorkspaceStatusOverviewProps {

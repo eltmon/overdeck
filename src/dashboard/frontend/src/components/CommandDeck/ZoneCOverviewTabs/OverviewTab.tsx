@@ -36,14 +36,14 @@ import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
-import { ContainerSection } from '../../inspector/ContainerSection';
-import { ReviewPipelineSection } from '../../inspector/ReviewPipelineSection';
-import type { ContainerMenuState } from '../../inspector/types';
+import { ContainerSection } from './ContainerSection';
+import { ReviewPipelineSection } from './ReviewPipelineSection';
+import type { ContainerMenuState } from '../../../lib/workspace-types';
 import { SwitchModelModal } from '../../SwitchModelModal';
 import { useSwitchModel } from '../../../hooks/useSwitchModel';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
-import { getFriendlyModelName } from '../../inspector/utils';
+import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 
 interface OverviewTabProps {
   issueId: string;

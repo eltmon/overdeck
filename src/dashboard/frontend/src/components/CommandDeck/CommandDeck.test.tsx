@@ -153,7 +153,7 @@ vi.mock('../chat/ModelPicker', () => ({
 
 vi.mock('../../lib/store', () => ({
   useDashboardStore: vi.fn(() => []),
-  selectAgentList: vi.fn(() => []),
+  selectAgents: vi.fn(() => []),
   selectIssues: vi.fn(() => []),
   selectDashboardLifecycle: vi.fn(() => ({ active: false })),
 }));

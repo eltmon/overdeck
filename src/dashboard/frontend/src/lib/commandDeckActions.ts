@@ -3,7 +3,7 @@
  * unified Command Deck (PAN-830, blocker-2 in 001-review-agent-changes-requested).
  *
  * The PRD's core goal is "single, complete surface" — every action reachable
- * elsewhere (IssueCard, InspectorPanel, BadgeBar, StatusFlowControl,
+ * elsewhere (IssueCard, Issue Drawer, BadgeBar, StatusFlowControl,
  * WorkspacePane) must also be reachable from the three Command Deck zones.
  *
  * This module exposes two pure functions:
@@ -23,7 +23,7 @@
  * etc.) so behaviour is identical to the inspector / kanban card surfaces.
  */
 
-import type { ReviewStatus, WorkspaceInfo } from '../components/inspector/types';
+import type { ReviewStatus, WorkspaceInfo } from './workspace-types';
 import type { Agent, WorkAgentLifecycle } from '../types';
 import { isReviewPipelineStuck } from './pipeline-state';
 

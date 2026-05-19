@@ -3,9 +3,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAlert, useConfirm } from '../DialogProvider';
 import { useResetIssue } from '../../hooks/useResetIssue';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { cn } from '../../lib/utils';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 const GHOST_BUTTON_CLASSES = 'rounded-[var(--radius-sm)] border border-border px-[12px] py-[7px] text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45';
 

@@ -16,7 +16,7 @@ import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredHarness, loadStoredModel, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
-import { useDashboardStore, selectAgentList } from '../../lib/store';
+import { useDashboardStore, selectAgents } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -416,7 +416,7 @@ export function CommandDeck({
   }, [projectsWithSessions]);
 
   // Agents from dashboard store (for terminal panel in detail view)
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
   // Map aggregated costs per issue for the project tree sidebar and project overview.
   const { issueCosts, issueCostDetails } = useMemo(() => {

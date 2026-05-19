@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Loader2 } from 'lucide-react';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
-import { getFriendlyModelName } from './inspector/utils';
+import { getFriendlyModelName } from '../lib/dashboard-utils';
 
 interface SwitchModelModalProps {
   currentModel: string;

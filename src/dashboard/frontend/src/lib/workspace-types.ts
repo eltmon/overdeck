@@ -1,4 +1,4 @@
-import type { GitStatus } from '../../types';
+import type { GitStatus } from '../types';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification';

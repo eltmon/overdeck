@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { WifiOff, RefreshCw } from 'lucide-react';
-import { XTerminal } from '../XTerminal';
+import { XTerminal } from './XTerminal';
 
 export type SessionState = 'connecting' | 'ended';
 

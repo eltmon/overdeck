@@ -27,9 +27,8 @@ import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
 import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
-import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
+import { AgentsSkeleton } from './components/skeletons/AgentsSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
-import { DetailPanelLayout } from './components/DetailPanelLayout';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
@@ -41,7 +40,7 @@ import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgentList, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useDashboardStore, selectAgents, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -327,25 +326,14 @@ export default function App() {
 
   const queryClient = useQueryClient();
 
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
-  useEffect(() => {
-    if (!selectedIssue) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelectedIssue(null);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIssue]);
-
   const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
+  const openIssue = useDashboardStore((state) => state.openIssue);
 
   // Dashboard lifecycle state from event store (restart events)
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
@@ -493,7 +481,7 @@ export default function App() {
 
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
   const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
     useState<Set<string>>(new Set());
@@ -565,19 +553,6 @@ export default function App() {
       }
     }
   }, [agents]);
-
-  // Find the work agent for selected issue (agent-<id>, not planning-<id>)
-  const selectedIssueAgent = selectedIssue
-    ? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase() && a.id.startsWith('agent-'))
-      ?? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase())
-      ?? null
-    : null;
-
-  // Find issue URL for selected issue
-  const selectedIssueData = selectedIssue
-    ? issues.find((i) => i.identifier.toLowerCase() === selectedIssue.toLowerCase())
-    : null;
-
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({
@@ -690,7 +665,7 @@ export default function App() {
       } else if (action.startsWith('open-workspace:')) {
         const issueId = action.slice('open-workspace:'.length);
         setActiveTab('kanban');
-        if (issueId) setSelectedIssue(issueId);
+        if (issueId) openIssue(issueId);
       } else if (action.startsWith('auto-start-nag:')) {
         // Format: auto-start-nag:<count>:<max>
         setIsPaletteOpen(false);
@@ -702,7 +677,7 @@ export default function App() {
       }
     });
     return unsub;
-  }, []);
+  }, [openIssue, setActiveTab]);
 
   // Auto-start nag toast for desktop app (launched 2-5 times without enabling)
   function showAutoStartNag(count: number, max: number): void {
@@ -725,9 +700,9 @@ export default function App() {
   }
 
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
-    setSelectedIssue(issueId);
+    openIssue(issueId);
     setActiveTab('kanban');
-  }, []);
+  }, [openIssue, setActiveTab]);
 
   return (
     <div className="h-screen flex flex-row overflow-hidden bg-background">
@@ -883,37 +858,18 @@ export default function App() {
               <div className="flex-1 overflow-auto p-6 w-full">
                 <MetricsSummaryRow />
                 <KanbanBoard
-                  selectedIssue={selectedIssue}
-                  onSelectIssue={setSelectedIssue}
+                  selectedIssue={null}
+                  onSelectIssue={(issueId) => {
+                    if (issueId) openIssue(issueId);
+                  }}
                   onPlanDialogChange={setPlanDialogIssueId}
                 />
               </div>
-              {selectedIssue && selectedIssueData && (
-                <div
-                  className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6"
-                  onClick={() => setSelectedIssue(null)}
-                >
-                  <div
-                    className="h-[min(90vh,1100px)] w-[min(92vw,1400px)] overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <DetailPanelLayout
-                      agent={selectedIssueAgent ?? undefined}
-                      issueId={selectedIssue}
-                      issueUrl={selectedIssueData.url}
-                      issue={selectedIssueData}
-                      onClose={() => setSelectedIssue(null)}
-                      suppressTerminal={planDialogIssueId === selectedIssue}
-                      inline
-                    />
-                  </div>
-                </div>
-              )}
             </>
           </BootstrapGate>
         )}
         {activeTab === 'agents' && (
-          <BootstrapGate fallback={<AgentListSkeleton />}>
+          <BootstrapGate fallback={<AgentsSkeleton />}>
             <div className="h-full w-full overflow-y-auto">
               <FleetAgentsView />
             </div>
@@ -1029,7 +985,7 @@ export default function App() {
         onClose={() => setIsPaletteOpen(false)}
         onNavigate={(tab, issueId) => {
           setActiveTab(tab as Tab);
-          if (issueId) setSelectedIssue(issueId);
+          if (issueId) openIssue(issueId);
         }}
       />
 

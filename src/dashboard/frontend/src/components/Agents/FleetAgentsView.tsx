@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { useDashboardStore, selectAgentList, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
@@ -221,7 +221,7 @@ function DropdownFilter({ label, selected, options, onToggle }: {
 
 export function FleetAgentsView() {
   const now = useSharedTick();
-  const agents = useDashboardStore(selectAgentList) as Agent[];
+  const agents = useDashboardStore(selectAgents) as Agent[];
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);

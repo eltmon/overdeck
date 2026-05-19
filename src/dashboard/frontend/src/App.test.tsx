@@ -13,23 +13,30 @@ import App, {
 
 const {
   mockDashboardState,
+  mockOpenIssue,
   mockRefreshDashboardState,
   mockToastError,
   mockToastInfo,
   mockToastSuccess,
-} = vi.hoisted(() => ({
-  mockDashboardState: {
-    agents: [],
-    issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
-    dashboardLifecycle: { active: false },
-    channelPermissionRequestsById: {},
-    drawer: { issueId: null, tab: 'overview' },
-  },
-  mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
-  mockToastError: vi.fn(),
-  mockToastInfo: vi.fn(),
-  mockToastSuccess: vi.fn(),
-}))
+} = vi.hoisted(() => {
+  const mockOpenIssue = vi.fn();
+
+  return {
+    mockOpenIssue,
+    mockDashboardState: {
+      agents: [],
+      issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
+      dashboardLifecycle: { active: false },
+      channelPermissionRequestsById: {},
+      drawer: { issueId: null, tab: 'overview' },
+      openIssue: mockOpenIssue,
+    },
+    mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
+    mockToastError: vi.fn(),
+    mockToastInfo: vi.fn(),
+    mockToastSuccess: vi.fn(),
+  };
+})
 
 vi.mock('./components/KanbanBoard', () => ({
   KanbanBoard: ({ onSelectIssue }: { onSelectIssue?: (issueId: string | null) => void }) => (
@@ -70,11 +77,8 @@ vi.mock('./components/flywheel/FlywheelConversationPane', () => ({ FlywheelConve
 vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
-vi.mock('./components/skeletons/AgentListSkeleton', () => ({ AgentListSkeleton: () => null }));
+vi.mock('./components/skeletons/AgentsSkeleton', () => ({ AgentsSkeleton: () => null }));
 vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () => null }));
-vi.mock('./components/DetailPanelLayout', () => ({
-  DetailPanelLayout: ({ inline }: { inline?: boolean }) => <div data-testid="detail-panel-layout" data-inline={inline ? 'true' : 'false'} />,
-}));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
@@ -95,7 +99,7 @@ vi.mock('./lib/store', () => ({
     }
     return [];
   }),
-  selectAgentList: (state: { agents: unknown[] }) => state.agents,
+  selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
   selectIssues: (state: { issues: unknown[] }) => state.issues,
@@ -144,6 +148,8 @@ beforeEach(() => {
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
+  mockDashboardState.openIssue = mockOpenIssue
+  mockOpenIssue.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
@@ -336,12 +342,12 @@ describe('App kanban issue details', () => {
     }));
   });
 
-  it('opens issue details inline in a modal from kanban selection', () => {
+  it('opens the issue drawer from kanban selection', () => {
     renderApp();
 
     fireEvent.click(screen.getByText('Open issue'));
 
-    expect(screen.getByTestId('detail-panel-layout')).toHaveAttribute('data-inline', 'true');
+    expect(mockOpenIssue).toHaveBeenCalledWith('PAN-123');
   });
 });
 

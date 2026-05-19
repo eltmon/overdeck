@@ -10,13 +10,13 @@ Parity mapping is resolved for `workspace-9a7q`: every legacy row below is now e
 - [x] `src/dashboard/frontend/src/components/inspector/*` sub-file rows below are mapped to a redesigned surface or explicit out-of-scope decision.
 - [x] `src/dashboard/frontend/src/components/AgentList.tsx` and its tests have replacement coverage in the redesigned Agents surface.
 - [x] `src/dashboard/frontend/src/components/GodView/AgentGrid.tsx` has replacement coverage in the redesigned Agents surface; the rest of `GodView/*` remains per PRD non-goal.
-- [ ] `src/dashboard/frontend/src/components/InspectorPanel.tsx`, `InspectorPanel.test.tsx`, and `components/inspector/*` are removed by `workspace-9a7q`.
-- [ ] `src/dashboard/frontend/src/components/AgentList.tsx` and its tests are removed by `workspace-9a7q`.
-- [ ] `src/dashboard/frontend/src/components/GodView/AgentGrid.tsx` is removed by `workspace-9a7q` and the rest of `GodView/*` is untouched.
-- [ ] `grep -r InspectorPanel src/` returns zero results after deletion.
-- [ ] `grep -r AgentList src/` returns zero results after deletion.
-- [ ] `npm run typecheck` passes after deletion.
-- [ ] `npm test` passes after deletion.
+- [x] `src/dashboard/frontend/src/components/InspectorPanel.tsx`, `InspectorPanel.test.tsx`, and `components/inspector/*` are removed by `workspace-9a7q`.
+- [x] `src/dashboard/frontend/src/components/AgentList.tsx` and its tests are removed by `workspace-9a7q`.
+- [x] `src/dashboard/frontend/src/components/GodView/AgentGrid.tsx` is removed by `workspace-9a7q` and the rest of `GodView/*` is untouched.
+- [x] `grep -r InspectorPanel src/` returns zero results after deletion.
+- [x] `grep -r AgentList src/` returns zero results after deletion.
+- [x] `npm run typecheck` passes after deletion.
+- [x] `npm test` passes after deletion.
 
 ## InspectorPanel feature inventory
 

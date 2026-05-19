@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useDashboardStore, selectAgentList } from '../lib/store';
+import { useDashboardStore, selectAgents } from '../lib/store';
 
 interface CloisterStatus {
   running: boolean;
@@ -143,7 +143,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     retry: false,
   });
 
-  const agents = useDashboardStore(selectAgentList);
+  const agents = useDashboardStore(selectAgents);
   const runningAgentCount = agents.filter(a => a.status === 'running').length;
   const aliveConversationCount = conversations.filter(c => c.sessionAlive).length;
 

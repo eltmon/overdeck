@@ -4,7 +4,7 @@ import { Stream } from 'effect';
 
 import { WS_METHODS, type DomainEvent, type ReviewStatusSnapshot } from '@panctl/contracts';
 
-import { useDashboardStore, selectIssues, selectAgentList, selectReviewStatus } from '../../lib/store';
+import { useDashboardStore, selectIssues, selectAgents, selectReviewStatus } from '../../lib/store';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import type { Agent, Issue } from '../../types';
 
@@ -353,7 +353,7 @@ export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const applyEvent = useDashboardStore((state) => state.applyEvent);
   const issues = useDashboardStore(selectIssues) as Issue[];
-  const agents = useDashboardStore(selectAgentList) as Agent[];
+  const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));

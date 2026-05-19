@@ -4,7 +4,7 @@
  * Fetches workspace, review status, lifecycle, and planning state so the
  * renderer can call getZoneAActions() with a complete input shape.
  *
- * Mirrors the relevant queries from InspectorPanel so the action strip works
+ * Mirrors the relevant queries from Issue Drawer so the action strip works
  * without being coupled to the inspector's broader data dependencies.
  */
 
@@ -12,10 +12,10 @@ import { useCallback, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Agent, Issue, WorkAgentLifecycle, StartAgentResponse } from '../../types';
-import type { ReviewStatus, WorkspaceInfo } from '../inspector/types';
+import type { ReviewStatus, WorkspaceInfo } from '../../lib/workspace-types';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
-import { shouldForceReviewTrigger } from '../inspector/utils';
+import { shouldForceReviewTrigger } from '../../lib/dashboard-utils';
 
 interface PlanningState {
   hasPlan: boolean;

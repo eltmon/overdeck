@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 
-import { useDashboardStore, selectAgentList, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
@@ -170,7 +170,7 @@ function MetricIcon({ label }: { label: string }) {
 export function PipelineView() {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
   const { data: issueCosts = {} } = useQuery({
     queryKey: ['issueCosts'],

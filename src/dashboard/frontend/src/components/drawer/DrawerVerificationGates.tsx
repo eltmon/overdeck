@@ -1,5 +1,8 @@
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { cn } from '../../lib/utils';
 import { useDrawerData, type DrawerVerificationGateStatus } from './useDrawerData';
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 const GATE_TONE_CLASSES = {
   passed: 'drawer-gate-border-pass text-success-foreground',

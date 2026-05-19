@@ -1,5 +1,5 @@
 /** Shimmer skeleton for the Agents tab — matches the two-panel grid layout. */
-export function AgentListSkeleton() {
+export function AgentsSkeleton() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 w-full">
       {/* Left panel — agent list */}

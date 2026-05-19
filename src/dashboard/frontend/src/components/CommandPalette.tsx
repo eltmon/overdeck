@@ -25,7 +25,7 @@ import {
   Bot,
   RefreshCw,
 } from 'lucide-react';
-import { useDashboardStore, selectAgentList, selectIssues } from '../lib/store';
+import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ async function callApi(path: string, method = 'POST'): Promise<void> {
 
 export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const issues = useDashboardStore(selectIssues) as Issue[];
   const openIssue = useDashboardStore((state) => state.openIssue);
 

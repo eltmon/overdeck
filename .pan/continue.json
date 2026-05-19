@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T01:08:44.502Z",
+  "updated": "2026-05-19T01:29:14.234Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "364c41ca9"
+    "sha": "e3b5904ea"
   },
   "decisions": [
     {
@@ -203,10 +203,12 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-pok2 parity checklist blocker is resolved and verified; close workspace-pok2, then continue workspace-9a7q deletion from bd ready.",
-    "beadId": "workspace-pok2",
+    "description": "workspace-9a7q legacy inspector deletion is implemented and verified; commit and close workspace-9a7q, then continue with the next ready bead.",
+    "beadId": "workspace-9a7q",
     "filesToRead": [
-      "docs/design/inspector-parity-checklist.md"
+      "docs/design/inspector-parity-checklist.md",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/lib/commandDeckSurfaceRegistry.ts"
     ]
   },
   "beadsMapping": {},
@@ -388,6 +390,12 @@
       "timestamp": "2026-05-19T01:08:44.502Z",
       "reason": "bead",
       "note": "Resolved workspace-pok2 InspectorPanel parity checklist blockers by converting every unresolved legacy feature row to Covered, Out of scope, or Covered / Out of scope with rationale, leaving deletion execution checks for workspace-9a7q.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:29:14.234Z",
+      "reason": "bead",
+      "note": "Implemented workspace-9a7q legacy inspector deletion by removing InspectorPanel, components/inspector-only files, AgentList, DetailPanelLayout, and GodView/AgentGrid; moved still-live shared utilities/components to Command Deck or lib locations; rewired legacy issue selections to IssueDrawer; verified deletion greps, frontend suite, typecheck, lint, root tests, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -591,6 +599,12 @@
     "d2-drawer-subscription-contract.ac3": "completed",
     "d2-drawer-subscription-contract.ac4": "completed",
     "d2-drawer-subscription-contract.ac5": "completed",
-    "d2-drawer-subscription-contract.ac6": "completed"
+    "d2-drawer-subscription-contract.ac6": "completed",
+    "i2-inspector-panel-retirement": "completed",
+    "i2-inspector-panel-retirement.ac1": "completed",
+    "i2-inspector-panel-retirement.ac2": "completed",
+    "i2-inspector-panel-retirement.ac3": "completed",
+    "i2-inspector-panel-retirement.ac4": "completed",
+    "i2-inspector-panel-retirement.ac5": "completed"
   }
 }

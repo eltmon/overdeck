@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { StatusHistoryEntry } from './types';
-import { formatRelativeTime } from './utils';
+import type { StatusHistoryEntry } from '../../../lib/workspace-types';
+import { formatRelativeTime } from '../../../lib/dashboard-utils';
 
 export function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
   const [expanded, setExpanded] = useState(false);

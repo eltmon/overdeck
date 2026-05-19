@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info, GitMerge, Terminal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { ReviewStatus } from './types';
-import { formatRelativeTime, isStale } from './utils';
+import type { ReviewStatus } from '../../../lib/workspace-types';
+import { formatRelativeTime, isStale } from '../../../lib/dashboard-utils';
 import { StatusHistory } from './StatusHistory';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
-import { usePrQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { statusColor } from '../CommandDeck/ZoneCOverviewTabs/PrDiffTab';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../../lib/commandDeckSurfaceRegistry';
+import { usePrQuery } from './queries';
+import { statusColor } from './PrDiffTab';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;

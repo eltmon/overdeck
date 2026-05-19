@@ -1,4 +1,4 @@
-import { isPendingReviewStranded } from '../../lib/pipeline-state';
+import { isPendingReviewStranded } from './pipeline-state';
 
 export function formatRelativeTime(isoString: string): string {
   const now = Date.now();

@@ -7,7 +7,7 @@ import {
   syncSnapshotReducer,
   applyEventReducer,
   applyEventsReducer,
-  selectAgentList,
+  selectAgents,
   selectAgentById,
   selectAgentsByRole,
   selectReviewStatus,
@@ -346,8 +346,8 @@ describe('selectors', () => {
     resources: { containers: 5, networks: 3 },
   }
 
-  it('selectAgentList returns array of agents', () => {
-    expect(selectAgentList(state).map((a) => a.id).sort()).toEqual(['agent-1', 'review-1'])
+  it('selectAgents returns array of agents', () => {
+    expect(selectAgents(state).map((a) => a.id).sort()).toEqual(['agent-1', 'review-1'])
   })
 
   it('selectAgentById returns agent for known id', () => {
