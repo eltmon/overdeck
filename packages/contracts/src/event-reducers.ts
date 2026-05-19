@@ -90,7 +90,11 @@ export interface ReadModelState {
   /** Bumped whenever a conversation is created, so the sidebar list can refresh
    * immediately instead of waiting for its poll tick. */
   conversationsListRevision: number
-  memory: MemoryReadModelState
+  observationsByIssueId: Record<string, MemoryObservation[]>
+  statusByIssueId: Record<string, MemoryStatus>
+  rollupsByIssueId: Record<string, MemoryRollupTriggerSnapshot[]>
+  resetMarkersByScopeId: Record<string, ResetMarker[]>
+  healthByIssueId: Record<string, MemoryHealthSnapshot>
   /** PAN-457 — active scan progress snapshot */
   scanProgress: ScanProgressSnapshot | null
   /** PAN-457 — latest enrichment stats */
@@ -172,13 +176,11 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   conversationsListRevision: 0,
-  memory: {
-    observationsByIssueId: {},
-    statusByIssueId: {},
-    rollupsByIssueId: {},
-    resetMarkersByScopeId: {},
-    healthByIssueId: {},
-  },
+  observationsByIssueId: {},
+  statusByIssueId: {},
+  rollupsByIssueId: {},
+  resetMarkersByScopeId: {},
+  healthByIssueId: {},
   scanProgress: null,
   enrichStats: null,
   enrichProgressBySessionId: {},
@@ -318,7 +320,11 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
-    memory: memory ? { ...state.memory, ...memory } : state.memory,
+    observationsByIssueId: memory?.observationsByIssueId ?? state.observationsByIssueId,
+    statusByIssueId: memory?.statusByIssueId ?? state.statusByIssueId,
+    rollupsByIssueId: memory?.rollupsByIssueId ?? state.rollupsByIssueId,
+    resetMarkersByScopeId: memory?.resetMarkersByScopeId ?? state.resetMarkersByScopeId,
+    healthByIssueId: memory?.healthByIssueId ?? state.healthByIssueId,
     scanProgress: snapshot.scanProgress ?? null,
     enrichStats: snapshot.enrichStats ?? null,
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
@@ -742,7 +748,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'memory.observation_created': {
       const observation = event.payload.observation
-      const existing = state.memory.observationsByIssueId[observation.issueId] ?? []
+      const existing = state.observationsByIssueId[observation.issueId] ?? []
       const index = existing.findIndex(entry => entry.id === observation.id)
       const updated = trimMemoryObservations(index === -1
         ? [...existing, observation]
@@ -750,12 +756,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        memory: {
-          ...state.memory,
-          observationsByIssueId: {
-            ...state.memory.observationsByIssueId,
-            [observation.issueId]: updated,
-          },
+        observationsByIssueId: {
+          ...state.observationsByIssueId,
+          [observation.issueId]: updated,
         },
       }
     }
@@ -765,12 +768,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        memory: {
-          ...state.memory,
-          statusByIssueId: {
-            ...state.memory.statusByIssueId,
-            [identity.issueId]: status,
-          },
+        statusByIssueId: {
+          ...state.statusByIssueId,
+          [identity.issueId]: status,
         },
       }
     }
@@ -784,16 +784,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         threshold: event.payload.threshold,
         triggeredAt: event.timestamp,
       }
-      const existing = state.memory.rollupsByIssueId[event.payload.issueId] ?? []
+      const existing = state.rollupsByIssueId[event.payload.issueId] ?? []
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        memory: {
-          ...state.memory,
-          rollupsByIssueId: {
-            ...state.memory.rollupsByIssueId,
-            [event.payload.issueId]: [...existing, trigger],
-          },
+        rollupsByIssueId: {
+          ...state.rollupsByIssueId,
+          [event.payload.issueId]: [...existing, trigger],
         },
       }
     }
@@ -801,7 +798,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'memory.reset_marker_created': {
       const { marker } = event.payload
       const key = `${marker.scope}:${marker.scopeId}`
-      const existing = state.memory.resetMarkersByScopeId[key] ?? []
+      const existing = state.resetMarkersByScopeId[key] ?? []
       const index = existing.findIndex(entry => entry.id === marker.id)
       const updated = index === -1
         ? [...existing, marker]
@@ -809,12 +806,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        memory: {
-          ...state.memory,
-          resetMarkersByScopeId: {
-            ...state.memory.resetMarkersByScopeId,
-            [key]: updated,
-          },
+        resetMarkersByScopeId: {
+          ...state.resetMarkersByScopeId,
+          [key]: updated,
         },
       }
     }
@@ -831,12 +825,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        memory: {
-          ...state.memory,
-          healthByIssueId: {
-            ...state.memory.healthByIssueId,
-            [event.payload.issueId]: health,
-          },
+        healthByIssueId: {
+          ...state.healthByIssueId,
+          [event.payload.issueId]: health,
         },
       }
     }
