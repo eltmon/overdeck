@@ -538,16 +538,9 @@ export async function spawnReviewRoleForIssue(
     }
 
     const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
-    // PAN-1213 follow-on: propagate host override from the work agent so the
-    // synthesis parent doesn't get rejected by the docker stack-health gate
-    // when the work agent itself was started with --host.
-    const { getAgentState: _getWorkState } = await import('../agents.js');
-    const workAgentState = _getWorkState(`agent-${opts.issueId.toLowerCase()}`);
-    const allowHostForSynthesis = workAgentState?.hostOverride === true;
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
-      allowHost: allowHostForSynthesis,
       ...(opts.model ? { model: opts.model } : {}),
       ...(allowHost ? { allowHost: true } : {}),
     });
