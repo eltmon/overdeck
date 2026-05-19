@@ -84,8 +84,10 @@ describe('memory transcript checkpoints', () => {
     }))));
 
     const claims = attempts.filter((result) => result.status === 'claimed');
+    const alreadyClaimed = attempts.filter((result) => result.status === 'empty' && result.reason === 'already-claimed');
 
-    expect(claims).toHaveLength(50);
+    expect(claims).toHaveLength(1);
+    expect(alreadyClaimed).toHaveLength(49);
     expect(getTranscriptCheckpoint('session-concurrent')?.lastOffset).toBe(0);
 
     const commits = await Promise.all(claims.map((range) => Promise.resolve().then(() => commit({
@@ -97,10 +99,8 @@ describe('memory transcript checkpoints', () => {
     }))));
 
     const committed = commits.filter((result) => result.status === 'committed');
-    const rejected = commits.filter((result) => result.status === 'empty');
 
     expect(committed).toHaveLength(1);
-    expect(rejected).toHaveLength(49);
     expect(getTranscriptCheckpoint('session-concurrent')?.lastOffset).toBe(committed[0]?.status === 'committed' ? committed[0].checkpoint.lastOffset : null);
   });
 
@@ -149,7 +149,7 @@ describe('memory transcript checkpoints', () => {
 
   it('keeps failed pipeline ranges retryable without process-local reservations', () => {
     expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toMatchObject({ status: 'claimed' });
-    expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toMatchObject({ status: 'claimed' });
+    expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toMatchObject({ status: 'empty', reason: 'already-claimed' });
 
     releaseTranscriptRange('session-retry', 0, 100);
 

@@ -72,7 +72,7 @@ class TestProvider implements ExtractionProvider {
 }
 
 describe('memory extraction provider policy', () => {
-  it('reads today\'s memory-extraction spend from persisted cost events', () => {
+  it('reads today\'s memory-extraction spend from persisted cost events', async () => {
     const today = new Date();
     today.setHours(12, 0, 0, 0);
     const yesterday = new Date(today);
@@ -130,7 +130,7 @@ describe('memory extraction provider policy', () => {
       sessionId: identity.sessionId,
     });
 
-    expect(getTodayMemoryExtractionSpendUsd(identity)).toBe(1.25);
+    expect(await getTodayMemoryExtractionSpendUsd(identity)).toBe(1.25);
   });
 
   it('skips extraction when today\'s memory-extraction spend is at the cap', async () => {

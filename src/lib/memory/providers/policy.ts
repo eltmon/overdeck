@@ -68,7 +68,7 @@ export async function extractWithProviderPolicy<T>(
   return { status: 'dropped', reason: 'extraction-failed', error: lastError };
 }
 
-export function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): number {
+export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): Promise<number> {
   return queryMemoryExtractionCostUsd({
     issueId: identity.issueId,
     startTs: startOfLocalDayIso(),

@@ -18,6 +18,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import type { NormalizedCavemanConfig } from '../config-yaml.js';
 import { FsError } from '../errors.js';
+import { areMemoryObservationsEnabled } from '../memory/settings.js';
 import { getCavemanHooksDir } from './setup.js';
 
 /** Caveman variant for A/B testing and cost tracking */
@@ -58,12 +59,19 @@ export async function injectMemoryHookSettings(workspacePath: string): Promise<v
   const claudeDir = join(workspacePath, '.claude');
   await mkdir(claudeDir, { recursive: true });
 
-  const scriptPath = await installTrustedMemoryHookScript();
-
   const settingsPath = join(claudeDir, 'settings.json');
   const settings = await readWorkspaceSettings(settingsPath);
   const hooks = (settings.hooks ?? {}) as Record<string, HookEntry[]>;
   settings.hooks = hooks;
+
+  // Remove memory hooks when observations are disabled; skip installation otherwise.
+  if (!await areMemoryObservationsEnabled()) {
+    settings.hooks = removeMemoryHooks(hooks);
+    await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    return;
+  }
+
+  const scriptPath = await installTrustedMemoryHookScript();
 
   upsertHook(hooks, 'Stop', `node "${scriptPath}" turn`, 1);
   upsertHook(hooks, 'SessionStart', `node "${scriptPath}" session-start`, 1);
@@ -149,6 +157,16 @@ function upsertHook(hooks: Record<string, HookEntry[]>, hookType: string, comman
   list.push({ matcher: '.*', hooks: [{ type: 'command', command, timeout }] });
 }
 
+function removeMemoryHooks(hooks: Record<string, HookEntry[]>): Record<string, HookEntry[]> {
+  const scriptName = MEMORY_HOOK_SCRIPT;
+  const result: Record<string, HookEntry[]> = {};
+  for (const [type, list] of Object.entries(hooks)) {
+    const filtered = list.filter((entry) => !entry.hooks?.some((hook) => hook.command?.includes(scriptName)));
+    if (filtered.length > 0) result[type] = filtered;
+  }
+  return result;
+}
+
 function memoryHookScript(): string {
   return `#!/usr/bin/env node
 const { existsSync, readFileSync } = require('node:fs');
@@ -164,11 +182,11 @@ process.stdin.on('end', async () => {
   try { input = JSON.parse(raw); } catch { input = {}; }
   try {
     if (endpoint === 'turn') {
-      await post('/api/memory/turn', input, 500);
+      void post('/api/memory/turn', input, 500).catch(() => {});
       return;
     }
     if (endpoint === 'session-start') {
-      await post('/api/memory/session/start', input, 500);
+      void post('/api/memory/session/start', input, 500).catch(() => {});
       return;
     }
     if (endpoint === 'prompt-inject') {

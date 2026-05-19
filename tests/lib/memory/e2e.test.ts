@@ -173,7 +173,7 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
     ]);
 
     const statuses = [hookResult.status, pollerResult.status].sort();
-    expect(statuses).toEqual(['written', 'written']);
+    expect(statuses).toEqual(['noop', 'written']);
     expect(await readPersistedObservations()).toHaveLength(7);
   });
 });

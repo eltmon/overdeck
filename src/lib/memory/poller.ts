@@ -106,7 +106,10 @@ export class TranscriptPoller {
   }
 
   async syncActiveTranscripts(): Promise<void> {
-    if (!await this.areObservationsEnabled()) return;
+    if (!await this.areObservationsEnabled()) {
+      for (const sessionId of this.entries.keys()) this.unregister(sessionId);
+      return;
+    }
 
     const active = await this.getActiveEntries();
     const activeIds = new Set(active.map((entry) => entry.sessionId));

@@ -1,7 +1,10 @@
+import { randomUUID } from 'crypto';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { getDatabase } from '../database/index.js';
 
 export type TranscriptClaimTrigger = 'stop-hook' | 'poller' | 'reconciliation' | 'manual';
+
+const CLAIM_EXPIRY_MS = 60_000;
 
 export interface TranscriptCheckpoint {
   sessionId: string;
@@ -14,6 +17,10 @@ export interface TranscriptCheckpoint {
   lastMidTurnAt: string | null;
   midTurnCountInCurrentTurn: number;
   updatedAt: string;
+  claimOwner: string | null;
+  claimFrom: number | null;
+  claimTo: number | null;
+  claimExpiresAt: string | null;
 }
 
 export interface ClaimTranscriptRangeInput {
@@ -37,11 +44,11 @@ export type ClaimTranscriptRangeResult =
       toOffset: number;
       checkpoint: TranscriptCheckpoint;
     }
-  | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' };
+  | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' | 'already-claimed' };
 
 export type CommitTranscriptRangeResult =
   | { status: 'committed'; checkpoint: TranscriptCheckpoint }
-  | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' };
+  | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' | 'no-active-claim' };
 
 interface TranscriptCheckpointRow {
   session_id: string;
@@ -54,6 +61,10 @@ interface TranscriptCheckpointRow {
   last_mid_turn_at: string | null;
   mid_turn_count_in_current_turn: number;
   updated_at: string;
+  claim_owner: string | null;
+  claim_from: number | null;
+  claim_to: number | null;
+  claim_expires_at: string | null;
 }
 
 export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTranscriptRangeResult {
@@ -63,6 +74,7 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
 
   const db = getDatabase();
   const now = (input.now ?? new Date()).toISOString();
+  const expiry = new Date((input.now ?? new Date()).getTime() + CLAIM_EXPIRY_MS).toISOString();
   const insertInitialCheckpoint = db.prepare(`
     INSERT INTO transcript_checkpoints (
       session_id,
@@ -77,8 +89,20 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
     WHERE @expectedFromOffset = 0
     ON CONFLICT(session_id) DO NOTHING
   `);
+
+  const owner = `claim-${cryptoRandomUUID()}`;
   const claim = db.prepare(`
-    SELECT
+    UPDATE transcript_checkpoints
+    SET
+      claim_owner = @owner,
+      claim_from = @expectedFromOffset,
+      claim_to = @toOffset,
+      claim_expires_at = @expiry,
+      updated_at = @now
+    WHERE session_id = @sessionId
+      AND last_offset = @expectedFromOffset
+      AND (claim_owner IS NULL OR claim_expires_at < @now)
+    RETURNING
       session_id,
       project_id,
       workspace_id,
@@ -88,19 +112,28 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
       last_observation_at,
       last_mid_turn_at,
       mid_turn_count_in_current_turn,
-      updated_at
-    FROM transcript_checkpoints
-    WHERE session_id = @sessionId
-      AND last_offset = @expectedFromOffset
+      updated_at,
+      claim_owner,
+      claim_from,
+      claim_to,
+      claim_expires_at
   `);
 
   const runClaim = db.transaction(() => {
     insertInitialCheckpoint.run(bind(input, now));
-    return claim.get(bind(input, now)) as TranscriptCheckpointRow | undefined;
+    return claim.get({ ...bind(input, now), owner, expiry }) as TranscriptCheckpointRow | undefined;
   });
 
   const row = runClaim();
-  if (!row) return { status: 'empty', reason: 'offset-mismatch' };
+  if (!row) {
+    const existing = db.prepare(`
+      SELECT claim_owner, claim_expires_at FROM transcript_checkpoints WHERE session_id = ?
+    `).get(input.sessionId) as { claim_owner: string | null; claim_expires_at: string | null } | undefined;
+    if (existing && existing.claim_owner && (existing.claim_expires_at ?? '9999') >= now) {
+      return { status: 'empty', reason: 'already-claimed' };
+    }
+    return { status: 'empty', reason: 'offset-mismatch' };
+  }
 
   return {
     status: 'claimed',
@@ -143,9 +176,14 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
         WHEN @trigger = 'poller' THEN mid_turn_count_in_current_turn + 1
         ELSE mid_turn_count_in_current_turn
       END,
+      claim_owner = NULL,
+      claim_from = NULL,
+      claim_to = NULL,
+      claim_expires_at = NULL,
       updated_at = @now
     WHERE session_id = @sessionId
       AND last_offset = @expectedFromOffset
+      AND claim_owner IS NOT NULL
     RETURNING
       session_id,
       project_id,
@@ -156,16 +194,35 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
       last_observation_at,
       last_mid_turn_at,
       mid_turn_count_in_current_turn,
-      updated_at
+      updated_at,
+      claim_owner,
+      claim_from,
+      claim_to,
+      claim_expires_at
   `);
 
   const row = commit.get({ ...bind(input, now), consumedOffset: input.consumedOffset }) as TranscriptCheckpointRow | undefined;
-  if (!row) return { status: 'empty', reason: 'offset-mismatch' };
+  if (!row) {
+    const existing = db.prepare(`SELECT last_offset, claim_owner FROM transcript_checkpoints WHERE session_id = ?`).get(input.sessionId) as { last_offset: number; claim_owner: string | null } | undefined;
+    if (existing && existing.last_offset !== input.expectedFromOffset) {
+      return { status: 'empty', reason: 'offset-mismatch' };
+    }
+    return { status: 'empty', reason: 'no-active-claim' };
+  }
   return { status: 'committed', checkpoint: rowToCheckpoint(row) };
 }
 
-export function releaseTranscriptRange(_sessionId: string, _expectedFromOffset: number, _toOffset: number): void {
-  return undefined;
+export function releaseTranscriptRange(sessionId: string, _expectedFromOffset: number, _toOffset: number): void {
+  const db = getDatabase();
+  db.prepare(`
+    UPDATE transcript_checkpoints
+    SET claim_owner = NULL,
+        claim_from = NULL,
+        claim_to = NULL,
+        claim_expires_at = NULL
+    WHERE session_id = ?
+      AND claim_owner IS NOT NULL
+  `).run(sessionId);
 }
 
 export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
@@ -181,7 +238,11 @@ export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
         last_observation_at,
         last_mid_turn_at,
         mid_turn_count_in_current_turn,
-        updated_at
+        updated_at,
+        claim_owner,
+        claim_from,
+        claim_to,
+        claim_expires_at
       FROM transcript_checkpoints
       ORDER BY updated_at ASC
       LIMIT ?
@@ -203,7 +264,11 @@ export function getTranscriptCheckpoint(sessionId: string): TranscriptCheckpoint
         last_observation_at,
         last_mid_turn_at,
         mid_turn_count_in_current_turn,
-        updated_at
+        updated_at,
+        claim_owner,
+        claim_from,
+        claim_to,
+        claim_expires_at
       FROM transcript_checkpoints
       WHERE session_id = ?
     `)
@@ -237,9 +302,21 @@ function rowToCheckpoint(row: TranscriptCheckpointRow): TranscriptCheckpoint {
     lastMidTurnAt: row.last_mid_turn_at,
     midTurnCountInCurrentTurn: row.mid_turn_count_in_current_turn,
     updatedAt: row.updated_at,
+    claimOwner: row.claim_owner,
+    claimFrom: row.claim_from,
+    claimTo: row.claim_to,
+    claimExpiresAt: row.claim_expires_at,
   };
 }
 
 function isValidOffset(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
+}
+
+function cryptoRandomUUID(): string {
+  try {
+    return randomUUID();
+  } catch {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 }
