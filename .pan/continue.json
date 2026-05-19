@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T00:25:32.627Z",
+  "updated": "2026-05-19T00:34:31.552Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "69c35f837"
+    "sha": "89f1f09f6"
   },
   "decisions": [
     {
@@ -203,13 +203,15 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-p6bj drawer Tabs are implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-bffv InspectorPanel parity checklist is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerTabs.tsx",
-      "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
+      "docs/design/inspector-parity-checklist.md",
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/inspector/ActionsSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/ContainerSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx"
     ]
   },
   "beadsMapping": {},
@@ -373,6 +375,12 @@
       "timestamp": "2026-05-19T00:25:32.627Z",
       "reason": "bead-close",
       "note": "Implemented workspace-p6bj drawer Tabs with Overview/Plan/Beads/Conversation/Terminal/Activity/Files, URL tab sync, Beads count chip, tab placeholders, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:34:31.552Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-bffv InspectorPanel parity checklist at docs/design/inspector-parity-checklist.md, enumerating legacy InspectorPanel features, inspector/* sub-files, AgentList, and GodView/AgentGrid deletion gates with destination or confirmation status. Verified conflict-marker check, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
