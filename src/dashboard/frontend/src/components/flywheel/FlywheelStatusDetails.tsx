@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { FlywheelAgent, FlywheelStatus, FlywheelSubstrateBug } from '@panctl/contracts';
 import { AgentCard as ResourceAgentCard } from '../ResourceCard';
+import { IssueRow, MetricStrip, MetricTile } from '../shared/statusPrimitives';
 import type { Agent } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -81,9 +82,32 @@ export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatu
   const navigateAgent = onNavigateAgent ?? (() => undefined);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]" aria-label="Flywheel status details">
-      <div className="space-y-4">
-        <Section title="Substrate Bugs Filed and Fixed">
+    <div className="space-y-4" aria-label="Flywheel status details">
+      <MetricStrip>
+        <MetricTile label="Bugs Fixed" value={status.headline.bugsFixed} tone="success" />
+        <MetricTile
+          label="SWARM Items"
+          value={`${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal}`}
+          subtext="merged"
+          tone="info"
+        />
+        <MetricTile label="PRs Merged" value={status.headline.prsMerged} tone="success" />
+        <MetricTile label="Awaiting UAT" value={status.headline.awaitingUat} tone={status.headline.awaitingUat > 0 ? 'warning' : 'default'} />
+      </MetricStrip>
+
+      <Section title="Active Pipeline">
+        {status.activePipeline.length > 0 ? (
+          <div className="space-y-3">
+            {status.activePipeline.map((item) => <IssueRow key={`${item.issueId}-${item.verb}`} item={item} />)}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No active pipeline items.</p>
+        )}
+      </Section>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+        <div className="space-y-4">
+          <Section title="Substrate Bugs Filed and Fixed">
           {status.substrateBugs.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-sm">
@@ -179,5 +203,6 @@ export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatu
         </Section>
       </div>
     </div>
+  </div>
   );
 }

@@ -29,7 +29,17 @@ const status: FlywheelStatus = {
     prsMerged: 4,
     awaitingUat: 5,
   },
-  activePipeline: [],
+  activePipeline: [
+    {
+      issueId: 'PAN-7',
+      title: 'Ship dashboard shell',
+      verb: 'working',
+      status: 'running',
+      progressPercent: 67,
+      agentId: 'agent-1',
+      pr: 17,
+    },
+  ],
   substrateBugs: [
     {
       issueId: 'PAN-1',
@@ -78,6 +88,25 @@ const status: FlywheelStatus = {
 };
 
 describe('FlywheelStatusDetails', () => {
+  it('renders headline metrics and active pipeline rows', () => {
+    render(<FlywheelStatusDetails status={status} />);
+
+    const metrics = screen.getByLabelText('Flywheel headline metrics');
+    expect(within(metrics).getByText('Bugs Fixed')).toBeInTheDocument();
+    expect(within(metrics).getByText('1')).toBeInTheDocument();
+    expect(within(metrics).getByText('SWARM Items')).toBeInTheDocument();
+    expect(within(metrics).getByText('2/3')).toBeInTheDocument();
+    expect(within(metrics).getByText('PRs Merged')).toBeInTheDocument();
+    expect(within(metrics).getByText('4')).toBeInTheDocument();
+    expect(within(metrics).getByText('Awaiting UAT')).toBeInTheDocument();
+    expect(within(metrics).getByText('5')).toBeInTheDocument();
+
+    expect(screen.getByText('PAN-7')).toBeInTheDocument();
+    expect(screen.getByText('Ship dashboard shell')).toBeInTheDocument();
+    expect(screen.getByText('working')).toBeInTheDocument();
+    expect(screen.getByText('67%')).toBeInTheDocument();
+  });
+
   it('renders substrate bugs with status badges and commit links', () => {
     render(<FlywheelStatusDetails status={status} />);
 
