@@ -79,22 +79,40 @@ For every `REVIEWER_READY` signal, read the referenced output file. Treat a miss
 
 For every `REVIEWER_FAILED` or `REVIEWER_TIMEOUT` signal, include that sub-role as a blocking infrastructure failure in the synthesis report.
 
-### 4. Synthesize the verdict
+### 4. Determine the cycle number and the diff scope to evaluate
 
-Apply this logic:
+Before applying verdict logic, establish where this review sits in the issue's lifecycle:
 
-1. Deduplicate repeated findings across sub-roles and keep the highest severity.
-2. Preserve blockers: any `!` or `⊗` finding with changed-file evidence blocks approval unless you document why it is invalid.
-3. Keep scopes separate: correctness bugs, security vulnerabilities, performance regressions, and requirements gaps remain attributed to their original sub-role.
-4. Treat any requirements reviewer `!` finding as blocking.
-5. Treat any failed or timed-out reviewer as blocking.
-6. Keep `~`, `≉`, and `?` findings non-blocking unless the report explains why the risk reaches blocker severity.
+```bash
+# Cycle number = count of existing review directories for this issue (including the current one)
+ls -1dt .pan/review/agent-<issueId>-review-* 2>/dev/null | wc -l
+```
 
-Approve only when all four terminal signals arrived, all four reviewer reports are readable, and no blocking findings remain.
+Then compute two diffs and remember which one is which:
 
-### 5. Write the synthesis report
+- **PR diff** — `git merge-base origin/main HEAD` to `HEAD`. This is everything the PR has introduced.
+- **Cycle diff** — commits since the previous cycle's synthesis. Find the previous synthesis dir (second-newest under `.pan/review/agent-<issueId>-review-*`), read the commit SHA it reviewed (top of its `synthesis.md` or its `context.json`), and diff that SHA to `HEAD`. On cycle 1 there is no previous; the cycle diff equals the PR diff.
 
-Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling status.
+Code outside the PR diff is **pre-existing** and is out of scope for blockers regardless of which reviewer flagged it.
+
+### 5. Synthesize the verdict
+
+Apply this logic in order:
+
+1. **Deduplicate** repeated findings across sub-roles and keep the highest severity.
+2. **Scope gate (mandatory).** For every `!` or `⊗` finding, confirm the cited file:line falls inside the **PR diff**. If a reviewer flagged code the PR did not touch, demote the finding to `~` (advisory) and note `pre-existing, out of PR scope` in the synthesis. Pre-existing risk does not block this PR, no matter the severity.
+3. **Convergence gate (cycle ≥ 3).** Once the issue has been through two prior review cycles, only block on findings whose cited file:line falls inside the **cycle diff** — i.e., code that changed since the previous synthesis. Findings on PR-introduced code that the previous synthesis already saw-and-passed (or saw-and-flagged-as-non-blocking) cannot be promoted to blockers in a later cycle. Each cycle re-litigates only what changed since the last cycle, never the whole PR. Document any demotions explicitly: `previously reviewed, not promotable`.
+4. **Proportionality check.** If the combined blocker count from all four reviewers exceeds **3× the number of commits in the PR diff**, you are almost certainly seeing reviewer overreach or a scope mismatch between the issue and the PR. In that case: keep at most the top 3 highest-severity blockers per sub-role, fold the rest into a non-blocking "deferred findings" section, and add a `## Scope Note` paragraph naming the disproportion. Do not silently swallow findings — surface the imbalance so the operator can correct the issue or the prompts.
+5. **Keep scopes separate**: correctness bugs, security vulnerabilities, performance regressions, and requirements gaps remain attributed to their original sub-role.
+6. **Requirements blockers must be PR-scoped.** Treat a requirements reviewer `!` finding as blocking **only when** the missing acceptance criterion is for behavior the PR diff is expected to deliver. Acceptance criteria that describe whole-feature scope beyond what this PR set out to do are out-of-scope and demote to `~`. When in doubt, prefer demotion and surface in `## Scope Note` rather than blocking.
+7. **Reviewer failures still block.** Treat any failed or timed-out reviewer as blocking.
+8. **Non-blocking severities.** Keep `~`, `≉`, and `?` findings non-blocking unless the report explains why the risk reaches blocker severity and the finding survives the scope and convergence gates above.
+
+Approve when all four terminal signals arrived, all four reviewer reports are readable, and no blocking findings remain after the gates above.
+
+### 6. Write the synthesis report
+
+Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling status. Record the HEAD SHA you reviewed so the next cycle can compute its cycle diff.
 
 ```markdown
 # Review Synthesis — <issueId> — <timestamp>
@@ -105,6 +123,9 @@ Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling 
 - Manifest: <path>
 - Branch: <branch>
 - Workspace: <workspace>
+- HEAD reviewed: <sha>
+- Cycle number: <n>
+- Prior cycle SHA: <sha or "none">
 
 ## Convoy Status
 | Sub-role | Signal | Output | Blocking findings |
@@ -120,15 +141,18 @@ Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling 
 <finding summary and evidence>
 
 ## Non-blocking Findings
-<Group `~`, `≉`, and `?` findings by sub-role.>
+<Group `~`, `≉`, and `?` findings by sub-role. Include findings demoted by the scope, convergence, or proportionality gates and tag them: `[demoted: pre-existing]`, `[demoted: previously reviewed]`, or `[deferred: proportionality]`.>
+
+## Scope Note
+<Only present when the proportionality check fired, or when the requirements reviewer raised whole-feature ACs that this PR did not promise to deliver. Name the disproportion or scope mismatch in 1-3 sentences.>
 
 ## Clean Sub-roles
 <List sub-roles with no findings.>
 ```
 
-If you find no blocking findings, set `## Blocking Findings` to `None`.
+If you find no blocking findings, set `## Blocking Findings` to `None`. Omit `## Scope Note` when neither gate fired.
 
-### 6. Signal review status
+### 7. Signal review status
 
 After writing `synthesis.md`, use the local Panopticon CLI to signal the verdict:
 
