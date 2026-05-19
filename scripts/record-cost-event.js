@@ -3927,7 +3927,11 @@ function initSchema(db) {
       last_observation_at            TEXT,
       last_mid_turn_at               TEXT,
       mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
-      updated_at                     TEXT NOT NULL
+      updated_at                     TEXT NOT NULL,
+      claim_owner                    TEXT,
+      claim_from                     INTEGER,
+      claim_to                       INTEGER,
+      claim_expires_at               TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
@@ -4179,7 +4183,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 39`);
+	db.pragma(`user_version = 40`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4187,7 +4191,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 39) return;
+	if (currentVersion === 40) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4636,7 +4640,21 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
         ON transcript_checkpoints(project_id, issue_id, workspace_id);
     `);
-	db.pragma(`user_version = 39`);
+	if (currentVersion < 40) {
+		try {
+			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_owner TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 40`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -4727,6 +4745,25 @@ function getDatabase() {
 */
 /** A SQLite operation against panopticon.db failed. */
 var DatabaseError = class extends TaggedError("DatabaseError") {};
+const dailySpendCache = /* @__PURE__ */ new Map();
+function dailySpendCacheKey(issueId, startTs) {
+	return `${issueId}:${startTs}`;
+}
+function startOfLocalDayIso(ts) {
+	const d = new Date(ts);
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+}
+function recordMemoryExtractionSpend(issueId, startTs, cost) {
+	const key = dailySpendCacheKey(issueId, startTs);
+	const existing = dailySpendCache.get(key);
+	if (existing) {
+		existing.total += cost;
+		existing.updatedAt = Date.now();
+	} else dailySpendCache.set(key, {
+		total: cost,
+		updatedAt: Date.now()
+	});
+}
 /**
 * Insert a cost event. Returns the new row ID, or null if it was a duplicate.
 * Deduplication is handled by the UNIQUE index on request_id.
@@ -4744,6 +4781,7 @@ function insertCostEvent(event, sourceFile) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, event.source ?? sourceFile ?? null, event.cavemanVariant ?? null);
 			if (result.changes === 0) return null;
+			if (event.source === "memory-extraction" || sourceFile === "memory-extraction") recordMemoryExtractionSpend(event.issueId, startOfLocalDayIso(event.ts), event.cost);
 			return result.lastInsertRowid;
 		},
 		catch: (cause) => new DatabaseError({
