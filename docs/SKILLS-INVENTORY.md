@@ -6,13 +6,13 @@ It was generated from:
 - `~/.claude/skills/*/SKILL.md` — user-level skills
 - `/home/eltmon/Projects/.claude/skills/*/SKILL.md` — project-level skills
 
-Claude Code gives user-level skills precedence over project-level skills when names collide. This inventory records 115 unique skills from 119 skill files. Duplicates are shown with both scopes.
+Claude Code gives user-level skills precedence over project-level skills when names collide. This inventory records 116 unique skills from 120 skill files. Duplicates are shown with both scopes.
 
 ## Skills
 
 | Skill | Scope | What it does |
 |---|---|---|
-| `/all-up` | Project | Run the Fix-All flywheel: pan-oversee EVERY PAN issue currently in In Progress and In Review simultaneously, drive each through the Panopticon pipeline to readyForMerge, fix every infrastructure bug encountered along the way (no bandaids), and surface merge-ready issues on the Awaiting Merge page. |
+| `/pan-flywheel` | Project | pan flywheel — start, pause, resume, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator. |
 | `/backups` | User | Check and manage Backblaze B2 backups via restic. View snapshots, check timer status, run manual backups, restore files. Covers home directory and K8s database backups. |
 | `/beads` | User, Project | Git-backed issue tracker for multi-session work with dependencies and persistent memory across conversation compaction. Use when work spans sessions, has blockers, or needs context recovery after compaction. |
 | `/beads-completion-check` | User, Project | Verify all beads (tasks) in a workspace are closed before review completion. Use as final check in code review workflow. Returns PASS if no open beads, BLOCKED if open beads found. Triggers on "check beads", "verify tasks complete", "beads status", or as subagent in review workflow. |

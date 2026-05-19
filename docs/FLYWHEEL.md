@@ -2,6 +2,8 @@
 
 The Flywheel is Panopticon's singleton orchestrator for long-running, fix-all runs. It keeps PAN issues moving through the existing `plan`, `work`, `review`, `test`, and `ship` roles until each branch reaches the human merge gate.
 
+The canonical skill entrypoint is `/pan-flywheel`, which wraps the `pan flywheel` CLI. Legacy invocations redirect there for one release only.
+
 Read this with:
 
 - [`FIX-ALL-PRD.md`](./FIX-ALL-PRD.md) for product intent.
@@ -73,8 +75,8 @@ The Flywheel row in Settings → Roles controls the singleton orchestrator, not 
 | Harness | Selects the runtime used by the orchestrator. `claude-code` is the default; `pi` is available where project policy allows it. |
 | Model | Selects the model or workhorse slot for the orchestrator's reasoning loop. This should usually be stronger than a worker default because it makes prioritization and recovery decisions. |
 | Effort | Sets the reasoning budget for each loop tick. Use higher effort for unattended fix-all runs and lower effort for short, supervised runs. |
-| Context cap | Sets the maximum context percentage before the orchestrator must compact, checkpoint, or stop for recovery instead of continuing with a near-full session. |
-| Brief path | Points at the markdown brief used to guide the run. The default is [`docs/flywheel-brief.md`](./flywheel-brief.md). |
+| Max agents | Sets the orchestrator's active-agent budget. The value is reflected in `FlywheelStatus.system.agentsCap`. |
+| Scope | Chooses whether the run stays on PAN issues or includes every tracked project. `pan-only` is the default. |
 
 Changing the Flywheel row affects future starts. It must not mutate already-saved run artifacts.
 
@@ -96,9 +98,24 @@ The default brief lives at [`docs/flywheel-brief.md`](./flywheel-brief.md). Cust
 
 Do not put secrets, machine-local paths, or one-time session state in a brief. Put durable operating rules in the brief and transient run state in the Flywheel run directory.
 
-## Relationship to `all-up`
+## Skill → CLI → API → UI map
 
-The historical `all-up` skill described a manual operating loop for pushing many Panopticon issues forward. The Flywheel turns that loop into a product surface:
+| Layer | Surface | Responsibility |
+| --- | --- | --- |
+| Skill | `/pan-flywheel` | Loads the operator guidance and tells Claude Code to use the canonical `pan flywheel` commands. |
+| CLI | `pan flywheel start [--brief <path>]` | Validates the brief path, creates a run ID, spawns the `flywheel-orchestrator`, and writes the first `latest.json`. |
+| CLI | `pan flywheel emit-status --file <json>` | Validates a `FlywheelStatus` payload and publishes it to the dashboard status endpoint. |
+| CLI | `pan flywheel status [--json]` | Reads the active run's latest status snapshot from the run directory. |
+| CLI | `pan flywheel pause` / `pan flywheel resume` | Toggles the singleton gate for the active orchestrator. |
+| CLI | `pan flywheel report` | Rewrites `docs/FLYWHEEL-STATE.md`, appends the operation report, saves `report.md`, and commits the report. |
+| API | `GET /api/flywheel/runs` | Lists run summaries for the sidebar live badge and Flywheel page. |
+| API | `GET /api/flywheel/runs/:id` | Returns a run detail plus its latest validated status snapshot. |
+| API | `GET /api/flywheel/brief` / `POST /api/flywheel/brief` | Reads and updates the markdown brief, constrained to paths inside the project root. |
+| UI | `/flywheel` | Shows the run pane, transcript link, status details, and Settings → Roles → Flywheel configuration summary. |
+| UI | Sidebar Flywheel item | Opens `/flywheel` and shows a live badge when a run summary reports `status: running`. |
+| UI | Settings → Roles → Flywheel | Edits the orchestrator model, harness, effort, max-agent budget, and scope for future starts. |
+
+The legacy skill described a manual operating loop for pushing many Panopticon issues forward. The Flywheel turns that loop into a product surface:
 
 - The brief replaces ad hoc prompt text.
 - `FlywheelStatus` replaces prose-only progress updates.

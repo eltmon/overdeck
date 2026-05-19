@@ -212,7 +212,7 @@ For deeper detail beyond the pipeline view:
 ## When to surface this
 
 - User asks "what's running?", "where are we?", "show status", "status snapshot"
-- After invoking `/all-up` to checkpoint progress
+- After invoking `/pan-flywheel` to checkpoint progress
 - After spawning new agents
 - Before reporting completion of a flywheel run
 - Whenever the user says "give me a visual" or "snapshot"

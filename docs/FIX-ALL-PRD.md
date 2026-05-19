@@ -7,6 +7,10 @@
 >
 > **Scope: Panopticon (PAN) issues only.** Other trackers (MIN, AUR, KRUX, …) are
 > out of scope unless the user explicitly opts them in for a single run.
+>
+> **Successor note:** this historical PRD originally named the operator skill
+> `/all-up`. The shipped skill is now `/pan-flywheel`, which wraps the
+> `pan flywheel` CLI and keeps the old name as a one-release redirect.
 
 ## TL;DR
 
@@ -124,12 +128,12 @@ A new top-level dashboard tab. Behavior:
   - **Merge** button → POSTs to `/api/workspaces/:id/merge`
   - Last review-status timestamp
 - **Empty state**: "Nothing awaiting merge. The flywheel is idling — kick off
-  more work or run `/all-up`."
+  more work or run `/pan-flywheel`."
 - **No polling** — uses the existing event-sourced Zustand store
   (`reviewStatusByIssueId`).
 - **Order**: oldest-ready first (FIFO — don't let issues age in the queue).
 
-## Required Surface: `/all-up` skill
+## Required Surface: `/pan-flywheel` skill
 
 A skill that, when invoked, kicks off the flywheel:
 
@@ -216,11 +220,11 @@ it's "more shipped features per day, per human-second of attention."
 
 - [ ] `Awaiting Merge` page exists, lives in the sidebar, lists every
       `readyForMerge` issue with frontend link + merge button.
-- [ ] `/all-up` skill exists at `~/.claude/skills/all-up/SKILL.md` and references
+- [ ] `/pan-flywheel` skill exists at `~/.claude/skills/pan-flywheel/SKILL.md` and references
       this PRD + `OPERATION-FIX-ALL.md`.
-- [ ] When invoked, `/all-up` follows the flywheel loop above end-to-end without
+- [ ] When invoked, `/pan-flywheel` follows the flywheel loop above end-to-end without
       bypassing the pipeline.
-- [ ] Every bug encountered during a `/all-up` run has a corresponding commit
+- [ ] Every bug encountered during a `/pan-flywheel` run has a corresponding commit
       in Panopticon.
 - [ ] Manual user input is required only for: UAT verification + merge approval.
 - [ ] After every revolution, `main` is clean: working tree empty, all commits
@@ -228,7 +232,7 @@ it's "more shipped features per day, per human-second of attention."
 
 ## Exit Criteria for a Single Run
 
-A `/all-up` run is "done" when:
+A `/pan-flywheel` run is "done" when:
 
 1. Every PAN issue that started in `In Progress`/`In Review` has reached
    `readyForMerge: true` **or** is legitimately blocked with the blocker
