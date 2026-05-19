@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T00:21:42.345Z",
+  "updated": "2026-05-19T00:25:32.627Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "eefdaae3c"
+    "sha": "69c35f837"
   },
   "decisions": [
     {
@@ -203,14 +203,13 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-lr3v drawer Action Bar is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-p6bj drawer Tabs are implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerTabs.tsx",
       "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/server/routes/agents.ts"
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -368,6 +367,12 @@
       "timestamp": "2026-05-19T00:21:42.345Z",
       "reason": "bead-close",
       "note": "Implemented workspace-lr3v drawer Action Bar with reset, stop, View PR, and merge controls, added POST /api/agents/:id/stop route alias, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:25:32.627Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-p6bj drawer Tabs with Overview/Plan/Beads/Conversation/Terminal/Activity/Files, URL tab sync, Beads count chip, tab placeholders, focused drawer tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -559,6 +564,11 @@
     "d10-drawer-action-bar.ac2": "completed",
     "d10-drawer-action-bar.ac3": "completed",
     "d10-drawer-action-bar.ac4": "completed",
-    "d10-drawer-action-bar.ac5": "completed"
+    "d10-drawer-action-bar.ac5": "completed",
+    "d4-drawer-tabs": "completed",
+    "d4-drawer-tabs.ac1": "completed",
+    "d4-drawer-tabs.ac2": "completed",
+    "d4-drawer-tabs.ac3": "completed",
+    "d4-drawer-tabs.ac4": "completed"
   }
 }

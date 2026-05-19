@@ -6,9 +6,27 @@ import DrawerActiveAgent from './DrawerActiveAgent';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
+import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
 import PhaseTimeline from './PhaseTimeline';
 import { useDrawerData } from './useDrawerData';
+
+function tabLabel(tab: string) {
+  return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function DrawerTabPlaceholder({ tab }: { tab: string }) {
+  return (
+    <div data-testid={`drawer-tab-panel-${tab}`} className="rounded-[var(--radius)] border border-dashed border-border bg-card/60 p-[18px]">
+      <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        {tabLabel(tab)}
+      </div>
+      <p className="text-[13px] leading-6 text-muted-foreground">
+        This drawer section will appear here as data streams in.
+      </p>
+    </div>
+  );
+}
 
 export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
@@ -74,23 +92,20 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
+        <DrawerTabs />
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 overflow-auto px-[22px] py-[18px]">
-            <div className="space-y-[14px]">
-              <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
-                <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                  {drawer.tab}
-                </div>
-                <p className="text-[13px] leading-6 text-muted-foreground">
-                  Issue details will appear here as data streams in.
-                </p>
+            {drawer.tab === 'overview' ? (
+              <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
+                <PhaseTimeline />
+                <DrawerActiveAgent />
+                <DrawerVerificationGates />
+                <DrawerBeadsList />
+                <DrawerReviewSpecialists />
               </div>
-              <PhaseTimeline />
-              <DrawerActiveAgent />
-              <DrawerVerificationGates />
-              <DrawerBeadsList />
-              <DrawerReviewSpecialists />
-            </div>
+            ) : (
+              <DrawerTabPlaceholder tab={drawer.tab} />
+            )}
           </div>
           <DrawerActivityRail />
         </div>

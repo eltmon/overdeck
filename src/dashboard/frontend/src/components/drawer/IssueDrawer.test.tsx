@@ -71,7 +71,31 @@ describe('IssueDrawer', () => {
     expect(await screen.findByTestId('issue-drawer')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Issue PAN-1' })).toBeInTheDocument();
     expect(screen.getByText('Drawer issue')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-activity')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('drawer-tab-panel-activity')).toBeInTheDocument();
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'activity' });
+  });
+
+  it('renders drawer tabs with active underline count chips and URL sync', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer([
+      { id: 'done', title: 'Done bead', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
+      { id: 'open', title: 'Open bead', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
+    ]);
+
+    expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[14px]');
+    expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
+    expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
+    expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
+    expect(within(screen.getByTestId('drawer-tab-beads')).getByTestId('drawer-tab-beads-count')).toHaveTextContent('1/2');
+    expect(screen.getByTestId('drawer-tab-beads-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+
+    fireEvent.click(screen.getByTestId('drawer-tab-files'));
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=files');
+    expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
   });
 
   it('scrolls to active agent section when URL hash targets it', async () => {
