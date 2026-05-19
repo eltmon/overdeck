@@ -47,6 +47,9 @@ interface CommandPaletteProps {
   onNavigate: (tab: string, issueId?: string) => void;
 }
 
+const EMPTY_AGENTS: Agent[] = [];
+const EMPTY_ISSUES: Issue[] = [];
+
 // ─── Server API ───────────────────────────────────────────────────────────────
 
 async function callApi(path: string, method = 'POST'): Promise<void> {
@@ -61,8 +64,8 @@ async function callApi(path: string, method = 'POST'): Promise<void> {
 
 export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
-  const issues = useDashboardStore(selectIssues) as Issue[];
+  const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
+  const issues = useDashboardStore((state) => isOpen ? selectIssues(state) : EMPTY_ISSUES) as Issue[];
   const openIssue = useDashboardStore((state) => state.openIssue);
 
   // Reset query when opened
@@ -88,6 +91,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     // Small delay so modal closes before action side effects
     setTimeout(action, 50);
   }, [onClose]);
+
+  if (!isOpen) return null;
 
   // ─── Static actions ─────────────────────────────────────────────────────────
 
@@ -244,8 +249,6 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   // Group
   const groups = [...new Set(filtered.map((a) => a.group))];
-
-  if (!isOpen) return null;
 
   return (
     <div

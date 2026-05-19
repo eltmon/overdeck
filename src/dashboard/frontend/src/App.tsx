@@ -360,6 +360,7 @@ export default function App() {
 
   const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
   // Dashboard lifecycle state from event store (restart events)
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
@@ -501,10 +502,11 @@ export default function App() {
       setSelectedConvIdState(routeState.convId);
       setConversationViewModeState(routeState.viewMode);
       setConversationViewModes(routeState.viewModes);
+      syncDrawerFromUrl();
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [syncDrawerFromUrl]);
 
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
@@ -727,8 +729,8 @@ export default function App() {
   }
 
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
-    openIssue(issueId);
     setActiveTab('kanban');
+    openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
   return (

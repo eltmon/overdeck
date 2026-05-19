@@ -1,24 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
+import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import MetricStrip, { type MetricStripTile } from '../primitives/MetricStrip';
+import PhaseHeader from '../primitives/PhaseHeader';
 import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
-import type { PhaseGlyphPhase } from '../primitives/PhaseGlyph';
 import { LiveCounter } from './LiveCounter';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
-
-export type PipelineStage =
-  | 'stuck'
-  | 'merging'
-  | 'awaitingMerge'
-  | 'tests'
-  | 'review'
-  | 'buildGate'
-  | 'working'
-  | 'planning'
-  | 'idle';
+import type { Agent, Issue } from '../../types';
 
 export interface IssueCostBreakdown {
   byModel: Record<string, { cost: number; tokens: number }>;
@@ -36,40 +26,18 @@ interface ProjectOverviewProps {
 interface BucketedFeature {
   feature: ProjectFeature;
   reviewStatus: ReviewStatusSnapshot | undefined;
-  stage: PipelineStage;
+  phase: PipelineIssuePhase;
 }
 
-const PIPELINE_STAGES: Exclude<PipelineStage, 'stuck'>[] = [
-  'merging',
-  'awaitingMerge',
-  'tests',
-  'review',
-  'buildGate',
-  'working',
-  'planning',
-  'idle',
-];
-
-const BUCKET_STAGES: PipelineStage[] = ['stuck', ...PIPELINE_STAGES];
-
-const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string }> = {
-  stuck: { label: 'Stuck / blocked', color: 'var(--destructive)' },
-  merging: { label: 'Merging', color: 'var(--info)' },
-  awaitingMerge: { label: 'Awaiting merge', color: 'var(--success)' },
-  tests: { label: 'Tests', color: 'var(--signal-review)' },
-  review: { label: 'Review', color: 'var(--signal-review)' },
-  buildGate: { label: 'Build gate', color: 'var(--warning)' },
-  working: { label: 'Working', color: 'var(--primary)' },
-  planning: { label: 'Planning', color: 'var(--muted-foreground)' },
-  idle: { label: 'Idle', color: 'var(--muted-foreground)' },
-};
-
-const MERGING_STATUSES = new Set(['queued', 'merging', 'verifying']);
-const REVIEW_STUCK_STATUSES = new Set(['failed', 'blocked']);
-const TEST_STUCK_STATUSES = new Set(['failed', 'dispatch_failed']);
-const MERGE_STUCK_STATUSES = new Set(['failed']);
-const VERIFICATION_STUCK_STATUSES = new Set(['failed']);
+const PIPELINE_PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
 const ACTIVE_AGENT_STATUSES = new Set(['active', 'running', 'starting']);
+const REVIEW_BLOCKED_STATUSES = new Set(['failed', 'blocked']);
+const TEST_BLOCKED_STATUSES = new Set(['failed', 'dispatch_failed']);
+const MERGE_BLOCKED_STATUSES = new Set(['failed']);
+const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
+
+type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>;
+type PipelineClassifierAgent = Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'>;
 
 function MetricIcon({ label }: { label: string }) {
   return <span aria-hidden="true">{label}</span>;
@@ -79,50 +47,81 @@ function hasActiveWorkSession(feature: ProjectFeature): boolean {
   return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
 }
 
+function hasWorkSession(feature: ProjectFeature): boolean {
+  return feature.sessions?.some(session => session.type === 'work') ?? false;
+}
+
 function hasActiveAgentSignal(feature: ProjectFeature): boolean {
   return hasActiveWorkSession(feature) || ACTIVE_AGENT_STATUSES.has(feature.agentStatus ?? '');
 }
 
-export function bucketFeature(
+function reviewStatusForClassifier(
   feature: ProjectFeature,
   reviewStatus: ReviewStatusSnapshot | undefined,
-): PipelineStage {
-  if (reviewStatus?.stuck) return 'stuck';
+): ReviewStatusSnapshot | undefined {
+  if (!feature.readyForMerge) return reviewStatus;
+  return {
+    ...(reviewStatus ?? { issueId: feature.issueId }),
+    readyForMerge: reviewStatus?.readyForMerge ?? true,
+  } as ReviewStatusSnapshot;
+}
 
-  if (
-    REVIEW_STUCK_STATUSES.has(reviewStatus?.reviewStatus ?? '') ||
-    TEST_STUCK_STATUSES.has(reviewStatus?.testStatus ?? '') ||
-    MERGE_STUCK_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
-    VERIFICATION_STUCK_STATUSES.has(reviewStatus?.verificationStatus ?? '')
-  ) {
-    return 'stuck';
-  }
+function featureState(feature: ProjectFeature): string | undefined {
+  const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
+  if (raw.includes('review')) return 'in_review';
+  if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
+  if (raw.includes('done') || raw.includes('complete')) return 'done';
+  if (raw.includes('cancel')) return 'canceled';
+  return feature.status;
+}
 
-  if (reviewStatus?.blockerReasons && reviewStatus.blockerReasons.length > 0) {
-    return 'stuck';
-  }
+function classifierIssue(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): PipelineClassifierIssue {
+  const state = featureState(feature);
+  return {
+    status: feature.status,
+    state,
+    stateType: state === 'done' ? 'completed' : state === 'canceled' ? 'canceled' : undefined,
+    hasPlan: feature.hasPlanning,
+    planningComplete: feature.hasPlanning && !hasWorkSession(feature),
+    mergeStatus: reviewStatus?.mergeStatus,
+  };
+}
 
-  if (reviewStatus?.mergeStatus && MERGING_STATUSES.has(reviewStatus.mergeStatus)) {
-    return 'merging';
-  }
+function classifierAgent(feature: ProjectFeature): PipelineClassifierAgent | null {
+  if (!hasActiveAgentSignal(feature)) return null;
+  return {
+    role: 'work',
+    status: 'running',
+  };
+}
 
-  if (
-    reviewStatus?.readyForMerge &&
-    (!reviewStatus.blockerReasons || reviewStatus.blockerReasons.length === 0)
-  ) {
-    return 'awaitingMerge';
-  }
+export function bucketFeaturePhase(
+  feature: ProjectFeature,
+  reviewStatus: ReviewStatusSnapshot | undefined,
+): PipelineIssuePhase {
+  const status = reviewStatusForClassifier(feature, reviewStatus);
+  return getPipelineIssuePhase(classifierIssue(feature, status), status, classifierAgent(feature));
+}
 
-  if (reviewStatus?.testStatus === 'testing') return 'tests';
-  if (reviewStatus?.reviewStatus === 'reviewing') return 'review';
-  if (reviewStatus?.verificationStatus === 'running') return 'buildGate';
-  if (hasActiveAgentSignal(feature) && !reviewStatus) return 'working';
+function reviewStatusForFeature(
+  feature: ProjectFeature,
+  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>,
+) {
+  return reviewStatusByIssueId[feature.issueId] ??
+    reviewStatusByIssueId[feature.issueId.toUpperCase()] ??
+    reviewStatusByIssueId[feature.issueId.toLowerCase()];
+}
 
-  if (feature.hasPlanning && !feature.sessions?.some(session => session.type === 'work')) {
-    return 'planning';
-  }
-
-  return 'idle';
+function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  return Boolean(
+    feature.agentStatus === 'failed' ||
+      reviewStatus?.stuck ||
+      (reviewStatus?.blockerReasons?.length ?? 0) > 0 ||
+      REVIEW_BLOCKED_STATUSES.has(reviewStatus?.reviewStatus ?? '') ||
+      TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
+      MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
+      VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
+  );
 }
 
 export function ProjectOverview({
@@ -146,35 +145,34 @@ export function ProjectOverview({
 
   const bucketedFeatures = useMemo<BucketedFeature[]>(
     () => features.map(feature => {
-      const reviewStatus = reviewStatusByIssueId[feature.issueId];
+      const reviewStatus = reviewStatusForFeature(feature, reviewStatusByIssueId);
       return {
         feature,
         reviewStatus,
-        stage: bucketFeature(feature, reviewStatus),
+        phase: bucketFeaturePhase(feature, reviewStatus),
       };
     }),
     [features, reviewStatusByIssueId],
   );
 
-  const bucketedByStage = useMemo(() => {
-    const byStage = new Map<PipelineStage, BucketedFeature[]>();
-    for (const stage of BUCKET_STAGES) byStage.set(stage, []);
-    for (const entry of bucketedFeatures) byStage.get(entry.stage)?.push(entry);
-    return byStage;
+  const bucketedByPhase = useMemo(() => {
+    const byPhase = new Map<PipelineIssuePhase, BucketedFeature[]>();
+    for (const phase of PIPELINE_PHASES) byPhase.set(phase, []);
+    for (const entry of bucketedFeatures) byPhase.get(entry.phase)?.push(entry);
+    return byPhase;
   }, [bucketedFeatures]);
 
-  const stuckFeatures = bucketedByStage.get('stuck') ?? [];
-  const activeStageCount = BUCKET_STAGES.filter(stage => (bucketedByStage.get(stage)?.length ?? 0) > 0).length;
+  const activePhaseCount = PIPELINE_PHASES.filter(phase => (bucketedByPhase.get(phase)?.length ?? 0) > 0).length;
 
   const metricTiles = useMemo<MetricStripTile[]>(() => {
-    const reviewRunning = bucketedFeatures.filter(({ stage }) => stage === 'review' || stage === 'tests' || stage === 'buildGate').length;
-    const readyToShip = bucketedFeatures.filter(({ stage }) => stage === 'awaitingMerge' || stage === 'merging').length;
+    const reviewRunning = bucketedFeatures.filter(({ phase }) => phase === 'review').length;
+    const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
 
     return [
       { id: 'active', eyebrow: 'Active issues', value: features.length, sub: projectName, icon: <MetricIcon label="●" />, signal: 'info' },
       { id: 'work', eyebrow: 'Work running', value: activeAgentCount, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' },
-      { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review gates', icon: <MetricIcon label="◆" />, signal: 'review' },
-      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready or merging', icon: <MetricIcon label="↑" />, signal: 'success' },
+      { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review phase', icon: <MetricIcon label="◆" />, signal: 'review' },
+      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ship phase', icon: <MetricIcon label="↑" />, signal: 'success' },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' },
     ];
   }, [activeAgentCount, bucketedFeatures, features.length, projectName, totalCost]);
@@ -196,27 +194,18 @@ export function ProjectOverview({
         issueCount={features.length}
         totalCost={totalCost}
         activeAgentCount={activeAgentCount}
-        activeStageCount={activeStageCount}
+        activePhaseCount={activePhaseCount}
         metricTiles={metricTiles}
       />
 
-      {stuckFeatures.length > 0 && (
-        <StuckCallout
-          entries={stuckFeatures}
-          issueCosts={issueCosts}
-          issueCostDetails={issueCostDetails}
-          onSelectFeature={onSelectFeature}
-        />
-      )}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {PIPELINE_STAGES.map(stage => {
-          const entries = bucketedByStage.get(stage) ?? [];
+        {PIPELINE_PHASES.map(phase => {
+          const entries = bucketedByPhase.get(phase) ?? [];
           if (entries.length === 0) return null;
           return (
             <PipelineSection
-              key={stage}
-              stage={stage}
+              key={phase}
+              phase={phase}
               entries={entries}
               issueCosts={issueCosts}
               issueCostDetails={issueCostDetails}
@@ -234,14 +223,14 @@ function HeroBillboard({
   issueCount,
   totalCost,
   activeAgentCount,
-  activeStageCount,
+  activePhaseCount,
   metricTiles,
 }: {
   projectName: string;
   issueCount: number;
   totalCost: number;
   activeAgentCount: number;
-  activeStageCount: number;
+  activePhaseCount: number;
   metricTiles: MetricStripTile[];
 }) {
   return (
@@ -297,83 +286,30 @@ function HeroBillboard({
           value={<LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
         />
         <StatCard label="Active agents" value={activeAgentCount.toString()} />
-        <StatCard label="Pipeline stages" value={activeStageCount.toString()} />
+        <StatCard label="Pipeline phases" value={activePhaseCount.toString()} />
       </div>
     </div>
   );
 }
 
-function StuckCallout({
-  entries,
-  issueCosts,
-  issueCostDetails,
-  onSelectFeature,
-}: {
-  entries: BucketedFeature[];
-  issueCosts: Record<string, number>;
-  issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
-  onSelectFeature: (feature: ProjectFeature) => void;
-}) {
-  return (
-    <section
-      aria-label="Stuck and blocked issues"
-      style={{
-        border: '1px solid color-mix(in srgb, var(--destructive) 45%, var(--border))',
-        borderRadius: 14,
-        padding: 14,
-        background: 'color-mix(in srgb, var(--destructive) 7%, transparent)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          color: 'var(--destructive)',
-          fontWeight: 700,
-          fontSize: 13,
-          marginBottom: 12,
-        }}
-      >
-        <AlertTriangle size={16} />
-        Stuck / blocked issues
-        <CountBadge count={entries.length} color="var(--destructive)" />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-        {entries.map(entry => (
-          <ProjectIssueRow
-            key={entry.feature.issueId}
-            entry={entry}
-            issueCosts={issueCosts}
-            issueCostDetails={issueCostDetails}
-            onSelectFeature={onSelectFeature}
-            reason={stuckReason(entry.reviewStatus)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function PipelineSection({
-  stage,
+  phase,
   entries,
   issueCosts,
   issueCostDetails,
   onSelectFeature,
 }: {
-  stage: PipelineStage;
+  phase: PipelineIssuePhase;
   entries: BucketedFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
 }) {
-  const config = STAGE_CONFIG[stage];
-
   return (
     <section
-      aria-label={`${config.label} pipeline stage`}
+      aria-label={`${phase} pipeline phase`}
+      data-component="command-deck-pipeline-phase"
+      data-phase={phase}
       style={{
         border: '1px solid var(--border)',
         borderRadius: 14,
@@ -381,34 +317,7 @@ function PipelineSection({
         background: 'var(--card)',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 12,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '999px',
-            background: config.color,
-          }}
-        />
-        <h3
-          style={{
-            margin: 0,
-            fontSize: 13,
-            fontWeight: 700,
-            color: 'var(--foreground)',
-          }}
-        >
-          {config.label}
-        </h3>
-        <CountBadge count={entries.length} color={config.color} />
-      </div>
+      <PhaseHeader phase={phase} count={entries.length} variant="command-deck" className="static" />
 
       <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
         {entries.map(entry => (
@@ -426,21 +335,13 @@ function PipelineSection({
   );
 }
 
-function phaseForStage(stage: PipelineStage): PhaseGlyphPhase {
-  if (stage === 'merging' || stage === 'awaitingMerge' || stage === 'stuck') return 'ship';
-  if (stage === 'tests' || stage === 'review' || stage === 'buildGate') return 'review';
-  if (stage === 'working') return 'work';
-  if (stage === 'planning') return 'plan';
-  return 'todo';
-}
-
-function verbBadgePropsForStage(stage: PipelineStage): { variant: Exclude<VerbBadgeVariant, 'STUCK · Nh'> } | { variant: 'STUCK · Nh'; hours: number } {
-  if (stage === 'stuck') return { variant: 'STUCK · Nh', hours: 1 };
-  if (stage === 'merging') return { variant: 'SHIP RUNNING' };
-  if (stage === 'awaitingMerge') return { variant: 'READY TO MERGE' };
-  if (stage === 'tests' || stage === 'review' || stage === 'buildGate') return { variant: 'REVIEW RUNNING' };
-  if (stage === 'working') return { variant: 'WORK RUNNING' };
-  if (stage === 'planning') return { variant: 'PLANNING' };
+function verbBadgePropsForPhase(entry: BucketedFeature): { variant: Exclude<VerbBadgeVariant, 'STUCK · Nh'> } | { variant: 'STUCK · Nh'; hours: number } {
+  if (isBlockedFeature(entry.feature, entry.reviewStatus)) return { variant: 'CHANGES REQUESTED' };
+  if (entry.phase === 'ship' && (entry.reviewStatus?.readyForMerge || entry.feature.readyForMerge)) return { variant: 'READY TO MERGE' };
+  if (entry.phase === 'ship') return { variant: 'SHIP RUNNING' };
+  if (entry.phase === 'review') return { variant: 'REVIEW RUNNING' };
+  if (entry.phase === 'work') return { variant: 'WORK RUNNING' };
+  if (entry.phase === 'plan') return { variant: 'PLANNING' };
   return { variant: 'QUEUED FOR PLAN' };
 }
 
@@ -480,12 +381,12 @@ function ProjectIssueRow({
   return (
     <IssueRow
       issueId={entry.feature.issueId}
-      phase={phaseForStage(entry.stage)}
+      phase={entry.phase}
       priority={priorityForFeature(entry.feature)}
       title={entry.feature.title}
       project={{ name: entry.feature.projectName }}
       labels={reason ? [<StatusPill key="reason">{reason}</StatusPill>] : []}
-      verbBadge={<VerbBadge {...verbBadgePropsForStage(entry.stage)} />}
+      verbBadge={<VerbBadge {...verbBadgePropsForPhase(entry)} />}
       agent={agent ? { name: agent.name, sub: agent.sub } : undefined}
       ledger={cost !== undefined ? { cost: <CostBadge cost={cost} details={costDetails} /> } : undefined}
       variant="command-deck"
@@ -637,23 +538,6 @@ function friendlyStageName(stage: string): string {
   return labels[stage] ?? stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function CountBadge({ count, color }: { count: number; color: string }) {
-  return (
-    <span
-      style={{
-        borderRadius: '999px',
-        padding: '1px 7px',
-        fontSize: 11,
-        fontWeight: 700,
-        color,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-      }}
-    >
-      {count}
-    </span>
-  );
-}
-
 function StatusPill({ children }: { children: ReactNode }) {
   return (
     <span
@@ -688,19 +572,23 @@ function stuckReason(reviewStatus: ReviewStatusSnapshot | undefined): string {
 }
 
 function subStatus(entry: BucketedFeature): string | undefined {
-  const { reviewStatus, stage } = entry;
+  const { reviewStatus, phase } = entry;
 
-  if (stage === 'review' && reviewStatus?.reviewSubStatuses) {
+  if (isBlockedFeature(entry.feature, reviewStatus)) {
+    return stuckReason(reviewStatus);
+  }
+
+  if (phase === 'review' && reviewStatus?.reviewSubStatuses) {
     return Object.entries(reviewStatus.reviewSubStatuses)
       .map(([role, status]) => `${role}: ${status}`)
       .join(', ');
   }
 
-  if ((stage === 'merging' || stage === 'awaitingMerge') && reviewStatus?.mergeStep) {
+  if (phase === 'ship' && reviewStatus?.mergeStep) {
     return reviewStatus.mergeStep;
   }
 
-  if (stage === 'buildGate' && reviewStatus?.verificationCycleCount && reviewStatus.verificationCycleCount > 1) {
+  if (phase === 'review' && reviewStatus?.verificationCycleCount && reviewStatus.verificationCycleCount > 1) {
     return `Cycle ${reviewStatus.verificationCycleCount}`;
   }
 

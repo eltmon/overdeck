@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
@@ -32,6 +33,23 @@ type ProjectOption = {
   id: string;
   name: string;
 };
+
+type IssueCostRollup = {
+  issueId: string;
+  totalCost?: number;
+  tokenCount?: number;
+};
+
+async function fetchIssueCosts(): Promise<Record<string, IssueCostRollup>> {
+  const res = await fetch('/api/costs/by-issue');
+  if (!res.ok) return {};
+  const data = await res.json() as { issues?: IssueCostRollup[] };
+  const costs: Record<string, IssueCostRollup> = {};
+  for (const issue of data.issues ?? []) {
+    costs[issue.issueId.toLowerCase()] = issue;
+  }
+  return costs;
+}
 
 function reviewStatusForIssue(reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>, issue: Issue) {
   return reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
@@ -165,6 +183,11 @@ export function PipelineView() {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
+  const { data: issueCosts = {} } = useQuery({
+    queryKey: ['issue-costs-by-issue'],
+    queryFn: fetchIssueCosts,
+    staleTime: 15_000,
+  });
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
     review: null,
@@ -172,6 +195,12 @@ export function PipelineView() {
     plan: null,
     todo: null,
   });
+
+  useEffect(() => {
+    const handlePopState = () => setFilter(readFilterState());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const agentByIssueId = useMemo(() => {
     const map = new Map<string, Agent>();
@@ -260,7 +289,7 @@ export function PipelineView() {
     const readyToShip = Object.values(reviewStatusByIssueId).filter(
       (status) => status.readyForMerge === true && status.mergeStatus !== 'merged',
     ).length;
-    const spend = agents.reduce((total, agent) => total + (agent.costSoFar ?? 0), 0);
+    const spend = Object.values(issueCosts).reduce((total, cost) => total + (cost.totalCost ?? 0), 0);
 
     return [
       { id: 'active', eyebrow: 'Active issues', value: activeIssues, sub: 'open pipeline', icon: <MetricIcon label="●" />, signal: 'info' as const },
@@ -269,7 +298,7 @@ export function PipelineView() {
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
     ];
-  }, [agents, issues, reviewStatusByIssueId]);
+  }, [agents, issueCosts, issues, reviewStatusByIssueId]);
 
   const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
 

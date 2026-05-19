@@ -2679,7 +2679,14 @@ function BoardIssueCard({ issue, workAgent, workAgents = [], planningAgent, spec
     null;
   const hasPlan = planningStateProp?.hasPlan ?? issue.hasPlan ?? false;
   const hasBeads = planningStateProp?.hasBeads ?? issue.hasBeads ?? false;
-  const progressTotal = Number(hasPlan) + Number(hasBeads) + Number(planningStateProp?.planningComplete ?? issue.planningComplete ?? false);
+  const progressTotal = Math.min(3, Number(hasPlan) + Number(hasBeads) + Number(planningStateProp?.planningComplete ?? issue.planningComplete ?? false));
+  const progressPercent = `${Math.round((progressTotal / 3) * 100)}%`;
+  const beadProgressColor =
+    isReadyToMerge || isMerged ? 'var(--success)' :
+    canonical === 'in_review' ? 'var(--warning)' :
+    canonical === 'in_progress' ? 'var(--info)' :
+    canonical === 'todo' ? 'var(--signal-review)' :
+    'var(--muted-foreground)';
   const issueSpecialists = specialists.filter((specialist) => specialist.status !== 'stopped');
 
   return (
@@ -2726,6 +2733,18 @@ function BoardIssueCard({ issue, workAgent, workAgents = [], planningAgent, spec
               <span className="rounded-full border border-border bg-muted px-2 py-0.5">beads {progressTotal}/3</span>
               {activeAgent && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{activeAgent.id} · {getFriendlyModelName(activeAgent.model)}</span>}
               {issueSpecialists.length > 0 && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{issueSpecialists.length} specialists</span>}
+            </div>
+            <div className="mt-3" data-component="bead-progress" data-progress={progressTotal}>
+              <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <span>Bead progress</span>
+                <span>{progressTotal}/3</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full transition-[width]"
+                  style={{ width: progressPercent, background: beadProgressColor }}
+                />
+              </div>
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">

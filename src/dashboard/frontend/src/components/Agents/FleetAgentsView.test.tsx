@@ -43,7 +43,9 @@ function renderFleetView() {
       mutations: { retry: false },
     },
   });
-  client.setQueryData(['agents-cost-trends'], { trends: [{ totalCost: 12.34, totalTokens: 456_000 }] });
+  client.setQueryData(['issue-costs-by-issue'], {
+    'pan-1': { issueId: 'PAN-1', totalCost: 12.34, tokenCount: 456_000 },
+  });
 
   return render(
     <QueryClientProvider client={client}>
@@ -80,8 +82,8 @@ describe('FleetAgentsView', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/costs/trends?days=1') {
-        return new Response(JSON.stringify({ trends: [{ totalCost: 12.34, totalTokens: 456_000 }] }), { status: 200 });
+      if (url === '/api/costs/by-issue') {
+        return new Response(JSON.stringify({ issues: [{ issueId: 'PAN-1', totalCost: 12.34, tokenCount: 456_000 }] }), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
     }));
@@ -91,12 +93,12 @@ describe('FleetAgentsView', () => {
     vi.useRealTimers();
   });
 
-  it('renders running, stuck, and idle AgentCard primitives in the fleet grid', () => {
+  it('renders running and stuck AgentCard primitives in the fleet grid', () => {
     renderFleetView();
 
     expect(screen.getByText('agent-running')).toBeInTheDocument();
     expect(screen.getByText('agent-stuck')).toBeInTheDocument();
-    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
     expect(screen.queryByText('agent-dead')).not.toBeInTheDocument();
     expect(screen.getByText('working on PAN-1')).toBeInTheDocument();
   });
@@ -154,7 +156,7 @@ describe('FleetAgentsView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ship' }));
     expect(new URLSearchParams(window.location.search).get('phase')).toBe('work,ship');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
     expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
   });
 
@@ -177,13 +179,9 @@ describe('FleetAgentsView', () => {
     fireEvent.click(screen.getByLabelText('Panopticon'));
     expect(window.location.search).toBe('?projects=pan');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
     expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('haiku-4-5'));
-    expect(window.location.search).toBe('?projects=pan&models=claude-haiku-4-5-20251001');
-    expect(screen.queryByText('agent-running')).not.toBeInTheDocument();
-    expect(screen.getByText('agent-idle')).toBeInTheDocument();
-    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('haiku-4-5')).not.toBeInTheDocument();
   });
 });

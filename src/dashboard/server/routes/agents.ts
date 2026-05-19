@@ -1898,7 +1898,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, graceful: false, message }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message }));
 
     if (result.success) {
       const updatedState = yield* Effect.promise(() => getAgentStateAsync(id));

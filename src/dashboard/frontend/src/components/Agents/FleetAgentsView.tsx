@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -17,7 +18,7 @@ const ROLE_ORDER = {
   ship: 4,
 } satisfies Record<AgentCardRole, number>;
 
-const ACTIVE_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stopped', 'starting', 'running', 'failed']);
+const ACTIVE_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed']);
 const PHASE_FILTERS = ['work', 'review', 'ship', 'plan', 'stuck'] as const;
 type AgentPhaseFilter = typeof PHASE_FILTERS[number];
 
@@ -31,6 +32,23 @@ type FilterOption = {
   id: string;
   name: string;
 };
+
+type IssueCostRollup = {
+  issueId: string;
+  totalCost?: number;
+  tokenCount?: number;
+};
+
+async function fetchIssueCosts(): Promise<Record<string, IssueCostRollup>> {
+  const res = await fetch('/api/costs/by-issue');
+  if (!res.ok) return {};
+  const data = await res.json() as { issues?: IssueCostRollup[] };
+  const costs: Record<string, IssueCostRollup> = {};
+  for (const issue of data.issues ?? []) {
+    costs[issue.issueId.toLowerCase()] = issue;
+  }
+  return costs;
+}
 
 function agentRole(agent: Agent): AgentCardRole {
   return agent.role ?? 'work';
@@ -115,7 +133,7 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
 }
 
 function isFleetAgent(agent: Agent) {
-  return agent.status !== 'dead' && (Boolean(agent.role) || ACTIVE_STATUSES.has(agent.status));
+  return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || ACTIVE_STATUSES.has(agent.status));
 }
 
 function parseList(value: string | null) {
@@ -210,6 +228,17 @@ export function FleetAgentsView() {
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
+  const { data: issueCosts = {} } = useQuery({
+    queryKey: ['issue-costs-by-issue'],
+    queryFn: fetchIssueCosts,
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    const handlePopState = () => setFilter(readFilterState());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const issuesById = useMemo(() => {
     const map = new Map<string, Issue>();
@@ -265,8 +294,17 @@ export function FleetAgentsView() {
     const avgRuntime = runningAgents.length === 0
       ? 0
       : runningAgents.reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0) / runningAgents.length;
-    const cost24h = fleetAgents.reduce((total, agent) => total + (agent.costSoFar ?? 0), 0);
-    const tokens24h = 0;
+    const costIssueIds = new Set(fleetAgents.map((agent) => issueKey(agent.issueId)).filter(Boolean));
+    const { cost24h, tokens24h } = Array.from(costIssueIds).reduce(
+      (totals, issueId) => {
+        const cost = issueCosts[issueId];
+        return {
+          cost24h: totals.cost24h + (cost?.totalCost ?? 0),
+          tokens24h: totals.tokens24h + (cost?.tokenCount ?? 0),
+        };
+      },
+      { cost24h: 0, tokens24h: 0 },
+    );
 
     return [
       { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
@@ -275,7 +313,7 @@ export function FleetAgentsView() {
         id: 'cost',
         eyebrow: 'Cost 24h',
         value: formatCost(cost24h),
-        sub: 'store selectors',
+        sub: 'cost events',
         icon: <MetricIcon label="$" />,
         signal: 'cost' as const,
         title: 'Open /costs for canonical 24h spend numbers',
@@ -284,7 +322,7 @@ export function FleetAgentsView() {
       { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
       { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
     ];
-  }, [fleetAgents, now]);
+  }, [fleetAgents, issueCosts, now]);
 
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);
@@ -318,7 +356,7 @@ export function FleetAgentsView() {
     return (
       <section data-component="fleet-agents-view" className="p-6">
         <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-          No running, stuck, or idle agents.
+          No running or stuck agents.
         </div>
       </section>
     );

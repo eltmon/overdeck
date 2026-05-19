@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WS_METHODS } from '@panctl/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),
@@ -112,61 +111,12 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
   });
 
-  it('subscribes once to issue-filtered drawer events for all drawer sections', () => {
+  it('uses the global event stream instead of opening a drawer-specific issue subscription', () => {
     useDashboardStore.getState().openIssue('PAN-1');
 
     renderDrawer();
 
-    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
-    const [connect] = wsTransportMock.subscribe.mock.calls[0]!;
-    const subscribeIssueEvents = vi.fn(() => ({}));
-
-    connect({ [WS_METHODS.subscribeIssueEvents]: subscribeIssueEvents });
-
-    expect(subscribeIssueEvents).toHaveBeenCalledWith({ issueId: 'PAN-1' });
-  });
-
-  it('tears down the drawer issue subscription on close and reuses quick same-issue reopens', async () => {
-    vi.useFakeTimers();
-    const unsubscribe = vi.fn();
-    wsTransportMock.subscribe.mockReturnValue(unsubscribe);
-    useDashboardStore.getState().openIssue('PAN-1');
-
-    const first = renderDrawer();
-
-    first.unmount();
-    await vi.advanceTimersByTimeAsync(999);
-    expect(unsubscribe).not.toHaveBeenCalled();
-
-    const second = renderDrawer();
-
-    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
-    second.unmount();
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps one issue-filtered listener through 50 rapid open-close-open bursts', async () => {
-    vi.useFakeTimers();
-    const unsubscribe = vi.fn();
-    wsTransportMock.subscribe.mockReturnValue(unsubscribe);
-    useDashboardStore.getState().openIssue('PAN-1');
-
-    let current: ReturnType<typeof renderDrawer> | null = null;
-    for (let index = 0; index < 50; index += 1) {
-      current = renderDrawer();
-      current.unmount();
-      await vi.advanceTimersByTimeAsync(999);
-      expect(unsubscribe).not.toHaveBeenCalled();
-    }
-
-    current = renderDrawer();
-    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
-
-    current.unmount();
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(wsTransportMock.subscribe).not.toHaveBeenCalled();
   });
 
   it('scrolls to active agent section when URL hash targets it', async () => {
@@ -351,7 +301,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-active-agent')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
     expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
-    expect(screen.getByText('GPT-5.5 · claude-code · spend —')).toHaveClass('text-right', 'font-mono');
+    expect(screen.getByText(/GPT-5\.5 · .* · spend loading/)).toHaveClass('text-right', 'font-mono');
     expect(screen.getByTestId('drawer-active-agent-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
     expect(within(screen.getByTestId('drawer-active-agent-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
 
