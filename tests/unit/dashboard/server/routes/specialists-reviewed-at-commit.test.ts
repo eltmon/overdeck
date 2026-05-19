@@ -40,21 +40,21 @@ vi.mock('child_process', async (importActual) => {
     ...actual,
     exec: (...args: unknown[]) => {
       // exec(cmd, opts, callback) or exec(cmd, callback)
-      const command = args[0] as string;
+      const command = String(args[0] ?? '');
       const callback = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
-      const treeMatch = command.match(/^git rev-parse (.+)\^\{tree\}$/);
-      const stdout = treeMatch
-        ? (mockTreeShas.get(treeMatch[1]!) ?? `${treeMatch[1]}-tree`)
-        : mockExecHeadSha;
       mockExecCallback(...args);
-      callback(null, { stdout: stdout + '\n', stderr: '' });
+      const stdout = command.includes('^{tree}')
+        ? command.includes('oldsha1') ? mockOldTreeSha : mockNewTreeSha
+        : mockExecHeadSha;
+      callback(null, { stdout: `${stdout}\n`, stderr: '' });
       return {} as ReturnType<typeof actual.exec>;
     },
   };
 });
 
 let mockExecHeadSha = 'defaultsha';
-let mockTreeShas = new Map<string, string>();
+let mockOldTreeSha = 'old-tree';
+let mockNewTreeSha = 'new-tree';
 
 // ─── Stub modules that deacon imports ────────────────────────────────────────
 
@@ -125,7 +125,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
   mockExecHeadSha = 'defaultsha';
-  mockTreeShas = new Map<string, string>();
+  mockOldTreeSha = 'old-tree';
+  mockNewTreeSha = 'new-tree';
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
 });
 
@@ -210,10 +211,8 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     });
 
     mockExecHeadSha = 'newsha99';
-    mockTreeShas = new Map([
-      ['oldsha1', 'sametree'],
-      ['newsha99', 'sametree'],
-    ]);
+    mockOldTreeSha = 'sametree';
+    mockNewTreeSha = 'sametree';
 
     const actions = await checkPostReviewCommits();
 
