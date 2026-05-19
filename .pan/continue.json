@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T00:45:36.323Z",
+  "updated": "2026-05-19T01:08:44.502Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "67edec355"
+    "sha": "364c41ca9"
   },
   "decisions": [
     {
@@ -203,14 +203,10 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-epub drawer subscription contract is implemented and verified; run required inspection, then continue the next ready PAN-1148 bead from bd ready.",
-    "beadId": "workspace-epub",
+    "description": "workspace-pok2 parity checklist blocker is resolved and verified; close workspace-pok2, then continue workspace-9a7q deletion from bd ready.",
+    "beadId": "workspace-pok2",
     "filesToRead": [
-      "packages/contracts/src/rpc.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/server/__tests__/ws-rpc.test.ts"
+      "docs/design/inspector-parity-checklist.md"
     ]
   },
   "beadsMapping": {},
@@ -386,6 +382,12 @@
       "timestamp": "2026-05-19T00:45:36.323Z",
       "reason": "bead-close",
       "note": "Implemented workspace-epub drawer subscription contract with subscribeIssueEvents(issueId), server-side event filtering, shared useDrawerData-managed subscription teardown/reuse, focused WS-RPC and drawer tests, full npm test, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:08:44.502Z",
+      "reason": "bead",
+      "note": "Resolved workspace-pok2 InspectorPanel parity checklist blockers by converting every unresolved legacy feature row to Covered, Out of scope, or Covered / Out of scope with rationale, leaving deletion execution checks for workspace-9a7q.",
       "agentModel": "gpt-5.5"
     }
   ],
