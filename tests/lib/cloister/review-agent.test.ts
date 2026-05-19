@@ -26,13 +26,13 @@ import {
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
 
-const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessageAgent, mockGetAgentState, mockNotifyPipeline } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessageAgent, mockNotifyPipeline, mockGetAgentState } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
-  mockGetAgentState: vi.fn().mockReturnValue(undefined),
   mockNotifyPipeline: vi.fn(),
+  mockGetAgentState: vi.fn(() => null),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -49,11 +49,10 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: vi.fn().mockReturnValue(null),
+  getAgentState: mockGetAgentState,
   messageAgent: mockMessageAgent,
   saveAgentStateAsync: mockSaveAgentStateAsync,
   spawnRun: mockSpawnRun,
-  getAgentState: mockGetAgentState,
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -504,6 +503,7 @@ describe('template/output contract', () => {
 describe('convoy orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetAgentState.mockReturnValue(null);
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
   });
 
