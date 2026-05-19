@@ -1131,7 +1131,15 @@ export class CloisterService {
   }
 
   /**
-   * Poke an agent (send "are you stuck?" message)
+   * Poke an agent (send "are you stuck?" message).
+   *
+   * NOTE: runtime.sendMessage() is async — both ClaudeCodeRuntime and PiRuntime
+   * are declared `async sendMessage(): Promise<void>`. A `throw` inside an
+   * async function before any await still returns a rejected Promise, so the
+   * surrounding try/catch CANNOT catch it. Without explicit `.catch()`, the
+   * rejection becomes an UnhandledPromiseRejection and crashes the dashboard
+   * server. We hit this in production when the deacon health-check polled a
+   * dead agent (PAN-1189 wedge sweep #12-13).
    */
   private pokeAgent(agentId: string): void {
     try {
@@ -1144,7 +1152,11 @@ export class CloisterService {
         'Hey, I noticed you haven\'t made progress in a while. Are you stuck? ' +
         'If you need help or clarification, please ask. Otherwise, please continue with your work.';
 
-      runtime.sendMessage(agentId, pokeMessage);
+      // Fire-and-forget: chain .catch() so async rejection cannot bubble out
+      // as an UnhandledPromiseRejection.
+      Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
+        console.error(`Failed to send poke to ${agentId}:`, sendErr);
+      });
       this.emit({ type: 'poked_agent', agentId });
 
       console.log(`🔔 Poked ${agentId}`);
@@ -1155,6 +1167,10 @@ export class CloisterService {
 
   /**
    * Kill an agent
+   *
+   * runtime.killAgent() is also async in some runtime implementations — apply
+   * the same fire-and-forget guard as pokeAgent so async rejection cannot
+   * crash the dashboard from a deacon health-check timer callback.
    */
   private killAgent(agentId: string): void {
     try {
@@ -1163,7 +1179,9 @@ export class CloisterService {
         throw new Error(`No runtime found for agent ${agentId}`);
       }
 
-      runtime.killAgent(agentId);
+      Promise.resolve(runtime.killAgent(agentId)).catch((killErr) => {
+        console.error(`Failed to kill ${agentId}:`, killErr);
+      });
       this.emit({ type: 'killed_agent', agentId });
 
       console.log(`🔔 Killed ${agentId}`);
