@@ -5,8 +5,12 @@ import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
-import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
+import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
+import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
+import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
+import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
+import { DiscussionsTab } from './ZoneCOverviewTabs/DiscussionsTab';
 import { BeadsDialog } from '../BeadsDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
@@ -194,6 +198,144 @@ interface CommandDeckProps {
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
 const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
 const SECTION_SPLIT_KEY = 'mc-section-split';
+
+type ProjectRightTab = 'pipeline' | 'plans' | 'beads' | 'conversations' | 'activity' | 'settings';
+
+const PROJECT_RIGHT_TABS: Array<{ id: ProjectRightTab; label: string }> = [
+  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'plans', label: 'Plans' },
+  { id: 'beads', label: 'Beads' },
+  { id: 'conversations', label: 'Conversations' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
+];
+
+function projectTabStorageKey(projectName: string) {
+  return `mc-project-right-tab:${projectName}`;
+}
+
+function readProjectTab(projectName: string): ProjectRightTab {
+  try {
+    const saved = localStorage.getItem(projectTabStorageKey(projectName));
+    return PROJECT_RIGHT_TABS.some((tab) => tab.id === saved) ? (saved as ProjectRightTab) : 'pipeline';
+  } catch {
+    return 'pipeline';
+  }
+}
+
+function ProjectRightPaneTabs({
+  projectName,
+  features,
+  issueCosts,
+  issueCostDetails,
+  conversations,
+  selectedConversation,
+  onOpenIssue,
+  onSelectConversation,
+}: {
+  projectName: string;
+  features: ProjectFeature[];
+  issueCosts: Record<string, number>;
+  issueCostDetails: Record<string, IssueCostBreakdown>;
+  conversations: Conversation[];
+  selectedConversation: string | null;
+  onOpenIssue: (issueId: string) => void;
+  onSelectConversation: (name: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<ProjectRightTab>(() => readProjectTab(projectName));
+  const [activeIssueId, setActiveIssueId] = useState<string | null>(() => features[0]?.issueId ?? null);
+
+  useEffect(() => {
+    setActiveTab(readProjectTab(projectName));
+    setActiveIssueId((current) => {
+      if (current && features.some((feature) => feature.issueId === current)) return current;
+      return features[0]?.issueId ?? null;
+    });
+  }, [features, projectName]);
+
+  const selectTab = (tab: ProjectRightTab) => {
+    setActiveTab(tab);
+    try { localStorage.setItem(projectTabStorageKey(projectName), tab); } catch { /* ignore */ }
+  };
+
+  const openPipelineFeature = (feature: ProjectFeature) => {
+    setActiveIssueId(feature.issueId);
+    onOpenIssue(feature.issueId);
+  };
+
+  const tabLabel = PROJECT_RIGHT_TABS.find((tab) => tab.id === activeTab)?.label ?? activeTab;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background" data-component="command-deck-right-pane-tabs">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-2" role="tablist" aria-label={`${projectName} right pane tabs`}>
+        {PROJECT_RIGHT_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === tab.id ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => selectTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {activeTab !== 'pipeline' && features.length > 0 && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Issue</span>
+          <select
+            value={activeIssueId ?? ''}
+            onChange={(event) => setActiveIssueId(event.target.value || null)}
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+            aria-label={`${tabLabel} issue`}
+          >
+            {features.map((feature) => (
+              <option key={feature.issueId} value={feature.issueId}>{feature.issueId}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-auto" role="tabpanel" data-command-deck-project-tab={activeTab}>
+        {activeTab === 'pipeline' && (
+          <ProjectOverview
+            projectName={projectName}
+            features={features}
+            issueCosts={issueCosts}
+            issueCostDetails={issueCostDetails}
+            onSelectFeature={openPipelineFeature}
+          />
+        )}
+        {activeTab !== 'pipeline' && !activeIssueId && (
+          <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
+            No project issue is available for {tabLabel}.
+          </div>
+        )}
+        {activeTab === 'plans' && activeIssueId && <VBriefTab issueId={activeIssueId} />}
+        {activeTab === 'beads' && activeIssueId && <BeadsTab issueId={activeIssueId} />}
+        {activeTab === 'conversations' && activeIssueId && (
+          <div className="flex min-h-full flex-col gap-4 p-4">
+            <DiscussionsTab issueId={activeIssueId} />
+            <div className="flex flex-col gap-2">
+              {conversations.length > 0 ? conversations.map((conversation) => (
+                <button
+                  key={conversation.name}
+                  type="button"
+                  className={`rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors ${selectedConversation === conversation.name ? 'bg-accent text-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => onSelectConversation(conversation.name)}
+                >
+                  {conversation.title ?? conversation.name}
+                </button>
+              )) : <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No project conversations.</div>}
+            </div>
+          </div>
+        )}
+        {activeTab === 'activity' && activeIssueId && <ActivityTab issueId={activeIssueId} />}
+        {activeTab === 'settings' && activeIssueId && <OverviewTab issueId={activeIssueId} />}
+      </div>
+    </div>
+  );
+}
 
 export function CommandDeck({
   issues = [],
@@ -417,6 +559,7 @@ export function CommandDeck({
 
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const openIssue = useDashboardStore((state) => state.openIssue);
 
   // Map aggregated costs per issue for the project tree sidebar and project overview.
   const { issueCosts, issueCostDetails } = useMemo(() => {
@@ -1149,7 +1292,6 @@ export function CommandDeck({
             />
           )}
 
-          <DeaconStatus />
           {versionData && (
             <div className={styles.sidebarFooter}>
               <span className={styles.versionLabel}>v{versionData.version}</span>
@@ -1200,12 +1342,15 @@ export function CommandDeck({
               issue={selectedIssue ?? undefined}
             />
           ) : selectedProject ? (
-            <ProjectOverview
+            <ProjectRightPaneTabs
               projectName={selectedProject}
               features={selectedProjectData?.features ?? []}
               issueCosts={issueCosts}
               issueCostDetails={issueCostDetails}
-              onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
+              conversations={projectConversations[selectedProject] ?? []}
+              selectedConversation={selectedConversation}
+              onOpenIssue={(issueId) => openIssue(issueId)}
+              onSelectConversation={handleSelectConversation}
             />
           ) : (
             <div className={styles.contentEmpty}>

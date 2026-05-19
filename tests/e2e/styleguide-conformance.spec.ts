@@ -218,19 +218,23 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count()).toBeGreaterThan(0);
     await expect.poll(() => pipeline.page.locator('[data-component="phase-header"]').count()).toBeGreaterThan(0);
     await expect.poll(() => pipeline.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]').count()).toBe(1);
+    await expect.poll(() => pipeline.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await pipeline.context.close();
 
     const board = await openRoute('/board');
     await expect.poll(() => board.page.locator('[data-component="issue-card"][data-issue-id="PAN-1148"]').count()).toBe(1);
+    await expect.poll(() => board.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await board.context.close();
 
     const commandDeck = await openRoute('/command-deck');
     await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
     await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count()).toBe(1);
+    await expect.poll(() => commandDeck.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await commandDeck.context.close();
 
     const agents = await openRoute('/agents');
     await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count()).toBe(1);
+    await expect.poll(() => agents.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await agents.context.close();
   }, 45_000);
 });

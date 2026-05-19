@@ -1006,11 +1006,26 @@ async function sendAgentMessage(id: string, message: string) {
   return { success: true };
 }
 
+export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) {
+    return {
+      ok: false as const,
+      response: jsonResponse({ ok: false, error: originCheck.error }, { status: 403 }),
+    };
+  }
+  return { ok: true as const };
+}
+
 function postAgentMessageLikeRoute(path: string) {
   return HttpRouter.add(
     'POST',
     path,
     httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateAgentMessageOrigin(request);
+      if (!originCheck.ok) return originCheck.response;
+
       const params = yield* HttpRouter.params;
       const id = params['id'] ?? '';
       const body = yield* readJsonBody;

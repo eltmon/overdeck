@@ -103,6 +103,7 @@ export interface Agent {
   killCount: number;
   workspace?: string;
   workspaceLocation?: 'local' | 'remote';
+  costSoFar?: number;
   git?: GitStatus;
   type?: 'agent';
   /**

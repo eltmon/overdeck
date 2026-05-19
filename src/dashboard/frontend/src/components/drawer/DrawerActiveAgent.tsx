@@ -5,7 +5,6 @@ import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegis
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import type { Agent } from '../../types';
-import { useAgentCost } from '../../hooks/useHandoffData';
 import { useDrawerData } from './useDrawerData';
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -34,7 +33,6 @@ function formatSpend(cost: number | undefined) {
 export default function DrawerActiveAgent() {
   const { agents, activityRail } = useDrawerData();
   const activeAgent = agents.find(isActiveAgent) ?? null;
-  const { data: costData } = useAgentCost(activeAgent?.id);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -50,7 +48,7 @@ export default function DrawerActiveAgent() {
   }
 
   const streamLines = activityRail.slice(0, 8).map((item) => item.message);
-  const meta = `${getFriendlyModelName(activeAgent.model)} · ${getHarness(activeAgent)} · spend ${formatSpend(costData?.cost)}`;
+  const meta = `${getFriendlyModelName(activeAgent.model)} · ${getHarness(activeAgent)} · spend ${formatSpend(activeAgent.costSoFar)}`;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

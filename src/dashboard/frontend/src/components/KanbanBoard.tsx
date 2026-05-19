@@ -1,6 +1,5 @@
-import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext, type ReactNode } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { useDashboardStore, selectAgents, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 import {
   DndContext,
@@ -19,34 +18,24 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, VolumeX, Unlock } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, XCircle, ScrollText, Pause } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
-import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { useUIPreferences } from '../hooks/useUIPreferences';
-import { ResetIssueButton } from './ResetIssueButton';
-import { StopAgentButton } from './StopAgentButton';
-import { ArtifactLinks } from './ArtifactLinks';
-import { MergeButton } from './MergeButton';
-import { RecoverButton } from './RecoverButton';
-import { getPendingQuestionTitle, hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
+import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import { formatRelativeTime } from '../lib/formatRelativeTime';
-import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
+import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
-import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
-import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 
@@ -64,89 +53,12 @@ const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   expert: 'badge-bg-destructive text-destructive-foreground',
 };
 
-function kbFormatLastHeard(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-function kbStalenessStyle(ms: number): { color: string; bg: string; border: string } {
-  if (ms < 2 * 60_000)  return { color: 'text-success',     bg: 'badge-bg-success',     border: 'border-success/40' };
-  if (ms < 10 * 60_000) return { color: 'text-warning',     bg: 'badge-bg-warning',     border: 'border-warning/40' };
-  if (ms < 30 * 60_000) return { color: 'text-orange-400',  bg: 'bg-orange-900/40',     border: 'border-orange-500/40' };
-  return                        { color: 'text-destructive', bg: 'badge-bg-destructive', border: 'border-destructive/40' };
-}
-
-function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
-  const tick = useKanbanTick();
-  if (!lastActivity) return null;
-  const ms = tick - new Date(lastActivity).getTime();
-  if (ms < 2000) return null;
-  const label = kbFormatLastHeard(ms);
-  const style = kbStalenessStyle(ms);
-  return (
-    <span
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${style.bg} ${style.color} border ${style.border}`}
-      title={`Last heard: ${label}`}
-    >
-      <Radio className="w-3 h-3" />
-      {label}
-    </span>
-  );
-}
-
-// Shared one-second tick for all KanbanBoard child components (eliminates
-// N independent setInterval timers when many agent cards are visible).
-const KanbanTickContext = createContext<number>(Date.now());
-function KanbanTickProvider({ children }: { children: ReactNode }) {
-  const [kanbanTick, setKanbanTick] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return <KanbanTickContext.Provider value={kanbanTick}>{children}</KanbanTickContext.Provider>;
-}
-function useKanbanTick() {
-  return useContext(KanbanTickContext);
-}
-
 // Difficulty badge component
 function DifficultyBadge({ level }: { level: ComplexityLevel }) {
   const color = DIFFICULTY_COLORS[level];
   return (
     <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
       {level}
-    </span>
-  );
-}
-
-// Agent type icons for badges
-const AGENT_ICONS: Record<string, string> = {
-  work: '🤖',
-  review: '👁️',
-  test: '🧪',
-  merge: '🔀'
-};
-
-// Agent attribution badge component
-function AgentBadge({
-  type,
-  isConflict
-}: {
-  type: 'work' | 'review' | 'test' | 'merge';
-  isConflict: boolean;
-}) {
-  const icon = AGENT_ICONS[type];
-  const conflictClass = isConflict ? 'animate-[pulse_2s_ease-in-out_infinite]' : '';
-
-  return (
-    <span className={`inline-flex items-center text-xs text-primary ${conflictClass}`}>
-      <span>{icon}</span>
     </span>
   );
 }
@@ -192,10 +104,6 @@ function formatCost(cost: number): string {
 }
 
 // Get cost badge color based on amount
-function getLabelStyle(_label: string): string {
-  return 'bg-muted text-muted-foreground border border-border';
-}
-
 function getCostColor(_cost: number): string {
   return 'bg-popover text-muted-foreground';
 }
@@ -1164,6 +1072,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
   const [, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  const [columnOrderOverrides, setColumnOrderOverrides] = useState<Record<string, string[]>>({});
 
   // Undo state
   const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
@@ -1389,10 +1298,31 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [issues]);
 
   // Handle drag end
-  const handleDragEnd = useCallback((_event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    const activeIssue = active.data.current?.issue as Issue | undefined;
+    const overIssue = issues.find((issue) => issue.id === over?.id || issue.identifier === over?.id);
+
+    if (activeIssue && overIssue && activeIssue.id !== overIssue.id) {
+      const activeStatus = STATUS_LABELS[activeIssue.status] as CanonicalState | undefined;
+      const overStatus = STATUS_LABELS[overIssue.status] as CanonicalState | undefined;
+      if (activeStatus && activeStatus === overStatus) {
+        setColumnOrderOverrides((prev) => {
+          const sourceOrder = prev[activeStatus] ?? issues
+            .filter((issue) => STATUS_LABELS[issue.status] === activeStatus)
+            .map((issue) => issue.identifier);
+          const nextOrder = sourceOrder.filter((id) => id !== activeIssue.identifier);
+          const overIndex = nextOrder.indexOf(overIssue.identifier);
+          if (overIndex === -1) return prev;
+          nextOrder.splice(overIndex, 0, activeIssue.identifier);
+          return { ...prev, [activeStatus]: nextOrder };
+        });
+      }
+    }
+
     setActiveDragIssue(null);
     setActiveDragStatus(null);
-  }, []);
+  }, [issues]);
 
   // Confirm agent warning
   const confirmAgentMove = useCallback(() => {
@@ -1603,8 +1533,21 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
     }
+
+    for (const status of Object.keys(result)) {
+      const order = columnOrderOverrides[status];
+      if (!order) continue;
+      const rank = new Map(order.map((id, index) => [id, index]));
+      result[status] = [...result[status]].sort((a, b) => {
+        const aRank = rank.get(a.identifier) ?? Number.MAX_SAFE_INTEGER;
+        const bRank = rank.get(b.identifier) ?? Number.MAX_SAFE_INTEGER;
+        if (aRank !== bRank) return aRank - bRank;
+        return 0;
+      });
+    }
+
     return result;
-  }, [grouped, planningStateById]);
+  }, [columnOrderOverrides, grouped, planningStateById]);
 
   const kanbanIssueIds = useMemo(() => {
     if (cycleFilter === 'all' || cycleFilter === 'backlog' || cycleFilter === 'canceled') return [];
@@ -1615,7 +1558,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
 
   return (
-    <KanbanTickProvider>
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex flex-col gap-2">
@@ -1998,7 +1940,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onClose={handleCloseProgress}
       />
     </div>
-    </KanbanTickProvider>
   );
 }
 
@@ -2060,7 +2001,7 @@ function ColumnContent({
 
     return (
       <DraggableCardWrapper key={issue.id} issue={issue}>
-        <IssueCard
+        <BoardIssueCard
           issue={issue}
         workAgent={workAgent}
         workAgents={workAgents}
@@ -2170,10 +2111,18 @@ interface DraggableCardWrapperProps {
 }
 
 function DraggableCardWrapper({ issue, children }: DraggableCardWrapperProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef: setDraggableNodeRef, transform, isDragging } = useDraggable({
     id: issue.id,
     data: { issue },
   });
+  const { setNodeRef: setDroppableNodeRef } = useDroppable({
+    id: issue.id,
+    data: { issue },
+  });
+  const setNodeRef = useCallback((node: HTMLDivElement | null) => {
+    setDraggableNodeRef(node);
+    setDroppableNodeRef(node);
+  }, [setDraggableNodeRef, setDroppableNodeRef]);
 
   const style = transform
     ? {
@@ -2691,92 +2640,28 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
-  const queryClient = useQueryClient();
-  const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
-  const showAlert = useAlert();
+function BoardIssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const { prefs: _prefs } = useUIPreferences();
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
-  const stackHealthDetails = stackHealth?.reasons.join('; ');
-  const ttsMute = useTtsIssueMute(issue.identifier || '');
 
-  // Auto-scroll into view when selected via search
   useEffect(() => {
     if (isSelected && cardRef.current) {
       cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
   }, [isSelected]);
 
-  // Review status for merge-readiness badge
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
   const isClosedNotMerged = reviewStatus?.mergeStatus === 'failed' || issue.mergeStatus === 'failed';
   const isReadyToMerge = !isMerged && !isClosedNotMerged && reviewStatus?.readyForMerge === true;
-
-  // PAN-796: toast on pipeline recovery events
-  const prevStuckRef = useRef(reviewStatus?.stuck);
-  const prevAutoRequeueRef = useRef(reviewStatus?.autoRequeueCount);
-  useEffect(() => {
-    const id = issue.identifier || '';
-    if (!id) return;
-    const wasStuck = prevStuckRef.current;
-    const prevRequeue = prevAutoRequeueRef.current ?? 0;
-    const nowStuck = reviewStatus?.stuck;
-    const nowRequeue = reviewStatus?.autoRequeueCount ?? 0;
-    prevStuckRef.current = nowStuck;
-    prevAutoRequeueRef.current = nowRequeue;
-    if (!wasStuck && nowStuck && reviewStatus?.stuckReason === 'review_infrastructure_failure') {
-      toast.error(`${id}: Review circuit breaker tripped after ${reviewStatus.reviewRetryCount ?? 0} retries`, { duration: 8000 });
-    }
-    if (wasStuck && !nowStuck) {
-      toast.success(`${id}: Review pipeline recovered`, { duration: 5000 });
-    }
-    if (nowRequeue > prevRequeue && nowRequeue > 0 && !nowStuck) {
-      toast.warning(`${id}: Auto-requeued (${nowRequeue}/7)`, { duration: 5000 });
-    }
-  }, [reviewStatus?.stuck, reviewStatus?.autoRequeueCount, reviewStatus?.stuckReason, reviewStatus?.reviewRetryCount, issue.identifier]);
-
-  // Determine which agent is relevant based on issue status
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
-  const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
-  // PAN-1048: see comment on the earlier standbyAgent — derive from role + live tmux.
-  const standbyAgent = issueWorkAgents.find(
-    (candidate) =>
-      candidate.status === 'stopped' &&
-      (candidate.role ?? 'work') === 'work' &&
-      !!candidate.lifecycle?.hasLiveTmuxSession,
-  );
-  const isStandby = !!standbyAgent;
-  const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;
-  const hasMultipleWorkAgents = issueWorkAgents.length > 1;
-  // Show "Watch Planning" when planning agent is starting or has a live session
-  const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'running' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
-
-  // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
-  const agent = activeAgent || planningAgent;
-  const controlledAgent = activeAgent && (activeAgent.role ?? 'work') === 'work' ? activeAgent : undefined;
-
-  // Compute agent idle duration for "inactive" badge
-  const agentIdleMinutes = (() => {
-    if (!agent?.lastActivity || !isRunning) return 0;
-    const ms = Date.now() - new Date(agent.lastActivity).getTime();
-    return Math.floor(ms / 60000);
-  })();
-  // Show inactive badge when agent hasn't acted in > 30 min (stuck threshold)
-  const isAgentIdle = agentIdleMinutes >= 30;
-
-  // Check if issue has "Review Ready" label (agent completed work)
-  // Don't show on terminal states — "ready for review" is meaningless once done/canceled
+  const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
+  const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
-  const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
-  const hasPendingQuestion = hasActualPendingQuestion(agent);
-  const pendingQuestionTitle = getPendingQuestionTitle(agent);
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
-  const pipelineCallToAction = canonical === 'in_review' ? getPipelineCallToAction(reviewStatus) : null;
   const phaseLabel =
     canonical === 'backlog' ? 'Backlog' :
     canonical === 'todo' ? 'Ready to start' :
@@ -2790,315 +2675,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :
     canonical === 'in_review' ? <VerbBadge variant="REVIEW RUNNING" /> :
     canonical === 'in_progress' && isRunning ? <VerbBadge variant="WORK RUNNING" /> :
-    canonical === 'todo' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
-    canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
+    canonical === 'todo' || canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
     null;
-  const controlledAgentCompletedStopped = controlledAgent?.status === 'stopped' && controlledAgent.runtimeState === 'completed' && controlledAgent.paused !== true && controlledAgent.troubled !== true;
-  const pauseTitle = [
-    'Paused',
-    controlledAgent?.pausedReason ? `Reason: ${controlledAgent.pausedReason}` : undefined,
-    controlledAgent?.pausedAt ? `Paused: ${formatRelativeTime(controlledAgent.pausedAt, new Date())}` : undefined,
-  ].filter(Boolean).join('\n');
-  const troubledTitle = controlledAgent ? [
-    `${controlledAgent.consecutiveFailures ?? 0} consecutive failure${(controlledAgent.consecutiveFailures ?? 0) === 1 ? '' : 's'}`,
-    controlledAgent.lastFailureReason ? `Last reason: ${controlledAgent.lastFailureReason}` : undefined,
-    controlledAgent.lastFailureAt ? `Last failure: ${formatRelativeTime(controlledAgent.lastFailureAt, new Date())}` : undefined,
-    controlledAgent.lastFailureNextRetryAt ? `Next retry: ${formatRelativeTime(controlledAgent.lastFailureNextRetryAt, new Date())}` : undefined,
-  ].filter(Boolean).join('\n') : '';
-  const agentGatingReason = controlledAgent && !isRunning && !controlledAgentCompletedStopped
-    ? controlledAgent.paused === true
-      ? 'Paused'
-      : controlledAgent.troubled === true
-        ? `Troubled (${controlledAgent.consecutiveFailures ?? 0} failure${(controlledAgent.consecutiveFailures ?? 0) === 1 ? '' : 's'})`
-        : noResumeMode?.active === true
-          ? 'Boot --no-resume'
-          : canonical === 'in_progress'
-            ? 'Manual'
-            : undefined
-    : undefined;
-  const agentGatingTitle = agentGatingReason === 'Boot --no-resume' && noResumeMode?.since
-    ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, new Date())}`
-    : agentGatingReason;
-  const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-border/70 bg-card/80 px-2.5 py-2';
-
-  // Planning-state is embedded in the issue from /api/issues (server-side
-  // filesystem checks). No per-card fetch needed.
   const hasPlan = planningStateProp?.hasPlan ?? issue.hasPlan ?? false;
   const hasBeads = planningStateProp?.hasBeads ?? issue.hasBeads ?? false;
-  const planningComplete = planningStateProp?.planningComplete ?? issue.planningComplete ?? false;
-  const artifactLinks = (
-    <ArtifactLinks
-      issueId={issue.identifier || ''}
-      hasPlan={hasPlan}
-      hasBeads={hasBeads}
-      onViewBeads={() => onViewBeads && onViewBeads(issue)}
-      onViewVBrief={() => onViewVBrief && onViewVBrief(issue)}
-      variant="card"
-    />
-  );
-
-  // Plan/See Plan chip — opens the planning dialog. Green "See Plan" when a
-  // plan already exists (clearer than "Re-plan" when the user is *continuing*
-  // an in-progress planning session, not starting over).
-  const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
-  const planChip = (
-    <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
-      <button
-        data-testid={`action-plan-${issue.identifier}`}
-        onClick={(e) => handlePlan(e)}
-        className={`flex items-center gap-1 text-xs transition-colors px-2 py-1 ${
-          planLabelExists
-            ? 'text-success hover:text-success/80'
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
-        title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
-      >
-        <FileText className="w-3.5 h-3.5" />
-        {planLabelExists ? 'See Plan' : 'Plan…'}
-      </button>
-      {!planLabelExists && (
-        <button
-          data-testid={`action-auto-plan-${issue.identifier}`}
-          onClick={(e) => handlePlan(e, true)}
-          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 border-l border-border/70 px-2 py-1 transition-colors"
-          title="Run non-interactive planning"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          Auto-plan
-        </button>
-      )}
-    </div>
-  );
-
-  // Send message mutation
-  const [messageInput, setMessageInput] = useState('');
-  const [showMessageInput, setShowMessageInput] = useState(false);
-  const [showPauseReason, setShowPauseReason] = useState(false);
-  const [pauseReason, setPauseReason] = useState('');
-
-  const pauseAgentMutation = useMutation({
-    mutationFn: async ({ agentId, reason }: { agentId: string; reason?: string }) => {
-      const res = await fetch(`/api/agents/${agentId}/pause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reason ? { reason } : {}),
-      });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to pause agent');
-      }
-      return res.json();
-    },
-    onSuccess: async (_updated, variables) => {
-      await refreshDashboardState(queryClient);
-      setShowPauseReason(false);
-      setPauseReason('');
-      showAlert({ message: `Paused ${variables.agentId}`, variant: 'success' });
-    },
-    onError: (error: Error) => {
-      showAlert({ message: `Failed to pause agent: ${error.message}`, variant: 'error' });
-    },
-  });
-
-  const unpauseAgentMutation = useMutation({
-    mutationFn: async (agentId: string) => {
-      const res = await fetch(`/api/agents/${agentId}/unpause`, { method: 'POST' });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to unpause agent');
-      }
-      return res.json();
-    },
-    onSuccess: async (_updated, agentId) => {
-      await refreshDashboardState(queryClient);
-      showAlert({ message: `Unpaused ${agentId}`, variant: 'success' });
-    },
-    onError: (error: Error) => {
-      showAlert({ message: `Failed to unpause agent: ${error.message}`, variant: 'error' });
-    },
-  });
-
-  const clearTroubledAgentMutation = useMutation({
-    mutationFn: async (agentId: string) => {
-      const res = await fetch(`/api/agents/${agentId}/untroubled`, { method: 'POST' });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to clear troubled state');
-      }
-      return res.json();
-    },
-    onSuccess: async (_updated, agentId) => {
-      await refreshDashboardState(queryClient);
-      showAlert({ message: `Cleared troubled state for ${agentId}`, variant: 'success' });
-    },
-    onError: (error: Error) => {
-      showAlert({ message: `Failed to clear troubled state: ${error.message}`, variant: 'error' });
-    },
-  });
-
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ agentId, message }: { agentId: string; message: string }) => {
-      const res = await fetch(`/api/agents/${agentId}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
-      if (!res.ok) throw new Error('Failed to send message');
-      return res.json();
-    },
-    onSuccess: () => {
-      setMessageInput('');
-      setShowMessageInput(false);
-    },
-  });
-
-  const handleTell = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMessageInput(!showMessageInput);
-  };
-
-  const handlePauseClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowPauseReason(true);
-  };
-
-  const handlePauseSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!controlledAgent) return;
-    pauseAgentMutation.mutate({ agentId: controlledAgent.id, reason: pauseReason.trim() || undefined });
-  };
-
-  const handlePauseCancel = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowPauseReason(false);
-    setPauseReason('');
-  };
-
-  const handleUnpause = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (controlledAgent) unpauseAgentMutation.mutate(controlledAgent.id);
-  };
-
-  const handleClearTroubled = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (controlledAgent) clearTroubledAgentMutation.mutate(controlledAgent.id);
-  };
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (agent && messageInput.trim()) {
-      sendMessageMutation.mutate({ agentId: agent.id, message: messageInput.trim() });
-    }
-  };
-
-  const [isResuming, setIsResuming] = useState(false);
-  const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (isResuming && isRunning) {
-      setIsResuming(false);
-      if (resumingTimeoutRef.current) clearTimeout(resumingTimeoutRef.current);
-    }
-  }, [isResuming, isRunning]);
-
-  const resumeSessionMutation = useMutation({
-    mutationFn: async () => {
-      const agentId = activeAgent?.id;
-      if (!agentId) throw new Error('No agent to resume');
-      const res = await fetch(`/api/agents/${agentId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        let message = `Failed to resume session (${res.status})`;
-        try {
-          const data = JSON.parse(text);
-          message = data.error || message;
-        } catch {
-          message = text.length < 200 ? text : message;
-        }
-        throw new Error(message);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setIsResuming(true);
-      resumingTimeoutRef.current = setTimeout(() => setIsResuming(false), 60000);
-      refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      // If the agent is already running, the store snapshot is just stale — refresh it silently
-      if (err.message.includes('runtime=active') || err.message.includes('status=running')) {
-        setIsResuming(false);
-        refreshDashboardState(queryClient);
-        return;
-      }
-      showAlert({ message: `Failed to resume session: ${err.message}`, variant: 'error' });
-    },
-  });
-
-  const handleResumeSession = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    resumeSessionMutation.mutate();
-  };
-
-  // In Review card with stopped agent = "session lost" / needs recovery.
-  // Exclude agents that completed normally (runtimeState === 'completed') — those transitioned
-  // to in_review intentionally and don't need recovery.
-  const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped'
-    && canonical === 'in_review'
-    && activeAgent?.runtimeState !== 'completed';
-
-  const handlePlan = (e: React.MouseEvent, autoStart = false) => {
-    e.stopPropagation();
-    onPlan(autoStart);
-  };
-
-  const agentLifecycleControls = controlledAgent ? (
-    <>
-      {controlledAgent.paused === true ? (
-        <button
-          onClick={handleUnpause}
-          disabled={unpauseAgentMutation.isPending}
-          className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors disabled:opacity-50"
-          title={controlledAgent.pausedReason ? `Unpause agent (${controlledAgent.pausedReason})` : 'Unpause agent'}
-          data-testid={`card-agent-unpause-${issue.identifier}`}
-        >
-          {unpauseAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
-          Unpause
-        </button>
-      ) : (
-        <button
-          onClick={handlePauseClick}
-          disabled={pauseAgentMutation.isPending}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-warning transition-colors disabled:opacity-50"
-          title="Pause agent"
-          data-testid={`card-agent-pause-${issue.identifier}`}
-        >
-          {pauseAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
-          Pause
-        </button>
-      )}
-      {controlledAgent.troubled === true && (
-        <button
-          onClick={handleClearTroubled}
-          disabled={clearTroubledAgentMutation.isPending}
-          className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors disabled:opacity-50"
-          title={troubledTitle || 'Clear troubled state'}
-          data-testid={`card-agent-clear-troubled-${issue.identifier}`}
-        >
-          {clearTroubledAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-          Clear troubled
-        </button>
-      )}
-    </>
-  ) : null;
-
-  // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
+  const progressTotal = Number(hasPlan) + Number(hasBeads) + Number(planningStateProp?.planningComplete ?? issue.planningComplete ?? false);
+  const issueSpecialists = specialists.filter((specialist) => specialist.status !== 'stopped');
 
   return (
     <IssueCardPrimitive
@@ -3112,7 +2694,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       mergeReadyCard={isReadyToMerge}
       runningCard={isRunning}
       unhealthyCard={isStackUnhealthy}
-      sessionLostCard={isSessionLost}
+      sessionLostCard={false}
       onClick={onSelect}
     >
       <div className="relative p-4">
@@ -3123,907 +2705,63 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 <input
                   type="checkbox"
                   checked={isBulkSelected || false}
-                  onChange={(e) => {
-                    e.stopPropagation();
+                  onChange={(event) => {
+                    event.stopPropagation();
                     onBulkToggle();
                   }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
+                  onClick={(event) => event.stopPropagation()}
+                  className="h-4 w-4 shrink-0 cursor-pointer rounded border-border text-primary focus:ring-primary"
                   aria-label={`Select ${issue.identifier}`}
                 />
               )}
-              {issue.project && (
-                <span
-                  className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_0_4px_rgba(255,255,255,0.05)]"
-                  style={{ backgroundColor: issue.project.color || '#6b7280' }}
-                  title={issue.project.name}
-                />
-              )}
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                {phaseLabel}
-              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{phaseLabel}</span>
               {cardVerbBadge}
-              {issue.source === 'github' && (
-                <span title="GitHub Issue" className="inline-flex items-center">
-                  <Github className="w-3 h-3 text-muted-foreground" />
-                </span>
-              )}
-              <a
-                href={issue.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-foreground hover:text-primary"
-              >
-                <span>{issue.identifier}</span>
-                <ExternalLink className="w-3 h-3 opacity-50" />
-              </a>
             </div>
-
-            <p className="mt-2 text-[15px] font-medium leading-5 text-foreground line-clamp-2">
-              {issue.title}
-            </p>
-
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              {(issue.labels || [])
-                .filter((label) => typeof label === 'string' && !['review ready', 'needs-close-out', 'merged', 'closed-out'].includes(label.toLowerCase()))
-                .slice(0, 3)
-                .map((label) => (
-                  <span
-                    key={label}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${getLabelStyle(label)}`}
-                  >
-                    {label}
-                  </span>
-                ))}
-              {issue.assignee && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/80 px-2.5 py-1 text-[11px] text-muted-foreground">
-                  <User className="w-3 h-3" />
-                  {issue.assignee.name.split(' ')[0]}
-                </span>
-              )}
-              {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                    (activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
-                      ? 'badge-bg-signal-cost text-signal-cost-foreground'
-                      : 'border border-border/70 bg-card/80 text-muted-foreground'
-                  }`}
-                  title={(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
-                >
-                  {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
-                    <Cloud className="w-3 h-3" />
-                  ) : (
-                    <Monitor className="w-3 h-3" />
-                  )}
-                  {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
-                </span>
-              )}
+            <div className="mt-3 flex min-w-0 items-center gap-2">
+              <span className="shrink-0 font-mono text-sm font-semibold text-muted-foreground">{issue.identifier}</span>
+              <span className="truncate text-sm font-semibold text-foreground">{issue.title}</span>
             </div>
-
-            {hasMultipleWorkAgents && (
-              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Swarm
-                </span>
-                {issueWorkAgents.map((workSessionAgent, index) => {
-                  const attachable = isAgentSessionAttachable(workSessionAgent);
-                  return (
-                    <span
-                      key={workSessionAgent.id}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
-                        attachable
-                          ? 'badge-bg-primary text-primary-foreground'
-                          : 'border border-border/70 bg-card text-muted-foreground'
-                      }`}
-                      title={workSessionAgent.id}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${attachable ? 'bg-primary-foreground/90' : 'bg-muted-foreground'}`} />
-                      {getWorkSessionLabel(workSessionAgent, index)}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-            {/* Project color indicator */}
-            {isRunning && (
-              <div className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
-              </div>
-            )}
-            {isResuming && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-primary text-primary-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Resuming…
-              </span>
-            )}
-            {isSessionLost && (
-              <span
-                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-warning text-warning-foreground"
-                title="Session lost — agent was running when the system stopped. Resume session to continue."
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-warning-foreground animate-pulse" />
-                Session lost
-              </span>
-            )}
-            {controlledAgent?.paused === true && (
-              <span
-                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
-                title={pauseTitle}
-                data-testid={`card-agent-paused-${issue.identifier}`}
-              >
-                <Pause className="w-3 h-3" />
-                Paused
-              </span>
-            )}
-            {controlledAgent?.troubled === true && (
-              <span
-                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-destructive text-destructive-foreground"
-                title={troubledTitle || 'Troubled'}
-                data-testid={`card-agent-troubled-${issue.identifier}`}
-              >
-                <AlertTriangle className="w-3 h-3" />
-                Troubled
-              </span>
-            )}
-            {agentGatingReason && (
-              <span
-                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30"
-                title={agentGatingTitle}
-                data-testid={`card-agent-gating-${issue.identifier}`}
-              >
-                {agentGatingReason}
-              </span>
-            )}
-            {/* Agent attribution badges */}
-            {(() => {
-              const badges = [];
-              // Conflict detection: multiple agents working on same issue
-              const hasConflict = (!!workAgent && specialists.length > 0) ||
-                                  specialists.length > 1;
-
-              if (workAgent) {
-                badges.push({
-                  type: 'work' as const,
-                  name: 'work' // Don't show issue ID - it's already displayed in the card header
-                });
-              }
-              for (const spec of specialists) {
-                // PAN-1048 — role primitive directly maps to the AgentBadge type.
-                // Map ship → merge for the legacy badge palette so reviewers
-                // still see the familiar "merge" indicator.
-                const specType = (spec.role === 'ship' ? 'merge' : spec.role) as 'review' | 'test' | 'merge';
-                if (specType !== 'review' && specType !== 'test' && specType !== 'merge') continue;
-                badges.push({ type: specType, name: specType });
-              }
-
-              return badges.map((b, i) => (
-                <AgentBadge key={i} type={b.type} isConflict={hasConflict} />
-              ));
-            })()}
-            {/* Plan Failed badge - shown when planning agent spawn failed */}
-            {planningAgent?.status === 'failed' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-destructive text-destructive-foreground animate-pulse hover:bg-destructive/30 transition-colors cursor-pointer"
-                title={planningAgent.error ? `Planning failed: ${planningAgent.error}` : 'Planning agent failed to start — click to retry'}
-              >
-                <XCircle className="w-3 h-3" />
-                Plan Failed
-              </button>
-            )}
-            {/* Planning badge - clickable to watch the active planning session */}
-            {planningAgent && planningAgent.status !== 'stopped' && planningAgent.status !== 'failed' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onPlan(); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-signal-review text-signal-review-foreground animate-pulse hover:bg-signal-review/30 transition-colors cursor-pointer"
-                title="Planning in progress — click to watch"
-              >
-                <Sparkles className="w-3 h-3" />
-                Planning
-              </button>
-            )}
-            {/* Planning Complete badge — planning done, waiting for user to start work agent */}
-            {planningComplete && !isRunning && !isTerminal && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold badge-bg-success text-success-foreground border badge-border-success uppercase tracking-wide"
-                title="Planning complete — open the drawer to start implementation"
-              >
-                <Sparkles className="w-3 h-3" />
-                Ready
-              </span>
-            )}
-            {/* Workspace location badge - shows for any agent with a workspace */}
-            {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
-              <span
-                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  (activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
-                    ? 'badge-bg-signal-cost text-signal-cost-foreground'
-                    : 'bg-card text-muted-foreground border border-border'
-                }`}
-                title={(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
-              >
-                {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
-                  <Cloud className="w-3 h-3" />
-                ) : (
-                  <Monitor className="w-3 h-3" />
-                )}
-                {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
-              </span>
-            )}
-            {/* Review Ready badge - prominent indicator that agent completed work */}
-            {isReviewReady && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground animate-pulse"
-                title="Agent completed work - ready for human review"
-              >
-                <CheckCheck className="w-3 h-3" />
-                Ready
-              </span>
-            )}
-            {/* Awaiting Input badge - agent is waiting for user response */}
-            {!isTerminal && hasPendingQuestion && (
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect();
-                }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-warning text-warning-foreground border border-warning/50 animate-pulse cursor-pointer hover:bg-warning/90 uppercase tracking-wide"
-                title={`${pendingQuestionTitle} — click to open inspector`}
-                data-testid={`card-input-${issue.identifier}`}
-              >
-                <AlertTriangle className="w-3 h-3" />
-                Input
-              </span>
-            )}
-            {isPipelineStuck && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse uppercase tracking-wide"
-                title="Pipeline is blocked by a failed review, test, rebase, or verification step. Use Recover to rerun the pipeline."
-              >
-                <AlertTriangle className="w-3 h-3" />
-                Stuck
-              </span>
-            )}
-            {pipelineCallToAction && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground border border-warning/40"
-                title={pipelineCallToAction.title}
-                data-testid={`card-review-test-${issue.identifier}`}
-              >
-                <AlertCircle className="w-3 h-3" />
-                {pipelineCallToAction.label}
-              </span>
-            )}
-            {isStackUnhealthy && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-destructive text-destructive-foreground border border-destructive/50"
-                title={stackHealthDetails || 'Workspace Docker stack is unhealthy'}
-                data-testid={`card-stack-health-${issue.identifier}`}
-              >
-                <AlertTriangle className="w-3 h-3" />
-                Workspace unhealthy
-              </span>
-            )}
-            {/* Lifecycle resolution badges (PAN-309) */}
-            {shouldShowAgentDoneBadge({
-              issueStatus: issue.status,
-              isTerminal,
-              isPipelineStuck,
-              resolution: agent?.resolution,
-              hasPendingQuestion,
-            }) && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success text-foreground"
-                title="Agent evidence shows work is complete — waiting for agent to call pan done"
-              >
-                <CheckCircle className="w-3 h-3" />
-                Done
-              </span>
-            )}
-            {!isTerminal && !isPipelineStuck && agent?.resolution === 'stuck' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground animate-pulse"
-                title={`Agent appears stuck — no clear progress signal after ${agent.resolutionCount || 0} check(s). Consider sending a message.`}
-              >
-                <XCircle className="w-3 h-3" />
-                Stuck
-              </span>
-            )}
-            {!isTerminal && !isPipelineStuck && agent?.resolution === 'abandoned' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-destructive text-foreground border border-yellow-500"
-                title="Deacon exhausted its poke budget — agent needs human attention"
-              >
-                <XCircle className="w-3 h-3" />
-                Abandoned
-              </span>
-            )}
-            {!isTerminal && !isPipelineStuck && agent?.resolution === 'needs_input' && !hasPendingQuestion && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse"
-                title="Agent stopped because it needs human input or hit a blocker"
-              >
-                <AlertCircle className="w-3 h-3" />
-                Blocked
-              </span>
-            )}
-            {!isTerminal && agent?.resolution === 'api_error' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/60 text-orange-300 border border-orange-500/40"
-                title="Agent hit a transient API error — auto-retry nudge sent"
-              >
-                <AlertCircle className="w-3 h-3" />
-                API Error
-              </span>
-            )}
-            {/* Compacting badge — shown when agent is compressing context */}
-            {isRunning && activeAgent?.runtimeState === 'compacting' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-violet-900/60 text-violet-300 border border-violet-500/40 animate-pulse"
-                title="Agent is compressing its context window — messages sent now will be processed after compaction"
-              >
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Compacting
-              </span>
-            )}
-            {/* Last heard — live staleness indicator for any running agent */}
-            {!isTerminal && isRunning && agent?.lastActivity && (
-              <LiveLastHeardBadge lastActivity={agent.lastActivity} />
-            )}
-            {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
-            {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && agent?.resolution !== 'abandoned' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
-                title={`Agent has not been active for ${agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h ${agentIdleMinutes % 60}m` : `${agentIdleMinutes}m`} — Deacon will poke it`}
-              >
-                <AlertTriangle className="w-3 h-3" />
-                {agentIdleMinutes >= 60 ? `${Math.floor(agentIdleMinutes / 60)}h idle` : `${agentIdleMinutes}m idle`}
-              </span>
-            )}
-            {/* Tracker vs Shadow state badges */}
-            {issue.source === 'rally' && <TrackerShadowBadges issue={issue} />}
-            {/* Difficulty badge */}
-            {(() => {
-              const difficulty = parseDifficultyLabel(issue.labels || []);
-              return difficulty ? <DifficultyBadge level={difficulty} /> : null;
-            })()}
-            {/* Ready to merge badge — yellow indicator when review+tests passed */}
-            {isReadyToMerge && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-yellow-900/60 text-yellow-300 border border-yellow-500/40 uppercase tracking-wide"
-                title="Review and tests passed — ready for human merge approval"
-              >
-                <GitMerge className="w-3 h-3" />
-                Ready
-              </span>
-            )}
-            {/* Per-issue Deacon pause toggle — on every card, any state. */}
-            <DeaconIgnoreButton
-              issueIdentifier={issue.identifier || ''}
-              ignored={reviewStatus?.deaconIgnored === true}
-              reason={reviewStatus?.deaconIgnoredReason}
-            />
-            {/* PAN-794: review-infra breaker tripped — distinct copy/flow from DivergedBadge. */}
-            {reviewStatus?.stuck && reviewStatus.stuckReason === 'review_infrastructure_failure' && (
-              <ReviewInfraStuckBadge
-                issueIdentifier={issue.identifier || ''}
-                retries={reviewStatus.reviewRetryCount ?? 0}
-                recoveryStartedAt={reviewStatus.recoveryStartedAt}
-              />
-            )}
-            {/* PAN-796: per-role review sub-status dots during active review */}
-            {reviewStatus?.reviewStatus === 'reviewing' && reviewStatus.reviewSubStatuses && Object.keys(reviewStatus.reviewSubStatuses).length > 0 && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-900/50 text-blue-200 border border-blue-500/40"
-                title={Object.entries(reviewStatus.reviewSubStatuses).map(([role, st]) => `${role}: ${st}`).join(', ')}
-              >
-                {Object.entries(reviewStatus.reviewSubStatuses).map(([role, st]) => (
-                  <span key={role} className="flex items-center gap-0.5" title={`${role}: ${st}`}>
-                    <span className={`w-2 h-2 rounded-full ${st === 'done' ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
-                    <span className="text-[10px]">{role.slice(0, 3)}</span>
-                  </span>
-                ))}
-              </span>
-            )}
-            {/* PAN-796: auto-requeue count badge (shown during active recovery, not when stuck — stuck has its own badge) */}
-            {!reviewStatus?.stuck && (reviewStatus?.autoRequeueCount ?? 0) > 0 && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/50 text-orange-200 border border-orange-500/40"
-                title={`Auto-requeued ${reviewStatus!.autoRequeueCount} time(s) — circuit breaker at 7`}
-              >
-                <RefreshCw className="w-3 h-3" />
-                {reviewStatus!.autoRequeueCount}/7
-              </span>
-            )}
-            {/* PAN-796: test retry count badge */}
-            {(reviewStatus?.testRetryCount ?? 0) > 0 && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/50 text-orange-200 border border-orange-500/40"
-                title={`Test dispatch retried ${reviewStatus!.testRetryCount} time(s)`}
-              >
-                <RotateCcw className="w-3 h-3" />
-                Tests: {reviewStatus!.testRetryCount}
-              </span>
-            )}
-            {/* Diverged / stuck badge — shown when gitPush threw MainDivergedError */}
-            {reviewStatus?.stuck && reviewStatus.stuckReason !== 'review_infrastructure_failure' && (
-              <DivergedBadge
-                issueIdentifier={issue.identifier || ''}
-                stuckReason={reviewStatus.stuckReason}
-                stuckDetails={reviewStatus.stuckDetails}
-              />
-            )}
-            {/* Merged badge — prominent indicator for verified merges on Done cards */}
-            {isMerged && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-success text-success-foreground uppercase tracking-wide"
-                title="Branch verified merged into main"
-              >
-                <GitMerge className="w-3 h-3" />
-                Merged
-              </span>
-            )}
-            {/* Needs close-out badge - amber indicator for reopened issues needing review */}
-            {issue.labels?.some(l => l.toLowerCase() === 'needs-close-out') && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground"
-                title="Reopened for close-out review — verify this work is complete, then click Close Out"
-              >
-                <AlertTriangle className="w-3 h-3" />
-                Needs Review
-              </span>
-            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              {issue.project && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{issue.project.name}</span>}
+              <span className="rounded-full border border-border bg-muted px-2 py-0.5">beads {progressTotal}/3</span>
+              {activeAgent && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{activeAgent.id} · {getFriendlyModelName(activeAgent.model)}</span>}
+              {issueSpecialists.length > 0 && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{issueSpecialists.length} specialists</span>}
             </div>
           </div>
-
-          <div className="shrink-0 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                ttsMute.toggle();
-              }}
-              disabled={ttsMute.loading || ttsMute.pending}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition-colors disabled:opacity-50 ${
-                ttsMute.muted
-                  ? 'border-warning/50 bg-warning/15 text-warning hover:bg-warning/25'
-                  : 'border-border/70 bg-card/80 text-muted-foreground hover:text-foreground hover:bg-popover'
-              }`}
-              title={ttsMute.muted ? 'Unmute TTS for this issue' : 'Mute TTS for this issue'}
-              aria-label={ttsMute.muted ? `Unmute TTS for ${issue.identifier}` : `Mute TTS for ${issue.identifier}`}
-              aria-pressed={ttsMute.muted}
-              data-testid={`card-tts-mute-${issue.identifier}`}
-            >
-              <VolumeX className="w-3.5 h-3.5" />
-            </button>
-            {costsLoading && !cost && (
-              <span className="inline-block h-7 w-16 rounded-full bg-popover animate-pulse" />
-            )}
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {costsLoading && !cost && <span className="inline-block h-6 w-14 animate-pulse rounded-full bg-popover" />}
             {cost && cost.totalCost > 0 && (
               <button
-                onClick={(e) => { e.stopPropagation(); setShowCostModal(true); }}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-all hover:ring-1 hover:ring-white/20 ${getCostColor(cost.totalCost)}`}
-                title="Click for cost breakdown"
+                type="button"
+                onClick={(event) => { event.stopPropagation(); setShowCostModal(true); }}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${getCostColor(cost.totalCost)}`}
                 data-testid={`card-cost-${issue.identifier}`}
               >
-                <DollarSign className="w-3 h-3" />
+                <DollarSign className="h-3 w-3" />
                 {formatCost(cost.totalCost).slice(1)}
               </button>
             )}
-          </div>
-        </div>
-
-      {/* Action buttons for running agents */}
-      {isRunning && (
-        <div className={actionBarClass}>
-          {artifactLinks}
-          {agentLifecycleControls}
-          <button
-            onClick={handleTell}
-            className={`flex items-center gap-1 text-xs transition-colors ${
-              showMessageInput ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Tell"
-            data-testid={`card-tell-${issue.identifier}`}
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            Tell
-          </button>
-          {canonical === 'in_review' && !isTerminal && (
-            <RecoverButton
-              issueId={issue.identifier}
-              reviewStatus={reviewStatus}
-              variant="card"
-              data-testid={`card-recover-${issue.identifier}`}
-            />
-          )}
-          <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
-          <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
-          {/* Model badge */}
-          {activeAgent && activeAgent.model && (
-            <span className="flex-1 text-center text-[10px] text-foreground font-medium">
-              {getFriendlyModelName(activeAgent.model)}
-            </span>
-          )}
-          <StopAgentButton
-            agentId={agent?.id}
-            variant="card"
-            data-testid={`card-stop-${issue.identifier}`}
-          />
-        </div>
-      )}
-
-      {/* Message input for Tell */}
-      {showMessageInput && agent && (
-        <form
-          onSubmit={handleSendMessage}
-          className="mt-2"
-          onClick={(e) => e.stopPropagation()}
-          data-testid={`card-tell-form-${issue.identifier}`}
-        >
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 bg-card text-foreground text-sm px-3 py-1.5 rounded border border-border focus:border-primary focus:outline-none"
-              autoFocus
-              data-testid={`card-tell-input-${issue.identifier}`}
-            />
-            <button
-              type="submit"
-              disabled={!messageInput.trim() || sendMessageMutation.isPending}
-              className="px-3 py-1.5 bg-primary text-foreground text-sm rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {sendMessageMutation.isPending ? '...' : 'Send'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {showPauseReason && controlledAgent && (
-        <form
-          onSubmit={handlePauseSubmit}
-          className="mt-2"
-          onClick={(e) => e.stopPropagation()}
-          data-testid={`card-agent-pause-form-${issue.identifier}`}
-        >
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={pauseReason}
-              onChange={(e) => setPauseReason(e.target.value)}
-              placeholder="Pause reason (optional)"
-              className="flex-1 bg-card text-foreground text-sm px-3 py-1.5 rounded border border-border focus:border-warning focus:outline-none"
-              autoFocus
-              data-testid={`card-agent-pause-reason-${issue.identifier}`}
-            />
-            <button
-              type="submit"
-              disabled={pauseAgentMutation.isPending}
-              className="px-3 py-1.5 bg-warning text-warning-foreground text-sm rounded hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid={`card-agent-pause-submit-${issue.identifier}`}
-            >
-              {pauseAgentMutation.isPending ? 'Pausing...' : 'Pause'}
-            </button>
-            <button
-              type="button"
-              onClick={handlePauseCancel}
-              className="px-3 py-1.5 bg-card text-muted-foreground text-sm rounded border border-border hover:text-foreground disabled:opacity-50"
-              data-testid={`card-agent-pause-cancel-${issue.identifier}`}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Start/Plan buttons for backlog/todo items without running agent */}
-      {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className={actionBarClass}>
-          {isPlanningActive ? (
-            <button
-              data-testid={`action-watch-planning-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
-              title="Watch Planning"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            planChip
-          )}
-          {planLabelExists && (
-            <>
-              {artifactLinks}
-              {agentLifecycleControls}
-            </>
-          )}
-          {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
-          {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
-        </div>
-      )}
-
-      {/* In Progress items without running agent */}
-      {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className={actionBarClass}>
-          {isPlanningActive ? (
-            <button
-              data-testid={`action-watch-planning-${issue.identifier}`}
-              onClick={handlePlan}
-              className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors animate-pulse"
-              title="Watch Planning"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            planChip
-          )}
-          {artifactLinks}
-          {agentLifecycleControls}
-          {/* Resume Session only when there's an actual prior work agent to resume. */}
-          {activeAgent?.lifecycle?.canResumeSession && (
-            <button
-              onClick={handleResumeSession}
-              disabled={resumeSessionMutation.isPending}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-              title="Resume Session"
-              data-testid={`card-resume-session-${issue.identifier}`}
-            >
-              {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
-            </button>
-          )}
-          <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
-        </div>
-      )}
-
-      {/* In Review items - Resume Session (if lost) + Recover + Reopen */}
-      {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <>
-          {pipelineCallToAction && (
-            <div className="mt-3 rounded-xl border border-warning/40 badge-bg-warning px-3 py-2 text-xs text-warning-foreground">
-              <div className="font-medium">{pipelineCallToAction.label}</div>
-              <div className="mt-1 text-warning-foreground/80">{pipelineCallToAction.detail}</div>
+            <div className="flex items-center gap-2">
+              {onViewBeads && (
+                <button type="button" onClick={(event) => { event.stopPropagation(); onViewBeads(issue); }} className="text-muted-foreground hover:text-foreground" aria-label={`Open beads for ${issue.identifier}`}>
+                  <List className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {onViewVBrief && (
+                <button type="button" onClick={(event) => { event.stopPropagation(); onViewVBrief(issue); }} className="text-muted-foreground hover:text-foreground" aria-label={`Open vBRIEF for ${issue.identifier}`}>
+                  <ScrollText className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-          )}
-          <div className={actionBarClass}>
-            {agentLifecycleControls}
-            <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
-            {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
-            <button
-              onClick={handleResumeSession}
-              disabled={resumeSessionMutation.isPending || isResuming}
-              className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
-              title="Resume Session"
-              data-testid={`card-resume-session-${issue.identifier}`}
-            >
-              {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
-            </button>
-          )}
-            <RecoverButton
-              issueId={issue.identifier}
-              reviewStatus={reviewStatus}
-              variant="card"
-              data-testid={`card-recover-${issue.identifier}`}
-            />
-            <ReopenSection issue={issue} inline />
-            <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           </div>
-        </>
-      )}
-
-      {/* Done items - Reopen + Close Out */}
-      {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className={actionBarClass}>
-          <button
-            onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Tasks"
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => onViewVBrief && onViewVBrief(issue)}
-            className="flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="vBRIEF"
-          >
-            <ScrollText className="w-3.5 h-3.5" />
-          </button>
-          <ReopenSection issue={issue} inline />
-          <CloseOutSection issue={issue} />
         </div>
-      )}
-
-      {/* Cost breakdown modal */}
-      <CostBreakdownModal
-        issueId={issue.identifier}
-        isOpen={showCostModal}
-        onClose={() => setShowCostModal(false)}
-      />
+        <CostBreakdownModal
+          issueId={issue.identifier}
+          isOpen={showCostModal}
+          onClose={() => setShowCostModal(false)}
+        />
       </div>
     </IssueCardPrimitive>
   );
 }
 
-// Move to Backlog button for Todo items
-function BacklogButton({ issue }: { issue: Issue }) {
-  const queryClient = useQueryClient();
-  const [isPending, setIsPending] = useState(false);
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        setIsPending(true);
-        try {
-          await fetch(`/api/issues/${issue.identifier}/move-status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'backlog' }),
-          });
-          await refreshDashboardState(queryClient);
-        } catch (err) {
-          console.error('Move to backlog failed:', err);
-        } finally {
-          setIsPending(false);
-        }
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
-      title="Move to Backlog"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      Backlog
-    </button>
-  );
-}
-
-// Move to Todo button for Backlog items
-function TodoButton({ issue }: { issue: Issue }) {
-  const queryClient = useQueryClient();
-  const [isPending, setIsPending] = useState(false);
-
-  return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        setIsPending(true);
-        try {
-          await fetch(`/api/issues/${issue.identifier}/move-status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'todo' }),
-          });
-          await refreshDashboardState(queryClient);
-        } catch (err) {
-          console.error('Move to todo failed:', err);
-        } finally {
-          setIsPending(false);
-        }
-      }}
-      disabled={isPending}
-      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
-      title="Move to Todo"
-    >
-      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
-      Todo
-    </button>
-  );
-}
-
-// Reopen section for Done/In Review items
-function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-
-  const reopenMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/reopen`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to reopen issue');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      await refreshDashboardState(queryClient);
-    },
-  });
-
-  const handleReopen = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (await confirm({ title: 'Reopen Issue', message: `Reopen ${issue.identifier} for re-work?\n\nThis will move it back to In Progress.`, confirmLabel: 'Reopen' })) {
-      reopenMutation.mutate();
-    }
-  };
-
-  const content = (
-    <>
-      <button
-        onClick={handleReopen}
-        disabled={reopenMutation.isPending}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        title="Move issue back to In Progress: resets review/test/merge state to pending, reopens the closed (unmerged) PR, removes done/merged labels, and appends a reopen entry to the continue file. Preserves the workspace, branch, beads, and vBRIEF."
-      >
-        {reopenMutation.isPending ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <RotateCcw className="w-3.5 h-3.5" />
-        )}
-        {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
-      </button>
-      {reopenMutation.isError && (
-        <span className="text-xs text-destructive-foreground">{(reopenMutation.error as Error).message}</span>
-      )}
-    </>
-  );
-
-  if (inline) return content;
-
-  return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
-      {content}
-    </div>
-  );
-}
-
-// Close-out section for Done items
-function CloseOutSection({ issue }: { issue: Issue }) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-
-  const closeOutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/close-out`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Close-out failed');
-      }
-      return data;
-    },
-    onSuccess: async () => {
-      await refreshDashboardState(queryClient);
-    },
-  });
-
-  const handleCloseOut = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (await confirm({ title: 'Close Out Issue', message: `Close out ${issue.identifier}?\n\nThis will:\n• Verify branch is merged\n• Archive workspace artifacts\n• Clean up agent state\n• Close issue on tracker\n• Apply closed-out label`, variant: 'destructive', confirmLabel: 'Close Out' })) {
-      closeOutMutation.mutate();
-    }
-  };
-
-  return (
-    <>
-      <button
-        onClick={handleCloseOut}
-        disabled={closeOutMutation.isPending}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-      >
-        {closeOutMutation.isPending ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <CheckCheck className="w-3.5 h-3.5" />
-        )}
-        {closeOutMutation.isPending ? 'Closing out...' : 'Close Out'}
-      </button>
-      {closeOutMutation.isError && (
-        <span className="text-xs text-destructive-foreground">{(closeOutMutation.error as Error).message}</span>
-      )}
-    </>
-  );
-}

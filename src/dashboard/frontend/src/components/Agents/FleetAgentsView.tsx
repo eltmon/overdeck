@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -32,21 +31,6 @@ type FilterOption = {
   id: string;
   name: string;
 };
-
-type CostTrend = {
-  totalCost?: number;
-  totalTokens?: number;
-};
-
-type CostTrendsResponse = {
-  trends?: CostTrend[];
-};
-
-async function fetchCostTrends(): Promise<CostTrendsResponse> {
-  const res = await fetch('/api/costs/trends?days=1');
-  if (!res.ok) return { trends: [] };
-  return res.json();
-}
 
 function agentRole(agent: Agent): AgentCardRole {
   return agent.role ?? 'work';
@@ -226,11 +210,6 @@ export function FleetAgentsView() {
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
-  const { data: costTrends = { trends: [] } } = useQuery({
-    queryKey: ['agents-cost-trends'],
-    queryFn: fetchCostTrends,
-    staleTime: 10_000,
-  });
 
   const issuesById = useMemo(() => {
     const map = new Map<string, Issue>();
@@ -286,8 +265,8 @@ export function FleetAgentsView() {
     const avgRuntime = runningAgents.length === 0
       ? 0
       : runningAgents.reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0) / runningAgents.length;
-    const cost24h = costTrends.trends?.reduce((total, trend) => total + (trend.totalCost ?? 0), 0) ?? 0;
-    const tokens24h = costTrends.trends?.reduce((total, trend) => total + (trend.totalTokens ?? 0), 0) ?? 0;
+    const cost24h = fleetAgents.reduce((total, agent) => total + (agent.costSoFar ?? 0), 0);
+    const tokens24h = 0;
 
     return [
       { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
@@ -296,7 +275,7 @@ export function FleetAgentsView() {
         id: 'cost',
         eyebrow: 'Cost 24h',
         value: formatCost(cost24h),
-        sub: 'canonical /costs',
+        sub: 'store selectors',
         icon: <MetricIcon label="$" />,
         signal: 'cost' as const,
         title: 'Open /costs for canonical 24h spend numbers',
@@ -305,7 +284,7 @@ export function FleetAgentsView() {
       { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
       { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
     ];
-  }, [costTrends.trends, fleetAgents, now]);
+  }, [fleetAgents, now]);
 
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);

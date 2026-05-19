@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AgentHealth } from '../types';
 import { Activity, AlertTriangle, CheckCircle, XCircle, Clock, Brain } from 'lucide-react';
 import { TldrServiceStatus } from './TldrServiceStatus';
+import { DeaconStatus } from './CommandDeck/DeaconStatus';
 
 async function fetchHealth(): Promise<AgentHealth[]> {
   const res = await fetch('/api/health/agents');
@@ -93,7 +94,7 @@ export function HealthDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* TLDR Service Status */}
+      <DeaconStatus />
       <TldrServiceStatus />
 
       {/* Summary */}

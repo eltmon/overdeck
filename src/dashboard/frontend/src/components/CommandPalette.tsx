@@ -172,7 +172,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       icon: Terminal,
       group: 'Navigation',
       keywords: ['shell', 'console'],
-      onSelect: () => onNavigate('terminal'),
+      onSelect: () => onNavigate('command-deck'),
     },
     {
       id: 'open-agents',
@@ -185,7 +185,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     },
   ];
 
-  // ─── Dynamic: active workspaces ─────────────────────────────────────────────
+  // ─── Dynamic: issues ────────────────────────────────────────────────────────
 
   const activeAgents = agents.filter((a) => a.status !== 'dead');
   const activeIssueIds = new Set(activeAgents.map((a) => a.issueId?.toLowerCase()).filter(Boolean));
@@ -195,22 +195,22 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       .map((agent) => [agent.issueId!.toLowerCase(), agent.git!.branch]),
   );
 
-  const workspaceActions: PaletteAction[] = issues
-    .filter((issue) => activeIssueIds.has(issue.identifier.toLowerCase()))
-    .map((issue) => {
-      const branch = branchByIssueId.get(issue.identifier.toLowerCase());
-      return {
-        id: `workspace-${issue.identifier}`,
-        label: issue.identifier,
-        description: branch ? `${issue.title} · ${branch}` : issue.title,
-        icon: FolderOpen,
-        group: 'Active Workspaces',
-        keywords: [issue.identifier, issue.title, branch ?? ''].filter(Boolean),
-        onSelect: () => {
-          openIssue(issue.identifier);
-        },
-      };
-    });
+  const issueActions: PaletteAction[] = issues.map((issue) => {
+    const issueKey = issue.identifier.toLowerCase();
+    const branch = branchByIssueId.get(issueKey);
+    const active = activeIssueIds.has(issueKey);
+    return {
+      id: `issue-${issue.identifier}`,
+      label: issue.identifier,
+      description: branch ? `${issue.title} · ${branch}` : issue.title,
+      icon: FolderOpen,
+      group: active ? 'Active Workspaces' : 'Issues',
+      keywords: [issue.id, issue.identifier, issue.title, branch ?? '', issue.workspacePath ?? ''].filter(Boolean),
+      onSelect: () => {
+        openIssue(issue.identifier);
+      },
+    };
+  });
 
   // ─── Dynamic: running agents ─────────────────────────────────────────────────
 
@@ -229,7 +229,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   // ─── Filter ─────────────────────────────────────────────────────────────────
 
-  const allActions = [...staticActions, ...workspaceActions, ...agentActions];
+  const allActions = [...staticActions, ...issueActions, ...agentActions];
 
   const filtered = query.trim().length === 0
     ? allActions
