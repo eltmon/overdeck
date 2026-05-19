@@ -141,7 +141,7 @@ describe('extractFromTranscriptDelta', () => {
       'health',
     ]);
     expect(writePendingTurn).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'obs-1',
+      id: 'pending-3eaf83723ec3de760d7091119fbb1366',
       fromOffset: 0,
       toOffset: 100,
       lastFullLineOffset: 100,

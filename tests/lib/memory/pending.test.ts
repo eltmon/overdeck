@@ -71,8 +71,8 @@ afterEach(async () => {
 });
 
 describe('pending turn writer', () => {
-  it('builds chronological filenames from millis and sanitized session id', () => {
-    expect(pendingTurnFileName(pendingTurn())).toBe('1778963460123_session_with_spaces.json');
+  it('builds deterministic filenames from sanitized session id and transcript range', () => {
+    expect(pendingTurnFileName(pendingTurn())).toBe('session_with_spaces_10_100.json');
   });
 
   it('writes pending turn payloads atomically into the issue pending directory', async () => {
@@ -80,15 +80,25 @@ describe('pending turn writer', () => {
     const result = await writePendingTurn(turn);
 
     expect(result).toEqual({
-      fileName: '1778963460123_session_with_spaces.json',
-      path: join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending/1778963460123_session_with_spaces.json'),
+      fileName: 'session_with_spaces_10_100.json',
+      path: join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending/session_with_spaces_10_100.json'),
     });
 
     const raw = await readFile(result.path, 'utf8');
     expect(JSON.parse(raw)).toEqual(turn);
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending'));
-    expect(files).toEqual(['1778963460123_session_with_spaces.json']);
+    expect(files).toEqual(['session_with_spaces_10_100.json']);
+  });
+
+  it('treats replayed transcript ranges as idempotent upserts', async () => {
+    const enqueue = vi.fn<[StatusRollupJob], Promise<void>>(async () => undefined);
+    const first = await writePendingTurn(pendingTurn(), { loadThreshold: () => 1, enqueueStatusRollup: enqueue });
+    const replay = await writePendingTurn(pendingTurn({ id: 'pending-replay', createdAt: '2026-05-16T20:32:00.000Z' }), { loadThreshold: () => 1, enqueueStatusRollup: enqueue });
+
+    expect(replay).toEqual(first);
+    expect(enqueue).toHaveBeenCalledOnce();
+    expect(await readPendingTurns('panopticon-cli', 'PAN-1052')).toHaveLength(1);
   });
 
   it('triggers a workspace status rollup after the configurable pending threshold is reached', async () => {

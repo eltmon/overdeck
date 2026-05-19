@@ -56,8 +56,15 @@ export async function writePendingTurn(turn: PendingTurn, options: StatusRollupT
 
   const fileName = pendingTurnFileName(turn);
   const path = `${dir}/${fileName}`;
-  const tempPath = `${dir}/.${fileName}.${process.pid}.${randomUUID()}.tmp`;
 
+  try {
+    await readFile(path, 'utf8');
+    return { path, fileName };
+  } catch (error) {
+    if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') throw error;
+  }
+
+  const tempPath = `${dir}/.${fileName}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(turn, null, 2)}\n`, 'utf8');
   await rename(tempPath, path);
   if (options.triggerRollup !== false) await maybeTriggerStatusRollup(turn.identity, options);
@@ -110,12 +117,17 @@ export async function readPendingTurns(projectId: string, issueId: string): Prom
   for (const file of files) {
     turns.push(JSON.parse(await readFile(`${dir}/${file}`, 'utf8')) as PendingTurn);
   }
-  return turns;
+  return turns.sort((a, b) => {
+    const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    const sessionDiff = a.identity.sessionId.localeCompare(b.identity.sessionId);
+    if (sessionDiff !== 0) return sessionDiff;
+    return a.fromOffset - b.fromOffset || a.toOffset - b.toOffset;
+  });
 }
 
-export function pendingTurnFileName(turn: Pick<PendingTurn, 'createdAt' | 'identity'>): string {
-  const millis = new Date(turn.createdAt).getTime();
-  return `${millis}_${safeFileSegment(turn.identity.sessionId)}.json`;
+export function pendingTurnFileName(turn: Pick<PendingTurn, 'identity' | 'fromOffset' | 'toOffset'>): string {
+  return `${safeFileSegment(turn.identity.sessionId)}_${turn.fromOffset}_${turn.toOffset}.json`;
 }
 
 async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {

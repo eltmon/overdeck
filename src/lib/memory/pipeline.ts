@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
 import {
   claimTranscriptRange,
   commitTranscriptRange,
+  getTranscriptCheckpoint,
   releaseTranscriptRange,
   type ClaimTranscriptRangeResult,
   type CommitTranscriptRangeResult,
@@ -28,7 +29,7 @@ import { isSubagentHookPayload } from './subagent-filter.js';
 export interface ExtractFromTranscriptDeltaInput {
   sessionId: string;
   transcriptPath: string;
-  fromOffset: number;
+  fromOffset?: number;
   toOffset: number;
   identity: MemoryIdentity;
   trigger: TranscriptClaimTrigger;
@@ -218,6 +219,11 @@ function deterministicObservationId(sessionId: string, fromOffset: number): stri
   return `obs-${digest}`;
 }
 
+function deterministicPendingTurnId(sessionId: string, fromOffset: number, toOffset: number): string {
+  const digest = createHash('sha256').update(`${sessionId}:${fromOffset}:${toOffset}`).digest('hex').slice(0, 32);
+  return `pending-${digest}`;
+}
+
 async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<
   | { status: 'claimed'; result: ClaimTranscriptRangeResult }
   | { status: 'failed'; reason: 'claim-failed' }
@@ -228,7 +234,7 @@ async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<
       status: 'claimed',
       result: claim({
         sessionId: input.sessionId,
-        expectedFromOffset: input.fromOffset,
+        expectedFromOffset: input.fromOffset ?? getTranscriptCheckpoint(input.sessionId)?.lastOffset ?? 0,
         toOffset: input.toOffset,
         transcriptPath: input.transcriptPath,
         identity: input.identity,
@@ -283,7 +289,7 @@ function buildPendingTurn(
   compressed: CompressedTranscriptDelta,
 ): PendingTurn {
   return {
-    id: input.id ?? randomUUID(),
+    id: deterministicPendingTurnId(input.sessionId, fromOffset, toOffset),
     createdAt: (input.now ?? new Date()).toISOString(),
     identity: input.identity,
     trigger: input.trigger,

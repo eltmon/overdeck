@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { appendFile, readFile } from 'fs/promises';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@panctl/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
-import { expandMemoryQuery, getCachedMemoryQueryExpansion, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
+import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryPromptTimeInjectionEnabled } from './settings.js';
 
@@ -12,6 +12,8 @@ export const PROMPT_TIME_MEMORY_BUDGETS = {
   summaries: 500,
   sibling: 1500,
 } as const;
+
+const PROMPT_TIME_EXPANSION_TIMEOUT_MS = 750;
 
 export interface PromptTimeMemoryInjectionInput {
   prompt: string;
@@ -81,34 +83,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     });
   }
 
-  let expansion: QueryExpansionResult;
-  if (surface === 'user-prompt') {
-    expansion = getCachedMemoryQueryExpansion({
-      prompt: input.prompt,
-      identity: input.identity,
-      previousObservations: input.previousObservations,
-      now,
-    });
-  } else {
-    try {
-      expansion = await expandMemoryQuery({
-        prompt: input.prompt,
-        identity: input.identity,
-        previousObservations: input.previousObservations,
-        now,
-        id: input.id,
-        expand: input.expansion,
-      });
-    } catch {
-      expansion = {
-        query: input.prompt,
-        expandedTerms: [],
-        cacheKey: '',
-        status: 'fallback',
-        reason: 'extraction-failed',
-      };
-    }
-  }
+  const expansion = await resolveQueryExpansion(input, now, surface);
 
   const search = input.search ?? searchMemory;
   const [status, sameProjectHits, siblingHits] = await Promise.all([
@@ -140,7 +115,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
 
   if (candidates.length === 0) {
     return finalize(input, now, budgets, {
-      outcome: expansion.status === 'fallback' ? 'expansion-failed' : 'no-hits',
+      outcome: expansion.status === 'fallback' && expansion.reason ? 'expansion-failed' : 'no-hits',
       reason: expansion.reason ?? 'no-memory-hits',
       query: expansion.query,
       expandedTerms: expansion.expandedTerms,
@@ -178,6 +153,48 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     allocationBytes: selection.allocationBytes,
     hitCounts,
   });
+}
+
+async function resolveQueryExpansion(
+  input: PromptTimeMemoryInjectionInput,
+  now: Date,
+  surface: RagDecision['surface'],
+): Promise<QueryExpansionResult> {
+  try {
+    const expansion = expandMemoryQuery({
+      prompt: input.prompt,
+      identity: input.identity,
+      previousObservations: input.previousObservations,
+      now,
+      id: input.id,
+      expand: input.expansion,
+    });
+    if (surface !== 'user-prompt') return await expansion;
+
+    return await withTimeout(expansion, PROMPT_TIME_EXPANSION_TIMEOUT_MS);
+  } catch {
+    return {
+      query: input.prompt,
+      expandedTerms: [],
+      cacheKey: '',
+      status: 'fallback',
+      reason: 'extraction-failed',
+    };
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('query expansion timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 function statusCandidate(status: MemoryStatus, identity: MemoryIdentity): CandidateContext {

@@ -99,7 +99,8 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
     })));
 
     expect(rollupJobs).toHaveLength(1);
-    expect(rollupJobs[0]!.map((turn) => turn.id)).toEqual(['obs-1', 'obs-2', 'obs-3', 'obs-4']);
+    expect(rollupJobs[0]!.map((turn) => turn.id)).toHaveLength(4);
+    expect(rollupJobs[0]!.every((turn) => turn.id.startsWith('pending-'))).toBe(true);
     expect(await readPendingTurns(identity.projectId, identity.issueId)).toHaveLength(2);
 
     expect((await searchMemoryCli('6', { project: identity.projectId, issue: identity.issueId })).map((hit) => hit.observation.id))

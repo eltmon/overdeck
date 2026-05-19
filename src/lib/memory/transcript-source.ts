@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, sep } from 'node:path';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { getAgentRuntimeStateAsync, listRunningAgentsAsync, type AgentState } from '../agents.js';
 import { sessionFilePath } from '../paths.js';
@@ -34,7 +34,7 @@ interface ClaudeCodeTranscriptSourceOptions {
   getRuntimeState?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   resolveTranscriptPath?: (workspace: string, sessionId: string) => string;
   statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
-  isSubagentSession?: (sessionId: string, agent: RunningAgent) => boolean | Promise<boolean>;
+  isSubagentSession?: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
 }
 
 export class ClaudeCodeTranscriptSource implements TranscriptSource {
@@ -44,14 +44,14 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   private readonly getRuntimeState: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   private readonly resolveTranscriptPath: (workspace: string, sessionId: string) => string;
   private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
-  private readonly isSubagentSession: (sessionId: string, agent: RunningAgent) => boolean | Promise<boolean>;
+  private readonly isSubagentSession: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
 
   constructor(options: ClaudeCodeTranscriptSourceOptions = {}) {
     this.listAgents = options.listAgents ?? listRunningAgentsAsync;
     this.getRuntimeState = options.getRuntimeState ?? getAgentRuntimeStateAsync;
     this.resolveTranscriptPath = options.resolveTranscriptPath ?? sessionFilePath;
     this.statTranscript = options.statTranscript ?? stat;
-    this.isSubagentSession = options.isSubagentSession ?? (() => false);
+    this.isSubagentSession = options.isSubagentSession ?? isClaudeCodeSubagentSession;
   }
 
   async getActiveTranscripts(): Promise<TranscriptEntry[]> {
@@ -77,9 +77,9 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   private async resolveAgentTranscript(agent: RunningAgent): Promise<TranscriptEntry | null> {
     const sessionId = agent.sessionId ?? (await this.getRuntimeState(agent.id))?.claudeSessionId;
     if (!sessionId) return null;
-    if (await this.isSubagentSession(sessionId, agent)) return null;
 
     const transcriptPath = this.resolveTranscriptPath(agent.workspace, sessionId);
+    if (await this.isSubagentSession(sessionId, agent, transcriptPath)) return null;
     let fileStat: { size: number; mtimeMs: number };
     try {
       fileStat = await this.statTranscript(transcriptPath);
@@ -149,6 +149,10 @@ export async function getActiveTranscriptEntries(
   registry: TranscriptSourceRegistry = defaultTranscriptSourceRegistry,
 ): Promise<TranscriptEntry[]> {
   return registry.getActiveTranscripts();
+}
+
+function isClaudeCodeSubagentSession(_sessionId: string, _agent: RunningAgent, transcriptPath: string): boolean {
+  return transcriptPath.split(sep).includes('subagents') || transcriptPath.includes('/subagents/');
 }
 
 function buildMemoryIdentity(agent: RunningAgent, sessionId: string): MemoryIdentity {

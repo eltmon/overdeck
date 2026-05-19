@@ -24,7 +24,6 @@ import { sessionFilePath } from '../../../lib/paths.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
-import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
@@ -60,7 +59,6 @@ type MemorySessionStartHookPayload = typeof MemorySessionStartHookPayload.Type;
 
 export interface HandleMemoryTurnBodyOptions {
   resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
-  getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
   getTranscriptSize?: (transcriptPath: string) => Promise<number>;
   enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
@@ -111,20 +109,27 @@ export async function handleMemoryTurnBody(
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
 
-  const trustedTranscriptPath = await (options.resolveTranscriptPath ?? resolveTrustedTranscriptPath)(body, sessionId);
+  const payloadIdentity = parseMemoryIdentity(payload.identity, sessionId);
+  let agentState: AgentState | null = null;
+  const trustedTranscriptPath = options.resolveTranscriptPath
+    ? await options.resolveTranscriptPath(body, sessionId)
+    : resolveTrustedTranscriptPathFromState(agentState = await resolveAgentState(body, sessionId), sessionId);
   if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
     return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
   }
 
-  const identity = parseMemoryIdentity(payload.identity, sessionId)
-    ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
+  if (!payloadIdentity && !options.resolveIdentity && !agentState) {
+    agentState = await resolveAgentState(body, sessionId);
+  }
+  const identity = payloadIdentity
+    ?? (options.resolveIdentity
+      ? await options.resolveIdentity(body, sessionId)
+      : resolveMemoryIdentityFromState(agentState, sessionId));
   if (!identity) {
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
 
-  const fromOffset = validOffset(payload.from_offset)
-    ? payload.from_offset
-    : (options.getTranscriptCheckpoint ?? getTranscriptCheckpoint)(sessionId)?.lastOffset ?? 0;
+  const fromOffset = validOffset(payload.from_offset) ? payload.from_offset : undefined;
   const toOffset = validOffset(payload.to_offset)
     ? payload.to_offset
     : await (options.getTranscriptSize ?? getTranscriptSize)(trustedTranscriptPath);
@@ -132,7 +137,7 @@ export async function handleMemoryTurnBody(
   const pipelineInput: ExtractFromTranscriptDeltaInput = {
     sessionId,
     transcriptPath: trustedTranscriptPath,
-    fromOffset,
+    ...(fromOffset === undefined ? {} : { fromOffset }),
     toOffset,
     identity,
     trigger: 'stop-hook',
@@ -354,7 +359,10 @@ function parseMemoryIdentity(value: unknown, sessionId: string): MemoryIdentity 
 }
 
 async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: string): Promise<MemoryIdentity | null> {
-  const state = await resolveAgentState(body, sessionId);
+  return resolveMemoryIdentityFromState(await resolveAgentState(body, sessionId), sessionId);
+}
+
+function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: string): MemoryIdentity | null {
   if (!state) return null;
   return {
     projectId: inferProjectId(state.workspace),
@@ -368,7 +376,10 @@ async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: s
 }
 
 async function resolveTrustedTranscriptPath(body: Record<string, unknown>, sessionId: string): Promise<string | null> {
-  const state = await resolveAgentState(body, sessionId);
+  return resolveTrustedTranscriptPathFromState(await resolveAgentState(body, sessionId), sessionId);
+}
+
+function resolveTrustedTranscriptPathFromState(state: AgentState | null, sessionId: string): string | null {
   return state ? resolve(sessionFilePath(state.workspace, sessionId)) : null;
 }
 

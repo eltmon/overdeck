@@ -35,18 +35,6 @@ describe('memory subagent filter', () => {
         agentHarness: 'claude-code',
       },
     }, {
-      getTranscriptCheckpoint: () => ({
-        sessionId: 'session-1',
-        projectId: 'panopticon-cli',
-        workspaceId: 'feature-pan-1052',
-        issueId: 'PAN-1052',
-        transcriptPath: '/tmp/session-1.jsonl',
-        lastOffset: 42,
-        lastObservationAt: null,
-        lastMidTurnAt: null,
-        midTurnCountInCurrentTurn: 0,
-        updatedAt: '2026-05-16T23:00:00.000Z',
-      }),
       getTranscriptSize: async () => 120,
       resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
       enqueuePipeline,
@@ -56,7 +44,6 @@ describe('memory subagent filter', () => {
     expect(enqueuePipeline).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: 'session-1',
       transcriptPath: '/tmp/session-1.jsonl',
-      fromOffset: 42,
       toOffset: 120,
       trigger: 'stop-hook',
       identity: expect.objectContaining({

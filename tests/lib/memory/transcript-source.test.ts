@@ -87,6 +87,18 @@ describe('ClaudeCodeTranscriptSource', () => {
     expect(await source.getActiveTranscripts()).toEqual([]);
   });
 
+  it('excludes Claude Code Explore subagent transcripts from the production poller source', async () => {
+    const source = new ClaudeCodeTranscriptSource({
+      listAgents: async () => [agent({ id: 'agent-explore', sessionId: 'explore-agent' })],
+      resolveTranscriptPath: (workspace, sessionId) => `${workspace}/.claude/session-main/subagents/${sessionId}.jsonl`,
+      statTranscript: async () => {
+        throw new Error('subagent transcript should be filtered before stat');
+      },
+    });
+
+    expect(await source.getActiveTranscripts()).toEqual([]);
+  });
+
   it('parses JSONL deltas into compressed turn events', () => {
     const source = new ClaudeCodeTranscriptSource();
     const line = jsonl({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'ship it' }] } });
