@@ -1,6 +1,7 @@
 import { open, stat } from 'fs/promises';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { getTranscriptCheckpoint } from './checkpoints.js';
+import { getTranscriptCheckpointAsync } from './checkpoint-client.js';
+import type { TranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
 import { areMemoryObservationsEnabled } from './settings.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
@@ -33,7 +34,7 @@ export interface TranscriptPollerOptions {
   getActiveTranscriptEntries?: () => Promise<TranscriptEntry[]>;
   statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   readTranscriptSlice?: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
-  getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
+  getTranscriptCheckpoint?: (sessionId: string) => Promise<TranscriptCheckpoint | null>;
   extractFromTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
   enqueueTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => void | Promise<unknown>;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
@@ -58,7 +59,7 @@ export class TranscriptPoller {
   private readonly getActiveEntries: () => Promise<TranscriptEntry[]>;
   private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   private readonly readTranscriptSlice: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
-  private readonly getCheckpoint: typeof getTranscriptCheckpoint;
+  private readonly getCheckpoint: (sessionId: string) => Promise<TranscriptCheckpoint | null>;
   private readonly enqueueDelta: (input: ExtractFromTranscriptDeltaInput) => void | Promise<unknown>;
   private readonly areObservationsEnabled: () => boolean | Promise<boolean>;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -73,7 +74,7 @@ export class TranscriptPoller {
     this.getActiveEntries = options.getActiveTranscriptEntries ?? getActiveTranscriptEntries;
     this.statTranscript = options.statTranscript ?? stat;
     this.readTranscriptSlice = options.readTranscriptSlice ?? readTranscriptSlice;
-    this.getCheckpoint = options.getTranscriptCheckpoint ?? getTranscriptCheckpoint;
+    this.getCheckpoint = options.getTranscriptCheckpoint ?? getTranscriptCheckpointAsync;
     this.enqueueDelta = options.enqueueTranscriptDelta ?? options.extractFromTranscriptDelta ?? ((input) => { enqueueMemoryPipelineJob(input); });
     this.areObservationsEnabled = options.areObservationsEnabled ?? areMemoryObservationsEnabled;
   }
@@ -188,9 +189,9 @@ export class TranscriptPoller {
     this.entries.set(entry.sessionId, nextEntry);
 
     if (pendingLineCount < this.activityLineThreshold) return 'belowThreshold';
-    if (this.isRateLimited(entry.sessionId)) return 'rateLimited';
+    if (await this.isRateLimited(entry.sessionId)) return 'rateLimited';
 
-    const checkpoint = this.getCheckpoint(entry.sessionId);
+    const checkpoint = await this.getCheckpoint(entry.sessionId);
     const fromOffset = checkpoint?.lastOffset ?? entry.lastExtractionOffset;
     const extractionResult = await this.enqueueDelta({
       sessionId: entry.sessionId,
@@ -209,8 +210,8 @@ export class TranscriptPoller {
     return 'fired';
   }
 
-  private isRateLimited(sessionId: string): boolean {
-    const checkpoint = this.getCheckpoint(sessionId);
+  private async isRateLimited(sessionId: string): Promise<boolean> {
+    const checkpoint = await this.getCheckpoint(sessionId);
     if (!checkpoint) return false;
     if (checkpoint.midTurnCountInCurrentTurn >= this.maxMidTurnExtractionsPerTurn) return true;
     if (!checkpoint.lastMidTurnAt) return false;
