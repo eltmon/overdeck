@@ -38,6 +38,7 @@
 | [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 | [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
+| [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, and skill → CLI → API → UI mapping |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Fix-All Flywheel PRD: continuous, self-improving mass pan-oversee with `main` always clean |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Operational manual for mass pan-oversee: phases, classification, bug log template |
 

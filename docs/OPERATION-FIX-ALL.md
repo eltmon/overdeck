@@ -1,5 +1,8 @@
 # Operation Fix-All: Mass Agent Oversight & Infrastructure Bug Hunt
 
+> **Successor note:** current Flywheel runs use `/pan-flywheel` and the
+> `pan flywheel` CLI. Older run logs may mention the legacy skill name.
+
 ## Purpose
 
 A mass `/pan-oversee` operation across ALL active PAN issues simultaneously. The goal is
@@ -198,7 +201,7 @@ For each bug found during the operation:
 - **Issues inventoried**: 6 PAN issues in In Progress/In Review (PAN-544, PAN-596, PAN-645, PAN-647, PAN-655, PAN-662, PAN-670)
 - **Issues moved to Awaiting Merge**: 4 (PAN-544, PAN-647, PAN-655, PAN-670)
 - **Bugs fixed**: 5 substrate bugs (see Known Recurring Issues entries above)
-- **Friction points removed**: urgency-first priority ladder added to all flywheel docs and the all-up skill; Awaiting Merge now priority-sorted
+- **Friction points removed**: urgency-first priority ladder added to all flywheel docs and the `/pan-flywheel` skill; Awaiting Merge now priority-sorted
 - **Still in pipeline**: PAN-645 (review→test→merge cycle; one failing test remaining); PAN-596 and PAN-662 (blocked on pre-existing failures that PAN-645 will fix once it merges)
 
 ### 2026-04-14 — Run 9
@@ -325,7 +328,7 @@ pan up
 
 ---
 
-## Run report — 2026-05-18 (Opus 4.7, all-up-with-twist brief)
+## Run report — 2026-05-18 (Opus 4.7, custom twist brief)
 
 **Window:** 2026-05-18T05:30Z – 2026-05-18T10:00Z (~4.5h, autonomous overnight)
 

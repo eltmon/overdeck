@@ -30,6 +30,7 @@ import type { ConversationFilter, DiscoveredSession } from '../../lib/database/d
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
+import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -405,6 +406,21 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.map(storedToDomainEvent),
         );
       },
+
+      [WS_METHODS.subscribeFlywheelStatus]: (_input) =>
+        Stream.callback((queue) =>
+          Effect.acquireRelease(
+            Effect.promise(async () => {
+              const activeRunId = await runDashboardDbJob<string | null>('getSetting', 'flywheel.active_run_id');
+              const latest = await readCurrentLatestFlywheelStatus({ activeRunId });
+              if (latest) Queue.offerUnsafe(queue, latest);
+              return subscribeLatestFlywheelStatus((status) => {
+                Queue.offerUnsafe(queue, status);
+              });
+            }),
+            (unsubscribe) => Effect.sync(() => unsubscribe()),
+          ),
+        ),
 
       // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
       [WS_METHODS.subscribeTerminal]: (input) =>

@@ -145,7 +145,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  for (const role of ['plan', 'work', 'review', 'test', 'ship'] as const) {
+  for (const role of ['plan', 'work', 'review', 'test', 'ship', 'flywheel'] as const) {
     router[`role:${role}`] = { model: resolveModel(role, undefined, config) };
   }
   for (const subRole of ['inspect', 'inspect-deep'] as const) {

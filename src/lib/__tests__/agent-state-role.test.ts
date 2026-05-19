@@ -58,6 +58,22 @@ describe('AgentState role persistence', () => {
     expect(command).not.toContain('pan-review-agent');
   });
 
+  it('threads configured effort into claude-code role runtime commands', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
+    expect(command).toContain('--agent roles/flywheel.md');
+    expect(command).toContain("--model 'claude-opus-4-7'");
+    expect(command).toContain('--effort low');
+  });
+
+  it('preserves the flywheel singleton agent id during normalization', async () => {
+    const { normalizeAgentId } = await import('../agents.js');
+
+    expect(normalizeAgentId('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(normalizeAgentId('PAN-1')).toBe('agent-pan-1');
+  });
+
   it('does not pass --agent for review convoy sub-roles (prompts are harness-agnostic templates inlined by the orchestrator)', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath } = await import('../agents.js');
 
@@ -114,6 +130,23 @@ describe('AgentState role persistence', () => {
     expect(rawState.handoffCount).toBeUndefined();
     expect(rawState.agentPhase).toBeUndefined();
     expect(rawState.type).toBeUndefined();
+  });
+
+  it('accepts flywheel role in persisted state.json', async () => {
+    const { getAgentState, saveAgentState } = await import('../agents.js');
+
+    saveAgentState({
+      id: 'agent-flywheel-orchestrator',
+      issueId: 'RUN-1',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'flywheel',
+      model: 'claude-opus-4-7',
+      status: 'running',
+      startedAt: '2026-05-18T00:00:00.000Z',
+    } as any);
+
+    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
   it('bases Channels eligibility on work role and claude-code harness', async () => {

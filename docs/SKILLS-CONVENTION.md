@@ -76,6 +76,7 @@ Workflow / reference / topical skills are not subject to the strict invocation-p
 - If you're **adding a CLI flag**, update the wrapper skill in the same commit.
 - If you're **removing a CLI flag**, search the `skills/` tree for references and clean them up in the same commit.
 - If you're **renaming a verb**, rename the wrapper directory in the same commit.
+- If you're keeping a one-release compatibility redirect for a renamed skill, add it to the linter's legacy redirect table. The old skill must be a minimal redirect stub, not a copy of the old workflow.
 
 ## How skills are distributed
 

@@ -1,8 +1,8 @@
-# Flywheel State — 2026-05-18 (Run 1 of all-up-with-twist)
+# Flywheel State — 2026-05-18 (Run 1)
 
-This file is the flywheel's memory. The next `/all-up` run reads it before doing anything else. Updated at the END of each revolution.
+This file is the per-run state snapshot written by `pan flywheel report`. The next `pan flywheel start` run reads it before doing anything else. Updated at the END of each revolution.
 
-**Run window:** 2026-05-18T05:30Z → 2026-05-18T10:00Z (Claude Opus 4.7, all-up-with-twist brief at `/home/eltmon/Projects/ALL-UP-WITH-TWIST.md`)
+**Run window:** 2026-05-18T05:30Z → 2026-05-18T10:00Z (Claude Opus 4.7, custom twist brief)
 
 **Headline result:** 6 substrate bugs filed and fixed in code; SWARM proven operational end-to-end on PAN-1148 (8 slot PRs merged across waves 0 and 2-3); PAN-1170 ready for user UAT/merge; PAN-1169 in review cycle.
 

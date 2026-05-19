@@ -36,6 +36,13 @@ const settingsPayload = {
     },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
+    flywheel: {
+      harness: 'claude-code',
+      model: 'claude-opus-4-7',
+      effort: 'high',
+      maxAgents: 8,
+      scope: 'pan-only',
+    },
   },
   models: {
     providers: {
@@ -58,15 +65,18 @@ function renderPanel() {
 
 describe('RolesPanel', () => {
   beforeEach(() => {
+    let currentSettings = structuredClone(settingsPayload);
+
     global.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
       if (url === '/api/settings' && init?.method === 'PUT') {
+        currentSettings = JSON.parse(String(init.body));
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
       }
       if (url === '/api/settings') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(settingsPayload),
+          json: () => Promise.resolve(currentSettings),
         } as Response);
       }
       if (url === '/api/settings/available-models') {
@@ -87,23 +97,30 @@ describe('RolesPanel', () => {
     }) as unknown as typeof fetch;
   });
 
-  it('renders five role cards in order with workhorse and specific model choices', async () => {
+  it('renders role cards in order with workhorse, specific model, and flywheel choices', async () => {
     renderPanel();
 
     const cards = await screen.findAllByTestId('role-card');
-    expect(cards).toHaveLength(5);
+    expect(cards).toHaveLength(6);
     expect(cards.map((card) => within(card).getByRole('heading', { level: 4 }).textContent)).toEqual([
       'Plan',
       'Work',
       'Review',
       'Test',
       'Ship',
+      'Flywheel',
     ]);
 
     expect(screen.getByLabelText('Plan model')).toHaveValue('workhorse:expensive');
     expect(screen.getByLabelText('Work model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Test model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Ship model')).toHaveValue('workhorse:mid');
+    expect(screen.getByLabelText('Flywheel model')).toHaveValue('claude-opus-4-7');
+    expect(screen.getByLabelText('Flywheel harness')).toHaveValue('claude-code');
+    expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
+    expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
+    expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
+    expect(screen.getByText('Changes apply on the next tick — no restart needed.')).toBeInTheDocument();
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
@@ -151,5 +168,29 @@ describe('RolesPanel', () => {
     expect(body.roles.review.sub.security.model).toBe('kimi-k2.6-flash');
     expect(body.roles.review.sub.correctness.model).toBe('workhorse:mid');
     expect(body.roles.plan.model).toBe('workhorse:expensive');
+  });
+
+  it('persists flywheel-specific settings and reloads the saved value', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await screen.findByLabelText('Flywheel scope');
+    await user.selectOptions(screen.getByLabelText('Flywheel scope'), 'all-tracked-projects');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Flywheel scope')).toHaveValue('all-tracked-projects');
+    });
+
+    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
+      url.toString() === '/api/settings' && init?.method === 'PUT'
+    ));
+    const body = JSON.parse(putCall?.[1]?.body as string);
+    expect(body.roles.flywheel).toMatchObject({
+      harness: 'claude-code',
+      model: 'claude-opus-4-7',
+      effort: 'high',
+      maxAgents: 8,
+      scope: 'all-tracked-projects',
+    });
   });
 });

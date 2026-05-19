@@ -40,3 +40,35 @@ export function isDeaconGloballyPaused(): boolean {
 export function setDeaconGloballyPaused(paused: boolean): void {
   setSetting(DEACON_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
 }
+
+// ============== Flywheel gates ==============
+
+export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
+export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
+
+export function isFlywheelGloballyPaused(): boolean {
+  try {
+    return getSetting(FLYWHEEL_GLOBAL_PAUSE_KEY) === 'true';
+  } catch (err) {
+    console.warn('[app-settings] Failed to read flywheel pause flag:', err);
+    return false;
+  }
+}
+
+export function setFlywheelGloballyPaused(paused: boolean): void {
+  setSetting(FLYWHEEL_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
+}
+
+export function getFlywheelActiveRunId(): string | null {
+  try {
+    const value = getSetting(FLYWHEEL_ACTIVE_RUN_ID_KEY);
+    return value && value.trim() ? value : null;
+  } catch (err) {
+    console.warn('[app-settings] Failed to read flywheel active run id:', err);
+    return null;
+  }
+}
+
+export function setFlywheelActiveRunId(runId: string | null): void {
+  setSetting(FLYWHEEL_ACTIVE_RUN_ID_KEY, runId ?? '');
+}

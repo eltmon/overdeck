@@ -48,6 +48,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
+  getAgentState: vi.fn().mockReturnValue(null),
   messageAgent: mockMessageAgent,
   saveAgentStateAsync: mockSaveAgentStateAsync,
   spawnRun: mockSpawnRun,

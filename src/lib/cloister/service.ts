@@ -71,6 +71,7 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 import { emitActivityEntry } from '../activity-logger.js';
+export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');

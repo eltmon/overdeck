@@ -193,6 +193,13 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
       },
       { type: "separator" },
       {
+        label: "Flywheel Documentation",
+        click: () =>
+          void shell.openExternal(
+            "https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md",
+          ),
+      },
+      {
         label: "Panopticon on GitHub",
         click: () =>
           void shell.openExternal("https://github.com/eltmon/panopticon-cli"),

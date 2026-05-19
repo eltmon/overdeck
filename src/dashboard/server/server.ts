@@ -60,6 +60,7 @@ import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
+import { flywheelRouteLayer } from './routes/flywheel.js';
 import { dashboardSessionCookieHeader, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -315,6 +316,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   codexAuthRouteLayer,
   swarmRouteLayer,
   discoveredSessionsRouteLayer,
+  flywheelRouteLayer,
   staticRouteLayer,
 );
 

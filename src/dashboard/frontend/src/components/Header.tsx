@@ -5,6 +5,7 @@ export type Tab =
   | 'command-deck'
   | 'kanban'
   | 'agents'
+  | 'flywheel'
   | 'resources'
   | 'skills'
   | 'health'

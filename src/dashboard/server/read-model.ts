@@ -82,7 +82,7 @@ function cleanIssues(issues: unknown[]): DashboardSnapshot['issues'] {
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
 type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';

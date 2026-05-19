@@ -43,7 +43,7 @@ import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.j
 
 const execAsync = promisify(exec);
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
 
 /**
  * Write an agent launcher script atomically. Every agent shares a fixed
@@ -300,6 +300,7 @@ export async function getRoleRuntimeBaseCommand(
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
+  effort?: 'low' | 'medium' | 'high',
 ): Promise<string> {
   const validatedModel = requireModelOverride(model);
   const quotedModel = shellQuoteModelId(validatedModel);
@@ -311,6 +312,7 @@ export async function getRoleRuntimeBaseCommand(
   const definitionPath = roleAgentDefinitionPath(role, subRole);
   const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
   const nameFlag = ` --name ${agentName}`;
+  const effortFlag = effort ? ` --effort ${effort}` : '';
   // The convoy sub-roles have no `--agent` definition, so claude won't pick up
   // a frontmatter permissionMode. Fall back to the global Claude permission
   // flags in that case so the run still launches with the user's bypass/plan
@@ -322,17 +324,19 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${nameFlag}`;
+  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
 const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-'];
+const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator']);
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
 export function normalizeAgentId(agentId: string): string {
+  if (SINGLETON_AGENT_IDS.has(agentId)) return agentId;
   if (AGENT_PREFIXES.some(p => agentId.startsWith(p))) {
     return agentId;
   }
@@ -608,7 +612,7 @@ export function getAgentDir(agentId: string): string {
 }
 
 function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship';
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel';
 }
 
 function cleanAgentState(raw: AgentState): AgentState {
@@ -1754,6 +1758,8 @@ export interface SpawnRunOptions {
   reviewSynthesisAgentId?: string;
   reviewOutputPath?: string;
   allowHost?: boolean;
+  registerConversation?: boolean;
+  effort?: 'low' | 'medium' | 'high';
 }
 
 /**
@@ -2186,9 +2192,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await saveAgentStateAsync(state);
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
+  const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
   const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
 
   let promptFile: string | undefined;
   if (options.prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
@@ -2228,7 +2235,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
   let sessionId: string | undefined;
-  if (isSpecialistRole) {
+  if (shouldRegisterConversation) {
     sessionId = randomUUID();
 
     // Persist the pinned --session-id to <agentDir>/session.id so
@@ -2298,7 +2305,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
-    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
+    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     sessionId,
     reviewSignal,
     // PAN-977: review sub-role launchers must outlive their tmux session. The

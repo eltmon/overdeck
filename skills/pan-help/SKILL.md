@@ -85,6 +85,17 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 | `pan sync` | Sync skills to AI tools (auto-runs on `pan up`) | `pan sync` |
 | `pan sync --dry-run` | Preview skill sync without applying | `pan sync --dry-run` |
 
+### Operations
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `pan flywheel start` | Start the singleton Fix-All Flywheel orchestrator | `pan flywheel start --brief docs/flywheel-brief.md` |
+| `pan flywheel status` | Show the active Flywheel run snapshot | `pan flywheel status --json` |
+| `pan flywheel pause` | Pause the active Flywheel run gate | `pan flywheel pause` |
+| `pan flywheel resume` | Resume a paused Flywheel run | `pan flywheel resume` |
+| `pan flywheel emit-status` | Validate and publish a FlywheelStatus payload | `pan flywheel emit-status --file latest.json` |
+| `pan flywheel report` | Write and commit end-of-run Flywheel report artifacts | `pan flywheel report` |
+
 ### Maintenance
 
 | Command | Description | Example |
