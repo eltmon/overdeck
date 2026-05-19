@@ -112,7 +112,7 @@ export interface ReviewStatus {
   reviewTempStashSequence?: number;
 }
 
-function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
+export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
   // Only block readyForMerge if verification explicitly FAILED.
   // 'pending' means "scheduled but not yet run this cycle" — not a failure signal.
   // request-review resets verificationStatus to 'pending' as part of its cycle reset,

@@ -2493,6 +2493,41 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
+  // PAN-1215: One-shot cleanup of tracked workspace-only .pan/ artifacts.
+  // These files are gitignored but may still be tracked on older branches.
+  // If tracked, checkpoint commits and rebases can drop them, breaking the
+  // verification gate. Remove them from the index when the workspace is clean.
+  if (role === 'work') {
+    try {
+      const workspace = options.workspace;
+      const { stdout: trackedFiles } = await execAsync(
+        'git ls-files .pan/continue.json .pan/spec.vbrief.json',
+        { cwd: workspace },
+      );
+      if (trackedFiles.trim()) {
+        const { stdout: porcelain } = await execAsync(
+          'git status --porcelain -- .pan/',
+          { cwd: workspace },
+        );
+        if (!porcelain.trim()) {
+          await execAsync(
+            'git rm --cached --ignore-unmatch .pan/continue.json .pan/spec.vbrief.json',
+            { cwd: workspace },
+          );
+          await execAsync(
+            'git commit -m "chore: untrack workspace .pan/ artifacts (PAN-1215)"',
+            { cwd: workspace },
+          );
+          console.log(`[agents] Untracked workspace .pan/ artifacts for ${options.issueId}`);
+        } else {
+          console.warn(`[agents] Skipping .pan/ untrack for ${options.issueId} — .pan/ paths have uncommitted changes`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[agents] .pan/ untrack cleanup failed for ${options.issueId}: ${err.message}`);
+    }
+  }
+
   // Build prompt with FPP work if available
   let prompt = options.prompt || '';
 

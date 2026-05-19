@@ -2207,6 +2207,28 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         `Reset review for ${issueId}: new commits after review passed ` +
         `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
       );
+
+      // Redispatch a fresh review convoy. Re-read status to guard against races
+      // with other dispatch paths (HTTP request-review, manual CLI) that may have
+      // already picked up the work between the reset above and now.
+      const freshStatus = getReviewStatus(issueId);
+      if (freshStatus?.reviewStatus === 'pending') {
+        const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+        const branch = `feature/${issueId.toLowerCase()}`;
+        const dispatchResult = await spawnReviewRoleForIssue({
+          issueId,
+          workspace: workspacePath,
+          branch,
+          force: true,
+        });
+        if (dispatchResult.success) {
+          actions.push(`Re-dispatched review for ${issueId}`);
+          console.log(`[deacon] Re-dispatched review convoy for ${issueId} after post-review commit reset`);
+        } else {
+          actions.push(`Failed to re-dispatch review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
+          console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
+        }
+      }
     }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

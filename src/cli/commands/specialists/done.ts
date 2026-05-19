@@ -91,6 +91,10 @@ export async function doneCommand(
           const message = err instanceof Error ? err.message : String(err);
           console.warn(chalk.yellow(`  ⚠ Could not snapshot reviewedAtCommit: ${message}`));
         }
+        // Clear any stale verificationStatus='failed' so the override unblocks
+        // readyForMerge. A human passing review assumes responsibility for the gate.
+        update.verificationStatus = 'passed';
+        update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
         console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Test agent can now proceed'));
       } else if (options.status === 'blocked') {

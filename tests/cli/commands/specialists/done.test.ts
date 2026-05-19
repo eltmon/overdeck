@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
 const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  setReviewStatus: mockSetReviewStatus,
-  getReviewStatus: vi.fn(),
-}));
+vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/review-status.js')>();
+  return {
+    ...actual,
+    setReviewStatus: mockSetReviewStatus,
+    getReviewStatus: vi.fn(),
+  };
+});
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
@@ -18,13 +23,16 @@ describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    mockSetReviewStatus.mockReturnValue({
-      issueId: 'PAN-1059',
-      reviewStatus: 'blocked',
-      testStatus: 'pending',
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+    mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
+      return {
+        issueId: 'PAN-1059',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+        ...update,
+      };
     });
     mockDeliverReviewVerdictFeedback.mockResolvedValue({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -85,7 +93,15 @@ describe('specialists done command', () => {
       reviewStatus: 'passed',
       reviewNotes: 'approved',
       reviewedAtCommit: undefined,
+      verificationStatus: 'passed',
+      verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
     });
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+  });
+
+  it('verificationSatisfied is true after passed override even from failed state (AC10/AC27)', () => {
+    expect(verificationSatisfied({ verificationStatus: 'failed' })).toBe(false);
+    expect(verificationSatisfied({ verificationStatus: 'passed' })).toBe(true);
+    expect(verificationSatisfied({ verificationStatus: 'pending' })).toBe(true);
   });
 });
