@@ -302,6 +302,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
   contextManifestPath?: string;
   synthesisAgentId?: string;
   model?: string;
+  allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
     const { saveAgentStateAsync, spawnRun, getAgentState } = await import('../agents.js');
@@ -353,6 +354,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
       // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
+      ...(opts.allowHost ? { allowHost: true } : {}),
     });
     run.reviewSubRole = opts.subRole;
     run.reviewRunId = opts.runId;
@@ -377,7 +379,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
 }
 
 export async function spawnReviewRoleForIssue(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
@@ -500,7 +502,9 @@ export async function spawnReviewRoleForIssue(
   }
 
   try {
-    const { spawnRun, saveAgentStateAsync } = await import('../agents.js');
+    const { spawnRun, saveAgentStateAsync, getAgentStateAsync } = await import('../agents.js');
+    const workAgentState = await getAgentStateAsync(`agent-${opts.issueId.toLowerCase()}`);
+    const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers
     // read one pre-built diff+AC object instead of each running git diff
@@ -545,6 +549,7 @@ export async function spawnReviewRoleForIssue(
       prompt,
       allowHost: allowHostForSynthesis,
       ...(opts.model ? { model: opts.model } : {}),
+      ...(allowHost ? { allowHost: true } : {}),
     });
     // Persist the runId on the synthesis agent's own state so the idempotency
     // guard above can tell a genuinely-running review (runId matches current
@@ -569,6 +574,7 @@ export async function spawnReviewRoleForIssue(
         outputPath,
         contextManifestPath,
         synthesisAgentId: run.id,
+        allowHost,
       });
       if (!result.success) {
         try {

@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/scripts/record-cost-event.d.ts": {
-    "mtime": 1779142045.5378273,
+    "mtime": 1779148320.4551597,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/scripts/notify-complete": {
@@ -1760,8 +1760,8 @@
     "hash": "de0836b619d4769cc1e545725b06de28"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/review-agent.ts": {
-    "mtime": 1779142045.6738732,
-    "hash": "82e19bf48c1dbd9911f5d5058f8a1460"
+    "mtime": 1779148638.3398793,
+    "hash": "5d89e282d2ede8fc34254c0f144db7ea"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/specialist-logs.ts": {
     "mtime": 1779142045.6738732,
@@ -1910,6 +1910,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/__tests__/specialists-reviewer-name.test.ts": {
     "mtime": 1779142045.6720214,
     "hash": "f78ac855a3fffe403281c72c04d259fa"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/__tests__/review-agent.test.ts": {
+    "mtime": 1779148731.6830258,
+    "hash": "3a6cdedfbb34f5d3447d195c63fc0d7a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/__tests__/specialists-caveman.test.ts": {
     "mtime": 1779142045.6720214,
@@ -2156,7 +2160,7 @@
     "hash": "3f5fcfcbb2b4a2468e7e36cbdd26efc2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/vbrief/continue-state.ts": {
-    "mtime": 1779146231.879829,
+    "mtime": 1779148161.0527813,
     "hash": "d36c753e397031ee46a3ea0955f2d60f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/vbrief/beads.ts": {
@@ -2816,7 +2820,7 @@
     "hash": "c035904b746f125da8019de1c298d26a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/InspectorPanel.tsx": {
-    "mtime": 1779145753.3758276,
+    "mtime": 1779148161.035781,
     "hash": "7466f32c1dafe6977d4266a06d9d4309"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/DeepWipeDialog.tsx": {
@@ -3584,7 +3588,7 @@
     "hash": "82c38946666d4afc14ab200a1de36320"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/__tests__/InspectorPanel.swarm.test.tsx": {
-    "mtime": 1779145784.1208522,
+    "mtime": 1779148161.035781,
     "hash": "529557f48e9130ed77b3f3739ffa9552"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/__tests__/DetailPanelLayout.test.tsx": {
@@ -4344,7 +4348,7 @@
     "hash": "dd13fbeadece3a88305c8f7acb15c250"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/swarm.ts": {
-    "mtime": 1779146560.9348736,
+    "mtime": 1779148161.0527813,
     "hash": "df8d40510d2d14ce4fd6362526e515b7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/origin-validation.ts": {
@@ -4460,7 +4464,7 @@
     "hash": "46bdee8405d46f2035d36739b8981e6d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/swarm.test.ts": {
-    "mtime": 1779146570.1101818,
+    "mtime": 1779148161.0527813,
     "hash": "4c4158a63b2fae37e2e6301a127b49e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/costs-experiments.test.ts": {
@@ -4724,7 +4728,7 @@
     "hash": "024dca58ca35a466dcb447d43e5accdb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/index.ts": {
-    "mtime": 1779147645.109346,
+    "mtime": 1779148161.067782,
     "hash": "dd3cdaa5a45abae18d1bac4b430bbc1b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/fork.ts": {
@@ -4904,7 +4908,7 @@
     "hash": "99caafccb0ccba30127b877db86991bd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/swarm.ts": {
-    "mtime": 1779147662.4939344,
+    "mtime": 1779148161.067782,
     "hash": "65ab20c0d3892552fbf366518e0e2e18"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/triage.ts": {
@@ -5160,7 +5164,7 @@
     "hash": "6f312f5d2c8174089e8cc44c1871822d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/__tests__/swarm.test.ts": {
-    "mtime": 1779147690.5018823,
+    "mtime": 1779148161.067782,
     "hash": "24206253f8ef5164a49a3b86556af81f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/__tests__/workspace-reap.test.ts": {
@@ -5667,6 +5671,10 @@
     "mtime": 1779142045.3943164,
     "hash": "7cedf697c0891bf92dd125db65bf2a4d"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-1204-home-tab-briefing-compliance.md": {
+    "mtime": 1779148160.944605,
+    "hash": "881ccc3dea1b9acb517350342e658fde"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/fizzy-visual-pipeline.md": {
     "mtime": 1779142045.3943164,
     "hash": "dc3765dd1e57f6d25733bad875e81988"
@@ -5699,6 +5707,10 @@
     "mtime": 1779142045.3938456,
     "hash": "168dc07114c44ff8ee7ebe21bd2354e9"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-1203-panopticon-docs-rag.md": {
+    "mtime": 1779148160.944605,
+    "hash": "7f36c4a5f9a9537910f3bbe1ff2849ac"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-982-claude-code-agent-integration.md": {
     "mtime": 1779142045.3943164,
     "hash": "c35a809a1060021338dc9753cf858b8c"
@@ -5726,6 +5738,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/project-setup-wizard-ui.md": {
     "mtime": 1779142045.3953164,
     "hash": "029221f8a35e844aaa867d3a6cb587b8"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-1205-html-artifacts.md": {
+    "mtime": 1779148160.944605,
+    "hash": "ffa3608c13b5364e71b1c079b25f62d7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-632-merge-system-refactor.md": {
     "mtime": 1779142045.3938456,
@@ -5779,6 +5795,10 @@
     "mtime": 1779142045.3943164,
     "hash": "80ba3b64387b690b522a3e69a34c3ff6"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-1200-universal-context-system.md": {
+    "mtime": 1779148160.944605,
+    "hash": "15a0b1ae5493761529bc032d3de9484c"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-798-audit.md": {
     "mtime": 1779142045.3938456,
     "hash": "0592c542445db30e96c7151eeb9d8ae6"
@@ -5806,6 +5826,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/workspace-migration-plan.md": {
     "mtime": 1779142045.3953164,
     "hash": "411c862f36b50d3714a925ed2c38683e"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-1201-hybrid-context-distribution.md": {
+    "mtime": 1779148160.944605,
+    "hash": "8b6848c597d227f0772cc0e5a6d847b1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/docs/prds/planned/PAN-785-terminal-performance.md": {
     "mtime": 1779142045.3938456,
