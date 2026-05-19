@@ -64,6 +64,7 @@ import { getAgentStateAsync, getProviderAuthMode, normalizeAgentId } from '../..
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -2366,10 +2367,12 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
     const issueDataService = getIssueDataService();
 
-    // Sequential execution — closeOut touches filesystem/git, parallel runs risk index-lock races
-    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
+    // Pre-validate all issues and build contexts sequentially (lightweight).
+    // Then run closeOut with bounded concurrency (max 3) to avoid unbounded
+    // resource use while keeping git index-lock risk low for independent issues.
+    type CloseOutTask = { id: string; ctx: LifecycleContext } | { id: string; skipped: true; error: string };
+    const tasks: CloseOutTask[] = [];
     for (const id of issueIds) {
-      // Server-side active-agent guardrail
       const cachedIssue = issueDataService.getIssues().find(
         (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
       );
@@ -2377,7 +2380,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
       const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id, allowPausedMerged));
       if (hasActiveAgent) {
-        results.push({ issueId: id, success: false, error: 'Skipped: active agent running', skipped: true });
+        tasks.push({ id, skipped: true, error: 'Skipped: active agent running' });
         continue;
       }
 
@@ -2395,7 +2398,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
       if (!projectPath) {
-        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false });
+        tasks.push({ id, skipped: true, error: `Could not resolve project path for ${id}` });
         continue;
       }
 
@@ -2420,10 +2423,19 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
 
-      const closeResult = yield* closeOut(ctx).pipe(
-        Effect.catch((error: unknown) =>
-          Effect.succeed({
-            workflow: 'close-out' as const,
+      tasks.push({ id, ctx });
+    }
+
+    const closeOutTasks = tasks
+      .filter((t): t is { id: string; ctx: LifecycleContext } => !('skipped' in t))
+      .map(({ id, ctx }) => async () => {
+        try {
+          // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+          const closeResult = await Effect.runPromise(closeOut(ctx));
+          return { id, closeResult };
+        } catch (error) {
+          const closeResult: WorkflowResult = {
+            workflow: 'close-out',
             issueId: id,
             success: false,
             steps: [{
@@ -2433,10 +2445,15 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
               error: error instanceof Error ? error.message : 'Unknown error',
             }],
             duration: 0,
-          }),
-        ),
-      );
+          };
+          return { id, closeResult };
+        }
+      });
 
+    const closeOutResults = yield* Effect.promise(() => withConcurrencyLimit(closeOutTasks, 3));
+
+    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
+    for (const { id, closeResult } of closeOutResults) {
       if (closeResult.success) {
         let newLabels: string[] = ['closed-out'];
         try {
@@ -2471,6 +2488,12 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         error: closeResult.success ? undefined : failedStep?.error,
         skipped: false,
       });
+    }
+
+    for (const task of tasks) {
+      if ('skipped' in task) {
+        results.push({ issueId: task.id, success: false, error: task.error, skipped: true });
+      }
     }
 
     // Invalidate trackers once if any issue closed successfully

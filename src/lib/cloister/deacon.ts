@@ -3749,7 +3749,16 @@ function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>)
   return getReviewStatus(state.issueId)?.mergeStatus === 'merged';
 }
 
+// Cache for auto-close-out canonical state queries to avoid N+1 shell execs on patrol
+const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
+const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
+  const cached = autoCloseOutCache.get(issueId);
+  if (cached && Date.now() - cached.timestamp < AUTO_CLOSE_OUT_CACHE_TTL_MS) {
+    return cached.state;
+  }
+
   const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) return null;
 
@@ -3766,7 +3775,9 @@ async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | 
   const labels = (parsed.labels ?? [])
     .map(label => typeof label === 'string' ? label : label.name)
     .filter((label): label is string => typeof label === 'string');
-  return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+  const result = mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+  autoCloseOutCache.set(issueId, { state: result, timestamp: Date.now() });
+  return result;
 }
 
 function recordAutoCloseOutFailure(issueId: string, message: string): void {

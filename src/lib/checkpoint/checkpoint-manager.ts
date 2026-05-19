@@ -180,11 +180,14 @@ export async function hasCheckpoint(cwd: string, agentId: string, turnId: string
  */
 export async function deleteCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
-  if (!(await hasCheckpoint(cwd, agentId, turnId))) return
-  await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
-    cwd,
-    encoding: 'utf-8',
-  })
+  try {
+    await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
+      cwd,
+      encoding: 'utf-8',
+    })
+  } catch {
+    // No-op if ref doesn't exist
+  }
 }
 
 /**
