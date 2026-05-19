@@ -6,6 +6,7 @@ import DrawerActivityRail from './DrawerActivityRail';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerVerificationGates from './DrawerVerificationGates';
+import PhaseTimeline from './PhaseTimeline';
 import { useDrawerData } from './useDrawerData';
 
 export function IssueDrawer() {
@@ -83,6 +84,7 @@ export function IssueDrawer() {
                   Issue details will appear here as data streams in.
                 </p>
               </div>
+              <PhaseTimeline />
               <DrawerActiveAgent />
               <DrawerVerificationGates />
               <DrawerBeadsList />

@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T00:07:20.909Z",
+  "updated": "2026-05-19T00:11:28.061Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "f5712dc53"
+    "sha": "ba9f332cc"
   },
   "decisions": [
     {
@@ -203,13 +203,13 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-tw8n Agents card to drawer anchor wiring is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-eztf drawer Phase Timeline is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
-      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx",
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerActiveAgent.tsx"
+      "src/dashboard/frontend/src/components/drawer/PhaseTimeline.tsx",
+      "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -355,6 +355,12 @@
       "timestamp": "2026-05-19T00:07:20.909Z",
       "reason": "bead-close",
       "note": "Implemented workspace-tw8n Agents card drawer wiring: AgentCard Open issue now opens overview with #active-agent, IssueDrawer scrolls to the Active Agent anchor, focused FleetAgentsView and IssueDrawer tests pass, plus typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:11:28.061Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-eztf drawer Phase Timeline with six PRD steps, done/current/upcoming top accents, useDrawerData-derived phase state, current when-stamp foreground styling, focused drawer tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -536,6 +542,10 @@
     "d5-drawer-active-agent.ac4": "completed",
     "a5-agents-drawer-wiring": "completed",
     "a5-agents-drawer-wiring.ac1": "completed",
-    "a5-agents-drawer-wiring.ac2": "completed"
+    "a5-agents-drawer-wiring.ac2": "completed",
+    "d3-drawer-phase-timeline": "completed",
+    "d3-drawer-phase-timeline.ac1": "completed",
+    "d3-drawer-phase-timeline.ac2": "completed",
+    "d3-drawer-phase-timeline.ac3": "completed"
   }
 }

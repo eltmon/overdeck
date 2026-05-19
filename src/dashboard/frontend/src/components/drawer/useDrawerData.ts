@@ -43,6 +43,16 @@ export type DrawerVerificationGate = {
   detail: string;
 };
 
+export type DrawerPhaseTimelineState = 'done' | 'current' | 'upcoming';
+
+export type DrawerPhaseTimelineStep = {
+  id: 'triaged' | 'planned' | 'implemented' | 'reviewed' | 'shipping' | 'merged';
+  label: string;
+  state: DrawerPhaseTimelineState;
+  when: string;
+  sub: string;
+};
+
 type ActivityEntry = {
   id?: string;
   timestamp?: string;
@@ -76,6 +86,7 @@ export type DrawerData = {
   beads: DrawerBeadItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: DrawerVerificationGate[];
+  phaseTimeline: DrawerPhaseTimelineStep[];
   activityRail: DrawerActivityItem[];
 };
 
@@ -244,6 +255,37 @@ function verificationGates(reviewStatus: ReviewStatusSnapshot | undefined): Draw
   return [...qualityGates, { id: 'uat', label: 'UAT', status: uatStatus, detail: gateDetail(uatStatus) }];
 }
 
+function formatWhen(value: string | undefined) {
+  const time = parseTime(value);
+  if (time === null) return '—';
+  const date = new Date(time);
+  return `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot | undefined): DrawerPhaseTimelineStep[] {
+  const merged = reviewStatus?.mergeStatus === 'merged' || issue?.state === 'done' || issue?.status.toLowerCase() === 'done' || Boolean(issue?.completedAt);
+  const shippingCurrent = !merged && (reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || Boolean(reviewStatus?.readyForMerge));
+  const reviewedDone = merged || shippingCurrent || reviewStatus?.reviewStatus === 'passed';
+  const reviewedCurrent = !reviewedDone && reviewStatus?.reviewStatus === 'reviewing';
+  const implementedDone = reviewedDone || reviewedCurrent || reviewStatus?.verificationStatus === 'passed' || reviewStatus?.testStatus === 'passed';
+  const implementedCurrent = !implementedDone && (reviewStatus?.verificationStatus === 'running' || reviewStatus?.testStatus === 'testing' || issue?.state === 'in_progress' || issue?.status.toLowerCase() === 'in progress');
+  const plannedDone = implementedDone || implementedCurrent || Boolean(issue?.planningComplete || issue?.hasPlan);
+  const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent || plannedDone ? 2 : 1;
+  const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
+
+  return [
+    { id: 'triaged', label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
+    { id: 'planned', label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
+    { id: 'implemented', label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
+    { id: 'reviewed', label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
+    { id: 'shipping', label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
+    { id: 'merged', label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
+  ].map((step, index) => ({
+    ...step,
+    state: done[index] ? 'done' : index === currentIndex ? 'current' : 'upcoming',
+  }));
+}
+
 export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const issues = useDashboardStore(selectIssues) as Issue[];
@@ -264,7 +306,7 @@ export function useDrawerData(): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], beads: [], reviewSpecialists: [], verificationGates: [], activityRail: [] };
+      return { issue: null, agents: [], beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [] };
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
@@ -289,6 +331,7 @@ export function useDrawerData(): DrawerData {
       beads: normalizeBeads(beadsData?.tasks, drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: verificationGates(reviewStatus),
+      phaseTimeline: phaseTimeline(issue, reviewStatus),
       activityRail,
     };
   }, [agents, beadsData, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);

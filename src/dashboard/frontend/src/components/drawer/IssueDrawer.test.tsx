@@ -161,6 +161,41 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
   });
 
+  it('renders phase timeline from drawer data with done current and upcoming states', () => {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, hasPlan: true, status: 'In Progress' }],
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          verificationStatus: 'passed',
+          mergeStatus: 'merging',
+          readyForMerge: true,
+          reviewSpawnedAt: '2026-05-18T00:10:00.000Z',
+          updatedAt: '2026-05-18T00:15:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-phase-timeline')).toHaveClass('grid-cols-6');
+    expect(screen.getByText('Triaged')).toBeInTheDocument();
+    expect(screen.getByText('Planned')).toBeInTheDocument();
+    expect(screen.getByText('Implemented')).toBeInTheDocument();
+    expect(screen.getByText('Reviewed')).toBeInTheDocument();
+    expect(screen.getByText('Shipping')).toBeInTheDocument();
+    expect(screen.getByText('Merged')).toBeInTheDocument();
+    expect(within(screen.getByTestId('drawer-phase-triaged')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
+    expect(within(screen.getByTestId('drawer-phase-reviewed')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
+    expect(within(screen.getByTestId('drawer-phase-shipping')).getByTestId('drawer-phase-accent-current')).toHaveClass('bg-signal-review');
+    expect(within(screen.getByTestId('drawer-phase-merged')).getByTestId('drawer-phase-accent-upcoming')).toHaveClass('bg-transparent');
+    expect(within(screen.getByTestId('drawer-phase-shipping')).getByText('05/18')).toHaveClass('font-medium', 'text-foreground');
+    expect(within(screen.getByTestId('drawer-phase-merged')).getByText('—')).toHaveClass('text-muted-foreground');
+  });
+
   it('renders verification gates from drawer data with PRD border tones', () => {
     useDashboardStore.setState({
       reviewStatusByIssueId: {
