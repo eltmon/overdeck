@@ -351,18 +351,18 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent || plannedDone ? 2 : 1;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
 
-  const steps: DrawerPhaseTimelineStep[] = [
-    { id: 'triaged', label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
-    { id: 'planned', label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
-    { id: 'implemented', label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
-    { id: 'reviewed', label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
-    { id: 'shipping', label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
-    { id: 'merged', label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
+  const steps = [
+    { id: 'triaged' as const, label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
+    { id: 'planned' as const, label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
+    { id: 'implemented' as const, label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
+    { id: 'reviewed' as const, label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
+    { id: 'shipping' as const, label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
+    { id: 'merged' as const, label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
   ];
   return steps.map((step, index) => ({
     ...step,
-    state: (done[index] ? 'done' : index === currentIndex ? 'current' : 'upcoming') as DrawerPhaseTimelineStep['state'],
-  }));
+    state: done[index] ? 'done' : index === currentIndex ? 'current' : 'upcoming',
+  })) as DrawerPhaseTimelineStep[];
 }
 
 export function useDrawerData(): DrawerData {
