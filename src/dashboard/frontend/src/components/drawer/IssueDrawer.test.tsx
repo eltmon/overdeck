@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
@@ -48,6 +48,7 @@ function renderDrawer(beads: TestBead[] = []) {
 
 describe('IssueDrawer', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     window.history.replaceState(null, '', '/');
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
@@ -170,6 +171,59 @@ describe('IssueDrawer', () => {
     expect(within(screen.getByTestId('drawer-verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
     expect(screen.getByTestId('drawer-verification-gate-test')).toHaveClass('badge-border-muted', 'text-muted-foreground');
     expect(screen.getByTestId('drawer-verification-gate-uat')).toHaveClass('badge-border-info', 'text-info-foreground');
+  });
+
+  it('renders active agent card with stream excerpt and sends tell input', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ success: true }) } as Response);
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-PAN-1': {
+          id: 'agent-PAN-1',
+          issueId: 'PAN-1',
+          runtime: 'claude-code',
+          harness: 'claude-code',
+          model: 'gpt-5.5',
+          status: 'running',
+          role: 'work',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+      recentActivity: [
+        { id: 'stream-1', timestamp: '2026-05-18T00:00:00.000Z', source: 'agent', level: 'info', message: 'Implementing drawer card', issueId: 'PAN-1' },
+      ],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-active-agent')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
+    expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
+    expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
+    expect(screen.getByText('GPT-5.5 · claude-code · spend —')).toHaveClass('text-right', 'font-mono');
+    expect(screen.getByTestId('drawer-active-agent-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
+    expect(within(screen.getByTestId('drawer-active-agent-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Tell active agent'), { target: { value: 'Please continue' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/tell', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'Please continue' }),
+      }));
+    });
+    expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
+  });
+
+  it('renders active agent placeholder when no agent is active', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-active-agent')).toBeInTheDocument();
+    expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
   it('renders drawer beads list from drawer data with done and current states', () => {

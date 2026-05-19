@@ -19,6 +19,7 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
  *   GET    /api/agents
  *   GET    /api/agents/:id/output
  *   POST   /api/agents/:id/message
+ *   POST   /api/agents/:id/tell
  *   DELETE /api/agents/:id
  *   GET    /api/agents/:id/health-history
  *   POST   /api/agents/:id/poke
@@ -979,46 +980,60 @@ const getAgentConversationRoute = HttpRouter.add(
   })),
 );
 
+async function sendAgentMessage(id: string, message: string) {
+  const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+  const remoteStateFile = join(agentStateDir, 'remote-state.json');
+  let isRemote = false;
+  let vmName = '';
+
+  if (existsSync(remoteStateFile)) {
+    try {
+      const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
+      if (state.location === 'remote' && state.vmName) {
+        isRemote = true;
+        vmName = state.vmName;
+      }
+    } catch {}
+  }
+
+  if (isRemote && vmName) {
+    const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
+    await sendToRemoteAgent(id, vmName, message);
+    return { success: true, remote: true };
+  }
+
+  await messageAgent(id, message);
+  return { success: true };
+}
+
+function postAgentMessageLikeRoute(path: string) {
+  return HttpRouter.add(
+    'POST',
+    path,
+    httpHandler(Effect.gen(function* () {
+      const params = yield* HttpRouter.params;
+      const id = params['id'] ?? '';
+      const body = yield* readJsonBody;
+
+      const { message } = body as any;
+      if (!message) {
+        return jsonResponse({ error: 'Message required' }, { status: 400 });
+      }
+
+      return yield* Effect.promise(() => sendAgentMessage(id, message)).pipe(
+        Effect.map((result) => jsonResponse(result)),
+      );
+    })),
+  );
+}
+
 // ─── Route: POST /api/agents/:id/message ─────────────────────────────────────
 
-const postAgentMessageRoute = HttpRouter.add(
-  'POST',
-  '/api/agents/:id/message',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+const postAgentMessageRoute = postAgentMessageLikeRoute('/api/agents/:id/message');
 
-    const { message } = body as any;
-    if (!message) {
-      return jsonResponse({ error: 'Message required' }, { status: 400 });
-    }
+// ─── Route: POST /api/agents/:id/tell ────────────────────────────────────────
 
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-    const remoteStateFile = join(agentStateDir, 'remote-state.json');
-    let isRemote = false;
-    let vmName = '';
-
-    if (existsSync(remoteStateFile)) {
-      try {
-        const state = JSON.parse(yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')));
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      } catch {}
-    }
-
-    if (isRemote && vmName) {
-      const { sendToRemoteAgent } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
-      yield* Effect.promise(() => sendToRemoteAgent(id, vmName, message));
-      return jsonResponse({ success: true, remote: true });
-    } else {
-      yield* Effect.promise(() => messageAgent(id, message));
-      return jsonResponse({ success: true });
-    }
-  })),
-);
+const postAgentTellRoute = postAgentMessageLikeRoute('/api/agents/:id/tell');
 
 // ─── Route: DELETE /api/agents/:id ───────────────────────────────────────────
 
@@ -3461,6 +3476,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentOutputRoute,
   getAgentConversationRoute,
   postAgentMessageRoute,
+  postAgentTellRoute,
   deleteAgentRoute,
   getAgentHealthHistoryRoute,
   postAgentPokeRoute,
