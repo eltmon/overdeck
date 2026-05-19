@@ -27,7 +27,9 @@ You are verifying that a single unit of work (bead) was implemented correctly be
 
 ## Your Task
 
-Perform exactly three checks. Be thorough but fast — you are reviewing one bead's diff, not a full MR.
+Perform exactly two checks. Be thorough but fast — you are reviewing one bead's diff, not a full MR.
+
+**Compile, lint, and tests are NOT your job.** The verification gate (PAN-174) already runs `npm run typecheck`, `npm run lint`, and `npm test` from `projects.yaml` after the work agent signals completion, before the review role dispatches. Running them here is pure duplication that stalls inspection on slow toolchains (`mvnw compile` in particular has timed out inspection runs).
 
 ### Check 1: Spec Fidelity
 
@@ -73,22 +75,11 @@ Where possible, verify with grep:
 grep -r "from.*ChatContext" {{workspacePath}}/src/components/chat/ 2>/dev/null
 ```
 
-### Check 3: Compile + Smoke
-
-Run compile and lint checks to verify the code is in a working state:
-
-```bash
-cd {{workspacePath}}
-{{compileCommand}}
-```
-
-Report any compilation or lint errors. The code must compile cleanly after each bead.
-
 ## Decision
 
-### PASS — All three checks pass
+### PASS — Both checks pass
 
-The implementation matches the spec, no constraints are violated, and the code compiles.
+The implementation matches the spec and no constraints are violated.
 
 ### BLOCKED — Any check fails
 

@@ -96,33 +96,6 @@ async function getBeadDescription(beadId: string, workspacePath: string): Promis
 }
 
 /**
- * Detect the compile/lint command for the workspace.
- */
-function detectCompileCommand(workspacePath: string): string {
-  // Check for common project types
-  const checks: Array<{ file: string; command: string }> = [
-    { file: 'tsconfig.json', command: 'npx tsc --noEmit && npx eslint . --max-warnings=0 2>/dev/null || npx eslint .' },
-    { file: 'package.json', command: 'npm run build 2>&1 | tail -20' },
-    { file: 'pom.xml', command: './mvnw compile -q' },
-    { file: 'Cargo.toml', command: 'cargo check' },
-    { file: 'go.mod', command: 'go build ./...' },
-  ];
-
-  for (const check of checks) {
-    // Check workspace root and common subdirectories
-    for (const subdir of ['', 'fe', 'api', 'frontend', 'backend']) {
-      const checkPath = subdir ? join(workspacePath, subdir, check.file) : join(workspacePath, check.file);
-      if (existsSync(checkPath)) {
-        const cwd = subdir ? `cd ${subdir} && ` : '';
-        return `${cwd}${check.command}`;
-      }
-    }
-  }
-
-  return 'echo "No compile command detected — skipping compile check"';
-}
-
-/**
  * Build the prompt for the inspect specialist.
  */
 export async function buildInspectPrompt(context: InspectContext): Promise<string> {
@@ -140,11 +113,9 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
   // Get diff scope
   const diffBase = await getDiffBase(context.projectKey, context.issueId, context.workspace);
   const diffStats = await getDiffStats(context.workspace, diffBase);
-  const compileCommand = detectCompileCommand(context.workspace);
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
-  // Replace template variables
   const prompt = template
     .replace(/\{\{apiUrl\}\}/g, apiUrl)
     .replace(/\{\{projectPath\}\}/g, context.projectPath)
@@ -155,9 +126,8 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
     .replace(/\{\{diffBase\}\}/g, diffBase)
     .replace(/\{\{diffStats\}\}/g, diffStats)
     .replace(/\{\{beadDescription\}\}/g, beadDescription)
-    .replace(/\{\{compileCommand\}\}/g, compileCommand)
-    .replace(/\{\{resultStatus\}\}/g, '${RESULT_STATUS}')  // Placeholder for specialist to fill
-    .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');    // Placeholder for specialist to fill
+    .replace(/\{\{resultStatus\}\}/g, '${RESULT_STATUS}')
+    .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
 
   return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
 }

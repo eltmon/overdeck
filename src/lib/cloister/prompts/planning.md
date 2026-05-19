@@ -190,7 +190,9 @@ For each sub-task, estimate difficulty using this rubric:
 
 **You MUST set this field explicitly on every bead.** Omitting it is a planning error — the work prompt requires it. Default to `false` for the typical mechanical bead; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 beads with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large beads are more often the actual problem.
 
-When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the bead needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol beads where the inspector should answer “was this done correctly?” rather than only “was the deed done?”
+When `requiresInspection: true`, you MUST also populate `metadata.foundationFor: [<beadId>, …]` listing the downstream beads that depend on this one. The list answers the question "if this bead were implemented wrong, which other beads would have to be redone?" If you cannot name at least one dependent bead, the inspection criterion has not actually been met — flip `requiresInspection` back to `false`. Criteria 2-5 above (architectural decision, spec ambiguity, security boundary, cross-cutting protocol) still qualify; in those cases list the beads that *encode assumptions about this bead's output*. An empty `foundationFor` on a `requiresInspection: true` bead is a planning error.
+
+When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the bead needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol beads where the inspector should answer "was this done correctly?" rather than only "was the deed done?"
 
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:

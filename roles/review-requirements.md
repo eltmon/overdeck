@@ -29,12 +29,38 @@ Do not review general bugs, security vulnerabilities, performance regressions, s
 
 1. Review the inline shared context summary in your spawn prompt.
 2. Extract every requirement, acceptance criterion, bead claim, and explicit non-goal from the summary and manifest.
-3. Start with risk-ranked changed files from the summary.
-4. Map each requirement to changed code evidence, tests, or observable behavior.
-5. Use targeted Grep/Glob only to verify a specific requirement, symbol, route, component, or config link.
-6. Mark each requirement as implemented, partial, missing, not applicable, or out of scope.
+3. Identify the PR diff scope from the manifest — the set of files this PR actually changed.
+4. Start with risk-ranked changed files from the summary.
+5. Classify each acceptance criterion into one of three scope buckets before mapping evidence (see "Per-AC scope classification" below).
+6. Map each requirement to changed code evidence, tests, or observable behavior.
+7. Use targeted Grep/Glob only to verify a specific requirement, symbol, route, component, or config link.
+8. Mark each requirement as implemented, partial, missing, not applicable, or out of scope.
 
 Do not run broad `git diff`, rediscover all changed files, or re-gather issue context that the manifest already provides.
+
+## Per-AC scope classification (REQUIRED)
+
+For every acceptance criterion, vBRIEF item, and bead claim, decide which scope bucket it falls into. This determines whether a gap is allowed to block this PR:
+
+| Bucket | Meaning | Max severity |
+| --- | --- | --- |
+| `in_pr_scope` | The AC describes behavior the PR diff is expected to deliver. Evidence (or its absence) lives inside the PR diff. | `!` (blocking) allowed when missing |
+| `whole_feature_scope` | The AC is part of the larger feature this PR contributes to, but the code path it covers is entirely outside the PR diff. The PR did not promise to deliver it. | `~` (advisory) only |
+| `pre_existing` | The AC describes a system property that existed before this PR. Pre-existing risk is never this PR's responsibility. | `~` (advisory) only |
+
+Scope detection heuristic:
+
+- AC behavior touches files in the PR diff → `in_pr_scope`
+- AC behavior is part of the feature but its code lives entirely outside the PR diff → `whole_feature_scope`
+- AC describes a system property that exists pre-PR → `pre_existing`
+
+When in doubt between `in_pr_scope` and `whole_feature_scope`, prefer `whole_feature_scope` — the synthesis agent will fold those into the scope note for operator review rather than silently dropping them. Over-tagging `in_pr_scope` is what produces the 100+-AC blocker waves that have been thrashing reviews.
+
+Severity promotion rules:
+
+- `!` MUST is only legal when `scope: in_pr_scope` and the AC is missing or contradicted.
+- `whole_feature_scope` and `pre_existing` gaps emit at `~` only, regardless of how obviously missing they are.
+- `⊗` MUST NOT applies when the PR introduces forbidden behavior — independent of scope bucket; the prohibition is what matters.
 
 ## TLDR: prefer code summaries over full reads
 
@@ -76,21 +102,27 @@ Write exactly one final report to the output file.
 
 ## Summary
 **Issue:** <issue ID and title if present in manifest>
-**Requirements found:** <N>
-**Implemented:** <N>
-**Partial:** <N>
-**Missing:** <N>
+**Requirements found:** <N total>
+**In-PR-scope:** <N>
+**Whole-feature-scope:** <N>
+**Pre-existing:** <N>
+**Implemented (in_pr_scope):** <N>
+**Partial (in_pr_scope):** <N>
+**Missing (in_pr_scope):** <N>
 **Overall:** COMPLETE / PARTIAL / INCOMPLETE
 
 ## Coverage Matrix
-| Requirement | Source | Status | Evidence |
-| --- | --- | --- | --- |
-| <requirement> | <vBRIEF/AC/bead/issue> | Implemented | `path/to/file.ts:42` |
-| <requirement> | <source> | Missing | No changed-code evidence found |
+| Requirement | Source | Scope | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| <requirement> | <vBRIEF/AC/bead/issue> | in_pr_scope | Implemented | `path/to/file.ts:42` |
+| <requirement> | <source> | in_pr_scope | Missing | No changed-code evidence found |
+| <requirement> | <source> | whole_feature_scope | Not in this PR | Belongs to feature, not this change set |
+| <requirement> | <source> | pre_existing | Implemented (pre-PR) | Existed before this branch |
 
 ## Findings
 
 ### ! <title> — <requirement source>
+**Scope:** in_pr_scope
 **Evidence tier:** Tier <n>
 **Requirement:** <exact requirement text>
 **Expected:** <what should exist or happen>
@@ -98,14 +130,16 @@ Write exactly one final report to the output file.
 **Impact:** <user-visible or pipeline-visible consequence>
 **Fix:** <specific missing work>
 
+(`!` findings MUST cite `Scope: in_pr_scope`. Any whole_feature_scope or pre_existing gap goes under Non-blocking Notes at `~`.)
+
 ## Non-blocking Notes
-<`~`, `≉`, and `?` items, or "None">
+<`~`, `≉`, and `?` items, or "None". Group whole_feature_scope and pre_existing gaps here. Tag each with its scope bucket so synthesis can render the scope note.>
 
 ## Clean Requirements Checked
-<brief list of requirements verified with evidence>
+<brief list of in_pr_scope requirements verified with evidence>
 ```
 
-If every requirement is covered, still write the report with `## Findings` set to `None`.
+If every in-PR-scope requirement is covered, still write the report with `## Findings` set to `None`.
 
 ## Write contract
 
