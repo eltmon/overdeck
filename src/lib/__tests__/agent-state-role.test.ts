@@ -58,6 +58,15 @@ describe('AgentState role persistence', () => {
     expect(command).not.toContain('pan-review-agent');
   });
 
+  it('threads configured effort into claude-code role runtime commands', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
+    expect(command).toContain('--agent roles/flywheel.md');
+    expect(command).toContain("--model 'claude-opus-4-7'");
+    expect(command).toContain('--effort low');
+  });
+
   it('does not pass --agent for review convoy sub-roles (prompts are harness-agnostic templates inlined by the orchestrator)', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath } = await import('../agents.js');
 

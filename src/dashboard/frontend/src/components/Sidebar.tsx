@@ -97,7 +97,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
   const { data: flywheelRuns = [] } = useQuery({
     queryKey: ['flywheel-runs'],
     queryFn: async () => {
-      const res = await fetch('/api/flywheel/runs');
+      const res = await fetch('/api/flywheel/runs?limit=10');
       if (!res.ok) return [];
       return res.json() as Promise<FlywheelRunSummary[]>;
     },

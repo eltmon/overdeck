@@ -19,12 +19,13 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
   resumeFlywheel: vi.fn(async () => {
     flywheelLifecycleMocks.paused = false;
   }),
-  spawnFlywheel: vi.fn(async ({ runId }: { runId: string }) => ({
+  spawnFlywheel: vi.fn(async ({ runId, model, harness }: { runId: string; model?: string; harness?: 'claude-code' | 'pi' }) => ({
     id: 'flywheel-orchestrator',
     issueId: runId,
     workspace: '/repo',
+    harness,
     role: 'flywheel',
-    model: 'claude-opus-4-7',
+    model: model ?? 'claude-opus-4-7',
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
@@ -50,6 +51,24 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsAsync: vi.fn(async () => flywheelLifecycleMocks.sessionExists),
+}));
+
+vi.mock('../../../lib/config-yaml.js', () => ({
+  loadConfig: () => ({
+    config: {
+      roles: {
+        flywheel: {
+          harness: 'pi',
+          model: 'claude-sonnet-4-6',
+          effort: 'low',
+          maxAgents: 3,
+          scope: 'all-tracked-projects',
+        },
+      },
+      workhorses: {},
+    },
+  }),
+  resolveModel: () => 'claude-sonnet-4-6',
 }));
 
 import {
@@ -189,6 +208,7 @@ describe('flywheel CLI commands', () => {
   });
 
   it('renders human-readable active run status', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
     await writeLatestFlywheelStatus(validStatus);
 
     await flywheelStatusCommand({});
@@ -206,6 +226,7 @@ describe('flywheel CLI commands', () => {
   });
 
   it('emits raw FlywheelStatus JSON with --json', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
     await writeLatestFlywheelStatus(validStatus);
 
     await flywheelStatusCommand({ json: true });
@@ -231,9 +252,16 @@ describe('flywheel CLI commands', () => {
       runId: 'RUN-1',
       briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
       workspace: tempDir,
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'low',
+      maxAgents: 3,
+      scope: 'all-tracked-projects',
     }));
     const latest = JSON.parse(await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'latest.json'), 'utf8')) as FlywheelStatus;
     expect(latest.runId).toBe('RUN-1');
+    expect(latest.orchestrator).toMatchObject({ harness: 'pi', model: 'claude-sonnet-4-6', effort: 'low' });
+    expect(latest.system.agentsCap).toBe(3);
     expect(latest.agents[0]?.id).toBe('flywheel-orchestrator');
     expect(logSpy).toHaveBeenCalledWith('Flywheel started: RUN-1');
     expect(logSpy).toHaveBeenCalledWith('Brief: docs/flywheel-brief.md');

@@ -7,6 +7,7 @@ import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
 import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
+import { loadConfig, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
@@ -44,6 +45,14 @@ interface ReportOpenOptions {
 interface FlywheelGateSnapshot {
   paused: boolean;
   activeRunId: string | null;
+}
+
+interface ResolvedFlywheelRoleConfig {
+  harness: 'claude-code' | 'pi';
+  model: string;
+  effort: RoleEffort;
+  maxAgents: number;
+  scope: FlywheelScope;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -117,16 +126,35 @@ function mb(bytes: number): number {
   return Math.round(bytes / 1024 / 1024);
 }
 
-async function createInitialFlywheelStatus(runId: string, startedAt: string, cwd: string, agentModel: string | undefined): Promise<FlywheelStatus> {
+function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
+  const { config } = loadConfig();
+  const flywheel = config.roles?.flywheel;
+  return {
+    harness: flywheel?.harness ?? 'claude-code',
+    model: resolveModel('flywheel', undefined, config),
+    effort: flywheel?.effort ?? 'high',
+    maxAgents: flywheel?.maxAgents ?? 8,
+    scope: flywheel?.scope ?? 'pan-only',
+  };
+}
+
+async function createInitialFlywheelStatus(
+  runId: string,
+  startedAt: string,
+  cwd: string,
+  agentModel: string | undefined,
+  agentHarness: 'claude-code' | 'pi' | undefined,
+  roleConfig: ResolvedFlywheelRoleConfig,
+): Promise<FlywheelStatus> {
   const ramTotalMb = mb(totalmem());
   return {
     runId,
     startedAt,
     elapsedMs: 0,
     orchestrator: {
-      harness: 'claude-code',
-      model: agentModel ?? 'default',
-      effort: 'high',
+      harness: agentHarness ?? roleConfig.harness,
+      model: agentModel ?? roleConfig.model,
+      effort: roleConfig.effort,
       ctxPercent: 0,
     },
     headline: {
@@ -153,7 +181,7 @@ async function createInitialFlywheelStatus(runId: string, startedAt: string, cwd
       swapUsedMb: 0,
       swapTotalMb: 0,
       agentsActive: 1,
-      agentsCap: 8,
+      agentsCap: roleConfig.maxAgents,
     },
     openQuestions: [],
     ticks: 0,
@@ -192,8 +220,25 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
-  const agent = await spawnFlywheel({ runId, briefPath: brief.absolutePath, workspace: cwd });
-  await writeLatestFlywheelStatus(await createInitialFlywheelStatus(runId, startedAt, cwd, agent.model));
+  const roleConfig = resolveFlywheelRoleConfig();
+  const agent = await spawnFlywheel({
+    runId,
+    briefPath: brief.absolutePath,
+    workspace: cwd,
+    model: roleConfig.model,
+    harness: roleConfig.harness,
+    effort: roleConfig.effort,
+    maxAgents: roleConfig.maxAgents,
+    scope: roleConfig.scope,
+  });
+  await writeLatestFlywheelStatus(await createInitialFlywheelStatus(
+    runId,
+    startedAt,
+    cwd,
+    agent.model,
+    agent.harness,
+    roleConfig,
+  ));
   return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
 }
 
@@ -221,11 +266,10 @@ function formatElapsed(ms: number): string {
 }
 
 async function loadActiveFlywheelStatus(): Promise<FlywheelStatus | null> {
-  const runs = await listFlywheelRuns();
-  const activeRun = runs.find((run) => run.status === 'running');
-  if (!activeRun) return null;
-  const detail = await getFlywheelRunDetail(activeRun.id);
-  return detail?.latest ?? null;
+  const activeRunId = getFlywheelActiveRunId();
+  if (!activeRunId) return null;
+  const detail = await getFlywheelRunDetail(activeRunId);
+  return detail?.status === 'running' ? detail.latest : null;
 }
 
 export function formatFlywheelStatus(status: FlywheelStatus): string {
@@ -389,6 +433,11 @@ function replaceOrAppendRunSection(existing: string, section: string, runNumber:
 }
 
 async function loadReportFlywheelStatus(): Promise<FlywheelStatus | null> {
+  const activeRunId = getFlywheelActiveRunId();
+  if (activeRunId) {
+    const activeDetail = await getFlywheelRunDetail(activeRunId);
+    if (activeDetail?.latest) return activeDetail.latest;
+  }
   const runs = await listFlywheelRuns();
   const run = runs.find((candidate) => candidate.status === 'running') ?? runs[0];
   if (!run) return null;
@@ -454,7 +503,14 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
   if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
     return { before, after: before, changed: false };
   }
-  await resumeFlywheel();
+  const roleConfig = resolveFlywheelRoleConfig();
+  await resumeFlywheel({
+    model: roleConfig.model,
+    harness: roleConfig.harness,
+    effort: roleConfig.effort,
+    maxAgents: roleConfig.maxAgents,
+    scope: roleConfig.scope,
+  });
   return { before, after: readFlywheelGateSnapshot(), changed: true };
 }
 

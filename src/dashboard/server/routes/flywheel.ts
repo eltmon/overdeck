@@ -15,8 +15,11 @@ import {
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
 import { openFlywheelRunReport, pauseFlywheelRun, resumeFlywheelRun, startFlywheelRun } from '../../../cli/commands/flywheel.js';
+import { getConversationByName } from '../../../lib/database/conversations-db.js';
+import { sessionExistsAsync } from '../../../lib/tmux.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
+const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 
 interface BriefRequestBody {
   content?: unknown;
@@ -135,6 +138,13 @@ export async function getFlywheelRunPayload(runId: string, options: FlywheelRunS
   return getFlywheelRunDetail(runId, options);
 }
 
+export async function getFlywheelConversationPayload() {
+  const conversation = getConversationByName(FLYWHEEL_CONVERSATION_NAME);
+  if (!conversation) return null;
+  const sessionAlive = await sessionExistsAsync(conversation.tmuxSession);
+  return { ...conversation, sessionAlive };
+}
+
 interface FlywheelActionDeps {
   start?: typeof startFlywheelRun;
   pause?: typeof pauseFlywheelRun;
@@ -198,6 +208,14 @@ const getFlywheelRunRoute = HttpRouter.add(
     const run = yield* Effect.promise(() => getFlywheelRunPayload(parsed.runId));
     if (!run) return jsonResponse({ error: 'Flywheel run not found', runId: parsed.runId }, { status: 404 });
     return jsonResponse(run);
+  })),
+);
+
+const getFlywheelConversationRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/conversation',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => jsonResponse(await getFlywheelConversationPayload()));
   })),
 );
 
@@ -350,6 +368,7 @@ const postFlywheelBriefRoute = HttpRouter.add(
 export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunsRoute,
   getFlywheelRunRoute,
+  getFlywheelConversationRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,
   postFlywheelPauseRoute,

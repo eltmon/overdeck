@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
+import { getFlywheelActiveRunId } from '../../../lib/database/app-settings.js';
 
 export type FlywheelRunStatus = 'running' | 'complete' | 'aborted';
 
@@ -13,6 +14,10 @@ export interface FlywheelRunStateOptions {
 
 export interface FlywheelRunListOptions extends FlywheelRunStateOptions {
   limit?: number;
+}
+
+export interface FlywheelCurrentStatusOptions extends FlywheelRunStateOptions {
+  activeRunId?: string | null;
 }
 
 export interface FlywheelRunSummary {
@@ -160,9 +165,22 @@ async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Pr
   };
 }
 
-export async function readCurrentLatestFlywheelStatus(options: FlywheelRunStateOptions = {}): Promise<FlywheelStatus | null> {
-  const latestRun = (await listFlywheelRuns(options))[0];
-  return latestRun ? readLatestFlywheelStatus(latestRun.id, options) : null;
+export async function readCurrentLatestFlywheelStatus(options: FlywheelCurrentStatusOptions = {}): Promise<FlywheelStatus | null> {
+  const activeRunId = options.activeRunId === undefined ? getFlywheelActiveRunId() : options.activeRunId;
+  if (!activeRunId || !isFlywheelRunId(activeRunId)) return null;
+  const activeRun = await getFlywheelRunDetail(activeRunId, options);
+  return activeRun?.status === 'running' ? activeRun.latest : null;
+}
+
+function selectLatestRunIds(entries: Dirent[], limit: number): string[] {
+  const selected: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !isFlywheelRunId(entry.name)) continue;
+    selected.push(entry.name);
+    selected.sort((a, b) => runNumber(b) - runNumber(a));
+    if (selected.length > limit) selected.length = limit;
+  }
+  return selected;
 }
 
 export async function listFlywheelRuns(options: FlywheelRunListOptions = {}): Promise<FlywheelRunSummary[]> {
@@ -175,11 +193,7 @@ export async function listFlywheelRuns(options: FlywheelRunListOptions = {}): Pr
     if (code === 'ENOENT') return [];
     throw error;
   }
-  const runIds = entries
-    .filter((entry) => entry.isDirectory() && isFlywheelRunId(entry.name))
-    .map((entry) => entry.name)
-    .sort((a, b) => runNumber(b) - runNumber(a))
-    .slice(0, normalizeLimit(options.limit));
+  const runIds = selectLatestRunIds(entries, normalizeLimit(options.limit));
   const summaries = await mapWithConcurrency(runIds, RUN_SUMMARY_CONCURRENCY, (runId) => summarizeRun(runId, options));
   return summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }

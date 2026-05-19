@@ -84,6 +84,7 @@ describe('FlywheelPage', () => {
     expect(screen.getByLabelText('Flywheel page')).toHaveClass('grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]');
     expect(screen.getByLabelText('Flywheel status pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');
     expect(screen.getByTestId('conversation-pane')).toBeInTheDocument();
   });
 

@@ -33,7 +33,7 @@ function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; st
     if (url === '/api/version') {
       return Response.json({ version: '0.5.0', isDev: false });
     }
-    if (url === '/api/flywheel/runs') {
+    if (url === '/api/flywheel/runs?limit=10') {
       return Response.json(runs);
     }
     return Response.json({});
@@ -76,7 +76,7 @@ describe('Sidebar', () => {
   it('does not show a live badge without an active Flywheel run', async () => {
     const { fetchMock } = renderSidebar({ runs: [{ id: 'RUN-1', status: 'complete' }] });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/runs'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/runs?limit=10'));
 
     expect(screen.queryByText('live')).toBeNull();
   });

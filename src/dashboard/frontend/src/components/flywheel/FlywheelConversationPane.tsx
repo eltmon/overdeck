@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Loader2, Pause, Play, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,7 +40,7 @@ interface FlywheelConversationPaneProps {
 
 const DEFAULT_FLYWHEEL_CONFIG: Required<FlywheelRoleConfig> = {
   harness: 'claude-code',
-  model: 'opus-4.7',
+  model: 'claude-opus-4-7',
   effort: 'high',
   maxAgents: 8,
   scope: 'pan-only',
@@ -51,6 +50,12 @@ async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json() as Promise<T>;
+}
+
+async function fetchFlywheelConversation(): Promise<Conversation | null> {
+  const res = await fetch('/api/flywheel/conversation');
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return res.json() as Promise<Conversation>;
 }
 
 async function postFlywheelAction<T>(path: string, body?: unknown): Promise<T> {
@@ -104,9 +109,9 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     enabled: !!latestRun?.id,
     refetchInterval: latestRun?.status === 'running' ? 5000 : false,
   });
-  const conversationsQuery = useQuery({
-    queryKey: ['conversations'],
-    queryFn: () => fetchJson<Conversation[]>('/api/conversations'),
+  const conversationQuery = useQuery({
+    queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME],
+    queryFn: fetchFlywheelConversation,
     refetchInterval: 5000,
   });
   const settingsQuery = useQuery({
@@ -116,23 +121,21 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   });
 
   const run = runDetailQuery.data ?? null;
-  const status = run?.latest ?? null;
-  const conversation = useMemo(
-    () => findFlywheelConversation(conversationsQuery.data ?? []),
-    [conversationsQuery.data],
-  );
+  const activeRun = run?.status === 'running' ? run : null;
+  const status = activeRun?.latest ?? null;
+  const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
 
   const refreshFlywheel = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['flywheel-runs'] }),
       queryClient.invalidateQueries({ queryKey: ['flywheel-run-detail'] }),
-      queryClient.invalidateQueries({ queryKey: ['conversations'] }),
+      queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] }),
     ]);
   };
 
   const startMutation = useMutation({
-    mutationFn: (newRun: boolean) => postFlywheelAction('/api/flywheel/start', newRun ? { newRun: true } : undefined),
+    mutationFn: () => postFlywheelAction('/api/flywheel/start'),
     onSuccess: async () => {
       toast.success('Flywheel started');
       await refreshFlywheel();
@@ -161,7 +164,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-              <span>{run?.id ?? 'No active run'}</span>
+              <span>{activeRun?.id ?? (run ? `${run.id} (${run.status})` : 'No active run')}</span>
               {topBarLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
             </div>
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -174,7 +177,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => startMutation.mutate(false)}
+              onClick={() => startMutation.mutate()}
               disabled={actionPending}
             >
               <Play className="h-3.5 w-3.5" />
@@ -184,7 +187,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
               onClick={() => pauseMutation.mutate()}
-              disabled={actionPending || !run}
+              disabled={actionPending || !activeRun}
             >
               <Pause className="h-3.5 w-3.5" />
               Pause
@@ -192,7 +195,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => startMutation.mutate(true)}
+              onClick={() => startMutation.mutate()}
               disabled={actionPending}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -226,7 +229,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {conversationsQuery.isLoading ? (
+        {conversationQuery.isLoading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading flywheel conversation…

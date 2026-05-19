@@ -34,6 +34,14 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
             <div>
               <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">Fix-All Flywheel</h1>
               <p className="mt-1 text-sm text-muted-foreground">Autonomous pipeline sweep across active Panopticon work.</p>
+              <a
+                href="https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+              >
+                Flywheel docs
+              </a>
             </div>
             <div className="rounded-lg border border-border bg-background px-3 py-2 text-right">
               <div className="flex items-center justify-end gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

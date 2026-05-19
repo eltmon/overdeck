@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   activeRunId: null as string | null,
   paused: false,
-  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string }) => ({
+  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi' }) => ({
     id: options.agentId,
     issueId,
     workspace: options.workspace,
+    harness: options.harness,
     role,
     model: 'claude-opus-4-7',
     status: 'running',
@@ -54,6 +55,29 @@ describe('flywheel lifecycle', () => {
       allowHost: true,
       registerConversation: true,
     }));
+  });
+
+  it('passes configured run settings into the spawn command and prompt', async () => {
+    await spawnFlywheel({
+      runId: 'RUN-1',
+      workspace: '/repo',
+      env: cleanEnv,
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'low',
+      maxAgents: 3,
+      scope: 'all-tracked-projects',
+    });
+
+    expect(mocks.spawnRun).toHaveBeenCalledWith('RUN-1', 'flywheel', expect.objectContaining({
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'low',
+    }));
+    const prompt = mocks.spawnRun.mock.calls[0][2].prompt;
+    expect(prompt).toContain('Effort: low');
+    expect(prompt).toContain('Max concurrent agents: 3');
+    expect(prompt).toContain('Scope: all-tracked-projects');
   });
 
   it('rejects non-canonical run IDs before spawning', async () => {

@@ -96,8 +96,8 @@ function mockFetch() {
         paths: { latest: '/tmp/latest.json', report: '/tmp/report.md' },
       });
     }
-    if (url === '/api/conversations') {
-      return Response.json([flywheelConversation]);
+    if (url === '/api/flywheel/conversation') {
+      return Response.json(flywheelConversation);
     }
     if (url === '/api/settings') {
       return Response.json({
@@ -143,7 +143,7 @@ describe('FlywheelConversationPane helpers', () => {
   it('applies flywheel config defaults', () => {
     expect(resolveFlywheelConfig(undefined)).toMatchObject({
       harness: 'claude-code',
-      model: 'opus-4.7',
+      model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,
       scope: 'pan-only',
@@ -169,6 +169,8 @@ describe('FlywheelConversationPane', () => {
     expect(screen.getByText('Effort: high')).toBeInTheDocument();
     expect(screen.getByText('Context: 42%')).toBeInTheDocument();
     expect(screen.getByTestId('conversation-panel')).toHaveTextContent('flywheel-orchestrator');
+    expect(fetch).toHaveBeenCalledWith('/api/flywheel/conversation');
+    expect(fetch).not.toHaveBeenCalledWith('/api/conversations');
   });
 
   it('shows the current roles.flywheel config and opens settings from the config card', async () => {
@@ -195,9 +197,37 @@ describe('FlywheelConversationPane', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open Run Report/i }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/start', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/start', expect.objectContaining({ method: 'POST', body: undefined }));
       expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/pause', expect.objectContaining({ method: 'POST' }));
       expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/report/open', expect.objectContaining({ method: 'POST' }));
     });
+  });
+
+  it('does not expose active controls or live metadata for completed runs', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/flywheel/runs?limit=10') {
+        return Response.json([{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status: 'complete' }]);
+      }
+      if (url === '/api/flywheel/runs/RUN-2') {
+        return Response.json({
+          id: 'RUN-2',
+          startedAt: flywheelStatus.startedAt,
+          status: 'complete',
+          latest: flywheelStatus,
+          paths: { latest: '/tmp/latest.json', report: '/tmp/report.md' },
+        });
+      }
+      if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      return Response.json({ error: 'not found' }, { status: 404 });
+    }));
+
+    renderPane();
+
+    expect(await screen.findByText('RUN-2 (complete)')).toBeInTheDocument();
+    expect(screen.getByText('Model: claude-opus-4-7')).toBeInTheDocument();
+    expect(screen.getByText('Effort: high')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pause/i })).toBeDisabled();
   });
 });

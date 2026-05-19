@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
+  getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
   postFlywheelPausePayload,
@@ -13,7 +14,7 @@ import {
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
-import { subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
+import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -196,6 +197,18 @@ describe('flywheel run payload helpers', () => {
       latest: status,
       paths: { report: reportPath },
     });
+  });
+
+  it('bootstraps the current status from the active running run only', async () => {
+    const completed = makeStatus('RUN-1', '2026-05-18T10:00:00.000Z');
+    const running = makeStatus('RUN-2', '2026-05-18T12:00:00.000Z');
+    await writeLatestFlywheelStatus(completed, { panopticonHome });
+    await writeFile(join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'report.md'), '# Report\n');
+    await writeLatestFlywheelStatus(running, { panopticonHome });
+
+    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: null })).resolves.toBeNull();
+    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-1' })).resolves.toBeNull();
+    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-2' })).resolves.toEqual(running);
   });
 
   it('returns null for a missing run', async () => {

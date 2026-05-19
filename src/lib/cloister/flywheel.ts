@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Schema } from 'effect';
 import { FlywheelRunId } from '@panctl/contracts';
 import type { AgentState } from '../agents.js';
+import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { spawnRun, stopAgentAsync } from '../agents.js';
 import {
   getFlywheelActiveRunId,
@@ -20,6 +21,9 @@ export interface FlywheelLifecycleOptions {
   prompt?: string;
   model?: string;
   harness?: 'claude-code' | 'pi';
+  effort?: RoleEffort;
+  maxAgents?: number;
+  scope?: FlywheelScope;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -40,13 +44,20 @@ function defaultFlywheelRunId(): FlywheelRunId {
   return parseRunId(`RUN-${Date.now()}`);
 }
 
-function defaultFlywheelPrompt(runId: string, briefPath?: string, briefContent?: string): string {
-  const briefSection = briefPath
-    ? `\n\nBrief path: ${briefPath}\n\n${briefContent ?? ''}`
+function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {
+  const configLines = [
+    options.harness ? `Harness: ${options.harness}` : undefined,
+    options.effort ? `Effort: ${options.effort}` : undefined,
+    options.maxAgents ? `Max concurrent agents: ${options.maxAgents}` : undefined,
+    options.scope ? `Scope: ${options.scope}` : undefined,
+  ].filter(Boolean).join('\n');
+  const configSection = configLines ? `\n\nRun configuration:\n${configLines}` : '';
+  const briefSection = options.briefPath
+    ? `\n\nBrief path: ${options.briefPath}\n\n${briefContent ?? ''}`
     : '';
   return `FLYWHEEL ORCHESTRATOR TASK for ${runId}:
 
-Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, and wait for explicit lifecycle instructions when the run is paused or complete.${briefSection}`;
+Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.${configSection}${briefSection}`;
 }
 
 export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -62,9 +73,10 @@ async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptio
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
     workspace: options.workspace ?? process.cwd(),
-    prompt: options.prompt ?? defaultFlywheelPrompt(runId, options.briefPath, briefContent),
+    prompt: options.prompt ?? defaultFlywheelPrompt(runId, options, briefContent),
     model: options.model,
     harness: options.harness,
+    effort: options.effort,
     allowHost: true,
     registerConversation: true,
   });

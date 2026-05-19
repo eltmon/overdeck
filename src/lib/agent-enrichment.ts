@@ -37,7 +37,7 @@ export interface Question { question: string; header: string; options: QuestionO
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
 
 export interface AgentEnrichment {
-  role: 'plan' | 'work' | 'review' | 'test' | 'ship' | undefined
+  role: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | undefined
   hasPendingQuestion: boolean
   pendingQuestionCount: number
   pendingQuestionPrompt?: string
@@ -252,7 +252,7 @@ export async function computeAgentEnrichment(
 
   const role: AgentEnrichment['role'] =
     (stateRole === 'plan' || stateRole === 'work' || stateRole === 'review' ||
-     stateRole === 'test' || stateRole === 'ship')
+     stateRole === 'test' || stateRole === 'ship' || stateRole === 'flywheel')
       ? stateRole
       : (isPlanning ? 'plan' : undefined)
 
