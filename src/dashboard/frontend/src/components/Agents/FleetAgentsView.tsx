@@ -285,9 +285,14 @@ export function FleetAgentsView() {
     const runningAgents = fleetAgents.filter(isRunningAgent);
     const stuckAgents = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status) || agent.troubled);
     const queuedAgents = fleetAgents.filter((agent) => agent.status === 'starting');
-    const avgRuntime = runningAgents.length === 0
-      ? 0
-      : runningAgents.reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0) / runningAgents.length;
+    const avgRuntime = (() => {
+      if (runningAgents.length === 0) return 0;
+      const durations = runningAgents.map((agent) => new Date(agent.startedAt).getTime());
+      const finiteDurations = durations.filter((t) => Number.isFinite(t));
+      if (finiteDurations.length === 0) return 0;
+      const sum = finiteDurations.reduce((total, t) => total + Math.max(0, now.getTime() - t), 0);
+      return sum / finiteDurations.length;
+    })();
     const costIssueIds = new Set(fleetAgents.map((agent) => issueKey(agent.issueId)).filter(Boolean));
     const { cost24h, tokens24h } = Array.from(costIssueIds).reduce(
       (totals, issueId) => {

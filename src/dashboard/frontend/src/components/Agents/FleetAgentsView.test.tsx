@@ -213,4 +213,46 @@ describe('FleetAgentsView', () => {
 
     expect(screen.queryByLabelText('haiku-4-5')).not.toBeInTheDocument();
   });
+
+  it('avg runtime tile uses only finite startedAt values (all valid)', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-a': agent({ id: 'agent-a', issueId: 'PAN-1', status: 'running', startedAt: '2026-05-18T00:00:00.000Z' }),
+        'agent-b': agent({ id: 'agent-b', issueId: 'PAN-2', status: 'running', startedAt: '2026-05-18T01:00:00.000Z' }),
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
+    expect(within(tiles[4] as HTMLElement).getByText('2h 30m')).toBeInTheDocument();
+  });
+
+  it('avg runtime tile skips invalid startedAt and averages only valid entries (mixed)', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-valid': agent({ id: 'agent-valid', issueId: 'PAN-1', status: 'running', startedAt: '2026-05-18T00:00:00.000Z' }),
+        'agent-invalid': agent({ id: 'agent-invalid', issueId: 'PAN-2', status: 'running', startedAt: undefined as any }),
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
+    expect(within(tiles[4] as HTMLElement).getByText('3h 0m')).toBeInTheDocument();
+  });
+
+  it('avg runtime tile renders 0m when all running agents have invalid startedAt', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-bad-1': agent({ id: 'agent-bad-1', issueId: 'PAN-1', status: 'running', startedAt: undefined as any }),
+        'agent-bad-2': agent({ id: 'agent-bad-2', issueId: 'PAN-2', status: 'running', startedAt: '' as any }),
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
+    expect(within(tiles[4] as HTMLElement).getByText('0m')).toBeInTheDocument();
+  });
 });
