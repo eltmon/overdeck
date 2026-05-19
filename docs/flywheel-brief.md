@@ -25,6 +25,8 @@ Work in priority order:
 
 Within each tier, prefer the oldest ready item. Do not let easy low-priority work starve urgent substrate fixes.
 
+**Author allowlist (hard filter).** The flywheel ONLY autopicks issues whose author is `eltmon` (the project owner). Issues filed by `panopticon-agent[bot]`, other bots, or other humans are NEVER eligible for autopick — even if they look high-priority. Verify with `gh issue view <num> --json author` before claiming. This is a non-negotiable scope gate: the flywheel's job is to drive forward work the owner asked for, not work that agents filed about each other.
+
 **Parked labels.** Skip any issue labeled `needs-design` or `needs-discussion` — these are explicitly held for a human decision and are not eligible for autopick, planning, or starting. Do not assign agents, do not file derivative beads, do not advance their pipeline state. Treat them as out of scope until a human removes the label.
 
 ## Role taxonomy
