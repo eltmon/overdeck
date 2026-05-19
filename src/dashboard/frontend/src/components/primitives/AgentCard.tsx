@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { memo, type CSSProperties, type ReactNode } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
@@ -42,7 +42,7 @@ const ROLE_ACCENTS = {
   flywheel: 'var(--primary)',
 } satisfies Record<AgentCardRole, string>;
 
-export default function AgentCard({
+function AgentCard({
   id,
   name,
   role,
@@ -145,3 +145,5 @@ export default function AgentCard({
     </article>
   );
 }
+
+export default memo(AgentCard);

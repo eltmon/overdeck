@@ -281,7 +281,9 @@ function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; 
 }
 
 export default function App() {
-  normalizeCurrentRoute();
+  useEffect(() => {
+    normalizeCurrentRoute();
+  }, []);
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
   if (terminalPath.startsWith('/terminal/') || terminalSession) {

@@ -3,6 +3,7 @@ import { getHarness } from '@panctl/contracts';
 
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
+import { isAgentProblemStatus } from '../../lib/pipeline-state';
 import { useDashboardStore, selectAgentOutput } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import type { Agent } from '../../types';
@@ -14,7 +15,18 @@ function isActiveAgent(agent: Agent) {
   return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';
 }
 
+function stuckHours(agent: Agent, now: Date) {
+  const since = agent.firstFailureInRunAt ?? agent.lastFailureAt ?? agent.lastActivity ?? agent.startedAt;
+  if (!since) return 0;
+  const sinceTime = new Date(since).getTime();
+  if (Number.isNaN(sinceTime)) return 0;
+  return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
+}
+
 function verbBadgeForAgent(agent: Agent): VerbBadgeProps {
+  if (isAgentProblemStatus(agent.status) || agent.troubled) {
+    return { variant: 'STUCK · Nh', hours: stuckHours(agent, new Date()), className: 'text-[9px]' };
+  }
   if (agent.hasPendingQuestion) return { variant: 'INPUT', className: 'text-[9px]' };
   if (agent.role === 'plan') return { variant: 'PLANNING', className: 'text-[9px]' };
   if (agent.role === 'review' || agent.role === 'test') return { variant: 'REVIEW RUNNING', className: 'text-[9px]' };

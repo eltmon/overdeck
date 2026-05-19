@@ -140,7 +140,7 @@ function filterMatchesShipModifier(filter: PipelineFilterState, reviewStatus?: R
 
 function isClosedIssue(issue: Issue) {
   const state = issue.state ?? issue.status;
-  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Closed' || state === 'Completed';
+  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Canceled' || state === 'Closed' || state === 'Completed';
 }
 
 function isRunningAgent(agent: Agent) {
