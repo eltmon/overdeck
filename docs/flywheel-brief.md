@@ -25,6 +25,8 @@ Work in priority order:
 
 Within each tier, prefer the oldest ready item. Do not let easy low-priority work starve urgent substrate fixes.
 
+**Parked labels.** Skip any issue labeled `needs-design` or `needs-discussion` — these are explicitly held for a human decision and are not eligible for autopick, planning, or starting. Do not assign agents, do not file derivative beads, do not advance their pipeline state. Treat them as out of scope until a human removes the label.
+
 ## Role taxonomy
 
 Panopticon work moves through five issue-scoped roles:
