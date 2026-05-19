@@ -872,6 +872,31 @@ describe('swarm route helpers', () => {
     expect(__testInternals.getActiveSwarmIssueIds().has('PAN-971')).toBe(true);
   });
 
+  it('GET /api/swarm/:issueId returns persisted state without refreshing PR mergeability', async () => {
+    mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify(baseSwarmState({ consecutiveConflictCount: 1 }), null, 2));
+
+    const { HttpRouter } = await import('effect/unstable/http');
+    const { __testInternals, swarmRouteLayer } = await import('../swarm.js');
+    const { handler, dispose } = HttpRouter.toWebHandler(swarmRouteLayer, { disableLogger: true });
+    try {
+      const response = await handler(new Request('http://localhost/api/swarm/PAN-971'));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        issueId: 'PAN-971',
+        slots: [{ status: 'completed', consecutiveConflictCount: 1 }],
+      });
+    } finally {
+      await dispose();
+    }
+
+    expect(ghExecFileMock).not.toHaveBeenCalled();
+    const persistedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(persistedState.slots[0]).toMatchObject({ status: 'completed', consecutiveConflictCount: 1 });
+  });
+
   it('POST /api/swarm/refresh uses the same status and mergeability refresh path as polling', async () => {
     mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
@@ -978,6 +1003,7 @@ describe('swarm route helpers', () => {
     await __testInternals.pollSwarmAutoAdvance();
 
     const dispatchedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(dispatchedState.slots.some(s => s.itemId === 'wave-0-item' && s.recoveryAction === 'retry')).toBe(false);
     expect(dispatchedState.slots.filter(s => s.itemId === 'wave-0-item').at(-1)?.status).toBe('running');
     expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
     expect(activityLogger.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
@@ -986,6 +1012,15 @@ describe('swarm route helpers', () => {
       issueId: 'PAN-971',
       message: 'Operator recovered slot 1 via retry (wave-0-item)',
     }));
+
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-2']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(false);
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const stillRunningState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(stillRunningState.lastAutoAdvanceError).toBeUndefined();
+    expect(stillRunningState.autoAdvanceFailureCount).toBe(0);
+    expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
   });
 
   it('recovers a failed-merge slot via drop and dispatches downstream DAG work', async () => {

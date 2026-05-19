@@ -535,6 +535,20 @@ function isRetryRecoverySlot(slot: SlotAssignment): boolean {
   return slot.status === 'pending' && slot.recoveryAction === 'retry';
 }
 
+function hasNewerActiveSlotForItem(slots: SlotAssignment[], index: number): boolean {
+  const slot = slots[index];
+  if (!slot) return false;
+  return slots.slice(index + 1).some(candidate =>
+    candidate.itemId === slot.itemId
+    && (candidate.status === 'running' || candidate.status === 'pending')
+    && !isRetryRecoverySlot(candidate),
+  );
+}
+
+function hasRetryRecoverySlotNeedingDispatch(slots: SlotAssignment[]): boolean {
+  return slots.some((slot, index) => isRetryRecoverySlot(slot) && !hasNewerActiveSlotForItem(slots, index));
+}
+
 function slotKeepsSwarmPolling(slot: SlotAssignment): boolean {
   return slot.status === 'running'
     || slot.status === 'pending'
@@ -1337,8 +1351,10 @@ async function dispatchSwarmWave(
   // the new one. Reusing slot id 1 for a different item id appends a new
   // record alongside the prior history.
   const newKeys = new Set(dispatched.map(s => `${s.slot}::${s.itemId}`));
+  const dispatchedItemIds = new Set(dispatched.map(s => s.itemId));
   const carriedSlots: SlotAssignment[] = (existingState?.slots ?? [])
-    .filter(prior => !newKeys.has(`${prior.slot}::${prior.itemId}`));
+    .filter(prior => !newKeys.has(`${prior.slot}::${prior.itemId}`))
+    .filter(prior => !(isRetryRecoverySlot(prior) && dispatchedItemIds.has(prior.itemId)));
   const cumulativeSlots: SlotAssignment[] = [...carriedSlots, ...dispatched];
 
   const state: SwarmState = {
@@ -1860,7 +1876,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       continue;
     }
 
-    const hasRetryRecoverySlot = state.slots.some(isRetryRecoverySlot);
+    const hasRetryRecoverySlot = hasRetryRecoverySlotNeedingDispatch(state.slots);
 
     // PAN-977 round-12 high-1 / round-13 blocker #1: final-wave cleanup
     // consults observed post-refresh state and runs AFTER persistence. If
@@ -2513,18 +2529,7 @@ const getSwarmRoute = HttpRouter.add(
       return jsonResponse({ error: `No swarm state for ${issueId}` }, { status: 404 });
     }
 
-    const sessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const project = yield* Effect.promise(() => Promise.resolve(resolveProjectFromIssue(issueId)));
-    const refreshed = yield* Effect.promise(() => refreshSwarmRuntimeState(state, sessions, project?.projectPath));
-    if (refreshed.changed) {
-      yield* Effect.promise(async () => {
-        // PAN-977 round-11 high-2: saveSwarmState is the single canonical
-        // writer — no separate persistSwarmRuntime() needed here.
-        await saveSwarmState(refreshed.state);
-      });
-    }
-
-    return jsonResponse(refreshed.state);
+    return jsonResponse(state);
   })),
 );
 
