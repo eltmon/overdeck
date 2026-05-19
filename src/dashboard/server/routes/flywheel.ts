@@ -1,13 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
+import { FlywheelStatus } from '@panctl/contracts';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
   listFlywheelRuns,
+  writeLatestFlywheelStatus,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
 
@@ -17,6 +19,13 @@ interface BriefRequestBody {
   content?: unknown;
   path?: unknown;
 }
+
+interface FlywheelStatusResponse {
+  status: number;
+  body: { ok: true; runId: string } | { error: string; details: string[] };
+}
+
+const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
   const originCheck = validateOrigin(request);
@@ -65,6 +74,32 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+const readUnknownJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try {
+    return { ok: true as const, body: text ? (JSON.parse(text) as unknown) : {} };
+  } catch {
+    return { ok: false as const, error: 'Request body must be valid JSON' };
+  }
+});
+
+export async function postFlywheelStatusPayload(payload: unknown, options: FlywheelRunStateOptions = {}): Promise<FlywheelStatusResponse> {
+  try {
+    const status = decodeFlywheelStatus(payload);
+    await writeLatestFlywheelStatus(status, options);
+    return { status: 200, body: { ok: true, runId: status.runId } };
+  } catch (error) {
+    return {
+      status: 400,
+      body: {
+        error: 'Invalid FlywheelStatus payload',
+        details: [error instanceof Error ? error.message : String(error)],
+      },
+    };
+  }
+}
+
 export async function getFlywheelRunsPayload(options: FlywheelRunStateOptions = {}) {
   return listFlywheelRuns(options);
 }
@@ -90,6 +125,22 @@ const getFlywheelRunRoute = HttpRouter.add(
     const run = yield* Effect.promise(() => getFlywheelRunPayload(runId));
     if (!run) return jsonResponse({ error: 'Flywheel run not found', runId }, { status: 404 });
     return jsonResponse(run);
+  })),
+);
+
+const postFlywheelStatusRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/status',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error, details: [] }, { status: 400 });
+
+    const result = yield* Effect.promise(() => postFlywheelStatusPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -152,6 +203,7 @@ const postFlywheelBriefRoute = HttpRouter.add(
 export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunsRoute,
   getFlywheelRunRoute,
+  postFlywheelStatusRoute,
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,
 );

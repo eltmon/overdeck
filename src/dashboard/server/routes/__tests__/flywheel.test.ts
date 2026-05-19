@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,9 +6,10 @@ import type { FlywheelStatus } from '@panctl/contracts';
 import {
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
-import { writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
+import { subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -81,6 +82,44 @@ describe('resolveFlywheelBriefPath', () => {
       ok: false,
       error: 'Brief path must stay inside the project root',
     });
+  });
+});
+
+describe('flywheel status POST payload helper', () => {
+  let panopticonHome: string;
+
+  beforeEach(async () => {
+    panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-post-'));
+  });
+
+  afterEach(async () => {
+    await rm(panopticonHome, { recursive: true, force: true });
+  });
+
+  it('accepts a valid status, persists latest.json, and notifies subscribers', async () => {
+    const status = makeStatus('RUN-7', '2026-05-18T13:00:00.000Z');
+    const received: FlywheelStatus[] = [];
+    const unsubscribe = subscribeLatestFlywheelStatus((next) => received.push(next));
+
+    const result = await postFlywheelStatusPayload(status, { panopticonHome });
+    unsubscribe();
+
+    expect(result).toEqual({ status: 200, body: { ok: true, runId: 'RUN-7' } });
+    await expect(readFile(join(panopticonHome, 'flywheel', 'runs', 'RUN-7', 'latest.json'), 'utf8'))
+      .resolves.toEqual(`${JSON.stringify(status, null, 2)}\n`);
+    expect(received).toEqual([status]);
+  });
+
+  it.each([
+    ['missing runId', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), runId: undefined }],
+    ['invalid orchestrator effort', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), orchestrator: { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z').orchestrator, effort: 'maximum' } }],
+    ['invalid activePipeline', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), activePipeline: [{ issueId: 'PAN-1' }] }],
+  ])('rejects schema-invalid payloads: %s', async (_name, payload) => {
+    const result = await postFlywheelStatusPayload(payload, { panopticonHome });
+
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({ error: 'Invalid FlywheelStatus payload' });
+    expect('details' in result.body && result.body.details.length).toBeGreaterThan(0);
   });
 });
 
