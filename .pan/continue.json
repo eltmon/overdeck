@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-18T21:48:04.025Z",
+  "updated": "2026-05-19T01:32:10.267Z",
   "gitState": {
     "branch": "feature/pan-1052",
     "sha": "ba1999366",
@@ -370,6 +370,11 @@
       "reason": "work",
       "note": "workspace-ujc0 implemented: added src/lib/memory/search.ts FTS search with safe quoted MATCH query construction, project/workspace/issue predicates, reset marker filtering, includeArchived bypass, limit*3 overfetch before tag filtering, BM25 metadata hits, and tests/lib/memory/search.test.ts coverage.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:32:10.267Z",
+      "reason": "end",
+      "note": "Completed PAN-1052 memory substrate bead verification. Local bd reports all PAN-1052 beads closed and 0 open/ready; branch pushed at 417aaee78. pan done preflight still sees stale open beads, filed as substrate bug https://github.com/eltmon/panopticon-cli/issues/1209."
     }
   ],
   "feedback": [],

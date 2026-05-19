@@ -70,14 +70,16 @@ export const selectGodViewAgentStatuses = (s: { agentsById: Record<string, { sta
 
 export const selectGodViewActivityFeed = (s: ActivityFeedState): GodViewActivityEvent[] => {
   const activity = s.recentActivity as GodViewActivityEvent[];
-  const observations = Object.values(s.observationsByIssueId ?? {})
+  const observations: GodViewActivityEvent[] = Object.values(s.observationsByIssueId ?? {})
     .flat()
     .filter((observation) => observation.actionStatus !== null)
     .map((observation) => ({
+      id: `memory-${observation.id}`,
       agentId: observation.workspaceId,
       issueId: observation.issueId,
       timestamp: observation.timestamp,
-      type: 'activity',
+      source: 'memory',
+      level: 'success',
       message: observation.actionStatus ?? observation.summary,
     }));
 
