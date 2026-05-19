@@ -32,7 +32,11 @@ const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessage
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
   mockNotifyPipeline: vi.fn(),
+<<<<<<< HEAD
   mockGetAgentState: vi.fn(() => null),
+=======
+  mockGetAgentState: vi.fn().mockReturnValue(null),
+>>>>>>> 7e4a88e3e (test(review): align verification mocks with rebase logic)
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -505,6 +509,7 @@ describe('convoy orchestration', () => {
     vi.clearAllMocks();
     mockGetAgentState.mockReturnValue(null);
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
+    mockGetAgentState.mockReturnValue(null);
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
@@ -540,6 +545,7 @@ describe('convoy orchestration', () => {
     expect(result.success).toBe(true);
     const expectedOutput = '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/security.md';
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      allowHost: false,
       reviewOutputPath: expectedOutput,
     }));
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -565,6 +571,7 @@ describe('convoy orchestration', () => {
       workspace: '/workspace',
       subRole: 'security',
       model: 'configured-reviewer-model',
+      allowHost: false,
       prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
     }));
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({

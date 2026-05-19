@@ -193,6 +193,8 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     });
 
     mockExecHeadSha = 'newsha99';
+    mockOldTreeSha = 'oldtree';
+    mockNewTreeSha = 'newtree';
 
     const actions = await checkPostReviewCommits();
 
