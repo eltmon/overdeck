@@ -52,12 +52,18 @@ export function IssueDrawer() {
   }, [closeIssue, drawer.issueId]);
 
   useEffect(() => {
-    if (!drawer.issueId || window.location.hash !== '#active-agent') return;
+    if (!drawer.issueId) return;
 
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('active-agent')?.scrollIntoView({ block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frame);
+    const scrollToActive = () => {
+      if (window.location.hash !== '#active-agent') return;
+      window.requestAnimationFrame(() => {
+        document.getElementById('active-agent')?.scrollIntoView({ block: 'start' });
+      });
+    };
+
+    scrollToActive();
+    window.addEventListener('hashchange', scrollToActive);
+    return () => window.removeEventListener('hashchange', scrollToActive);
   }, [drawer.issueId]);
 
   if (!drawer.issueId) return null;

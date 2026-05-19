@@ -64,6 +64,7 @@ function compactModel(model: string) {
 }
 
 function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
   const safeMs = Math.max(0, ms);
   const hours = Math.floor(safeMs / 3_600_000);
   const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
@@ -250,7 +251,7 @@ export function FleetAgentsView() {
         if (stuckDelta !== 0) return stuckDelta;
         const roleDelta = ROLE_ORDER[agentRole(a)] - ROLE_ORDER[agentRole(b)];
         if (roleDelta !== 0) return roleDelta;
-        return (b.lastActivity ?? b.startedAt).localeCompare(a.lastActivity ?? a.startedAt);
+        return (b.lastActivity ?? b.startedAt ?? '').localeCompare(a.lastActivity ?? a.startedAt ?? '');
       })
   ), [agents]);
 
