@@ -143,11 +143,7 @@ export function EventRouter() {
       flushScheduled.current = true
       setTimeout(() => {
         flushScheduled.current = false
-        const batch = pendingBatch.current.splice(0)
-        if (batch.length === 0) return
-        applyEvents(batch)
-        const lastSeq = batch[batch.length - 1]!.sequence
-        coordinator.markEventBatchApplied(lastSeq)
+        drainDeferredEvents()
       }, 16)
     }
 

@@ -72,7 +72,7 @@ afterEach(async () => {
 
 describe('pending turn writer', () => {
   it('builds deterministic filenames from sanitized session id and transcript range', () => {
-    expect(pendingTurnFileName(pendingTurn())).toBe('session_with_spaces_10_100.json');
+    expect(pendingTurnFileName(pendingTurn())).toBe('1778963460123_session_with_spaces_10_100.json');
   });
 
   it('writes pending turn payloads atomically into the issue pending directory', async () => {
@@ -80,15 +80,15 @@ describe('pending turn writer', () => {
     const result = await writePendingTurn(turn);
 
     expect(result).toEqual({
-      fileName: 'session_with_spaces_10_100.json',
-      path: join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending/session_with_spaces_10_100.json'),
+      fileName: '1778963460123_session_with_spaces_10_100.json',
+      path: join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending/1778963460123_session_with_spaces_10_100.json'),
     });
 
     const raw = await readFile(result.path, 'utf8');
     expect(JSON.parse(raw)).toEqual(turn);
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending'));
-    expect(files).toEqual(['session_with_spaces_10_100.json']);
+    expect(files).toEqual(['1778963460123_session_with_spaces_10_100.json']);
   });
 
   it('treats replayed transcript ranges as idempotent upserts', async () => {

@@ -125,6 +125,12 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
       return { status: 'failed', observation: null, reason: 'compress-failed' };
     }
     if (compressed.result.eventsConsumed === 0 || compressed.result.text.trim().length === 0) {
+      const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
+      if (committed.status === 'failed') {
+        await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
+        return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
+      }
+      checkpointCommitted = true;
       return { status: 'noop', observation: null, reason: 'empty-delta' };
     }
 
@@ -142,11 +148,23 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
     });
 
     if (extracted.status === 'skipped') {
+      const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
+      if (committed.status === 'failed') {
+        await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
+        return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
+      }
+      checkpointCommitted = true;
       await recordHealth({ status: 'degraded', reason: extracted.reason, success: false });
       return { status: 'skipped', observation: null, reason: extracted.reason };
     }
 
     if (extracted.status === 'dropped') {
+      const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
+      if (committed.status === 'failed') {
+        await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
+        return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
+      }
+      checkpointCommitted = true;
       await recordHealth({ status: 'failing', reason: extracted.reason, success: false });
       return { status: 'dropped', observation: null, reason: extracted.reason };
     }

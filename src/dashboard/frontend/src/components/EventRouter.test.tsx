@@ -151,6 +151,42 @@ describe('EventRouter memory updates', () => {
     expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-live-2'])
   })
 
+  it('does not flush out-of-order live events while sequence-gap replay is in flight', async () => {
+    let resolveReplay: (events: DomainEvent[]) => void = () => undefined
+    const replayPromise = new Promise<DomainEvent[]>((resolve) => {
+      resolveReplay = resolve
+    })
+    request
+      .mockResolvedValueOnce(snapshot)
+      .mockReturnValueOnce(replayPromise)
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(subscribed).not.toBeNull()
+
+    act(() => {
+      subscribed!(memoryObservationEvent(1, 'obs-live-1'))
+      subscribed!(memoryObservationEvent(3, 'obs-live-3'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16)
+    })
+
+    expect(useDashboardStore.getState().observationsByIssueId['PAN-1052']).toBeUndefined()
+
+    await act(async () => {
+      resolveReplay([memoryObservationEvent(1, 'obs-replay-1'), memoryObservationEvent(2, 'obs-replay-2')])
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const observations = useDashboardStore.getState().observationsByIssueId['PAN-1052'] ?? []
+    expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-replay-2', 'obs-live-3'])
+  })
+
   it('stops snapshot fallback polling after three minutes', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     request.mockRejectedValue(new Error('offline'))

@@ -1,15 +1,15 @@
 import type { MemoryIdentity } from '@panctl/contracts';
-import { queryCostEvents } from '../../database/cost-events-db.js';
 import { updateMemoryHealth } from '../health.js';
 import {
   getExtractionProvider,
   resolveExtractionProviderSelection,
 } from './registry.js';
-import type {
-  ExtractionProviderOptions,
-  ExtractionProviderResult,
-  ExtractionProviderSelection,
-  MemoryProviderSettings,
+import {
+  getCachedDailyMemoryExtractionSpendUsd,
+  type ExtractionProviderOptions,
+  type ExtractionProviderResult,
+  type ExtractionProviderSelection,
+  type MemoryProviderSettings,
 } from './types.js';
 
 const DEFAULT_DAILY_CAP_USD = 5;
@@ -69,13 +69,5 @@ export async function extractWithProviderPolicy<T>(
 }
 
 export function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): number {
-  const events = queryCostEvents({ issueId: identity.issueId, startTs: startOfLocalDayIso() });
-  return events
-    .filter((event) => event.source === 'memory-extraction')
-    .reduce((sum, event) => sum + event.cost, 0);
-}
-
-function startOfLocalDayIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  return getCachedDailyMemoryExtractionSpendUsd(identity.issueId);
 }

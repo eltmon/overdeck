@@ -826,7 +826,8 @@ export const MemoryRollupTriggeredEvent = Schema.Struct({
     projectId: Schema.String,
     workspaceId: Schema.String,
     issueId: IssueId,
-    pendingTurns: Schema.Array(PendingTurn),
+    pendingCount: Schema.Number,
+    turnIds: Schema.Array(Schema.String),
     threshold: Schema.Number,
   }),
 })

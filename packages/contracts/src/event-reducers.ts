@@ -782,7 +782,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         workspaceId: event.payload.workspaceId,
         issueId: event.payload.issueId,
         pendingTurns: [],
-        pendingCount: event.payload.pendingTurns.length,
+        pendingCount: event.payload.pendingCount,
         threshold: event.payload.threshold,
         triggeredAt: event.timestamp,
       }

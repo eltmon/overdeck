@@ -54,16 +54,11 @@ export async function writePendingTurn(turn: PendingTurn, options: StatusRollupT
   const dir = resolvePendingDir(turn.identity.projectId, turn.identity.issueId);
   await ensureDir(dir);
 
+  const existing = await findExistingPendingTurn(dir, turn);
+  if (existing) return existing;
+
   const fileName = pendingTurnFileName(turn);
   const path = `${dir}/${fileName}`;
-
-  try {
-    await readFile(path, 'utf8');
-    return { path, fileName };
-  } catch (error) {
-    if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') throw error;
-  }
-
   const tempPath = `${dir}/.${fileName}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(turn, null, 2)}\n`, 'utf8');
   await rename(tempPath, path);
@@ -126,8 +121,23 @@ export async function readPendingTurns(projectId: string, issueId: string): Prom
   });
 }
 
-export function pendingTurnFileName(turn: Pick<PendingTurn, 'identity' | 'fromOffset' | 'toOffset'>): string {
-  return `${safeFileSegment(turn.identity.sessionId)}_${turn.fromOffset}_${turn.toOffset}.json`;
+export function pendingTurnFileName(turn: Pick<PendingTurn, 'createdAt' | 'identity' | 'fromOffset' | 'toOffset'>): string {
+  const millis = new Date(turn.createdAt).getTime();
+  return `${millis}_${pendingTurnRangeKey(turn)}.json`;
+}
+
+async function findExistingPendingTurn(dir: string, turn: PendingTurn): Promise<WritePendingTurnResult | null> {
+  const rangeSuffix = `_${pendingTurnRangeKey(turn)}.json`;
+  const files = await readdir(dir).catch((error: unknown) => {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [] as string[];
+    throw error;
+  });
+  const fileName = files.find((file) => file.endsWith(rangeSuffix));
+  return fileName ? { path: `${dir}/${fileName}`, fileName } : null;
+}
+
+function pendingTurnRangeKey(turn: Pick<PendingTurn, 'identity' | 'fromOffset' | 'toOffset'>): string {
+  return `${safeFileSegment(turn.identity.sessionId)}_${turn.fromOffset}_${turn.toOffset}`;
 }
 
 async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
@@ -146,7 +156,8 @@ async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
       projectId: job.identity.projectId,
       workspaceId: job.identity.workspaceId,
       issueId: job.identity.issueId,
-      pendingTurns: job.pendingTurns,
+      pendingCount: job.pendingTurns.length,
+      turnIds: job.pendingTurns.map((turn) => turn.id),
       threshold: job.threshold,
     },
   });

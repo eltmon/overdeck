@@ -239,6 +239,60 @@ describe('extractFromTranscriptDelta', () => {
     }));
   });
 
+  it('commits consumed offsets for empty transcript deltas instead of releasing them for retry', async () => {
+    const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, 100).checkpoint }));
+    const releaseRange = vi.fn();
+
+    const result = await extractFromTranscriptDelta(input({
+      claimRange: () => claimedRange(0, 100),
+      compress: async () => ({ text: '   ', eventsConsumed: 0, lastFullLineOffset: 72 }),
+      commitRange,
+      releaseRange,
+    }));
+
+    expect(result).toEqual({ status: 'noop', observation: null, reason: 'empty-delta' });
+    expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({
+      expectedFromOffset: 0,
+      toOffset: 100,
+      consumedOffset: 72,
+    }));
+    expect(releaseRange).not.toHaveBeenCalled();
+  });
+
+  it('commits consumed offsets when extraction is skipped by policy', async () => {
+    const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, 100).checkpoint }));
+    const releaseRange = vi.fn();
+
+    const result = await extractFromTranscriptDelta(input({
+      claimRange: () => claimedRange(0, 100),
+      compress: async () => ({ text: 'U: one complete event', eventsConsumed: 1, lastFullLineOffset: 88 }),
+      extract: async () => ({ status: 'skipped', reason: 'cost-cap' }),
+      commitRange,
+      releaseRange,
+    }));
+
+    expect(result).toEqual({ status: 'skipped', observation: null, reason: 'cost-cap' });
+    expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({ consumedOffset: 88 }));
+    expect(releaseRange).not.toHaveBeenCalled();
+  });
+
+  it('commits consumed offsets when extraction is dropped by policy', async () => {
+    const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, 100).checkpoint }));
+    const releaseRange = vi.fn();
+
+    const result = await extractFromTranscriptDelta(input({
+      claimRange: () => claimedRange(0, 100),
+      compress: async () => ({ text: 'U: one complete event', eventsConsumed: 1, lastFullLineOffset: 94 }),
+      extract: async () => ({ status: 'dropped', reason: 'extraction-failed', error: new Error('provider failed') }),
+      commitRange,
+      releaseRange,
+    }));
+
+    expect(result).toEqual({ status: 'dropped', observation: null, reason: 'extraction-failed' });
+    expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({ consumedOffset: 94 }));
+    expect(releaseRange).not.toHaveBeenCalled();
+  });
+
   it('releases claimed ranges without committing when post-claim durable stages fail', async () => {
     const commitRange = vi.fn();
     const releaseRange = vi.fn();

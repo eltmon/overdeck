@@ -43,6 +43,7 @@ export interface QueryExpansionInput {
   perDayCostCapUsd?: number;
   now?: Date;
   id?: string;
+  signal?: AbortSignal;
   expand?: QueryExpansionCall;
   logDecision?: (entry: QueryExpansionLogEntry) => Promise<void>;
 }
@@ -50,6 +51,7 @@ export interface QueryExpansionInput {
 export type QueryExpansionCall = (
   prompt: string,
   jsonSchema: unknown,
+  options?: { signal?: AbortSignal },
 ) => Promise<MemoryExtractionPolicyResult<unknown>>;
 
 export interface QueryExpansionResult {
@@ -100,10 +102,11 @@ export async function expandMemoryQuery(input: QueryExpansionInput): Promise<Que
     perDayCostCapUsd: input.perDayCostCapUsd,
     temperature: 0,
     maxTokens: 200,
+    signal: input.signal,
   }));
 
   try {
-    const expanded = await expand(buildQueryExpansionPrompt(input), QUERY_EXPANSION_JSON_SCHEMA);
+    const expanded = await expand(buildQueryExpansionPrompt(input), QUERY_EXPANSION_JSON_SCHEMA, { signal: input.signal });
     if (expanded.status === 'skipped') return await fallback(input, cacheKey, expanded.reason);
     if (expanded.status === 'dropped') return await fallback(input, cacheKey, expanded.reason);
 
