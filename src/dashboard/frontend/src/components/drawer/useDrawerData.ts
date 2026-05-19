@@ -263,9 +263,13 @@ function formatDuration(startValue: string | undefined, endValue: string | undef
   return `${Math.round(hours / 24)}d`;
 }
 
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function beadTitle(bead: BeadTask, issueId: string) {
   const title = bead.title ?? bead.name ?? bead.id ?? 'Untitled bead';
-  return title.replace(new RegExp(`^${issueId}:\\s*`, 'i'), '');
+  return title.replace(new RegExp(`^${escapeRegExp(issueId)}:\\s*`, 'i'), '');
 }
 
 function issueBeads(issue: Issue | null): BeadTask[] | undefined {
@@ -341,12 +345,12 @@ function formatWhen(value: string | undefined) {
 }
 
 function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot | undefined): DrawerPhaseTimelineStep[] {
-  const merged = reviewStatus?.mergeStatus === 'merged' || issue?.state === 'done' || issue?.status.toLowerCase() === 'done' || Boolean(issue?.completedAt);
+  const merged = reviewStatus?.mergeStatus === 'merged' || issue?.state === 'done' || issue?.status?.toLowerCase() === 'done' || Boolean(issue?.completedAt);
   const shippingCurrent = !merged && (reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || Boolean(reviewStatus?.readyForMerge));
   const reviewedDone = merged || shippingCurrent || reviewStatus?.reviewStatus === 'passed';
   const reviewedCurrent = !reviewedDone && reviewStatus?.reviewStatus === 'reviewing';
   const implementedDone = reviewedDone || reviewedCurrent || reviewStatus?.verificationStatus === 'passed' || reviewStatus?.testStatus === 'passed';
-  const implementedCurrent = !implementedDone && (reviewStatus?.verificationStatus === 'running' || reviewStatus?.testStatus === 'testing' || issue?.state === 'in_progress' || issue?.status.toLowerCase() === 'in progress');
+  const implementedCurrent = !implementedDone && (reviewStatus?.verificationStatus === 'running' || reviewStatus?.testStatus === 'testing' || issue?.state === 'in_progress' || issue?.status?.toLowerCase() === 'in progress');
   const plannedDone = implementedDone || implementedCurrent || Boolean(issue?.planningComplete || issue?.hasPlan);
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent || plannedDone ? 2 : 1;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
@@ -367,7 +371,6 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
 
 export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
-  const applyEvent = useDashboardStore((state) => state.applyEvent);
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
@@ -376,8 +379,8 @@ export function useDrawerData(): DrawerData {
 
   useEffect(() => {
     if (!drawerIssueId) return;
-    return acquireDrawerIssueSubscription(drawerIssueId, applyEvent);
-  }, [applyEvent, drawerIssueId]);
+    return acquireDrawerIssueSubscription(drawerIssueId, () => {});
+  }, [drawerIssueId]);
 
   return useMemo(() => {
     if (!drawerIssueId) {
@@ -406,7 +409,8 @@ export function useDrawerData(): DrawerData {
         if (Number.isNaN(aTime)) return 1;
         if (Number.isNaN(bTime)) return -1;
         return bTime - aTime;
-      });
+      })
+      .slice(0, 100);
 
     return {
       issue,

@@ -191,8 +191,9 @@ export function PipelineView() {
   const agentByIssueId = useMemo(() => {
     const map = new Map<string, Agent>();
     for (const agent of agents) {
-      if (agent.issueId && !map.has(agent.issueId)) {
-        map.set(agent.issueId, agent);
+      const key = agent.issueId?.toLowerCase();
+      if (key && !map.has(key)) {
+        map.set(key, agent);
       }
     }
     return map;
@@ -226,7 +227,7 @@ export function PipelineView() {
         continue;
       }
 
-      const agent = agentByIssueId.get(issue.identifier) ?? null;
+      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
       const reviewStatus = reviewStatusForIssue(reviewStatusByIssueId, issue);
       let phase = getPipelineIssuePhase(issue, reviewStatus, agent);
 

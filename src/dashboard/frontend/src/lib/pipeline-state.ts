@@ -156,6 +156,10 @@ export function getPipelineIssuePhase(
     return 'review';
   }
 
+  if (agent?.role === 'plan' && isAgentRunningStatus(agent.status)) {
+    return 'plan';
+  }
+
   if (agent?.role === 'work' && isAgentRunningStatus(agent.status)) {
     return 'work';
   }
