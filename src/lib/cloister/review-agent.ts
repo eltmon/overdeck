@@ -305,19 +305,12 @@ export async function spawnReviewSubRoleForIssue(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentStateAsync, spawnRun, getAgentState } = await import('../agents.js');
+    const { saveAgentStateAsync, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
     const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
     const reviewerDir = join(AGENTS_DIR, reviewerAgentId(opts.issueId, opts.subRole));
-
-    // PAN-1213 follow-on: propagate host override from the work agent. If the
-    // work agent runs on host (no docker stack), the review sub-roles must too
-    // — otherwise spawnRun's stack-health gate rejects them and the synthesis
-    // parent hangs forever waiting for REVIEWER_READY signals.
-    const workAgentState = getAgentState(`agent-${opts.issueId.toLowerCase()}`);
-    const allowHost = workAgentState?.hostOverride === true;
 
     await mkdir(dirname(outputPath), { recursive: true });
     await rm(outputPath, { force: true });
@@ -349,7 +342,6 @@ export async function spawnReviewSubRoleForIssue(opts: {
       subRole: opts.subRole,
       prompt,
       model,
-      allowHost,
       // PAN-977: thread the synthesis wiring up front so the generated launcher
       // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
       reviewSynthesisAgentId: synthesisAgentId,

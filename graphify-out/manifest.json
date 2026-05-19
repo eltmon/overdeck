@@ -336,8 +336,8 @@
     "hash": "eb4f2d7fe560def2ec3f939050e41d4e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts": {
-    "mtime": 1779142045.6911788,
-    "hash": "04130eac7f720c3b92e571d34a9c1ec5"
+    "mtime": 1779167312.5587158,
+    "hash": "df4cdfc3bad7de8bbec5e4fe5853fc0b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/tests/unit/dashboard/server/routes/approve-push.test.ts": {
     "mtime": 1779142045.6911788,
@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/scripts/record-cost-event.d.ts": {
-    "mtime": 1779151776.5402129,
+    "mtime": 1779167147.2860458,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/scripts/notify-complete": {
@@ -1760,8 +1760,8 @@
     "hash": "de0836b619d4769cc1e545725b06de28"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/review-agent.ts": {
-    "mtime": 1779167045.3225498,
-    "hash": "d7f067b0b57870e42491f4d2d7e24da7"
+    "mtime": 1779167277.2315035,
+    "hash": "5d89e282d2ede8fc34254c0f144db7ea"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/cloister/specialist-logs.ts": {
     "mtime": 1779142045.6738732,
