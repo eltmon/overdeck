@@ -166,11 +166,15 @@ export interface SwarmSlotRuntime {
   itemTitle: string;
   sessionName: string;
   workspace: string;
-  status: 'pending' | 'running' | 'merged' | 'failed';
+  status: 'pending' | 'running' | 'merged' | 'failed' | 'failed-merge';
   /** ISO 8601 datetime, set when the slot agent is dispatched. */
   dispatchedAt?: string;
   /** ISO 8601 datetime, set when the slot branch is merged into the feature branch. */
   mergedAt?: string;
+  consecutiveConflictCount?: number;
+  prUrl?: string;
+  recoveryAction?: 'retry' | 'drop' | 'handoff';
+  recoveredAt?: string;
 }
 
 /** Context update written by a synthesis agent before a convergence-point item is dispatched. */

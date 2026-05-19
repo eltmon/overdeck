@@ -1,5 +1,6 @@
 /**
  * pan swarm <id> [--dry-run] [--wave N] [--model <model>] [--max-slots N] [--auto-advance]
+ * pan swarm recover <issueId> <slotId> --action <retry|drop|handoff> [--yes]
  *
  * Swarm execution: spawn parallel agents across vBRIEF plan items using
  * dependency-wave scheduling.
@@ -14,6 +15,7 @@
  */
 
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import ora from 'ora';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -84,6 +86,19 @@ interface SwarmCommandOptions {
   yes?: boolean;
 }
 
+type SwarmRecoverAction = 'retry' | 'drop' | 'handoff';
+
+interface SwarmRecoverCommandOptions {
+  action?: string;
+  yes?: boolean;
+}
+
+const SWARM_RECOVER_ACTIONS = new Set(['retry', 'drop', 'handoff']);
+
+function isSwarmRecoverAction(value: string | undefined): value is SwarmRecoverAction {
+  return Boolean(value && SWARM_RECOVER_ACTIONS.has(value));
+}
+
 function buildHostOverrideConfirmation(issueId: string): string {
   return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
 }
@@ -107,6 +122,36 @@ async function confirmHostOverride(options: SwarmCommandOptions): Promise<boolea
   } finally {
     rl.close();
   }
+}
+
+export function registerSwarmCommands(program: Command): void {
+  const swarm = program
+    .command('swarm')
+    .description('Swarm execution: spawn parallel agents across vBRIEF plan items using dependency-wave scheduling')
+    .argument('[id]', 'Issue ID to dispatch')
+    .option('--dry-run', 'Print the wave plan without spawning agents')
+    .option('--wave <n>', 'Dispatch only wave N')
+    .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
+    .option('--max-slots <n>', 'Max concurrent agents')
+    .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
+    .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
+    .option('--host', 'Bypass workspace docker stack-health gate and spawn swarm slots on the host')
+    .option('--yes', 'Confirm --host in non-interactive contexts')
+    .option('--task <op>', 'vBRIEF task operation: next | show | claim | done | block | unblock | cancel')
+    .option('--item <id>', 'vBRIEF item ID for show/claim/done/block operations')
+    .option('--reason <text>', 'Reason for task status mutation')
+    .option('--sequence <n>', 'Expected vBRIEF plan.sequence for CAS-protected task mutations')
+    .action((id: string | undefined, options: SwarmCommandOptions, command: Command) => {
+      if (!id) command.help({ error: true });
+      return swarmCommand(id, options);
+    });
+
+  swarm
+    .command('recover <issueId> <slotId>')
+    .description('Recover a failed-merge swarm slot via retry, drop, or handoff')
+    .requiredOption('--action <action>', 'Recovery action: retry, drop, or handoff')
+    .option('--yes', 'Confirm drop recovery, which marks the vBRIEF item done')
+    .action(recoverSwarmCommand);
 }
 
 export async function swarmCommand(
@@ -204,6 +249,72 @@ export async function swarmCommand(
   } catch (error: any) {
     spinner.fail(chalk.red(`Failed to reach dashboard: ${error.message}`));
     console.error(chalk.dim(`Make sure the dashboard is running: pan up`));
+    process.exit(1);
+  }
+}
+
+async function confirmDropRecovery(options: SwarmRecoverCommandOptions): Promise<boolean> {
+  if (options.action !== 'drop' || options.yes) return true;
+  if (!process.stdin.isTTY) {
+    console.error(chalk.red('--yes required for non-interactive drop'));
+    return false;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(chalk.bold('Drop this failed-merge slot and mark its vBRIEF item done? (y/N) '))).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
+export async function recoverSwarmCommand(
+  issueIdInput: string,
+  slotIdInput: string,
+  options: SwarmRecoverCommandOptions,
+): Promise<void> {
+  const issueId = resolveBareNumericId(issueIdInput);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${issueIdInput}"`));
+    process.exit(1);
+  }
+  if (!/^[1-9]\d*$/.test(slotIdInput)) {
+    console.error(chalk.red(`Invalid slotId: ${slotIdInput}`));
+    console.error(chalk.dim('slotId must be a positive integer.'));
+    process.exit(1);
+  }
+  if (!isSwarmRecoverAction(options.action)) {
+    console.error(chalk.red(`Invalid --action: ${options.action ?? ''}`));
+    console.error(chalk.dim('Valid actions: retry, drop, handoff'));
+    process.exit(1);
+  }
+  if (!(await confirmDropRecovery(options))) {
+    process.exit(1);
+  }
+
+  const slotId = Number.parseInt(slotIdInput, 10);
+  const action = options.action;
+  const spinner = ora(`Recovering slot ${slotId} of ${issueId} via ${action}...`).start();
+  try {
+    const internalToken = ensureInternalToken();
+    const response = await fetch(`${DASHBOARD_URL}/api/swarm/${issueId}/slot/${slotId}/recover`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: internalToken,
+      },
+      body: JSON.stringify({ action }),
+    });
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) {
+      spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));
+      process.exit(1);
+    }
+    spinner.succeed(chalk.green(`Slot ${slotId} of ${issueId} recovered via ${action}.`));
+  } catch (error: any) {
+    spinner.fail(chalk.red(`Failed to reach dashboard: ${error.message}`));
+    console.error(chalk.dim('Make sure the dashboard is running: pan up'));
     process.exit(1);
   }
 }

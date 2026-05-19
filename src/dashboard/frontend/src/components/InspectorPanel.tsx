@@ -93,6 +93,84 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+interface SwarmSlotView {
+  slot: number;
+  itemId: string;
+  itemTitle: string;
+  sessionName: string;
+  workspace: string;
+  status: 'pending' | 'running' | 'completed' | 'merged' | 'failed' | 'failed-merge';
+  phase?: 'synthesis' | 'implementation';
+  startedAt?: string;
+  completedAt?: string;
+  failureReason?: string;
+  consecutiveConflictCount?: number;
+  prUrl?: string;
+}
+
+interface SwarmStateView {
+  issueId: string;
+  autoAdvanceFailureCount?: number;
+  lastAutoAdvanceError?: string;
+  slots: SwarmSlotView[];
+}
+
+function slotStatusLabel(status: SwarmSlotView['status']): string {
+  if (status === 'failed-merge') return 'Failed merge';
+  return status.replace(/-/g, ' ');
+}
+
+function slotStatusClass(status: SwarmSlotView['status']): string {
+  if (status === 'failed-merge') return 'bg-destructive/20 text-destructive border-destructive/40';
+  if (status === 'failed') return 'bg-destructive text-destructive-foreground border-destructive';
+  if (status === 'merged') return 'bg-success/20 text-success border-success/40';
+  if (status === 'completed') return 'bg-primary/20 text-primary border-primary/40';
+  if (status === 'running') return 'bg-warning/20 text-warning border-warning/40';
+  return 'bg-muted text-muted-foreground border-border';
+}
+
+export function SwarmRuntimeSection({ swarmState }: { swarmState?: SwarmStateView | null }) {
+  if (!swarmState || swarmState.slots.length === 0) return null;
+  const failureCount = swarmState.autoAdvanceFailureCount ?? 0;
+  const showFailureBanner = Boolean(swarmState.lastAutoAdvanceError) || failureCount > 0;
+
+  return (
+    <div className="px-3 py-2 border-b border-border text-xs" data-testid="swarm-runtime-section">
+      <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Swarm Runtime</div>
+      {showFailureBanner && (
+        <div className="mb-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-[10px] text-destructive" data-testid="swarm-failure-banner">
+          {swarmState.lastAutoAdvanceError && <div>{swarmState.lastAutoAdvanceError}</div>}
+          {failureCount > 0 && <div>Auto-advance failures: {failureCount}</div>}
+        </div>
+      )}
+      <div className="space-y-1.5">
+        {swarmState.slots.map((slot, index) => (
+          <div key={`${slot.slot}-${slot.itemId}-${index}`} className="rounded border border-border/70 bg-card p-2">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[11px] font-medium text-foreground" title={slot.itemTitle}>{slot.itemTitle}</div>
+                <div className="font-mono text-[10px] text-muted-foreground">slot {slot.slot} · {slot.itemId}</div>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${slotStatusClass(slot.status)}`}>
+                {slotStatusLabel(slot.status)}
+              </span>
+            </div>
+            {slot.failureReason && (
+              <div className="mt-1 text-[10px] text-muted-foreground" data-testid="swarm-slot-failure-reason">{slot.failureReason}</div>
+            )}
+            {slot.prUrl && (
+              <a href={slot.prUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80">
+                <GitPullRequest className="h-3 w-3" />
+                Slot PR
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export interface InspectorPanelProps {
   agent?: Agent;
   workAgents?: Agent[];
@@ -137,6 +215,18 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   const awaitingInput = hasActualPendingQuestion(agent);
   const awaitingInputTitle = getPendingQuestionTitle(agent);
   const awaitingInputPrompt = agent?.pendingQuestionPrompt?.trim();
+
+  const { data: swarmState } = useQuery<SwarmStateView | undefined>({
+    queryKey: ['swarm-state', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/swarm/${issueId}`);
+      if (res.status === 404) return undefined;
+      if (!res.ok) throw new Error('Failed to fetch swarm state');
+      return await res.json() as SwarmStateView;
+    },
+    enabled: Boolean(issueId),
+    staleTime: 5000,
+  });
 
   // Check lifecycle state for stopped agents (drives Start vs Resume vs Reset semantics)
   const { data: agentLifecycle } = useQuery<WorkAgentLifecycle | undefined>({
@@ -954,6 +1044,8 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             </div>
           </div>
         )}
+
+        <SwarmRuntimeSection swarmState={swarmState} />
 
         {swarmWorkAgents.length > 1 && (
           <div className="px-3 py-2 border-b border-border text-xs">

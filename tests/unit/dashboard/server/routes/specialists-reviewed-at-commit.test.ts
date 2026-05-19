@@ -40,15 +40,21 @@ vi.mock('child_process', async (importActual) => {
     ...actual,
     exec: (...args: unknown[]) => {
       // exec(cmd, opts, callback) or exec(cmd, callback)
+      const command = args[0] as string;
       const callback = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
+      const treeMatch = command.match(/^git rev-parse (.+)\^\{tree\}$/);
+      const stdout = treeMatch
+        ? (mockTreeShas.get(treeMatch[1]!) ?? `${treeMatch[1]}-tree`)
+        : mockExecHeadSha;
       mockExecCallback(...args);
-      callback(null, { stdout: mockExecHeadSha + '\n', stderr: '' });
+      callback(null, { stdout: stdout + '\n', stderr: '' });
       return {} as ReturnType<typeof actual.exec>;
     },
   };
 });
 
 let mockExecHeadSha = 'defaultsha';
+let mockTreeShas = new Map<string, string>();
 
 // ─── Stub modules that deacon imports ────────────────────────────────────────
 
@@ -119,6 +125,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
   mockExecHeadSha = 'defaultsha';
+  mockTreeShas = new Map<string, string>();
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
 });
 
@@ -192,6 +199,31 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     expect(after?.testStatus).toBe('pending');
     expect(after?.readyForMerge).toBe(false);
     expect(after?.reviewedAtCommit).toBeUndefined();
+  });
+
+  it('preserves review when HEAD changed but the tree did not', async () => {
+    setReviewStatus('PAN-904', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: 'oldsha1',
+    });
+
+    mockExecHeadSha = 'newsha99';
+    mockTreeShas = new Map([
+      ['oldsha1', 'sametree'],
+      ['newsha99', 'sametree'],
+    ]);
+
+    const actions = await checkPostReviewCommits();
+
+    expect(actions.filter((a) => a.includes('PAN-904'))).toHaveLength(0);
+
+    const after = getReviewStatus('PAN-904');
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
+    expect(after?.readyForMerge).toBe(true);
+    expect(after?.reviewedAtCommit).toBe('newsha99');
   });
 
   it('does not reset review when HEAD matches reviewedAtCommit', async () => {

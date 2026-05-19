@@ -1,0 +1,109 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SwarmRuntimeSection > renders failed-merge slots with PR link, reason, and swarm failure banner 1`] = `
+<div>
+  <div
+    class="px-3 py-2 border-b border-border text-xs"
+    data-testid="swarm-runtime-section"
+  >
+    <div
+      class="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground"
+    >
+      Swarm Runtime
+    </div>
+    <div
+      class="mb-2 rounded border border-destructive/40 bg-destructive/10 p-2 text-[10px] text-destructive"
+      data-testid="swarm-failure-banner"
+    >
+      <div>
+        Swarm slot 1 PR https://github.com/owner/repo/pull/1188 unmergeable
+      </div>
+      <div>
+        Auto-advance failures: 
+        2
+      </div>
+    </div>
+    <div
+      class="space-y-1.5"
+    >
+      <div
+        class="rounded border border-border/70 bg-card p-2"
+      >
+        <div
+          class="flex items-start gap-2"
+        >
+          <div
+            class="min-w-0 flex-1"
+          >
+            <div
+              class="truncate text-[11px] font-medium text-foreground"
+              title="Mergeability detector"
+            >
+              Mergeability detector
+            </div>
+            <div
+              class="font-mono text-[10px] text-muted-foreground"
+            >
+              slot 
+              1
+               · 
+              mergeability-detector
+            </div>
+          </div>
+          <span
+            class="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize bg-destructive/20 text-destructive border-destructive/40"
+          >
+            Failed merge
+          </span>
+        </div>
+        <div
+          class="mt-1 text-[10px] text-muted-foreground"
+          data-testid="swarm-slot-failure-reason"
+        >
+          PR #1188 not mergeable: CONFLICTING
+        </div>
+        <a
+          class="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80"
+          href="https://github.com/owner/repo/pull/1188"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <svg
+            class="lucide lucide-git-pull-request h-3 w-3"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="18"
+              cy="18"
+              r="3"
+            />
+            <circle
+              cx="6"
+              cy="6"
+              r="3"
+            />
+            <path
+              d="M13 6h3a2 2 0 0 1 2 2v7"
+            />
+            <line
+              x1="6"
+              x2="6"
+              y1="9"
+              y2="21"
+            />
+          </svg>
+          Slot PR
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+`;

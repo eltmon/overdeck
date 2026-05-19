@@ -1,0 +1,574 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-18T22:40:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
+    "updated": "2026-05-18T23:22:16.395Z"
+  },
+  "plan": {
+    "id": "pan-1194",
+    "title": "Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
+    "status": "proposed",
+    "uid": "8452620e-f664-41c0-b8b4-4fb39fe2205f",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-18T22:40:00.000Z",
+    "updated": "2026-05-18T23:22:16.395Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
+        "label": "PAN-1194",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
+        "label": "PAN-1148 (reproduction)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "auto-advance",
+      "recovery",
+      "merge-conflict"
+    ],
+    "narratives": {
+      "Problem": "Swarm auto-advance in src/dashboard/server/routes/swarm.ts requires `state.slots.every(s => s.status === 'merged' || (s.status === 'completed' && s.phase === 'synthesis'))` before dispatching the next DAG wave. If a slot's PR becomes unmergeable (merge conflict, force-closed, branch deleted), the slot sits at `completed` (or even `running`) forever. The poll loop keeps the swarm in its active-issue registry and burns one gh/tmux query every 5 s indefinitely, but never advances. Symptom from PAN-1148 (2026-05-18): 7 of 8 slot PRs merged; slot-2 PR #1188 went CONFLICTING; autoAdvance=true, currentWave stuck at 0 forever, no autoAdvanceFailureCount recorded.",
+      "Proposal": "Add a per-slot PR mergeability check that runs every poll tick alongside the existing tmux-pane refresh. Transition unmergeable slots to a new terminal state `failed-merge`, fold them into the existing failed-slot handling branch in `pollSwarmAutoAdvance` so the swarm halts cleanly with `recordAutoAdvanceFailure` and a human-readable error message, and expose a recovery API (`POST /api/swarm/:issueId/slot/:slotId/recover` with `action: 'retry' | 'drop' | 'handoff'`) plus CLI (`pan swarm recover`) so the operator can unblock the swarm with an explicit choice."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose 'halt + operator recovery' path over the alternative 'merged-without-effect' silent auto-skip described in the issue.",
+        "rationale": "The slot agent already produced commits on the slot branch; silently dropping them loses work the operator may want to salvage. The existing failed-slot branch in pollSwarmAutoAdvance already implements halt-with-error semantics — folding failed-merge into that path keeps the architecture coherent and avoids inventing a new 'silent skip' state machine. Operator explicitly chooses the recovery action via API/CLI."
+      },
+      {
+        "summary": "Named the new terminal status `failed-merge` (not `merge-failed`, `unmergeable`, or a sub-kind of `failed`).",
+        "rationale": "The issue body uses `failed-merge` verbatim. The bug should match the bug name. Distinct from `failed` (which means tmux pane died) — `failed-merge` means the work succeeded but cannot land."
+      },
+      {
+        "summary": "Widened SwarmSlotRuntime.status union in src/lib/vbrief/continue-state.ts to include 'failed-merge' rather than smuggling the kind through failureReason text.",
+        "rationale": "Persisting status as the existing 'failed' string would require string-matching the failureReason to recover the kind on read — brittle. Widening the union is non-breaking (additive) and keeps the runtime ↔ state mappers symmetric."
+      },
+      {
+        "summary": "Detection scope = slots with status ∈ {'running','completed'} AND phase === 'implementation'. Synthesis slots are explicitly excluded.",
+        "rationale": "Synthesis slots never open PRs (they POST synthesisOutput to /api/swarm/slot-merged). Running implementation slots are included because a slot's PR can become CONFLICTING while the agent is still working — a sibling slot merging into the parent feature branch will conflict mid-flight."
+      },
+      {
+        "summary": "Require CONFLICTING signal to be observed for two consecutive polls before transitioning to failed-merge.",
+        "rationale": "Avoids thrashing during the merge-agent's legitimate rebase window. Adds a small `consecutiveConflictCount` field to the slot record. Two-tick debounce (10 s with the 5 s poll cadence) is well under merge-agent's typical work and well over GitHub's transient post-push mergeable-state-unknown window."
+      },
+      {
+        "summary": "Recovery API = single POST endpoint with action discriminator (`retry` | `drop` | `handoff`) rather than three separate routes.",
+        "rationale": "One endpoint keeps the auth/permission surface small. Action validation is centralized. CLI maps cleanly to `pan swarm recover <issueId> <slotId> --action <name>`."
+      },
+      {
+        "summary": "Dashboard UI scope = visual indicator + failure context only. Interactive recovery buttons deferred to a follow-up issue.",
+        "rationale": "A full operator UI for retry/drop/handoff needs UX review (confirmation modals, history view, undo semantics). CLI + API land here so the operator is unblocked without dashboard buttons. Visual indicator (red pill, PR link, failureReason) is small and easy to verify."
+      },
+      {
+        "summary": "PR query uses `gh pr list --repo <owner/repo> --head <slotBranch> --state all --json ...` with 5 s AbortSignal.timeout, executed via execAsync.",
+        "rationale": "Pattern already exists in src/lib/cloister/merge-agent.ts:213. No blocking calls allowed in dashboard server code (.claude/rules/no-execsync-server.md)."
+      },
+      {
+        "summary": "Tests use vi.useFakeTimers() for all retry/backoff/poll-loop scenarios.",
+        "rationale": "Required by .claude/rules/fake-timers-for-retry-tests.md. Real setTimeouts in the auto-advance loop test (5 s poll cadence + 60 s backoff + 5 s gh timeout) would burn ~70 s per case and cause OOM under parallel workers."
+      },
+      {
+        "summary": "Non-GitHub projects: mergeability check is a no-op (returns immediately after `resolveGitHubIssue(issueId).isGitHub === false`).",
+        "rationale": "Linear/Rally/GitLab projects have no `gh` equivalent. The auto-advance halt-forever symptom is GitHub-specific (the reproduction uses GitHub PR #1188). Other trackers will get their own detection mechanism if/when needed; out of scope here."
+      },
+      {
+        "summary": "`drop` recovery action requires explicit confirmation (`--yes` flag in CLI; API requires `action: 'drop'` literal).",
+        "rationale": "drop is destructive — it marks the slot's vBRIEF item `done` and abandons any commits on the slot branch. Accidental invocation would silently lose work."
+      }
+    ],
+    "items": [
+      {
+        "id": "type-additions",
+        "title": "Add `failed-merge` to slot status types and runtime ↔ state mappers",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1194",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Extend the `SlotAssignment.status` union in src/dashboard/server/routes/swarm.ts and the `SwarmSlotRuntime.status` union in src/lib/vbrief/continue-state.ts to include the literal `'failed-merge'`. Update `runtimeFromState` and `stateFromRuntime` mappers (swarm.ts:228, 270) so a `failed-merge` slot round-trips between SwarmState and the durable SwarmRuntime without lossy folding into `failed`. Add an optional `consecutiveConflictCount?: number` field on both `SlotAssignment` and `SwarmSlotRuntime` to support the two-tick debounce (H4). Add an optional `prUrl?: string` field on `SlotAssignment` so the dashboard can render the PR link without re-querying gh. Do NOT touch the auto-advance poll loop yet — this bead lays the type foundation only."
+        },
+        "subItems": [
+          {
+            "id": "type-additions.ac1",
+            "title": "`SlotAssignment.status` includes `'failed-merge'` and `SwarmState`/`SwarmDispatchResponseBody` type checks pass against the widened union.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-additions.ac2",
+            "title": "`SwarmSlotRuntime.status` includes `'failed-merge'` in src/lib/vbrief/continue-state.ts. Existing readers of SwarmSlotRuntime (e.g. continue-state-swarm.test.ts) continue to typecheck without changes.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-additions.ac3",
+            "title": "`runtimeFromState` and `stateFromRuntime` round-trip a `failed-merge` slot without changing its status. New unit test asserts the round-trip preserves status, failureReason, consecutiveConflictCount, and prUrl.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-additions.ac4",
+            "title": "`SlotAssignment` and `SwarmSlotRuntime` gain optional `consecutiveConflictCount?: number` and `prUrl?: string` fields. The mappers preserve both fields when present and omit them when absent.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-additions.ac5",
+            "title": "`npm run typecheck` passes with zero new errors after the union widening.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mergeability-detector",
+        "title": "Implement `refreshSwarmSlotMergeability` helper with PR-state-driven `failed-merge` detection",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1194",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Add `async function refreshSwarmSlotMergeability(state: SwarmState, projectPath?: string): Promise<{ state: SwarmState; changed: boolean }>` to src/dashboard/server/routes/swarm.ts, mirroring the contract of the existing `refreshSwarmSlotStatuses`. For each slot whose `status ∈ {'running','completed'}` AND `phase === 'implementation'`, resolve the slot branch (`feature/<issueLower>-slot-<N>`) and query `gh pr list --repo <owner/repo> --head <slotBranch> --state all --json number,mergeable,mergeableState,state,closed,url,mergedAt --limit 5` via `execAsync` with a 5 s `AbortSignal.timeout`. Decision matrix: PR `mergeableState === 'CONFLICTING'` OR (`mergeable === false` && `mergeableState` nullish) → increment `consecutiveConflictCount`; when count reaches 2, transition slot to `failed-merge` with `failureReason: 'PR #<n> not mergeable: <reason>'` and `prUrl: pr.url`. PR list empty AND slot already `completed` → transition (branch was deleted post-merge-attempt). PR `state === 'CLOSED' && !pr.mergedAt` → transition. Any successful mergeable observation resets `consecutiveConflictCount` to 0. Non-GitHub projects (`!resolveGitHubIssue(issueId).isGitHub`) → return `{ state, changed: false }` immediately. gh timeout / shell error → skip that slot for that tick, do NOT transition (transient). MUST use only the latest matching slot record per slot number (reverse-scan + prefer running > completed, same shape as `onSlotMergeComplete`)."
+        },
+        "subItems": [
+          {
+            "id": "mergeability-detector.ac1",
+            "title": "Function signature exactly: `async function refreshSwarmSlotMergeability(state: SwarmState, projectPath?: string): Promise<{ state: SwarmState; changed: boolean }>` exported via `__testInternals` for tests.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac2",
+            "title": "Synthesis slots (`phase === 'synthesis'`) are never inspected (no PR exists). Unit test asserts the helper returns `changed: false` when the only slot is a completed synthesis slot.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac3",
+            "title": "Non-GitHub project (resolveGitHubIssue returns isGitHub=false) is a no-op. Unit test stubs the helper to non-GitHub and asserts no gh process is spawned and changed=false.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac4",
+            "title": "PR CONFLICTING observed once: slot stays at its current status with `consecutiveConflictCount` incremented to 1. Observed twice consecutively: slot transitions to `failed-merge` with failureReason naming the PR number and prUrl populated. Unit test covers both ticks.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac5",
+            "title": "PR list empty AND slot was `completed`: slot transitions to `failed-merge` with failureReason 'No open PR found for <branch>'. PR list empty AND slot was `running`: no transition (PR may not have been opened yet).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac6",
+            "title": "PR closed without merge (`state === 'CLOSED' && !mergedAt`): slot transitions to `failed-merge` with failureReason 'PR #<n> closed without merge'.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac7",
+            "title": "PR mergeable (`mergeable === true` OR `mergeableState ∈ {'CLEAN','UNSTABLE','BEHIND','HAS_HOOKS'}` per existing KNOWN_NON_BLOCKING_STATES): consecutiveConflictCount is reset to 0 if previously > 0. No status transition.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac8",
+            "title": "gh shell-out timeout (AbortSignal fires) OR non-zero exit: slot is skipped for the tick, no transition, no exception bubbles out of the helper. Unit test uses execAsync mock that throws AbortError.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac9",
+            "title": "Cumulative slot history: when state.slots has multiple records sharing a slot number, only the latest running/completed implementation record is inspected and mutated. Historical merged/failed records are untouched. Unit test seeds two records for slot 1 (one merged, one running) and asserts only the running one is mutated.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-detector.ac10",
+            "title": "No blocking I/O: helper uses execAsync (or execFileAsync), readFile from 'fs/promises', and never imports execSync/readFileSync/readdirSync. Verified by grep in the unit test file or in CI lint.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poll-integration",
+        "title": "Wire `refreshSwarmSlotMergeability` into `pollSwarmAutoAdvance` and treat `failed-merge` as a failure for halt + error reporting",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `pollSwarmAutoAdvance` (src/dashboard/server/routes/swarm.ts ~line 1437), call `refreshSwarmSlotMergeability(state, projectPath)` AFTER the existing `refreshSwarmSlotStatuses` call and BEFORE the existing `saveSwarmState` write. Combine the `changed` flag so a single persist captures both transitions. Extend the existing failed-slot detection (`state.slots.some(slot => slot.status === 'failed')` at line 1467) to also match `'failed-merge'`. When the failure branch fires for a failed-merge slot, build a human-readable message naming the slot number, item title, branch, and PR URL (when present) and pass it to `recordAutoAdvanceFailure`. Emit an `emitActivityEntry({ source: 'ship', level: 'error', issueId, message: ... })` entry naming the slot/branch/PR and the operator action options (`pan swarm recover <issue> <slot> --action <retry|drop|handoff>`). Also mirror the change into the `/api/swarm/refresh` route (~line 2056) so manual refresh triggers the same detection."
+        },
+        "subItems": [
+          {
+            "id": "poll-integration.ac1",
+            "title": "`pollSwarmAutoAdvance` calls `refreshSwarmSlotMergeability` after `refreshSwarmSlotStatuses` and before the saveSwarmState persistence. A single saveSwarmState call writes both passes' changes.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-integration.ac2",
+            "title": "The existing failed-slot branch at swarm.ts:1467 is extended to match `slot.status === 'failed' || slot.status === 'failed-merge'`. recordAutoAdvanceFailure is called with a slot-specific message naming the PR URL when present.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-integration.ac3",
+            "title": "Activity log emits exactly one entry per failed-merge transition (idempotent): `{ source: 'ship', level: 'error', issueId, message: 'Swarm slot <N> PR <prUrl> unmergeable: <reason>. Recover with: pan swarm recover <ISSUE> <N> --action <retry|drop|handoff>' }`. Subsequent polls observing the same already-transitioned slot do NOT re-emit.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-integration.ac4",
+            "title": "`/api/swarm/refresh` route (POST) calls `refreshSwarmSlotMergeability` after `refreshSwarmSlotStatuses` and persists via the same saveSwarmState path. Manual operator refresh observes the same failed-merge detection as the auto-advance poll.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-integration.ac5",
+            "title": "Unit test (vi.useFakeTimers()): seed a SwarmState with one running implementation slot, mock gh to return CONFLICTING for two consecutive polls, run two ticks of pollSwarmAutoAdvance, assert the slot is `failed-merge`, `lastAutoAdvanceError` is populated, `autoAdvanceFailureCount >= 1`, and exactly one activity log entry was emitted.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-integration.ac6",
+            "title": "Regression test: pre-fix scenario (slot stuck at `completed` with PR CONFLICTING, other slots `merged`, autoAdvance=true) results in the swarm being halted with a clear lastAutoAdvanceError instead of looping forever. Asserts that after N ticks the swarm has NOT dispatched a new wave AND has a recorded failure.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recovery-endpoint",
+        "title": "Add `POST /api/swarm/:issueId/slot/:slotId/recover` recovery endpoint with retry/drop/handoff actions",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1194",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new Effect route at `POST /api/swarm/:issueId/slot/:slotId/recover` in src/dashboard/server/routes/swarm.ts. Body schema: `{ action: 'retry' | 'drop' | 'handoff' }`. Auth: require the internal token (same pattern as `/api/swarm`). Validate `issueId` via canonicalIssueId, `slotId` as positive integer. Resolve the latest matching slot record (reverse-scan, must be `failed-merge`). Reject 409 if no failed-merge slot found. `retry`: mutate the slot record's status back to a sentinel `'recovering'` (or set status to a value that causes the next dispatch to re-spawn — simplest: re-add the item to a dispatchable set by clearing the matched slot's status and clearing top-level autoAdvanceFailureCount/autoAdvanceRetryAfter/lastAutoAdvanceError; let the next pollSwarmAutoAdvance dispatch run). `drop`: apply `done` task operation to the vBRIEF for `slot.itemId` via `applyTaskOperationToPlanFileAsync` and leave the slot record at `failed-merge` (it's a terminal but advance-allowed state); clear top-level failure counters so auto-advance resumes. `handoff`: clear top-level autoAdvance flag on the SwarmState and emit a handback activity entry. All three: emit `source: 'ship', level: 'info', message: 'Operator recovered slot <N> via <action>'`. Internally use the existing `saveSwarmState` writer. Return 200 with `{ ok: true, action, slotId, issueId }`. Authoritative behavior matrix lives in a JSDoc above the route."
+        },
+        "subItems": [
+          {
+            "id": "recovery-endpoint.ac1",
+            "title": "Route registered at exact path `POST /api/swarm/:issueId/slot/:slotId/recover` with internal-token auth. Returns 403 without the token, 400 for invalid issueId/slotId, 409 if no failed-merge slot exists, 400 for invalid action.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac2",
+            "title": "`action: 'retry'` clears the matched failed-merge slot (reverts to pending/recovering state) AND clears top-level autoAdvanceFailureCount, autoAdvanceRetryAfter, lastAutoAdvanceError. Next pollSwarmAutoAdvance tick is free to dispatch. Unit test verifies the next pollSwarmAutoAdvance call dispatches a fresh slot for the same itemId.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac3",
+            "title": "`action: 'drop'` calls applyTaskOperationToPlanFileAsync({ type: 'done', itemId: <slot.itemId>, reason: 'Operator dropped slot via failed-merge recovery', writerId: 'swarm-recover-drop-<pid>' }) AND clears top-level failure counters. The slot record stays at `failed-merge` but advance is no longer blocked. Subsequent poll dispatches the next DAG-ready item.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac4",
+            "title": "`action: 'handoff'` flips state.autoAdvance to false and emits `source: 'ship', level: 'warn', message: 'Swarm autoAdvance disabled for <ISSUE> after operator handoff of slot <N>. Take it from here.'`. The auto-advance poll loop drops the issue from activeSwarmIssueIds on its next tick (existing cleanup branch).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac5",
+            "title": "Every successful action emits a `source: 'ship', level: 'info'` activity entry recording the operator decision and naming slot, item, action.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac6",
+            "title": "Persistence ordering: ALL three actions write SwarmState via the existing saveSwarmState path. drop additionally writes the vBRIEF via applyTaskOperationToPlanFileAsync; if the vBRIEF write fails, saveSwarmState is NOT called and the route returns 500 with the underlying error (no half-applied state).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac7",
+            "title": "Idempotency: replaying the same recover request on a slot that has already been recovered (no failed-merge entry exists) returns 409 with a clear message rather than 500 or silently re-applying.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          },
+          {
+            "id": "recovery-endpoint.ac8",
+            "title": "Unit tests for all three actions use vi.useFakeTimers() where the poll loop is exercised post-recovery.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
+          }
+        ],
+        "completed": "2026-05-18T23:22:16.395Z"
+      },
+      {
+        "id": "cli-recover",
+        "title": "Add `pan swarm recover <issueId> <slotId>` CLI subcommand wrapping the recovery endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/cli/commands/swarm.ts to register a `recover` subcommand: `pan swarm recover <issueId> <slotId> --action <retry|drop|handoff> [--yes]`. POSTs to the dashboard's `/api/swarm/:issueId/slot/:slotId/recover` endpoint with the internal token (same pattern as the existing `pan swarm` POST at line 167). Validate args before sending. For `--action drop`, require `--yes` OR interactive confirmation prompt (the action is destructive — drops vBRIEF task to `done` without delivering it). Surface the server's response via ora spinner: success → green checkmark + message; failure → red X + server error text. Exit code 0 on success, 1 on any failure."
+        },
+        "subItems": [
+          {
+            "id": "cli-recover.ac1",
+            "title": "`pan swarm recover --help` lists the three valid `--action` values and the destructive nature of `drop`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-recover.ac2",
+            "title": "`pan swarm recover PAN-1194 2 --action retry` posts to /api/swarm/PAN-1194/slot/2/recover with `{ action: 'retry' }` and the internal token. On 200, prints `Slot 2 of PAN-1194 recovered via retry.` and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-recover.ac3",
+            "title": "`pan swarm recover PAN-1194 2 --action drop` WITHOUT `--yes` prompts the operator for confirmation (interactive). With `--yes`, proceeds without prompt. With neither and stdin non-TTY, exits 1 with `--yes required for non-interactive drop`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-recover.ac4",
+            "title": "Server returns non-2xx: CLI prints the server's `error` field, exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-recover.ac5",
+            "title": "Invalid `--action` value rejected client-side before the HTTP call with a clear message listing valid values.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-recover.ac6",
+            "title": "Smoke test (vitest, fetch mocked) covers each action and the destructive-drop confirmation path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-visual",
+        "title": "Render `failed-merge` slot status visually in the dashboard with PR link and failure reason",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-18T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Find the dashboard component(s) rendering swarm slot status (likely SwarmPanel or a child of CommandDeck — locate via grep for `status === 'merged'`/`status === 'failed'` in src/dashboard/frontend/src/components). Add a render branch for the new `failed-merge` status that displays: (1) a distinct red/error pill labeled `Failed merge`, (2) the failureReason text, (3) a clickable PR URL link (target=_blank) when `prUrl` is present. Also surface `lastAutoAdvanceError` and `autoAdvanceFailureCount` on the swarm-level panel so the operator sees the swarm-wide halt context. NO interactive recovery buttons in this bead — those are deferred. Keep the change additive (no refactor of existing rendering)."
+        },
+        "subItems": [
+          {
+            "id": "frontend-visual.ac1",
+            "title": "A SwarmState with one `failed-merge` slot renders a distinct error pill (not the existing `failed` styling) in the dashboard. Verified by React Testing Library snapshot test asserting the new label appears.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-visual.ac2",
+            "title": "`prUrl` (when present) renders as an `<a target='_blank' rel='noopener noreferrer'>` link. Missing prUrl renders no link (no broken-link placeholder).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-visual.ac3",
+            "title": "`failureReason` text is rendered verbatim (text-content only, no HTML interpretation) below the slot title.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-visual.ac4",
+            "title": "Swarm-level panel surfaces `lastAutoAdvanceError` and `autoAdvanceFailureCount` (when > 0) in a visible banner — not behind a tooltip — so an operator scanning the dashboard sees the halt context immediately.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-visual.ac5",
+            "title": "Type-check passes: the widened `SlotAssignment.status` union surfaces correctly into the frontend (whether via packages/contracts re-export or local type duplication).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-visual.ac6",
+            "title": "Frontend lint and vitest pass after the changes.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "type-additions",
+        "to": "mergeability-detector",
+        "type": "blocks"
+      },
+      {
+        "from": "type-additions",
+        "to": "recovery-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "type-additions",
+        "to": "frontend-visual",
+        "type": "blocks"
+      },
+      {
+        "from": "mergeability-detector",
+        "to": "poll-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "recovery-endpoint",
+        "to": "cli-recover",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-integration",
+        "to": "frontend-visual",
+        "type": "informs"
+      },
+      {
+        "from": "recovery-endpoint",
+        "to": "frontend-visual",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json"
+    }
+  }
+}
