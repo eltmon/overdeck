@@ -117,7 +117,7 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   }
   const runId = parseRunId(activeRunId);
 
-  setFlywheelGloballyPaused(false);
   const agent = await spawnFlywheelAgent(runId, options);
+  setFlywheelGloballyPaused(false);
   return { activeRunId, agent };
 }

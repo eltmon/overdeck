@@ -14,7 +14,7 @@ import {
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
-import { hasDashboardInternalToken } from './dashboard-auth.js';
+import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
@@ -74,25 +74,16 @@ function parseRunsLimit(value: string | null): number | undefined {
   return Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : undefined;
 }
 
-export function resolveFlywheelBriefPath(projectRoot: string, requestedPath?: string): { ok: true; path: string } | { ok: false; error: string } {
-  const rawPath = requestedPath?.trim() || DEFAULT_BRIEF_PATH;
-  if (rawPath.includes('\0')) {
-    return { ok: false, error: 'Brief path is invalid' };
-  }
-
+export function resolveFlywheelBriefPath(projectRoot: string): { ok: true; path: string } | { ok: false; error: string } {
   const root = resolve(projectRoot);
-  const resolvedPath = isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath);
-  if (!isInsideRoot(root, resolvedPath)) {
-    return { ok: false, error: 'Brief path must stay inside the project root' };
-  }
-
+  const resolvedPath = resolve(root, DEFAULT_BRIEF_PATH);
   const normalizedRoot = root.endsWith(sep) ? root : `${root}${sep}`;
-  const displayPath = resolvedPath === root ? '.' : relative(root, resolvedPath);
+  const displayPath = relative(root, resolvedPath);
   return { ok: true, path: resolvedPath.startsWith(normalizedRoot) ? displayPath : resolvedPath };
 }
 
-function resolveBriefAbsolutePath(projectRoot: string, requestedPath?: string): { ok: true; absolutePath: string; displayPath: string } | { ok: false; error: string } {
-  const resolved = resolveFlywheelBriefPath(projectRoot, requestedPath);
+function resolveBriefAbsolutePath(projectRoot: string): { ok: true; absolutePath: string; displayPath: string } | { ok: false; error: string } {
+  const resolved = resolveFlywheelBriefPath(projectRoot);
   if (!resolved.ok) return resolved;
   return {
     ok: true,
@@ -360,11 +351,14 @@ const getFlywheelBriefRoute = HttpRouter.add(
   '/api/flywheel/brief',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const requestedPath = HttpServerRequest.toURL(request).pipe(Option.match({
-      onNone: () => undefined,
-      onSome: (url) => url.searchParams.get('path') ?? undefined,
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+    const hasPathOverride = HttpServerRequest.toURL(request).pipe(Option.match({
+      onNone: () => false,
+      onSome: (url) => url.searchParams.has('path'),
     }));
-    const resolved = resolveBriefAbsolutePath(process.cwd(), requestedPath);
+    if (hasPathOverride) return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
+    const resolved = resolveBriefAbsolutePath(process.cwd());
     if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
 
     return yield* Effect.promise(async () => {
@@ -389,8 +383,8 @@ const postFlywheelBriefRoute = HttpRouter.add(
   '/api/flywheel/brief',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
 
     const parsed = yield* readJsonBody;
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
@@ -398,11 +392,11 @@ const postFlywheelBriefRoute = HttpRouter.add(
     if (typeof body.content !== 'string') {
       return jsonResponse({ error: 'content must be a string' }, { status: 400 });
     }
-    if (body.path !== undefined && typeof body.path !== 'string') {
-      return jsonResponse({ error: 'path must be a string when provided' }, { status: 400 });
+    if (body.path !== undefined) {
+      return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
     }
 
-    const resolved = resolveBriefAbsolutePath(process.cwd(), body.path);
+    const resolved = resolveBriefAbsolutePath(process.cwd());
     if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
 
     return yield* Effect.promise(async () => {

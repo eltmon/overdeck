@@ -12,6 +12,8 @@ import {
   getFlywheelRunDetail,
   listFlywheelRuns,
   nextFlywheelRunId,
+  readFlywheelLaunchMetadata,
+  writeFlywheelLaunchMetadata,
   writeLatestFlywheelStatus,
 } from './flywheel-run-state.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
@@ -194,6 +196,13 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
   const brief = await requireFlywheelBrief(cwd, options.brief ?? DEFAULT_BRIEF_PATH);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
+  await writeFlywheelLaunchMetadata({
+    version: 1,
+    runId,
+    workspace: cwd,
+    briefPath: brief.absolutePath,
+    briefDisplayPath: brief.displayPath,
+  });
   const roleConfig = await resolveFlywheelRoleConfig();
   const agent = await spawnFlywheelAgent(runId, {
     briefPath: brief.absolutePath,
@@ -233,15 +242,22 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
   }
   if (!before.activeRunId) throw new Error('No active flywheel run to resume');
 
+  const launch = await readFlywheelLaunchMetadata(before.activeRunId);
+  if (!launch) {
+    throw new Error(`Flywheel run ${before.activeRunId} is missing launch metadata; cannot resume safely`);
+  }
+  const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = await resolveFlywheelRoleConfig();
-  await setPaused(false);
   await spawnFlywheelAgent(before.activeRunId, {
+    workspace: launch.workspace,
+    briefPath: brief.absolutePath,
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
   });
+  await setPaused(false);
   return { before, after: await readGateSnapshot(), changed: true };
 }
 

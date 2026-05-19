@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
@@ -72,23 +72,6 @@ describe('resolveFlywheelBriefPath', () => {
     });
   });
 
-  it('accepts an absolute path inside the project root', () => {
-    const path = resolve(projectRoot, 'docs/custom-brief.md');
-
-    expect(resolveFlywheelBriefPath(projectRoot, path)).toEqual({
-      ok: true,
-      path: 'docs/custom-brief.md',
-    });
-  });
-
-  it('rejects paths outside the project root', () => {
-    const outside = resolve(projectRoot, '..', 'outside.md');
-
-    expect(resolveFlywheelBriefPath(projectRoot, outside)).toEqual({
-      ok: false,
-      error: 'Brief path must stay inside the project root',
-    });
-  });
 
   it('rejects brief symlinks that resolve outside the project root', async () => {
     const outsideDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-brief-outside-'));

@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, publishFlywheelStatusCleared, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
+import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, publishFlywheelStatusCleared, readFlywheelLaunchMetadata, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { loadConfig, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
@@ -231,6 +231,13 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
+  await writeFlywheelLaunchMetadata({
+    version: 1,
+    runId,
+    workspace: cwd,
+    briefPath: brief.absolutePath,
+    briefDisplayPath: brief.displayPath,
+  });
   const roleConfig = resolveFlywheelRoleConfig();
   const agent = await spawnFlywheel({
     runId,
@@ -514,8 +521,16 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
   if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
     return { before, after: before, changed: false };
   }
+  if (!before.activeRunId) throw new Error('No active flywheel run to resume');
+  const launch = await readFlywheelLaunchMetadata(before.activeRunId);
+  if (!launch) {
+    throw new Error(`Flywheel run ${before.activeRunId} is missing launch metadata; cannot resume safely`);
+  }
+  const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = resolveFlywheelRoleConfig();
   await resumeFlywheel({
+    workspace: launch.workspace,
+    briefPath: brief.absolutePath,
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,

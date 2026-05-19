@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStatus } from '@panctl/contracts';
-import { subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
+import { readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 
 const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
@@ -262,7 +262,14 @@ describe('flywheel CLI commands', () => {
       scope: 'all-tracked-projects',
     }));
     const latest = JSON.parse(await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'latest.json'), 'utf8')) as FlywheelStatus;
+    const launch = await readFlywheelLaunchMetadata('RUN-1');
     expect(latest.runId).toBe('RUN-1');
+    expect(launch).toMatchObject({
+      runId: 'RUN-1',
+      workspace: tempDir,
+      briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
+      briefDisplayPath: 'docs/flywheel-brief.md',
+    });
     expect(latest.orchestrator).toMatchObject({ harness: 'pi', model: 'claude-sonnet-4-6', effort: 'low' });
     expect(latest.system.agentsCap).toBe(3);
     expect(latest.agents[0]?.id).toBe('flywheel-orchestrator');
@@ -339,15 +346,45 @@ describe('flywheel CLI commands', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('resumes the flywheel and prints before/after gate state', async () => {
+  it('resumes the flywheel with the original workspace and brief metadata', async () => {
+    const repoDir = join(tempDir, 'repo');
+    await mkdir(repoDir, { recursive: true });
+    const briefPath = join(repoDir, 'some-brief.md');
+    await writeFile(briefPath, '# Resume Brief\n', 'utf8');
+    await writeFlywheelLaunchMetadata({
+      version: 1,
+      runId: 'RUN-1',
+      workspace: repoDir,
+      briefPath,
+      briefDisplayPath: 'some-brief.md',
+    });
     flywheelLifecycleMocks.activeRunId = 'RUN-1';
     flywheelLifecycleMocks.paused = true;
 
     await flywheelResumeCommand();
 
-    expect(flywheelLifecycleMocks.resumeFlywheel).toHaveBeenCalledTimes(1);
+    expect(flywheelLifecycleMocks.resumeFlywheel).toHaveBeenCalledWith(expect.objectContaining({
+      workspace: repoDir,
+      briefPath,
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'low',
+      maxAgents: 3,
+      scope: 'all-tracked-projects',
+    }));
     expect(logSpy).toHaveBeenCalledWith('Flywheel resumed: before paused=true active_run_id=RUN-1; after paused=false active_run_id=RUN-1');
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('refuses to resume legacy runs without launch metadata', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
+
+    await flywheelResumeCommand();
+
+    expect(flywheelLifecycleMocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Flywheel run RUN-1 is missing launch metadata; cannot resume safely');
+    expect(process.exitCode).toBe(1);
   });
 
   it('treats resume while already running as an idempotent notice', async () => {

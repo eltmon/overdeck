@@ -411,7 +411,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         Stream.callback((queue) =>
           Effect.acquireRelease(
             Effect.promise(async () => {
-              const latest = await readCurrentLatestFlywheelStatus();
+              const activeRunId = await runDashboardDbJob<string | null>('getSetting', 'flywheel.active_run_id');
+              const latest = await readCurrentLatestFlywheelStatus({ activeRunId });
               if (latest) Queue.offerUnsafe(queue, latest);
               return subscribeLatestFlywheelStatus((status) => {
                 Queue.offerUnsafe(queue, status);

@@ -1,8 +1,8 @@
 ---
 name: flywheel
 description: Panopticon Flywheel role — singleton orchestrator that drives PAN issues through the pipeline and fixes substrate bugs at the root.
-# No `model:` or `effort:` pin — Cloister resolves these from config.yaml roles.flywheel.
-# Hardcoding them here would override the user's per-role settings.
+effort: high
+# No `model:` pin — Cloister resolves it from config.yaml roles.flywheel.
 permissionMode: bypassPermissions
 hooks:
   PreToolUse:

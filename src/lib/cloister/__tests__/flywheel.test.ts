@@ -128,4 +128,15 @@ describe('flywheel lifecycle', () => {
       registerConversation: true,
     }));
   });
+
+  it('keeps the pause gate set when resume spawn fails', async () => {
+    await spawnFlywheel({ runId: 'RUN-9', workspace: '/repo', env: cleanEnv });
+    await pauseFlywheel();
+    mocks.spawnRun.mockRejectedValueOnce(new Error('tmux session collision'));
+
+    await expect(resumeFlywheel({ workspace: '/repo', env: cleanEnv })).rejects.toThrow('tmux session collision');
+
+    expect(mocks.paused).toBe(true);
+    expect(mocks.activeRunId).toBe('RUN-9');
+  });
 });

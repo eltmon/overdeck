@@ -35,6 +35,14 @@ export interface FlywheelRunDetail extends FlywheelRunSummary {
   };
 }
 
+export interface FlywheelLaunchMetadata {
+  version: 1;
+  runId: string;
+  workspace: string;
+  briefPath: string;
+  briefDisplayPath: string;
+}
+
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
 const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
 const RUN_ID_PATTERN = /^RUN-(\d+)$/;
@@ -119,15 +127,46 @@ export async function nextFlywheelRunId(options: FlywheelRunStateOptions = {}): 
   return parseFlywheelRunId(`RUN-${maxRunNumber + 1}`);
 }
 
+async function writeJsonAtomic(path: string, payload: unknown): Promise<string> {
+  const tmpPath = join(dirname(path), `.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await rename(tmpPath, path);
+  return path;
+}
+
 export async function writeLatestFlywheelStatus(status: FlywheelStatus, options: FlywheelRunStateOptions = {}): Promise<string> {
-  const runDir = getFlywheelRunDir(status.runId, options);
-  const latestPath = join(runDir, 'latest.json');
-  const tmpPath = join(runDir, `.latest.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
-  await mkdir(dirname(latestPath), { recursive: true });
-  await writeFile(tmpPath, `${JSON.stringify(status, null, 2)}\n`, 'utf8');
-  await rename(tmpPath, latestPath);
+  const latestPath = join(getFlywheelRunDir(status.runId, options), 'latest.json');
+  await writeJsonAtomic(latestPath, status);
   publishLatestFlywheelStatus(status);
   return latestPath;
+}
+
+function decodeLaunchMetadata(payload: unknown): FlywheelLaunchMetadata {
+  if (typeof payload !== 'object' || payload === null) throw new Error('Invalid Flywheel launch metadata');
+  const record = payload as Record<string, unknown>;
+  if (record.version !== 1) throw new Error('Invalid Flywheel launch metadata version');
+  for (const key of ['runId', 'workspace', 'briefPath', 'briefDisplayPath']) {
+    if (typeof record[key] !== 'string' || !record[key]) throw new Error(`Invalid Flywheel launch metadata: ${key}`);
+  }
+  return record as unknown as FlywheelLaunchMetadata;
+}
+
+export async function writeFlywheelLaunchMetadata(metadata: FlywheelLaunchMetadata, options: FlywheelRunStateOptions = {}): Promise<string> {
+  const runId = parseFlywheelRunId(metadata.runId);
+  const launchPath = join(getFlywheelRunDir(runId, options), 'launch.json');
+  return writeJsonAtomic(launchPath, { ...metadata, runId });
+}
+
+export async function readFlywheelLaunchMetadata(runId: string, options: FlywheelRunStateOptions = {}): Promise<FlywheelLaunchMetadata | null> {
+  const launchPath = join(getFlywheelRunDir(runId, options), 'launch.json');
+  try {
+    return decodeLaunchMetadata(JSON.parse(await readFile(launchPath, 'utf8')) as unknown);
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 export async function readLatestFlywheelStatus(runId: string, options: FlywheelRunStateOptions = {}): Promise<FlywheelStatus | null> {
