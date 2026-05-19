@@ -14,7 +14,7 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(activeTab: Tab = 'pipeline') {
+function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }> } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -23,13 +23,26 @@ function renderSidebar(activeTab: Tab = 'pipeline') {
   });
   const onTabChange = vi.fn();
   const onSearchOpen = vi.fn();
-  const view = render(
+  const runs = options.runs ?? [];
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === '/api/version') {
+      return Response.json({ version: '0.5.0', isDev: false });
+    }
+    if (url === '/api/flywheel/runs?limit=10') {
+      return Response.json(runs);
+    }
+    return Response.json({});
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const { container } = render(
     <QueryClientProvider client={client}>
-      <Sidebar activeTab={activeTab} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
+      <Sidebar activeTab={options.activeTab ?? 'pipeline'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
     </QueryClientProvider>,
   );
 
-  return { ...view, onTabChange, onSearchOpen };
+  return { container, onTabChange, fetchMock };
 }
 
 describe('Sidebar navigation', () => {
@@ -44,7 +57,7 @@ describe('Sidebar navigation', () => {
   });
 
   it('orders Operations as Pipeline, Board, Command Deck, Agents, AutoPreso with the migration tooltip', () => {
-    const { container, onTabChange } = renderSidebar('pipeline');
+    const { container, onTabChange } = renderSidebar({ activeTab: 'pipeline' });
 
     const operationLabels = Array.from(container.querySelectorAll('nav [data-testid^="sidebar-"]'))
       .slice(0, 5)
@@ -59,7 +72,7 @@ describe('Sidebar navigation', () => {
   });
 
   it('routes the expanded logo to Pipeline', () => {
-    const { onTabChange } = renderSidebar('kanban');
+    const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 
     const logo = screen.getByTitle('Go to Pipeline');
     fireEvent.click(logo);
@@ -68,7 +81,7 @@ describe('Sidebar navigation', () => {
 
   it('keeps collapsed-mode icons clickable', () => {
     localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true');
-    const { onTabChange } = renderSidebar('kanban');
+    const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 
     const logo = screen.getByTitle('Go to Pipeline');
     fireEvent.click(logo);

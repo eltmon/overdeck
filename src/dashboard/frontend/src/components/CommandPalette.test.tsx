@@ -124,7 +124,7 @@ describe('CommandPalette flywheel action', () => {
     await user.click(screen.getByText('Run flywheel'));
 
     await waitFor(() => {
-      expect(onNavigate).toHaveBeenCalledWith('/flywheel');
+      expect(onNavigate).toHaveBeenCalledWith('flywheel');
     });
   });
 });

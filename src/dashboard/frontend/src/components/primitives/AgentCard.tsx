@@ -4,7 +4,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import VerbBadge, { type VerbBadgeProps } from './VerbBadge';
 
-export type AgentCardRole = 'plan' | 'work' | 'review' | 'test' | 'ship';
+export type AgentCardRole = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
 
 export type AgentCardIssue = {
   id: string;
@@ -39,6 +39,7 @@ const ROLE_ACCENTS = {
   review: 'var(--warning)',
   test: 'var(--success)',
   ship: 'var(--signal-cost)',
+  flywheel: 'var(--primary)',
 } satisfies Record<AgentCardRole, string>;
 
 export default function AgentCard({

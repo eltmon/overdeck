@@ -17,6 +17,7 @@ const ROLE_ORDER = {
   review: 2,
   test: 3,
   ship: 4,
+  flywheel: 5,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed', 'error', 'unknown']);
@@ -123,7 +124,9 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
 function agentPhase(agent: Agent): AgentPhaseFilter {
   if (isAgentProblemStatus(agent.status) || agent.troubled) return 'stuck';
   const role = agentRole(agent);
-  return role === 'test' ? 'review' : role;
+  if (role === 'test') return 'review';
+  if (role === 'flywheel') return 'work';
+  return role;
 }
 
 function isFleetAgent(agent: Agent) {
