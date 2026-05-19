@@ -24,7 +24,8 @@ export async function writeObservation(observation: MemoryObservation, options: 
 
   await ensureParentDir(jsonlPath);
   await withAppendLock(jsonlPath, async () => {
-    const byteOffset = await appendJsonl(jsonlPath, observation);
+    const existingOffset = await findObservationByteOffset(jsonlPath, observation.id);
+    const byteOffset = existingOffset ?? await appendJsonl(jsonlPath, observation);
     try {
       await (options.indexObservation ?? indexObservation)(observation, jsonlPath, byteOffset);
     } catch {
@@ -50,6 +51,25 @@ export function renderObservationMarkdownLine(observation: MemoryObservation): s
   const files = observation.files.length > 0 ? ` — files: ${observation.files.map(inline).join(', ')}` : '';
   const tags = observation.tags.length > 0 ? ` — tags: ${observation.tags.map(inline).join(', ')}` : '';
   return `- <!-- obs:${observation.id} --> **${time}** ${inline(status)}${files}${tags}`;
+}
+
+async function findObservationByteOffset(jsonlPath: string, observationId: string): Promise<number | null> {
+  const raw = await readOptional(jsonlPath);
+  let byteOffset = 0;
+  for (const line of raw.split('\n')) {
+    if (line.trim().length === 0) {
+      byteOffset += Buffer.byteLength(`${line}\n`);
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(line) as { id?: unknown };
+      if (parsed.id === observationId) return byteOffset;
+    } catch {
+      // Malformed historical lines must not block retry idempotency.
+    }
+    byteOffset += Buffer.byteLength(`${line}\n`);
+  }
+  return null;
 }
 
 async function appendJsonl(jsonlPath: string, observation: MemoryObservation): Promise<number> {
@@ -81,6 +101,15 @@ async function withAppendLock<T>(jsonlPath: string, task: () => Promise<T>): Pro
 async function indexObservation(observation: MemoryObservation, jsonlPath: string, byteOffset: number): Promise<void> {
   const content = [observation.narrative, observation.summary].filter(Boolean).join('\n\n');
   await runMemoryFtsTransaction(observation.projectId, [
+    {
+      method: 'run',
+      sql: `
+        DELETE FROM memory_fts
+        WHERE source = ?
+          AND project_id = ?
+      `,
+      params: [observation.id, observation.projectId],
+    },
     {
       method: 'run',
       sql: `

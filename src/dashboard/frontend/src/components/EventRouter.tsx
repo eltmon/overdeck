@@ -101,11 +101,36 @@ export function EventRouter() {
           applyEvents(typed)
           coordinator.markEventBatchApplied(typed[typed.length - 1]!.sequence)
         }
-        coordinator.completeReplayRecovery()
+        const needsAnotherReplay = coordinator.completeReplayRecovery()
+        if (needsAnotherReplay) {
+          await replay(coordinator.getState().latestSequence)
+          return
+        }
+        drainDeferredEvents()
       } catch (err) {
         console.error('[EventRouter] replay failed:', err)
         coordinator.failRecovery()
       }
+    }
+
+    function drainDeferredEvents() {
+      const deferred = pendingBatch.current.splice(0).sort((a, b) => a.sequence - b.sequence)
+      const applyBatch: DomainEvent[] = []
+      for (const event of deferred) {
+        const classification = coordinator.classifyDomainEvent(event.sequence)
+        if (classification === 'ignore') continue
+        if (classification === 'apply') {
+          applyBatch.push(event)
+          coordinator.markEventBatchApplied(event.sequence)
+          continue
+        }
+        pendingBatch.current.push(event)
+        if (classification === 'recover') {
+          replay(coordinator.getState().latestSequence).catch(console.error)
+          break
+        }
+      }
+      if (applyBatch.length > 0) applyEvents(applyBatch)
     }
 
     // ── Event coalescing ──────────────────────────────────────────────────────

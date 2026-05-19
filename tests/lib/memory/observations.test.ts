@@ -74,7 +74,7 @@ describe('observation writer', () => {
     expect(markdown).toBe(`${renderObservationMarkdownLine(entry)}\n`);
   });
 
-  it('uses O_APPEND for JSONL while keeping markdown mirror idempotent by observation id', async () => {
+  it('keeps JSONL, FTS, and markdown idempotent by observation id', async () => {
     const first = observation({ actionStatus: 'First status' });
     const second = observation({ actionStatus: 'Updated status', summary: 'Updated summary.' });
 
@@ -85,13 +85,19 @@ describe('observation writer', () => {
     const markdownPath = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.md');
 
     const jsonlEntries = (await readFile(jsonlPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
-    expect(jsonlEntries).toHaveLength(2);
-    expect(jsonlEntries.map((entry) => entry.actionStatus)).toEqual(['First status', 'Updated status']);
+    expect(jsonlEntries).toEqual([first]);
 
     const markdown = await readFile(markdownPath, 'utf8');
     expect(markdown).toContain('Updated status');
     expect(markdown).not.toContain('First status');
     expect(markdown.match(/<!-- obs:obs-1 -->/g)).toHaveLength(1);
+
+    const ftsRows = await withMemoryFtsDatabase(first.projectId, (db) => db.prepare(`
+      SELECT source, display_content
+      FROM memory_fts
+      WHERE source = ?
+    `).all(first.id) as Array<Record<string, unknown>>);
+    expect(ftsRows).toEqual([{ source: 'obs-1', display_content: 'Updated summary.' }]);
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
     expect(files.sort()).toEqual(['2026-05-16.jsonl', '2026-05-16.md']);

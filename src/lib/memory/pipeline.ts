@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
 import {
   claimTranscriptRange,
@@ -136,7 +136,7 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
       settings: input.settings,
       perDayCostCapUsd: input.perDayCostCapUsd,
       now: input.now,
-      id: input.id,
+      id: input.id ?? deterministicObservationId(input.sessionId, claimed.result.fromOffset),
       extract: input.extract,
     });
 
@@ -211,6 +211,11 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
       release(input.sessionId, claimedRange.fromOffset, claimedRange.toOffset);
     }
   }
+}
+
+function deterministicObservationId(sessionId: string, fromOffset: number): string {
+  const digest = createHash('sha256').update(`${sessionId}:${fromOffset}`).digest('hex').slice(0, 32);
+  return `obs-${digest}`;
 }
 
 async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<

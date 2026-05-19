@@ -263,6 +263,11 @@ setAgentStoppedNotifier((agentId) => {
       const state = await getAgentStateAsync(agentId);
       if (state) {
         es.append({
+          type: 'agent.heartbeat_dead',
+          timestamp: new Date().toISOString(),
+          payload: { agentId, issueId: state.issueId, sessionId: state.sessionId },
+        } as any);
+        es.append({
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
           payload: buildAgentStatusChangedPayload(state),
@@ -270,7 +275,7 @@ setAgentStoppedNotifier((agentId) => {
         return;
       }
       es.append({
-        type: 'agent.stopped',
+        type: 'agent.heartbeat_dead',
         timestamp: new Date().toISOString(),
         payload: { agentId },
       } as any);
@@ -339,7 +344,7 @@ console.log('[panopticon] Memory transcript poller started');
 void (async () => {
   const store = await initEventStore();
   store.subscribe((event) => {
-    if (event.type === 'agent.stopped') {
+    if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
         ? (event.payload as { agentId: string }).agentId
         : null;
@@ -351,7 +356,7 @@ void (async () => {
         : null;
       if (sessionId) clearQueryExpansionCache(sessionId);
     }
-    if (event.type === 'agent.started' || event.type === 'agent.stopped') {
+    if (event.type === 'agent.started' || event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] lifecycle registry sync failed:', err?.message ?? err));
     }
   });

@@ -185,20 +185,23 @@ export async function readRecentObservations(projectId: string, issueId: string,
     throw error;
   }))
     .filter((file) => file.endsWith('.jsonl'))
-    .sort();
+    .sort()
+    .reverse();
 
   const observations: MemoryObservation[] = [];
   for (const file of files) {
     const raw = await readFile(`${observationsDir}/${file}`, 'utf8');
-    for (const line of raw.split('\n')) {
-      if (line.trim().length === 0) continue;
+    const lines = raw.trimEnd().split('\n');
+    for (let index = lines.length - 1; index >= 0 && observations.length < limit; index -= 1) {
+      const line = lines[index];
+      if (!line || line.trim().length === 0) continue;
       observations.push(JSON.parse(line) as MemoryObservation);
     }
+    if (observations.length >= limit) break;
   }
 
   return observations
-    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-    .slice(-limit);
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
 export async function readArchivedStatuses(projectId: string, issueId: string, limit = 3): Promise<MemoryStatus[]> {
@@ -310,17 +313,41 @@ function renderObservations(observations: MemoryObservation[]): string {
   ].join('\n')).join('\n\n');
 }
 
+const PENDING_TURN_PROMPT_BUDGET_CHARS = 12_000;
+const PENDING_TURN_TEXT_BUDGET_CHARS = 2_000;
+
 function renderPendingTurns(pendingTurns: PendingTurn[]): string {
   if (pendingTurns.length === 0) return 'none';
-  return pendingTurns.map((turn, index) => [
-    `Pending turn ${index + 1}:`,
-    `- Created: ${turn.createdAt}`,
-    `- Session: ${turn.identity.sessionId}`,
-    `- Trigger: ${turn.trigger}`,
-    `- Offset: ${turn.fromOffset}-${turn.toOffset}`,
-    `- Events consumed: ${turn.eventsConsumed}`,
-    `- Compressed text:\n${turn.compressedText}`,
-  ].join('\n')).join('\n\n');
+
+  const rendered: string[] = [];
+  let used = 0;
+  let omitted = 0;
+  for (const [index, turn] of pendingTurns.entries()) {
+    const compressedText = truncateText(turn.compressedText, PENDING_TURN_TEXT_BUDGET_CHARS);
+    const block = [
+      `Pending turn ${index + 1}:`,
+      `- Created: ${turn.createdAt}`,
+      `- Session: ${turn.identity.sessionId}`,
+      `- Trigger: ${turn.trigger}`,
+      `- Offset: ${turn.fromOffset}-${turn.toOffset}`,
+      `- Events consumed: ${turn.eventsConsumed}`,
+      `- Compressed text:\n${compressedText}`,
+    ].join('\n');
+    if (used + block.length > PENDING_TURN_PROMPT_BUDGET_CHARS) {
+      omitted = pendingTurns.length - index;
+      break;
+    }
+    rendered.push(block);
+    used += block.length;
+  }
+
+  if (omitted > 0) rendered.push(`Omitted ${omitted} pending turn(s) after the ${PENDING_TURN_PROMPT_BUDGET_CHARS} character budget.`);
+  return rendered.join('\n\n');
+}
+
+function truncateText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}\n[truncated ${value.length - maxChars} chars]`;
 }
 
 function isEnoent(error: unknown): boolean {

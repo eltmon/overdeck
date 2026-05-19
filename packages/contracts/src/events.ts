@@ -40,9 +40,17 @@ export const AgentStoppedEvent = Schema.Struct({
   type: Schema.Literal("agent.stopped"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId }),
+  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, sessionId: Schema.optional(Schema.String) }),
 })
 export type AgentStoppedEvent = typeof AgentStoppedEvent.Type
+
+export const AgentHeartbeatDeadEvent = Schema.Struct({
+  type: Schema.Literal("agent.heartbeat_dead"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ agentId: AgentId, issueId: Schema.optional(IssueId), sessionId: Schema.optional(Schema.String) }),
+})
+export type AgentHeartbeatDeadEvent = typeof AgentHeartbeatDeadEvent.Type
 
 /** Role lifecycle — work agent completed implementation and is ready for review. */
 export const WorkCompletedEvent = Schema.Struct({
@@ -997,6 +1005,7 @@ export const DomainEvent = Schema.Union([
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
   AgentStoppedEvent,
+  AgentHeartbeatDeadEvent,
   WorkCompletedEvent,
   AgentCompletedEvent,
   ReviewApprovedEvent,

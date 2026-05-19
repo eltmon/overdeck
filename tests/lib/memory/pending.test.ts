@@ -92,7 +92,7 @@ describe('pending turn writer', () => {
   });
 
   it('triggers a workspace status rollup after the configurable pending threshold is reached', async () => {
-    const enqueue = vi.fn<[StatusRollupJob], void>();
+    const enqueue = vi.fn<[StatusRollupJob], Promise<void>>(async () => undefined);
     restoreEnqueuer = setStatusRollupEnqueuer(enqueue);
 
     await writePendingTurn(turnForSession('session-a', 1), { loadThreshold: () => 4 });
@@ -138,7 +138,7 @@ describe('pending turn writer', () => {
     expect(processed).toHaveLength(2);
   });
 
-  it('collapses concurrent triggers to one in-flight rollup per workspace', async () => {
+  it('collapses concurrent triggers until the enqueued rollup completion promise settles', async () => {
     await writePendingTurn(turnForSession('session-a', 1), { loadThreshold: () => 10 });
     await writePendingTurn(turnForSession('session-b', 2), { loadThreshold: () => 10 });
     await writePendingTurn(turnForSession('session-c', 3), { loadThreshold: () => 10 });
@@ -153,10 +153,16 @@ describe('pending turn writer', () => {
     ]);
 
     await vi.waitFor(() => expect(enqueue).toHaveBeenCalledOnce());
+    expect(await maybeTriggerStatusRollup(identity, { loadThreshold: () => 4, enqueueStatusRollup: enqueue })).toEqual({
+      status: 'collapsed',
+      pendingCount: 5,
+      threshold: 4,
+    });
     release();
     await writes;
+    await maybeTriggerStatusRollup(identity, { loadThreshold: () => 4, enqueueStatusRollup: enqueue });
 
-    expect(enqueue).toHaveBeenCalledOnce();
+    expect(enqueue).toHaveBeenCalledTimes(2);
   });
 
   it('reads pending turns from every session in chronological filename order', async () => {

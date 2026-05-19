@@ -199,6 +199,25 @@ describe('extractFromTranscriptDelta', () => {
     });
   });
 
+  it('derives deterministic observation ids from the claimed session range when no id is supplied', async () => {
+    const writeObservation = vi.fn(async () => ({ jsonlPath: '/tmp/observations.jsonl', markdownPath: '/tmp/observations.md' }));
+
+    const result = await extractFromTranscriptDelta(input({
+      id: undefined,
+      claimRange: () => claimedRange(40, 100),
+      compress: async () => ({ text: 'U: one complete event', eventsConsumed: 1, lastFullLineOffset: 100 }),
+      extract: async () => extractedPayload(),
+      writeObservation,
+      writePendingTurn: async () => ({ path: '/tmp/pending.json', fileName: 'pending.json' }),
+      emitObservationCreated: async () => undefined,
+      maybeTriggerRollup: async () => ({ status: 'below-threshold' as const, pendingCount: 1, threshold: 4 }),
+      commitRange: () => ({ status: 'committed' as const, checkpoint: claimedRange(40, 100).checkpoint }),
+    }));
+
+    expect(result.status).toBe('written');
+    expect(writeObservation.mock.calls[0]![0].id).toBe('obs-5ae912f2f824e63d45cac4c8b0935079');
+  });
+
   it('commits checkpoints only to the last fully consumed JSONL line', async () => {
     const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, 100).checkpoint }));
 

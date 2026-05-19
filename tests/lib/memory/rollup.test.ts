@@ -155,6 +155,42 @@ describe('memory status rollup synthesis', () => {
     ]);
   });
 
+  it('scans newest observation files first and stops after the requested limit', async () => {
+    const observationsDir = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations');
+    await ensureDir(observationsDir);
+    await writeFile(
+      join(observationsDir, '2026-05-15.jsonl'),
+      `${Array.from({ length: 25 }, (_, index) => JSON.stringify({ ...observation(index + 1), id: `old-${index + 1}`, timestamp: `2026-05-15T20:${String(index + 1).padStart(2, '0')}:00.000Z` })).join('\n')}\n`,
+      'utf8',
+    );
+    await writeFile(
+      join(observationsDir, '2026-05-16.jsonl'),
+      `${Array.from({ length: 3 }, (_, index) => JSON.stringify({ ...observation(index + 1), id: `new-${index + 1}`, timestamp: `2026-05-16T20:0${index + 1}:00.000Z` })).join('\n')}\n`,
+      'utf8',
+    );
+
+    expect((await readRecentObservations(identity.projectId, identity.issueId, 3)).map((item) => item.id)).toEqual([
+      'new-1',
+      'new-2',
+      'new-3',
+    ]);
+  });
+
+  it('bounds pending turn text in the rollup prompt', () => {
+    const prompt = buildStatusRollupPrompt({
+      pendingTurns: Array.from({ length: 20 }, (_, index) => ({
+        ...pendingTurn(index + 1),
+        compressedText: `turn-${index + 1} ${'x'.repeat(3_000)}`,
+      })),
+      observations: [],
+      archivedStatuses: [],
+    });
+
+    expect(prompt).toContain('[truncated ');
+    expect(prompt).toContain('Omitted ');
+    expect(prompt.length).toBeLessThan(15_000);
+  });
+
   it('returns a validated memory status from a provider payload without carrying forward stale workingSet entries', async () => {
     const extract: StatusRollupExtractCall = async () => extracted({
       ...baseStatus,

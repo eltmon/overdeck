@@ -31,6 +31,7 @@ const PUBLIC_CATALOG = [
   'activity.updated',
   'agent.started',
   'agent.stopped',
+  'agent.heartbeat_dead',
   'agent.output_received',
   'workspace.created',
   'workspace.destroyed',

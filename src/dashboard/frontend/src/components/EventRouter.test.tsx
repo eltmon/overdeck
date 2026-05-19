@@ -42,14 +42,14 @@ function resetDashboardStore() {
   })
 }
 
-function memoryObservationEvent(sequence: number): DomainEvent {
+function memoryObservationEvent(sequence: number, id = 'obs-live'): DomainEvent {
   return {
     type: 'memory.observation_created',
     sequence,
     timestamp: '2026-05-16T12:00:01.000Z',
     payload: {
       observation: {
-        id: 'obs-live',
+        id,
         timestamp: '2026-05-16T12:00:01.000Z',
         projectId: 'panopticon-cli',
         workspaceId: 'feature-pan-1052',
@@ -101,6 +101,54 @@ describe('EventRouter memory updates', () => {
     })
 
     expect(useDashboardStore.getState().observationsByIssueId['PAN-1052']?.[0]?.id).toBe('obs-live')
+  })
+
+  it('drops deferred live events that are covered by replay', async () => {
+    request
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce([memoryObservationEvent(1, 'obs-replay-1'), memoryObservationEvent(2, 'obs-replay-2')])
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(subscribed).not.toBeNull()
+
+    act(() => {
+      subscribed!(memoryObservationEvent(2, 'obs-live-duplicate'))
+    })
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const observations = useDashboardStore.getState().observationsByIssueId['PAN-1052'] ?? []
+    expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-replay-2'])
+  })
+
+  it('applies deferred live events that remain after replay', async () => {
+    request
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce([memoryObservationEvent(1, 'obs-replay-1')])
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(subscribed).not.toBeNull()
+
+    act(() => {
+      subscribed!(memoryObservationEvent(2, 'obs-live-2'))
+    })
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const observations = useDashboardStore.getState().observationsByIssueId['PAN-1052'] ?? []
+    expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-live-2'])
   })
 
   it('stops snapshot fallback polling after three minutes', async () => {

@@ -16,7 +16,7 @@ export interface StatusRollupJob {
   threshold: number;
 }
 
-export type EnqueueStatusRollup = (job: StatusRollupJob) => void | Promise<void>;
+export type EnqueueStatusRollup = (job: StatusRollupJob) => Promise<void>;
 export type StatusRollupProcessor = (job: StatusRollupJob) => Promise<void>;
 
 export interface StatusRollupTriggerOptions {

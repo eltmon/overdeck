@@ -17,7 +17,7 @@ Use `pan memory` to inspect the durable memory substrate for a project or issue.
 ## Commands
 
 ```bash
-pan memory search <query> [--project <id>] [--workspace <id>] [--issue <id>] [--tag <tag>] [--sibling] [--limit <n>] [--json]
+pan memory search <query> [--project <id>] [--workspace <id>] [--issue <id>] [--tag <tag>] [--sibling] [--include-archived] [--limit <n>] [--json]
 pan memory status <issue> [--project <id>] [--json]
 pan memory reset <scope> <scopeId> --reason <text> [--project <id>] [--from <iso>] [--json]
 pan memory summary <issue> [--project <id>] [--date <yyyy-mm-dd>] [--json]
