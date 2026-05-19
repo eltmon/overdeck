@@ -730,13 +730,13 @@ function pruneCheckpointRefs(projectPath: string, issueLower: string): Effect.Ef
       const step = 'teardown:checkpoint-refs';
       const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
       const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
-      await pruneCheckpointRefsForAgents(projectPath, agentIds);
-      return stepOk(step, [`Pruned checkpoint refs for ${agentIds.join(', ')}`]);
+      const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
+      return stepOk(step, [`Pruned ${pruned} checkpoint ref(s) for ${agentIds.join(', ')}`]);
     },
     catch: (err) => err,
   }).pipe(
     Effect.catch((err) =>
-      Effect.succeed(stepSkipped('teardown:checkpoint-refs', [`Checkpoint prune failed (non-fatal): ${(err as Error).message}`])),
+      Effect.succeed(stepFailed('teardown:checkpoint-refs', `Checkpoint prune failed: ${(err as Error).message}`)),
     ),
   );
 }

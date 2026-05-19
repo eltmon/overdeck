@@ -55,6 +55,10 @@ function buildResult(
   };
 }
 
+function hasBlockingFailure(steps: StepResult[]): boolean {
+  return steps.some(s => !s.success && !s.skipped);
+}
+
 /**
  * approve() — Post-merge lifecycle.
  */
@@ -178,6 +182,10 @@ export function closeOut(
       deleteBranches: closeOutConfig?.delete_feature_branch ?? false,
     });
     allSteps.push(...teardownSteps);
+    if (hasBlockingFailure(teardownSteps)) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — teardown failed, tracker issue and review status preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start);
+    }
 
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
@@ -186,6 +194,10 @@ export function closeOut(
       applyLabel: true,
     });
     allSteps.push(...closeSteps);
+    if (hasBlockingFailure(closeSteps)) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — issue close failed, review status preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start);
+    }
 
     // 8. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);

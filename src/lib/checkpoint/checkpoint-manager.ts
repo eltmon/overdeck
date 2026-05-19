@@ -180,14 +180,11 @@ export async function hasCheckpoint(cwd: string, agentId: string, turnId: string
  */
 export async function deleteCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
-  try {
-    await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
-      cwd,
-      encoding: 'utf-8',
-    })
-  } catch {
-    // Best-effort: missing ref is tolerated
-  }
+  if (!(await hasCheckpoint(cwd, agentId, turnId))) return
+  await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
+    cwd,
+    encoding: 'utf-8',
+  })
 }
 
 /**
@@ -309,16 +306,10 @@ export async function getCheckpointTimestamp(cwd: string, agentId: string, turnI
  */
 export async function listCheckpoints(cwd: string, agentId: string): Promise<string[]> {
   assertSafeAgentId(agentId)
-  try {
-    // List only refs scoped to this agent: refs/pan/turn/<agentId>/<turnId>
-    // strip=4 removes the first 4 slash-delimited components, yielding just <turnId>
-    const { stdout } = await execFileAsync('git', [
-      'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
-    ], { cwd, encoding: 'utf-8' })
-    return stdout.split('\n').filter(Boolean).sort()
-  } catch {
-    return []
-  }
+  const { stdout } = await execFileAsync('git', [
+    'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
+  ], { cwd, encoding: 'utf-8' })
+  return stdout.split('\n').filter(Boolean).sort()
 }
 
 /**
@@ -339,18 +330,14 @@ export async function deleteAllCheckpoints(cwd: string, agentId: string): Promis
 export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string[]): Promise<number> {
   let totalRefs = 0
   for (const agentId of agentIds) {
-    try {
-      assertSafeAgentId(agentId)
-      const turns = await listCheckpoints(cwd, agentId)
-      if (turns.length === 0) continue
-      for (const turnId of turns) {
-        await deleteCheckpoint(cwd, agentId, turnId)
-      }
-      console.log(`[checkpoint] Pruned ${turns.length} ref(s) for agent ${agentId}`)
-      totalRefs += turns.length
-    } catch (err) {
-      console.warn(`[checkpoint] Could not prune refs for agent ${agentId}: ${err}`)
+    assertSafeAgentId(agentId)
+    const turns = await listCheckpoints(cwd, agentId)
+    if (turns.length === 0) continue
+    for (const turnId of turns) {
+      await deleteCheckpoint(cwd, agentId, turnId)
     }
+    console.log(`[checkpoint] Pruned ${turns.length} ref(s) for agent ${agentId}`)
+    totalRefs += turns.length
   }
   if (totalRefs === 0) {
     console.log(`[checkpoint] No checkpoint refs found for agents: ${agentIds.join(', ')}`)

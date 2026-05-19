@@ -11,8 +11,9 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockClearReviewStatus } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockClearReviewStatus: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -49,7 +50,7 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
-  clearReviewStatus: vi.fn(),
+  clearReviewStatus: mockClearReviewStatus,
 }));
 
 vi.mock('@linear/sdk', () => ({
@@ -91,6 +92,16 @@ function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
       edges: [],
     },
   };
+}
+
+function successfulTracker() {
+  return {
+    name: 'github',
+    transitionIssue: vi.fn().mockResolvedValue(undefined),
+    addComment: vi.fn().mockResolvedValue(undefined),
+    updateIssue: vi.fn().mockResolvedValue(undefined),
+    getIssue: vi.fn().mockResolvedValue(null),
+  } as any;
 }
 
 describe('workflows', () => {
@@ -201,7 +212,7 @@ describe('workflows', () => {
     it('should abort if archive fails', async () => {
       // Since there's no active PRD, it will skip — that's success
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       // Should complete without abort since skipped == success
       expect(result.steps.some(s => s.step === 'close-out:abort')).toBe(false);
@@ -212,7 +223,7 @@ describe('workflows', () => {
       mkdirSync(wsPath, { recursive: true });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeUndefined();
       expect(existsSync(wsPath)).toBe(true);
@@ -225,7 +236,7 @@ describe('workflows', () => {
       );
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
     });
@@ -268,14 +279,51 @@ describe('workflows', () => {
       writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')).toBeDefined();
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')).toBeDefined();
 
+      const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));
+      expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/agent-pan-100/'))).toBe(true);
+      expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/planning-pan-100/'))).toBe(true);
+
       const spec = findSpecByIssue(testDir, 'PAN-100');
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
+    });
+
+    it('should abort before closing the tracker issue when teardown fails', async () => {
+      mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+        if (command === 'git' && Array.isArray(args) && args.includes('for-each-ref')) {
+          throw new Error('ref storage unavailable');
+        }
+        return { stdout: '', stderr: '' };
+      });
+      const tracker = successfulTracker();
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
+      expect(result.steps.some(s => s.step.startsWith('close-issue:'))).toBe(false);
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
+      expect(tracker.transitionIssue).not.toHaveBeenCalled();
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('should preserve review status when tracker close fails', async () => {
+      const tracker = successfulTracker();
+      tracker.transitionIssue.mockRejectedValueOnce(new Error('tracker unavailable'));
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {

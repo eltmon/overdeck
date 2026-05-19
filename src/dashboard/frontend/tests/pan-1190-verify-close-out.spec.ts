@@ -2,7 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 
 const BASE_URL = 'http://127.0.0.1:3013';
 const ISSUE_ID = 'PAN-1190';
-const CACHE_KEY = 'pan-snapshot-cache-v1';
 
 const baseIssue = {
   id: ISSUE_ID,
@@ -18,13 +17,22 @@ const baseIssue = {
   source: 'github',
 };
 
-function snapshotFor(stage: 'ready' | 'verifying' | 'closed-out') {
+async function installMockTransport(page: Page) {
+  await page.addInitScript(() => {
+    (window as typeof window & { __pan1190Stage?: 'ready' | 'verifying' | 'closed-out' }).__pan1190Stage = 'ready';
+  });
+
+  await page.route('**/src/lib/wsTransport.ts*', route => route.fulfill({
+    contentType: 'application/javascript',
+    body: `
+const ISSUE_ID = '${ISSUE_ID}';
+const baseIssue = ${JSON.stringify(baseIssue)};
+function snapshotFor(stage) {
   const issue = stage === 'ready'
     ? { ...baseIssue, status: 'In Review', state: 'in_review', labels: ['review ready'] }
     : stage === 'verifying'
       ? { ...baseIssue, status: 'Verifying On Main', state: 'verifying_on_main', labels: ['verifying-on-main'] }
       : { ...baseIssue, status: 'Done', state: 'done', labels: ['closed-out'] };
-
   return {
     sequence: stage === 'ready' ? 1 : stage === 'verifying' ? 2 : 3,
     agents: [],
@@ -35,14 +43,23 @@ function snapshotFor(stage: 'ready' | 'verifying' | 'closed-out') {
         : { issueId: ISSUE_ID, reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false, updatedAt: '2026-05-18T00:01:00.000Z' },
     ],
     issues: [issue],
+    channelPermissionRequests: [],
     timestamp: new Date().toISOString(),
   };
 }
-
-async function installSnapshot(page: Page, stage: 'ready' | 'verifying' | 'closed-out') {
-  await page.evaluate(({ key, snapshot }) => {
-    localStorage.setItem(key, JSON.stringify({ data: snapshot, timestamp: new Date().toISOString() }));
-  }, { key: CACHE_KEY, snapshot: snapshotFor(stage) });
+const transport = {
+  request: async () => snapshotFor(window.__pan1190Stage || 'ready'),
+  requestStream: async () => undefined,
+  subscribe: () => () => undefined,
+  dispose: () => undefined,
+};
+export function getTransport() { return transport; }
+export function resetTransport() {}
+export function ensureDashboardSession() { return Promise.resolve(); }
+export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json', 'x-panopticon-csrf-token': 'test-csrf' }; }
+export class WsTransport {}
+`,
+  }));
 }
 
 async function routeDashboardApis(page: Page) {
@@ -90,8 +107,18 @@ async function routeDashboardApis(page: Page) {
     topSpenders: { agents: [], issues: [] },
   } }));
   await page.route('**/api/registered-projects', route => route.fulfill({ json: [] }));
-  await page.route('**/api/issues/**/merge', route => route.fulfill({ json: { success: true } }));
-  await page.route('**/api/issues/**/close-out', route => route.fulfill({ json: { workflow: 'close-out', issueId: ISSUE_ID, success: true, steps: [], duration: 1 } }));
+  await page.route('**/api/issues/**/merge', async route => {
+    await page.evaluate(() => {
+      (window as typeof window & { __pan1190Stage?: string }).__pan1190Stage = 'verifying';
+    });
+    await route.fulfill({ json: { success: true } });
+  });
+  await page.route('**/api/issues/**/close-out', async route => {
+    await page.evaluate(() => {
+      (window as typeof window & { __pan1190Stage?: string }).__pan1190Stage = 'closed-out';
+    });
+    await route.fulfill({ json: { workflow: 'close-out', issueId: ISSUE_ID, success: true, steps: [], duration: 1 } });
+  });
   await page.route('**/api/version', route => route.fulfill({ json: { version: 'test' } }));
   await page.route('**/api/tracker-status', route => route.fulfill({ json: { primary: 'github', configured: [] } }));
   await page.route('**/api/cliproxy/status', route => route.fulfill({ json: { running: true, pid: 1234, checkedAt: new Date().toISOString() } }));
@@ -107,27 +134,19 @@ async function routeDashboardApis(page: Page) {
 test.describe('PAN-1190 verify then close-out flow', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('drives merge to VERIFYING, then closes out and removes the issue from the board', async ({ page }) => {
+  test('drives merge to VERIFYING, then closes out and removes the issue from the board without reload', async ({ page }) => {
+    await installMockTransport(page);
     await routeDashboardApis(page);
 
     await page.goto(`${BASE_URL}/`);
-    await installSnapshot(page, 'ready');
-    await page.reload();
     await expect(page.getByText(ISSUE_ID)).toBeVisible();
     await page.getByTestId(`issue-card-${ISSUE_ID}`).getByRole('button', { name: 'Merge' }).click();
     await page.getByRole('button', { name: 'Merge' }).last().click();
-    await expect(page.getByText(ISSUE_ID)).toBeVisible();
-
-    await installSnapshot(page, 'verifying');
-    await page.reload();
     await expect(page.getByTestId('verifying-on-main-badge')).toBeVisible();
     await expect(page.getByTestId(`close-out-${ISSUE_ID}`)).toBeVisible();
 
     await page.getByTestId(`close-out-${ISSUE_ID}`).click();
     await page.getByRole('button', { name: 'Close Out' }).last().click();
-
-    await installSnapshot(page, 'closed-out');
-    await page.reload();
     await expect(page.getByText(ISSUE_ID)).toHaveCount(0);
   });
 });
