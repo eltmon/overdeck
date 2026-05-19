@@ -104,6 +104,7 @@ export function recordExtractionCost(input: {
     agentId: input.identity.sessionId,
     issueId: input.identity.issueId,
     sessionType: 'memory-extraction',
+    source: 'memory-extraction',
     provider: input.provider,
     model: input.model,
     input: input.usage.input,

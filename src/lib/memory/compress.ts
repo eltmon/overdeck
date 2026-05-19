@@ -1,6 +1,7 @@
 import { open } from 'fs/promises';
 
 const MAX_USER_CHARS = 40_000;
+export const MAX_TRANSCRIPT_DELTA_BYTES = 1024 * 1024;
 
 export interface CompressTranscriptDeltaInput {
   transcriptPath: string;
@@ -30,14 +31,18 @@ interface ToolUseBlock {
 }
 
 export async function compressTranscriptDelta(input: CompressTranscriptDeltaInput): Promise<CompressedTranscriptDelta> {
-  const length = Math.max(0, input.toOffset - input.fromOffset);
+  const length = Math.min(Math.max(0, input.toOffset - input.fromOffset), MAX_TRANSCRIPT_DELTA_BYTES);
   if (length === 0) return { text: '', eventsConsumed: 0, lastFullLineOffset: input.fromOffset };
 
   const file = await open(input.transcriptPath, 'r');
   try {
-    const buffer = Buffer.alloc(length);
+    const buffer = Buffer.allocUnsafe(length);
     const { bytesRead } = await file.read(buffer, 0, length, input.fromOffset);
-    return compressJsonlBuffer(buffer.subarray(0, bytesRead).toString('utf8'), input.fromOffset);
+    const result = compressJsonlBuffer(buffer.subarray(0, bytesRead).toString('utf8'), input.fromOffset);
+    if (result.lastFullLineOffset === input.fromOffset && bytesRead === MAX_TRANSCRIPT_DELTA_BYTES) {
+      return { ...result, lastFullLineOffset: input.fromOffset + bytesRead };
+    }
+    return result;
   } finally {
     await file.close();
   }
@@ -48,11 +53,15 @@ export function compressJsonlBuffer(buffer: string, fromOffset = 0): CompressedT
   if (lastNewline === -1) return { text: '', eventsConsumed: 0, lastFullLineOffset: fromOffset };
 
   const complete = buffer.slice(0, lastNewline + 1);
-  const lines = complete.split('\n').filter((line) => line.trim().length > 0);
   const parts: string[] = [];
   let eventsConsumed = 0;
 
-  for (const line of lines) {
+  let start = 0;
+  for (let index = 0; index < complete.length; index++) {
+    if (complete[index] !== '\n') continue;
+    const line = complete.slice(start, index);
+    start = index + 1;
+    if (line.trim().length === 0) continue;
     let entry: TranscriptEntry;
     try {
       entry = JSON.parse(line) as TranscriptEntry;

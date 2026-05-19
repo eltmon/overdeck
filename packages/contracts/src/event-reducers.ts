@@ -48,6 +48,7 @@ export interface MemoryRollupTriggerSnapshot {
   workspaceId: string
   issueId: string
   pendingTurns: PendingTurn[]
+  pendingCount: number
   threshold: number
   triggeredAt: string
 }
@@ -780,17 +781,19 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         projectId: event.payload.projectId,
         workspaceId: event.payload.workspaceId,
         issueId: event.payload.issueId,
-        pendingTurns: [...event.payload.pendingTurns],
+        pendingTurns: [],
+        pendingCount: event.payload.pendingTurns.length,
         threshold: event.payload.threshold,
         triggeredAt: event.timestamp,
       }
       const existing = state.rollupsByIssueId[event.payload.issueId] ?? []
+      const updated = [...existing, trigger].slice(-10)
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         rollupsByIssueId: {
           ...state.rollupsByIssueId,
-          [event.payload.issueId]: [...existing, trigger],
+          [event.payload.issueId]: updated,
         },
       }
     }

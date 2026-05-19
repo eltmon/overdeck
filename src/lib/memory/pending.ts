@@ -3,6 +3,7 @@ import { readdir, readFile, rename, writeFile } from 'fs/promises';
 import type { MemoryIdentity, PendingTurn } from '@panctl/contracts';
 import { ensureDir, resolvePendingDir } from './paths.js';
 import { getMemoryRollupPendingThreshold } from './settings.js';
+import { updateMemoryHealth } from './health.js';
 
 export interface WritePendingTurnResult {
   path: string;
@@ -16,6 +17,7 @@ export interface StatusRollupJob {
 }
 
 export type EnqueueStatusRollup = (job: StatusRollupJob) => void | Promise<void>;
+export type StatusRollupProcessor = (job: StatusRollupJob) => Promise<void>;
 
 export interface StatusRollupTriggerOptions {
   enqueueStatusRollup?: EnqueueStatusRollup;
@@ -29,6 +31,7 @@ export type StatusRollupTriggerResult =
   | { status: 'collapsed'; pendingCount: number; threshold: number };
 
 let configuredStatusRollupEnqueuer: EnqueueStatusRollup | undefined;
+let configuredStatusRollupProcessor: StatusRollupProcessor | undefined;
 const inFlightRollups = new Set<string>();
 
 export function setStatusRollupEnqueuer(enqueue: EnqueueStatusRollup | undefined): () => void {
@@ -36,6 +39,14 @@ export function setStatusRollupEnqueuer(enqueue: EnqueueStatusRollup | undefined
   configuredStatusRollupEnqueuer = enqueue;
   return () => {
     configuredStatusRollupEnqueuer = previous;
+  };
+}
+
+export function setStatusRollupProcessor(processor: StatusRollupProcessor | undefined): () => void {
+  const previous = configuredStatusRollupProcessor;
+  configuredStatusRollupProcessor = processor;
+  return () => {
+    configuredStatusRollupProcessor = previous;
   };
 }
 
@@ -108,7 +119,13 @@ export function pendingTurnFileName(turn: Pick<PendingTurn, 'createdAt' | 'ident
 }
 
 async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
+  if (configuredStatusRollupProcessor) {
+    await configuredStatusRollupProcessor(job);
+    return;
+  }
+
   const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  const { synthesizeStatusRollup, commitStatusRollup } = await import('./rollup.js');
   const store = await initEventStore();
   await store.appendAsync({
     type: 'memory.rollup_triggered',
@@ -120,6 +137,30 @@ async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
       pendingTurns: job.pendingTurns,
       threshold: job.threshold,
     },
+  });
+
+  const identity = job.pendingTurns[0]?.identity;
+  const result = await synthesizeStatusRollup({
+    projectId: job.identity.projectId,
+    issueId: job.identity.issueId,
+    pendingTurns: job.pendingTurns,
+    identity,
+  });
+  if (result.status !== 'synthesized') {
+    if (identity) {
+      await updateMemoryHealth(identity, {
+        status: result.status === 'skipped' ? 'degraded' : 'failing',
+        reason: result.reason,
+        success: false,
+      });
+    }
+    return;
+  }
+
+  await commitStatusRollup({
+    identity: job.identity,
+    status: result.memoryStatus,
+    pendingTurns: job.pendingTurns,
   });
 }
 

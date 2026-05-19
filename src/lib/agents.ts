@@ -2618,7 +2618,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Write prompt to file for complex prompts (avoids shell escaping issues)
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   if (prompt) {
-    writeFileSync(promptFile, prompt);
+    await writeFileAsync(promptFile, prompt);
   }
 
   // Auto-setup hooks if not configured

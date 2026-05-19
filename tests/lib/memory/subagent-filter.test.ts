@@ -48,6 +48,7 @@ describe('memory subagent filter', () => {
         updatedAt: '2026-05-16T23:00:00.000Z',
       }),
       getTranscriptSize: async () => 120,
+      resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
       enqueuePipeline,
     });
 
@@ -84,6 +85,56 @@ describe('memory subagent filter', () => {
     expect(enqueuePipeline).not.toHaveBeenCalled();
   });
 
+  it('rejects primary-agent turn hooks when the supplied transcript path is not trusted', async () => {
+    const enqueuePipeline = vi.fn();
+
+    const result = await handleMemoryTurnBody({
+      session_id: 'session-1',
+      transcript_path: '/tmp/attacker.jsonl',
+      stop_hook_active: true,
+    }, {
+      resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
+      enqueuePipeline,
+    });
+
+    expect(result).toEqual({
+      status: 'error',
+      statusCode: 422,
+      error: 'transcript path could not be verified',
+    });
+    expect(enqueuePipeline).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe caller-supplied identity path segments before enqueueing', async () => {
+    const enqueuePipeline = vi.fn();
+
+    const result = await handleMemoryTurnBody({
+      session_id: 'session-1',
+      transcript_path: '/tmp/session-1.jsonl',
+      stop_hook_active: true,
+      identity: {
+        projectId: '../outside',
+        workspaceId: 'feature-pan-1052',
+        issueId: 'PAN-1052',
+        runId: 'run-1',
+        agentRole: 'work',
+        agentHarness: 'claude-code',
+      },
+    }, {
+      resolveIdentity: async () => null,
+      getTranscriptSize: async () => 120,
+      resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
+      enqueuePipeline,
+    });
+
+    expect(result).toEqual({
+      status: 'error',
+      statusCode: 422,
+      error: 'memory identity could not be resolved',
+    });
+    expect(enqueuePipeline).not.toHaveBeenCalled();
+  });
+
   it('returns 422 when primary-agent turn identity cannot be resolved', async () => {
     const result = await handleMemoryTurnBody({
       session_id: 'session-1',
@@ -92,6 +143,7 @@ describe('memory subagent filter', () => {
     }, {
       resolveIdentity: async () => null,
       getTranscriptSize: async () => 120,
+      resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
       enqueuePipeline: vi.fn(),
     });
 
@@ -133,6 +185,7 @@ describe('memory subagent filter', () => {
       },
     }, {
       statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
+      resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
       registerTranscript,
     });
 

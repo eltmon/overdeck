@@ -71,7 +71,7 @@ export async function extractWithProviderPolicy<T>(
 export function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): number {
   const events = queryCostEvents({ issueId: identity.issueId, startTs: startOfLocalDayIso() });
   return events
-    .filter((event) => event.sessionType === 'memory-extraction')
+    .filter((event) => event.source === 'memory-extraction')
     .reduce((sum, event) => sum + event.cost, 0);
 }
 

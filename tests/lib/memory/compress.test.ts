@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { compressJsonlBuffer, compressTranscriptDelta } from '../../../src/lib/memory/compress.js';
+import { compressJsonlBuffer, compressTranscriptDelta, MAX_TRANSCRIPT_DELTA_BYTES } from '../../../src/lib/memory/compress.js';
 
 let tempDir: string | null = null;
 
@@ -62,6 +62,24 @@ describe('compressTranscriptDelta', () => {
     expect(result.text).toBe('U: complete');
     expect(result.eventsConsumed).toBe(1);
     expect(result.lastFullLineOffset).toBe(100 + Buffer.byteLength(fullLine, 'utf8'));
+  });
+
+  it('limits transcript delta reads to a bounded slice and advances the checkpoint for oversized partial chunks', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-compress-'));
+    const transcriptPath = join(tempDir, 'session.jsonl');
+    await writeFile(transcriptPath, 'x'.repeat(MAX_TRANSCRIPT_DELTA_BYTES + 100), 'utf8');
+
+    const result = await compressTranscriptDelta({
+      transcriptPath,
+      fromOffset: 0,
+      toOffset: MAX_TRANSCRIPT_DELTA_BYTES + 100,
+    });
+
+    expect(result).toEqual({
+      text: '',
+      eventsConsumed: 0,
+      lastFullLineOffset: MAX_TRANSCRIPT_DELTA_BYTES,
+    });
   });
 
   it('returns no events when the range contains only a partial line', () => {

@@ -147,6 +147,29 @@ describe('observation writer', () => {
     expect(JSON.parse(indexedJson)).toEqual(entry);
   });
 
+  it('serializes concurrent JSONL appends and indexes each observation at its own byte offset', async () => {
+    const entries = Array.from({ length: 5 }, (_, index) => observation({
+      id: `obs-${index}`,
+      actionStatus: `Concurrent ${index}`,
+      summary: `Concurrent summary ${index}.`,
+    }));
+
+    const results = await Promise.all(entries.map((entry) => writeObservation(entry)));
+    const jsonlPath = results[0].jsonlPath;
+    const raw = await readFile(jsonlPath, 'utf8');
+
+    for (const entry of entries) {
+      const indexRow = await withMemoryFtsDatabase(entry.projectId, (db) => db.prepare(`
+        SELECT observation_path_jsonl, byte_offset
+        FROM observation_index
+        WHERE id = ?
+      `).get(entry.id) as { observation_path_jsonl: string; byte_offset: number });
+      expect(indexRow.observation_path_jsonl).toBe(jsonlPath);
+      const indexedJson = raw.slice(indexRow.byte_offset).split('\n')[0];
+      expect(JSON.parse(indexedJson)).toEqual(entry);
+    }
+  });
+
   it('does not block JSONL writes when FTS indexing fails and records health', async () => {
     const entry = observation();
     const result = await writeObservation(entry, {

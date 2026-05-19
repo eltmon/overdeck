@@ -8,6 +8,7 @@ import {
   pendingTurnFileName,
   readPendingTurns,
   setStatusRollupEnqueuer,
+  setStatusRollupProcessor,
   writePendingTurn,
   type StatusRollupJob,
 } from '../../../src/lib/memory/pending.js';
@@ -16,6 +17,7 @@ import { loadMemorySettings } from '../../../src/lib/memory/settings.js';
 let tempDir: string | null = null;
 let originalHome: string | undefined;
 let restoreEnqueuer: (() => void) | null = null;
+let restoreProcessor: (() => void) | null = null;
 
 const identity = {
   projectId: 'panopticon-cli',
@@ -58,6 +60,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  restoreProcessor?.();
+  restoreProcessor = null;
   restoreEnqueuer?.();
   restoreEnqueuer = null;
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
@@ -113,6 +117,25 @@ describe('pending turn writer', () => {
       'session-c',
       'session-d',
     ]);
+  });
+
+  it('runs the default rollup processor before clearing the in-flight key', async () => {
+    const processed: StatusRollupJob[] = [];
+    restoreProcessor = setStatusRollupProcessor(async (job) => {
+      processed.push(job);
+    });
+
+    await writePendingTurn(turnForSession('session-a', 1), { loadThreshold: () => 2 });
+    await writePendingTurn(turnForSession('session-b', 2), { loadThreshold: () => 2 });
+
+    expect(processed).toHaveLength(1);
+    expect(processed[0]?.pendingTurns.map((turn) => turn.identity.sessionId)).toEqual(['session-a', 'session-b']);
+    expect(await maybeTriggerStatusRollup(identity, { loadThreshold: () => 2 })).toEqual({
+      status: 'triggered',
+      pendingCount: 2,
+      threshold: 2,
+    });
+    expect(processed).toHaveLength(2);
   });
 
   it('collapses concurrent triggers to one in-flight rollup per workspace', async () => {

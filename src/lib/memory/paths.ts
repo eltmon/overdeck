@@ -1,13 +1,36 @@
 import { mkdir } from 'fs/promises';
-import { dirname, join } from 'path';
+import { dirname, join, resolve, relative, isAbsolute } from 'path';
 import { getPanopticonHome } from '../paths.js';
 
+const SAFE_SEGMENT = /^[A-Za-z0-9._-]{1,128}$/;
+
+export function assertMemorySafeSegment(value: string, field: string): string {
+  if (!SAFE_SEGMENT.test(value) || value === '.' || value === '..') {
+    throw new Error(`Invalid memory ${field}`);
+  }
+  return value;
+}
+
+export function resolveMemoryBase(): string {
+  return resolve(getPanopticonHome(), 'memory');
+}
+
+export function assertUnderMemoryBase(path: string): string {
+  const base = resolveMemoryBase();
+  const resolved = resolve(path);
+  const rel = relative(base, resolved);
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) return resolved;
+  throw new Error('Resolved memory path escapes memory base');
+}
+
 export function resolveMemoryRoot(projectId: string): string {
-  return join(getPanopticonHome(), 'memory', projectId);
+  const path = join(resolveMemoryBase(), assertMemorySafeSegment(projectId, 'projectId'));
+  return assertUnderMemoryBase(path);
 }
 
 export function resolveIssueMemoryRoot(projectId: string, issueId: string): string {
-  return join(resolveMemoryRoot(projectId), issueId);
+  const path = join(resolveMemoryRoot(projectId), assertMemorySafeSegment(issueId, 'issueId'));
+  return assertUnderMemoryBase(path);
 }
 
 export function resolveObservationsFile(projectId: string, issueId: string, date: string | Date | number): string {

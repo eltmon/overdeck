@@ -24,7 +24,16 @@ const QUERY_EXPANSION_JSON_SCHEMA = {
   },
 };
 
-const expansionCache = new Map<string, QueryExpansionResult>();
+const QUERY_EXPANSION_CACHE_MAX_ENTRIES = 500;
+const QUERY_EXPANSION_CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface CachedQueryExpansionResult {
+  result: QueryExpansionResult;
+  sessionId: string;
+  expiresAt: number;
+}
+
+const expansionCache = new Map<string, CachedQueryExpansionResult>();
 
 export interface QueryExpansionInput {
   prompt: string;
@@ -65,7 +74,7 @@ export interface QueryExpansionLogEntry {
 
 export async function expandMemoryQuery(input: QueryExpansionInput): Promise<QueryExpansionResult> {
   const cacheKey = buildQueryExpansionCacheKey(input);
-  const cached = expansionCache.get(cacheKey);
+  const cached = getCachedExpansion(cacheKey, input.now ?? new Date());
   if (cached) {
     const result: QueryExpansionResult = { ...cached, status: 'cache-hit' };
     await logQueryExpansion(input, result);
@@ -98,7 +107,7 @@ export async function expandMemoryQuery(input: QueryExpansionInput): Promise<Que
       status: 'expanded',
       reason: null,
     };
-    expansionCache.set(cacheKey, result);
+    setCachedExpansion(cacheKey, input.identity.sessionId, result, input.now ?? new Date());
     await logQueryExpansion(input, result);
     return result;
   } catch {
@@ -143,8 +152,39 @@ export function buildQueryExpansionCacheKey(input: Pick<QueryExpansionInput, 'pr
   return `${input.identity.sessionId}:${createHash('sha256').update(content).digest('hex')}`;
 }
 
-export function clearQueryExpansionCache(): void {
-  expansionCache.clear();
+export function clearQueryExpansionCache(sessionId?: string): void {
+  if (!sessionId) {
+    expansionCache.clear();
+    return;
+  }
+  for (const [key, cached] of expansionCache.entries()) {
+    if (cached.sessionId === sessionId) expansionCache.delete(key);
+  }
+}
+
+function getCachedExpansion(cacheKey: string, now: Date): QueryExpansionResult | null {
+  const cached = expansionCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= now.getTime()) {
+    expansionCache.delete(cacheKey);
+    return null;
+  }
+  expansionCache.delete(cacheKey);
+  expansionCache.set(cacheKey, cached);
+  return cached.result;
+}
+
+function setCachedExpansion(cacheKey: string, sessionId: string, result: QueryExpansionResult, now: Date): void {
+  expansionCache.set(cacheKey, {
+    result,
+    sessionId,
+    expiresAt: now.getTime() + QUERY_EXPANSION_CACHE_TTL_MS,
+  });
+  while (expansionCache.size > QUERY_EXPANSION_CACHE_MAX_ENTRIES) {
+    const oldest = expansionCache.keys().next().value;
+    if (!oldest) break;
+    expansionCache.delete(oldest);
+  }
 }
 
 async function fallback(

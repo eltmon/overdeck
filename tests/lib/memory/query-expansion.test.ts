@@ -133,6 +133,39 @@ describe('memory query expansion', () => {
     ]);
   });
 
+  it('evicts cached expansions by session and TTL', async () => {
+    let calls = 0;
+    const expand: QueryExpansionCall = async () => {
+      calls += 1;
+      return extracted({ terms: ['provider registry', 'Anthropic SDK', 'cliproxy memory'] });
+    };
+
+    await expandMemoryQuery({
+      prompt: 'find provider work',
+      identity,
+      now: new Date('2026-05-16T20:00:00.000Z'),
+      id: 'run-1',
+      expand,
+    });
+    clearQueryExpansionCache(identity.sessionId);
+    await expandMemoryQuery({
+      prompt: 'find provider work',
+      identity,
+      now: new Date('2026-05-16T20:01:00.000Z'),
+      id: 'run-2',
+      expand,
+    });
+    await expandMemoryQuery({
+      prompt: 'find provider work',
+      identity,
+      now: new Date('2026-05-16T20:32:00.000Z'),
+      id: 'run-3',
+      expand,
+    });
+
+    expect(calls).toBe(3);
+  });
+
   it('falls back to the raw prompt and logs expansion-failed when the provider fails', async () => {
     const result = await expandMemoryQuery({
       prompt: 'raw search text',

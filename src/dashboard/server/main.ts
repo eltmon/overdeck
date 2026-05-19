@@ -39,6 +39,7 @@ import { cleanupOrphanedConversationAttachments } from './services/conversation-
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
 import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../lib/memory/reconciliation.js';
+import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 
 declare const Bun: unknown;
 
@@ -345,6 +346,10 @@ void (async () => {
       if (agentId) {
         void reconcileAgentMemory(agentId).catch(err => console.warn('[memory-reconciliation] agent sweep failed:', err?.message ?? err));
       }
+      const sessionId = typeof (event.payload as { sessionId?: unknown }).sessionId === 'string'
+        ? (event.payload as { sessionId: string }).sessionId
+        : null;
+      if (sessionId) clearQueryExpansionCache(sessionId);
     }
     if (event.type === 'agent.started' || event.type === 'agent.stopped') {
       void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] lifecycle registry sync failed:', err?.message ?? err));

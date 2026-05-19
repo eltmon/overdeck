@@ -6,6 +6,8 @@ import { ensureParentDir, resolveObservationsFile } from './paths.js';
 import { withMemoryFtsDatabase } from './fts-db.js';
 import { updateMemoryHealth } from './health.js';
 
+const appendLocks = new Map<string, Promise<void>>();
+
 export interface WriteObservationResult {
   jsonlPath: string;
   markdownPath: string;
@@ -21,18 +23,19 @@ export async function writeObservation(observation: MemoryObservation, options: 
   const markdownPath = observationMarkdownPath(observation);
 
   await ensureParentDir(jsonlPath);
-  const byteOffset = await appendJsonl(jsonlPath, observation);
+  await withAppendLock(jsonlPath, async () => {
+    const byteOffset = await appendJsonl(jsonlPath, observation);
+    try {
+      await (options.indexObservation ?? indexObservation)(observation, jsonlPath, byteOffset);
+    } catch {
+      await (options.updateHealth ?? updateMemoryHealth)(observation, {
+        status: 'degraded',
+        reason: 'fts-index-failed',
+        success: false,
+      });
+    }
+  });
   await upsertObservationMarkdown(markdownPath, observation);
-
-  try {
-    await (options.indexObservation ?? indexObservation)(observation, jsonlPath, byteOffset);
-  } catch {
-    await (options.updateHealth ?? updateMemoryHealth)(observation, {
-      status: 'degraded',
-      reason: 'fts-index-failed',
-      success: false,
-    });
-  }
 
   return { jsonlPath, markdownPath };
 }
@@ -57,6 +60,21 @@ async function appendJsonl(jsonlPath: string, observation: MemoryObservation): P
     return size;
   } finally {
     await handle.close();
+  }
+}
+
+async function withAppendLock<T>(jsonlPath: string, task: () => Promise<T>): Promise<T> {
+  const previous = appendLocks.get(jsonlPath) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const chained = previous.then(() => current, () => current);
+  appendLocks.set(jsonlPath, chained);
+  await previous.catch(() => undefined);
+  try {
+    return await task();
+  } finally {
+    release();
+    if (appendLocks.get(jsonlPath) === chained) appendLocks.delete(jsonlPath);
   }
 }
 

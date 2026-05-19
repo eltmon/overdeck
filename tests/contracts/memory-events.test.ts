@@ -110,7 +110,8 @@ describe('memory DomainEvent contracts', () => {
       projectId: identity.projectId,
       workspaceId: identity.workspaceId,
       issueId: identity.issueId,
-      pendingTurns: [pendingTurn],
+      pendingTurns: [],
+      pendingCount: 1,
       threshold: 4,
       triggeredAt: TS,
     }])
@@ -156,6 +157,7 @@ describe('memory DomainEvent contracts', () => {
             workspaceId: identity.workspaceId,
             issueId: identity.issueId,
             pendingTurns: [pendingTurn],
+            pendingCount: 1,
             threshold: 4,
             triggeredAt: TS,
           }],

@@ -142,6 +142,9 @@ function upsertHook(hooks: Record<string, HookEntry[]>, hookType: string, comman
 
 function memoryHookScript(): string {
   return `#!/usr/bin/env node
+const { existsSync, readFileSync } = require('node:fs');
+const { homedir } = require('node:os');
+const { join } = require('node:path');
 const endpoint = process.argv[2];
 const baseUrl = process.env.PANOPTICON_DASHBOARD_URL || 'http://localhost:3011';
 const chunks = [];
@@ -179,13 +182,19 @@ async function post(path, body, timeoutMs) {
   try {
     return await fetch(baseUrl + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-panopticon-internal-token': internalToken() },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
   } finally {
     clearTimeout(timer);
   }
+}
+function internalToken() {
+  if (process.env.PANOPTICON_INTERNAL_TOKEN) return process.env.PANOPTICON_INTERNAL_TOKEN;
+  const path = join(process.env.PANOPTICON_HOME || join(homedir(), '.panopticon'), 'internal-token');
+  if (!existsSync(path)) return '';
+  return readFileSync(path, 'utf8').trim();
 }
 `;
 }

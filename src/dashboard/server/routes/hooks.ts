@@ -12,7 +12,7 @@
  */
 
 import { stat } from 'fs/promises';
-import { basename, dirname } from 'path';
+import { basename, dirname, resolve } from 'path';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { Effect, Layer, Result, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -20,6 +20,9 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
 import { getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync, type AgentState } from '../../../lib/agents.js';
+import { sessionFilePath } from '../../../lib/paths.js';
+import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
+import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
 import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
@@ -61,6 +64,7 @@ export interface HandleMemoryTurnBodyOptions {
   getTranscriptSize?: (transcriptPath: string) => Promise<number>;
   enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
+  resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
 }
 
 export interface HandleMemorySessionStartBodyOptions {
@@ -68,6 +72,7 @@ export interface HandleMemorySessionStartBodyOptions {
   statTranscript?: (transcriptPath: string) => Promise<{ size: number; mtimeMs: number }>;
   registerTranscript?: typeof registerTranscriptForPolling;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
+  resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
 }
 
 export type HandleMemoryTurnBodyResult =
@@ -106,6 +111,11 @@ export async function handleMemoryTurnBody(
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
 
+  const trustedTranscriptPath = await (options.resolveTranscriptPath ?? resolveTrustedTranscriptPath)(body, sessionId);
+  if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
+    return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
+  }
+
   const identity = parseMemoryIdentity(payload.identity, sessionId)
     ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
   if (!identity) {
@@ -117,11 +127,11 @@ export async function handleMemoryTurnBody(
     : (options.getTranscriptCheckpoint ?? getTranscriptCheckpoint)(sessionId)?.lastOffset ?? 0;
   const toOffset = validOffset(payload.to_offset)
     ? payload.to_offset
-    : await (options.getTranscriptSize ?? getTranscriptSize)(transcriptPath);
+    : await (options.getTranscriptSize ?? getTranscriptSize)(trustedTranscriptPath);
 
   const pipelineInput: ExtractFromTranscriptDeltaInput = {
     sessionId,
-    transcriptPath,
+    transcriptPath: trustedTranscriptPath,
     fromOffset,
     toOffset,
     identity,
@@ -152,17 +162,22 @@ export async function handleMemorySessionStartBody(
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
 
+  const trustedTranscriptPath = await (options.resolveTranscriptPath ?? resolveTrustedTranscriptPath)(body, sessionId);
+  if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
+    return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
+  }
+
   const identity = parseMemoryIdentity(payload.identity, sessionId)
     ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
   if (!identity) {
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
 
-  const fileStat = await (options.statTranscript ?? getTranscriptStat)(transcriptPath);
+  const fileStat = await (options.statTranscript ?? getTranscriptStat)(trustedTranscriptPath);
   (options.registerTranscript ?? registerTranscriptForPolling)({
     agentId: stringField(body.agentId) ?? stringField(body.agent_id) ?? identity.runId,
     sessionId,
-    transcriptPath,
+    transcriptPath: trustedTranscriptPath,
     identity,
     harness: identity.agentHarness,
     size: fileStat.size,
@@ -209,6 +224,7 @@ const postMemoryInjectRoute = HttpRouter.add(
   '/api/memory/inject',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    if (!hasDashboardInternalToken(request)) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
     const rawBody = yield* request.text;
 
     let body: Record<string, unknown>;
@@ -229,6 +245,7 @@ const postMemorySessionStartRoute = HttpRouter.add(
   '/api/memory/session/start',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    if (!hasDashboardInternalToken(request)) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
     const rawBody = yield* request.text;
 
     let body: Record<string, unknown>;
@@ -251,6 +268,7 @@ const postMemoryTurnRoute = HttpRouter.add(
   '/api/memory/turn',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    if (!hasDashboardInternalToken(request)) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
     const rawBody = yield* request.text;
 
     let body: Record<string, unknown>;
@@ -324,20 +342,19 @@ export const hooksRouteLayer = Layer.mergeAll(
 function parseMemoryIdentity(value: unknown, sessionId: string): MemoryIdentity | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const identity = value as Record<string, unknown>;
-  const projectId = stringField(identity.projectId);
-  const workspaceId = stringField(identity.workspaceId);
-  const issueId = stringField(identity.issueId);
-  const runId = stringField(identity.runId);
+  const projectId = safeIdentityField(identity.projectId, 'projectId');
+  const workspaceId = safeIdentityField(identity.workspaceId, 'workspaceId');
+  const issueId = safeIdentityField(identity.issueId, 'issueId');
+  const runId = safeIdentityField(identity.runId, 'runId');
   const agentRole = stringField(identity.agentRole);
-  const agentHarness = stringField(identity.agentHarness);
+  const agentHarness = safeIdentityField(identity.agentHarness, 'agentHarness');
   if (!projectId || !workspaceId || !issueId || !runId || !agentRole || !agentHarness) return null;
   if (!isRole(agentRole)) return null;
   return { projectId, workspaceId, issueId, runId, sessionId, agentRole, agentHarness };
 }
 
 async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: string): Promise<MemoryIdentity | null> {
-  const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
-  const state = agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId);
+  const state = await resolveAgentState(body, sessionId);
   if (!state) return null;
   return {
     projectId: inferProjectId(state.workspace),
@@ -348,6 +365,16 @@ async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: s
     agentRole: state.role,
     agentHarness: state.harness ?? 'claude-code',
   };
+}
+
+async function resolveTrustedTranscriptPath(body: Record<string, unknown>, sessionId: string): Promise<string | null> {
+  const state = await resolveAgentState(body, sessionId);
+  return state ? resolve(sessionFilePath(state.workspace, sessionId)) : null;
+}
+
+async function resolveAgentState(body: Record<string, unknown>, sessionId: string): Promise<AgentState | null> {
+  const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
+  return agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId);
 }
 
 async function findAgentStateBySessionId(sessionId: string): Promise<AgentState | null> {
@@ -384,6 +411,16 @@ function enqueueMemoryTurnPipeline(input: ExtractFromTranscriptDeltaInput): void
 
 function stringField(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function safeIdentityField(value: unknown, field: string): string | null {
+  const stringValue = stringField(value);
+  if (!stringValue) return null;
+  try {
+    return assertMemorySafeSegment(stringValue, field);
+  } catch {
+    return null;
+  }
 }
 
 function isRole(value: string): value is MemoryIdentity['agentRole'] {

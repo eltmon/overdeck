@@ -116,6 +116,47 @@ describe('memory extraction worker pool', () => {
     expect(maxActive).toBe(2);
   });
 
+  it('drops oldest queued extraction jobs when the queue limit is reached', async () => {
+    const releases: Array<() => void> = [];
+    const results: MemoryExtractionJobResult[] = [];
+    const pool = new MemoryExtractionWorkerPool({
+      loadConcurrency: () => 1,
+      queueLimit: 2,
+      writeObservation: vi.fn(async (observation: MemoryObservation) => ({ jsonlPath: `${observation.id}.jsonl`, markdownPath: `${observation.id}.md` })),
+      updateHealth: vi.fn(async () => undefined),
+      onResult: (result) => results.push(result),
+    });
+
+    pool.enqueue(job({
+      jobId: 'job-0',
+      extract: async () => {
+        await new Promise<void>((resolve) => releases.push(resolve));
+        return extracted(validPayload(0));
+      },
+    }));
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+
+    for (let index = 1; index < 4; index++) {
+      pool.enqueue(job({
+        jobId: `job-${index}`,
+        extract: async () => {
+          await new Promise<void>((resolve) => releases.push(resolve));
+          return extracted(validPayload(index));
+        },
+      }));
+    }
+    expect(pool.droppedCount()).toBe(1);
+
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases.splice(0).forEach((release) => release());
+    await pool.waitForIdle();
+
+    expect(results.map((result) => result.jobId)).toEqual(['job-0', 'job-2', 'job-3']);
+  });
+
   it('runs transcript-delta pipeline jobs with bounded concurrency', async () => {
     let active = 0;
     let maxActive = 0;
@@ -147,6 +188,37 @@ describe('memory extraction worker pool', () => {
 
     expect(results.map((result) => result.status)).toEqual(['completed', 'completed', 'completed', 'completed']);
     expect(maxActive).toBe(2);
+  });
+
+  it('coalesces queued transcript-delta jobs by session only when the queue limit is reached', async () => {
+    const releases: Array<() => void> = [];
+    const processed: string[] = [];
+    const pool = new MemoryPipelineWorkerPool({
+      loadConcurrency: () => 1,
+      queueLimit: 2,
+      extractFromTranscriptDelta: async (input) => {
+        processed.push(input.jobId ?? 'missing');
+        await new Promise<void>((resolve) => releases.push(resolve));
+        return { status: 'noop' as const, observation: null, reason: 'empty-delta' as const };
+      },
+    });
+
+    pool.enqueue(pipelineJob({ jobId: 'pipeline-0', sessionId: 'session-1' }));
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+
+    for (let index = 1; index < 4; index++) {
+      pool.enqueue(pipelineJob({ jobId: `pipeline-${index}`, sessionId: 'session-1' }));
+    }
+    expect(pool.droppedCount()).toBe(1);
+
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases.splice(0).forEach((release) => release());
+    await pool.waitForIdle();
+
+    expect(processed).toEqual(['pipeline-0', 'pipeline-2', 'pipeline-3']);
   });
 
   it('writes observations and records one healthy extraction per successful job', async () => {

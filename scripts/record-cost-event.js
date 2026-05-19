@@ -4742,7 +4742,7 @@ function insertCostEvent(event, sourceFile) {
             tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
             source_file, caveman_variant
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, sourceFile ?? null, event.cavemanVariant ?? null);
+        `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, event.source ?? sourceFile ?? null, event.cavemanVariant ?? null);
 			if (result.changes === 0) return null;
 			return result.lastInsertRowid;
 		},

@@ -58,7 +58,7 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
           event.tldrBypasses ?? null,
           event.tldrTokensSaved ?? null,
           event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
-          sourceFile ?? null,
+          event.source ?? sourceFile ?? null,
           event.cavemanVariant ?? null,
         );
         if (result.changes === 0) return null; // Duplicate
@@ -117,7 +117,7 @@ export function insertCostEvents(
         ev.tldrBypasses ?? null,
         ev.tldrTokensSaved ?? null,
         ev.tldrBypassReasons ? JSON.stringify(ev.tldrBypassReasons) : null,
-        sourceFile ?? null,
+        ev.source ?? sourceFile ?? null,
         ev.cavemanVariant ?? null,
       );
       if (result.changes > 0) {
@@ -183,7 +183,8 @@ export function queryCostEvents(opts: {
     SELECT ts, agent_id, issue_id, session_type, provider, model,
            input, output, cache_read, cache_write, cost, request_id,
            session_id,
-           tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons
+           tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+           source_file
     FROM cost_events
     ${where}
     ORDER BY ts ASC
@@ -475,6 +476,7 @@ interface DbCostRow {
   tldr_bypasses: number | null;
   tldr_tokens_saved: number | null;
   tldr_bypass_reasons: string | null;
+  source_file: string | null;
   caveman_variant: string | null;
 }
 
@@ -504,6 +506,7 @@ function rowToCostEvent(row: DbCostRow): CostEvent {
     cost: row.cost,
     requestId: row.request_id ?? undefined,
     sessionId: row.session_id ?? undefined,
+    source: row.source_file ?? undefined,
     tldrInterceptions: row.tldr_interceptions ?? undefined,
     tldrBypasses: row.tldr_bypasses ?? undefined,
     tldrTokensSaved: row.tldr_tokens_saved ?? undefined,

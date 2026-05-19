@@ -13,6 +13,7 @@ import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type 
 import { getMemoryWorkerConcurrency } from './settings.js';
 
 export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
+export const DEFAULT_MEMORY_WORKER_QUEUE_LIMIT = 500;
 
 export interface MemoryExtractionJob extends ExtractObservationInput {
   jobId?: string;
@@ -29,6 +30,7 @@ export interface MemoryExtractionWorkerPoolOptions {
   writeObservation?: (observation: MemoryObservation) => Promise<WriteObservationResult>;
   updateHealth?: (identity: MemoryExtractionJob['identity'], update: MemoryHealthUpdate) => Promise<unknown>;
   onResult?: (result: MemoryExtractionJobResult) => void | Promise<void>;
+  queueLimit?: number;
 }
 
 export interface MemoryPipelineJob extends ExtractFromTranscriptDeltaInput {
@@ -43,6 +45,7 @@ export interface MemoryPipelineWorkerPoolOptions {
   loadConcurrency?: () => number | Promise<number>;
   extractFromTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
   onResult?: (result: MemoryPipelineJobResult) => void | Promise<void>;
+  queueLimit?: number;
 }
 
 interface QueuedMemoryExtractionJob {
@@ -55,12 +58,18 @@ interface QueuedMemoryPipelineJob {
   job: MemoryPipelineJob;
 }
 
+function normalizeQueueLimit(value: number | undefined): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : DEFAULT_MEMORY_WORKER_QUEUE_LIMIT;
+}
+
 export class MemoryExtractionWorkerPool {
   private readonly queue: QueuedMemoryExtractionJob[] = [];
   private readonly loadConcurrency: () => number | Promise<number>;
   private readonly writeObservation: (observation: MemoryObservation) => Promise<WriteObservationResult>;
   private readonly updateHealth: (identity: MemoryExtractionJob['identity'], update: MemoryHealthUpdate) => Promise<unknown>;
   private readonly onResult?: (result: MemoryExtractionJobResult) => void | Promise<void>;
+  private readonly queueLimit: number;
+  private droppedJobs = 0;
   private active = 0;
   private pumping = false;
   private idleResolvers: Array<() => void> = [];
@@ -70,10 +79,12 @@ export class MemoryExtractionWorkerPool {
     this.writeObservation = options.writeObservation ?? writeObservation;
     this.updateHealth = options.updateHealth ?? updateMemoryHealth;
     this.onResult = options.onResult;
+    this.queueLimit = normalizeQueueLimit(options.queueLimit);
   }
 
   enqueue(job: MemoryExtractionJob): string {
     const jobId = job.jobId ?? randomUUID();
+    this.dropOldestIfFull();
     this.queue.push({ jobId, job: { ...job, jobId } });
     void this.pump();
     return jobId;
@@ -87,9 +98,19 @@ export class MemoryExtractionWorkerPool {
     return this.queue.length + this.active;
   }
 
+  droppedCount(): number {
+    return this.droppedJobs;
+  }
+
   async waitForIdle(): Promise<void> {
     if (this.pendingCount() === 0) return;
     await new Promise<void>((resolve) => this.idleResolvers.push(resolve));
+  }
+
+  private dropOldestIfFull(): void {
+    if (this.queue.length < this.queueLimit) return;
+    this.queue.shift();
+    this.droppedJobs += 1;
   }
 
   private async pump(): Promise<void> {
@@ -190,6 +211,8 @@ export class MemoryPipelineWorkerPool {
   private readonly loadConcurrency: () => number | Promise<number>;
   private readonly extractDelta: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
   private readonly onResult?: (result: MemoryPipelineJobResult) => void | Promise<void>;
+  private readonly queueLimit: number;
+  private droppedJobs = 0;
   private active = 0;
   private pumping = false;
   private idleResolvers: Array<() => void> = [];
@@ -198,10 +221,12 @@ export class MemoryPipelineWorkerPool {
     this.loadConcurrency = options.loadConcurrency ?? getMemoryWorkerConcurrency;
     this.extractDelta = options.extractFromTranscriptDelta ?? extractFromTranscriptDelta;
     this.onResult = options.onResult;
+    this.queueLimit = normalizeQueueLimit(options.queueLimit);
   }
 
   enqueue(job: MemoryPipelineJob): string {
     const jobId = job.jobId ?? randomUUID();
+    this.coalesceOrDrop(job);
     this.queue.push({ jobId, job: { ...job, jobId } });
     void this.pump();
     return jobId;
@@ -211,9 +236,25 @@ export class MemoryPipelineWorkerPool {
     return this.queue.length + this.active;
   }
 
+  droppedCount(): number {
+    return this.droppedJobs;
+  }
+
   async waitForIdle(): Promise<void> {
     if (this.pendingCount() === 0) return;
     await new Promise<void>((resolve) => this.idleResolvers.push(resolve));
+  }
+
+  private coalesceOrDrop(job: MemoryPipelineJob): void {
+    if (this.queue.length < this.queueLimit) return;
+    const existingIndex = this.queue.findIndex((queued) => queued.job.sessionId === job.sessionId);
+    if (existingIndex !== -1) {
+      this.queue.splice(existingIndex, 1);
+      this.droppedJobs += 1;
+      return;
+    }
+    this.queue.shift();
+    this.droppedJobs += 1;
   }
 
   private async pump(): Promise<void> {

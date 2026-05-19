@@ -119,6 +119,20 @@ describe('injectMemoryHookSettings', () => {
     expect(settings.hooks.SessionStart).toHaveLength(1);
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
   });
+
+  it('reinstalls all memory hooks after workspace settings are recreated', async () => {
+    await injectMemoryHookSettings(workspaceDir);
+    rmSync(join(workspaceDir, '.claude'), { recursive: true, force: true });
+    mkdirSync(workspaceDir, { recursive: true });
+
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(readFileSync(join(workspaceDir, '.claude', 'hooks', 'panopticon-memory-hook.js'), 'utf-8')).toContain('x-panopticon-internal-token');
+  });
 });
 
 // ─── injectCavemanSettings ────────────────────────────────────────────────────
