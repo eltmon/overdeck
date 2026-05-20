@@ -1,6 +1,6 @@
 {
   "name": "@panctl/cli",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
