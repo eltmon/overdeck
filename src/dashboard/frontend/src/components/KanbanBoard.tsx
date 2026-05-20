@@ -2696,7 +2696,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
