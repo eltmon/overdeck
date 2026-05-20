@@ -28,6 +28,7 @@ pan flywheel status
 pan flywheel status --json
 pan flywheel pause
 pan flywheel resume
+pan flywheel abort
 pan flywheel emit-status --file latest.json
 pan flywheel report
 ```
@@ -64,6 +65,16 @@ pan flywheel resume
 `pause` flips the Flywheel gate and stops active orchestration without clearing the active run id. `resume` clears the gate and restarts the singleton if needed.
 
 If the Flywheel is already paused or already running, these commands report the current gate state and exit successfully.
+
+### Abort
+
+```bash
+pan flywheel abort
+```
+
+Discards the active Flywheel run without writing a report. Stops `flywheel-orchestrator` if it is still attached, writes `aborted.json` under the run directory, and clears the SQLite gate so the next `pan flywheel start` can proceed.
+
+Use this when a run is stuck because the orchestrator died (reboot, crash) and there is nothing worth reporting, or when you want a clean slate without ceremony. Idempotent: a no-op when nothing is active.
 
 ### Emit Status
 

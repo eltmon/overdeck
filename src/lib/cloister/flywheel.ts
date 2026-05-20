@@ -11,6 +11,7 @@ import {
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../database/app-settings.js';
+import { resolveLiveFlywheelRunId } from '../../dashboard/server/services/flywheel-run-state.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
@@ -119,7 +120,11 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     throw new Error('Refusing to spawn flywheel-orchestrator inside a workspace devcontainer');
   }
 
-  const activeRunId = getFlywheelActiveRunId();
+  // Self-healing gate check (PAN-1245): if the SQLite gate points at a run
+  // that has already ended (report.md/aborted.json) or whose on-disk state is
+  // gone (post-reboot, post-wipe), resolveLiveFlywheelRunId clears the gate
+  // and returns null. Only a genuinely live prior run blocks a new start.
+  const activeRunId = await resolveLiveFlywheelRunId();
   if (activeRunId) {
     throw new Error(`Flywheel run ${activeRunId} is already active; pause, resume, or report it before starting another run`);
   }

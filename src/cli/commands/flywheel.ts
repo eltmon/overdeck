@@ -6,10 +6,11 @@ import { promisify } from 'node:util';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, publishFlywheelStatusCleared, readFlywheelLaunchMetadata, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
+import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { loadConfig, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
+import { stopAgentAsync } from '../../lib/agents.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
@@ -285,7 +286,10 @@ function formatElapsed(ms: number): string {
 }
 
 async function loadActiveFlywheelStatus(): Promise<FlywheelStatus | null> {
-  const activeRunId = getFlywheelActiveRunId();
+  // resolveLiveFlywheelRunId self-heals the SQLite gate when the prior run
+  // has ended or its on-disk state is gone (PAN-1245). Status and start now
+  // consult the same source of truth.
+  const activeRunId = await resolveLiveFlywheelRunId();
   if (!activeRunId) return null;
   const detail = await getFlywheelRunDetail(activeRunId);
   return detail?.status === 'running' ? detail.latest : null;
@@ -415,11 +419,18 @@ ${patternLines}
 }
 
 async function isFlywheelStateDirty(cwd: string): Promise<boolean> {
-  const { stdout } = await execAsync(
-    'git status --porcelain docs/FLYWHEEL-STATE.md',
-    { cwd, encoding: 'utf8' },
-  );
-  return stdout.trim().length > 0;
+  // Tolerate non-git cwd / missing file: a non-zero git exit means there are
+  // no orchestrator-authored changes worth committing here (PAN-1245). The
+  // gate clear in flywheelReportCommand must not be blocked by this check.
+  try {
+    const { stdout } = await execAsync(
+      'git status --porcelain docs/FLYWHEEL-STATE.md',
+      { cwd, encoding: 'utf8' },
+    );
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function loadReportFlywheelStatus(): Promise<FlywheelStatus | null> {
@@ -524,9 +535,7 @@ export async function flywheelResumeCommand(): Promise<void> {
 
 function clearFlywheelRunGate(runId: string): void {
   if (getFlywheelActiveRunId() === runId) {
-    setFlywheelActiveRunId(null);
-    setFlywheelGloballyPaused(false);
-    publishFlywheelStatusCleared();
+    clearFlywheelGate();
   }
 }
 
@@ -545,16 +554,21 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     const runReport = formatFlywheelStateReport(status, mergeQueue);
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 
-    const stateChanged = await isFlywheelStateDirty(cwd);
-    if (!stateChanged) {
+    // PAN-1245: the gate must clear once report.md is written, even if the
+    // commit phase fails (non-git cwd, no FLYWHEEL-STATE.md changes, hook
+    // failure). Otherwise a partial report leaves the gate stuck and the
+    // next `pan flywheel start` is blocked.
+    try {
+      const stateChanged = await isFlywheelStateDirty(cwd);
+      if (stateChanged) {
+        await commitFlywheelStateChanges(cwd, runNumber);
+        console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
+      } else {
+        console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
+      }
+    } finally {
       clearFlywheelRunGate(status.runId);
-      console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
-      return;
     }
-
-    await commitFlywheelStateChanges(cwd, runNumber);
-    clearFlywheelRunGate(status.runId);
-    console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -605,6 +619,26 @@ export async function flywheelReportOpenCommand(options: ReportOpenOptions = {})
   }
 }
 
+// Discard the current flywheel run without writing a report (PAN-1245). Used
+// when a run is stuck post-reboot, or when the user wants a clean slate
+// without ceremony. Stops the orchestrator if attached, writes aborted.json,
+// clears the gate. Idempotent: a no-op when nothing is active.
+export async function flywheelAbortCommand(): Promise<void> {
+  try {
+    const candidate = getFlywheelActiveRunId();
+    if (!candidate) {
+      console.log('No active flywheel run to abort.');
+      return;
+    }
+    await stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+    await abortFlywheelRun(candidate);
+    console.log(`Aborted flywheel run ${candidate}.`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
@@ -642,4 +676,9 @@ export function registerFlywheelCommands(program: Command): void {
     .command('report')
     .description('Write and commit the current Flywheel run report')
     .action(flywheelReportCommand);
+
+  flywheel
+    .command('abort')
+    .description('Discard the active Flywheel run without writing a report')
+    .action(flywheelAbortCommand);
 }

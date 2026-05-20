@@ -9,10 +9,12 @@ import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResu
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
 import {
+  abortFlywheelRun,
   getFlywheelRunDetail,
   listFlywheelRuns,
   nextFlywheelRunId,
   readFlywheelLaunchMetadata,
+  resolveLiveFlywheelRunId,
   writeFlywheelLaunchMetadata,
   writeLatestFlywheelStatus,
 } from './flywheel-run-state.js';
@@ -188,7 +190,9 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
     throw new Error('Refusing to spawn flywheel-orchestrator inside a workspace devcontainer');
   }
 
-  const activeRunId = await getActiveRunId();
+  // Self-healing gate check (PAN-1245). Mirrors the CLI's spawnFlywheel guard
+  // so the two start paths agree about what counts as "active".
+  const activeRunId = await resolveLiveFlywheelRunId();
   if (activeRunId) {
     throw new Error(`Flywheel run ${activeRunId} is already active; pause, resume, or report it before starting another run`);
   }
@@ -242,6 +246,22 @@ export async function pauseFlywheelRunForDashboard(): Promise<{ before: Flywheel
   await setPaused(true);
   await import('../../../lib/agents.js').then(({ stopAgentAsync }) => stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
   return { before, after: await readGateSnapshot(), changed: true };
+}
+
+// Discard the current flywheel run without writing a report (PAN-1245). Stops
+// the orchestrator if still attached, writes `aborted.json`, clears the gate.
+// Safe to call from any state: returns { aborted: null } when nothing was live.
+export async function abortFlywheelRunForDashboard(): Promise<{ aborted: string | null }> {
+  const candidate = await getActiveRunId();
+  if (!candidate) {
+    // Defensive cleanup: gate could be in a half-cleared state.
+    const stale = await resolveLiveFlywheelRunId();
+    return { aborted: stale ?? null };
+  }
+  const { stopAgentAsync } = await import('../../../lib/agents.js');
+  await stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+  await abortFlywheelRun(candidate);
+  return { aborted: candidate };
 }
 
 export async function resumeFlywheelRunForDashboard(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
@@ -307,7 +327,9 @@ export async function openFlywheelRunReportForDashboard(options: ReportOpenOptio
 }
 
 export async function readCurrentFlywheelStatusForDashboard(): Promise<FlywheelStatus | null> {
-  const activeRunId = await getActiveRunId();
+  // Use the self-healing resolver so the dashboard "current run" surface and
+  // the CLI's `pan flywheel status` agree (PAN-1245).
+  const activeRunId = await resolveLiveFlywheelRunId();
   if (!activeRunId) return null;
   const activeRun = await getFlywheelRunDetail(activeRunId);
   return activeRun?.status === 'running' ? activeRun.latest : null;

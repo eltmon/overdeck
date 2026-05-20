@@ -31,6 +31,13 @@ vi.mock('../../database/app-settings.js', () => ({
   },
 }));
 
+// PAN-1245: spawnFlywheel now consults the self-healing resolver. In tests we
+// short-circuit it to mirror the prior gate-only semantics; the resolver's
+// self-heal logic is covered by flywheel-run-state's own tests.
+vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
+  resolveLiveFlywheelRunId: async () => mocks.activeRunId,
+}));
+
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
 
 const cleanEnv = { PANOPTICON_DISABLE_DEACON: undefined, HOSTNAME: 'host-panopticon' };

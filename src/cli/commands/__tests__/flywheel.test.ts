@@ -7,12 +7,13 @@ import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStatus } from '@panctl/contracts';
-import { readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
+import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 
 const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
   activeRunId: null as string | null,
   sessionExists: false,
+  stoppedAgents: [] as string[],
   pauseFlywheel: vi.fn(async () => {
     flywheelLifecycleMocks.paused = true;
   }),
@@ -29,6 +30,9 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
+  stopAgentAsync: vi.fn(async (agentId: string) => {
+    flywheelLifecycleMocks.stoppedAgents.push(agentId);
+  }),
 }));
 
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
@@ -53,6 +57,10 @@ vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsAsync: vi.fn(async () => flywheelLifecycleMocks.sessionExists),
 }));
 
+vi.mock('../../../lib/agents.js', () => ({
+  stopAgentAsync: flywheelLifecycleMocks.stopAgentAsync,
+}));
+
 vi.mock('../../../lib/config-yaml.js', () => ({
   loadConfig: () => ({
     config: {
@@ -73,6 +81,7 @@ vi.mock('../../../lib/config-yaml.js', () => ({
 
 import {
   emitStatusCommand,
+  flywheelAbortCommand,
   flywheelPauseCommand,
   flywheelReportCommand,
   flywheelResumeCommand,
@@ -152,9 +161,11 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.paused = false;
     flywheelLifecycleMocks.activeRunId = null;
     flywheelLifecycleMocks.sessionExists = false;
+    flywheelLifecycleMocks.stoppedAgents = [];
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
+    flywheelLifecycleMocks.stopAgentAsync.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -477,6 +488,52 @@ describe('flywheel CLI commands', () => {
     expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('Second observation.');
   });
 
+  // PAN-1245: report must clear the gate even when the cwd is not a git
+  // repo. Previously isFlywheelStateDirty threw on non-git cwd and the gate
+  // stayed stuck, blocking the next pan flywheel start.
+  it('clears the active-run gate even when run from a non-git directory', async () => {
+    const nonRepoDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-noreport-'));
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelReportCommand({ cwd: nonRepoDir });
+
+    expect(flywheelLifecycleMocks.activeRunId).toBeNull();
+    expect(flywheelLifecycleMocks.paused).toBe(false);
+    expect(process.exitCode).toBeUndefined();
+    await rm(nonRepoDir, { recursive: true, force: true });
+  });
+
+  // PAN-1245: abort is the discard affordance for stuck runs (orchestrator
+  // dead post-reboot, run never produced useful output, etc.). Writes
+  // aborted.json, stops the orchestrator, clears the gate. Idempotent.
+  it('aborts the active run and clears the gate', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-3';
+    flywheelLifecycleMocks.paused = true;
+    await writeLatestFlywheelStatus({ ...validStatus, runId: 'RUN-3' });
+
+    await flywheelAbortCommand();
+
+    const aborted = JSON.parse(
+      await readFile(join(getFlywheelRunDir('RUN-3'), 'aborted.json'), 'utf8'),
+    ) as { runId: string; abortedAt: string };
+    expect(aborted.runId).toBe('RUN-3');
+    expect(flywheelLifecycleMocks.stoppedAgents).toContain('flywheel-orchestrator');
+    expect(flywheelLifecycleMocks.activeRunId).toBeNull();
+    expect(flywheelLifecycleMocks.paused).toBe(false);
+    expect(logSpy).toHaveBeenCalledWith('Aborted flywheel run RUN-3.');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('treats abort with no active run as an idempotent notice', async () => {
+    await flywheelAbortCommand();
+
+    expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
+    expect(logSpy).toHaveBeenCalledWith('No active flywheel run to abort.');
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it('registers flywheel subcommands with their flags', () => {
     const program = new Command();
     registerFlywheelCommands(program);
@@ -488,11 +545,13 @@ describe('flywheel CLI commands', () => {
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
+    const abort = flywheel?.commands.find(command => command.name() === 'abort');
     expect(start?.options.map(option => option.long)).toContain('--brief');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
     expect(status?.options.map(option => option.long)).toContain('--json');
     expect(pause).toBeDefined();
     expect(resume).toBeDefined();
     expect(report).toBeDefined();
+    expect(abort).toBeDefined();
   });
 });

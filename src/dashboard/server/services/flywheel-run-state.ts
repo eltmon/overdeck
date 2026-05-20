@@ -4,7 +4,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../../lib/database/app-settings.js';
+import {
+  getFlywheelActiveRunId,
+  isFlywheelGloballyPaused,
+  setFlywheelActiveRunId,
+  setFlywheelGloballyPaused,
+} from '../../../lib/database/app-settings.js';
 
 export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 
@@ -261,4 +266,53 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelRunSt
       ...((await fileExists(openedPrPath)) ? { openedPr: openedPrPath } : {}),
     },
   };
+}
+
+// Clear the SQLite "active run" gate and the pause flag, and notify subscribers.
+// Exported so callers in CLI and dashboard share a single clearing primitive
+// (PAN-1245: gate previously cleared in three different places that drifted).
+export function clearFlywheelGate(): void {
+  setFlywheelActiveRunId(null);
+  setFlywheelGloballyPaused(false);
+  publishFlywheelStatusCleared();
+}
+
+// Single source of truth for "is a flywheel run live?". Reads the SQLite gate,
+// validates it against on-disk run state, and self-heals if the gate points at
+// a run that has already ended (report.md / aborted.json present), at a run
+// whose state was wiped, or at a malformed value. Both `pan flywheel start`
+// and the dashboard Start path consult this — they cannot disagree (PAN-1245).
+export async function resolveLiveFlywheelRunId(options: FlywheelRunStateOptions = {}): Promise<string | null> {
+  const candidate = getFlywheelActiveRunId();
+  if (!candidate) return null;
+  if (!isFlywheelRunId(candidate)) {
+    clearFlywheelGate();
+    return null;
+  }
+  const latest = await readLatestFlywheelStatus(candidate, options);
+  if (!latest) {
+    // The gate points at a run with no snapshot on disk — the run dir was
+    // wiped or never fully initialized. Treat as dead.
+    clearFlywheelGate();
+    return null;
+  }
+  const runDir = getFlywheelRunDir(candidate, options);
+  const status = await deriveRunStatus(runDir, candidate);
+  if (status === 'complete' || status === 'aborted') {
+    clearFlywheelGate();
+    return null;
+  }
+  return candidate;
+}
+
+// Mark a flywheel run as aborted and clear the gate if it still points at this
+// run. Writes `aborted.json` so `deriveRunStatus` reports the run as aborted on
+// subsequent reads, mirroring the report.md → complete convention.
+export async function abortFlywheelRun(runId: string, options: FlywheelRunStateOptions = {}): Promise<void> {
+  const parsed = parseFlywheelRunId(runId);
+  const abortedPath = join(getFlywheelRunDir(parsed, options), 'aborted.json');
+  await writeJsonAtomic(abortedPath, { runId: parsed, abortedAt: new Date().toISOString() });
+  if (getFlywheelActiveRunId() === parsed) {
+    clearFlywheelGate();
+  }
 }

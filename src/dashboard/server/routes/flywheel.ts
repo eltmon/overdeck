@@ -18,6 +18,7 @@ import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from '.
 import { sessionExistsAsync } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
+  abortFlywheelRunForDashboard,
   openFlywheelRunReportForDashboard,
   pauseFlywheelRunForDashboard,
   readCurrentFlywheelStatusForDashboard,
@@ -185,6 +186,7 @@ interface FlywheelActionDeps {
   start?: typeof startFlywheelRunForDashboard;
   pause?: typeof pauseFlywheelRunForDashboard;
   resume?: typeof resumeFlywheelRunForDashboard;
+  abort?: typeof abortFlywheelRunForDashboard;
   openReport?: typeof openFlywheelRunReportForDashboard;
 }
 
@@ -205,6 +207,11 @@ export async function postFlywheelPausePayload(deps: FlywheelActionDeps = {}) {
 export async function postFlywheelResumePayload(deps: FlywheelActionDeps = {}) {
   const result = await (deps.resume ?? resumeFlywheelRunForDashboard)();
   return { status: 200, body: { ok: true, changed: result.changed } };
+}
+
+export async function postFlywheelAbortPayload(deps: FlywheelActionDeps = {}) {
+  const result = await (deps.abort ?? abortFlywheelRunForDashboard)();
+  return { status: 200, body: { ok: true, aborted: result.aborted } };
 }
 
 export async function postFlywheelReportOpenPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
@@ -326,6 +333,23 @@ const postFlywheelResumeRoute = HttpRouter.add(
 
     try {
       const result = yield* Effect.promise(() => postFlywheelResumePayload());
+      return jsonResponse(result.body, { status: result.status });
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    }
+  })),
+);
+
+const postFlywheelAbortRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/abort',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    try {
+      const result = yield* Effect.promise(() => postFlywheelAbortPayload());
       return jsonResponse(result.body, { status: result.status });
     } catch (error) {
       return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
@@ -466,6 +490,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelStartRoute,
   postFlywheelPauseRoute,
   postFlywheelResumeRoute,
+  postFlywheelAbortRoute,
   postFlywheelReportRoute,
   postFlywheelReportOpenRoute,
   getFlywheelBriefRoute,
