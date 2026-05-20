@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
-    "updated": "2026-05-19T06:24:16.461Z"
+    "updated": "2026-05-20T02:32:53.093Z"
   },
   "plan": {
     "id": "pan-1190",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f5e8a1c2-9b3d-4e7f-a8b1-c2d3e4f5a6b7",
     "author": "agent:claude-opus-4-7",
-    "sequence": 105,
+    "sequence": 1034,
     "created": "2026-05-18T13:25:00.000Z",
-    "updated": "2026-05-19T06:24:16.461Z",
+    "updated": "2026-05-20T02:32:53.093Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1190",
@@ -1079,53 +1079,49 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1190-add-post-merge-uat-phase-merge-done-close-out-is-a-deliberate-operator-step.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "test",
         "issueId": "PAN-1190",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-19T06:24:16.456Z",
+        "updatedAt": "2026-05-20T02:32:53.078Z",
         "work": {
-          "updatedAt": "2026-05-19T06:24:16.456Z",
+          "updatedAt": "2026-05-20T02:32:53.078Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-19T06:24:16.456Z",
-          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/dashboard/frontend/src/components/CloisterStatusBar.tsx\n  - src/dashboard/server/server.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
-          "history": [
-            {
-              "status": "failed",
-              "at": "2026-05-19T06:24:16.456Z",
-              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/dashboard/frontend/src/components/CloisterStatusBar.tsx\n  - src/dashboard/server/server.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
-            }
-          ]
+          "updatedAt": "2026-05-20T02:32:53.078Z",
+          "history": []
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-19T06:24:16.456Z",
+          "status": "passed",
+          "updatedAt": "2026-05-20T02:32:53.078Z",
+          "notes": "75/75 AC met, 0 blockers across security/correctness/performance/requirements",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-19T06:24:16.456Z"
+              "status": "passed",
+              "at": "2026-05-20T02:32:53.078Z",
+              "notes": "75/75 AC met, 0 blockers across security/correctness/performance/requirements"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-19T06:24:16.456Z",
+          "status": "dispatch_failed",
+          "updatedAt": "2026-05-20T02:32:53.078Z",
+          "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0). Run 'pan workspace rebuild PAN-1190' or retry with --host to override.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-19T06:24:16.456Z"
+              "status": "dispatch_failed",
+              "at": "2026-05-20T02:32:53.078Z",
+              "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0). Run 'pan workspace rebuild PAN-1190' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-19T06:24:16.456Z",
+          "updatedAt": "2026-05-20T02:32:53.078Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-19T06:24:16.456Z",
+          "updatedAt": "2026-05-20T02:32:53.078Z",
           "history": [],
           "readyForMerge": false
         }

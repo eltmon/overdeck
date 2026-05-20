@@ -4,7 +4,7 @@
     "created": "2026-05-19T21:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1221: PAN-1148 follow-up — 2 minor review nits deferred at merge, plus a post-merge stream output panel regression discovered in UAT.",
-    "updated": "2026-05-19T21:41:01.171Z"
+    "updated": "2026-05-20T02:31:21.068Z"
   },
   "plan": {
     "id": "pan-1221",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f7d8c9e2-1a4b-4f3c-8e5d-9b2a7c6f1e3d",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 44,
     "created": "2026-05-19T21:50:00.000Z",
-    "updated": "2026-05-19T21:41:01.171Z",
+    "updated": "2026-05-20T02:31:21.068Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1221",
@@ -240,7 +240,72 @@
     ],
     "edges": [],
     "metadata": {
-      "canonicalFilename": "2026-05-19-PAN-1221-pan-1148-follow-up-2-minor-review-nits-deferred-at-merge.vbrief.json"
+      "canonicalFilename": "2026-05-19-PAN-1221-pan-1148-follow-up-2-minor-review-nits-deferred-at-merge.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1221",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-20T02:31:21.064Z",
+        "work": {
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T02:31:21.064Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "notes": "All 4 reviewers pass — F1 lifecycle event param, F2 NaN guard, F3 output stream complete; 4243 tests green",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T02:31:21.064Z",
+              "notes": "All 4 reviewers pass — F1 lifecycle event param, F2 NaN guard, F3 output stream complete; 4243 tests green"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T02:31:21.064Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-20T02:31:21.064Z",
+          "notes": "GitHub PR #1225 has failing required checks on HEAD 3e2bc2a4. Fix CI before merging — see https://github.com/eltmon/panopticon-cli/pull/1225 for details.",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T02:31:21.064Z",
+              "notes": "GitHub PR #1225 has failing required checks on HEAD 3e2bc2a4. Fix CI before merging — see https://github.com/eltmon/panopticon-cli/pull/1225 for details."
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1225"
+        }
+      }
     }
   },
   "status": "proposed"

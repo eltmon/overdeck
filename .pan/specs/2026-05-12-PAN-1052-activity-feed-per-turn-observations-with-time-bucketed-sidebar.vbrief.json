@@ -4,7 +4,7 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-19T06:28:25.791Z"
+    "updated": "2026-05-19T08:54:35.274Z"
   },
   "plan": {
     "id": "pan-1052",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 109,
+    "sequence": 184,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-19T06:28:25.791Z",
+    "updated": "2026-05-19T08:54:35.274Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2276,60 +2276,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-12-PAN-1052-activity-feed-per-turn-observations-with-time-bucketed-sidebar.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1052",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-19T06:28:25.791Z",
+        "updatedAt": "2026-05-19T08:54:35.264Z",
         "work": {
-          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-19T06:28:25.791Z",
-          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/lib/agents.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+          "status": "passed",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-19T06:28:25.791Z",
-              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/lib/agents.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
+              "status": "passed",
+              "at": "2026-05-19T08:54:35.264Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-19T06:28:25.791Z",
-          "notes": "claimTranscriptRange() not atomic + sync SQLite on dashboard event loop",
+          "status": "blocked",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
+          "notes": "All four convoy reviewers (security/correctness/performance/requirements) exited with code 1 without producing reports — blocking infrastructure failure",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-19T06:28:25.791Z",
-              "notes": "claimTranscriptRange() not atomic + sync SQLite on dashboard event loop"
+              "status": "blocked",
+              "at": "2026-05-19T08:54:35.264Z",
+              "notes": "All four convoy reviewers (security/correctness/performance/requirements) exited with code 1 without producing reports — blocking infrastructure failure"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-19T06:28:25.791Z"
+              "at": "2026-05-19T08:54:35.264Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "updatedAt": "2026-05-19T08:54:35.264Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-19T06:28:25.791Z"
+              "at": "2026-05-19T08:54:35.264Z"
             }
           ],
           "readyForMerge": false,
