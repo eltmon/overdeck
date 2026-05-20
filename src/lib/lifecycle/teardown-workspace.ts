@@ -338,21 +338,40 @@ async function removeWorktree(
 }
 
 /**
- * Remove agent state directories (~/.panopticon/agents/agent-<issue>/ and planning-<issue>/).
+ * Remove every agent state directory tied to an issue:
+ *   - agent-<issue>                       (work agent)
+ *   - planning-<issue>                    (legacy planner)
+ *   - agent-<issue>-<role>                (review, test, ship, …)
+ *   - agent-<issue>-review-<subRole>      (correctness, performance, requirements, security)
+ *
+ * The specialist prefix sweep is load-bearing: without it, review/test/ship
+ * state.json files survive forever after merge, and the dashboard's
+ * StoppedAgentsBanner keeps them visible as if they need restarting.
  */
 async function removeAgentState(issueLower: string): Promise<StepResult> {
   const step = 'teardown:agent-state';
-  const dirs = [
-    join(AGENTS_DIR, `agent-${issueLower}`),
-    join(AGENTS_DIR, `planning-${issueLower}`),
-  ];
+  const { readdir, rm } = await import('fs/promises');
+
+  let entries: string[];
+  try {
+    entries = await readdir(AGENTS_DIR);
+  } catch {
+    return stepSkipped(step, ['Agents directory not present']);
+  }
+
+  const work = `agent-${issueLower}`;
+  const planner = `planning-${issueLower}`;
+  const specialistPrefix = `agent-${issueLower}-`;
+  const targets = entries.filter(name =>
+    name === work || name === planner || name.startsWith(specialistPrefix),
+  );
 
   let removed = 0;
-  for (const dir of dirs) {
-    if (existsSync(dir)) {
-      rmSync(dir, { recursive: true, force: true });
+  for (const name of targets) {
+    try {
+      await rm(join(AGENTS_DIR, name), { recursive: true, force: true });
       removed++;
-    }
+    } catch { /* non-fatal */ }
   }
 
   if (removed > 0) {

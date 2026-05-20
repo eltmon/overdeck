@@ -532,22 +532,28 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not kill canonical reviewer sessions: ${err}`);
   }
 
-  // 5b. Delete work agent + planning state dirs from ~/.panopticon/agents/ (non-fatal)
+  // 5b. Delete work agent + planning + specialist state dirs from ~/.panopticon/agents/ (non-fatal)
   // Event-driven cleanup — the merge is the moment the agent state becomes useless.
   // See docs/REVIEW-AGENT-ARCHITECTURE.md "Dispatch mechanics" for the broader rule:
   // state dirs are cleaned at the event that renders them obsolete, not by retention.
+  // The prefix sweep is required: review/test/ship specialists carry
+  // agent-<issue>-<role>[-<subRole>] state.json files that otherwise survive forever
+  // and resurface in the dashboard's StoppedAgentsBanner.
   try {
-    const { rm } = await import('fs/promises');
+    const { rm, readdir } = await import('fs/promises');
     const { AGENTS_DIR } = await import('../paths.js');
     const issueLower = issueId.toLowerCase();
-    const agentDir = join(AGENTS_DIR, `agent-${issueLower}`);
-    const planningDir = join(AGENTS_DIR, `planning-${issueLower}`);
-    for (const dir of [agentDir, planningDir]) {
-      try {
-        await rm(dir, { recursive: true, force: true });
-      } catch { /* non-fatal */ }
+    const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
+    const work = `agent-${issueLower}`;
+    const planner = `planning-${issueLower}`;
+    const specialistPrefix = `agent-${issueLower}-`;
+    const targets = entries.filter(name =>
+      name === work || name === planner || name.startsWith(specialistPrefix),
+    );
+    for (const name of targets) {
+      await rm(join(AGENTS_DIR, name), { recursive: true, force: true }).catch(() => {});
     }
-    console.log(`[merge-agent] ✓ Removed agent state dirs for ${issueId}`);
+    console.log(`[merge-agent] ✓ Removed ${targets.length} agent state dir(s) for ${issueId}`);
   } catch (err) {
     console.warn(`[merge-agent] Could not remove agent state dirs: ${err}`);
   }
