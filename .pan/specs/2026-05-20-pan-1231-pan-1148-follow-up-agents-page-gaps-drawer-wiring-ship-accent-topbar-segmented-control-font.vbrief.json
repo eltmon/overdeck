@@ -1,0 +1,338 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1231: PAN-1148 follow-up — Agents page gaps (drawer wiring / ship accent / TopBar segmented control / font)",
+    "updated": "2026-05-20T02:39:28.892Z"
+  },
+  "plan": {
+    "id": "pan-1231",
+    "title": "PAN-1148 follow-up — Agents page gaps (drawer wiring / ship accent / TopBar segmented control / font)",
+    "status": "proposed",
+    "uid": "cbff9200-1ed8-4105-8715-6cc69d80324f",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:45:00.000Z",
+    "updated": "2026-05-20T02:39:28.892Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1231",
+        "label": "PAN-1231",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1148 audit (parent)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1227",
+        "label": "Beads closed without delivery (substrate)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "PRD",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/design/mockups/agents-opus.html",
+        "label": "Mockup",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "agents-page",
+      "follow-up",
+      "audit-fix"
+    ],
+    "narratives": {
+      "Problem": "Four gaps identified by the PAN-1148 audit (#1226) remain on the Agents surface: (A-1) AgentCard ship-role accent uses var(--signal-cost) cyan instead of var(--signal-review) purple — style guide forbids signal-cost for non-currency UI; (A-2) AgentCard name uses DM Sans instead of SF Mono per PRD §4.7.9; (N-A-1) the Grid/Table/Timeline segmented control and Start agent button shown in the mockup are absent from the TopBar; (N-A-2) AgentCard 'Open issue' should open the IssueDrawer scrolled to the Active Agent section — bead workspace-tw8n was closed claiming this delivered, but audit shows it isn't wired in practice. This is one of three closed-without-delivery beads tracked separately under #1227.",
+      "Proposal": "Ship four narrowly-scoped beads that each close one audit gap. (1) Flip ROLE_ACCENTS.ship from var(--signal-cost) to var(--signal-review) in primitives/AgentCard.tsx and assert via test. (2) Add font-mono to the AgentCard h3 name. (3) Add the TopBar shell to FleetAgentsView using the existing primitives/TopBar.tsx (which already supports segmentedControl + actions slots); segmented control buttons update ?view= URL state and the active segment style; Grid renders the existing card grid, Table/Timeline render a labelled 'Coming soon' placeholder section so the segmented control is fully functional within this issue's scope; Start agent button navigates to the Issues (Kanban) tab where the existing per-issue start flow lives. (4) Reproduce the drawer scroll bug in a real browser via Playwright, fix the timing gap if needed (likely a missing rAF retry once DrawerActiveAgent mounts after async data load), and add a behavioural test that asserts scrollIntoView is invoked on the live #active-agent element — not just that the URL hash was set."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decompose the issue into four beads — one per audit gap — rather than one combined Agents-cleanup bead.",
+        "rationale": "Each gap is independently reviewable, mergeable, and testable. Combining them would let the work agent ship a subset (which is exactly the failure pattern flagged by #1227). Per-gap beads make the work.inspect gate and review convoy verify each acceptance criterion in isolation."
+      },
+      {
+        "summary": "Table and Timeline segments render a 'Coming soon' placeholder section in this issue. Real Table/Timeline view implementations are out of scope and tracked as separate follow-up issues.",
+        "rationale": "The audit gap N-A-1 is that the TopBar control + Start button are ABSENT. Adding the control closes the gap. Building two unspecified new view designs is a separate, larger feature scope that the PRD §4.6 does not specify. Shipping clickable segments with state + a labelled placeholder is a complete, honest delivery of the visible shell — no half-finished hidden states, no broken view-switching."
+      },
+      {
+        "summary": "Start agent button navigates to the Issues (Kanban) tab.",
+        "rationale": "No global start-agent dialog exists today — startAgentMutation in FeatureItem.tsx and ZoneActionStrip.tsx is per-issue. The Issues tab is where users select an issue and start an agent via the existing per-issue UI. Navigating there is the smallest defensible action; the alternative (inventing a new dialog) is out of scope and would itself be a half-implemented feature."
+      },
+      {
+        "summary": "URL state for the segmented control uses ?view=grid|table|timeline and composes additively with existing ?phase=, ?projects=, ?models= params.",
+        "rationale": "FleetAgentsView already manages multiple URL search params via replaceFilterUrl. Reusing that idiom keeps the URL behaviour consistent and avoids resetting filters when the user switches segments."
+      },
+      {
+        "summary": "N-A-2 fix includes both a behavioural unit test (scrollIntoView spy) AND a Playwright UAT step — not just a URL-hash assertion.",
+        "rationale": "The original bead workspace-tw8n passed its URL-hash test but failed the user-visible behaviour. Repeating the same shallow assertion would close the bead without closing the gap. The behavioural test must spy Element.prototype.scrollIntoView and assert it was called with the active-agent element."
+      },
+      {
+        "summary": "Scope of the --signal-cost style-guide rule audit is limited to AgentCard.tsx in this issue. A repo-wide sweep is tracked under the parent audit #1226.",
+        "rationale": "The PAN-1231 issue body explicitly cites AgentCard.tsx:43 only. Expanding scope to a repo-wide sweep would dilute the gap-fix and risks colliding with other audit follow-up issues."
+      }
+    ],
+    "items": [
+      {
+        "id": "pan-1231-ship-accent",
+        "title": "AgentCard ship-role accent: use --signal-review (purple), not --signal-cost (cyan)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/primitives/AgentCard.tsx, change ROLE_ACCENTS.ship from 'var(--signal-cost)' to 'var(--signal-review)' (line 41). Add or update a unit test that asserts the AgentCard for role='ship' renders the --agent-card-accent CSS variable set to var(--signal-review). Confirms the mockup .acard.ship::before { background: var(--signal-review); } rule and respects the style-guide reservation of --signal-cost for currency UI only."
+        },
+        "subItems": [
+          {
+            "id": "pan-1231-ship-accent.ac1",
+            "title": "ROLE_ACCENTS.ship === 'var(--signal-review)' in primitives/AgentCard.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-ship-accent.ac2",
+            "title": "A unit test renders <AgentCard role='ship' /> and asserts the rendered article element's inline style includes --agent-card-accent: var(--signal-review)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-ship-accent.ac3",
+            "title": "No other call site of ROLE_ACCENTS regresses (plan stays --signal-review, work stays --info, review stays --warning, test stays --success, flywheel stays --primary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-ship-accent.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1231-name-sf-mono",
+        "title": "AgentCard H1 row name uses SF Mono (font-mono) per PRD §4.7.9",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/primitives/AgentCard.tsx, add `font-mono` to the h3 at line 79 so the agent name renders in SF Mono per the mockup `.acard-h1 .name { font-family: 'SF Mono', monospace; font-size: 13px; }` and PRD §4.7.9."
+        },
+        "subItems": [
+          {
+            "id": "pan-1231-name-sf-mono.ac1",
+            "title": "AgentCard h3.name has the `font-mono` Tailwind class in primitives/AgentCard.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-name-sf-mono.ac2",
+            "title": "A unit test asserts the h3 element rendering the name has the `font-mono` class applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-name-sf-mono.ac3",
+            "title": "Font weight (font-semibold) and size (text-[13px]) and color/leading classes are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-name-sf-mono.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1231-topbar-shell",
+        "title": "Add TopBar shell to FleetAgentsView with Grid/Table/Timeline segmented control and Start agent button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wrap FleetAgentsView's content in the existing primitives/TopBar.tsx component matching mockup agents-opus.html:170-194. TopBar slots: breadcrumb='Eltmon / Agents' (or project-aware breadcrumb), meta='{N} active · {M} stuck · {runtime} cumulative runtime' computed from current fleet state, search placeholder (visual only — no functional search in this bead), segmentedControl with three buttons (Grid | Table | Timeline) bound to ?view=grid|table|timeline URL state (default grid), and an actions slot with a 'Start agent' button. Grid renders the existing card grid. Table and Timeline render a single labelled 'Coming soon' placeholder section so the segmented control is end-to-end functional. Start agent button navigates to the Issues (Kanban) tab via the existing tab-switching mechanism (e.g., setActiveTab('issues') passed in as a prop or via the dashboard store)."
+        },
+        "subItems": [
+          {
+            "id": "pan-1231-topbar-shell.ac1",
+            "title": "FleetAgentsView renders <TopBar /> with breadcrumb, meta (live fleet counts + cumulative runtime), search placeholder, segmentedControl, and Start agent button slots populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac2",
+            "title": "Segmented control has exactly three buttons labelled Grid, Table, Timeline. Clicking each sets ?view=grid|table|timeline and toggles the aria-pressed / active style on the selected segment.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac3",
+            "title": "Default view (no ?view= param) is 'grid' and renders the existing AgentCard grid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac4",
+            "title": "?view=table and ?view=timeline render a 'Coming soon' placeholder section (labelled, not empty) — never silently empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac5",
+            "title": "Start agent button navigates the user to the Issues (Kanban) tab. Wired via the existing activeTab state in App.tsx (passed as a prop or via store action) — no new global-start dialog is created.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac6",
+            "title": "Setting ?view= preserves existing ?phase=, ?projects=, ?models= search params (additive URL state)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac7",
+            "title": "FleetAgentsView.test.tsx is extended with tests covering: default grid render, segment click updates URL + active style, Table/Timeline render placeholder, Start agent click triggers tab navigation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac8",
+            "title": "Playwright UAT (isolated browser instance — no shared session): navigate to /?tab=agents, click each segmented button, verify URL updates and visible label matches; click Start agent, verify the URL/UI switches to the Issues tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-topbar-shell.ac9",
+            "title": "npm run typecheck, npm run lint, and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1231-drawer-scroll-wired",
+        "title": "AgentCard 'Open issue' actually scrolls IssueDrawer to #active-agent (not just sets URL hash)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Reproduce the audit failure in a real browser via Playwright (isolated instance): start the dashboard, navigate to /?tab=agents, click 'Open issue' on a fleet card with an active agent, and confirm whether the drawer is actually scrolled with the Active Agent section in view at the top of the scrollable region. The wiring code is in place (FleetAgentsView.openAgentIssue line 342-347; IssueDrawer.scrollToActive useEffect line 54-67; DrawerActiveAgent id='active-agent' line 57 and 95) — the most likely root cause is that scrollToActive runs in a useEffect that fires when drawer.issueId changes, but at that moment the DrawerActiveAgent element may not yet be in the DOM (async data load via useDrawerData). Fix: ensure the scroll happens AFTER the active-agent element actually exists — either via a layout effect that watches the element via MutationObserver / ref, or by retrying scroll on a short delay until the element is found (capped retries). Replace the existing FleetAgentsView 'opens the drawer from a fleet card issue action at the active-agent anchor' test with a behavioural test that spies Element.prototype.scrollIntoView and asserts it was called on the live #active-agent element after the click."
+        },
+        "subItems": [
+          {
+            "id": "pan-1231-drawer-scroll-wired.ac1",
+            "title": "Manual Playwright UAT (isolated browser, no shared session): clicking 'Open issue' on a fleet AgentCard opens the drawer AND the Active Agent section is visible in the drawer's scroll viewport without manual scrolling. Recorded as a passing UAT step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-drawer-scroll-wired.ac2",
+            "title": "A new unit test mounts FleetAgentsView + IssueDrawer + DrawerActiveAgent, spies Element.prototype.scrollIntoView, clicks 'Open issue' on a card, and asserts scrollIntoView was invoked on the element with id='active-agent'. The existing URL-hash-only test is replaced (not just supplemented) — a hash-only assertion is the original closed-without-delivery pattern and must not remain as the sole proof of delivery.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-drawer-scroll-wired.ac3",
+            "title": "The fix handles the async DrawerActiveAgent mount: if the element is not in the DOM when the effect first runs, the scroll is retried (e.g., via ref/observer/short polling with a small retry cap) until it succeeds or a clean timeout — never silently no-ops.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-drawer-scroll-wired.ac4",
+            "title": "Opening the drawer via other entry points (e.g., kanban card click without #active-agent hash) does NOT auto-scroll to the active-agent anchor — scroll behaviour is gated on the hash being present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1231-drawer-scroll-wired.ac5",
+            "title": "npm run typecheck, npm run lint, and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1231-pan-1148-follow-up-agents-page-gaps-drawer-wiring-ship-accent-topbar-segmented-control-font.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
