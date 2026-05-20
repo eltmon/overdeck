@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type DragStartEvent,
+  type DragOverEvent,
   type DragEndEvent,
   defaultDropAnimationSideEffects,
   type DropAnimation,
@@ -1124,6 +1125,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
   const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  const [activeOverId, setActiveOverId] = useState<string | null>(null);
   const [columnOrderOverrides, setColumnOrderOverrides] = useState<Record<string, string[]>>({});
 
   // Undo state
@@ -1349,6 +1351,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }
   }, [issues]);
 
+  // Handle drag over
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    setActiveOverId((event.over?.id as string) ?? null);
+  }, []);
+
   // Handle drag end
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -1374,6 +1381,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
     setActiveDragIssue(null);
     setActiveDragStatus(null);
+    setActiveOverId(null);
   }, [issues]);
 
   // Confirm agent warning
@@ -1839,6 +1847,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-hidden pb-4">
@@ -1849,7 +1858,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus}>
+              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={sortedGrouped[status].map(i => i.id)}>
                 <div
                   className="flex-1 min-w-0"
                   data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
@@ -2142,18 +2151,19 @@ function ColumnContent({
 }
 
 // DroppableColumn component
-export function DroppableColumn({ status, activeDragStatus, children }: { status: CanonicalState; activeDragStatus?: CanonicalState | null; children: React.ReactNode }) {
+export function DroppableColumn({ status, activeDragStatus, overId, issueIds, children }: { status: CanonicalState; activeDragStatus?: CanonicalState | null; overId?: string | null; issueIds?: string[]; children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
     id: status,
   });
 
-  const isBlocked = isOver && activeDragStatus !== undefined && activeDragStatus !== null && activeDragStatus !== status;
+  const isOverColumn = isOver || (overId !== undefined && overId !== null && (overId === status || issueIds?.includes(overId) === true));
+  const isBlocked = isOverColumn && activeDragStatus !== undefined && activeDragStatus !== null && activeDragStatus !== status;
 
   return (
     <div
       ref={setNodeRef}
       data-testid={`droppable-column-${status}`}
-      className={`flex-1 min-w-0 transition-all ${isBlocked ? 'cursor-not-allowed opacity-60' : isOver ? 'scale-[1.02]' : ''}`}
+      className={`flex-1 min-w-0 transition-all ${isBlocked ? 'cursor-not-allowed opacity-60' : isOverColumn ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>
