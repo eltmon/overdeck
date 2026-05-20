@@ -297,6 +297,12 @@ export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =
     },
   )
 
+// ─── Debug / test hook ────────────────────────────────────────────────────────
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { useDashboardStore?: typeof useDashboardStore }).useDashboardStore = useDashboardStore
+}
+
 // ─── Export pure functions for testing ────────────────────────────────────────
 
 export { syncSnapshot as syncSnapshotReducer, applyEvent as applyEventReducer, applyEvents as applyEventsReducer }
