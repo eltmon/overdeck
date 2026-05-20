@@ -8,6 +8,7 @@ import type { Issue, Agent } from '../types';
 import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
+import IssueCardPrimitive from './primitives/IssueCard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -778,6 +779,27 @@ describe('IssueCard', () => {
     });
 
     expect(screen.getByTestId('card-cost-TEST-123')).toBeInTheDocument();
+  });
+
+  it('uses success tokens for merge-ready cards', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Review' }),
+      // Simulate merge-ready state via review status injection would require
+      // more setup; instead test the primitive directly through the board card
+      // by leveraging the fact that KanbanBoard computes mergeReadyCard from
+      // reviewStatus. We render the primitive directly for a focused assertion.
+    });
+
+    // Render the primitive directly for a focused styling test
+    const { container } = render(
+      <IssueCardPrimitive issueId="TEST-123" priority={3} mergeReadyCard={true}>
+        <div>content</div>
+      </IssueCardPrimitive>,
+    );
+
+    const card = container.querySelector('[data-merge-ready-card="true"]');
+    expect(card).toHaveClass('border-success/60', 'bg-success/10');
+    expect(card).not.toHaveClass('border-warning/60', 'bg-warning/10');
   });
 });
 
