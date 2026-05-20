@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Compass, Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
@@ -231,6 +231,10 @@ function ProjectRightPaneTabs({
   conversations,
   selectedConversation,
   activeIssueId: controlledActiveIssueId,
+  conversationViewMode,
+  onConversationViewModeChange,
+  onArchivedConversation,
+  conversationAgentId,
   onOpenIssue,
   onSelectConversation,
 }: {
@@ -241,8 +245,12 @@ function ProjectRightPaneTabs({
   conversations: Conversation[];
   selectedConversation: string | null;
   activeIssueId?: string | null;
+  conversationViewMode?: ViewMode;
+  onConversationViewModeChange?: (mode: ViewMode) => void;
+  onArchivedConversation?: () => void;
+  conversationAgentId?: string;
   onOpenIssue: (issueId: string) => void;
-  onSelectConversation: (name: string) => void;
+  onSelectConversation: (name: string | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ProjectRightTab>(() => readProjectTab(projectName));
   const [activeIssueId, setActiveIssueId] = useState<string | null>(() => features[0]?.issueId ?? null);
@@ -265,6 +273,12 @@ function ProjectRightPaneTabs({
       setActiveTab('pipeline');
     }
   }, [controlledActiveIssueId]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setActiveTab('conversations');
+    }
+  }, [selectedConversation]);
 
   const selectTab = (tab: ProjectRightTab) => {
     hasExplicitTabChoiceRef.current = true;
@@ -335,19 +349,53 @@ function ProjectRightPaneTabs({
         {activeTab === 'beads' && effectiveActiveIssueId && <BeadsTab issueId={effectiveActiveIssueId} />}
         {activeTab === 'conversations' && effectiveActiveIssueId && (
           <div className="flex min-h-full flex-col gap-4 p-4">
-            <DiscussionsTab issueId={effectiveActiveIssueId} />
-            <div className="flex flex-col gap-2">
-              {conversations.length > 0 ? conversations.map((conversation) => (
-                <button
-                  key={conversation.name}
-                  type="button"
-                  className={`rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors ${selectedConversation === conversation.name ? 'bg-accent text-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => onSelectConversation(conversation.name)}
-                >
-                  {conversation.title ?? conversation.name}
-                </button>
-              )) : <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No project conversations.</div>}
-            </div>
+            {selectedConversation ? (
+              (() => {
+                const conv = conversations.find(c => c.name === selectedConversation);
+                return conv ? (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <button
+                      type="button"
+                      onClick={() => onSelectConversation(null)}
+                      className="mb-2 flex items-center gap-1 self-start rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ChevronLeft size={14} />
+                      Back to conversations
+                    </button>
+                    <div className="min-h-0 flex-1">
+                      <ConversationPanel
+                        key={conv.name}
+                        conversation={conv}
+                        viewMode={conversationViewMode ?? 'conversation'}
+                        onViewModeChange={onConversationViewModeChange}
+                        agentId={conversationAgentId}
+                        onArchived={onArchivedConversation}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
+                    Conversation not found.
+                  </div>
+                );
+              })()
+            ) : (
+              <>
+                <DiscussionsTab issueId={effectiveActiveIssueId} />
+                <div className="flex flex-col gap-2">
+                  {conversations.length > 0 ? conversations.map((conversation) => (
+                    <button
+                      key={conversation.name}
+                      type="button"
+                      className={`rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors ${selectedConversation === conversation.name ? 'bg-accent text-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => onSelectConversation(conversation.name)}
+                    >
+                      {conversation.title ?? conversation.name}
+                    </button>
+                  )) : <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No project conversations.</div>}
+                </div>
+              </>
+            )}
           </div>
         )}
         {activeTab === 'activity' && effectiveActiveIssueId && <ActivityTab issueId={effectiveActiveIssueId} />}
@@ -1342,6 +1390,13 @@ export function CommandDeck({
               conversations={projectConversations[rightPaneProject.name] ?? []}
               selectedConversation={selectedConversation}
               activeIssueId={selectedFeature || null}
+              conversationViewMode={conversationViewMode}
+              onConversationViewModeChange={onConversationViewModeChange}
+              onArchivedConversation={() => {
+                setSelectedConversation(null);
+                queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              }}
+              conversationAgentId={selectedAgent?.id}
               onOpenIssue={(issueId) => openIssue(issueId)}
               onSelectConversation={handleSelectConversation}
             />
