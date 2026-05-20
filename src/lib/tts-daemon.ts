@@ -689,7 +689,11 @@ export async function installTtsDaemonDependencies(): Promise<TtsDaemonInstallRe
     }
     const python = join(venvDir, 'bin', 'python');
     await runProcess(python, ['-m', 'pip', 'install', '--upgrade', 'pip', 'wheel', 'setuptools'], { cwd: packageDir });
-    await runProcess(python, ['-m', 'pip', 'install', 'torch', '--index-url', 'https://download.pytorch.org/whl/cu121'], { cwd: packageDir });
+    // Install torch AND torchaudio together from the CUDA wheel index. qwen-tts depends on
+    // torchaudio, and if it is absent at this point pip's resolver pulls the newest torchaudio
+    // from PyPI in the next step — which is built against a torch ABI ahead of the cu121 wheels
+    // and crashes the daemon with `undefined symbol: aoti_torch_abi_version` on import.
+    await runProcess(python, ['-m', 'pip', 'install', 'torch', 'torchaudio', '--index-url', 'https://download.pytorch.org/whl/cu121'], { cwd: packageDir });
     await runProcess(python, ['-m', 'pip', 'install', 'qwen-tts', 'soundfile', 'numpy'], { cwd: packageDir });
     return { status: 'installed', venvDir, message: `Qwen TTS daemon venv ready at ${venvDir}` };
   } catch (error) {
