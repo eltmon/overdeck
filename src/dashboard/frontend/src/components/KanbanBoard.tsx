@@ -1899,7 +1899,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
                   />
-                  {/* TODO(PAN-1238): + New issue column footer button — see PRD §4.7.6 */}
+                  {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
                 </div>
               </DroppableColumn>
