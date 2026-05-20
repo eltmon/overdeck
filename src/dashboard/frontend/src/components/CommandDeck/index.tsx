@@ -239,6 +239,7 @@ function ProjectRightPaneTabs({
   zoneA,
   onOpenIssue,
   onSelectConversation,
+  onActiveIssueIdChange,
 }: {
   projectName: string;
   features: ProjectFeature[];
@@ -262,6 +263,7 @@ function ProjectRightPaneTabs({
   };
   onOpenIssue: (issueId: string) => void;
   onSelectConversation: (name: string | null) => void;
+  onActiveIssueIdChange?: (issueId: string | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ProjectRightTab>(() => readProjectTab(projectName));
   const [activeIssueId, setActiveIssueId] = useState<string | null>(() => features[0]?.issueId ?? null);
@@ -361,6 +363,8 @@ function ProjectRightPaneTabs({
               const value = event.target.value || null;
               if (controlledActiveIssueId == null) {
                 setActiveIssueId(value);
+              } else {
+                onActiveIssueIdChange?.(value);
               }
               onOpenIssue(value ?? '');
             }}
@@ -1441,7 +1445,33 @@ export function CommandDeck({
               } : undefined}
               onOpenIssue={(issueId) => openIssue(issueId)}
               onSelectConversation={handleSelectConversation}
+              onActiveIssueIdChange={(issueId) => {
+                if (issueId) handleSelectFeature(issueId);
+              }}
             />
+          ) : selectedConversation ? (
+            (() => {
+              const conv = conversations.find(c => c.name === selectedConversation);
+              return conv ? (
+                <ConversationPanel
+                  key={conv.name}
+                  conversation={conv}
+                  viewMode={conversationViewMode}
+                  onViewModeChange={onConversationViewModeChange}
+                  agentId={selectedAgent?.id}
+                  onArchived={() => {
+                    setSelectedConversation(null);
+                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                  }}
+                />
+              ) : (
+                <div className={styles.contentEmpty}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p>Conversation not found.</p>
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
