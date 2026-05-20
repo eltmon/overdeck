@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
@@ -11,6 +11,18 @@ interface FlywheelPageProps {
 }
 
 type FlywheelLeftTab = 'status' | 'state';
+
+const SPLIT_STORAGE_KEY = 'panopticon.ui.flywheelSplitWidth';
+const SPLIT_MIN_LEFT = 360;
+const SPLIT_MIN_RIGHT = 360;
+const SPLIT_DEFAULT_LEFT = 720;
+
+function getStoredSplitWidth(): number {
+  const stored = localStorage.getItem(SPLIT_STORAGE_KEY);
+  if (!stored) return SPLIT_DEFAULT_LEFT;
+  const parsed = Number(stored);
+  return Number.isFinite(parsed) && parsed >= SPLIT_MIN_LEFT ? parsed : SPLIT_DEFAULT_LEFT;
+}
 
 async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
   const res = await fetch('/api/flywheel/current');
@@ -30,6 +42,47 @@ function formatElapsed(ms: number): string {
 export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
+  const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
+  const leftWidthRef = useRef(leftWidth);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const setLeftWidthClamped = useCallback((next: number) => {
+    const container = containerRef.current;
+    const containerWidth = container?.getBoundingClientRect().width ?? window.innerWidth;
+    const maxLeft = Math.max(SPLIT_MIN_LEFT, containerWidth - SPLIT_MIN_RIGHT);
+    const clamped = Math.round(Math.min(maxLeft, Math.max(SPLIT_MIN_LEFT, next)));
+    leftWidthRef.current = clamped;
+    setLeftWidth(clamped);
+    localStorage.setItem(SPLIT_STORAGE_KEY, String(clamped));
+  }, []);
+
+  const handleResizePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = leftWidthRef.current;
+      const onMove = (me: PointerEvent) => {
+        setLeftWidthClamped(startWidth + (me.clientX - startX));
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [setLeftWidthClamped],
+  );
+
+  useEffect(() => {
+    const onResize = () => setLeftWidthClamped(leftWidthRef.current);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [setLeftWidthClamped]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,10 +110,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
 
   return (
     <div
+      ref={containerRef}
       aria-label="Flywheel page"
-      className="grid h-full w-full grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] overflow-hidden bg-background"
+      className="flex h-full w-full overflow-hidden bg-background"
     >
-      <section className="min-w-0 overflow-y-auto border-r border-border" aria-label="Flywheel status pane">
+      <section
+        className="relative shrink-0 overflow-y-auto border-r border-border"
+        style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
+        aria-label="Flywheel status pane"
+      >
         <header className="sticky top-0 z-10 border-b border-border bg-card/60 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -149,7 +207,17 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
         </div>
       </section>
 
-      <div className="min-w-0 overflow-hidden" aria-label="Flywheel conversation column">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize flywheel panes"
+        className="group relative z-30 flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-border/40 hover:bg-primary/40 active:bg-primary"
+        onPointerDown={handleResizePointerDown}
+      >
+        <div className="h-8 w-0.5 rounded-full bg-border/70 transition-colors group-hover:bg-primary/70 group-active:bg-primary" />
+      </div>
+
+      <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
         <FlywheelConversationPane onOpenSettings={onOpenSettings} />
       </div>
     </div>
