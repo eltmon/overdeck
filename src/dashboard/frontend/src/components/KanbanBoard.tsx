@@ -2727,7 +2727,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'todo' || canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
     null;
   const beadProgressColor =
-    isReadyToMerge || isMerged ? 'var(--success)' :
+    isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :
     canonical === 'in_review' ? 'var(--warning)' :
     canonical === 'in_progress' ? 'var(--info)' :
     canonical === 'todo' ? 'var(--signal-review)' :
@@ -2765,7 +2765,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       <div className="relative" style={{ padding: '12px 12px 10px' }}>
         {/* Hover overlays */}
         {onBulkToggle && (
-          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <div className={`absolute top-2 left-2 transition-opacity z-10 ${isBulkSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
             <input
               type="checkbox"
               checked={isBulkSelected || false}

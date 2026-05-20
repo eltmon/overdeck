@@ -148,6 +148,7 @@ interface PlanningStateCacheEntry {
     beadCounts: { completed: number; total: number } | null;
   };
   planMtimeMs: number; // -1 when no plan file existed at compute time
+  continueMtimeMs: number; // -1 when no continue.json existed at compute time
 }
 const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 
@@ -186,6 +187,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     if (!projectPath) return updatePlanningStateCache(identifier, {
       result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
       planMtimeMs: -1,
+      continueMtimeMs: -1,
     });
 
     const issueLower = identifier.toLowerCase();
@@ -194,6 +196,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       return updatePlanningStateCache(identifier, {
         result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null },
         planMtimeMs: -1,
+        continueMtimeMs: -1,
       });
     }
 
@@ -207,8 +210,16 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       }
     }
 
+    const continuePath = join(workspacePath, '.pan', 'continue.json');
+    let continueMtimeMs = -1;
+    try {
+      continueMtimeMs = (await stat(continuePath)).mtimeMs;
+    } catch {
+      continueMtimeMs = -1;
+    }
+
     const cached = planningStateCache.get(identifier);
-    if (cached && cached.planMtimeMs === planMtimeMs && cached.result.workspacePath === workspacePath) {
+    if (cached && cached.planMtimeMs === planMtimeMs && cached.continueMtimeMs === continueMtimeMs && cached.result.workspacePath === workspacePath) {
       return false;
     }
 
@@ -218,11 +229,13 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     return updatePlanningStateCache(identifier, {
       result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath, beadCounts },
       planMtimeMs,
+      continueMtimeMs,
     });
   } catch {
     return updatePlanningStateCache(identifier, {
       result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
       planMtimeMs: -1,
+      continueMtimeMs: -1,
     });
   } finally {
     planningStateRefreshInFlight.delete(identifier);
@@ -233,6 +246,7 @@ function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheE
   const prev = planningStateCache.get(identifier);
   const changed = !prev
     || prev.planMtimeMs !== entry.planMtimeMs
+    || prev.continueMtimeMs !== entry.continueMtimeMs
     || JSON.stringify(prev.result) !== JSON.stringify(entry.result);
   planningStateCache.set(identifier, entry);
   return changed;
