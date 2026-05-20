@@ -38,7 +38,7 @@ const ROLE_ACCENTS = {
   work: 'var(--info)',
   review: 'var(--warning)',
   test: 'var(--success)',
-  ship: 'var(--signal-cost)',
+  ship: 'var(--signal-review)',
   flywheel: 'var(--primary)',
 } satisfies Record<AgentCardRole, string>;
 
