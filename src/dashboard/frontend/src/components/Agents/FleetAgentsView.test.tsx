@@ -36,7 +36,7 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
-function renderFleetView() {
+function renderFleetView(props: { onNavigateToIssues?: () => void } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -53,7 +53,7 @@ function renderFleetView() {
 
   return render(
     <QueryClientProvider client={client}>
-      <FleetAgentsView />
+      <FleetAgentsView {...props} />
     </QueryClientProvider>,
   );
 }
@@ -254,5 +254,65 @@ describe('FleetAgentsView', () => {
 
     const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
     expect(within(tiles[4] as HTMLElement).getByText('0m')).toBeInTheDocument();
+  });
+
+  it('renders TopBar with breadcrumb, meta, search placeholder, segmented control, and Start agent button', () => {
+    renderFleetView({ onNavigateToIssues: vi.fn() });
+
+    expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
+    expect(screen.getByText(/1 active · 1 stuck · 3h 0m cumulative runtime/)).toBeInTheDocument();
+    expect(screen.getByText('Search agents by name, issue, model…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
+  });
+
+  it('defaults to grid view and renders the existing card grid', () => {
+    renderFleetView();
+
+    expect(screen.getByRole('button', { name: 'grid', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+  });
+
+  it('switches to table view with Coming soon placeholder and updates URL', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'table' }));
+    expect(screen.getByRole('button', { name: 'table', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
+    expect(screen.queryByText('agent-running')).not.toBeInTheDocument();
+  });
+
+  it('switches to timeline view with Coming soon placeholder and updates URL', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'timeline' }));
+    expect(screen.getByRole('button', { name: 'timeline', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
+  });
+
+  it('preserves existing filters when switching view mode', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    expect(window.location.search).toBe('?phase=work');
+
+    fireEvent.click(screen.getByRole('button', { name: 'table' }));
+    expect(new URLSearchParams(window.location.search).get('phase')).toBe('work');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
+  });
+
+  it('calls onNavigateToIssues when Start agent is clicked', () => {
+    const onNavigateToIssues = vi.fn();
+    renderFleetView({ onNavigateToIssues });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start agent' }));
+    expect(onNavigateToIssues).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render Start agent button when onNavigateToIssues is omitted', () => {
+    renderFleetView();
+
+    expect(screen.queryByRole('button', { name: 'Start agent' })).not.toBeInTheDocument();
   });
 });

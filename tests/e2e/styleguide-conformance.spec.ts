@@ -253,4 +253,29 @@ describe('styleguide rendered surface conformance', () => {
     expect(primaryShadow).toContain('rgba(255, 255, 255, 0.06)');
     await drawer.context.close();
   }, 45_000);
+
+  it('agents page TopBar segmented control switches views and Start agent navigates to board', async () => {
+    const { context, page } = await openRoute('/agents');
+
+    await expect.poll(() => page.locator('[data-component="top-bar-segmented-control"]').count()).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agent-card"]').count()).toBe(1);
+
+    await page.getByRole('button', { name: 'table' }).click();
+    await expect.poll(() => page.url()).toContain('view=table');
+    await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count()).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agent-card"]').count()).toBe(0);
+
+    await page.getByRole('button', { name: 'timeline' }).click();
+    await expect.poll(() => page.url()).toContain('view=timeline');
+    await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count()).toBe(1);
+
+    await page.getByRole('button', { name: 'grid' }).click();
+    await expect.poll(() => page.url()).not.toContain('view=');
+    await expect.poll(() => page.locator('[data-component="agent-card"]').count()).toBe(1);
+
+    await page.getByRole('button', { name: 'Start agent' }).click();
+    await expect.poll(() => page.url()).toBe(`${baseUrl}/board`);
+
+    await context.close();
+  }, 45_000);
 });
