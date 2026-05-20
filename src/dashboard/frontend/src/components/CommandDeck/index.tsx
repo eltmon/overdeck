@@ -5,7 +5,6 @@ import { Compass, Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-re
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
-import { IssueWorkbench } from './IssueWorkbench';
 import { ZoneA } from './ZoneA';
 import type { OverviewTab as ZoneCOverviewTab } from './ZoneCOverview';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
@@ -1169,16 +1168,6 @@ export function CommandDeck({
     window.addEventListener('panopticon:reconnected', handler);
     return () => window.removeEventListener('panopticon:reconnected', handler);
   }, [queryClient]);
-
-  // Find selected feature data (memoized to avoid O(P×F) scan per render)
-  const selectedFeatureData = useMemo(() => {
-    if (!selectedFeature) return null;
-    for (const p of projectsWithSessions) {
-      const f = p.features.find(f => f.issueId === selectedFeature);
-      if (f) return f;
-    }
-    return null;
-  }, [projectsWithSessions, selectedFeature]);
 
   const selectedProjectData = useMemo(() => {
     if (!selectedProject) return null;
