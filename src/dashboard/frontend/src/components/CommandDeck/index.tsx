@@ -336,7 +336,7 @@ function ProjectRightPaneTabs({
           onSwitchTab={handleZoneASwitchTab}
         />
       )}
-      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-2" role="tablist" aria-label={`${projectName} right pane tabs`}>
+      <div className="flex h-[48px] shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-0" role="tablist" aria-label={`${projectName} right pane tabs`}>
         {PROJECT_RIGHT_TABS.map((tab) => (
           <button
             key={tab.id}
