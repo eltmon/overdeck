@@ -4,17 +4,17 @@
     "created": "2026-05-19T21:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1221: PAN-1148 follow-up — 2 minor review nits deferred at merge, plus a post-merge stream output panel regression discovered in UAT.",
-    "updated": "2026-05-20T14:01:50.604Z"
+    "updated": "2026-05-20T20:35:33.195Z"
   },
   "plan": {
     "id": "pan-1221",
     "title": "PAN-1148 follow-up: 2 minor review nits deferred at merge",
-    "status": "proposed",
+    "status": "completed",
     "uid": "f7d8c9e2-1a4b-4f3c-8e5d-9b2a7c6f1e3d",
     "author": "agent:claude-opus-4-7",
-    "sequence": 61,
+    "sequence": 95,
     "created": "2026-05-19T21:50:00.000Z",
-    "updated": "2026-05-20T14:01:50.604Z",
+    "updated": "2026-05-20T20:35:33.195Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1221",
@@ -242,71 +242,56 @@
     "metadata": {
       "canonicalFilename": "2026-05-19-PAN-1221-pan-1148-follow-up-2-minor-review-nits-deferred-at-merge.vbrief.json",
       "pipeline": {
-        "phase": "merge",
+        "phase": "done",
         "issueId": "PAN-1221",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T14:01:50.604Z",
+        "updatedAt": "2026-05-20T20:35:29.083Z",
         "work": {
-          "updatedAt": "2026-05-20T14:01:50.604Z",
+          "updatedAt": "2026-05-20T20:35:29.083Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-20T14:01:50.604Z",
-          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-          "history": [
-            {
-              "status": "passed",
-              "at": "2026-05-20T14:01:50.604Z",
-              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
-            }
-          ]
+          "updatedAt": "2026-05-20T20:35:29.083Z",
+          "history": []
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-05-20T14:01:50.604Z",
-          "notes": "All 14 ACs met; 2 non-blocking advisories on agent-output-service poller overlap",
+          "status": "pending",
+          "updatedAt": "2026-05-20T20:35:29.083Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-20T14:01:50.604Z",
-              "notes": "All 14 ACs met; 2 non-blocking advisories on agent-output-service poller overlap"
+              "status": "pending",
+              "at": "2026-05-20T20:35:29.083Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-05-20T14:01:50.604Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "status": "pending",
+          "updatedAt": "2026-05-20T20:35:29.083Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-20T14:01:50.604Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "status": "pending",
+              "at": "2026-05-20T20:35:29.083Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T14:01:50.604Z",
+          "updatedAt": "2026-05-20T20:35:29.083Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T14:01:50.604Z",
-          "notes": "Post-rebase verification failed at vbrief-ac",
+          "status": "merged",
+          "updatedAt": "2026-05-20T20:35:29.083Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T14:01:50.604Z",
-              "notes": "Post-rebase verification failed at vbrief-ac"
+              "status": "merged",
+              "at": "2026-05-20T20:35:29.083Z"
             }
           ],
-          "readyForMerge": true,
-          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1225"
+          "readyForMerge": false
         }
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
