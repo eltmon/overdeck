@@ -341,8 +341,7 @@ export function useDrawerData(): DrawerData {
   useEffect(() => {
     if (!drawerIssueId) return;
 
-    const isReuse = drawerIssueSubscription?.issueId === drawerIssueId;
-    if (isReuse) {
+    if (drawerIssueSubscription?.issueId === drawerIssueId) {
       if (drawerIssueSubscription.releaseTimer !== null) {
         window.clearTimeout(drawerIssueSubscription.releaseTimer);
         drawerIssueSubscription.releaseTimer = null;
