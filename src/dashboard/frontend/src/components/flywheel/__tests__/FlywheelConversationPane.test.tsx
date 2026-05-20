@@ -10,6 +10,12 @@ vi.mock('../../chat/ConversationPanel', () => ({
   ),
 }));
 
+vi.mock('../../XTerminal', () => ({
+  XTerminal: ({ sessionName }: { sessionName: string }) => (
+    <div data-testid="xterminal">{sessionName}</div>
+  ),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -184,6 +190,50 @@ describe('FlywheelConversationPane', () => {
 
     fireEvent.click(screen.getByText('Settings → Roles → Flywheel'));
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it('toggles between Conversation and Terminal views once the orchestrator session exists', async () => {
+    renderPane();
+
+    expect(await screen.findByTestId('conversation-panel')).toHaveTextContent('flywheel-orchestrator');
+    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
+
+    const conversationTab = screen.getByRole('tab', { name: 'Conversation' });
+    const terminalTab = screen.getByRole('tab', { name: 'Terminal' });
+    expect(conversationTab).toHaveAttribute('aria-selected', 'true');
+    expect(terminalTab).toHaveAttribute('aria-selected', 'false');
+    expect(terminalTab).not.toBeDisabled();
+
+    fireEvent.click(terminalTab);
+
+    expect(terminalTab).toHaveAttribute('aria-selected', 'true');
+    expect(conversationTab).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId('xterminal')).toHaveTextContent('flywheel-orchestrator');
+    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(conversationTab);
+
+    expect(conversationTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
+  });
+
+  it('disables the Terminal toggle when no flywheel-orchestrator session exists yet', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/flywheel/runs?limit=10') return Response.json([]);
+      if (url === '/api/flywheel/conversation') return Response.json(null);
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      return Response.json({ error: 'not found' }, { status: 404 });
+    }));
+
+    renderPane();
+
+    await waitFor(() => {
+      expect(screen.getByText(/No flywheel-orchestrator session yet/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('tab', { name: 'Terminal' })).toBeDisabled();
+    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
   });
 
   it('calls flywheel action routes from top-bar controls', async () => {

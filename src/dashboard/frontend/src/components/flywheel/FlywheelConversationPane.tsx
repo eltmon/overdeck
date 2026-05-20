@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Loader2, Pause, Play, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
+import toggleStyles from '../CommandDeck/styles/command-deck.module.css';
 
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 
@@ -95,7 +98,10 @@ export function findFlywheelConversation(conversations: Conversation[]): Convers
   )) ?? null;
 }
 
+type FlywheelPaneViewMode = 'conversation' | 'terminal';
+
 export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversationPaneProps) {
+  const [viewMode, setViewMode] = useState<FlywheelPaneViewMode>('conversation');
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
     queryKey: ['flywheel-runs'],
@@ -174,6 +180,28 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div className={toggleStyles.viewToggle} role="tablist" aria-label="Flywheel pane view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'conversation'}
+                className={`${toggleStyles.viewToggleBtn} ${viewMode === 'conversation' ? toggleStyles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('conversation')}
+              >
+                Conversation
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'terminal'}
+                className={`${toggleStyles.viewToggleBtn} ${viewMode === 'terminal' ? toggleStyles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('terminal')}
+                title={conversation ? 'Attach to flywheel-orchestrator tmux session' : 'No flywheel-orchestrator session yet'}
+                disabled={!conversation}
+              >
+                Terminal
+              </button>
+            </div>
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
@@ -235,12 +263,16 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             Loading flywheel conversation…
           </div>
         ) : conversation ? (
-          <ConversationPanel conversation={conversation} embedded />
+          viewMode === 'terminal' ? (
+            <XTerminal sessionName={FLYWHEEL_CONVERSATION_NAME} />
+          ) : (
+            <ConversationPanel conversation={conversation} embedded />
+          )
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
             <p className="text-sm font-medium text-foreground">No flywheel-orchestrator session yet.</p>
             <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-              Start a run to create the singleton conversation. Once it exists, this pane reuses the standard conversation transcript and composer.
+              Start a run to create the singleton conversation. Once it exists, this pane reuses the standard conversation transcript and composer, and the Terminal toggle attaches to the orchestrator&apos;s tmux session.
             </p>
           </div>
         )}
