@@ -30,7 +30,11 @@ interface AgentOutputServiceState {
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
 
 export function splitLines(text: string): string[] {
-  return text.split('\n')
+  const lines = text.split('\n')
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop()
+  }
+  return lines
 }
 
 /**
