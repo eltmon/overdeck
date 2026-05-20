@@ -291,10 +291,10 @@ function ProjectRightPaneTabs({
   }, [controlledActiveIssueId]);
 
   useEffect(() => {
-    if (selectedConversation) {
+    if (selectedConversation && conversations.some(c => c.name === selectedConversation)) {
       setActiveTab('conversations');
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, conversations]);
 
   const selectTab = (tab: ProjectRightTab) => {
     hasExplicitTabChoiceRef.current = true;
@@ -1189,7 +1189,19 @@ export function CommandDeck({
     return null;
   }, [projectsWithSessions, selectedFeature]);
 
-  const rightPaneProject = selectedProjectData ?? resolvedProjectForFeature;
+  const resolvedProjectForConversation = useMemo(() => {
+    if (!selectedConversation) return null;
+    const conv = conversations.find(c => c.name === selectedConversation);
+    if (!conv || !conv.cwd) return null;
+    const matched = registeredProjects.find(rp =>
+      conv.cwd === rp.path || conv.cwd.startsWith(rp.path + '/'),
+    );
+    if (!matched) return null;
+    const name = matched.name ?? matched.key;
+    return projectsWithSessions.find(p => p.name === name) ?? null;
+  }, [conversations, selectedConversation, registeredProjects, projectsWithSessions]);
+
+  const rightPaneProject = selectedProjectData ?? resolvedProjectForFeature ?? resolvedProjectForConversation;
 
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
@@ -1449,29 +1461,6 @@ export function CommandDeck({
                 if (issueId) handleSelectFeature(issueId);
               }}
             />
-          ) : selectedConversation ? (
-            (() => {
-              const conv = conversations.find(c => c.name === selectedConversation);
-              return conv ? (
-                <ConversationPanel
-                  key={conv.name}
-                  conversation={conv}
-                  viewMode={conversationViewMode}
-                  onViewModeChange={onConversationViewModeChange}
-                  agentId={selectedAgent?.id}
-                  onArchived={() => {
-                    setSelectedConversation(null);
-                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
-                  }}
-                />
-              ) : (
-                <div className={styles.contentEmpty}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p>Conversation not found.</p>
-                  </div>
-                </div>
-              );
-            })()
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>

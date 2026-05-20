@@ -60,17 +60,6 @@ vi.mock('./SessionView/SessionPanel', () => ({
   ),
 }));
 
-vi.mock('./IssueWorkbench', () => ({
-  IssueWorkbench: (props: any) => (
-    <div data-testid="issue-workbench" data-issue={props.issueId} data-mode={props.sessions?.length > 0 && props.sessions[0]?.presence === 'active' ? 'agent-selected' : 'feature-selected'}>
-      <div data-testid="issue-header" data-issue={props.issueId} data-title={props.title} />
-      {props.sessions?.map((s: any) => (
-        <div key={s.sessionId} data-testid="session-panel" data-session={s.sessionId} data-issue={props.issueId} />
-      ))}
-    </div>
-  ),
-}));
-
 vi.mock('./ProjectTree/ProjectNode', () => ({
   ProjectNode: (props: any) => {
     // Simulate tab switch to projects when rendered
