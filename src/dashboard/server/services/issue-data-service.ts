@@ -22,6 +22,17 @@ import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlanAsync, readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
+import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+
+/**
+ * Compute bead progress counts from a cached plan document.
+ * Exported for testing.
+ */
+export function computeBeadCounts(doc: VBriefDocument | null): { completed: number; total: number } | null {
+  const items = doc?.plan?.items ?? [];
+  if (items.length === 0) return null;
+  return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };
+}
 
 /**
  * Map a raw status string to its canonical state.
@@ -129,7 +140,13 @@ function mapRallyStateToCanonical(issueState: string): string {
  * change.
  */
 interface PlanningStateCacheEntry {
-  result: { hasPlan: boolean; hasBeads: boolean; planningComplete: boolean; workspacePath: string };
+  result: {
+    hasPlan: boolean;
+    hasBeads: boolean;
+    planningComplete: boolean;
+    workspacePath: string;
+    beadCounts: { completed: number; total: number } | null;
+  };
   planMtimeMs: number; // -1 when no plan file existed at compute time
 }
 const planningStateCache = new Map<string, PlanningStateCacheEntry>();
@@ -143,19 +160,20 @@ function getCachedPlanningState(identifier: string): {
   hasBeads: boolean;
   planningComplete: boolean;
   workspacePath: string;
+  beadCounts: { completed: number; total: number } | null;
 } {
   try {
     const resolved = resolveProjectFromIssue(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) {
-      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
     }
     const issueLower = identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     return planningStateCache.get(identifier)?.result
-      ?? { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
+      ?? { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null };
   } catch {
-    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
   }
 }
 
@@ -166,7 +184,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const resolved = resolveProjectFromIssue(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' },
+      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
       planMtimeMs: -1,
     });
 
@@ -174,7 +192,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
       return updatePlanningStateCache(identifier, {
-        result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath },
+        result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null },
         planMtimeMs: -1,
       });
     }
@@ -196,13 +214,14 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
 
     const doc = planPath ? await readWorkspacePlanAsync(workspacePath) : null;
     const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
+    const beadCounts = computeBeadCounts(doc);
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath },
+      result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath, beadCounts },
       planMtimeMs,
     });
   } catch {
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' },
+      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
       planMtimeMs: -1,
     });
   } finally {
@@ -416,6 +435,7 @@ export class IssueDataService {
         hasBeads: ps.hasBeads,
         planningComplete: ps.planningComplete,
         workspacePath: ps.workspacePath || undefined,
+        beadCounts: ps.beadCounts,
       };
     });
 
