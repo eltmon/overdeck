@@ -1,0 +1,539 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1232: PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors",
+    "updated": "2026-05-20T02:39:41.616Z"
+  },
+  "plan": {
+    "id": "pan-1232",
+    "title": "PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors",
+    "status": "proposed",
+    "uid": "d4f2e1a7-5b9c-4e3d-a8f6-2c1b9d4e5a7f",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:45:00.000Z",
+    "updated": "2026-05-20T02:39:41.616Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1232",
+        "label": "PAN-1232",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "Dashboard unified-redesign PRD §4.3, §4.7.8",
+        "type": "spec"
+      },
+      {
+        "uri": "docs/design/mockups/issue-detail-opus.html",
+        "label": "Issue-detail drawer mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "drawer",
+      "ui",
+      "pan-1148-followup"
+    ],
+    "narratives": {
+      "Problem": "PAN-1148 shipped the IssueDrawer shell (width, scrim, animation, tab strip, action bar, phase timeline, beads list, review specialists, activity rail), but the content layer underneath the shell never got wired up. Six of seven tabs render the literal placeholder string 'This drawer section will appear here as data streams in.' The drawer header collapses to a single 52px row with the wrong font (DM Sans 18px) and no priority bar / meta row. The active-agent stream excerpt renders every line in muted-foreground with no color classification. This issue closes those gaps to bring the drawer to PRD §4.3 + §4.7.8 compliance.",
+      "Proposal": "Decompose into 9 small, independently reviewable beads: (1) restructure drawer header per §4.7.8 — padding 16px 22px 0, 4×28 priority left bar at row start, meta row with branch chip + cost figure; (2) drawer title font: Space Grotesk 22px weight 600 letter-spacing -0.01em via font-display Tailwind class (font loader is a sibling cross-cutting issue's responsibility); (3) stream excerpt inline color helpers (.verb-line, .ok, .warn, .err, .neutral); (4-9) wire each of the six placeholder tabs (Plan, Beads, Conversation, Terminal, Activity, Files) to its real content by reusing existing components — VBriefViewer, DrawerBeadsList, ConversationPanel/MessagesTimeline (preserved per PRD §6 step 5), XTerminal, detailedActivity slice, DiffPanel. Every tab wrapper preserves its drawer-tab-panel-<tab> testid so the existing test suite continues to pass."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Skip preemptively adding @fontsource/space-grotesk global import; rely on sibling cross-cutting font-loader issue.",
+        "rationale": "Issue description explicitly calls this dependency out. Adding the import here risks conflict with the sibling fix. The Tailwind font-display class works regardless; visual rendering becomes correct once the sibling lands."
+      },
+      {
+        "summary": "Files tab uses DiffPanel (or its files-only summary mode) scoped to workspace branch vs main, not a new endpoint.",
+        "rationale": "DiffPanel already speaks the existing diff API. Adding a files-list endpoint would be a new server surface for a tab that needs ~20 lines of UI. Reuse is faster, smaller, and keeps the drawer purely a presentation layer."
+      },
+      {
+        "summary": "Activity tab renders detailedActivity scoped to the issue with no slice cap, reusing the side-rail item layout.",
+        "rationale": "PRD doesn't differentiate tab vs side-rail layout — uniform appearance keeps the drawer feeling cohesive. Removing the 100-item cap is the only meaningful difference from the side rail."
+      },
+      {
+        "summary": "Beads tab renders DrawerBeadsList as the sole content (same component as on Overview).",
+        "rationale": "PRD §4.3 lists 'Beads N/M' tab as functional but does not specify a different layout. Standalone DrawerBeadsList is the simplest defensible interpretation; no need to invent a second representation."
+      },
+      {
+        "summary": "All beads use requiresInspection: false.",
+        "rationale": "Every bead is a leaf wiring on top of an existing component. None lays an interface, schema, or naming convention that subsequent beads encode assumptions about. Inspection would be rubber-stamping."
+      }
+    ],
+    "items": [
+      {
+        "id": "drawer-header-priority-bar",
+        "title": "Restructure drawer header: padding, 4x28 priority left bar, meta row with branch chip + cost figure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite the <header> in src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx to match PRD §4.7.8: change padding from px-[22px] (with implicit vertical centering inside h-[52px]) to padding 16px 22px 0; add a 4px×28px priority bar at the start of the header row whose background is mapped from issue.priority (1=destructive, 2=warning, 3=muted-foreground, 4=transparent); change the ID chip to SF Mono 13px muted (font-mono text-[13px] text-muted-foreground); add a second 'meta row' below the title showing a 12px muted branch chip (background var(--accent), radius var(--radius-md), 8px gap from siblings) and a cost figure in --signal-cost-foreground. Branch comes from activeAgent.branchName via useDrawerData; cost comes from activeAgent.costSoFar (reuse formatSpend from DrawerActiveAgent or copy it inline). Both gracefully degrade to '—' when no active agent."
+        },
+        "subItems": [
+          {
+            "id": "drawer-header-priority-bar.ac1",
+            "title": "Header padding is 16px 22px 0 (not h-[52px] with vertical centering)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac2",
+            "title": "A 4x28 priority bar element renders at the start of the header row with data-testid='drawer-header-priority-bar'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac3",
+            "title": "Priority bar color maps: priority=1->bg-destructive, 2->bg-warning, 3->bg-muted-foreground, 4->bg-transparent (or border-transparent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac4",
+            "title": "ID chip uses font-mono text-[13px] text-muted-foreground (not text-[11px] uppercase tracking-[0.08em])",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac5",
+            "title": "A meta row renders below the title with data-testid='drawer-header-meta'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac6",
+            "title": "Meta row contains a branch chip (background var(--accent), radius var(--radius-md), 12px muted text) and a cost figure (--signal-cost-foreground)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac7",
+            "title": "Branch and cost gracefully render '—' when no active agent exists for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-header-priority-bar.ac8",
+            "title": "Existing IssueDrawer.test.tsx tests still pass (close button, scrim-close, Esc-close, tab switching, URL sync)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-title-font",
+        "title": "Drawer title font: Space Grotesk 22px weight 600 letter-spacing -0.01em",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In IssueDrawer.tsx, change the title element from text-[18px] font-semibold to font-display text-[22px] font-semibold tracking-[-0.01em]. The font-display Tailwind class is already mapped to Space Grotesk in src/dashboard/frontend/tailwind.config.js. Do NOT add @fontsource/space-grotesk global import here — the sibling cross-cutting font-loader issue is responsible for that. Per PRD §4.7.8 this is an explicit carve-out from the §4.7 'Space Grotesk reserved for sidebar wordmark' rule."
+        },
+        "subItems": [
+          {
+            "id": "drawer-title-font.ac1",
+            "title": "Title element uses className containing 'font-display', 'text-[22px]', 'font-semibold', 'tracking-[-0.01em]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-title-font.ac2",
+            "title": "No @fontsource/space-grotesk import added in this issue's diff (deferred to sibling font-loader issue)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stream-color-classifier",
+        "title": "Active-agent stream excerpt: inline color helpers (.verb-line, .ok, .warn, .err, .neutral)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/drawer/DrawerActiveAgent.tsx, replace the blanket text-muted-foreground line rendering at line 107-109 with a per-line classifier. Implement a pure helper classifyStreamLine(line: string): 'verb-line' | 'ok' | 'warn' | 'err' | 'neutral' that matches by prefix/keyword: lines starting with arrow/verb glyphs (→, ▸, ✱) → 'verb-line' (text-signal-review-foreground); lines containing /^✓|\\bOK\\b|\\bPASS\\b|\\bdone\\b/i → 'ok' (text-success-foreground); /^!|\\bWARN\\b|\\bWARNING\\b/i → 'warn' (text-warning-foreground); /^✗|\\bERR\\b|\\bERROR\\b|\\bFAIL\\b/i → 'err' (text-destructive-foreground); default → 'neutral' (text-foreground). Apply the corresponding text-* color class to each line; remove the wrapper text-muted-foreground class so per-line colors win."
+        },
+        "subItems": [
+          {
+            "id": "stream-color-classifier.ac1",
+            "title": "classifyStreamLine helper exists, is exported for testing, and covers all five kinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-color-classifier.ac2",
+            "title": "Unit test in DrawerActiveAgent.test.tsx (or sibling) asserts classifier output for one representative line of each kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-color-classifier.ac3",
+            "title": "Stream lines render with the corresponding color class; the outer wrapper no longer applies text-muted-foreground",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stream-color-classifier.ac4",
+            "title": "data-testid='drawer-active-agent-stream' wrapper is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-plan",
+        "title": "Wire Plan tab: render VBriefViewer for the issue's vBRIEF",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'plan' tab in IssueDrawer.tsx with a panel that fetches the vBRIEF from GET /api/workspaces/:issueId/plan (use @tanstack/react-query's useQuery) and renders <VBriefViewer doc={data ?? null} />. Wrap in a div with data-testid='drawer-tab-panel-plan'. Show loading and error states inline (small text-[12px] muted)."
+        },
+        "subItems": [
+          {
+            "id": "tab-plan.ac1",
+            "title": "When drawer.tab === 'plan', the panel renders <VBriefViewer> with the fetched plan inside a wrapper carrying data-testid='drawer-tab-panel-plan'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-plan.ac2",
+            "title": "Fetch uses GET /api/workspaces/:issueId/plan via useQuery with the drawer issueId as part of the query key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-plan.ac3",
+            "title": "Loading state renders a 12px muted 'Loading plan…' message; error renders a 12px muted error line; empty plan delegates the empty-state to VBriefViewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-plan.ac4",
+            "title": "Switching away from the plan tab and back does not re-fetch within React Query's default staleTime (no flicker)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-beads",
+        "title": "Wire Beads tab: render DrawerBeadsList standalone",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'beads' tab in IssueDrawer.tsx with <DrawerBeadsList /> wrapped in a div with data-testid='drawer-tab-panel-beads'. No other changes — DrawerBeadsList already reads from useDrawerData and handles the empty state."
+        },
+        "subItems": [
+          {
+            "id": "tab-beads.ac1",
+            "title": "When drawer.tab === 'beads', the panel renders <DrawerBeadsList> inside a wrapper carrying data-testid='drawer-tab-panel-beads'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-beads.ac2",
+            "title": "The Beads tab's count chip in DrawerTabs continues to show the same N/M value (no regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-conversation",
+        "title": "Wire Conversation tab: render existing thread component for active agent's session (PRD §6 step 5: no rewrite)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'conversation' tab in IssueDrawer.tsx with the existing conversation thread component (ConversationPanel from src/dashboard/frontend/src/components/chat/ConversationPanel.tsx, or MessagesTimeline if a lighter footprint is needed) keyed by the active agent's tmux session / conversation. DO NOT rewrite or reimplement conversation rendering — PRD §6 step 5: 'Preserve the existing conversation thread component inside the Conversations tab — no rewrite.' If no active agent exists for the issue, render an empty state ('No conversation yet — start an agent to begin.') with 12px muted text. Wrap in data-testid='drawer-tab-panel-conversation'."
+        },
+        "subItems": [
+          {
+            "id": "tab-conversation.ac1",
+            "title": "When drawer.tab === 'conversation' AND an active agent exists, the panel renders the existing ConversationPanel (or MessagesTimeline) component — no new conversation-rendering code is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-conversation.ac2",
+            "title": "When no active agent exists for the issue, the panel renders an empty state with 12px muted text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-conversation.ac3",
+            "title": "Wrapper carries data-testid='drawer-tab-panel-conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-conversation.ac4",
+            "title": "Conversation component is keyed by issue id (or conversation id) so switching issues remounts the thread cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-terminal",
+        "title": "Wire Terminal tab: render XTerminal pointed at active agent's tmux session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'terminal' tab in IssueDrawer.tsx with <XTerminal sessionName={activeAgent.tmuxSession ?? activeAgent.id} /> when an active agent exists, or an empty-state ('No agent session to attach to.') otherwise. Wrap in data-testid='drawer-tab-panel-terminal'. Only mount XTerminal when the tab is active (cheap-mount behavior) so the /ws/terminal connection isn't opened needlessly."
+        },
+        "subItems": [
+          {
+            "id": "tab-terminal.ac1",
+            "title": "When drawer.tab === 'terminal' AND an active agent exists, the panel renders <XTerminal> attached to the agent's tmux session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-terminal.ac2",
+            "title": "XTerminal is only mounted while the terminal tab is active (no socket opened for other tabs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-terminal.ac3",
+            "title": "When no active agent exists, an empty-state with 12px muted text renders instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-terminal.ac4",
+            "title": "Wrapper carries data-testid='drawer-tab-panel-terminal'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-activity",
+        "title": "Wire Activity tab: render full activity feed scoped to issue (no slice cap)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'activity' tab in IssueDrawer.tsx with an activity feed identical in row layout to DrawerActivityRail (8x8 status dot + 12px message + 10px mono muted timestamp), but reading the FULL detailedActivity slice scoped to the issue via the same agentIssueLookup pattern in useDrawerData. Reuse the phaseForActivity helper. Wrap in data-testid='drawer-tab-panel-activity'. Render newest-first; show empty state 'No activity yet.' when none."
+        },
+        "subItems": [
+          {
+            "id": "tab-activity.ac1",
+            "title": "When drawer.tab === 'activity', the panel renders activity items in newest-first order with no slice cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-activity.ac2",
+            "title": "Activity items use the same row layout as DrawerActivityRail (status dot + message + timestamp)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-activity.ac3",
+            "title": "Activity is filtered to the current issue via the same agentIssueLookup logic used by the side rail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-activity.ac4",
+            "title": "Wrapper carries data-testid='drawer-tab-panel-activity'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-activity.ac5",
+            "title": "Empty state copy renders when no activity exists for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-files",
+        "title": "Wire Files tab: render workspace branch-vs-main file changes via DiffPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the DrawerTabPlaceholder for the 'files' tab in IssueDrawer.tsx with the existing DiffPanel component scoped to the workspace branch (feature/<issue-id>) vs main. If DiffPanel exposes a 'files-only summary' or 'compact' mode, prefer that; otherwise render the full DiffPanel. Wrap in data-testid='drawer-tab-panel-files'. If the workspace branch does not exist (no workspace yet) render an empty state ('No workspace branch yet.') with 12px muted text. Do NOT introduce a new server endpoint — reuse whatever DiffPanel already calls."
+        },
+        "subItems": [
+          {
+            "id": "tab-files.ac1",
+            "title": "When drawer.tab === 'files' AND a workspace branch exists for the issue, the panel renders DiffPanel scoped to feature/<issue-id> vs main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-files.ac2",
+            "title": "When no workspace branch exists, an empty-state with 12px muted text renders instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-files.ac3",
+            "title": "Wrapper carries data-testid='drawer-tab-panel-files'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-files.ac4",
+            "title": "No new server route or endpoint is added; only existing DiffPanel API calls are used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "drawer-header-priority-bar",
+        "to": "drawer-title-font",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1232-pan-1148-follow-up-issuedrawer-6-tabs-as-placeholders-title-font-header-structure-stream-colors.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
