@@ -1,0 +1,426 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T03:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1230: PAN-1148 follow-up — Command Deck right-pane Pipeline-lens + TopBar height",
+    "updated": "2026-05-20T02:43:16.733Z"
+  },
+  "plan": {
+    "id": "pan-1230",
+    "title": "PAN-1148 follow-up — Command Deck right-pane Pipeline-lens + TopBar height",
+    "status": "proposed",
+    "uid": "8f4a1b2c-3d5e-4f6a-9b8c-7d6e5f4a3b2c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T03:00:00.000Z",
+    "updated": "2026-05-20T02:43:16.733Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1230",
+        "label": "PAN-1230",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1226 (parent 32-gap audit)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "PRD: unified dashboard redesign",
+        "type": "document"
+      },
+      {
+        "uri": "docs/design/mockups/pipeline-command-deck-opus.html",
+        "label": "Mockup: Command Deck (opus)",
+        "type": "design"
+      },
+      {
+        "uri": "docs/design/mockups/PAN-830-unified-command-deck.html",
+        "label": "Mockup: PAN-830 unified Command Deck",
+        "type": "design"
+      },
+      {
+        "uri": "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "label": "CommandDeck source",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "command-deck",
+      "ui",
+      "audit-followup",
+      "pan-1148",
+      "pan-1226"
+    ],
+    "narratives": {
+      "Problem": "The PAN-1148 unified-dashboard work shipped a per-project tabbed lens component (ProjectRightPaneTabs at src/dashboard/frontend/src/components/CommandDeck/index.tsx:226) with the six PRD tabs — Pipeline / Plans / Beads / Conversations / Activity / Settings — but failed to wire it as the actual right pane. The legacy top-level branches at index.tsx ~1310–1362 still win in normal usage: selecting a conversation mounts the old single-purpose ConversationPanel, and selecting an issue mounts the legacy IssueWorkbench. The lens only renders when the user clicks a project header without expanding into any feature, which is rare. The #1226 audit (CD-1, High) calls this out as 'the old conversation viewer is still there'. Separately, the right-pane top bar (the tab strip) is sized 52px-ish, but PRD §4.7.12 specifies 48px for Command Deck (CD-2, Medium).",
+      "Proposal": "Invert the right-pane render priority in CommandDeck/index.tsx so ProjectRightPaneTabs is the unconditional right-pane shell whenever a project is resolvable. Remove the top-level selectedConversation → ConversationPanel and selectedFeature → IssueWorkbench branches; instead, (a) render ConversationPanel inline INSIDE the Conversations tab when a conversation is selected, auto-switching the active tab on selection, and (b) thread selectedFeature into the lens as a controlled activeIssueId prop so tabs 2–6 drill into the highlighted issue and the Pipeline tab can scroll/highlight that row. Preserve the per-issue action surface (ZoneActionStrip) by mounting a compact issue-actions row above the tab strip when an issue is highlighted, so users don't lose access to start/stop/fork/plan/open-beads. Pin the tab strip height to 48px per PRD §4.7.12. Out of scope: the Issue Detail drawer (separate #1226 sub-issue), the 5-tile mini metric strip (separate #1226 sub-issue), and any rewrite of conversation rendering (PRD §6 step 5 forbids it)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope strictly to CD-1 (right pane = per-project lens) and CD-2 (right-pane top bar = 48px). The Issue Detail drawer overlay (PRD §4.7.8) and the 5-tile metric strip (PRD §4.7.12 'mini stats in feature header') are deferred to other #1226-derived follow-ups.",
+        "rationale": "The issue body explicitly lists only CD-1 and CD-2. Pulling in the drawer or metric strip would expand the bead count substantially and overlap with other #1226 children. Keeping scope tight matches the audit's split-out structure."
+      },
+      {
+        "summary": "CD-2's 48px target applies to the right-pane tab strip header (the bar at index.tsx:270 with Pipeline/Plans/Beads/Conversations/Activity/Settings tabs).",
+        "rationale": "PRD §4.7.12 row reads 'Command Deck | 48px (within feature header)'. The Command Deck doesn't compose the TopBar primitive (which defaults to 52px and stays at 52px for Pipeline). The tab strip is the right pane's visible feature-header top bar, so it is the element that must measure 48px."
+      },
+      {
+        "summary": "On issue selection (selectedFeature non-null with selectedProject set), the lens stays mounted as the right pane and switches to the Pipeline tab with that issue highlighted/scrolled-into-view. Tabs 2–6 receive the selected issue id via a controlled activeIssueId prop so drill-down content reflects the tree selection.",
+        "rationale": "Two alternatives were rejected: (a) auto-switching to 'overview'-style detail tab — there is no single 'issue detail' tab in the lens, and Plans/Beads/etc. each show only one facet; (b) re-mounting IssueWorkbench inline — that's the legacy shape the audit is removing. Pipeline-with-highlight matches what the PRD calls 'a per-project lens that mirrors Pipeline filtered to one project' and keeps the surface stable across selections."
+      },
+      {
+        "summary": "On conversation selection (selectedConversation non-null), the lens auto-switches activeTab to 'conversations' and renders ConversationPanel inline within that tab in place of the conversation list, with a back affordance to return to the list.",
+        "rationale": "PRD §6 step 5: 'Preserve the existing conversation thread component inside the Conversations tab — no rewrite of conversation rendering.' Auto-switching the tab is the only way to keep the existing 'click a conversation in the project tree → see the conversation' user flow intact after removing the top-level ConversationPanel branch."
+      },
+      {
+        "summary": "Per-issue actions previously surfaced by ZoneActionStrip (inside IssueWorkbench ZoneA) are folded into a compact issue-actions row that mounts above the lens tab strip when an issue is highlighted. The actions, their handlers, and their existing test ids are preserved verbatim.",
+        "rationale": "Without this, removing the top-level IssueWorkbench render would regress access to start/stop/fork/plan/open-beads — a UX regression the audit did not authorize. Reusing ZoneActionStrip (or its constituent buttons) keeps the diff small and behavior identical."
+      },
+      {
+        "summary": "Right-pane tab strip height is enforced via Tailwind h-[48px] on the strip container, with internal padding adjusted (e.g. py-0 + items-center) so the tab buttons remain vertically centered. The 48px is measured at runtime via getBoundingClientRect() in tests so cascade regressions are caught.",
+        "rationale": "Inline-style sizing or arbitrary CSS would be fragile against future style refactors. h-[48px] in Tailwind is the project's existing pattern (see Pipeline TopBar test at PipelineView.test.tsx:120 asserting h-[52px]). Tying the assertion to computed height (not class presence) catches actual rendering regressions."
+      },
+      {
+        "summary": "Browser-level UAT for the right-pane reframe uses a fresh, isolated Playwright browser context per test. localStorage keys (`mc-project-right-tab:*`) are seeded inside the test, not assumed.",
+        "rationale": "Per workspace conventions, Playwright sessions must be isolated — agents cannot rely on shared cookies, localStorage, or state from another agent's run. Fresh contexts also guarantee the 'first-time visit' default-tab behavior is exercised."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-lens-as-default-rightpane",
+        "title": "Make ProjectRightPaneTabs the unconditional right pane when a project is selected",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T03:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1230",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b2-conversation-rendering-in-tab",
+            "b3-preserve-issue-actions",
+            "b5-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, refactor the right-pane render logic at lines ~1310–1362. Remove the top-level `selectedConversation ? ConversationPanel : selectedFeature ? IssueWorkbench :` branches. Render ProjectRightPaneTabs whenever a project is resolvable (either selectedProject is set OR selectedFeature is set and the project can be derived from it). Thread selectedFeature into ProjectRightPaneTabs as a new controlled `activeIssueId` prop; inside ProjectRightPaneTabs, this prop overrides the internal `activeIssueId` state, the existing local state remains as a fallback when the prop is null (e.g. the user clicked the project header). Update the empty state to render only when no project at all is selected (no projects loaded yet)."
+        },
+        "subItems": [
+          {
+            "id": "b1-lens-as-default-rightpane.ac1",
+            "title": "When a project is selected in the tree (with or without a feature/conversation also selected), the right pane DOM contains `data-component=\"command-deck-right-pane-tabs\"` as the top-level right-pane container.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-lens-as-default-rightpane.ac2",
+            "title": "When a feature is selected in the project tree, the top-level right pane does NOT mount `data-testid=\"issue-workbench\"` (the legacy IssueWorkbench shell). The lens remains mounted instead.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-lens-as-default-rightpane.ac3",
+            "title": "ProjectRightPaneTabs accepts a new controlled `activeIssueId?: string | null` prop. When set, tabs 2–6 (Plans / Beads / Conversations / Activity / Settings) drill into that issue id. When null, the existing first-feature default applies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-lens-as-default-rightpane.ac4",
+            "title": "Selecting a feature in the tree sets the lens's `activeTab` to `'pipeline'` (so the user sees the project-filtered Pipeline with that issue) unless the user has explicitly chosen another tab during this session; tab choice still persists per-project to localStorage `mc-project-right-tab:<projectName>`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-lens-as-default-rightpane.ac5",
+            "title": "No regressions: existing tab keyboard navigation, tab persistence per-project, and Pipeline-tab ProjectOverview rendering all continue to work as in the current code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-lens-as-default-rightpane.ac6",
+            "title": "Typecheck + lint + existing CommandDeck unit tests pass (some tests will be updated in b5; this bead does not break any tests that aren't touched in b5).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-conversation-rendering-in-tab",
+        "title": "Render ConversationPanel inside the Conversations tab instead of as the top-level right pane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T03:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Inside ProjectRightPaneTabs, modify the `activeTab === 'conversations'` branch (currently at index.tsx ~316–332) so that when a conversation is selected (selectedConversation non-null), the tab renders ConversationPanel inline in place of the conversation list (or above it) — with a 'Back to conversations' affordance that clears selectedConversation. When no conversation is selected, the existing DiscussionsTab + conversation-button list renders as today. Wire the lens so that setting selectedConversation in CommandDeck auto-sets the lens's activeTab to `'conversations'` (an effect at the CommandDeck level or via a tab-controller prop). Forward the same `viewMode`, `onConvIdChange`, `onConversationViewModeChange`, `agentId`, and `onArchived` props that the old top-level ConversationPanel received."
+        },
+        "subItems": [
+          {
+            "id": "b2-conversation-rendering-in-tab.ac1",
+            "title": "Selecting a conversation (e.g. clicking a conversation row in the project tree) auto-switches the lens to the Conversations tab.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-conversation-rendering-in-tab.ac2",
+            "title": "When a conversation is selected, the Conversations tab body renders ConversationPanel with the same props (viewMode, onViewModeChange, agentId, onArchived) it received from the legacy top-level branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-conversation-rendering-in-tab.ac3",
+            "title": "A 'Back' (or equivalent) control inside the Conversations tab clears selectedConversation and restores the DiscussionsTab + conversation list view inside the tab.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-conversation-rendering-in-tab.ac4",
+            "title": "The top-level `selectedConversation ? ConversationPanel : ...` branch is fully removed from the right-pane render block in CommandDeck/index.tsx; ConversationPanel is imported only by the Conversations-tab code path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-conversation-rendering-in-tab.ac5",
+            "title": "Archiving a conversation (onArchived) still clears selectedConversation and invalidates the conversations query — behavior identical to today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-preserve-issue-actions",
+        "title": "Surface per-issue actions (start/stop/fork/plan/open-beads) within the lens shell so removing IssueWorkbench doesn't regress UX",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T03:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "When the lens has a non-null activeIssueId (from b1's controlled prop OR from internal state), mount a compact issue-actions row above the tab strip that reuses the existing ZoneActionStrip component (or its constituent action buttons). Forward the same agent / issue / onOpenBeads / onSwitchTab props that ZoneA was passing to ZoneActionStrip. Preserve existing test ids (e.g. `data-testid=\"zone-a-cost\"`, action-button data-testids) so existing tests and any external automation continue to find their targets. If the existing ZoneActionStrip API doesn't fit the new shell cleanly, extract the action-button JSX into a small `IssueActionsRow` component used by both ZoneA (legacy callers — none after b1) and the lens; do not modify ZoneActionStrip's behavior."
+        },
+        "subItems": [
+          {
+            "id": "b3-preserve-issue-actions.ac1",
+            "title": "When an issue is highlighted in the lens (activeIssueId non-null), a compact actions row is visible above or beside the tab strip exposing the same actions previously surfaced by ZoneA's ZoneActionStrip (start, stop, fork, plan, open-beads, view-source, view-url, cost display).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-preserve-issue-actions.ac2",
+            "title": "Every existing data-testid that ZoneA / ZoneActionStrip exposed (including but not limited to `zone-a-cost`) is preserved verbatim in the new actions row OR aliased into the lens with the same id, so existing tests and tools can find them.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-preserve-issue-actions.ac3",
+            "title": "Action handler wiring is unchanged: e.g. clicking 'Open beads' still triggers the BeadsDialog opener, clicking 'Plan' still triggers the PlanDialog opener, etc. No behavior regressions versus the legacy IssueWorkbench surface.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-preserve-issue-actions.ac4",
+            "title": "When no issue is highlighted (activeIssueId null — e.g. user clicked the project header), the actions row is hidden (or shows a project-level placeholder). The lens does not render dead/disabled action buttons.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-tab-strip-48px",
+        "title": "Right-pane tab strip height is exactly 48px per PRD §4.7.12",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T03:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, update the ProjectRightPaneTabs tab strip element (currently at line 270: `<div className=\"flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-2\" role=\"tablist\">`) to enforce a 48px height. Use Tailwind `h-[48px]` and adjust internal padding (replace `py-2` with `py-0` so the explicit height is authoritative; keep `px-3` and `items-center` so tab buttons vertically center). The Pipeline route's TopBar at 52px is unaffected — that primitive stays at h-[52px]."
+        },
+        "subItems": [
+          {
+            "id": "b4-tab-strip-48px.ac1",
+            "title": "The right-pane tab strip element (`data-component=\"command-deck-right-pane-tabs\"` → first child role=\"tablist\") has class `h-[48px]` and renders at exactly 48px tall (measured via `getBoundingClientRect().height`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-tab-strip-48px.ac2",
+            "title": "Tab button vertical alignment is unchanged visually — buttons remain centered within the strip after the height change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-tab-strip-48px.ac3",
+            "title": "Pipeline route TopBar primitive remains at 52px (the Pipeline test PipelineView.test.tsx:120 asserting `h-[52px]` still passes — Pipeline = 52px per PRD §4.7.12 row 1, Command Deck = 48px per row 3, they are different surfaces).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-tests",
+        "title": "Update + add tests covering the right-pane lens default and 48px tab strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T03:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update existing Vitest suites under src/dashboard/frontend/src/components/CommandDeck/__tests__ (and CommandDeck.test.tsx) that depended on the legacy `selectedFeature → IssueWorkbench` top-level rendering: rewrite assertions to target the lens (`data-component=\"command-deck-right-pane-tabs\"`). Add new Vitest assertions: (1) right pane is the lens when a project is selected, with or without feature/conversation; (2) selecting a conversation auto-switches activeTab to `'conversations'` and ConversationPanel mounts inside it; (3) ZoneActionStrip / IssueActionsRow renders above the tab strip when an issue is highlighted; (4) the tab strip computed height is 48px. Add a Playwright UAT in an isolated browser context that walks the flow: load /command-deck → pick a project → confirm lens is the right pane → pick a feature → confirm lens persists with issue context → pick a conversation → confirm Conversations tab opens with ConversationPanel inside it → assert the tab strip is 48px tall."
+        },
+        "subItems": [
+          {
+            "id": "b5-tests.ac1",
+            "title": "Vitest assertion: with selectedProject set and no selectedFeature, the right pane DOM contains `data-component=\"command-deck-right-pane-tabs\"`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac2",
+            "title": "Vitest assertion: with selectedFeature set, the right pane DOM does NOT contain `data-testid=\"issue-workbench\"` at the top level; the lens is rendered instead.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac3",
+            "title": "Vitest assertion: when selectedConversation transitions from null to some-id, the lens's active tab becomes `'conversations'` and ConversationPanel is rendered inside the tab body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac4",
+            "title": "Vitest assertion: when an issue is highlighted, the actions row containing the preserved data-testids (e.g. `zone-a-cost`) is mounted above the tab strip.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac5",
+            "title": "Vitest assertion: the tab strip element's `getBoundingClientRect().height` equals 48 (within ±1px tolerance for sub-pixel rounding) in the test render.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac6",
+            "title": "Playwright UAT in an isolated browser context performs the full flow above and asserts the same conditions in a real browser. The Playwright test does NOT share localStorage/cookies with any other agent's session; localStorage keys (e.g. `mc-project-right-tab:*`) are seeded inside the test fixture if needed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-tests.ac7",
+            "title": "Full test suite (`npm test` from workspace root and frontend) and `npm run typecheck` + `npm run lint` pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-lens-as-default-rightpane",
+        "to": "b2-conversation-rendering-in-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-lens-as-default-rightpane",
+        "to": "b3-preserve-issue-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-lens-as-default-rightpane",
+        "to": "b5-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-conversation-rendering-in-tab",
+        "to": "b5-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-preserve-issue-actions",
+        "to": "b5-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-tab-strip-48px",
+        "to": "b5-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1230-pan-1148-follow-up-command-deck-right-pane-pipeline-lens-topbar-height.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
