@@ -272,12 +272,15 @@ function ProjectRightPaneTabs({
 
   useEffect(() => {
     setActiveTab(readProjectTab(projectName));
+    hasExplicitTabChoiceRef.current = false;
+  }, [projectName]);
+
+  useEffect(() => {
     setActiveIssueId((current) => {
       if (current && features.some((feature) => feature.issueId === current)) return current;
       return features[0]?.issueId ?? null;
     });
-    hasExplicitTabChoiceRef.current = false;
-  }, [features, projectName]);
+  }, [features]);
 
   useEffect(() => {
     if (controlledActiveIssueId && !hasExplicitTabChoiceRef.current) {
