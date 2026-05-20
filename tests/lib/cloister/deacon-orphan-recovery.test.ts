@@ -88,6 +88,23 @@ vi.mock('../../../src/lib/projects.js', () => ({
   findProjectByPath: vi.fn().mockReturnValue(null),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock the workspace docker-stack health + rebuild modules. The deacon's
+// orphan-test recovery now self-heals an unhealthy stack before re-dispatching
+// (PAN-1190); these mocks let the tests drive that path without touching Docker.
+// ---------------------------------------------------------------------------
+
+const mockGetWorkspaceStackHealth = vi.fn();
+const mockRebuildWorkspaceStack = vi.fn();
+
+vi.mock('../../../src/lib/workspace/stack-health.js', () => ({
+  getWorkspaceStackHealth: (...args: unknown[]) => mockGetWorkspaceStackHealth(...args),
+}));
+
+vi.mock('../../../src/lib/workspace/rebuild-stack.js', () => ({
+  rebuildWorkspaceStack: (...args: unknown[]) => mockRebuildWorkspaceStack(...args),
+}));
+
 // Import after mocks are in place
 import { checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
 
@@ -119,6 +136,14 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockLoadReviewStatuses.mockReturnValue({});
     // Default: parallel review dispatch succeeds (review orphan re-dispatch path)
     mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
+    // Default: workspace docker stack is healthy, so orphan-test recovery
+    // proceeds straight to dispatch. Unhealthy-stack tests override this.
+    mockGetWorkspaceStackHealth.mockResolvedValue({
+      healthy: true,
+      reasons: [],
+      lastObserved: new Date().toISOString(),
+    });
+    mockRebuildWorkspaceStack.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -219,6 +244,81 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     // DB-backed path: setReviewStatus must be called with testStatus='dispatch_failed'
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'dispatch_failed' }));
+  });
+
+  // -------------------------------------------------------------------------
+  // Branch (e): unhealthy workspace docker stack → rebuild, then re-dispatch
+  // (PAN-1190: without this the orphan-test patrol loops dispatch_failed forever)
+  // -------------------------------------------------------------------------
+
+  it('(e) rebuilds an unhealthy workspace stack before re-dispatching the test role', async () => {
+    const stackIssue = 'PAN-1190-STACK';
+    const workspace = '/workspaces/feature-pan-1190-stack';
+
+    mockLoadReviewStatuses.mockReturnValue({
+      [stackIssue]: {
+        reviewStatus: 'passed',
+        testStatus: 'dispatch_failed',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockGetWorkspaceStackHealth.mockResolvedValue({
+      healthy: false,
+      reasons: ['feature-pan-1190-stack-dev-1 service exited (255)'],
+      lastObserved: new Date().toISOString(),
+    });
+    mockRebuildWorkspaceStack.mockResolvedValue({ success: true });
+    mockSpawnRun.mockResolvedValue({ id: 'test-run-stack' });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    // The deacon rebuilt the stack, then dispatched the test role.
+    expect(mockRebuildWorkspaceStack).toHaveBeenCalledWith(stackIssue, expect.anything());
+    expect(mockSpawnRun).toHaveBeenCalledWith(stackIssue, 'test', expect.objectContaining({ workspace }));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Re-dispatched orphaned test for/);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(stackIssue, expect.objectContaining({ testStatus: 'testing' }));
+  });
+
+  // -------------------------------------------------------------------------
+  // Branch (f): unhealthy stack + rebuild fails → defer, do NOT spin on dispatch
+  // -------------------------------------------------------------------------
+
+  it('(f) defers re-dispatch (no spawn) when the workspace stack rebuild fails', async () => {
+    const stackIssue = 'PAN-1190-STACKFAIL';
+    const workspace = '/workspaces/feature-pan-1190-stackfail';
+
+    mockLoadReviewStatuses.mockReturnValue({
+      [stackIssue]: {
+        reviewStatus: 'passed',
+        testStatus: 'dispatch_failed',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockGetWorkspaceStackHealth.mockResolvedValue({
+      healthy: false,
+      reasons: ['feature-pan-1190-stackfail-server-1 service exited (0)'],
+      lastObserved: new Date().toISOString(),
+    });
+    mockRebuildWorkspaceStack.mockResolvedValue({ success: false, error: 'docker build failed' });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    // Rebuild was attempted, but the test role must NOT be dispatched onto a
+    // still-broken stack — and the patrol must not spin.
+    expect(mockRebuildWorkspaceStack).toHaveBeenCalledWith(stackIssue, expect.anything());
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/deferring re-dispatch/i);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(stackIssue, expect.objectContaining({ testStatus: 'dispatch_failed' }));
   });
 
   // -------------------------------------------------------------------------

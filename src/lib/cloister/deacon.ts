@@ -1266,6 +1266,101 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
  */
 const REVIEW_INFRA_BREAKER_THRESHOLD = 3;
 
+/**
+ * Orphan-test self-heal state. A test role cannot spawn while the workspace
+ * docker stack is unhealthy — `assertWorkspaceStackHealthyForSpawn` throws and
+ * the orphan-test patrol re-fails the identical dispatch every cycle forever
+ * (observed: PAN-1190 looped `dispatch_failed` for ~18h after its server/dev
+ * containers exited). The deacon now rebuilds the stack before re-dispatch,
+ * bounded by a cooldown + attempt cap so a stack that genuinely cannot be
+ * rebuilt escalates to a human instead of looping `docker compose` forever.
+ */
+const testStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+  new Map();
+const TEST_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
+const TEST_STACK_REBUILD_MAX_ATTEMPTS = 3;
+
+/**
+ * Outcome of an orphan-test stack-health recovery attempt:
+ * - `healthy`   — stack is already fine; dispatch can proceed.
+ * - `rebuilt`   — stack was unhealthy, a rebuild ran successfully; dispatch can proceed.
+ * - `cooldown`  — stack unhealthy, a rebuild was attempted recently; wait it out.
+ * - `exhausted` — stack unhealthy, the rebuild cap is reached; escalate, stop retrying.
+ */
+type TestStackRecovery = 'healthy' | 'rebuilt' | 'cooldown' | 'exhausted';
+
+/**
+ * Ensure the workspace docker stack for a test re-dispatch is healthy,
+ * rebuilding it once per cooldown window if not. Bounded by
+ * TEST_STACK_REBUILD_MAX_ATTEMPTS so an unrebuildable stack escalates cleanly.
+ */
+async function recoverUnhealthyTestStack(
+  issueId: string,
+  workspacePath: string,
+): Promise<TestStackRecovery> {
+  const key = issueId.toUpperCase();
+  const { getWorkspaceStackHealth } = await import('../workspace/stack-health.js');
+
+  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
+  if (health.healthy) {
+    testStackRebuildState.delete(key);
+    return 'healthy';
+  }
+
+  const record = testStackRebuildState.get(key) ?? { lastAttempt: 0, attempts: 0, escalated: false };
+  const now = Date.now();
+
+  if (record.attempts >= TEST_STACK_REBUILD_MAX_ATTEMPTS) {
+    if (!record.escalated) {
+      record.escalated = true;
+      testStackRebuildState.set(key, record);
+      emitActivityEntry({
+        source: 'cloister',
+        level: 'error',
+        issueId: key,
+        message: `test-stack-rebuild-exhausted: ${key}`,
+        details: `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${health.reasons.join('; ')}. Manual 'pan workspace rebuild ${key}' or 'pan workspace reap' needed.`,
+      });
+      console.warn(
+        `[deacon] Test stack for ${key} unhealthy after ${record.attempts} rebuilds — escalated; ` +
+          `stop re-dispatching until a human intervenes`,
+      );
+    }
+    return 'exhausted';
+  }
+
+  if (now - record.lastAttempt < TEST_STACK_REBUILD_COOLDOWN_MS) {
+    return 'cooldown';
+  }
+
+  record.lastAttempt = now;
+  record.attempts += 1;
+  testStackRebuildState.set(key, record);
+  console.log(
+    `[deacon] Test stack for ${key} unhealthy (${health.reasons.join('; ')}) — rebuilding ` +
+      `(attempt ${record.attempts}/${TEST_STACK_REBUILD_MAX_ATTEMPTS})`,
+  );
+
+  const { rebuildWorkspaceStack } = await import('../workspace/rebuild-stack.js');
+  const result = await rebuildWorkspaceStack(issueId, {
+    onProgress: (m) => console.log(`[deacon]   ${key} stack rebuild: ${m}`),
+  });
+  if (!result.success) {
+    console.warn(`[deacon] Test stack rebuild failed for ${key}: ${result.error}`);
+    emitActivityEntry({
+      source: 'cloister',
+      level: 'error',
+      issueId: key,
+      message: `test-stack-rebuild-failed: ${key}`,
+      details: result.error ?? 'unknown error',
+    });
+    return 'cooldown';
+  }
+
+  console.log(`[deacon] Test stack for ${key} rebuilt — proceeding with test dispatch`);
+  return 'rebuilt';
+}
+
 export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -1565,31 +1660,49 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           const branch = `feature/${issueLower}`;
           const { spawnRun } = await import('../agents.js');
           const { buildTestRolePrompt } = await import('./test-agent-queue.js');
-          try {
-            const run = await spawnRun(issueId, 'test', {
-              workspace,
-              prompt: buildTestRolePrompt({ issueId, workspace, branch }),
-            });
-            setReviewStatus(issueId, { testStatus: 'testing' });
-            status.testStatus = 'testing';
+
+          // PAN-1190: a test role cannot spawn while the workspace docker stack
+          // is unhealthy (assertWorkspaceStackHealthyForSpawn throws). Self-heal
+          // the stack before re-dispatch so this patrol does not loop
+          // `dispatch_failed` forever; defer this cycle while a rebuild is
+          // cooling down, and stop entirely once the rebuild cap is exhausted.
+          const stackRecovery = await recoverUnhealthyTestStack(issueId, workspace);
+          if (stackRecovery === 'cooldown' || stackRecovery === 'exhausted') {
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
+            status.testStatus = 'dispatch_failed';
             actions.push(
-              `Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`,
+              stackRecovery === 'exhausted'
+                ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
+                : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
             );
-            console.log(
-              `[deacon] Re-dispatched test role for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
-            );
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('already running')) {
+          } else {
+            try {
+              const run = await spawnRun(issueId, 'test', {
+                workspace,
+                prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+              });
+              testStackRebuildState.delete(issueId.toUpperCase());
               setReviewStatus(issueId, { testStatus: 'testing' });
               status.testStatus = 'testing';
-              actions.push(`Orphaned test for ${issueId}: test role already running`);
-              console.log(`[deacon] Test role already running for ${issueId}`);
-            } else {
-              setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
-              status.testStatus = 'dispatch_failed';
-              actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
-              console.log(`[deacon] Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+              actions.push(
+                `Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`,
+              );
+              console.log(
+                `[deacon] Re-dispatched test role for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+              );
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              if (msg.includes('already running')) {
+                setReviewStatus(issueId, { testStatus: 'testing' });
+                status.testStatus = 'testing';
+                actions.push(`Orphaned test for ${issueId}: test role already running`);
+                console.log(`[deacon] Test role already running for ${issueId}`);
+              } else {
+                setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
+                status.testStatus = 'dispatch_failed';
+                actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+                console.log(`[deacon] Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+              }
             }
           }
         } else {

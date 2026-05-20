@@ -1,137 +1,32 @@
-import { execFile } from 'child_process';
-import { existsSync, readFileSync, rmSync } from 'fs';
-import { promisify } from 'util';
-import { dirname, join } from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
-import { ensureDevcontainer } from '../../lib/workspace/ensure-devcontainer.js';
-import { getProject, resolveProjectFromIssue } from '../../lib/projects.js';
 
-const execFileAsync = promisify(execFile);
+import {
+  composeProjectNameForWorkspace,
+  rebuildWorkspaceStack,
+} from '../../lib/workspace/rebuild-stack.js';
 
-const COMPOSE_FILES = [
-  'docker-compose.devcontainer.yml',
-  'docker-compose.yml',
-  'docker-compose.yaml',
-  'compose.yml',
-  'compose.yaml',
-];
-
-function declaredComposeProjectName(content: string, featureFolder: string): string | null {
-  const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-  if (templatedMatch) return `${templatedMatch[1]}${featureFolder}`;
-  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-  return literalMatch?.[1] ?? null;
-}
-
-export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
-  const featureFolder = `feature-${issueId.toLowerCase()}`;
-  const expected = `panopticon-${featureFolder}`;
-  for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
-    if (!existsSync(devPath)) continue;
-    try {
-      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
-      if (declared && declared !== expected) {
-        throw new Error(`Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${expected}`);
-      }
-    } catch (err: any) {
-      if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
-    }
-  }
-  return expected;
-}
-
-function findDevcontainerComposeFile(workspacePath: string): string | null {
-  const devcontainerDir = join(workspacePath, '.devcontainer');
-  for (const file of COMPOSE_FILES) {
-    const fullPath = join(devcontainerDir, file);
-    if (existsSync(fullPath)) return fullPath;
-  }
-  return null;
-}
-
-async function dockerCompose(args: string[], cwd: string): Promise<void> {
-  await execFileAsync('docker', ['compose', ...args], {
-    cwd,
-    encoding: 'utf-8',
-    timeout: 300_000,
-    maxBuffer: 10 * 1024 * 1024,
-  });
-}
+// Re-exported for backward compatibility — the rebuild primitive now lives in
+// src/lib/workspace/rebuild-stack.ts so server-side callers (the deacon) can
+// use it without pulling in the CLI command's spinner/exit handling.
+export { composeProjectNameForWorkspace };
 
 export async function workspaceRebuildCommand(issueId: string): Promise<void> {
-  const normalizedIssueId = issueId.toLowerCase();
-  const resolvedProject = resolveProjectFromIssue(issueId);
-  const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
-  if (!resolvedProject || !projectConfig) {
-    console.error(chalk.red(`✗ No project found for issue ${issueId}`));
-    process.exit(1);
-  }
-
-  if (!projectConfig.workspace?.docker?.compose_template) {
-    console.error(chalk.red(`✗ Project ${projectConfig.name} has no workspace docker compose_template configured`));
-    process.exit(1);
-  }
-
-  const workspacePath = join(
-    resolvedProject.projectPath,
-    projectConfig.workspace?.workspaces_dir ?? 'workspaces',
-    `feature-${normalizedIssueId}`,
-  );
-  if (!existsSync(workspacePath)) {
-    console.error(chalk.red(`✗ Workspace not found: ${workspacePath}`));
-    process.exit(1);
-  }
-
   const spinner = ora(`Rebuilding workspace stack for ${issueId.toUpperCase()}...`).start();
-  try {
-    const composeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
-    const existingComposeFile = findDevcontainerComposeFile(workspacePath);
-    if (existingComposeFile) {
-      spinner.text = 'Tearing down existing workspace stack...';
-      await dockerCompose([
-        '-f',
-        existingComposeFile,
-        '-p',
-        composeProjectName,
-        'down',
-        '-v',
-        '--remove-orphans',
-      ], dirname(existingComposeFile));
-    }
 
-    spinner.text = 'Re-rendering .devcontainer/ from template...';
-    const devcontainerDir = join(workspacePath, '.devcontainer');
-    if (existsSync(devcontainerDir)) {
-      rmSync(devcontainerDir, { recursive: true, force: true });
-    }
-    const ensured = ensureDevcontainer({ workspacePath, issueId: normalizedIssueId });
-    if (!ensured.step.success) {
-      throw new Error(ensured.step.error ?? 'Failed to render .devcontainer/');
-    }
+  const result = await rebuildWorkspaceStack(issueId, {
+    onProgress: (message) => {
+      spinner.text = message;
+    },
+  });
 
-    const composeFile = findDevcontainerComposeFile(workspacePath);
-    if (!composeFile) {
-      throw new Error(`No devcontainer compose file found in ${devcontainerDir}`);
-    }
-
-    spinner.text = 'Starting workspace stack...';
-    await dockerCompose([
-      '-f',
-      composeFile,
-      '-p',
-      composeProjectName,
-      'up',
-      '-d',
-      '--build',
-    ], dirname(composeFile));
-
-    spinner.succeed(`Workspace stack rebuilt for ${issueId.toUpperCase()}`);
-    console.log(chalk.dim(`  workspace: ${workspacePath}`));
-    console.log(chalk.dim(`  compose:   ${composeFile}`));
-    console.log(chalk.dim(`  project:   ${composeProjectName}`));
-  } catch (error: any) {
-    spinner.fail(`Workspace rebuild failed: ${error.message ?? error}`);
+  if (!result.success) {
+    spinner.fail(`Workspace rebuild failed: ${result.error}`);
     process.exit(1);
   }
+
+  spinner.succeed(`Workspace stack rebuilt for ${issueId.toUpperCase()}`);
+  console.log(chalk.dim(`  workspace: ${result.workspacePath}`));
+  console.log(chalk.dim(`  compose:   ${result.composeFile}`));
+  console.log(chalk.dim(`  project:   ${result.composeProjectName}`));
 }
