@@ -1,0 +1,484 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:32:51.033Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1229: PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
+    "updated": "2026-05-20T02:44:42.645Z"
+  },
+  "plan": {
+    "id": "pan-1229",
+    "title": "PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
+    "status": "proposed",
+    "uid": "7c9f4e2a-3b1d-4f8e-9a5c-2e8b1d3f7a9e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:32:51.033Z",
+    "updated": "2026-05-20T02:44:42.645Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1229",
+        "label": "PAN-1229",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1226 (parent audit)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "PRD §4.7.6 Issue Card (Board)",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/design/mockups/board-opus.html",
+        "label": "Board mockup",
+        "type": "mockup"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "kanban",
+      "frontend",
+      "pan-1148-followup",
+      "card-redesign"
+    ],
+    "narratives": {
+      "Problem": "PAN-1148 redesigned the Board card but three production gaps remain vs PRD §4.7.6: (B-1) the 'bead progress' indicator is a 0-3 planning-readiness proxy, not actual `Beads N/M` from `findPlan().items[]`; (B-2) the card body still carries configuration-era controls (bulk checkbox, phase label text, model pill, specialists pill, inline icon buttons) instead of the spec's minimal status card with a two-line agent foot; (B-3) the merge-ready border is amber, inverting the green=done / amber=needs-action semantic that's now consistent everywhere else in the redesign. Two low-priority affordance gaps round out the audit: cross-column drag silently snaps back instead of showing a visual block, and the mockup's column-footer '+ New issue' button is missing entirely.",
+      "Proposal": "Five tightly scoped beads, mostly local to a handful of files. (1) Server-side: extend the cached planning-state to compute `beadCounts: { completed, total } | null` from the already-loaded plan.items, and propagate it onto each issue payload — no new endpoint, no per-card fetch fan-out. (2) Frontend: rewrite the inner card body to the PRD §4.7.6 structure (project mark + ID + verb badge / 2-line clamp title / labels chips / `Beads N/M` progress bar driven by beadCounts / two-line agent foot with runtime mono + 18×18 avatar), drop the configuration-era controls, move cost + bulk-select to lightweight corner overlays so the spec grid stays intact. (3) Flip the IssueCard primitive's merge-ready styling from warning tokens to success tokens (border, gradient tone, accent bar). (4) Apply a `cursor-not-allowed + dim + no-lift` style to droppable columns when the active drag's source status differs - drag-end stays a no-op per the PRD non-goal. (5) Defer the '+ New issue' footer button to a fresh follow-up issue (filed via `gh issue create`), because shipping it requires brand-new tracker-write plumbing that doesn't exist anywhere in the dashboard yet."
+    },
+    "autoDecisions": [
+      {
+        "summary": "When beadCounts is null (issue has no plan yet), hide the bead-progress row entirely instead of rendering a synthetic readiness bar.",
+        "rationale": "The PRD's card design assumes a plan exists. The 0-3 readiness proxy was a stopgap that overloaded the bar with a different meaning (planning workflow stage) than the spec ('actual implementation progress'). Hiding the row for pre-plan cards keeps the surface honest; the verb badge ('QUEUED FOR PLAN') already communicates the no-plan state in row 1."
+      },
+      {
+        "summary": "Source beadCounts from the existing cached `readWorkspacePlanAsync` doc inside issue-data-service.ts rather than calling /api/command-deck/planning per card.",
+        "rationale": "The Board renders all visible issues at once. Per-card HTTP fetches would create N requests on every page load and cache invalidation. The planning-state cache already loads the same doc to compute `planningComplete`, so we get beadCounts for free by reading `doc.plan.items` in the same code path."
+      },
+      {
+        "summary": "Use the label 'Beads N/M' uniformly in the card; do NOT swap to 'Specialists N/M' for in-review issues even though the mockup shows that variant.",
+        "rationale": "The gap audit only flags the 0-3 → N/M switch; it does not call out the contextual 'Specialists' label. Adding contextual labels would expand scope into review-pipeline data sourcing. If users want the specialist variant later, that's a follow-up. The phase-coloured fill (info/warning/signal-review/success) already encodes the lifecycle phase visually."
+      },
+      {
+        "summary": "Keep the cost button on the card body but render it as a small corner overlay (top-right, absolute positioned), not inline in the spec's row-1 grid.",
+        "rationale": "Cost is an observation (not configuration), so removing it would lose useful spend signal during long agent runs. The PRD's row-1 grid is `project mark + ID + spacer + verb badge` with no cost slot — placing cost inline would break the grid. A corner overlay preserves the signal without disturbing the spec layout."
+      },
+      {
+        "summary": "Move the inline 'list' (beads) and 'scrolltext' (vBRIEF) icon buttons off the card body. Their function survives via card-click → Issue Detail drawer.",
+        "rationale": "PRD §4.7.6 has no slot for per-card action icons — the card is meant to be status-only with all configuration/inspection living inside Issue Detail. The drawer already renders fuller views of both beads and vBRIEF, so functionality is preserved, not lost."
+      },
+      {
+        "summary": "Relocate bulk-select to a hover-revealed top-left corner overlay rather than removing it.",
+        "rationale": "Bulk operations are a power-user workflow (bulk close, bulk reset) and have meaningful test coverage. Removing bulk-select entirely would regress that capability. The hover overlay preserves the workflow while keeping the resting state of the card spec-clean."
+      },
+      {
+        "summary": "Cross-column drag (N-B-1) gets a visual-only block — destination column dims with cursor-not-allowed; the drag still ends as a no-op.",
+        "rationale": "PRD §3 non-goal: 'Dragging a card has no effect on its phase.' We do not want to silently consume the drop OR add an error toast on mismatch — both feel buggy. A visible block during drag is the cheapest accurate affordance."
+      },
+      {
+        "summary": "Defer N-B-2 (+ New issue column footer button) to a fresh follow-up issue; do not stub it on this card.",
+        "rationale": "There is no existing POST /api/issues endpoint, no tracker write plumbing for GitHub Issues or Linear createIssue. Shipping the button without a working backend would either silently no-op (worse than missing) or open an empty dialog (bandaid). Per CLAUDE.md 'no partial implementations', the correct move is to file a follow-up that owns the full backend + frontend feature."
+      },
+      {
+        "summary": "Card body rewrite stays inside KanbanBoard.tsx; no new primitive component is extracted.",
+        "rationale": "The card body is rendered exactly once (inside DraggableCardWrapper, and inside DragOverlayCard via the same path). Extracting a primitive adds an indirection without benefit and would force prop plumbing for callbacks (onSelect/onBulkToggle/cost/etc) that's already local. The IssueCard primitive at primitives/IssueCard.tsx remains the chrome (border/accent/gradient); only the inner block is rewritten."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-server-beadcounts",
+        "title": "Expose `beadCounts: { completed, total } | null` on each issue payload from the cached plan doc",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:32:51.033Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1229",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b2-card-rewrite"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-data-service.ts, extend PlanningStateCacheEntry.result with an optional `beadCounts: { completed: number; total: number } | null`. In refreshPlanningState(), after loading the plan doc, compute beadCounts: when `doc.plan.items` has 1+ entries, set { completed: items.filter(i => i.status === 'completed').length, total: items.length }; otherwise null. Thread the new field through getCachedPlanningState (return type) and through the issue mapper at issue-data-service.ts:411 so every issue object carries it. Add the optional field to the frontend Issue interface in src/dashboard/frontend/src/types.ts."
+        },
+        "subItems": [
+          {
+            "id": "b1-server-beadcounts.ac1",
+            "title": "PlanningStateCacheEntry.result includes `beadCounts: { completed: number; total: number } | null` and is populated on every refresh.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-server-beadcounts.ac2",
+            "title": "refreshPlanningState returns beadCounts when `doc.plan.items.length > 0`, with `completed` counted from items.status === 'completed'; returns null for missing plan or empty items.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-server-beadcounts.ac3",
+            "title": "The issue mapper at issue-data-service.ts ~L411 spreads `beadCounts` onto every issue returned by IssueDataService.getIssues.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-server-beadcounts.ac4",
+            "title": "Frontend `Issue` type in src/dashboard/frontend/src/types.ts gains `beadCounts?: { completed: number; total: number } | null`; existing consumers (no required change) keep compiling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-server-beadcounts.ac5",
+            "title": "Vitest in src/dashboard/server (issue-data-service.test.ts or a new co-located test) covers three cases: plan with 7 completed of 12 → beadCounts { completed: 7, total: 12 }; plan with 0 of 5 → { completed: 0, total: 5 }; no plan or empty items → null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-server-beadcounts.ac6",
+            "title": "`npm run typecheck` and `npm run lint` pass for both packages (server + frontend) after the change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-card-rewrite",
+        "title": "Rewrite Board Issue Card body to match PRD §4.7.6 (project mark + ID + verb badge / 2-line title / labels / Beads N/M / two-line agent foot)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:32:51.033Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the contents of the inner `<div className=\"relative p-4\">…</div>` block in src/dashboard/frontend/src/components/KanbanBoard.tsx (currently around lines 2725-2800) with the PRD §4.7.6 structure. Use the cross-section design tokens from docs/design/mockups/board-opus.html as the authoritative reference for sizes, fonts, and gaps. Keep the IssueCard primitive at primitives/IssueCard.tsx as the surrounding chrome (border, accent bar, gradient) — only the inner block changes. Update KanbanBoard.test.tsx in the same diff."
+        },
+        "subItems": [
+          {
+            "id": "b2-card-rewrite.ac1",
+            "title": "Outer padding of the inner block is `12px 12px 10px` (replacing `p-4`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac2",
+            "title": "Row 1 contains in order: 8×8 project mark (radius 2px, coloured from `issue.project.color`) · SF Mono 10px muted issue identifier (e.g. `PAN-1229`) · spacer · existing VerbBadge (right-aligned).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac3",
+            "title": "Title row: 13px foreground, line-height 1.35, `display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;` — the previous redundant inline `<identifier> <title>` group is removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac4",
+            "title": "Labels row renders when `issue.labels` is non-empty: 4px gap, wrap, chip styling matches PRD §4.7.5 Issue Row labels (10px weight 500, padding `1px 6px`, radius `var(--radius-sm)`, `background: rgb(255 255 255 / 5%)`, `border: 1px solid var(--border)`, color muted).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac5",
+            "title": "Bead progress row appears only when `issue.beadCounts` is non-null. It shows the label `Beads N/M` (10px uppercase muted, letter-spaced 0.16em) on the left and a 3px-tall track (`background: var(--accent)`, `border-radius: 2px`, `overflow: hidden`) on the right; the fill width is `(completed / total) * 100%` and the fill colour is `var(--info)` for in-progress, `var(--warning)` for in-review, `var(--signal-review)` for ship/plan, and `var(--success)` for done/merge-ready cards.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac6",
+            "title": "Foot: 8px padding-top, `border-top: 1px solid var(--border)`. Left cell is a two-line agent stack — `card-agent-name` (SF Mono 10px foreground, ellipsis) over `card-agent-sub` (SF Mono 9px muted, ellipsis). Right side shows runtime in SF Mono 10px muted tabular-nums, then an 18×18 circle avatar with initials in a gradient fill matching the mockup palette.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac7",
+            "title": "Empty-state agent foot: when no active agent, name renders italic DM Sans muted (`no agent`) and sub renders the tracker reference (`GitHub #1129` / `Linear MIN-816`) per the mockup; runtime cell shows `—`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac8",
+            "title": "Active-agent sub line content matches the mockup: work agents show `<model> · bead N/M` (using friendly model name + beadCounts when present), review convoys show `<N reviewers> · <model>`; when no specific sub data is available, fall back to model-only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac9",
+            "title": "REMOVED from the card body: the inline bulk-select checkbox in row 1, the redundant phase label text (`Backlog`/`Ready to start`/`Agent active`/etc), the model pill, the `N specialists` pill, the `list` (beads) icon button, and the `scrolltext` (vBRIEF) icon button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac10",
+            "title": "Bulk-select RELOCATED to a hover-revealed top-left corner overlay: 16×16 checkbox positioned absolutely, hidden by default, revealed on card hover OR when `isBulkSelected` is true. Same `data-testid` and bulk-toggle behaviour as before so existing bulk-select tests pass with at most label/selector tweaks.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac11",
+            "title": "Cost button RELOCATED to a compact top-right corner overlay (absolute positioned, low z-index) — same DollarSign icon + format, same onClick → CostBreakdownModal, same `data-testid={\"card-cost-${identifier}\"}`. Renders only when `cost && cost.totalCost > 0`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac12",
+            "title": "Hover overlays (bulk-select, cost) are suppressed when the card is rendered inside DragOverlayCard so the floating ghost shows the resting card state.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac13",
+            "title": "KanbanBoard.test.tsx is updated: existing `it('calls onViewBeads when Tasks button is clicked')` and the equivalent vBRIEF test are removed (icon buttons no longer exist on the card). Bulk-select test is updated to target the overlay checkbox if its selector changes. NEW tests cover: `Beads 7/12` renders for `beadCounts: { completed: 7, total: 12 }`; the bead row is absent when beadCounts is null; the foot row contains agent name + sub + runtime + avatar in the spec'd structure; cost overlay renders when totalCost > 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac14",
+            "title": "Visual UAT: open the dashboard at `/board`, confirm cards in each column render with the new layout, the bead-progress bar shows real N/M for issues that have plans, no bar appears for pre-plan issues, hover reveals bulk-select + cost overlays, and the drag ghost matches the resting state.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-card-rewrite.ac15",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-merge-ready-success",
+        "title": "Flip merge-ready card styling from warning tokens to success tokens in the IssueCard primitive",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:32:51.033Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/primitives/IssueCard.tsx, change the three styling layers that fire when `mergeReadyCard` is true from warning tokens to success tokens. This inverts the current incorrect amber semantic to spec-correct green per PRD §4.7.6 ('Merge-ready card | Border becomes color-mix(in srgb, var(--success) 32%, transparent)')."
+        },
+        "subItems": [
+          {
+            "id": "b3-merge-ready-success.ac1",
+            "title": "The mergeReadyCard branch of the outer className changes `'border-warning/60 bg-warning/10 shadow-md'` to `'border-success/60 bg-success/10 shadow-md'` (or the closest equivalent that matches `color-mix(success / 32%)`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-merge-ready-success.ac2",
+            "title": "The `tone` computed value for mergeReadyCard changes from `'from-warning/20 via-warning/6 to-transparent'` to `'from-success/20 via-success/6 to-transparent'`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-merge-ready-success.ac3",
+            "title": "The `accent` computed value for mergeReadyCard changes from `'bg-warning'` to `'bg-success'`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-merge-ready-success.ac4",
+            "title": "Vitest in IssueCard.test.tsx (or KanbanBoard.test.tsx as appropriate): a card rendered with `mergeReadyCard={true}` exposes the success classes (border-success, bg-success, from-success) — no warning classes remain on the merge-ready path. Snapshot or class-assertion form, whichever fits the existing test style.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-merge-ready-success.ac5",
+            "title": "Visual UAT: open the dashboard, locate a merge-ready card (Awaiting Merge column or any card with READY TO MERGE verb), confirm the border + tint + accent are green (success token), not amber.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nb1-cross-column-drag-block",
+        "title": "Cross-column drag (N-B-1): show a visual block on the destination column instead of silently snapping back",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:32:51.033Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Thread the active drag's source canonical status (already tracked at the board level as `activeDragStatus`) down into DroppableColumn so it can render an incompatible-drop affordance when hovered. handleDragEnd remains a no-op for cross-column drops. PRD non-goal stands: dragging never changes phase."
+        },
+        "subItems": [
+          {
+            "id": "nb1-cross-column-drag-block.ac1",
+            "title": "DroppableColumn accepts an `activeDragStatus: CanonicalState | null` prop (or reads it from a context provided by KanbanBoard) so it knows the source column of the active drag.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb1-cross-column-drag-block.ac2",
+            "title": "When `isOver && activeDragStatus && activeDragStatus !== status`, the column applies `cursor-not-allowed`, an opacity dim (~`opacity-60`), and DOES NOT apply the `scale-[1.02]` lift. When `isOver && activeDragStatus === status` (same column, reordering), the existing `scale-[1.02]` lift still applies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb1-cross-column-drag-block.ac3",
+            "title": "DraggableCardWrapper updates the cursor to `cursor-not-allowed` while the active drag is over an incompatible column (best-effort — acceptable to leave the dragged card's cursor unchanged and rely on the column-level affordance if context plumbing is awkward).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb1-cross-column-drag-block.ac4",
+            "title": "handleDragEnd remains a no-op for cross-column drops: no toast, no API call, no error — the visual block during drag is the entire affordance.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb1-cross-column-drag-block.ac5",
+            "title": "Vitest: simulate `handleDragStart` from a `todo` card and assert that hovering an `in_progress` DroppableColumn renders the blocked style (opacity-60, no scale-[1.02], cursor-not-allowed). Drop is asserted to be a no-op.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb1-cross-column-drag-block.ac6",
+            "title": "Visual UAT: grab a card in `Todo` and drag it over `In Progress` — confirm the destination column dims and the cursor turns into not-allowed; releasing the drag leaves both columns unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nb2-followup-file",
+        "title": "File a follow-up GitHub issue for the '+ New issue' column-footer button (N-B-2 from the audit)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:32:51.033Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Run `gh issue create` against the `eltmon/panopticon-cli` repo to file a follow-up issue tracking N-B-2 ('+ New issue' column footer button). The body should reference PRD §4.7.6, the `board-opus.html` mockup `.add-btn` rule, the parent audit PAN-1226 and this issue PAN-1229, and note that the feature needs new tracker-write plumbing (no existing POST /api/issues, no GitHub Issues create / Linear createIssue paths in the dashboard). Record the new issue ID in `.pan/continue.json` decisions and add a single-line `// TODO(<new-issue-id>)` comment near the column body in KanbanBoard.tsx so future readers find the trail."
+        },
+        "subItems": [
+          {
+            "id": "nb2-followup-file.ac1",
+            "title": "A new GitHub issue is created in `eltmon/panopticon-cli` titled `Board view follow-up — + New issue column footer button (deferred from PAN-1229)`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb2-followup-file.ac2",
+            "title": "The issue body references PRD §4.7.6 / `docs/design/mockups/board-opus.html` `.add-btn`, parent audit PAN-1226, deferral context from PAN-1229, and the missing backend plumbing (POST /api/issues + tracker createIssue flows).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb2-followup-file.ac3",
+            "title": "A single-line `// TODO(PAN-<new-id>): + New issue column footer button — see PRD §4.7.6` comment is added at the location in KanbanBoard.tsx where the column body ends (or wherever the footer button would render in the new mockup).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nb2-followup-file.ac4",
+            "title": "The new follow-up issue ID is appended to `.pan/continue.json` decisions so subsequent agents can find the trail.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-server-beadcounts",
+        "to": "b2-card-rewrite",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1229-pan-1148-follow-up-board-view-gaps-bead-progress-card-layout-merge-ready-border.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
