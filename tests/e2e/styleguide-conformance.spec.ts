@@ -278,4 +278,26 @@ describe('styleguide rendered surface conformance', () => {
 
     await context.close();
   }, 45_000);
+
+  it('agents page Open issue scrolls drawer to active-agent section', async () => {
+    const { context, page } = await openRoute('/agents');
+
+    await expect.poll(() => page.locator('[data-component="agent-card"]').count()).toBe(1);
+    await page.getByText('Open issue').click();
+
+    await expect.poll(() => page.locator('[data-testid="issue-drawer"]').count()).toBe(1);
+    await expect.poll(() => page.locator('#active-agent').count()).toBe(1);
+
+    const activeAgent = page.locator('#active-agent');
+    const isInViewport = await activeAgent.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const parent = node.closest('[class*="overflow-auto"]');
+      if (!parent) return false;
+      const parentRect = parent.getBoundingClientRect();
+      return rect.top >= parentRect.top && rect.bottom <= parentRect.bottom;
+    });
+    expect(isInViewport).toBe(true);
+
+    await context.close();
+  }, 45_000);
 });

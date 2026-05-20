@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../lib/store';
 import type { Agent, Issue } from '../../types';
 import { FleetAgentsView } from './FleetAgentsView';
+import { IssueDrawer } from '../drawer/IssueDrawer';
+import { DialogProvider } from '../DialogProvider';
 
 function agent(overrides: Partial<Agent>): Agent {
   return {
@@ -163,14 +165,51 @@ describe('FleetAgentsView', () => {
     expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
   });
 
-  it('opens the drawer from a fleet card issue action at the active-agent anchor', () => {
-    renderFleetView();
+  it('opens the drawer from a fleet card and scrolls to the active-agent element', () => {
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    const cafSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
+    client.setQueryData(['cost-stream', undefined, 500], {
+      events: [],
+      byIssue: {
+        'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+      },
+      count: 1,
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <FleetAgentsView />
+          <IssueDrawer />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getAllByText('Open issue')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
     expect(window.location.hash).toBe('#active-agent');
+
+    const activeAgent = document.getElementById('active-agent');
+    expect(activeAgent).toBeTruthy();
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'start' });
+
+    scrollSpy.mockRestore();
+    rafSpy.mockRestore();
+    cafSpy.mockRestore();
   });
 
   it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {

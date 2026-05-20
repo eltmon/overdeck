@@ -54,16 +54,38 @@ export function IssueDrawer() {
   useEffect(() => {
     if (!drawer.issueId) return;
 
-    const scrollToActive = () => {
+    let rafId: number | null = null;
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const tryScroll = () => {
       if (window.location.hash !== '#active-agent') return;
-      window.requestAnimationFrame(() => {
-        document.getElementById('active-agent')?.scrollIntoView({ block: 'start' });
-      });
+      const el = document.getElementById('active-agent');
+      if (el) {
+        el.scrollIntoView({ block: 'start' });
+        return;
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        rafId = window.requestAnimationFrame(tryScroll);
+      }
+    };
+
+    const scrollToActive = () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      attempts = 0;
+      tryScroll();
     };
 
     scrollToActive();
     window.addEventListener('hashchange', scrollToActive);
-    return () => window.removeEventListener('hashchange', scrollToActive);
+    return () => {
+      window.removeEventListener('hashchange', scrollToActive);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [drawer.issueId]);
 
   if (!drawer.issueId) return null;
