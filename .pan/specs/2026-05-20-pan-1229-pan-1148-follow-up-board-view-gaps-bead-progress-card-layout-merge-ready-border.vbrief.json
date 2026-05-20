@@ -4,7 +4,7 @@
     "created": "2026-05-20T02:32:51.033Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1229: PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
-    "updated": "2026-05-20T02:44:42.645Z"
+    "updated": "2026-05-20T08:34:28.010Z"
   },
   "plan": {
     "id": "pan-1229",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7c9f4e2a-3b1d-4f8e-9a5c-2e8b1d3f7a9e",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-20T02:32:51.033Z",
-    "updated": "2026-05-20T02:44:42.645Z",
+    "updated": "2026-05-20T08:34:28.010Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1229",
@@ -477,7 +477,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-20-PAN-1229-pan-1148-follow-up-board-view-gaps-bead-progress-card-layout-merge-ready-border.vbrief.json"
+      "canonicalFilename": "2026-05-20-PAN-1229-pan-1148-follow-up-board-view-gaps-bead-progress-card-layout-merge-ready-border.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1229",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-20T08:34:28.010Z",
+        "work": {
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T08:34:28.010Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T08:34:28.010Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"

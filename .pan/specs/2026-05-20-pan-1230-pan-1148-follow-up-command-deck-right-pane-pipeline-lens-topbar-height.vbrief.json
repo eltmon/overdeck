@@ -4,7 +4,7 @@
     "created": "2026-05-20T03:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1230: PAN-1148 follow-up — Command Deck right-pane Pipeline-lens + TopBar height",
-    "updated": "2026-05-20T02:43:16.733Z"
+    "updated": "2026-05-20T10:04:37.332Z"
   },
   "plan": {
     "id": "pan-1230",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8f4a1b2c-3d5e-4f6a-9b8c-7d6e5f4a3b2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 44,
     "created": "2026-05-20T03:00:00.000Z",
-    "updated": "2026-05-20T02:43:16.733Z",
+    "updated": "2026-05-20T10:04:37.332Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1230",
@@ -419,7 +419,70 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-20-PAN-1230-pan-1148-follow-up-command-deck-right-pane-pipeline-lens-topbar-height.vbrief.json"
+      "canonicalFilename": "2026-05-20-PAN-1230-pan-1148-follow-up-command-deck-right-pane-pipeline-lens-topbar-height.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1230",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-20T10:04:37.322Z",
+        "work": {
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T10:04:37.322Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "notes": "PASS — 25/25 requirements, all four sub-reviews pass, one test-only mock issue noted for follow-up",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T10:04:37.322Z",
+              "notes": "PASS — 25/25 requirements, all four sub-reviews pass, one test-only mock issue noted for follow-up"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T10:04:37.322Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-20T10:04:37.322Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T10:04:37.322Z"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1239"
+        }
+      }
     }
   },
   "status": "proposed"

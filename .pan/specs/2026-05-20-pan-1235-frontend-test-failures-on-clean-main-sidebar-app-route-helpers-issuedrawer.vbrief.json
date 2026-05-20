@@ -4,7 +4,7 @@
     "created": "2026-05-20T07:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1235: Frontend test failures on clean main (Sidebar / App route helpers / IssueDrawer)",
-    "updated": "2026-05-20T07:08:56.087Z"
+    "updated": "2026-05-20T08:38:39.001Z"
   },
   "plan": {
     "id": "pan-1235",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a5bc0c52-30dc-4b16-adc1-f5472cb71682",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 29,
     "created": "2026-05-20T07:05:00.000Z",
-    "updated": "2026-05-20T07:08:56.087Z",
+    "updated": "2026-05-20T08:38:39.001Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1235",
@@ -129,7 +129,70 @@
     ],
     "edges": [],
     "metadata": {
-      "canonicalFilename": "2026-05-20-PAN-1235-frontend-test-failures-on-clean-main-sidebar-app-route-helpers-issuedrawer.vbrief.json"
+      "canonicalFilename": "2026-05-20-PAN-1235-frontend-test-failures-on-clean-main-sidebar-app-route-helpers-issuedrawer.vbrief.json",
+      "pipeline": {
+        "phase": "test",
+        "issueId": "PAN-1235",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-20T08:38:38.984Z",
+        "work": {
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T08:38:38.984Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "notes": "All 7 ACs verified; 996/996 tests green; zero blockers across all four reviewers",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T08:38:38.984Z",
+              "notes": "All 7 ACs verified; 996/996 tests green; zero blockers across all four reviewers"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T08:38:38.984Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-20T08:38:38.984Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T08:38:38.984Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1236"
+        }
+      }
     }
   },
   "status": "proposed"
