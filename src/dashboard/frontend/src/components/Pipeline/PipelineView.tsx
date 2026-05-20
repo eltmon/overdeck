@@ -292,7 +292,7 @@ export function PipelineView() {
 
     return [
       { id: 'active', eyebrow: 'Active issues', value: activeIssues, sub: 'open pipeline', icon: <MetricIcon label="●" />, signal: 'info' as const },
-      { id: 'work', eyebrow: 'Work running', value: workRunning, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' as const },
+      { id: 'work', eyebrow: 'Work running', value: workRunning, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
       { id: 'review', eyebrow: 'Review running', value: reviewIssueIds.size, sub: 'review gates', icon: <MetricIcon label="◆" />, signal: 'review' as const },
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },

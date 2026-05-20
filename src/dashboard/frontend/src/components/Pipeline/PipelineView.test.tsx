@@ -154,7 +154,7 @@ describe('PipelineView', () => {
     expect(await within(strip).findByText('$1.75')).toBeInTheDocument();
 
     const tiles = Array.from(strip.querySelectorAll('[data-component="metric-tile"]'));
-    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'warning', 'review', 'success', 'cost']);
+    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'info', 'review', 'success', 'cost']);
     expect(tiles.map((tile) => tile.querySelector('[data-component="metric-tile-value"]')?.textContent)).toEqual([
       '7',
       '1',
