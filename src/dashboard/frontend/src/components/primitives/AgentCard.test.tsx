@@ -53,4 +53,26 @@ describe('AgentCard', () => {
       unmount();
     }
   });
+
+  it('renders the agent name in SF Mono (font-mono)', () => {
+    render(
+      <AgentCard
+        id="agent-font-1"
+        name="Font Agent"
+        role="work"
+        meta={[
+          { label: 'Cost', value: '$0.00' },
+          { label: 'Tokens', value: '0' },
+          { label: 'Runtime', value: '0m' },
+        ]}
+        verbBadge={{ variant: 'WORK RUNNING' }}
+      />,
+    );
+
+    const name = screen.getByText('Font Agent');
+    expect(name.tagName.toLowerCase()).toBe('h3');
+    expect(name).toHaveClass('font-mono');
+    expect(name).toHaveClass('font-semibold');
+    expect(name).toHaveClass('text-[13px]');
+  });
 });

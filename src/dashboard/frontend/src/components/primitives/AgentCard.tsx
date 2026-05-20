@@ -76,7 +76,7 @@ function AgentCard({
       <div className="flex items-start justify-between gap-[12px] pl-[10px]">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-[8px]">
-            <h3 className="truncate text-[13px] font-semibold leading-none text-foreground">{name}</h3>
+            <h3 className="truncate font-mono text-[13px] font-semibold leading-none text-foreground">{name}</h3>
             <VerbBadge {...verbBadge} />
           </div>
           <p className="mt-[6px] truncate font-mono text-[10px] leading-none text-muted-foreground">{id}</p>
