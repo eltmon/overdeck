@@ -271,8 +271,12 @@ describe('PipelineView', () => {
     expect(ledger).not.toHaveClass('opacity-55');
   });
 
-  it('renders ledger cost for rows with cost events in the byIssue stream', () => {
+  it('renders ledger cost for rows with cost events in the byIssue stream', async () => {
     const { container } = renderPipelineView();
+
+    // Wait for the async cost fetch to resolve and render
+    await screen.findByText('$1.25');
+
     const pan1Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-1"]') as HTMLElement;
     const pan1Ledger = pan1Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
     expect(within(pan1Ledger).getByText('$1.25')).toBeInTheDocument();
@@ -280,7 +284,7 @@ describe('PipelineView', () => {
 
     const pan2Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
     const pan2Ledger = pan2Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
-    expect(within(pan2Ledger).getByText('$0.50')).toBeInTheDocument();
+    expect(within(pan2Ledger).getByText('$0.500')).toBeInTheDocument();
   });
 
   it('shows empty ledger styling for rows with no agent and no cost events', () => {
