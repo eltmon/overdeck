@@ -17,6 +17,14 @@ interface FlywheelRunSummary {
   status: 'running' | 'paused' | 'complete' | 'aborted';
 }
 
+interface MergeQueueItem {
+  issueId: string;
+  title: string;
+  pr?: number;
+  mergeOrder: number;
+  conflictsWith: string[];
+}
+
 interface FlywheelRunDetail extends FlywheelRunSummary {
   latest: FlywheelStatus | null;
   paths: {
@@ -126,12 +134,19 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     queryFn: () => fetchJson<SettingsResponse>('/api/settings'),
     staleTime: 30000,
   });
+  const mergeQueueQuery = useQuery({
+    queryKey: ['flywheel-merge-queue'],
+    queryFn: () => fetchJson<MergeQueueItem[]>('/api/flywheel/merge-queue'),
+    refetchInterval: latestRun?.status === 'running' ? 15000 : false,
+    enabled: !!latestRun,
+  });
 
   const run = runDetailQuery.data ?? null;
   const activeRun = run?.status === 'running' ? run : null;
   const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
+  const mergeQueue = mergeQueueQuery.data ?? [];
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -336,7 +351,37 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
         )}
       </div>
 
-      <footer className="border-t border-border bg-card/60 p-4">
+      <footer className="border-t border-border bg-card/60 p-4 space-y-3">
+        {mergeQueue.length > 0 && (
+          <div className="rounded-lg border border-border bg-background p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Merge Queue
+              </span>
+              <span className="text-xs text-muted-foreground">{mergeQueue.length} ready</span>
+            </div>
+            <ol className="space-y-1">
+              {mergeQueue.map((item) => (
+                <li key={item.issueId} className="flex items-start gap-2 text-xs">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    {item.mergeOrder}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium text-foreground">{item.issueId}</span>
+                    {item.pr != null && (
+                      <span className="ml-1 text-muted-foreground">#{item.pr}</span>
+                    )}
+                    {item.conflictsWith.length > 0 && (
+                      <span className="ml-1.5 text-amber-600 dark:text-amber-400" title={`File overlap with: ${item.conflictsWith.join(', ')}`}>
+                        ⚠ conflicts with {item.conflictsWith.join(', ')}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
         <button
           type="button"
           className="w-full rounded-lg border border-border bg-background p-3 text-left hover:bg-accent/60"

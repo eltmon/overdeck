@@ -67,6 +67,8 @@ export interface FlywheelPipelineItem {
   progressPercent?: number | undefined
   agentId?: string | undefined
   pr?: number | undefined
+  mergeOrder?: number | undefined
+  conflictsWith?: string[] | undefined
 }
 
 export const FlywheelPipelineItem = Schema.Struct({
@@ -77,6 +79,8 @@ export const FlywheelPipelineItem = Schema.Struct({
   progressPercent: Schema.optional(Schema.Number),
   agentId: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.Number),
+  mergeOrder: Schema.optional(Schema.Number),
+  conflictsWith: Schema.optional(Schema.Array(Schema.String)),
 })
 
 export const FlywheelSubstrateBugStatus = Schema.Literals(["filed", "fixed", "workaround"])

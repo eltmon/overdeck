@@ -433,6 +433,20 @@ const postFlywheelBriefRoute = HttpRouter.add(
   })),
 );
 
+const getFlywheelMergeQueueRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/merge-queue',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      const status = await readCurrentFlywheelStatusForDashboard();
+      if (!status) return jsonResponse([]);
+      const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
+      const queue = await computeMergeQueue(status.activePipeline, process.cwd());
+      return jsonResponse(queue);
+    });
+  })),
+);
+
 const getFlywheelStateRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/state',
@@ -446,6 +460,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunRoute,
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
+  getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,

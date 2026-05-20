@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FlywheelConversationPane, findFlywheelConversation, resolveFlywheelConfig } from '../FlywheelConversationPane';
+import { DialogProvider } from '../../DialogProvider';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 
 vi.mock('../../chat/ConversationPanel', () => ({
@@ -118,6 +119,9 @@ function mockFetch() {
         },
       });
     }
+    if (url === '/api/flywheel/merge-queue') {
+      return Response.json([]);
+    }
     return Response.json({ error: 'not found' }, { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -128,7 +132,9 @@ function renderPane(onOpenSettings = vi.fn()) {
   const client = makeClient();
   render(
     <QueryClientProvider client={client}>
-      <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+      <DialogProvider>
+        <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+      </DialogProvider>
     </QueryClientProvider>,
   );
   return client;
@@ -224,6 +230,7 @@ describe('FlywheelConversationPane', () => {
       if (url === '/api/flywheel/runs?limit=10') return Response.json([]);
       if (url === '/api/flywheel/conversation') return Response.json(null);
       if (url === '/api/settings') return Response.json({ roles: {} });
+      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -241,13 +248,12 @@ describe('FlywheelConversationPane', () => {
     renderPane();
 
     await screen.findByText('RUN-2');
-    fireEvent.click(screen.getByRole('button', { name: /Start/i }));
+    // In 'running' state only Pause and Open Run Report are visible
+    expect(screen.queryByRole('button', { name: /^New Run$/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Pause/i }));
-    fireEvent.click(screen.getByRole('button', { name: /New Run/i }));
     fireEvent.click(screen.getByRole('button', { name: /Open Run Report/i }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/start', expect.objectContaining({ method: 'POST', body: undefined }));
       expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/pause', expect.objectContaining({ method: 'POST' }));
       expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/report/open', expect.objectContaining({ method: 'POST' }));
     });
@@ -270,6 +276,7 @@ describe('FlywheelConversationPane', () => {
       }
       if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
       if (url === '/api/settings') return Response.json({ roles: {} });
+      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -278,6 +285,8 @@ describe('FlywheelConversationPane', () => {
     expect(await screen.findByText('RUN-2 (complete)')).toBeInTheDocument();
     expect(screen.getByText('Model: claude-opus-4-7')).toBeInTheDocument();
     expect(screen.getByText('Effort: high')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Pause/i })).toBeDisabled();
+    // Completed runs show no active controls — Pause/Resume are not rendered
+    expect(screen.queryByRole('button', { name: /Pause/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resume/i })).not.toBeInTheDocument();
   });
 });

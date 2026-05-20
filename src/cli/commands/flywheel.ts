@@ -12,6 +12,7 @@ import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFly
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
+import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -335,7 +336,7 @@ function tableCell(value: string | number | undefined): string {
   return String(value ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
-export function formatFlywheelStateReport(status: FlywheelStatus): string {
+export function formatFlywheelStateReport(status: FlywheelStatus, mergeQueue: MergeQueueItem[] = []): string {
   const runNumber = runNumberFromRunId(status.runId);
   const activePipelineRows = status.activePipeline.length > 0
     ? status.activePipeline.map((item) => `| ${tableCell(item.issueId)} | ${tableCell(item.verb)} | ${tableCell(item.status)} | ${tableCell(item.title)} | ${tableCell(item.progressPercent)} | ${tableCell(item.pr)} |`).join('\n')
@@ -349,6 +350,23 @@ export function formatFlywheelStateReport(status: FlywheelStatus): string {
   const questionLines = status.openQuestions.length > 0
     ? status.openQuestions.map((question) => `- ${question}`).join('\n')
     : '- None.';
+  const mergeQueueSection = mergeQueue.length > 0
+    ? `## Merge Queue
+
+Merge ship-ready PRs in this order to avoid rebase conflicts. Branches with overlapping file changes must be merged in sequence; non-overlapping branches can be merged in any order.
+
+| # | Issue | PR | Conflicts With |
+|---|---|---|---|
+${mergeQueue.map((item) => {
+  const prCell = item.pr != null ? `#${item.pr}` : '—';
+  const conflictsCell = item.conflictsWith.length > 0 ? item.conflictsWith.join(', ') : '—';
+  return `| ${item.mergeOrder} | ${item.issueId} | ${prCell} | ${conflictsCell} |`;
+}).join('\n')}
+
+---
+
+`
+    : '';
 
   return `# Flywheel Run ${runNumber} Report — ${reportDate(status)}
 
@@ -362,7 +380,7 @@ Per-run report derived from the last \`FlywheelStatus\` snapshot. Durable cumula
 
 ---
 
-## Active Pipeline
+${mergeQueueSection}## Active Pipeline
 
 | Issue | Verb | Status | Title | Progress | PR |
 |---|---|---|---|---:|---:|
@@ -523,7 +541,8 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     }
 
     const runNumber = runNumberFromRunId(status.runId);
-    const runReport = formatFlywheelStateReport(status);
+    const mergeQueue = await computeMergeQueue(status.activePipeline, cwd).catch(() => []);
+    const runReport = formatFlywheelStateReport(status, mergeQueue);
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 
     const stateChanged = await isFlywheelStateDirty(cwd);
