@@ -83,7 +83,7 @@
       {
         "id": "pan-1231-ship-accent",
         "title": "AgentCard ship-role accent: use --signal-review (purple), not --signal-cost (cyan)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-20T02:45:00.000Z",
         "metadata": {
@@ -99,7 +99,7 @@
           {
             "id": "pan-1231-ship-accent.ac1",
             "title": "ROLE_ACCENTS.ship === 'var(--signal-review)' in primitives/AgentCard.tsx",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "pan-1231-ship-accent.ac2",
             "title": "A unit test renders <AgentCard role='ship' /> and asserts the rendered article element's inline style includes --agent-card-accent: var(--signal-review)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -115,7 +115,7 @@
           {
             "id": "pan-1231-ship-accent.ac3",
             "title": "No other call site of ROLE_ACCENTS regresses (plan stays --signal-review, work stays --info, review stays --warning, test stays --success, flywheel stays --primary)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -123,7 +123,7 @@
           {
             "id": "pan-1231-ship-accent.ac4",
             "title": "npm run typecheck, npm run lint, and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -133,7 +133,7 @@
       {
         "id": "pan-1231-name-sf-mono",
         "title": "AgentCard H1 row name uses SF Mono (font-mono) per PRD §4.7.9",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-20T02:45:00.000Z",
         "metadata": {
@@ -149,7 +149,7 @@
           {
             "id": "pan-1231-name-sf-mono.ac1",
             "title": "AgentCard h3.name has the `font-mono` Tailwind class in primitives/AgentCard.tsx",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -157,7 +157,7 @@
           {
             "id": "pan-1231-name-sf-mono.ac2",
             "title": "A unit test asserts the h3 element rendering the name has the `font-mono` class applied",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -165,7 +165,7 @@
           {
             "id": "pan-1231-name-sf-mono.ac3",
             "title": "Font weight (font-semibold) and size (text-[13px]) and color/leading classes are preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -173,7 +173,7 @@
           {
             "id": "pan-1231-name-sf-mono.ac4",
             "title": "npm run typecheck, npm run lint, and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -183,7 +183,7 @@
       {
         "id": "pan-1231-topbar-shell",
         "title": "Add TopBar shell to FleetAgentsView with Grid/Table/Timeline segmented control and Start agent button",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-20T02:45:00.000Z",
         "metadata": {
@@ -199,7 +199,7 @@
           {
             "id": "pan-1231-topbar-shell.ac1",
             "title": "FleetAgentsView renders <TopBar /> with breadcrumb, meta (live fleet counts + cumulative runtime), search placeholder, segmentedControl, and Start agent button slots populated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -207,7 +207,7 @@
           {
             "id": "pan-1231-topbar-shell.ac2",
             "title": "Segmented control has exactly three buttons labelled Grid, Table, Timeline. Clicking each sets ?view=grid|table|timeline and toggles the aria-pressed / active style on the selected segment.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -215,7 +215,7 @@
           {
             "id": "pan-1231-topbar-shell.ac3",
             "title": "Default view (no ?view= param) is 'grid' and renders the existing AgentCard grid",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -223,7 +223,7 @@
           {
             "id": "pan-1231-topbar-shell.ac4",
             "title": "?view=table and ?view=timeline render a 'Coming soon' placeholder section (labelled, not empty) — never silently empty",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -231,7 +231,7 @@
           {
             "id": "pan-1231-topbar-shell.ac5",
             "title": "Start agent button navigates the user to the Issues (Kanban) tab. Wired via the existing activeTab state in App.tsx (passed as a prop or via store action) — no new global-start dialog is created.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -239,7 +239,7 @@
           {
             "id": "pan-1231-topbar-shell.ac6",
             "title": "Setting ?view= preserves existing ?phase=, ?projects=, ?models= search params (additive URL state)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -247,7 +247,7 @@
           {
             "id": "pan-1231-topbar-shell.ac7",
             "title": "FleetAgentsView.test.tsx is extended with tests covering: default grid render, segment click updates URL + active style, Table/Timeline render placeholder, Start agent click triggers tab navigation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -255,7 +255,7 @@
           {
             "id": "pan-1231-topbar-shell.ac8",
             "title": "Playwright UAT (isolated browser instance — no shared session): navigate to /?tab=agents, click each segmented button, verify URL updates and visible label matches; click Start agent, verify the URL/UI switches to the Issues tab",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -263,7 +263,7 @@
           {
             "id": "pan-1231-topbar-shell.ac9",
             "title": "npm run typecheck, npm run lint, and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -273,7 +273,7 @@
       {
         "id": "pan-1231-drawer-scroll-wired",
         "title": "AgentCard 'Open issue' actually scrolls IssueDrawer to #active-agent (not just sets URL hash)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-20T02:45:00.000Z",
         "metadata": {
@@ -289,7 +289,7 @@
           {
             "id": "pan-1231-drawer-scroll-wired.ac1",
             "title": "Manual Playwright UAT (isolated browser, no shared session): clicking 'Open issue' on a fleet AgentCard opens the drawer AND the Active Agent section is visible in the drawer's scroll viewport without manual scrolling. Recorded as a passing UAT step.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -297,7 +297,7 @@
           {
             "id": "pan-1231-drawer-scroll-wired.ac2",
             "title": "A new unit test mounts FleetAgentsView + IssueDrawer + DrawerActiveAgent, spies Element.prototype.scrollIntoView, clicks 'Open issue' on a card, and asserts scrollIntoView was invoked on the element with id='active-agent'. The existing URL-hash-only test is replaced (not just supplemented) — a hash-only assertion is the original closed-without-delivery pattern and must not remain as the sole proof of delivery.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -305,7 +305,7 @@
           {
             "id": "pan-1231-drawer-scroll-wired.ac3",
             "title": "The fix handles the async DrawerActiveAgent mount: if the element is not in the DOM when the effect first runs, the scroll is retried (e.g., via ref/observer/short polling with a small retry cap) until it succeeds or a clean timeout — never silently no-ops.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -313,7 +313,7 @@
           {
             "id": "pan-1231-drawer-scroll-wired.ac4",
             "title": "Opening the drawer via other entry points (e.g., kanban card click without #active-agent hash) does NOT auto-scroll to the active-agent anchor — scroll behaviour is gated on the hash being present.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -321,7 +321,7 @@
           {
             "id": "pan-1231-drawer-scroll-wired.ac5",
             "title": "npm run typecheck, npm run lint, and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
