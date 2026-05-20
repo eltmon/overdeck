@@ -68,7 +68,7 @@ export interface FlywheelPipelineItem {
   agentId?: string | undefined
   pr?: number | undefined
   mergeOrder?: number | undefined
-  conflictsWith?: string[] | undefined
+  conflictsWith?: readonly string[] | undefined
 }
 
 export const FlywheelPipelineItem = Schema.Struct({
