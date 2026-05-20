@@ -24,7 +24,7 @@ allowed-tools:
 
 ```bash
 pan plan <id> [--auto] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
-pan plan finalize [-w <path>] [--json]
+pan plan finalize [-w <path>] [--json] [--no-promote]
 pan plan done <id>
 ```
 
@@ -64,13 +64,14 @@ What it does:
 1. Reads `.pan/spec.vbrief.json` from the current workspace (walks up if needed).
 2. Materializes each `plan.items[]` entry into a corresponding bead, respecting declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
-4. Returns a summary of beads created, or JSON with `--json`.
+4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
+5. Returns a summary of beads created and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace.
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done).
 
 ## Completing planning (`pan plan done`)
 
-After `finalize`, run:
+`pan plan done <id>` exists for cases where finalize was run with `--no-promote`, or where a planning agent crashed between writing the spec and promoting. It calls the same complete-planning endpoint that `finalize` chains to.
 
 ```bash
 pan plan done PAN-1071

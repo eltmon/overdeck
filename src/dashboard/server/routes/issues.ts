@@ -1044,18 +1044,11 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       return { isRemotePlanning, remoteVmName };
     });
 
-    if (!skipKill) {
-      yield* Effect.promise(async () => {
-        try {
-          await killSessionAsync(sessionName);
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          if (!/can't find session|session not found|no session found/i.test(msg)) {
-            console.error(`[complete-planning] kill-session failed for ${sessionName}:`, msg);
-          }
-        }
-      });
-    }
+    // Session kill is deferred to after the HTTP response is sent. When
+    // `pan plan finalize` chains to this endpoint from inside the planning
+    // session itself, killing the session synchronously here would kill the
+    // caller mid-fetch and they would never see their own success response.
+    // Keep this name in scope; we schedule the kill at the very end.
 
     // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
     yield* Effect.promise(async () => {
@@ -1238,6 +1231,21 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
+
+    // Deferred session kill: schedule after the response is flushed so a chained
+    // `pan plan finalize` call from inside the planning session can read its own
+    // success response before its tmux pane is destroyed. ~1.5s is enough for the
+    // body to leave the kernel buffer and for plan-finalize to print.
+    if (!skipKill) {
+      setTimeout(() => {
+        killSessionAsync(sessionName).catch((error: unknown) => {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!/can't find session|session not found|no session found/i.test(msg)) {
+            console.error(`[complete-planning] deferred kill-session failed for ${sessionName}:`, msg);
+          }
+        });
+      }, 1500);
+    }
 
     return jsonResponse({
       success: true,

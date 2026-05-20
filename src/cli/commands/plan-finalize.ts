@@ -5,12 +5,14 @@ import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
   json?: boolean;
+  noPromote?: boolean;
 }
 
 function findWorkspaceRoot(start: string): string | null {
@@ -83,6 +85,17 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     eventType: 'planning.finalized',
   });
 
+  let promoted = false;
+  let promoteMessage: string | null = null;
+  let promoteError: string | null = null;
+
+  if (!options.noPromote) {
+    const promotion = await promotePlanning(issueId);
+    promoted = promotion.success;
+    promoteMessage = promotion.message;
+    promoteError = promotion.error;
+  }
+
   if (options.json) {
     console.log(JSON.stringify({
       success: true,
@@ -90,14 +103,63 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       count: result.created.length,
       canonicalFilename,
       planStatus: 'proposed',
+      promoted,
+      ...(promoteMessage ? { promoteMessage } : {}),
+      ...(promoteError ? { promoteError } : {}),
     }));
   } else {
     console.log(chalk.green(`✓ Created ${result.created.length} beads task${result.created.length === 1 ? '' : 's'}`));
     for (const id of result.created) console.log(chalk.dim('  • ' + id));
     console.log(chalk.green(`✓ Set plan.status=proposed (canonical: ${canonicalFilename})`));
     console.log('');
-    console.log(chalk.cyan('Planning is finalized. The dashboard will now show the Done button.'));
-    console.log(chalk.dim('You can exit this session — the user will click Done to start implementation.'));
+    if (options.noPromote) {
+      console.log(chalk.cyan('Planning is finalized. Promotion skipped (--no-promote).'));
+      console.log(chalk.dim('Run `pan plan done ' + issueId + '` or click Done in the dashboard to promote.'));
+    } else if (promoted) {
+      console.log(chalk.green('✓ Planning promoted to main — issue is ready for implementation.'));
+      if (promoteMessage) console.log(chalk.dim('  ' + promoteMessage));
+    } else {
+      console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
+      if (promoteError) console.log(chalk.dim('  ' + promoteError));
+      console.log(chalk.dim('Run `pan plan done ' + issueId + '` to retry, or click Done in the dashboard.'));
+    }
+  }
+}
+
+/**
+ * Chain plan-finalize into the dashboard's complete-planning endpoint so the
+ * canonical spec is promoted to main and the issue transitions to Planned
+ * without requiring a human Done click. The route defers its session kill
+ * until after the response is flushed so callers running inside the planning
+ * tmux session still see this response.
+ */
+async function promotePlanning(issueId: string): Promise<{ success: boolean; message: string | null; error: string | null }> {
+  try {
+    const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    const text = await response.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+    if (!response.ok) {
+      const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
+      return { success: false, message: null, error: String(err) };
+    }
+    return { success: true, message: parsed?.message ?? null, error: null };
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : String(err);
+    return { success: false, message: null, error: `Dashboard unreachable: ${message}` };
   }
 }
 

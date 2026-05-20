@@ -312,9 +312,10 @@ const planCmd = program
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads and mark the workspace spec as proposed')
+  .description('Materialize plan into beads, mark the workspace spec as proposed, and promote to main')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
+  .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .action(planFinalizeCommand);
 
 planCmd
