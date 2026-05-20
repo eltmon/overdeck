@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
-    "updated": "2026-05-20T12:56:25.188Z"
+    "updated": "2026-05-20T12:58:21.260Z"
   },
   "plan": {
     "id": "pan-1190",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f5e8a1c2-9b3d-4e7f-a8b1-c2d3e4f5a6b7",
     "author": "agent:claude-opus-4-7",
-    "sequence": 1594,
+    "sequence": 1595,
     "created": "2026-05-18T13:25:00.000Z",
-    "updated": "2026-05-20T12:56:25.188Z",
+    "updated": "2026-05-20T12:58:21.260Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1190",
@@ -1082,31 +1082,31 @@
         "phase": "test",
         "issueId": "PAN-1190",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T12:56:25.139Z",
+        "updatedAt": "2026-05-20T12:58:21.259Z",
         "work": {
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T12:56:25.139Z",
+              "at": "2026-05-20T12:58:21.259Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "notes": "All four sub-reviews pass; 0 blockers, 4 non-blocking advisories (shellQuote injection hardening, findPlan workspace-first shadowing, autoCloseOut GitHub-only scope, lib→server import inversion)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T12:56:25.139Z",
+              "at": "2026-05-20T12:58:21.259Z",
               "notes": "All four sub-reviews pass; 0 blockers, 4 non-blocking advisories (shellQuote injection hardening, findPlan workspace-first shadowing, autoCloseOut GitHub-only scope, lib→server import inversion)"
             }
           ],
@@ -1114,22 +1114,22 @@
         },
         "test": {
           "status": "dispatch_failed",
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0); panopticon-feature-pan-1190-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1190' or retry with --host to override.",
           "history": [
             {
               "status": "dispatch_failed",
-              "at": "2026-05-20T12:56:25.139Z",
+              "at": "2026-05-20T12:58:21.259Z",
               "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0); panopticon-feature-pan-1190-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1190' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-20T12:56:25.139Z",
+          "updatedAt": "2026-05-20T12:58:21.259Z",
           "history": [],
           "readyForMerge": false
         }
