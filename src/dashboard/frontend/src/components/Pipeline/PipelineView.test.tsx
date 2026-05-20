@@ -261,4 +261,33 @@ describe('PipelineView', () => {
     expect(screen.getByText('Open PR')).toBeInTheDocument();
     expect(screen.queryByText('Ready to ship')).toBeNull();
   });
+
+  it('renders ledger runtime for rows with an active agent', () => {
+    const { container } = renderPipelineView();
+    const pan2Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
+    const ledger = pan2Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    const runtime = within(ledger).getByText(/\d+h? \d+m/);
+    expect(runtime).toBeInTheDocument();
+    expect(ledger).not.toHaveClass('opacity-55');
+  });
+
+  it('renders ledger cost for rows with cost events in the byIssue stream', () => {
+    const { container } = renderPipelineView();
+    const pan1Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-1"]') as HTMLElement;
+    const pan1Ledger = pan1Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(within(pan1Ledger).getByText('$1.25')).toBeInTheDocument();
+    expect(pan1Ledger).not.toHaveClass('opacity-55');
+
+    const pan2Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
+    const pan2Ledger = pan2Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(within(pan2Ledger).getByText('$0.50')).toBeInTheDocument();
+  });
+
+  it('shows empty ledger styling for rows with no agent and no cost events', () => {
+    const { container } = renderPipelineView();
+    const pan6Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-6"]') as HTMLElement;
+    const ledger = pan6Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(ledger).toHaveClass('opacity-55');
+    expect(within(ledger).getAllByText('—')).toHaveLength(2);
+  });
 });

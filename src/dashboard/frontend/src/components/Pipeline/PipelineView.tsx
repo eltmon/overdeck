@@ -4,6 +4,7 @@ import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { getPipelineIssuePhase, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import MetricStrip from '../primitives/MetricStrip';
@@ -155,6 +156,15 @@ function formatCost(value: number) {
   return '$0';
 }
 
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const safeMs = Math.max(0, ms);
+  const hours = Math.floor(safeMs / 3_600_000);
+  const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function MetricIcon({ label }: { label: string }) {
   return <span aria-hidden="true">{label}</span>;
 }
@@ -174,6 +184,7 @@ export function PipelineView() {
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
   const { eventsByIssue } = useCostStream({ limit: 500 });
+  const now = useSharedTick(30000);
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
     review: null,
@@ -394,6 +405,14 @@ export function PipelineView() {
             <PhaseHeader phase={phase} count={groupedIssues[phase].length} />
             {groupedIssues[phase].map((issue) => {
               const agent = agentByIssueId.get(issue.identifier.toLowerCase());
+              const costEvents = eventsByIssue[issue.identifier];
+              const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
+              const ledger = {
+                runtime: agent?.startedAt
+                  ? formatDuration(now.getTime() - new Date(agent.startedAt).getTime())
+                  : undefined,
+                cost: costSum > 0 ? formatCost(costSum) : undefined,
+              };
               return (
                 <IssueRow
                   key={issue.identifier}
@@ -405,6 +424,7 @@ export function PipelineView() {
                   labels={issue.labels.slice(0, 3)}
                   verbBadge={verbBadgeForPhase(phase)}
                   agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
+                  ledger={ledger}
                   assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
                   onOpen={openIssue}
                 />
