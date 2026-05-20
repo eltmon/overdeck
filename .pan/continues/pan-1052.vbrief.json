@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-16T04:05:31.860Z",
-  "updated": "2026-05-20T12:41:20.849Z",
+  "updated": "2026-05-20T12:43:26.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,7 +214,20 @@
       "reason": "feedback",
       "note": "[2026-05-20T12:40Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-05-20T12:40:26.133Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T12:43Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-20T12:43:26.123Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-20T12:43:26Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1052 (attempt 1/10):\n\nFailed check: frontend-typecheck\n\nVerification FAILED at frontend-typecheck (4578ms):\n\nCommand failed: nice -n 19 sh -c 'npx tsc --noEmit'\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1052 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1052 -m \"Fixed frontend-typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
 }

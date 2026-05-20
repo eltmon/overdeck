@@ -4,7 +4,7 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-20T12:41:21.021Z"
+    "updated": "2026-05-20T12:43:27.533Z"
   },
   "plan": {
     "id": "pan-1052",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 196,
+    "sequence": 204,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-20T12:41:21.021Z",
+    "updated": "2026-05-20T12:43:27.533Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2279,57 +2279,57 @@
         "phase": "review",
         "issueId": "PAN-1052",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T12:41:21.008Z",
+        "updatedAt": "2026-05-20T12:43:27.532Z",
         "work": {
-          "updatedAt": "2026-05-20T12:41:21.008Z",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-05-20T12:41:21.008Z",
-          "notes": "Verification FAILED at lint (15895ms):\n\nor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 258 files, total: 9.47 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2014ms\u001b[39m\n\n> @panctl/cli@0.9.3 lint:skills\n> bash scripts/lint-skills.sh\n\nsrc/dashboard/server/event-store.ts (125:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:125:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m125 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "notes": "Verification FAILED at frontend-typecheck (4578ms):\n\nCommand failed: nice -n 19 sh -c 'npx tsc --noEmit'\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-20T12:41:21.008Z",
-              "notes": "Verification FAILED at lint (15895ms):\n\nor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 258 files, total: 9.47 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2014ms\u001b[39m\n\n> @panctl/cli@0.9.3 lint:skills\n> bash scripts/lint-skills.sh\n\nsrc/dashboard/server/event-store.ts (125:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:125:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m125 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n"
+              "at": "2026-05-20T12:43:27.532Z",
+              "notes": "Verification FAILED at frontend-typecheck (4578ms):\n\nCommand failed: nice -n 19 sh -c 'npx tsc --noEmit'\n"
             }
           ]
         },
         "review": {
           "status": "failed",
-          "updatedAt": "2026-05-20T12:41:21.008Z",
-          "notes": "Review role spawn failed: Workspace docker stack for PAN-1052 is not healthy: panopticon-feature-pan-1052-server-1 service exited (0); panopticon-feature-pan-1052-frontend-1 service exited (127); panopticon-feature-pan-1052-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1052' or retry with --host to override.",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "notes": "Verification failed at frontend-typecheck",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-20T12:41:21.008Z",
-              "notes": "Review role spawn failed: Workspace docker stack for PAN-1052 is not healthy: panopticon-feature-pan-1052-server-1 service exited (0); panopticon-feature-pan-1052-frontend-1 service exited (127); panopticon-feature-pan-1052-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1052' or retry with --host to override."
+              "at": "2026-05-20T12:43:27.532Z",
+              "notes": "Verification failed at frontend-typecheck"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-20T12:41:21.008Z",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-20T12:41:21.008Z"
+              "at": "2026-05-20T12:43:27.532Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T12:41:21.008Z",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-20T12:41:21.008Z",
+          "updatedAt": "2026-05-20T12:43:27.532Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-20T12:41:21.008Z"
+              "at": "2026-05-20T12:43:27.532Z"
             }
           ],
           "readyForMerge": false,
