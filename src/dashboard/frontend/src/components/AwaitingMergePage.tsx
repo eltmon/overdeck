@@ -5,8 +5,8 @@
  *   1. Open the workspace's frontendUrl in a new tab so the user can UAT.
  *   2. POST to /api/issues/:id/merge once UAT passes.
  *
- * This is the only page the user needs to look at while `/all-up` runs the
- * Fix-All flywheel. See FIX-ALL-PRD.md.
+ * This is the only page the user needs to look at while `/pan-flywheel` runs.
+ * See docs/flywheel-brief.md and docs/FLYWHEEL.md.
  */
 
 import { useMemo, useState } from 'react';

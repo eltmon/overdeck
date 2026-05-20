@@ -24,6 +24,7 @@ import {
   resumeFlywheelRunForDashboard,
   startFlywheelRunForDashboard,
 } from '../services/flywheel-actions.js';
+import { readFlywheelState } from '../services/flywheel-state.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -409,11 +410,20 @@ const postFlywheelBriefRoute = HttpRouter.add(
   })),
 );
 
+const getFlywheelStateRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/state',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => jsonResponse(await readFlywheelState()));
+  })),
+);
+
 export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunsRoute,
   getFlywheelRunRoute,
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
+  getFlywheelStateRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,
   postFlywheelPauseRoute,

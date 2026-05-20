@@ -6,10 +6,19 @@ The canonical skill entrypoint is `/pan-flywheel`, which wraps the `pan flywheel
 
 Read this with:
 
-- [`FIX-ALL-PRD.md`](./FIX-ALL-PRD.md) for product intent.
-- [`OPERATION-FIX-ALL.md`](./OPERATION-FIX-ALL.md) for the historical operating manual.
-- [`ROLES.md`](./ROLES.md) for the role taxonomy the Flywheel coordinates.
-- [`../packages/contracts/src/flywheel.ts`](../packages/contracts/src/flywheel.ts) for the shared status contract.
+- [`flywheel-brief.md`](./flywheel-brief.md) — the operating contract the orchestrator reads at the start of every run.
+- [`ROLES.md`](./ROLES.md) — the role taxonomy the Flywheel coordinates.
+- [`../packages/contracts/src/flywheel.ts`](../packages/contracts/src/flywheel.ts) — the shared `FlywheelStatus` contract.
+
+## Status vs State
+
+The Flywheel produces two different artifacts. They are not interchangeable.
+
+**Status** is the live snapshot of the current run. The orchestrator emits it every tick via `pan flywheel emit-status`. It is structured JSON validated against `FlywheelStatus`. Only the latest snapshot matters; the dashboard's **Status** tab renders it live and the CLI's `pan flywheel status` reads it back. Each run's snapshots persist at `${PANOPTICON_HOME}/flywheel/runs/<runId>/latest.json`.
+
+**State** is the durable cumulative memory across all runs. It lives at `docs/FLYWHEEL-STATE.md`, owned and edited by the orchestrator, plain markdown. Future runs read it before doing anything else. The dashboard's **State** tab renders it as markdown via `GET /api/flywheel/state`. The file does not exist before the first run that needs to record something durable; the orchestrator creates it.
+
+`pan flywheel report` writes the per-run report at `${PANOPTICON_HOME}/flywheel/runs/<runId>/report.md` and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The CLI does not author State content — that is the orchestrator's job.
 
 ## Status contract
 
@@ -50,7 +59,7 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 | `pan flywheel resume` | Continues a paused run from its saved state. |
 | `pan flywheel status` | Reads the latest `FlywheelStatus` snapshot. |
 | `pan flywheel emit-status --file <json>` | Validates and writes a status snapshot from the orchestrator. |
-| `pan flywheel report` | Produces the end-of-run report from the saved run state. |
+| `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Panopticon home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
@@ -107,11 +116,14 @@ Do not put secrets, machine-local paths, or one-time session state in a brief. P
 | CLI | `pan flywheel emit-status --file <json>` | Validates a `FlywheelStatus` payload and publishes it to the dashboard status endpoint. |
 | CLI | `pan flywheel status [--json]` | Reads the active run's latest status snapshot from the run directory. |
 | CLI | `pan flywheel pause` / `pan flywheel resume` | Toggles the singleton gate for the active orchestrator. |
-| CLI | `pan flywheel report` | Rewrites `docs/FLYWHEEL-STATE.md`, appends the operation report, saves `report.md`, and commits the report. |
+| CLI | `pan flywheel report` | Writes the per-run `report.md` under the run directory and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. |
+| API | `GET /api/flywheel/state` | Reads `docs/FLYWHEEL-STATE.md` for the dashboard State tab. Returns `{ exists: false }` before the first orchestrator write. |
 | API | `GET /api/flywheel/runs` | Lists run summaries for the sidebar live badge and Flywheel page. |
 | API | `GET /api/flywheel/runs/:id` | Returns a run detail plus its latest validated status snapshot. |
 | API | `GET /api/flywheel/brief` / `POST /api/flywheel/brief` | Reads and updates the markdown brief, constrained to paths inside the project root. |
-| UI | `/flywheel` | Shows the run pane, transcript link, status details, and Settings → Roles → Flywheel configuration summary. |
+| UI | `/flywheel` | Two-pane layout. Left pane has **Status** and **State** tabs. Right pane is the orchestrator conversation. |
+| UI | `/flywheel` → Status tab | Renders the live `FlywheelStatus` snapshot via `subscribeFlywheelStatus`. Default tab. |
+| UI | `/flywheel` → State tab | Renders `docs/FLYWHEEL-STATE.md` as markdown. |
 | UI | Sidebar Flywheel item | Opens `/flywheel` and shows a live badge when a run summary reports `status: running`. |
 | UI | Settings → Roles → Flywheel | Edits the orchestrator model, harness, effort, max-agent budget, and scope for future starts. |
 

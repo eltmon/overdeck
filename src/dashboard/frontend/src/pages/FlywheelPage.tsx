@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDetails';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
@@ -8,6 +9,8 @@ interface FlywheelPageProps {
   onOpenSettings?: () => void;
   onNavigateAgent?: (agentId: string) => void;
 }
+
+type FlywheelLeftTab = 'status' | 'state';
 
 async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
   const res = await fetch('/api/flywheel/current');
@@ -26,6 +29,7 @@ function formatElapsed(ms: number): string {
 
 export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
+  const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +83,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
               <div className="mt-1 font-mono text-sm text-foreground">{status?.runId ?? 'No run'}</div>
             </div>
           </div>
-          {status && (
+          {status && activeTab === 'status' && (
             <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
               <div className="rounded-md border border-border bg-background p-3">
                 <dt className="uppercase tracking-wide text-muted-foreground">Elapsed</dt>
@@ -95,18 +99,52 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
               </div>
             </dl>
           )}
+          <div className="mt-4" role="tablist" aria-label="Flywheel left-pane tabs">
+            <div className="inline-flex rounded-lg border border-border bg-background p-1 text-xs font-medium">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'status'}
+                onClick={() => setActiveTab('status')}
+                className={
+                  activeTab === 'status'
+                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
+                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
+                }
+              >
+                Status
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'state'}
+                onClick={() => setActiveTab('state')}
+                className={
+                  activeTab === 'state'
+                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
+                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
+                }
+              >
+                State
+              </button>
+            </div>
+          </div>
         </header>
 
-        <div className="p-6">
-          {status ? (
-            <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} />
-          ) : (
-            <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
-              <div>
-                <p className="text-base font-medium text-foreground">No active run — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pan flywheel start</code> to begin.</p>
-                <p className="mt-2 text-sm text-muted-foreground">The status pane will update as soon as the orchestrator emits its first snapshot.</p>
+        <div className="p-6" role="tabpanel" aria-label={activeTab === 'status' ? 'Flywheel status' : 'Flywheel state'}>
+          {activeTab === 'status' ? (
+            status ? (
+              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} />
+            ) : (
+              <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <div>
+                  <p className="text-base font-medium text-foreground">No active run — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pan flywheel start</code> to begin.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">The status pane will update as soon as the orchestrator emits its first snapshot.</p>
+                </div>
               </div>
-            </div>
+            )
+          ) : (
+            <FlywheelStatePane />
           )}
         </div>
       </section>

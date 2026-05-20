@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelPage } from '../FlywheelPage';
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   subscribeFlywheelStatus: vi.fn(),
   statusDetails: vi.fn(),
   conversationPane: vi.fn(),
+  statePane: vi.fn(),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -26,6 +27,13 @@ vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
   FlywheelConversationPane: (props: { onOpenSettings?: () => void }) => {
     mocks.conversationPane(props);
     return <div data-testid="conversation-pane">conversation</div>;
+  },
+}));
+
+vi.mock('../../components/flywheel/FlywheelStatePane', () => ({
+  FlywheelStatePane: () => {
+    mocks.statePane();
+    return <div data-testid="state-pane">state</div>;
   },
 }));
 
@@ -71,6 +79,7 @@ describe('FlywheelPage', () => {
     mocks.unsubscribe.mockReset();
     mocks.statusDetails.mockReset();
     mocks.conversationPane.mockReset();
+    mocks.statePane.mockReset();
     mocks.subscribeFlywheelStatus.mockReset();
     mocks.subscribeFlywheelStatus.mockImplementation((listener: (status: FlywheelStatus | null) => void) => {
       mocks.listener = listener;
@@ -138,5 +147,23 @@ describe('FlywheelPage', () => {
     unmount();
 
     expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('defaults to the Status tab and switches to State on tab click', () => {
+    render(<FlywheelPage />);
+
+    const stateTab = screen.getByRole('tab', { name: 'State' });
+    const statusTab = screen.getByRole('tab', { name: 'Status' });
+
+    expect(statusTab).toHaveAttribute('aria-selected', 'true');
+    expect(stateTab).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByTestId('state-pane')).not.toBeInTheDocument();
+
+    fireEvent.click(stateTab);
+
+    expect(stateTab).toHaveAttribute('aria-selected', 'true');
+    expect(statusTab).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId('state-pane')).toBeInTheDocument();
+    expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
   });
 });

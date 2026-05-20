@@ -81,7 +81,7 @@ The role prompt should use this helper instead of hand-writing HTTP requests so 
 pan flywheel report
 ```
 
-Writes the end-of-run artifacts for the active or latest run: `docs/FLYWHEEL-STATE.md`, an appended section in `docs/OPERATION-FIX-ALL.md`, and a `docs(flywheel): run N` commit when there are report changes.
+Writes the per-run report under the run directory (`${PANOPTICON_HOME}/flywheel/runs/<runId>/report.md`) and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md` (durable cumulative memory). Produces a `docs(flywheel): run N` commit when there are changes.
 
 Run this at the end of a Flywheel revolution, not after every status tick.
 
@@ -97,4 +97,4 @@ Run this at the end of a Flywheel revolution, not after every status tick.
 - `roles/flywheel.md` — orchestrator role prompt
 - `docs/flywheel-brief.md` — default brief
 - `docs/FLYWHEEL.md` — operator documentation
-- `docs/OPERATION-FIX-ALL.md` — run history
+- `docs/FLYWHEEL-STATE.md` — durable cumulative memory across all runs (created on first orchestrator write)

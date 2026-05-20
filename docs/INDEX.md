@@ -38,9 +38,10 @@
 | [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 | [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
-| [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, and skill → CLI → API → UI mapping |
-| [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Fix-All Flywheel PRD: continuous, self-improving mass pan-oversee with `main` always clean |
-| [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Operational manual for mass pan-oversee: phases, classification, bug log template |
+| [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, status vs state, and skill → CLI → API → UI mapping |
+| [flywheel-brief.md](./flywheel-brief.md) | Default operating contract the Flywheel orchestrator reads at the start of every run |
+| [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Consolidated into `flywheel-brief.md` and `FLYWHEEL.md` (redirect only — original content in git history) |
+| [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Consolidated into `flywheel-brief.md` (redirect only — original content in git history) |
 
 ---
 

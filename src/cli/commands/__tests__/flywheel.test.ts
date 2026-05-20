@@ -128,10 +128,10 @@ async function git(cwd: string, args: string[]): Promise<string> {
 async function createReportRepo(root: string): Promise<string> {
   const repoDir = join(root, 'repo');
   await mkdir(join(repoDir, 'docs'), { recursive: true });
-  await writeFile(join(repoDir, 'docs', 'OPERATION-FIX-ALL.md'), '# Operation Fix-All\n\n## Run Log\n', 'utf8');
+  await writeFile(join(repoDir, 'docs', '.placeholder'), '', 'utf8');
   await git(repoDir, ['init']);
-  await git(repoDir, ['add', 'docs/OPERATION-FIX-ALL.md']);
-  await git(repoDir, ['-c', 'user.name=Panopticon Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed operation log']);
+  await git(repoDir, ['add', 'docs/.placeholder']);
+  await git(repoDir, ['-c', 'user.name=Panopticon Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed repo']);
   return repoDir;
 }
 
@@ -399,7 +399,7 @@ describe('flywheel CLI commands', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('writes and commits a deterministic run report', async () => {
+  it('writes a per-run report under the run directory and does not touch FLYWHEEL-STATE.md', async () => {
     const repoDir = await createReportRepo(tempDir);
     flywheelLifecycleMocks.activeRunId = 'RUN-1';
     flywheelLifecycleMocks.paused = true;
@@ -413,21 +413,19 @@ describe('flywheel CLI commands', () => {
       openQuestions: ['Should the next tick resume PAN-3?'],
     });
 
+    const commitsBefore = await git(repoDir, ['rev-list', '--count', 'HEAD']);
+
     await flywheelReportCommand({ cwd: repoDir });
     unsubscribe();
 
-    const stateReport = await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8');
-    const operationLog = await readFile(join(repoDir, 'docs', 'OPERATION-FIX-ALL.md'), 'utf8');
-    expect(stateReport).toContain('# Flywheel State — 2026-05-18 (Run 1)');
-    expect(stateReport).toContain('| PAN-1 | working | running | Pipeline item | 50 | 123 |');
-    expect(stateReport).toContain('| PAN-2 | fixed | Substrate bug | abcdef1234 |');
-    expect(operationLog).toContain('## Run 1 — 2026-05-18');
-    expect(operationLog).toContain('**System:** 1/8 agents active');
-    expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
-    expect(await git(repoDir, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])).toBe([
-      'docs/FLYWHEEL-STATE.md',
-      'docs/OPERATION-FIX-ALL.md',
-    ].join('\n'));
+    const runReport = await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8');
+    expect(runReport).toContain('# Flywheel Run 1 Report — 2026-05-18');
+    expect(runReport).toContain('| PAN-1 | working | running | Pipeline item | 50 | 123 |');
+    expect(runReport).toContain('| PAN-2 | fixed | Substrate bug | abcdef1234 |');
+
+    await expect(readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8'))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe(commitsBefore);
     expect(flywheelLifecycleMocks.activeRunId).toBeNull();
     expect(flywheelLifecycleMocks.paused).toBe(false);
     expect(received.at(-1)).toBeNull();
@@ -440,31 +438,43 @@ describe('flywheel CLI commands', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('does not create a second report commit without new ticks', async () => {
+  it('commits orchestrator-authored changes to FLYWHEEL-STATE.md', async () => {
     const repoDir = await createReportRepo(tempDir);
     await writeLatestFlywheelStatus(validStatus);
-    await flywheelReportCommand({ cwd: repoDir });
-    logSpy.mockClear();
+    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), '# Flywheel State\n\nFirst observation.\n', 'utf8');
 
     await flywheelReportCommand({ cwd: repoDir });
 
-    expect(logSpy).toHaveBeenCalledWith('nothing to report');
-    expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe('2');
+    expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
+    expect(await git(repoDir, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])).toBe('docs/FLYWHEEL-STATE.md');
+    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('First observation.');
   });
 
-  it('amends the run report commit after new ticks', async () => {
+  it('does not create a commit when FLYWHEEL-STATE.md is unchanged', async () => {
     const repoDir = await createReportRepo(tempDir);
     await writeLatestFlywheelStatus(validStatus);
+    const commitsBefore = await git(repoDir, ['rev-list', '--count', 'HEAD']);
+
+    await flywheelReportCommand({ cwd: repoDir });
+
+    expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe(commitsBefore);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('No FLYWHEEL-STATE.md changes to commit'));
+  });
+
+  it('amends the run commit when FLYWHEEL-STATE.md changes again', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    await writeLatestFlywheelStatus(validStatus);
+    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), '# Flywheel State\n\nFirst observation.\n', 'utf8');
     await flywheelReportCommand({ cwd: repoDir });
     const firstCommit = await git(repoDir, ['rev-parse', 'HEAD']);
 
-    await writeLatestFlywheelStatus({ ...validStatus, elapsedMs: 2000, ticks: 2, lastTickAt: '2026-05-18T12:00:02.000Z' });
+    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), '# Flywheel State\n\nFirst observation.\n\nSecond observation.\n', 'utf8');
     await flywheelReportCommand({ cwd: repoDir });
 
     expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe('2');
     expect(await git(repoDir, ['rev-parse', 'HEAD'])).not.toBe(firstCommit);
     expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
-    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('ticks 2');
+    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('Second observation.');
   });
 
   it('registers flywheel subcommands with their flags', () => {

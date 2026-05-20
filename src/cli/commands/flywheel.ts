@@ -350,9 +350,9 @@ export function formatFlywheelStateReport(status: FlywheelStatus): string {
     ? status.openQuestions.map((question) => `- ${question}`).join('\n')
     : '- None.';
 
-  return `# Flywheel State — ${reportDate(status)} (Run ${runNumber})
+  return `# Flywheel Run ${runNumber} Report — ${reportDate(status)}
 
-This file is the flywheel's memory. The next \`pan flywheel start\` run reads it before doing anything else. Updated at the END of each revolution.
+Per-run report derived from the last \`FlywheelStatus\` snapshot. Durable cumulative memory across runs lives in \`docs/FLYWHEEL-STATE.md\`.
 
 **Run window:** ${status.startedAt} → ${status.lastTickAt} (${status.orchestrator.harness}, ${status.orchestrator.model}, ${status.orchestrator.effort})
 
@@ -392,62 +392,16 @@ ${patternLines}
 
 ## Skill Gaps
 
-- Keep \`pan flywheel report\` in the closeout path so run summaries stay committed with the codebase.
+- Keep \`pan flywheel report\` in the closeout path so run summaries stay archived under the run directory.
 `;
 }
 
-export function formatFlywheelOperationSection(status: FlywheelStatus): string {
-  const runNumber = runNumberFromRunId(status.runId);
-  const bugLines = status.substrateBugs.length > 0
-    ? status.substrateBugs.map((bug, index) => `${index + 1}. **${bug.issueId} — ${bug.title}.** Status: ${bug.status}${bug.commitSha ? ` (${bug.commitSha.slice(0, 10)})` : ''}.`).join('\n')
-    : 'None recorded.';
-  const activeLines = status.activePipeline.length > 0
-    ? status.activePipeline.map((item) => `- **${item.issueId}** — ${item.verb}/${item.status}: ${item.title}`).join('\n')
-    : '- None.';
-
-  return `## Run ${runNumber} — ${reportDate(status)}
-
-**Window:** ${status.startedAt} – ${status.lastTickAt} (${formatElapsed(status.elapsedMs)}, ${status.orchestrator.model})
-
-**Issues moved:** ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal} SWARM items merged; ${status.headline.prsMerged} PRs merged; ${status.headline.awaitingUat} awaiting UAT.
-
-**Bugs fixed in code:** ${status.headline.bugsFixed}
-
-${bugLines}
-
-**Still in pipeline:**
-
-${activeLines}
-
-**System:** ${status.system.agentsActive}/${status.system.agentsCap} agents active; RAM ${status.system.ramUsedMb}/${status.system.ramTotalMb} MiB; main ${status.system.mainHead.slice(0, 7)}; ticks ${status.ticks}.
-`;
-}
-
-async function readTextIfExists(path: string): Promise<string> {
-  try {
-    return await readFile(path, 'utf8');
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    if (code === 'ENOENT') return '';
-    throw error;
-  }
-}
-
-function hasRunSection(existing: string, runNumber: number): boolean {
-  return existing.includes(`## Run ${runNumber} — `);
-}
-
-function replaceOrAppendRunSection(existing: string, section: string, runNumber: number): string {
-  const normalizedExisting = existing.trimEnd();
-  const heading = `## Run ${runNumber} — `;
-  const start = normalizedExisting.indexOf(heading);
-  if (start === -1) {
-    return `${normalizedExisting}${normalizedExisting ? '\n\n' : ''}${section}`;
-  }
-
-  const nextRunMatch = /^## Run \d+ — /m.exec(normalizedExisting.slice(start + heading.length));
-  const end = nextRunMatch ? start + heading.length + nextRunMatch.index : normalizedExisting.length;
-  return `${normalizedExisting.slice(0, start).trimEnd()}\n\n${section}${normalizedExisting.slice(end).trimStart() ? `\n\n${normalizedExisting.slice(end).trimStart()}` : ''}`;
+async function isFlywheelStateDirty(cwd: string): Promise<boolean> {
+  const { stdout } = await execAsync(
+    'git status --porcelain docs/FLYWHEEL-STATE.md',
+    { cwd, encoding: 'utf8' },
+  );
+  return stdout.trim().length > 0;
 }
 
 async function loadReportFlywheelStatus(): Promise<FlywheelStatus | null> {
@@ -468,19 +422,14 @@ async function gitOutput(command: string, cwd: string): Promise<string> {
   return stdout.trim();
 }
 
-async function commitFlywheelReport(cwd: string, runNumber: number, requireAmend: boolean): Promise<'commit' | 'amend'> {
+async function commitFlywheelStateChanges(cwd: string, runNumber: number): Promise<void> {
   const subject = `docs(flywheel): run ${runNumber}`;
-  await execAsync('git add docs/FLYWHEEL-STATE.md docs/OPERATION-FIX-ALL.md', { cwd });
+  await execAsync('git add docs/FLYWHEEL-STATE.md', { cwd });
   const headSubject = await gitOutput('git log -1 --format=%s', cwd).catch(() => '');
-  if (requireAmend && headSubject !== subject) {
-    throw new Error(`Refusing to amend run ${runNumber}: latest commit is not ${subject}`);
-  }
-  const mode = headSubject === subject ? 'amend' : 'commit';
-  const command = mode === 'amend'
+  const command = headSubject === subject
     ? `git commit --amend -m ${JSON.stringify(subject)}`
     : `git commit -m ${JSON.stringify(subject)}`;
   await execAsync(command, { cwd, encoding: 'utf8' });
-  return mode;
 }
 
 function readFlywheelGateSnapshot(): FlywheelGateSnapshot {
@@ -574,29 +523,19 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     }
 
     const runNumber = runNumberFromRunId(status.runId);
-    const statePath = join(cwd, 'docs', 'FLYWHEEL-STATE.md');
-    const operationPath = join(cwd, 'docs', 'OPERATION-FIX-ALL.md');
-    const stateReport = formatFlywheelStateReport(status);
-    const existingOperation = await readTextIfExists(operationPath);
-    const operationReport = replaceOrAppendRunSection(
-      existingOperation,
-      formatFlywheelOperationSection(status),
-      runNumber,
-    );
+    const runReport = formatFlywheelStateReport(status);
+    await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 
-    const existingState = await readTextIfExists(statePath);
-    if (existingState === stateReport && existingOperation === operationReport) {
+    const stateChanged = await isFlywheelStateDirty(cwd);
+    if (!stateChanged) {
       clearFlywheelRunGate(status.runId);
-      console.log('nothing to report');
+      console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
       return;
     }
 
-    await writeFile(statePath, stateReport, 'utf8');
-    await writeFile(operationPath, operationReport, 'utf8');
-    await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), stateReport, 'utf8');
-    const mode = await commitFlywheelReport(cwd, runNumber, hasRunSection(existingOperation, runNumber));
+    await commitFlywheelStateChanges(cwd, runNumber);
     clearFlywheelRunGate(status.runId);
-    console.log(`${mode === 'amend' ? 'Updated' : 'Created'} docs(flywheel): run ${runNumber}`);
+    console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

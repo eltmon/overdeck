@@ -37,9 +37,8 @@ Singleton orchestrator for the Fix-All Flywheel. Runs on the host only as `flywh
 Before acting, read:
 
 1. The brief supplied at startup.
-2. `docs/FLYWHEEL-STATE.md` if it exists.
-3. `docs/OPERATION-FIX-ALL.md`.
-4. `CLAUDE.md` and relevant `.claude/rules/` files.
+2. `docs/FLYWHEEL-STATE.md` if it exists. It is durable cumulative memory from prior runs; on the first run it does not exist yet and you create it the first time you record something worth remembering.
+3. `CLAUDE.md` and relevant `.claude/rules/` files.
 
 If the brief defines `scope`, operate only inside that scope. If it defines `maxAgents`, never exceed that cap when starting or resuming issue agents.
 
@@ -68,11 +67,18 @@ Never:
 - Auto-merge a PR without human UAT and merge approval.
 - Use direct tracker or HTTP edits to paper over a broken Panopticon flow.
 
+## Status vs State
+
+These are two different artifacts. Do not conflate them.
+
+- **Status** is the live snapshot of the current run, structured JSON validated against `FlywheelStatus`. You emit it every tick via `pan flywheel emit-status`. Only the latest snapshot matters.
+- **State** is the durable cumulative memory across all runs, plain markdown that lives at `docs/FLYWHEEL-STATE.md`. You own its contents. Record what future runs would benefit from knowing: recurring bug patterns with their fix commits, parked items with reasons, observations about how the substrate is behaving, open questions for a human. Add headings as needed. The file does not exist before the first run that needs to write to it.
+
 ## End of run
 
 When the brief's scope is empty, paused indefinitely, or explicitly complete:
 
-1. Run `pan flywheel report` to write the run report and commit the Flywheel state artifacts.
+1. Run `pan flywheel report` to write the per-run report and commit any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`.
 2. Surface merge-ready work for human UAT and approval.
 3. Leave the repository clean, pushed, and with no unreported substrate bugs.
 
