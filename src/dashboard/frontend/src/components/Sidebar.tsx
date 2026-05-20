@@ -17,7 +17,7 @@ const SIDEBAR_STORAGE_KEY = 'panopticon.ui.sidebarCollapsed';
 
 interface FlywheelRunSummary {
   id: string;
-  status: 'running' | 'complete' | 'aborted';
+  status: 'running' | 'paused' | 'complete' | 'aborted';
 }
 
 interface NavItem {

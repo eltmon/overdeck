@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1221",
   "created": "2026-05-19T22:48:53.690Z",
-  "updated": "2026-05-20T01:11:39.462Z",
+  "updated": "2026-05-20T13:22:26.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -49,6 +49,16 @@
       "reason": "feedback",
       "note": "[2026-05-20T01:08Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-20T01:08:57.176Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-20T13:13:03.209Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T13:15Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-20T13:15:14.423Z"
     }
   ]
 }

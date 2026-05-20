@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { loadConfigAsyncNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
-import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
+import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
 import {
@@ -230,6 +230,15 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
 export async function pauseFlywheelRunForDashboard(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
   const before = await readGateSnapshot();
   if (before.paused) return { before, after: before, changed: false };
+  if (before.activeRunId) {
+    try {
+      const { readFile } = await import('node:fs/promises');
+      const { join } = await import('node:path');
+      const { getAgentDir } = await import('../../../lib/agents.js');
+      const sessionId = (await readFile(join(getAgentDir(FLYWHEEL_ORCHESTRATOR_AGENT_ID), 'session.id'), 'utf-8')).trim();
+      if (sessionId) await saveResumeSessionId(before.activeRunId, sessionId);
+    } catch { /* non-fatal: resume falls back to fresh if session.id is missing */ }
+  }
   await setPaused(true);
   await import('../../../lib/agents.js').then(({ stopAgentAsync }) => stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
   return { before, after: await readGateSnapshot(), changed: true };
@@ -248,6 +257,7 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
   }
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = await resolveFlywheelRoleConfig();
+  const resumeSessionId = await loadResumeSessionId(before.activeRunId) ?? undefined;
   await spawnFlywheelAgent(before.activeRunId, {
     workspace: launch.workspace,
     briefPath: brief.absolutePath,
@@ -256,6 +266,7 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
     effort: roleConfig.effort,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
+    resumeSessionId,
   });
   await setPaused(false);
   return { before, after: await readGateSnapshot(), changed: true };

@@ -175,6 +175,12 @@ export async function getFlywheelConversationPayload() {
   return { ...conversation, sessionAlive };
 }
 
+export async function postFlywheelReportPayload() {
+  const { flywheelReportCommand } = await import('../../../cli/commands/flywheel.js');
+  await flywheelReportCommand({ cwd: process.cwd() });
+  return { status: 200, body: { ok: true } };
+}
+
 interface FlywheelActionDeps {
   start?: typeof startFlywheelRunForDashboard;
   pause?: typeof pauseFlywheelRunForDashboard;
@@ -327,6 +333,23 @@ const postFlywheelResumeRoute = HttpRouter.add(
   })),
 );
 
+const postFlywheelReportRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/report',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    try {
+      const result = yield* Effect.promise(() => postFlywheelReportPayload());
+      return jsonResponse(result.body, { status: result.status });
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    }
+  })),
+);
+
 const postFlywheelReportOpenRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/report/open',
@@ -428,6 +451,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelStartRoute,
   postFlywheelPauseRoute,
   postFlywheelResumeRoute,
+  postFlywheelReportRoute,
   postFlywheelReportOpenRoute,
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,

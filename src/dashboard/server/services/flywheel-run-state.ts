@@ -4,9 +4,9 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelActiveRunId } from '../../../lib/database/app-settings.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../../lib/database/app-settings.js';
 
-export type FlywheelRunStatus = 'running' | 'complete' | 'aborted';
+export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 
 export interface FlywheelRunStateOptions {
   panopticonHome?: string;
@@ -192,16 +192,17 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function deriveRunStatus(runDir: string): Promise<FlywheelRunStatus> {
+async function deriveRunStatus(runDir: string, runId: string): Promise<FlywheelRunStatus> {
   if (await fileExists(join(runDir, 'aborted.json'))) return 'aborted';
   if (await fileExists(join(runDir, 'report.md'))) return 'complete';
+  if (isFlywheelGloballyPaused() && getFlywheelActiveRunId() === runId) return 'paused';
   return 'running';
 }
 
 async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Promise<FlywheelRunSummary> {
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
-  const status = await deriveRunStatus(runDir);
+  const status = await deriveRunStatus(runDir, runId);
   return {
     id: runId,
     startedAt: latest?.startedAt ?? '',
@@ -213,7 +214,7 @@ export async function readCurrentLatestFlywheelStatus(options: FlywheelCurrentSt
   const activeRunId = options.activeRunId === undefined ? getFlywheelActiveRunId() : options.activeRunId;
   if (!activeRunId || !isFlywheelRunId(activeRunId)) return null;
   const activeRun = await getFlywheelRunDetail(activeRunId, options);
-  return activeRun?.status === 'running' ? activeRun.latest : null;
+  return (activeRun?.status === 'running' || activeRun?.status === 'paused') ? activeRun.latest : null;
 }
 
 function selectLatestRunIds(entries: Dirent[], limit: number): string[] {
@@ -246,7 +247,7 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelRunSt
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
   if (!latest) return null;
-  const status = await deriveRunStatus(runDir);
+  const status = await deriveRunStatus(runDir, runId);
   const reportPath = join(runDir, 'report.md');
   const openedPrPath = join(runDir, 'opened-pr.json');
   return {

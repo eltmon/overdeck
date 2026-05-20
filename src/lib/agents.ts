@@ -1760,6 +1760,7 @@ export interface SpawnRunOptions {
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: 'low' | 'medium' | 'high';
+  resumeSessionId?: string;
 }
 
 /**
@@ -2236,18 +2237,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // stale snapshots made active synthesizers render as "Starting…".
   let sessionId: string | undefined;
   if (shouldRegisterConversation) {
-    sessionId = randomUUID();
+    // When resuming, reuse the prior JSONL session so `claude --resume` reloads conversation history.
+    // When starting fresh, generate a new UUID and use `claude --session-id`.
+    const rawSessionId = options.resumeSessionId ?? randomUUID();
 
-    // Persist the pinned --session-id to <agentDir>/session.id so
-    // resolveClaudeSessionId can locate the JSONL after the specialist exits.
-    // Specialists run with --session-id <uuid> but `claude --print` never fires
-    // the heartbeat hook that normally writes this file for interactive agents,
-    // so without this write the dashboard's "Conversation" tab renders
-    // "No conversation data available" even though the JSONL sits on disk.
+    // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
+    // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
     try {
       const agentDir = getAgentDir(agentId);
       await mkdir(agentDir, { recursive: true });
-      await writeFile(join(agentDir, 'session.id'), sessionId, 'utf-8');
+      await writeFile(join(agentDir, 'session.id'), rawSessionId, 'utf-8');
     } catch (err) {
       console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
     }
@@ -2258,7 +2257,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
         tmuxSession: agentId,
         cwd: workspace,
         issueId,
-        claudeSessionId: sessionId,
+        claudeSessionId: rawSessionId,
         model: selectedModel,
         harness: resolvedHarness,
       };
@@ -2270,6 +2269,12 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     } catch (err) {
       // Non-fatal: the specialist still runs, but without a conversation record
       console.warn(`[spawnRun] Failed to register conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
+    }
+
+    // Only set sessionId (→ --session-id flag) for fresh spawns.
+    // Resumes pass resumeSessionId (→ --resume flag) to the launcher instead.
+    if (!options.resumeSessionId) {
+      sessionId = rawSessionId;
     }
   }
 
@@ -2307,6 +2312,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     sessionId,
+    resumeSessionId: options.resumeSessionId,
     reviewSignal,
     // PAN-977: review sub-role launchers must outlive their tmux session. The
     // session gets reaped quickly (orphan-recovery / cleanup / restart churn)

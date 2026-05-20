@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, Pause, Play, Plus, Settings } from 'lucide-react';
+import { ExternalLink, Loader2, Pause, Play, Plus, RotateCcw, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import toggleStyles from '../CommandDeck/styles/command-deck.module.css';
+import { useConfirm } from '../DialogProvider';
 
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 
 interface FlywheelRunSummary {
   id: string;
   startedAt: string;
-  status: 'running' | 'complete' | 'aborted';
+  status: 'running' | 'paused' | 'complete' | 'aborted';
 }
 
 interface FlywheelRunDetail extends FlywheelRunSummary {
@@ -128,9 +129,15 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
 
   const run = runDetailQuery.data ?? null;
   const activeRun = run?.status === 'running' ? run : null;
-  const status = activeRun?.latest ?? null;
+  const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
+  const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
+    ? 'running'
+    : run?.status === 'paused'
+      ? 'paused'
+      : 'none';
+  const confirm = useConfirm();
 
   const refreshFlywheel = async () => {
     await Promise.all([
@@ -156,12 +163,46 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     },
     onError: (error: Error) => toast.error(`Failed to pause Flywheel: ${error.message}`),
   });
+  const resumeMutation = useMutation({
+    mutationFn: () => postFlywheelAction('/api/flywheel/resume'),
+    onSuccess: async () => {
+      toast.success('Flywheel resumed');
+      await refreshFlywheel();
+    },
+    onError: (error: Error) => toast.error(`Failed to resume Flywheel: ${error.message}`),
+  });
+  const newRunMutation = useMutation({
+    mutationFn: async () => {
+      if (runState === 'paused') {
+        await postFlywheelAction('/api/flywheel/report');
+      }
+      return postFlywheelAction('/api/flywheel/start');
+    },
+    onSuccess: async () => {
+      toast.success('Flywheel started');
+      await refreshFlywheel();
+    },
+    onError: (error: Error) => toast.error(`Failed to start Flywheel: ${error.message}`),
+  });
   const openReportMutation = useMutation({
     mutationFn: () => postFlywheelAction('/api/flywheel/report/open', { runId: run?.id }),
     onError: (error: Error) => toast.error(`Failed to open run report: ${error.message}`),
   });
 
-  const actionPending = startMutation.isPending || pauseMutation.isPending || openReportMutation.isPending;
+  const handleNewRun = async () => {
+    if (runState === 'paused') {
+      const ok = await confirm({
+        title: 'Start New Run',
+        message: `${run?.id ?? 'The current run'} is paused. Reporting it will close the run and start a fresh one. Continue?`,
+        confirmLabel: 'Report & Start New',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
+    newRunMutation.mutate();
+  };
+
+  const actionPending = startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || newRunMutation.isPending || openReportMutation.isPending;
   const topBarLoading = runsQuery.isLoading || runDetailQuery.isLoading;
 
   return (
@@ -202,33 +243,50 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
                 Terminal
               </button>
             </div>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => startMutation.mutate()}
-              disabled={actionPending}
-            >
-              <Play className="h-3.5 w-3.5" />
-              Start
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => pauseMutation.mutate()}
-              disabled={actionPending || !activeRun}
-            >
-              <Pause className="h-3.5 w-3.5" />
-              Pause
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => startMutation.mutate()}
-              disabled={actionPending}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Run
-            </button>
+            {runState === 'none' && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                onClick={() => startMutation.mutate()}
+                disabled={actionPending}
+              >
+                <Play className="h-3.5 w-3.5" />
+                New Run
+              </button>
+            )}
+            {runState === 'running' && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                onClick={() => pauseMutation.mutate()}
+                disabled={actionPending}
+              >
+                <Pause className="h-3.5 w-3.5" />
+                Pause
+              </button>
+            )}
+            {runState === 'paused' && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                onClick={() => resumeMutation.mutate()}
+                disabled={actionPending}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Resume
+              </button>
+            )}
+            {runState === 'paused' && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                onClick={handleNewRun}
+                disabled={actionPending}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Run
+              </button>
+            )}
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
