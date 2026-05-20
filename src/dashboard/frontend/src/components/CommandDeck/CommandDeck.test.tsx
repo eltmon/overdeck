@@ -235,6 +235,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
             {
               id: 1,
               name: 'test-conv',
+              cwd: '/path/to/test-project',
             },
           ],
         };
@@ -451,22 +452,65 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
   });
 
-  it('clears session view when switching to a conversation', async () => {
+  it('renders ConversationPanel inside the Conversations tab when a conversation is selected', async () => {
     renderCommandDeck();
 
-    // Select a session (projects are visible by default)
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
+    // Select a project
+    await screen.findAllByTestId('project-node');
+    fireEvent.click(screen.getByTestId('project-test-project'));
 
-    // Verify lens is shown
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
+    const lens = screen.getByTestId('command-deck-right-pane-tabs');
 
-    // Conversations section is expanded by default — click a conversation
+    // Click a conversation in the sidebar
     fireEvent.click(screen.getByTestId('conv-test'));
 
-    // Legacy top-level conversation panel is removed (moved into Conversations tab in b2)
-    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
-    // Lens remains as the unconditional right pane
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
+    // Conversations tab should be active
+    const conversationsTab = screen.getByRole('tab', { name: /Conversations/i });
+    expect(conversationsTab).toHaveAttribute('aria-selected', 'true');
+
+    // ConversationPanel renders inside the lens (not at the top level)
+    expect(lens.querySelector('[data-testid="conversation-panel"]')).toBeInTheDocument();
+  });
+
+  it('tab strip is exactly 48px tall', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node');
+    fireEvent.click(screen.getByTestId('project-test-project'));
+
+    const lens = screen.getByTestId('command-deck-right-pane-tabs');
+    const tablist = lens.querySelector('[role="tablist"]') as HTMLElement;
+    expect(tablist).toBeTruthy();
+    expect(tablist.classList.contains('h-[48px]')).toBe(true);
+  });
+
+  it('selecting a conversation auto-switches to Conversations tab and renders ConversationPanel inside the lens', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node');
+    fireEvent.click(screen.getByTestId('project-test-project'));
+
+    const lens = screen.getByTestId('command-deck-right-pane-tabs');
+
+    // Click a conversation in the sidebar
+    fireEvent.click(screen.getByTestId('conv-test'));
+
+    // Conversations tab should be active
+    const conversationsTab = screen.getByRole('tab', { name: /Conversations/i });
+    expect(conversationsTab).toHaveAttribute('aria-selected', 'true');
+
+    // ConversationPanel should render inside the lens
+    expect(lens.querySelector('[data-testid="conversation-panel"]')).toBeInTheDocument();
+  });
+
+  it('renders ZoneA action strip inside the lens when a feature is selected', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node');
+    fireEvent.click(screen.getByTestId('feature-PAN-821'));
+
+    const lens = screen.getByTestId('command-deck-right-pane-tabs');
+    expect(lens.querySelector('[data-testid="zone-a"]')).toBeInTheDocument();
+    expect(lens.querySelector('[data-testid="zone-action-strip"]')).toBeInTheDocument();
   });
 });
