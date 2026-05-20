@@ -38,6 +38,11 @@ interface AvailableModel {
 
 type AvailableModelsResponse = Record<string, AvailableModel[]>;
 
+interface ClaudeAuthStatus {
+  loggedIn?: boolean;
+  hasAnthropicApiKey?: boolean;
+}
+
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
@@ -63,6 +68,12 @@ async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
   return res.json();
 }
 
+async function fetchClaudeAuth(): Promise<ClaudeAuthStatus> {
+  const res = await fetch('/api/settings/claude-auth');
+  if (!res.ok) throw new Error('Failed to fetch Claude auth status');
+  return res.json();
+}
+
 function providerForModel(modelId: string, groups: Array<{ provider: string; models: AvailableModel[] }>): string | null {
   return groups.find((group) => group.models.some((model) => model.id === modelId))?.provider ?? null;
 }
@@ -71,13 +82,22 @@ function providerWarning(
   modelId: string | undefined,
   groups: Array<{ provider: string; label: string; models: AvailableModel[] }>,
   providers: Partial<Record<string, boolean>> | undefined,
+  claudeAuth: ClaudeAuthStatus | undefined,
 ): string | null {
   if (!modelId) return null;
   const provider = providerForModel(modelId, groups);
   if (!provider) return null;
   const label = PROVIDER_LABELS[provider] ?? provider;
   if (providers?.[provider] === false) return `${label} is not configured; roles using this workhorse will not be reachable until the provider is enabled with credentials.`;
-  if (provider === 'anthropic') return 'Anthropic model selected; roles using this workhorse may incur Anthropic spend.';
+  if (provider === 'anthropic') {
+    // Only warn about spend when authenticated via ANTHROPIC_API_KEY — Claude
+    // subscription users do not pay per-token for these models, and
+    // claude-code prefers the API key over subscription auth when both exist.
+    if (claudeAuth?.hasAnthropicApiKey) {
+      return 'Anthropic API key in use; roles using this workhorse will bill the Anthropic API.';
+    }
+    return null;
+  }
   return null;
 }
 
@@ -112,6 +132,11 @@ export function WorkhorsePanel() {
   const availableModelsQuery = useQuery({
     queryKey: ['available-models'],
     queryFn: fetchAvailableModels,
+    staleTime: 60000,
+  });
+  const claudeAuthQuery = useQuery({
+    queryKey: ['claude-auth'],
+    queryFn: fetchClaudeAuth,
     staleTime: 60000,
   });
 
@@ -160,7 +185,12 @@ export function WorkhorsePanel() {
         <div className="grid gap-4 md:grid-cols-3">
           {WORKHORSE_SLOTS.map((slot) => {
             const value = workhorses[slot.id];
-            const warning = providerWarning(value, providerGroups, settingsQuery.data?.models?.providers);
+            const warning = providerWarning(
+              value,
+              providerGroups,
+              settingsQuery.data?.models?.providers,
+              claudeAuthQuery.data,
+            );
 
             return (
             <label key={slot.id} className="space-y-1.5">

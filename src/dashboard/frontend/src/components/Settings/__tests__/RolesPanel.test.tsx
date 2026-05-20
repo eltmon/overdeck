@@ -63,38 +63,54 @@ function renderPanel() {
   );
 }
 
+type ClaudeAuthOverride = { loggedIn?: boolean; hasAnthropicApiKey?: boolean };
+
+function installFetchMock(opts: {
+  settings?: typeof settingsPayload;
+  claudeAuth?: ClaudeAuthOverride;
+} = {}) {
+  let currentSettings = structuredClone(opts.settings ?? settingsPayload);
+  const claudeAuth = opts.claudeAuth ?? { loggedIn: false, hasAnthropicApiKey: false };
+
+  global.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+    const url = input.toString();
+    if (url === '/api/settings' && init?.method === 'PUT') {
+      currentSettings = JSON.parse(String(init.body));
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
+    }
+    if (url === '/api/settings') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(currentSettings),
+      } as Response);
+    }
+    if (url === '/api/settings/available-models') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          anthropic: [
+            { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', costPer1MTokens: 45 },
+            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
+          ],
+          kimi: [
+            { id: 'kimi-k2.6-flash', name: 'Kimi K2.6 Flash', costPer1MTokens: 1 },
+          ],
+        }),
+      } as Response);
+    }
+    if (url === '/api/settings/claude-auth') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(claudeAuth),
+      } as Response);
+    }
+    return Promise.resolve({ ok: false, text: () => Promise.resolve('not found') } as Response);
+  }) as unknown as typeof fetch;
+}
+
 describe('RolesPanel', () => {
   beforeEach(() => {
-    let currentSettings = structuredClone(settingsPayload);
-
-    global.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
-      const url = input.toString();
-      if (url === '/api/settings' && init?.method === 'PUT') {
-        currentSettings = JSON.parse(String(init.body));
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
-      }
-      if (url === '/api/settings') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(currentSettings),
-        } as Response);
-      }
-      if (url === '/api/settings/available-models') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            anthropic: [
-              { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', costPer1MTokens: 45 },
-              { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
-            ],
-            kimi: [
-              { id: 'kimi-k2.6-flash', name: 'Kimi K2.6 Flash', costPer1MTokens: 1 },
-            ],
-          }),
-        } as Response);
-      }
-      return Promise.resolve({ ok: false, text: () => Promise.resolve('not found') } as Response);
-    }) as unknown as typeof fetch;
+    installFetchMock();
   });
 
   it('renders role cards in order with workhorse, specific model, and flywheel choices', async () => {
@@ -192,5 +208,41 @@ describe('RolesPanel', () => {
       maxAgents: 8,
       scope: 'all-tracked-projects',
     });
+  });
+});
+
+describe('RolesPanel — Anthropic spend warning (regression PAN-1093 follow-up)', () => {
+  const settingsWithAnthropicEnabled = structuredClone(settingsPayload);
+  settingsWithAnthropicEnabled.models.providers.anthropic = true;
+
+  it('does NOT warn when user is on Claude subscription (no ANTHROPIC_API_KEY)', async () => {
+    installFetchMock({
+      settings: settingsWithAnthropicEnabled,
+      claudeAuth: { loggedIn: true, hasAnthropicApiKey: false },
+    });
+    renderPanel();
+
+    await screen.findAllByTestId('role-card');
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/settings/claude-auth');
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.queryByText(/will bill the Anthropic API/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/verify this is intentional for non-Anthropic budget control/i)).not.toBeInTheDocument();
+  });
+
+  it('DOES warn when ANTHROPIC_API_KEY is set (api-key auth)', async () => {
+    installFetchMock({
+      settings: settingsWithAnthropicEnabled,
+      claudeAuth: { loggedIn: true, hasAnthropicApiKey: true },
+    });
+    renderPanel();
+
+    await screen.findAllByTestId('role-card');
+    const warnings = await screen.findAllByText(
+      /Anthropic API key in use; this model will bill the Anthropic API\./i,
+    );
+    expect(warnings.length).toBeGreaterThan(0);
   });
 });

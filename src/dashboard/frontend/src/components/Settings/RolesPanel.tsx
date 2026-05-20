@@ -43,6 +43,11 @@ interface AvailableModel {
 
 type AvailableModelsResponse = Record<string, AvailableModel[]>;
 
+interface ClaudeAuthStatus {
+  loggedIn?: boolean;
+  hasAnthropicApiKey?: boolean;
+}
+
 interface SubRoleDefinition {
   id: string;
   name: string;
@@ -159,6 +164,12 @@ async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
   return res.json();
 }
 
+async function fetchClaudeAuth(): Promise<ClaudeAuthStatus> {
+  const res = await fetch('/api/settings/claude-auth');
+  if (!res.ok) throw new Error('Failed to fetch Claude auth status');
+  return res.json();
+}
+
 function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): ModelRef {
   return settings?.roles?.[role.id]?.model ?? role.defaultModel;
 }
@@ -217,13 +228,21 @@ function providerWarning(
   workhorses: Required<Record<WorkhorseSlot, ModelRef>>,
   groups: Array<{ provider: string; label: string; models: AvailableModel[] }>,
   providers: Partial<Record<string, boolean>> | undefined,
+  claudeAuth: ClaudeAuthStatus | undefined,
 ): string | null {
   const resolved = resolveModelRef(value, workhorses);
   const provider = providerForModel(resolved, groups);
   if (!provider) return null;
   const label = PROVIDER_LABELS[provider] ?? provider;
   if (providers?.[provider] === false) return `${label} is not configured; this model will not be reachable until the provider is enabled with credentials.`;
-  if (provider === 'anthropic') return 'Anthropic model selected; verify this is intentional for non-Anthropic budget control.';
+  if (provider === 'anthropic') {
+    // Only warn about spend when authenticated via ANTHROPIC_API_KEY — Claude
+    // subscription users do not pay per-token for these models.
+    if (claudeAuth?.hasAnthropicApiKey) {
+      return 'Anthropic API key in use; this model will bill the Anthropic API.';
+    }
+    return null;
+  }
   return null;
 }
 
@@ -271,14 +290,15 @@ interface ModelPickerProps {
   workhorses: Required<Record<WorkhorseSlot, ModelRef>>;
   providerGroups: Array<{ provider: string; label: string; models: AvailableModel[] }>;
   providers?: Partial<Record<string, boolean>>;
+  claudeAuth?: ClaudeAuthStatus;
   disabled: boolean;
   onChange: (value: ModelRef) => void;
 }
 
-function ModelPicker({ label, value, workhorses, providerGroups, providers, disabled, onChange }: ModelPickerProps) {
+function ModelPicker({ label, value, workhorses, providerGroups, providers, claudeAuth, disabled, onChange }: ModelPickerProps) {
   const currentSpecificModelMissing = value && !isWorkhorseRef(value) && !modelExists(value, providerGroups);
   const resolved = resolveModelRef(value, workhorses);
-  const warning = providerWarning(value, workhorses, providerGroups, providers);
+  const warning = providerWarning(value, workhorses, providerGroups, providers, claudeAuth);
 
   return (
     <label className="space-y-1.5">
@@ -342,6 +362,11 @@ export function RolesPanel() {
   const availableModelsQuery = useQuery({
     queryKey: ['available-models'],
     queryFn: fetchAvailableModels,
+    staleTime: 60000,
+  });
+  const claudeAuthQuery = useQuery({
+    queryKey: ['claude-auth'],
+    queryFn: fetchClaudeAuth,
     staleTime: 60000,
   });
 
@@ -438,6 +463,7 @@ export function RolesPanel() {
                       workhorses={workhorses}
                       providerGroups={providerGroups}
                       providers={settings?.models?.providers}
+                      claudeAuth={claudeAuthQuery.data}
                       disabled={saveMutation.isPending}
                       onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
                     />
@@ -532,6 +558,7 @@ export function RolesPanel() {
                               workhorses={workhorses}
                               providerGroups={providerGroups}
                               providers={settings?.models?.providers}
+                              claudeAuth={claudeAuthQuery.data}
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />
