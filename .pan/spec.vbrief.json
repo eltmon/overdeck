@@ -1,0 +1,497 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:34:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1228: PAN-1148 follow-up — Pipeline view gaps (ledger / TopBar / sidebar / skeleton / empty state / scroll-restore)",
+    "updated": "2026-05-20T02:41:35.504Z"
+  },
+  "plan": {
+    "id": "pan-1228",
+    "title": "PAN-1148 follow-up — Pipeline view gaps (ledger / TopBar / sidebar / skeleton / empty state / scroll-restore)",
+    "status": "proposed",
+    "uid": "b7c3d8e9-f2a1-4e7b-9d6c-8a5b4f3e2d1c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:34:00.000Z",
+    "updated": "2026-05-20T02:41:35.504Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1228",
+        "label": "PAN-1228",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1226 (parent)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "Unified Redesign PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/mockups/pipeline-cross-project-opus.html",
+        "label": "Pipeline mockup",
+        "type": "mockup"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "pipeline",
+      "frontend",
+      "ui-polish",
+      "pan-1148-followup"
+    ],
+    "narratives": {
+      "Problem": "The Pipeline surface shipped (PAN-1148) without filling several PRD §4.7 contract slots. Rows show '—/—' for runtime+cost despite the cost stream being live (P-1). The Pipeline TopBar is missing the search input, the List/Board/Analytics segmented control, and the 'Start agent' primary button — all slots already exposed by the TopBar primitive (P-2). The shared Sidebar omits the 'Filter phase' and 'Projects' subgroups the Pipeline mockup specifies, with no filter wiring (P-3/P-5). The 'Work running' metric tile uses the warning signal (amber), violating PRD §4.7.3 which says blue/info is the machine signal (P-4). There is no PipelineSkeleton (Kanban and Agents both have one — N-P-1), no empty-state card when filters return zero issues (N-P-2), and the drawer close does not restore scroll position to the row that was clicked (N-P-3).",
+      "Proposal": "Close each gap in isolation, touching only Pipeline-adjacent files and the shared Sidebar's Pipeline-only conditional block. Plumb cost-stream events-by-issue and a tick-based agent runtime into IssueRow.ledger. Pass the three TopBar slots from PipelineView (search opens the existing global search modal; segmented control switches between pipeline/kanban/analytics tabs; Start-agent opens the same global search modal in start-agent intent). Render Sidebar 'Filter phase' and 'Projects' subgroups only when activeTab==='pipeline', wiring clicks to the URL-state PipelineView already reacts to via popstate. Flip the work-running tile signal token to 'info'. Build PipelineSkeleton mirroring KanbanSkeleton/AgentsSkeleton shape. Add an empty-state card matching FleetAgentsView's pattern. Capture and restore the Pipeline scroll container scrollTop across drawer open/close. No new endpoints; data sources already exist (useCostStream byIssue map, agent.startedAt, projects.yaml signal tokens)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "TopBar 'Start agent' primary button opens the existing global SearchModal (setIsSearchOpen(true)), the same affordance the Sidebar already wires.",
+        "rationale": "The issue specifies the button exists per mockup but does not prescribe behavior. The global SearchModal is the only flow today that lets a user pick an issue and trigger start. Inventing a new modal would expand scope; reusing SearchModal keeps the change to a single button + handler and stays consistent with ⌘K behavior described in PRD §4.6."
+      },
+      {
+        "summary": "Sidebar 'Filter phase' and 'Projects' subgroups render conditionally only when activeTab==='pipeline'.",
+        "rationale": "The shared Sidebar is used by every surface. Rendering pipeline-specific filter subgroups on Board/Agents/Settings would either be inert (no filter state to manipulate) or bleed into unrelated surfaces. Gating on activeTab keeps the change scoped to the surface the mockup documents while preserving the existing top filter row for in-context discovery."
+      },
+      {
+        "summary": "Sidebar filter clicks update the same URL search params PipelineView reads (?phase=… and ?projects=…). The existing PipelineView popstate listener consumes them; no new event bus.",
+        "rationale": "PipelineView already implements readFilterState/replaceFilterUrl. Routing sidebar clicks through the same URL contract avoids dual sources of truth, keeps the filter shareable, and means no new wiring in the store."
+      },
+      {
+        "summary": "IssueRow runtime in the Pipeline ledger is computed from agent.startedAt and re-renders against a 30s tick (useState + setInterval at the PipelineView level).",
+        "rationale": "FleetAgentsView already uses an identical now-tick (30s) for its runtime metrics. 30s matches the human-visible granularity of the ledger format (Xh Ym) and avoids per-row interval churn."
+      },
+      {
+        "summary": "Pipeline empty-state matches the FleetAgentsView pattern: a single dashed-border card with copy 'No issues match the selected filters.' rendered when every phase group is empty.",
+        "rationale": "This pattern is already in use one surface over (FleetAgentsView.tsx:394). Reusing the visual language keeps surfaces consistent and avoids designing a new empty state without a mockup."
+      },
+      {
+        "summary": "PipelineSkeleton mirrors KanbanSkeleton/AgentsSkeleton structure: shimmer placeholders for TopBar, MetricStrip (5 tiles), filter row, and 3-4 phase headers with 2-3 row placeholders each.",
+        "rationale": "Matches the existing skeleton family without introducing new shimmer primitives. Wired via the same BootstrapGate fallback pattern App.tsx already uses for Kanban/Agents."
+      },
+      {
+        "summary": "Drawer scroll restore is implemented inside PipelineView (capture before openIssue, restore via an effect keyed on drawer.issueId transitioning to null).",
+        "rationale": "Avoids leaking pipeline-specific scroll state into the global Zustand store. The PipelineView already owns its outer scroll container ref space; keeping the side-effect local matches the smallest blast radius."
+      },
+      {
+        "summary": "Each Pipeline IssueRow renders runtime only when the row has an active agent; rows without an agent keep the existing '—/—' empty ledger styling.",
+        "rationale": "Runtime without a runner is meaningless. Cost can be present without an active agent (historical cost events for the issue), so cost displays whenever the byIssue bucket is non-empty regardless of agent presence."
+      }
+    ],
+    "items": [
+      {
+        "id": "p1-row-ledger",
+        "title": "Populate Pipeline IssueRow ledger (runtime + cost) from cost stream + agent.startedAt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx, build a `ledger` object per IssueRow: cost = sum of `eventsByIssue[issue.identifier]` events formatted via the existing `formatCost`; runtime = `formatDuration(now - new Date(agent.startedAt))` when an agent is mapped to the issue, else undefined. Add a 30-second `now` tick to PipelineView mirroring FleetAgentsView's pattern. Pass the `ledger` prop into <IssueRow>. Do not change IssueRow itself — the prop already exists per PAN-1148."
+        },
+        "subItems": [
+          {
+            "id": "p1-row-ledger.ac1",
+            "title": "Rows with an active agent render runtime in the format 'Xh Ym' (or 'Xm' when under 1h) and update at least once per minute.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-row-ledger.ac2",
+            "title": "Rows whose issue has cost events in the byIssue stream render a non-empty cost value formatted with the existing formatCost helper (e.g. '$0.42', '$12.3').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-row-ledger.ac3",
+            "title": "Rows with no agent and no cost events keep the existing '—/—' empty ledger styling at 55% opacity (per IssueRow contract).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-row-ledger.ac4",
+            "title": "Typecheck, lint, and the existing vitest suite pass; no regression in PipelineView's existing filter/phase/project tests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-topbar-search",
+        "title": "Wire Pipeline TopBar search slot to the global SearchModal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Thread an `onSearchOpen` callback from App.tsx into PipelineView (alongside the existing onSearchOpen consumed by Sidebar). Render a search trigger element (mockup placeholder copy: 'Search issues, agents, branches…') matching PRD §4.7.2 spec (32px height, var(--radius-lg), 12px, 280px min-width) as the TopBar `search` slot. Clicking the trigger calls setIsSearchOpen(true)."
+        },
+        "subItems": [
+          {
+            "id": "p2-topbar-search.ac1",
+            "title": "The Pipeline TopBar renders a search trigger sized to PRD §4.7.2 spec with placeholder text 'Search issues, agents, branches…'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-topbar-search.ac2",
+            "title": "Clicking the search trigger opens the existing global SearchModal (same modal opened by the ⌘K shortcut and the Sidebar search icon).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-topbar-search.ac3",
+            "title": "App.tsx still owns the isSearchOpen state; no duplicated modal-control wiring is introduced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-topbar-segmented",
+        "title": "Add Pipeline TopBar List/Board/Analytics segmented control",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Pass an `onTabChange` callback from App.tsx into PipelineView. Render a segmented control with three buttons (List | Board | Analytics) into the TopBar `segmentedControl` slot, styled per PRD §4.7.2 (32px height, var(--radius-lg), 12px weight 500, active = var(--accent)). 'List' is the active state on the Pipeline surface. 'Board' switches activeTab to 'kanban'. 'Analytics' switches activeTab to 'metrics'."
+        },
+        "subItems": [
+          {
+            "id": "p2-topbar-segmented.ac1",
+            "title": "Pipeline TopBar renders a three-button segmented control labelled List / Board / Analytics with the active style applied to 'List'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-topbar-segmented.ac2",
+            "title": "Clicking 'Board' navigates to the kanban tab; clicking 'Analytics' navigates to the metrics tab; clicking 'List' is a no-op when already active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-topbar-segmented.ac3",
+            "title": "Segmented control matches the PRD §4.7.2 spec for height, radius, and active styling (no new design tokens introduced).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-topbar-start-agent",
+        "title": "Add Pipeline TopBar 'Start agent' primary button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Render a primary button labelled 'Start agent' (with a play-glyph icon to match the mockup) into the TopBar `actions` slot, styled per PRD §4.7.2 primary button spec. Click handler calls the same setIsSearchOpen(true) used by the search trigger — the search modal is the existing path to pick an issue and start its agent."
+        },
+        "subItems": [
+          {
+            "id": "p2-topbar-start-agent.ac1",
+            "title": "Pipeline TopBar renders a 'Start agent' primary button with the prescribed visual contract (32px height, primary background, var(--radius-lg)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-topbar-start-agent.ac2",
+            "title": "Clicking the button opens the global SearchModal so the user can pick an issue to start.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-sidebar-filters",
+        "title": "Render Sidebar 'Filter phase' and 'Projects' subgroups when on Pipeline, wired to URL filter state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/src/components/Sidebar.tsx so that, when activeTab==='pipeline', two extra nav groups render below 'Operations': (1) 'Filter phase' with items for 'All phases', Todo, Plan, Work, Review, Ship — each with a phase dot whose color matches the PRD §4.7.4 phase tokens; (2) 'Projects' with one item per project resolved from the same projects.yaml signal tokens already used by IssueRow. Clicks update window.location.search via history.replaceState so PipelineView's existing popstate listener picks them up. Counts come from the same selectIssues/agents the Pipeline already consumes (read from the store inside the sidebar, gated on activeTab to avoid recomputing for other surfaces)."
+        },
+        "subItems": [
+          {
+            "id": "p3-sidebar-filters.ac1",
+            "title": "When activeTab==='pipeline', the Sidebar renders a 'Filter phase' nav group with All / Todo / Plan / Work / Review / Ship items, phase-color dots, and per-phase counts derived from the same store selectors PipelineView uses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-sidebar-filters.ac2",
+            "title": "When activeTab==='pipeline', the Sidebar renders a 'Projects' nav group with one item per resolved project, each labelled with its project mark and the project's issue-prefix tag (e.g. PAN, MIN) on the right.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-sidebar-filters.ac3",
+            "title": "Clicking a phase item updates the URL `?phase=<phase>` (or removes it for 'All') and PipelineView's existing popstate handler re-applies the filter; clicking a project item toggles the project in `?projects=` and PipelineView reflects the new selection without a full reload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-sidebar-filters.ac4",
+            "title": "When activeTab is anything other than 'pipeline', neither the 'Filter phase' nor 'Projects' subgroup renders — the Board, Agents, and Settings tabs see the existing sidebar untouched.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-sidebar-filters.ac5",
+            "title": "The active phase/project items in the sidebar reflect the current filter state on first render (deep-linked URLs render with the right highlights).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-metric-signal",
+        "title": "Flip Pipeline 'Work running' metric tile signal from warning to info",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx around line 285, change `signal: 'warning' as const` on the 'Work running' tile to `signal: 'info' as const`. PRD §4.7.3 prescribes blue (info) for the machine signal — amber (warning) is reserved for human-attention metrics."
+        },
+        "subItems": [
+          {
+            "id": "p4-metric-signal.ac1",
+            "title": "The Pipeline 'Work running' metric tile icon is rendered in the info-foreground color (blue) instead of warning-foreground (amber).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-metric-signal.ac2",
+            "title": "Existing PipelineView tests covering the metric strip still pass; if they snapshot signal tokens, update them in the same diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "np1-pipeline-skeleton",
+        "title": "Create PipelineSkeleton component and wire it through BootstrapGate in App.tsx",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/frontend/src/components/skeletons/PipelineSkeleton.tsx mirroring the shimmer pattern of KanbanSkeleton.tsx and AgentsSkeleton.tsx: TopBar bar (52px), MetricStrip row of 5 placeholder tiles, filter-row pills, and 3-4 phase-header sections each with 2-3 row placeholders shaped like the IssueRow grid. In App.tsx around line 865, wrap <PipelineView /> in <BootstrapGate fallback={<PipelineSkeleton />}> identical to the kanban/agents pattern. Add the same vitest mock the Kanban/Agents skeletons have in App.test.tsx."
+        },
+        "subItems": [
+          {
+            "id": "np1-pipeline-skeleton.ac1",
+            "title": "src/dashboard/frontend/src/components/skeletons/PipelineSkeleton.tsx exists and exports a `PipelineSkeleton` function component with shimmer placeholders for the TopBar, 5-tile MetricStrip, filter row, and at least 3 phase sections.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np1-pipeline-skeleton.ac2",
+            "title": "App.tsx wraps the Pipeline view in <BootstrapGate fallback={<PipelineSkeleton />}> when activeTab==='pipeline'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np1-pipeline-skeleton.ac3",
+            "title": "App.test.tsx vi.mock entry for PipelineSkeleton is added alongside the existing Kanban/Agents skeleton mocks so the test suite stays clean.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "np2-pipeline-empty",
+        "title": "Pipeline empty-state card when no issues match the active filter",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In PipelineView.tsx, after computing groupedIssues and before rendering visiblePhases, if every visible phase has zero matching issues render a single dashed-border card matching the FleetAgentsView.tsx:394 pattern with copy 'No issues match the selected filters.'. The empty card replaces the per-phase sections but the TopBar, MetricStrip, and filter row remain visible above it."
+        },
+        "subItems": [
+          {
+            "id": "np2-pipeline-empty.ac1",
+            "title": "When every visible phase has zero issues after filtering, the Pipeline renders exactly one empty-state card with the prescribed copy and visual contract (dashed border, card background, muted-foreground text).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np2-pipeline-empty.ac2",
+            "title": "TopBar, MetricStrip, and the filter row are still rendered when the empty state appears (only the per-phase content area is replaced).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np2-pipeline-empty.ac3",
+            "title": "Clearing the filter from the empty state by clicking 'All phases' or the relevant sidebar/topbar control restores the row list without a hard reload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "np3-scroll-restore",
+        "title": "Pipeline drawer close restores scroll position to the row that was opened",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:34:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PipelineView's outer scroll container is the <div className=\"flex-1 overflow-auto\"> wrapping the phase sections. Hold a ref to that element. When openIssue fires from a row click, capture container.scrollTop into a ref or local state. Watch drawer.issueId via useDashboardStore — when it transitions from a non-null value back to null, restore the captured scrollTop on the next animation frame. PRD §4.6 explicitly requires 'Closing returns to the exact scroll position'."
+        },
+        "subItems": [
+          {
+            "id": "np3-scroll-restore.ac1",
+            "title": "After scrolling the Pipeline list, clicking an off-screen row to open the drawer, then closing the drawer (Escape, backdrop click, or close button), the Pipeline scroll container is restored to its pre-open scrollTop.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np3-scroll-restore.ac2",
+            "title": "Restoring scroll does not visibly flicker — the restored scrollTop is applied on the same frame the drawer-close animation begins (rAF-aligned).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np3-scroll-restore.ac3",
+            "title": "Opening a second issue from inside the drawer (sequential replacement, not a stack) does not lose the original scroll position — closing the second drawer still returns to the first row's offset.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "np3-scroll-restore.ac4",
+            "title": "Scroll-restore behaviour is implemented inside PipelineView (no new global store fields, no Zustand drawer-scroll state).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "p2-topbar-search",
+        "to": "p2-topbar-start-agent",
+        "type": "informs"
+      },
+      {
+        "from": "np1-pipeline-skeleton",
+        "to": "np2-pipeline-empty",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1228-pan-1148-follow-up-pipeline-view-gaps-ledger-topbar-sidebar-skeleton-empty-state-scroll-restore.vbrief.json"
+    }
+  }
+}

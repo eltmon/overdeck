@@ -1,0 +1,126 @@
+{
+  "version": "1",
+  "issueId": "PAN-1228",
+  "created": "2026-05-20T02:32:49.779Z",
+  "updated": "2026-05-20T02:34:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1228",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Scope is exactly the seven gaps PAN-1228 enumerates (P-1, P-2, P-3/P-5, P-4, N-P-1, N-P-2, N-P-3). No additional polish, refactors, or PRD slots that PAN-1148 already closed.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Three separate TopBar beads (search, segmented control, Start agent) instead of one combined bead. Each is independently reviewable and ships its own visual contract.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Sidebar phase + project subgroups (P-3 + P-5) are merged into a single bead (p3-sidebar-filters) because both depend on the same activeTab===pipeline gate and the same URL-state contract — splitting them creates two beads that touch identical scaffolding.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Sidebar filter clicks update the same URL params (?phase=, ?projects=) PipelineView already reads via readFilterState/popstate. No new Zustand state, no event bus.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Sidebar pipeline subgroups render only when activeTab==='pipeline'. Bleeding pipeline-specific filter UI into Board/Agents/Settings tabs would be inert at best and confusing at worst.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "'Start agent' primary button opens the existing global SearchModal (setIsSearchOpen(true)). No new picker or modal; the search modal is already the canonical issue-selection surface and the Sidebar wires the same affordance.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "IssueRow runtime ticks against a 30s setInterval at the PipelineView level, mirroring FleetAgentsView's now-tick. Runtime is only shown when an agent is mapped to the row.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Cost displays whenever the byIssue cost-events bucket is non-empty, even without an active agent (historical cost is valid signal). Runtime gating differs from cost gating intentionally.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Drawer scroll-restore is implemented inside PipelineView (capture container.scrollTop on row click; restore via rAF when drawer.issueId transitions to null). No new global store fields.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Empty-state copy is exactly 'No issues match the selected filters.', matching FleetAgentsView's existing pattern. Visual treatment is dashed-border card with muted-foreground text — no new design tokens.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "PipelineSkeleton lives at src/dashboard/frontend/src/components/skeletons/PipelineSkeleton.tsx alongside KanbanSkeleton and AgentsSkeleton. App.test.tsx vi.mock entry must be added in the same bead to keep the test suite consistent.",
+      "recordedAt": "2026-05-20T02:34:00.000Z"
+    },
+    {
+      "id": "D12",
+      "summary": "PRD §4.7.10 in the linked PRD (`pan-dashboard-unified-redesign.md`) currently documents Command Deck — project tree, not skeleton catalogues. The PAN-1228 issue body references §4.7.10 enumerating Pipeline alongside Kanban + Agents skeletons; treating this as authoritative because skeletons for Kanban and Agents already exist and a Pipeline counterpart is the obvious symmetric gap. If the work agent finds a different §-number in a newer PRD revision, follow the spirit (Pipeline needs a skeleton matching the existing pair), not the section number."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PipelineView is consumed under BootstrapGate today (App.tsx line ~867 currently does NOT wrap it in BootstrapGate). Adding the gate now will change first-paint behaviour for the Pipeline tab.",
+      "mitigation": "Match the Kanban/Agents pattern exactly: BootstrapGate fallback={<PipelineSkeleton />}. Verify the App.test.tsx mock matrix still passes."
+    },
+    {
+      "id": "H2",
+      "summary": "Sidebar is a shared component used by every surface. Adding pipeline-specific subgroups without a strict activeTab gate would leak filter UI into Board/Agents/Settings.",
+      "mitigation": "Gate every pipeline-specific render on `activeTab === 'pipeline'`. Add tests in Sidebar.test.tsx covering both rendering on Pipeline and non-rendering on other tabs."
+    },
+    {
+      "id": "H3",
+      "summary": "useCostStream polls every 5s by default. A 30s runtime tick and a 5s cost-poll re-render the entire PipelineView. With many rows this could cost frame budget.",
+      "mitigation": "Compute the per-issue cost map once via useMemo keyed on eventsByIssue. Avoid recomputing the entire issue list on the now-tick — derive runtime per row inline so React's diffing skips the cost columns. If profiling shows row churn, batch row props with React.memo."
+    },
+    {
+      "id": "H4",
+      "summary": "PipelineView's outer scroll container is currently a plain <div className=\"flex-1 overflow-auto\"> without a ref. Adding the ref and the scrollTop capture must not regress the keyboard/scrollIntoView behaviour PhaseHeader uses via phaseRefs.",
+      "mitigation": "Use a separate `scrollContainerRef` (not the phase refs). Capture scrollTop via the ref directly. Verify phaseRefs.current[scrollToPhase]?.scrollIntoView still works."
+    },
+    {
+      "id": "H5",
+      "summary": "URL filter state changes from the Sidebar use history.replaceState, but PipelineView's popstate listener only fires on browser back/forward, not on replaceState. The existing PipelineView filter buttons solve this by calling both replaceFilterUrl AND setFilter; clicks from outside PipelineView would only update the URL, not the state.",
+      "mitigation": "Either dispatch a synthetic popstate event after Sidebar clicks so PipelineView's listener fires, OR expose a thin pub/sub via a shared filter store. Prefer the synthetic-popstate approach because it is one line per click and stays inside the URL-as-source-of-truth model. Verify with a Sidebar→Pipeline integration test."
+    },
+    {
+      "id": "H6",
+      "summary": "Issue body references PRD §4.7.10 as enumerating Pipeline skeletons, but the linked PRD actually has §4.7.10 = Command Deck project tree. Pipeline skeleton requirement still stands by symmetry (Kanban + Agents have skeletons; Pipeline is the obvious gap).",
+      "mitigation": "Recorded as D12. Build the skeleton matching KanbanSkeleton+AgentsSkeleton structure; do not gate on the §-number being correct in the source PRD."
+    },
+    {
+      "id": "H7",
+      "summary": "Segmented control 'Analytics' destination is ambiguous — there is no 'analytics' tab today. Nearest fit is the 'metrics' tab.",
+      "mitigation": "Recorded in autoDecisions: segmented Analytics → activeTab 'metrics'. If a future PR adds a dedicated analytics tab, the wiring is a one-line constant change."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session orchestration context — see initial entry below for full template",
+      "note": "Planning session started for PAN-1228: PAN-1148 follow-up — Pipeline view gaps (ledger / TopBar / sidebar / skeleton / empty state / scroll-restore)",
+      "timestamp": "2026-05-20T02:32:49.779Z"
+    },
+    {
+      "reason": "planning",
+      "note": "Auto planning completed. 9 beads decomposed across the seven gaps. No requiresInspection: true beads — all changes are mechanical UI plumbing on existing primitives. Ready for pan plan finalize.",
+      "timestamp": "2026-05-20T02:34:00.000Z",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
