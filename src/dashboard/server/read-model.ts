@@ -22,7 +22,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -433,8 +433,8 @@ export const ReadModelServiceLive = Layer.effect(
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
-            issuesRaw: [...(cached.issues ?? [])],
-            resources: (cached.resources as ReadModelState['resources']) ?? null,
+            issuesRaw: [...(cached.issues ?? [])] as unknown[],
+            resources: (cached.resources as ResourceStats | null) ?? null,
             observationsByIssueId: cachedMemory?.observationsByIssueId ?? INITIAL_READ_MODEL_STATE.observationsByIssueId,
             statusByIssueId: cachedMemory?.statusByIssueId ?? INITIAL_READ_MODEL_STATE.statusByIssueId,
             rollupsByIssueId: cachedMemory?.rollupsByIssueId ?? INITIAL_READ_MODEL_STATE.rollupsByIssueId,
