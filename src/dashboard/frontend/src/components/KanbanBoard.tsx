@@ -1123,7 +1123,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, []);
 
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
-  const [, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
   const [columnOrderOverrides, setColumnOrderOverrides] = useState<Record<string, string[]>>({});
 
   // Undo state
@@ -1849,7 +1849,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <DroppableColumn key={status} status={status}>
+              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus}>
                 <div
                   className="flex-1 min-w-0"
                   data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
@@ -2141,15 +2141,18 @@ function ColumnContent({
 }
 
 // DroppableColumn component
-function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
+export function DroppableColumn({ status, activeDragStatus, children }: { status: CanonicalState; activeDragStatus?: CanonicalState | null; children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
     id: status,
   });
 
+  const isBlocked = isOver && activeDragStatus !== undefined && activeDragStatus !== null && activeDragStatus !== status;
+
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-0 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+      data-testid={`droppable-column-${status}`}
+      className={`flex-1 min-w-0 transition-all ${isBlocked ? 'cursor-not-allowed opacity-60' : isOver ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>

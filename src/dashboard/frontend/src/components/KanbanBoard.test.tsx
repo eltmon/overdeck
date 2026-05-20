@@ -5,10 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard, DroppableColumn } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
 import IssueCardPrimitive from './primitives/IssueCard';
+
+const mockUseDroppable = vi.fn(() => ({ isOver: false, setNodeRef: vi.fn() }));
+
+vi.mock('@dnd-kit/core', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core');
+  return {
+    ...actual,
+    useDroppable: (...args: Parameters<typeof import('@dnd-kit/core')['useDroppable']>) => mockUseDroppable(...args),
+  };
+});
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -1373,5 +1383,54 @@ describe('CompactChildCard', () => {
     }];
     render(<CompactChildCard issue={child} agents={agents} />);
     expect(screen.getByTitle('Agent running')).toBeDefined();
+  });
+});
+
+describe('DroppableColumn', () => {
+  beforeEach(() => {
+    mockUseDroppable.mockReturnValue({ isOver: false, setNodeRef: vi.fn() });
+  });
+
+  afterEach(() => {
+    mockUseDroppable.mockClear();
+  });
+
+  it('applies blocked styles when dragging over a different column', () => {
+    mockUseDroppable.mockReturnValue({ isOver: true, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="done">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).toContain('cursor-not-allowed');
+    expect(el.className).toContain('opacity-60');
+    expect(el.className).not.toContain('scale-[1.02]');
+  });
+
+  it('applies scale when dragging over the same column', () => {
+    mockUseDroppable.mockReturnValue({ isOver: true, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="in_progress">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).toContain('scale-[1.02]');
+    expect(el.className).not.toContain('cursor-not-allowed');
+    expect(el.className).not.toContain('opacity-60');
+  });
+
+  it('applies no hover styles when not dragging over', () => {
+    mockUseDroppable.mockReturnValue({ isOver: false, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="done">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).not.toContain('scale-[1.02]');
+    expect(el.className).not.toContain('cursor-not-allowed');
+    expect(el.className).not.toContain('opacity-60');
   });
 });
