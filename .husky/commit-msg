@@ -16,6 +16,13 @@ if [ -z "$staged_pkg_changes" ]; then
   exit 0
 fi
 
+# Merge commits legitimately bring in version bumps from main (e.g. a release
+# commit merged via `pan sync-main`). Skip the version guard for merge commits.
+merge_head_file="$(git rev-parse --git-dir)/MERGE_HEAD"
+if [ -f "$merge_head_file" ]; then
+  exit 0
+fi
+
 version_changed=0
 for pkg in $staged_pkg_changes; do
   if git diff --cached --name-status -- "$pkg" | grep -Eq '^A[[:space:]]'; then
