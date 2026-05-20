@@ -1,0 +1,135 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T07:05:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1235: Frontend test failures on clean main (Sidebar / App route helpers / IssueDrawer)",
+    "updated": "2026-05-20T07:08:56.087Z"
+  },
+  "plan": {
+    "id": "pan-1235",
+    "title": "Frontend test failures on clean main (Sidebar / App route helpers / IssueDrawer)",
+    "status": "proposed",
+    "uid": "a5bc0c52-30dc-4b16-adc1-f5472cb71682",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T07:05:00.000Z",
+    "updated": "2026-05-20T07:08:56.087Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1235",
+        "label": "PAN-1235",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "tests",
+      "drawer",
+      "websocket",
+      "subscription"
+    ],
+    "narratives": {
+      "Problem": "Two IssueDrawer tests fail on clean main: 'subscribes to issue-filtered drawer events and applies them to the store' and 'tears down the drawer issue subscription on close and reuses quick same-issue reopens'. The tests assert that mounting <IssueDrawer/> with an open issue calls wsTransport.subscribe exactly once with a connect callback that invokes WS_METHODS.subscribeIssueEvents({ issueId }), and that the resulting events flow into useDashboardStore.recentActivity via applyEvent. They also assert a 1000ms grace period before tear-down so that a quick same-issue reopen reuses the subscription. Investigation shows the implementation is half-built: src/dashboard/frontend/src/components/drawer/useDrawerData.ts already declares module-level drawerIssueSubscription state, stopDrawerIssueSubscription(), and the test helper resetDrawerIssueSubscriptionForTest(); the server-side SubscribeIssueEventsRpc and WS_METHODS.subscribeIssueEvents are both in @panctl/contracts. The only missing piece is a useEffect inside useDrawerData that wires the lifecycle. Per CLAUDE.md's no-bandaids rule, finishing the unfinished feature is the correct fix — not deleting the tests.",
+      "Proposal": "Add a single useEffect to useDrawerData.ts keyed on drawer.issueId. On mount with an issueId: if drawerIssueSubscription.issueId matches and a releaseTimer is pending, cancel it and increment refCount (no new wsTransport.subscribe call); if drawerIssueSubscription is null or for a different issue, stop the existing one (if any) and call getTransport().subscribe(connect, listener) where connect creates the SubscribeIssueEventsRpc stream and listener applies events via useDashboardStore.getState().applyEvent(event). On unmount: decrement refCount and, when it reaches zero, schedule window.setTimeout(stopDrawerIssueSubscription, 1000). The Sidebar (2 fails) and App route helpers (2 fails) failures are already resolved upstream in cc81b36e8 per the issue comment; only the drawer work remains."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Finish the half-built drawer subscription rather than delete the failing tests.",
+        "rationale": "The scaffolding (module-level drawerIssueSubscription state, stopDrawerIssueSubscription helper, resetDrawerIssueSubscriptionForTest test export, server-side SubscribeIssueEventsRpc, WS_METHODS.subscribeIssueEvents) is clearly an in-flight feature that was never wired in. Deleting the tests would walk past obvious unfinished work and violate CLAUDE.md's 'no bandaids' / 'fix root cause' rule. Completing the implementation also adds real value — a drawer-scoped issue event stream avoids replaying the entire global stream when only one issue is open."
+      },
+      {
+        "summary": "Listener applies events via useDashboardStore.getState().applyEvent(event).",
+        "rationale": "EventRouter already uses this exact pattern for the global subscribeDomainEvents stream. The shared reducer in packages/contracts/src/event-reducers.ts already handles activity.updated by replacing recentActivity with the payload's events — which is precisely what the failing test asserts on line 136. Using a custom inline reducer would duplicate logic; using applyEvent guarantees forward compatibility with any new event types added later."
+      },
+      {
+        "summary": "Lifecycle uses ref-counting with a 1000ms release timer, not naive mount/unmount.",
+        "rationale": "The test 'tears down the drawer issue subscription on close and reuses quick same-issue reopens' explicitly pins down this behavior: unmount, 999ms wait, remount-same-issue, subscribe call count stays at 1, unmount again, 1000ms wait, unsubscribe is called exactly once. The DrawerIssueSubscription type in useDrawerData.ts already has refCount and releaseTimer fields, so the contract is pre-declared."
+      },
+      {
+        "summary": "Single bead, no decomposition. Difficulty: medium. requiresInspection: false.",
+        "rationale": "The change is one file (useDrawerData.ts), one useEffect with ref-counted lifecycle. The two failing tests are the verification criterion — they pin down behavior precisely. No downstream beads depend on internal structure of this implementation. No architectural decision crystallizes here (the scaffold already encodes the design). No security boundary, no schema, no cross-cutting protocol. Splitting into smaller beads would not improve reviewability — the lifecycle logic is genuinely one indivisible piece. Difficulty 'medium' (not 'simple') because the grace-period reuse semantics require careful ordering of refCount/releaseTimer updates."
+      }
+    ],
+    "items": [
+      {
+        "id": "drawer-issue-subscription",
+        "title": "Wire missing drawer issue-filtered subscription in useDrawerData",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-20T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1235",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a useEffect to src/dashboard/frontend/src/components/drawer/useDrawerData.ts that wires the existing drawerIssueSubscription scaffold to wsTransport. The effect depends on the open drawer issueId from useDashboardStore. On mount with an issueId: if there is no existing subscription OR the existing one is for a different issue, stop the existing one (if any) and call getTransport().subscribe((client) => client[WS_METHODS.subscribeIssueEvents]({ issueId }), (event) => useDashboardStore.getState().applyEvent(event as DomainEvent)); store the returned unsubscribe in drawerIssueSubscription = { issueId, refCount: 1, unsubscribe, releaseTimer: null }. If a subscription already exists for this issue and has a pending releaseTimer, cancel the timer via window.clearTimeout and increment refCount. On effect cleanup: decrement refCount; if refCount === 0 schedule drawerIssueSubscription.releaseTimer = window.setTimeout(stopDrawerIssueSubscription, 1000). Both failing tests (IssueDrawer.test.tsx lines 118 and 139) must pass without other code changes."
+        },
+        "subItems": [
+          {
+            "id": "drawer-issue-subscription.ac1",
+            "title": "Test 'subscribes to issue-filtered drawer events and applies them to the store' passes: wsTransport.subscribe is called exactly once on mount; the connect callback invokes client[WS_METHODS.subscribeIssueEvents]({ issueId: 'PAN-1' }); the listener applied to an activity.updated event with payload events results in useDashboardStore.getState().recentActivity equaling the payload's events array.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac2",
+            "title": "Test 'tears down the drawer issue subscription on close and reuses quick same-issue reopens' passes: first mount, first.unmount(), advance 999ms, unsubscribe NOT called, second mount with same issue, wsTransport.subscribe still called exactly once total, second.unmount(), advance 1000ms, unsubscribe called exactly once.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac3",
+            "title": "All other 16 tests in IssueDrawer.test.tsx continue to pass with no regressions.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac4",
+            "title": "Full frontend vitest run is green: `cd src/dashboard/frontend && npx vitest run` reports 996 of 996 tests passing across 89 of 89 files (matching the post-cc81b36e8 baseline once these 2 fixes land).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac5",
+            "title": "The implementation reuses the existing DrawerIssueSubscription type, stopDrawerIssueSubscription() helper, and resetDrawerIssueSubscriptionForTest() export in useDrawerData.ts. No code is duplicated; the helpers stop being dead code.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac6",
+            "title": "Listener routes events through useDashboardStore.getState().applyEvent(event) — the same path EventRouter uses for the global stream — so all DomainEvent types (not just activity.updated) flow through the shared reducer correctly.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-issue-subscription.ac7",
+            "title": "npm run typecheck and npm run lint pass at the repo root.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1235-frontend-test-failures-on-clean-main-sidebar-app-route-helpers-issuedrawer.vbrief.json"
+    }
+  }
+}
