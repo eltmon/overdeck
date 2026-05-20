@@ -38,7 +38,7 @@ describe('role definitions', () => {
     expect(body).toContain('Beads');
     expect(body).toContain('pan plan finalize');
     expect(body).not.toContain('pan plan finalize <ISSUE-ID>');
-    expect(body).toMatch(/Stop after [`']?pan plan finalize[`']? returns/);
+    expect(body).toContain('Stop after `pan plan finalize` returns');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');
     // Output instructions must point at the canonical .pan/specs/ path, not legacy directories
