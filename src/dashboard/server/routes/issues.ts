@@ -2378,8 +2378,8 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     type CloseOutTask = { id: string; ctx: LifecycleContext } | { id: string; skipped: true; error: string };
     const tasks: CloseOutTask[] = [];
 
-    const agentChecks = yield* Effect.promise(() => Promise.all(
-      issueIds.map(async id => {
+    const agentChecks = yield* Effect.promise(() => withConcurrencyLimit(
+      issueIds.map(id => async () => {
         const cachedIssue = issueDataService.getIssues().find(
           (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
         );
@@ -2387,7 +2387,8 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
         const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
         return { id, hasActiveAgent };
-      })
+      }),
+      10
     ));
 
     for (const { id, hasActiveAgent } of agentChecks) {

@@ -1,6 +1,6 @@
 import type { Agent, Issue } from '../types';
 
-export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
+export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo' | 'verifying';
 
 type PipelineStateLike = {
   reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -120,6 +120,10 @@ export function getPipelineIssuePhase(
   const state = issue.state ?? issue.status;
   if (state === 'done' || state === 'closed' || state === 'completed') {
     return 'ship';
+  }
+
+  if (state === 'verifying_on_main') {
+    return 'verifying';
   }
 
   if (

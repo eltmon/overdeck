@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
 
-export type PhaseHeaderPhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
+export type PhaseHeaderPhase = 'ship' | 'review' | 'verifying' | 'work' | 'plan' | 'todo';
 export type PhaseHeaderVariant = 'pipeline' | 'command-deck';
 
 const PHASE_LABELS = {
   ship: 'Ship',
   review: 'Review',
+  verifying: 'Verifying',
   work: 'Work',
   plan: 'Plan',
   todo: 'Todo',
@@ -17,6 +18,7 @@ const PHASE_LABELS = {
 const PHASE_BORDER_CLASSES = {
   ship: 'border-t-success',
   review: 'border-t-warning',
+  verifying: 'border-t-info',
   work: 'border-t-info',
   plan: 'border-t-signal-review',
   todo: 'border-t-[rgb(255_255_255_/_15%)]',
@@ -25,6 +27,7 @@ const PHASE_BORDER_CLASSES = {
 const PHASE_DOT_CLASSES = {
   ship: 'bg-success',
   review: 'bg-warning',
+  verifying: 'bg-info',
   work: 'bg-info',
   plan: 'bg-signal-review',
   todo: 'bg-muted-foreground/30',

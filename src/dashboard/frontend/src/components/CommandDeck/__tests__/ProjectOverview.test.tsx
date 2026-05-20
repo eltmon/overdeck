@@ -85,8 +85,8 @@ describe('bucketFeaturePhase', () => {
   });
 
   it('buckets verifying issues as awaiting close-out instead of awaiting merge', () => {
-    expectStage('verifying', { stateLabel: 'Verifying' }, { readyForMerge: true });
-    expectStage('verifying', { stateLabel: 'Verifying On Main' }, { mergeStatus: 'merged' });
+    expectPhase('verifying', { stateLabel: 'Verifying' }, { readyForMerge: true });
+    expectPhase('verifying', { stateLabel: 'Verifying On Main' }, { mergeStatus: 'merged' });
   });
 
   it('buckets testing issues as tests', () => {

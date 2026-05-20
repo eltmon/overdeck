@@ -166,6 +166,7 @@ export const STATUS_ORDER: CanonicalState[] = [
   'todo',
   'in_progress',
   'in_review',
+  'verifying_on_main',
   'done'
 ];
 

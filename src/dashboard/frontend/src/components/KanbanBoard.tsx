@@ -803,6 +803,7 @@ export function CompactChildCard({
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const dotColor = canonical === 'done' ? 'bg-success' :
+                   canonical === 'verifying_on_main' ? 'bg-info' :
                    canonical === 'in_progress' ? 'bg-warning' :
                    canonical === 'in_review' ? 'bg-signal-review' :
                    'bg-muted-foreground';
@@ -882,6 +883,7 @@ export function ListIssueRow({
 
   // Status indicator color
   const statusColor = canonical === 'done' ? 'bg-success' :
+                      canonical === 'verifying_on_main' ? 'bg-info' :
                       canonical === 'in_review' ? 'bg-signal-review' :
                       canonical === 'in_progress' ? 'bg-warning' :
                       canonical === 'todo' ? 'bg-primary' :
