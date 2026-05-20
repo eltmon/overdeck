@@ -348,4 +348,35 @@ describe('pan tts test', () => {
     expect(result).toMatchObject({ ok: false, reason: 'daemon-unavailable' });
     expect(stderr.error).toHaveBeenCalledWith(expect.stringContaining('Daemon not running at 127.0.0.1:8787'));
   });
+
+  it('routes --status through the configured status voice', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"queued":true}', { status: 202 }));
+    const findVoiceByIdMock = vi.fn().mockResolvedValue(PRESET_VOICE);
+    const result = await runTtsTest('hello status', {
+      config: { ...CONFIG, voice: 'system-voice-id', statusVoice: 'status-voice-id' },
+      findVoiceById: findVoiceByIdMock,
+      fetch: fetchMock,
+      stdout: { log: vi.fn() },
+      stderr: { error: vi.fn() },
+      voiceKind: 'status',
+    });
+
+    expect(result).toEqual({ ok: true, url: 'http://127.0.0.1:8787/speak' });
+    expect(findVoiceByIdMock).toHaveBeenCalledWith('status-voice-id');
+  });
+
+  it('errors with --status when no status voice is configured', async () => {
+    const stderr = { error: vi.fn() };
+    const result = await runTtsTest(undefined, {
+      config: { ...CONFIG, statusVoice: undefined },
+      findVoiceById: vi.fn(),
+      fetch: vi.fn(),
+      stdout: { log: vi.fn() },
+      stderr,
+      voiceKind: 'status',
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'voice-not-found' });
+    expect(stderr.error).toHaveBeenCalledWith(expect.stringContaining('No status voice configured'));
+  });
 });

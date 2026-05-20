@@ -21,12 +21,15 @@ import {
 export const DEFAULT_TTS_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.';
 export const DEFAULT_TTS_TEST_VOICE = 'Vivian';
 
+export type TtsTestVoiceKind = 'system' | 'status';
+
 export interface RunTtsTestDeps {
   config?: NormalizedTtsDaemonConfig;
   findVoiceById?: (id: string) => Promise<TtsVoice | undefined>;
   fetch?: typeof fetch;
   stdout?: Pick<typeof console, 'log'>;
   stderr?: Pick<typeof console, 'error'>;
+  voiceKind?: TtsTestVoiceKind;
 }
 
 export interface TtsVoiceCommandDeps {
@@ -195,17 +198,24 @@ async function postTtsSpeakPayload(
 
 export async function runTtsTest(text: string | undefined, deps: RunTtsTestDeps = {}): Promise<TtsTestResult> {
   const config = deps.config ?? loadConfig().config.tts;
-  const voiceId = config.voice.trim();
+  const voiceKind: TtsTestVoiceKind = deps.voiceKind ?? 'system';
+  const configuredVoiceId = voiceKind === 'status' ? (config.statusVoice ?? '').trim() : config.voice.trim();
   const stdout = deps.stdout ?? console;
   const stderr = deps.stderr ?? console;
 
-  if (!voiceId) {
+  if (!configuredVoiceId) {
+    if (voiceKind === 'status') {
+      const message = 'No status voice configured (set tts.statusVoice in config.yaml or pick one in Settings → TTS).';
+      stderr.error(chalk.red(message));
+      return { ok: false, reason: 'voice-not-found', message };
+    }
     return postTtsSpeakPayload(buildDefaultTtsTestVoice(), text, config, { fetch: deps.fetch, stdout, stderr });
   }
 
-  const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
+  const voice = await (deps.findVoiceById ?? findVoiceById)(configuredVoiceId);
   if (!voice) {
-    const message = `Configured system voice not found: ${voiceId}`;
+    const label = voiceKind === 'status' ? 'status voice' : 'system voice';
+    const message = `Configured ${label} not found: ${configuredVoiceId}`;
     stderr.error(chalk.red(message));
     return { ok: false, reason: 'voice-not-found', message };
   }
@@ -419,9 +429,10 @@ export function registerTtsCommands(program: Command): void {
 
   tts
     .command('test [text]')
-    .description('Speak a test phrase using the configured system voice')
-    .action(async (text: string | undefined) => {
-      const result = await runTtsTest(text);
+    .description('Speak a test phrase using the configured system (priority) voice')
+    .option('--status', 'Use the status voice instead of the system (priority) voice')
+    .action(async (text: string | undefined, options: { status?: boolean }) => {
+      const result = await runTtsTest(text, { voiceKind: options.status ? 'status' : 'system' as TtsTestVoiceKind });
       if (!result.ok) process.exitCode = 1;
     });
 

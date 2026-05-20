@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+import { HttpServerRequest } from 'effect/unstable/http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkTtsHealth,
@@ -80,24 +82,22 @@ describe('checkTtsHealth', () => {
 });
 
 describe('TTS request body limits', () => {
-  it('rejects chunked request streams before buffering beyond the route cap', async () => {
-    const request = new Request('http://localhost/api/tts/speak', {
-      method: 'POST',
-      body: new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new Uint8Array(32));
-          controller.enqueue(new Uint8Array(33));
-          controller.close();
-        },
-      }),
-      duplex: 'half',
-    } as RequestInit & { duplex: 'half' });
+  it('returns the request body text under the cap', async () => {
+    const fakeRequest = {
+      text: Effect.succeed('hello'),
+    } as unknown as HttpServerRequest.HttpServerRequest;
 
-    await expect(readCappedTtsBodyText({ source: request }, 64)).resolves.toEqual({
-      ok: false,
-      status: 413,
-      error: 'TTS request too large',
-    });
+    const result = await Effect.runPromise(readCappedTtsBodyText(fakeRequest, 64));
+    expect(result).toEqual({ ok: true, text: 'hello' });
+  });
+
+  it('rejects bodies past the route cap with 413', async () => {
+    const fakeRequest = {
+      text: Effect.succeed('x'.repeat(65)),
+    } as unknown as HttpServerRequest.HttpServerRequest;
+
+    const result = await Effect.runPromise(readCappedTtsBodyText(fakeRequest, 64));
+    expect(result).toEqual({ ok: false, status: 413, error: 'TTS request too large' });
   });
 });
 

@@ -133,38 +133,29 @@ function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest
   return undefined;
 }
 
-type CappedBodyReadResult =
+export type CappedBodyReadResult =
   | { ok: true; text: string }
   | { ok: false; status: 413; error: string };
 
-export async function readCappedTtsBodyText(
-  request: Pick<HttpServerRequest.HttpServerRequest, 'source'>,
+// Read the body via Effect's request.text (which works against both Node's
+// IncomingMessage and Web Fetch Request). The old implementation reached for
+// request.source.body.getReader() directly, which is undefined on Node and
+// silently returned an empty body — every POST /api/tts/* request 400'd as
+// "invalid speak request" in production. Tests passed because they passed a
+// Fetch-style Request mock that does expose .body.
+export const readCappedTtsBodyText = (
+  request: HttpServerRequest.HttpServerRequest,
   maxBytes = TTS_ROUTE_BODY_MAX_BYTES,
-): Promise<CappedBodyReadResult> {
-  if (!request.source.body) return { ok: true, text: '' };
-
-  const reader = request.source.body.getReader();
-  const decoder = new TextDecoder();
-  let bytesRead = 0;
-  let text = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytesRead += value.byteLength;
-      if (bytesRead > maxBytes) {
-        await reader.cancel();
-        return { ok: false, status: 413, error: 'TTS request too large' };
-      }
-      text += decoder.decode(value, { stream: true });
+): Effect.Effect<CappedBodyReadResult> =>
+  Effect.gen(function* () {
+    const text = yield* request.text;
+    if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+      return { ok: false, status: 413, error: 'TTS request too large' } as const;
     }
-    text += decoder.decode();
-    return { ok: true, text };
-  } finally {
-    reader.releaseLock();
-  }
-}
+    return { ok: true, text } as const;
+  }).pipe(
+    Effect.catch(() => Effect.succeed({ ok: false, status: 413, error: 'TTS request too large' } as const)),
+  );
 
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   const { embedding: _embedding, ...publicVoice } = voice;
@@ -379,7 +370,7 @@ const postTtsVoiceRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    const bodyRead = yield* readCappedTtsBodyText(request);
     if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
     const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
@@ -430,7 +421,7 @@ const postTtsSpeakRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    const bodyRead = yield* readCappedTtsBodyText(request);
     if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
     const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
@@ -453,7 +444,7 @@ const postExtractEmbeddingRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    const bodyRead = yield* readCappedTtsBodyText(request);
     if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
     const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
