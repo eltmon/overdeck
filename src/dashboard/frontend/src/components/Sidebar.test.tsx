@@ -56,19 +56,26 @@ describe('Sidebar navigation', () => {
     }));
   });
 
-  it('orders Operations as Pipeline, Board, Command Deck, Agents, AutoPreso with the migration tooltip', () => {
-    const { container, onTabChange } = renderSidebar({ activeTab: 'pipeline' });
+  it('orders Operations as Command Deck, Board, Pipeline, Awaiting Merge, Agents, AutoPreso, Flywheel', () => {
+    const { container, onTabChange } = renderSidebar({ activeTab: 'command-deck' });
 
     const operationLabels = Array.from(container.querySelectorAll('nav [data-testid^="sidebar-"]'))
-      .slice(0, 5)
+      .slice(0, 7)
       .map((button) => button.textContent?.trim());
 
-    expect(operationLabels).toEqual(['Pipeline', 'Board', 'Command Deck', 'Agents', 'AutoPreso']);
-    expect(screen.getByTestId('sidebar-pipeline')).toHaveAttribute('title', 'Awaiting Merge → filter on Pipeline');
-    expect(screen.queryByTestId('sidebar-awaiting-merge')).toBeNull();
+    expect(operationLabels).toEqual([
+      'Command Deck',
+      'Board',
+      'Pipeline',
+      'Awaiting Merge',
+      'Agents',
+      'AutoPreso',
+      'Flywheel',
+    ]);
+    expect(screen.getByTestId('sidebar-awaiting-merge')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('sidebar-pipeline'));
-    expect(onTabChange).toHaveBeenCalledWith('pipeline');
+    fireEvent.click(screen.getByTestId('sidebar-command-deck'));
+    expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
 
   it('routes the expanded logo to Pipeline', () => {
@@ -87,11 +94,11 @@ describe('Sidebar navigation', () => {
     fireEvent.click(logo);
     expect(onTabChange).toHaveBeenCalledWith('pipeline');
 
-    const pipelineButton = screen.getByTestId('sidebar-pipeline');
-    expect(pipelineButton).toHaveAttribute('title', 'Awaiting Merge → filter on Pipeline');
-    expect(pipelineButton).toHaveTextContent('');
+    const commandDeckButton = screen.getByTestId('sidebar-command-deck');
+    expect(commandDeckButton).toHaveAttribute('title', 'Command Deck');
+    expect(commandDeckButton).toHaveTextContent('');
 
-    fireEvent.click(pipelineButton);
-    expect(onTabChange).toHaveBeenCalledWith('pipeline');
+    fireEvent.click(commandDeckButton);
+    expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
 });

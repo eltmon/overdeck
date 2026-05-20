@@ -37,10 +37,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
+      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
+      { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
       { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
-      { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
-      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
       { id: 'autopreso' as Tab, label: 'AutoPreso', icon: Mic },
       { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
