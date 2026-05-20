@@ -6,6 +6,8 @@ import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
 import { IssueWorkbench } from './IssueWorkbench';
+import { ZoneA } from './ZoneA';
+import type { OverviewTab as ZoneCOverviewTab } from './ZoneCOverview';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
 import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
@@ -235,6 +237,7 @@ function ProjectRightPaneTabs({
   onConversationViewModeChange,
   onArchivedConversation,
   conversationAgentId,
+  zoneA,
   onOpenIssue,
   onSelectConversation,
 }: {
@@ -249,6 +252,15 @@ function ProjectRightPaneTabs({
   onConversationViewModeChange?: (mode: ViewMode) => void;
   onArchivedConversation?: () => void;
   conversationAgentId?: string;
+  zoneA?: {
+    issueId: string;
+    title: string;
+    source?: string;
+    url?: string;
+    onOpenBeads?: () => void;
+    agent?: Agent;
+    issue?: Issue;
+  };
   onOpenIssue: (issueId: string) => void;
   onSelectConversation: (name: string | null) => void;
 }) {
@@ -286,6 +298,23 @@ function ProjectRightPaneTabs({
     try { localStorage.setItem(projectTabStorageKey(projectName), tab); } catch { /* ignore */ }
   };
 
+  const handleZoneASwitchTab = (tab: ZoneCOverviewTab) => {
+    const mapping: Record<string, ProjectRightTab> = {
+      overview: 'settings',
+      activity: 'activity',
+      costs: 'activity',
+      prd: 'plans',
+      state: 'settings',
+      inference: 'activity',
+      vbrief: 'plans',
+      beads: 'beads',
+      prdiff: 'activity',
+      discussions: 'conversations',
+    };
+    const mapped = mapping[tab];
+    if (mapped) selectTab(mapped);
+  };
+
   const openPipelineFeature = (feature: ProjectFeature) => {
     setActiveIssueId(feature.issueId);
     onOpenIssue(feature.issueId);
@@ -295,6 +324,18 @@ function ProjectRightPaneTabs({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background" data-component="command-deck-right-pane-tabs" data-testid="command-deck-right-pane-tabs">
+      {zoneA && (
+        <ZoneA
+          issueId={zoneA.issueId}
+          title={zoneA.title}
+          source={zoneA.source}
+          url={zoneA.url}
+          onOpenBeads={zoneA.onOpenBeads}
+          agent={zoneA.agent}
+          issue={zoneA.issue}
+          onSwitchTab={handleZoneASwitchTab}
+        />
+      )}
       <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-2" role="tablist" aria-label={`${projectName} right pane tabs`}>
         {PROJECT_RIGHT_TABS.map((tab) => (
           <button
@@ -1397,6 +1438,15 @@ export function CommandDeck({
                 queryClient.invalidateQueries({ queryKey: ['conversations'] });
               }}
               conversationAgentId={selectedAgent?.id}
+              zoneA={selectedFeature ? {
+                issueId: selectedFeature,
+                title: selectedIssueTitle,
+                source: selectedIssue?.source,
+                url: selectedIssue?.url,
+                onOpenBeads: () => setShowBeads(true),
+                agent: selectedAgent,
+                issue: selectedIssue ?? undefined,
+              } : undefined}
               onOpenIssue={(issueId) => openIssue(issueId)}
               onSelectConversation={handleSelectConversation}
             />
