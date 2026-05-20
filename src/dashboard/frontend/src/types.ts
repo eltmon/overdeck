@@ -45,6 +45,7 @@ export interface Issue {
   hasBeads?: boolean;
   planningComplete?: boolean;
   workspacePath?: string;
+  beadCounts?: { completed: number; total: number } | null;
 }
 
 export interface GitStatus {

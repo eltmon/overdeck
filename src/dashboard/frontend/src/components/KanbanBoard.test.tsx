@@ -731,6 +731,54 @@ describe('IssueCard', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onPlan).not.toHaveBeenCalled();
   });
+
+  it('renders Beads N/M progress row when beadCounts is present', () => {
+    renderIssueCard({
+      issue: createMockIssue({ beadCounts: { completed: 7, total: 12 } }),
+    });
+
+    expect(screen.getByText('Beads 7/12')).toBeInTheDocument();
+    const beadProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="bead-progress"]');
+    expect(beadProgress).toBeInTheDocument();
+    expect(beadProgress).toHaveAttribute('data-progress', '7');
+  });
+
+  it('hides bead progress row when beadCounts is null', () => {
+    renderIssueCard({
+      issue: createMockIssue({ beadCounts: null }),
+    });
+
+    expect(screen.queryByText(/Beads \d+\/\d+/)).not.toBeInTheDocument();
+  });
+
+  it('renders agent foot with name, sub, runtime and avatar for active agent', () => {
+    renderIssueCard({
+      workAgent: createMockAgent({ id: 'agent-test-123', model: 'claude-sonnet-4-6' }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    expect(card).toHaveTextContent('agent-test-123');
+    expect(card).toHaveTextContent('Sonnet 4.6');
+    expect(card.querySelector('[class*="rounded-full"][class*="grid"]')).toBeInTheDocument();
+  });
+
+  it('renders empty agent foot with no agent and tracker ref when no agent is active', () => {
+    renderIssueCard({
+      issue: createMockIssue({ source: 'github' }),
+      workAgent: undefined,
+    });
+
+    expect(screen.getByText('no agent')).toBeInTheDocument();
+    expect(screen.getByText('GitHub TEST-123')).toBeInTheDocument();
+  });
+
+  it('renders cost overlay when totalCost is greater than 0', () => {
+    renderIssueCard({
+      cost: { issueId: 'TEST-123', totalCost: 5.5, tokenCount: 1000, sessionCount: 1 },
+    });
+
+    expect(screen.getByTestId('card-cost-TEST-123')).toBeInTheDocument();
+  });
 });
 
 describe('groupByCanceledType', () => {
