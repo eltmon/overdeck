@@ -274,7 +274,7 @@ function ProjectRightPaneTabs({
 
   useEffect(() => {
     setActiveTab(readProjectTab(projectName));
-    hasExplicitTabChoiceRef.current = false;
+    hasExplicitTabChoiceRef.current = localStorage.getItem(projectTabStorageKey(projectName)) !== null;
   }, [projectName]);
 
   useEffect(() => {

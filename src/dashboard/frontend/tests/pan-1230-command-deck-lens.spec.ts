@@ -78,7 +78,7 @@ const COSTS_RESPONSE = {
 
 test.describe('PAN-1230 command deck lens', () => {
   test('right pane lens defaults to pipeline on project select, persists issue context on feature select, switches to conversations on conversation select, and tab strip is 48px tall', async ({ page }) => {
-    await page.route('**/api/command-deck/projects', route => route.fulfill({ json: PROJECTS_RESPONSE }));
+    await page.route('**/api/issues/resource-allocated', route => route.fulfill({ json: PROJECTS_RESPONSE }));
     await page.route('**/api/session-trees?projects=*', route => route.fulfill({ json: SESSION_TREES_RESPONSE }));
     await page.route('**/api/registered-projects', route => route.fulfill({ json: REGISTERED_PROJECTS_RESPONSE }));
     await page.route('**/api/conversations', route => route.fulfill({ json: CONVERSATIONS_RESPONSE }));
