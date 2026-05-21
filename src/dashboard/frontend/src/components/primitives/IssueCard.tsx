@@ -46,14 +46,14 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
   const tone = unhealthyCard || stuckCard
     ? 'from-destructive/12 via-destructive/5 to-transparent'
     : mergeReadyCard
-      ? 'from-warning/20 via-warning/6 to-transparent'
+      ? 'from-success/20 via-success/6 to-transparent'
       : runningCard
         ? 'from-primary/16 via-primary/6 to-transparent'
         : 'from-surface-overlay/60 via-surface/40 to-transparent';
   const accent = unhealthyCard || stuckCard
     ? 'bg-destructive'
     : mergeReadyCard
-      ? 'bg-warning'
+      ? 'bg-success'
       : runningCard
         ? 'bg-primary'
         : (PRIORITY_ACCENT_CLASSES[priority] || 'bg-muted-foreground');
@@ -76,7 +76,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
           : unhealthyCard || stuckCard
             ? 'border-destructive/60 bg-destructive/10 shadow-md'
             : mergeReadyCard
-              ? 'border-warning/60 bg-warning/10 shadow-md'
+              ? 'border-success/60 bg-success/10 shadow-md'
               : bulkSelected
                 ? 'border-primary/50 bg-primary/10 shadow-sm'
                 : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-md',

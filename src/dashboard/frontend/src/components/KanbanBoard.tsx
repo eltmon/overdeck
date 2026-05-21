@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type DragStartEvent,
+  type DragOverEvent,
   type DragEndEvent,
   defaultDropAnimationSideEffects,
   type DropAnimation,
@@ -106,6 +107,40 @@ function formatCost(cost: number): string {
 // Get cost badge color based on amount
 function getCostColor(_cost: number): string {
   return 'bg-popover text-muted-foreground';
+}
+
+function formatRuntime(startedAt: string): string {
+  const elapsed = Date.now() - new Date(startedAt).getTime();
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 1) return '<1 min';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins} min`;
+}
+
+function cardAvatarInitials(name: string): string {
+  const parts = name.trim().split(/[-\s_]+/).filter(Boolean);
+  if (parts.length > 1) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg, #a855f7, #06b6d4)',
+  'linear-gradient(135deg, #f59e0b, #ef4444)',
+  'linear-gradient(135deg, #10b981, #06b6d4)',
+  'linear-gradient(135deg, #60a5fa, #a855f7)',
+  'linear-gradient(135deg, #ef4444, #f59e0b)',
+];
+
+function avatarGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
 }
 
 export function applyReviewStateToIssue(
@@ -1089,7 +1124,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, []);
 
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
-  const [, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
+  const [activeOverId, setActiveOverId] = useState<string | null>(null);
   const [columnOrderOverrides, setColumnOrderOverrides] = useState<Record<string, string[]>>({});
 
   // Undo state
@@ -1315,6 +1351,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }
   }, [issues]);
 
+  // Handle drag over
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    setActiveOverId((event.over?.id as string) ?? null);
+  }, []);
+
   // Handle drag end
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -1340,6 +1381,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
     setActiveDragIssue(null);
     setActiveDragStatus(null);
+    setActiveOverId(null);
   }, [issues]);
 
   // Confirm agent warning
@@ -1805,6 +1847,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-hidden pb-4">
@@ -1815,7 +1858,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <DroppableColumn key={status} status={status}>
+              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={sortedGrouped[status].map(i => i.id)}>
                 <div
                   className="flex-1 min-w-0"
                   data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
@@ -1865,6 +1908,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
                   />
+                  {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
                 </div>
               </DroppableColumn>
@@ -2107,15 +2151,19 @@ function ColumnContent({
 }
 
 // DroppableColumn component
-function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
+export function DroppableColumn({ status, activeDragStatus, overId, issueIds, children }: { status: CanonicalState; activeDragStatus?: CanonicalState | null; overId?: string | null; issueIds?: string[]; children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
     id: status,
   });
 
+  const isOverColumn = isOver || (overId !== undefined && overId !== null && (overId === status || issueIds?.includes(overId) === true));
+  const isBlocked = isOverColumn && activeDragStatus !== undefined && activeDragStatus !== null && activeDragStatus !== status;
+
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-0 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+      data-testid={`droppable-column-${status}`}
+      className={`flex-1 min-w-0 transition-all ${isBlocked ? 'cursor-not-allowed opacity-60' : isOverColumn ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>
@@ -2658,7 +2706,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
@@ -2680,13 +2728,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
-  const phaseLabel =
-    canonical === 'backlog' ? 'Backlog' :
-    canonical === 'todo' ? 'Ready to start' :
-    canonical === 'in_progress' ? (isRunning ? 'Agent active' : 'Work paused') :
-    canonical === 'in_review' ? (isReadyToMerge ? 'Awaiting merge' : isPipelineStuck ? 'Needs recovery' : 'Review pipeline') :
-    canonical === 'done' ? 'Completed' :
-    'Canceled';
   const cardVerbBadge =
     isTerminal ? <VerbBadge variant="MERGED" /> :
     isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
@@ -2695,17 +2736,26 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'in_progress' && isRunning ? <VerbBadge variant="WORK RUNNING" /> :
     canonical === 'todo' || canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
     null;
-  const hasPlan = planningStateProp?.hasPlan ?? issue.hasPlan ?? false;
-  const hasBeads = planningStateProp?.hasBeads ?? issue.hasBeads ?? false;
-  const progressTotal = Math.min(3, Number(hasPlan) + Number(hasBeads) + Number(planningStateProp?.planningComplete ?? issue.planningComplete ?? false));
-  const progressPercent = `${Math.round((progressTotal / 3) * 100)}%`;
   const beadProgressColor =
-    isReadyToMerge || isMerged ? 'var(--success)' :
+    isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :
     canonical === 'in_review' ? 'var(--warning)' :
     canonical === 'in_progress' ? 'var(--info)' :
     canonical === 'todo' ? 'var(--signal-review)' :
     'var(--muted-foreground)';
-  const issueSpecialists = specialists.filter((specialist) => specialist.status !== 'stopped');
+  const reviewSpecialists = specialists.filter((s) => s.role === 'review' && s.status !== 'stopped');
+
+  const agentSubText = activeAgent
+    ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
+      ? `${reviewSpecialists.length} reviewers · ${getFriendlyModelName(activeAgent.model)}`
+      : issue.beadCounts
+        ? `${getFriendlyModelName(activeAgent.model)} · bead ${issue.beadCounts.completed}/${issue.beadCounts.total}`
+        : getFriendlyModelName(activeAgent.model))
+    : '';
+  const trackerRef = issue.source === 'github'
+    ? `GitHub ${issue.identifier}`
+    : issue.source === 'linear'
+      ? `Linear ${issue.identifier}`
+      : issue.identifier;
 
   return (
     <IssueCardPrimitive
@@ -2722,76 +2772,136 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       sessionLostCard={false}
       onClick={onSelect}
     >
-      <div className="relative p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              {onBulkToggle && (
-                <input
-                  type="checkbox"
-                  checked={isBulkSelected || false}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    onBulkToggle();
-                  }}
-                  onClick={(event) => event.stopPropagation()}
-                  className="h-4 w-4 shrink-0 cursor-pointer rounded border-border text-primary focus:ring-primary"
-                  aria-label={`Select ${issue.identifier}`}
-                />
-              )}
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{phaseLabel}</span>
-              {cardVerbBadge}
-            </div>
-            <div className="mt-3 flex min-w-0 items-center gap-2">
-              <span className="shrink-0 font-mono text-sm font-semibold text-muted-foreground">{issue.identifier}</span>
-              <span className="truncate text-sm font-semibold text-foreground">{issue.title}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-              {issue.project && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{issue.project.name}</span>}
-              <span className="rounded-full border border-border bg-muted px-2 py-0.5">beads {progressTotal}/3</span>
-              {activeAgent && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{activeAgent.id} · {getFriendlyModelName(activeAgent.model)}</span>}
-              {issueSpecialists.length > 0 && <span className="rounded-full border border-border bg-muted px-2 py-0.5">{issueSpecialists.length} specialists</span>}
-            </div>
-            <div className="mt-3" data-component="bead-progress" data-progress={progressTotal}>
-              <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                <span>Bead progress</span>
-                <span>{progressTotal}/3</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full transition-[width]"
-                  style={{ width: progressPercent, background: beadProgressColor }}
-                />
-              </div>
-            </div>
+      <div className="relative" style={{ padding: '12px 12px 10px' }}>
+        {/* Hover overlays */}
+        {onBulkToggle && (
+          <div className={`absolute top-2 left-2 transition-opacity z-10 ${isBulkSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+            <input
+              type="checkbox"
+              checked={isBulkSelected || false}
+              onChange={(event) => {
+                event.stopPropagation();
+                onBulkToggle();
+              }}
+              onClick={(event) => event.stopPropagation()}
+              className="h-4 w-4 shrink-0 cursor-pointer rounded border-border text-primary focus:ring-primary"
+              aria-label={`Select ${issue.identifier}`}
+            />
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            {costsLoading && !cost && <span className="inline-block h-6 w-14 animate-pulse rounded-full bg-popover" />}
-            {cost && cost.totalCost > 0 && (
-              <button
-                type="button"
-                onClick={(event) => { event.stopPropagation(); setShowCostModal(true); }}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${getCostColor(cost.totalCost)}`}
-                data-testid={`card-cost-${issue.identifier}`}
-              >
-                <DollarSign className="h-3 w-3" />
-                {formatCost(cost.totalCost).slice(1)}
-              </button>
-            )}
-            <div className="flex items-center gap-2">
-              {onViewBeads && (
-                <button type="button" onClick={(event) => { event.stopPropagation(); onViewBeads(issue); }} className="text-muted-foreground hover:text-foreground" aria-label={`Open beads for ${issue.identifier}`}>
-                  <List className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {onViewVBrief && (
-                <button type="button" onClick={(event) => { event.stopPropagation(); onViewVBrief(issue); }} className="text-muted-foreground hover:text-foreground" aria-label={`Open vBRIEF for ${issue.identifier}`}>
-                  <ScrollText className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+        )}
+        {cost && cost.totalCost > 0 && (
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setShowCostModal(true); }}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ${getCostColor(cost.totalCost)}`}
+              data-testid={`card-cost-${issue.identifier}`}
+            >
+              <DollarSign className="h-3 w-3" />
+              {formatCost(cost.totalCost).slice(1)}
+            </button>
           </div>
+        )}
+
+        {/* Row 1: project mark + ID + verb badge */}
+        <div className="flex items-center gap-2 mb-1.5">
+          {issue.project ? (
+            <div className="flex items-center gap-[5px]">
+              <span
+                className="block rounded-[2px]"
+                style={{ width: 8, height: 8, backgroundColor: issue.project.color }}
+              />
+              <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
+            </div>
+          ) : (
+            <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
+          )}
+          <span className="ml-auto">{cardVerbBadge}</span>
         </div>
+
+        {/* Title */}
+        <h3
+          className="text-[13px] leading-[1.35] text-foreground mb-2"
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {issue.title}
+        </h3>
+
+        {/* Labels */}
+        {issue.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2.5">
+            {issue.labels.map((label) => (
+              <span
+                key={label}
+                className="text-[10px] font-medium px-[6px] py-px rounded-sm"
+                style={{
+                  background: 'rgb(255 255 255 / 5%)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--muted-foreground)',
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Bead progress */}
+        {issue.beadCounts && (
+          <div className="flex items-center gap-2 mt-2" data-component="bead-progress" data-progress={issue.beadCounts.completed}>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+              Beads {issue.beadCounts.completed}/{issue.beadCounts.total}
+            </span>
+            <div
+              className="flex-1 h-[3px] rounded-[2px] overflow-hidden"
+              style={{ background: 'var(--accent)' }}
+            >
+              <div
+                className="h-full rounded-[2px]"
+                style={{
+                  width: `${(issue.beadCounts.completed / issue.beadCounts.total) * 100}%`,
+                  background: beadProgressColor,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Foot */}
+        <div className="flex items-center gap-2 pt-2 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="flex flex-col min-w-0 gap-0.5 flex-1">
+            {activeAgent ? (
+              <>
+                <span className="font-mono text-[10px] text-foreground truncate">{activeAgent.id}</span>
+                <span className="font-mono text-[9px] text-muted-foreground truncate">{agentSubText}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] text-muted-foreground italic" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                  no agent
+                </span>
+                <span className="font-mono text-[9px] text-muted-foreground truncate">{trackerRef}</span>
+              </>
+            )}
+          </div>
+          <span className="font-mono text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+            {activeAgent ? formatRuntime(activeAgent.startedAt) : '—'}
+          </span>
+          <span
+            className="w-[18px] h-[18px] rounded-full grid place-items-center text-[9px] font-semibold text-white border border-border shrink-0"
+            style={{
+              background: avatarGradient(activeAgent?.id ?? issue.identifier),
+            }}
+          >
+            {cardAvatarInitials(activeAgent?.id ?? issue.identifier)}
+          </span>
+        </div>
+
         <CostBreakdownModal
           issueId={issue.identifier}
           isOpen={showCostModal}
