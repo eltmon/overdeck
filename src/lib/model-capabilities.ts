@@ -35,12 +35,18 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
   // OpenAI retired/superseded models
   'gpt-5.2-codex': 'gpt-5.3-codex', // superseded by gpt-5.3-codex (April 2026)
-  'gpt-5.5-mini': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  'gpt-5.5-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
   'gpt-5.4-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  'o3-deep-research': 'o3',
-  // NOTE: gpt-5.4 family is Panopticon's abstraction over real OpenAI models.
-  // Do NOT treat gpt-4o/gpt-4o-mini as deprecated — they are the actual API names.
+  // OpenAI IDs dropped from Panopticon catalog (PAN-1122) — redirect to balanced default
+  'gpt-5.5-mini': 'gpt-5.4',
+  'gpt-5.5-nano': 'gpt-5.4',
+  'gpt-5.4-pro': 'gpt-5.4',
+  'o3': 'gpt-5.4',
+  'o4-mini': 'gpt-5.4',
+  'gpt-4o': 'gpt-5.4',
+  'gpt-4o-mini': 'gpt-5.4',
+  'o3-deep-research': 'gpt-5.4',
+  'gpt-5.3-codex': 'gpt-5.4',
+  'gpt-5.2': 'gpt-5.4',
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
   'gemini-3-flash': 'gemini-3-flash-preview',
@@ -54,16 +60,42 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
 };
 
 /**
+ * Panopticon catalog-drop redirects (PAN-1122)
+ *
+ * Maps OpenAI model IDs removed from Panopticon's supported catalog to the
+ * balanced default (gpt-5.4). Distinct from MODEL_DEPRECATIONS (provider-level
+ * retirements) — these IDs may still be valid at the OpenAI API but are no
+ * longer in Panopticon's supported set.
+ *
+ * resolveModelId checks this map first so saved configs referencing a dropped
+ * ID resolve to gpt-5.4 transparently.
+ */
+export const LEGACY_MODEL_REDIRECTS: Record<string, ModelId> = {
+  'gpt-5.5-mini': 'gpt-5.4',
+  'gpt-5.5-nano': 'gpt-5.4',
+  'gpt-5.4-pro': 'gpt-5.4',
+  'o3': 'gpt-5.4',
+  'o4-mini': 'gpt-5.4',
+  'gpt-4o': 'gpt-5.4',
+  'gpt-4o-mini': 'gpt-5.4',
+  'o3-deep-research': 'gpt-5.4',
+  'gpt-5.3-codex': 'gpt-5.4',
+  'gpt-5.2': 'gpt-5.4',
+};
+
+/**
  * Resolve a model ID to its current version
  *
- * If the model ID is deprecated, returns the replacement.
- * Otherwise, returns the model ID unchanged.
+ * Checks LEGACY_MODEL_REDIRECTS (catalog drops) first, then MODEL_DEPRECATIONS
+ * (provider retirements). Returns the model ID unchanged if neither map matches.
  *
- * @param modelId - Model ID to resolve (may be deprecated)
+ * @param modelId - Model ID to resolve (may be deprecated or catalog-dropped)
  * @returns Current model ID
  */
 export function resolveModelId(modelId: string): ModelId {
-  return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
+  return (LEGACY_MODEL_REDIRECTS[modelId] as ModelId)
+    || (MODEL_DEPRECATIONS[modelId] as ModelId)
+    || (modelId as ModelId);
 }
 
 /**
