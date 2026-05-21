@@ -13,6 +13,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { detectPlatform } from './platform.js';
 
 const execAsync = promisify(exec);
@@ -25,7 +26,7 @@ export type DnsSyncMethod = 'wsl2hosts' | 'hosts_file' | 'dnsmasq';
  * Detect the best DNS sync method for the current platform.
  */
 export function detectDnsSyncMethod(): DnsSyncMethod {
-  const plat = detectPlatform();
+  const plat = Effect.runSync(detectPlatform());
   switch (plat) {
     case 'wsl':
       return 'wsl2hosts';
@@ -155,7 +156,7 @@ export function removeHostsFileEntry(hostname: string): boolean {
 // ---- dnsmasq method ----
 
 function getDnsmasqConfigDir(): string {
-  const plat = detectPlatform();
+  const plat = Effect.runSync(detectPlatform());
   if (plat === 'darwin') {
     // Homebrew Intel location; Apple Silicon uses /opt/homebrew/etc/dnsmasq.d
     const brewPrefix = existsSync('/opt/homebrew') ? '/opt/homebrew' : '/usr/local';
@@ -204,7 +205,7 @@ export function removeDnsmasqEntry(hostname: string): boolean {
 }
 
 export async function restartDnsmasq(): Promise<boolean> {
-  const plat = detectPlatform();
+  const plat = Effect.runSync(detectPlatform());
   try {
     if (plat === 'darwin') {
       await execAsync('brew services restart dnsmasq');
