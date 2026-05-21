@@ -1,6 +1,9 @@
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join, relative } from 'path';
+import { Effect } from 'effect';
+import { FsError } from './errors.js';
 
 /**
  * Manifest entry for a single distributed file.
@@ -193,3 +196,76 @@ export function buildManifestFromDirectory(
 
   return manifest;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of {@link hashFile}. */
+export const hashFileEffect = (filePath: string): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const content = await readFile(filePath);
+      const hex = createHash('sha256').update(content).digest('hex');
+      return `sha256:${hex}`;
+    },
+    catch: (cause) => new FsError({ path: filePath, operation: 'hashFile', cause }),
+  });
+
+/** Effect variant of {@link readManifest}. Returns an empty manifest on any read/parse failure. */
+export const readManifestEffect = (manifestPath: string): Effect.Effect<Manifest, never> =>
+  Effect.tryPromise({
+    try: () => readFile(manifestPath, 'utf-8'),
+    catch: () => null,
+  }).pipe(
+    Effect.match({
+      onFailure: () => createEmptyManifest(),
+      onSuccess: (raw) => {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.version === 1 && parsed.managed_by === 'panopticon' && typeof parsed.installed === 'object') {
+            return parsed as Manifest;
+          }
+        } catch { /* fall through */ }
+        return createEmptyManifest();
+      },
+    }),
+  );
+
+/** Effect variant of {@link writeManifest}. */
+export const writeManifestEffect = (manifestPath: string, manifest: Manifest): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: async () => {
+      await mkdir(join(manifestPath, '..'), { recursive: true });
+      await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+    },
+    catch: (cause) => new FsError({ path: manifestPath, operation: 'writeManifest', cause }),
+  });
+
+/** Effect variant of {@link collectSourceFiles}. */
+export const collectSourceFilesEffect = (
+  sourceDir: string,
+  prefix: string,
+): Effect.Effect<Array<{ absolutePath: string; relativePath: string }>, FsError> =>
+  Effect.tryPromise({
+    try: async (): Promise<Array<{ absolutePath: string; relativePath: string }>> => {
+      const results: Array<{ absolutePath: string; relativePath: string }> = [];
+      if (!existsSync(sourceDir)) return results;
+
+      async function walk(dir: string): Promise<void> {
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await walk(fullPath);
+          } else if (entry.isFile()) {
+            const rel = relative(sourceDir, fullPath);
+            results.push({ absolutePath: fullPath, relativePath: `${prefix}${rel}` });
+          }
+        }
+      }
+
+      await walk(sourceDir);
+      return results;
+    },
+    catch: (cause) => new FsError({ path: sourceDir, operation: 'collectSourceFiles', cause }),
+  });
+

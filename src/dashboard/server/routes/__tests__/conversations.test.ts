@@ -403,6 +403,9 @@ function validateOrigin(
     return { ok: false, error: 'Invalid origin' };
   }
 
+  if (!referer) {
+    return { ok: false, error: 'Invalid referer' };
+  }
   const normalized = normalizeOrigin(referer);
   if (normalized && trusted.includes(normalized)) {
     return { ok: true };

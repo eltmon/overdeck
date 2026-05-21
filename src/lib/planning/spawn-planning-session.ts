@@ -16,6 +16,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import {
   sessionExistsAsync,
@@ -277,7 +278,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
-  return renderPrompt({
+  return Effect.runSync(renderPrompt({
     name: 'planning',
     vars: {
       ISSUE_ID: issue.identifier,
@@ -295,7 +296,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
     },
-  });
+  }));
 }
 
 /**
@@ -309,7 +310,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
         `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
       ).join('\n\n')
     : '_No child stories found._';
-  writeWorkspaceContext(
+  await Effect.runPromise(writeWorkspaceContext(
     workspacePath,
     `# Feature Context: ${issue.identifier}\n\n` +
       `**Title:** ${issue.title}\n\n` +
@@ -318,7 +319,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
       `## Child Stories\n${childStoriesSection}\n\n` +
       `---\n` +
       `*This file is auto-generated for story-level workspaces to reference.*\n`,
-  );
+  ));
 }
 
 // ─── Main spawn function ─────────────────────────────────────────────────────
@@ -416,7 +417,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Kill existing planning session if any
     await killSessionAsync(sessionName).catch(() => {});
 
-    const workspacePanPaths = ensureWorkspacePanDir(workspacePath);
+    const workspacePanPaths = await Effect.runPromise(ensureWorkspacePanDir(workspacePath));
     await Promise.all(
       ['transcripts', 'discussions', 'notes'].map((subdir) =>
         mkdir(join(workspacePanPaths.panDir, subdir), { recursive: true }),
@@ -491,7 +492,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
 
     // Capture planning prompt in workspace .pan/continue.json.
-    writeWorkspaceContinue(workspacePath, {
+    await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
       version: '1',
       issueId: issue.identifier,
       created: new Date().toISOString(),
@@ -510,7 +511,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         },
       ],
       feedback: [],
-    });
+    }));
 
     await writeFeatureContext(workspacePath, issue);
 

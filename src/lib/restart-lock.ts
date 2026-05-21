@@ -1,5 +1,6 @@
 import { mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { Data, Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
 
 export type RestartLockHolder = {
@@ -139,3 +140,38 @@ export async function acquireRestartLock(caller: string): Promise<RestartLockHan
 
   return null;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for restart-lock Effect variants. */
+export class RestartLockError extends Data.TaggedError('RestartLockError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `readRestartLockHolder`. */
+export const readRestartLockHolderEffect = (): Effect.Effect<RestartLockHolder | null, RestartLockError> =>
+  Effect.tryPromise({
+    try: () => readRestartLockHolder(),
+    catch: (cause) =>
+      new RestartLockError({
+        operation: 'readRestartLockHolder',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `acquireRestartLock`. */
+export const acquireRestartLockEffect = (
+  caller: string,
+): Effect.Effect<RestartLockHandle | null, RestartLockError> =>
+  Effect.tryPromise({
+    try: () => acquireRestartLock(caller),
+    catch: (cause) =>
+      new RestartLockError({
+        operation: 'acquireRestartLock',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

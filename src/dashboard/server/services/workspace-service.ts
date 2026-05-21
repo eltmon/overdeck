@@ -90,7 +90,7 @@ export const WorkspaceServiceLive = Layer.effect(
     function getWorkspacePath(issueId: string): { projectPath: string; workspacePath: string; branch: string } {
       const issueLower = issueId.toLowerCase();
       const project = resolveProjectFromIssue(issueId);
-      const projectPath = project?.path ?? process.cwd();
+      const projectPath = project?.projectPath ?? process.cwd();
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
       const branch = `feature/${issueLower}`;
       return { projectPath, workspacePath, branch };
@@ -132,11 +132,11 @@ export const WorkspaceServiceLive = Layer.effect(
             }
 
             const projectName = Object.entries(projects).find(
-              ([, p]) => p.path === project.path,
-            )?.[0] ?? 'unknown';
+              ([, p]) => p.path === project.projectPath,
+            )?.[0] ?? project.projectName;
 
             const result = await createWorkspace({
-              projectConfig: { ...project, name: projectName },
+              projectConfig: { name: projectName, path: project.projectPath },
               featureName: issueLower,
             });
 
@@ -176,7 +176,7 @@ export const WorkspaceServiceLive = Layer.effect(
             }
 
             const result = await removeWorkspace({
-              projectConfig: { ...project, name: issueId },
+              projectConfig: { name: project.projectName, path: project.projectPath },
               featureName: issueLower,
             });
 

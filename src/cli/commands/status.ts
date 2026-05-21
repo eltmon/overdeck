@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgents, getAgentDir, type AgentState } from '../../lib/agents.js';
@@ -103,7 +104,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     agent.id && agent.issueId && agent.workspace
   );
   const noResumeModeActive = await isBootNoResumeModeActive();
-  const dockerContainers = await collectDockerContainerLifecycleSnapshot();
+  const dockerContainers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
   const issueIds = new Map<string, string>();
   for (const agent of agents) {
     issueIds.set(issueKey(agent.issueId!), agent.issueId!);
@@ -116,7 +117,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const stackHealthByIssue = new Map(await Promise.all(
     Array.from(issueIds, async ([key, issueId]) => [
       key,
-      await getWorkspaceStackHealth(issueId, { containers: dockerContainers }),
+      await Effect.runPromise(getWorkspaceStackHealth(issueId, { containers: dockerContainers })),
     ] as const)
   ));
   const agentIssueKeys = new Set(agents.map(agent => issueKey(agent.issueId!)));

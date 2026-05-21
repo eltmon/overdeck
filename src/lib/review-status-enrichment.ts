@@ -1,5 +1,6 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
 import { listSessionNamesAsync } from './tmux.js';
 import { resolveProjectFromIssue } from './projects.js';
 import type { ReviewStatus } from './review-status.js';
@@ -163,3 +164,29 @@ export function enrichReviewStatusFromSessions(
     reviewSubStatuses,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for review-status-enrichment Effect variants. */
+export class ReviewEnrichmentError extends Data.TaggedError('ReviewEnrichmentError')<{
+  readonly issueId: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `enrichReviewStatus`. Falls back to the unenriched status
+ *  if tmux is unreachable, mirroring the sync swallow-and-continue behaviour. */
+export const enrichReviewStatusEffect = (
+  issueId: string,
+  status: ReviewStatus,
+): Effect.Effect<EnrichedReviewStatus, ReviewEnrichmentError> =>
+  Effect.tryPromise({
+    try: () => enrichReviewStatus(issueId, status),
+    catch: (cause) =>
+      new ReviewEnrichmentError({
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

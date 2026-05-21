@@ -5,6 +5,7 @@
  * separate UAT specialist and no per-project test-agent specialist pool.
  */
 
+import { Data, Effect } from 'effect';
 import { setReviewStatus } from '../review-status.js';
 import { spawnRun } from '../agents.js';
 import { resolveProjectFromIssue } from '../projects.js';
@@ -123,3 +124,119 @@ export async function dispatchTestAgentAndNotify(
     }
   }
 }
+
+// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
+
+/** A test-role dispatch error — wraps spawnRun / setReviewStatus failures. */
+export class TestDispatchError extends Data.TaggedError('TestDispatchError')<{
+  readonly issueId: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export interface DispatchTestAgentResult {
+  readonly delivered: boolean;
+  readonly notified: boolean;
+  readonly runId?: string;
+  readonly reason?: 'no-project' | 'already-running' | 'spawn-failed';
+}
+
+/**
+ * Effect variant of {@link dispatchTestAgentAndNotify}. Same semantics as the
+ * Promise version, but failures funnel through a typed error channel. The
+ * `notifyAgent` step is allowed to fail without failing the outer Effect — its
+ * outcome is reported via {@link DispatchTestAgentResult.notified}.
+ */
+export const dispatchTestAgentAndNotifyEffect = (
+  issueId: string,
+  workspace?: string,
+  branch?: string,
+  notifyAgent?: (agentId: string, msg: string) => Promise<void>,
+): Effect.Effect<DispatchTestAgentResult> =>
+  Effect.gen(function* () {
+    const resolved = yield* Effect.sync(() => resolveProjectFromIssue(issueId));
+    if (!resolved) {
+      yield* Effect.sync(() => {
+        console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role`);
+        setReviewStatus(issueId, {
+          testStatus: 'dispatch_failed',
+          testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
+        });
+      });
+      return { delivered: false, notified: false, reason: 'no-project' as const };
+    }
+
+    const prompt = buildTestRolePrompt({ issueId, workspace, branch });
+
+    const spawnEffect: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
+      try: () => spawnRun(issueId, 'test', { workspace, prompt }),
+      catch: (cause) => {
+        const msg = cause instanceof Error ? cause.message : String(cause);
+        return new TestDispatchError({ issueId, message: msg, cause });
+      },
+    }).pipe(
+      Effect.matchEffect({
+        onFailure: (err: TestDispatchError) => {
+          // "already running" is non-fatal — treat as delivered.
+          if (err.message.includes('already running')) {
+            return Effect.sync((): DispatchTestAgentResult => {
+              setReviewStatus(issueId, { testStatus: 'testing' });
+              console.log(`[test-dispatch] Test role already running for ${issueId}`);
+              return {
+                delivered: true,
+                notified: false,
+                reason: 'already-running',
+              };
+            });
+          }
+          return Effect.sync((): DispatchTestAgentResult => {
+            console.error(`[test-dispatch] Failed to dispatch test role for ${issueId}: ${err.message}`);
+            try {
+              setReviewStatus(issueId, {
+                testStatus: 'dispatch_failed',
+                testNotes: `Dispatch failed: ${err.message}`,
+              });
+            } catch (statusErr) {
+              console.error(`[test-dispatch] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
+            }
+            return {
+              delivered: false,
+              notified: false,
+              reason: 'spawn-failed',
+            };
+          });
+        },
+        onSuccess: (run) =>
+          Effect.sync((): DispatchTestAgentResult => {
+            setReviewStatus(issueId, { testStatus: 'testing' });
+            console.log(`[test-dispatch] Started test role for ${issueId} (${run.id})`);
+            return {
+              delivered: true,
+              notified: false,
+              runId: run.id,
+            };
+          }),
+      }),
+    );
+
+    const spawnResult: DispatchTestAgentResult = yield* spawnEffect;
+
+    if (spawnResult.delivered && notifyAgent) {
+      const notified = yield* Effect.tryPromise({
+        try: () =>
+          notifyAgent(
+            `agent-${issueId.toLowerCase()}`,
+            `REVIEW PASSED for ${issueId}. The test role has been dispatched automatically. Do NOT poll or check status — you will be notified when tests complete.`,
+          ).then(() => true),
+        catch: (err) => {
+          console.log(
+            `[test-dispatch] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
+          );
+          return false;
+        },
+      }).pipe(Effect.orElseSucceed(() => false));
+      return { ...spawnResult, notified };
+    }
+
+    return spawnResult;
+  });

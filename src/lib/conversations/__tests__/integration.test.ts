@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -244,15 +245,17 @@ describe('Stage 2: enrich after scan', () => {
 
 // ─── Stage 3: Embed ───────────────────────────────────────────────────────────
 
-const mockEmbedFn = async (
+// embedFn is wrapped via Effect.runPromise in embedSessions (PAN-1249), so the
+// mock must return an Effect, not a Promise.
+const mockEmbedFn = (
   _provider: unknown,
   opts: { text: string },
-): Promise<EmbeddingResult> => {
+): Effect.Effect<EmbeddingResult, any> => {
   const text = opts.text.toLowerCase();
   const values = text.includes('dashboard') || text.includes('metrics')
     ? [0, 1, 0, 0]
     : [1, 0, 0, 0];
-  return { embedding: new Float32Array(values), model: 'text-embedding-3-small' };
+  return Effect.succeed({ embedding: new Float32Array(values), model: 'text-embedding-3-small' });
 };
 
 describe('Stage 3: embed after enrich', () => {

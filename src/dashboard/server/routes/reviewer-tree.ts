@@ -104,6 +104,7 @@ export interface ReviewerRoundMetadata {
   roundCount: number;
   latestRound: number;
   latestStatus?: string;
+  latestReviewResult?: string;
   history: ReviewerRoundSummary[];
 }
 
@@ -235,10 +236,10 @@ export async function readReviewerRounds(
           findings: parsed.findings,
           cost: parsed.cost,
           summary,
-        };
+        } as ReviewerRoundSummary;
       } catch { /* skip malformed artifact */ return null; }
     }),
-  )).filter((x): x is ReviewerRoundSummary => x !== null);
+  )).filter((x): x is ReviewerRoundSummary => x !== null) as ReviewerRoundSummary[];
 
   if (history.length === 0) return undefined;
 

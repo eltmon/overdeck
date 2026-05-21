@@ -5,6 +5,7 @@
  * hierarchy: CLI > Project > Global > Env > Default
  */
 
+import { Data, Effect } from 'effect';
 import { loadConfig } from './config-yaml.js';
 import { getShadowModeFromEnv } from './env-loader.js';
 import { isShadowed, getPendingSyncCount } from './shadow-state.js';
@@ -191,3 +192,86 @@ export async function getShadowModeSummary(): Promise<{
     pendingSyncCount: await getPendingSyncCount(),
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for shadow-mode Effect variants. */
+export class ShadowModeError extends Data.TaggedError('ShadowModeError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `resolveShadowMode`. */
+export const resolveShadowModeEffect = (
+  options: ShadowModeOptions = {},
+): Effect.Effect<ShadowModeResult, ShadowModeError> =>
+  Effect.tryPromise({
+    try: () => resolveShadowMode(options),
+    catch: (cause) =>
+      new ShadowModeError({
+        operation: 'resolveShadowMode',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `isShadowModeEnabled`. */
+export const isShadowModeEnabledEffect = (
+  options: ShadowModeOptions = {},
+): Effect.Effect<boolean, ShadowModeError> =>
+  Effect.tryPromise({
+    try: () => isShadowModeEnabled(options),
+    catch: (cause) =>
+      new ShadowModeError({
+        operation: 'isShadowModeEnabled',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `shouldSkipTrackerUpdate`. */
+export const shouldSkipTrackerUpdateEffect = (
+  issueId: string,
+  cliFlag?: boolean,
+  trackerType: TrackerType = 'linear',
+): Effect.Effect<boolean, ShadowModeError> =>
+  Effect.tryPromise({
+    try: () => shouldSkipTrackerUpdate(issueId, cliFlag, trackerType),
+    catch: (cause) =>
+      new ShadowModeError({
+        operation: 'shouldSkipTrackerUpdate',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getShadowModeStatus`. */
+export const getShadowModeStatusEffect = (
+  options: ShadowModeOptions = {},
+): Effect.Effect<string, ShadowModeError> =>
+  Effect.tryPromise({
+    try: () => getShadowModeStatus(options),
+    catch: (cause) =>
+      new ShadowModeError({
+        operation: 'getShadowModeStatus',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getShadowModeSummary`. */
+export const getShadowModeSummaryEffect = (): Effect.Effect<
+  Awaited<ReturnType<typeof getShadowModeSummary>>,
+  ShadowModeError
+> =>
+  Effect.tryPromise({
+    try: () => getShadowModeSummary(),
+    catch: (cause) =>
+      new ShadowModeError({
+        operation: 'getShadowModeSummary',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

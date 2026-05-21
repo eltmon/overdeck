@@ -8,9 +8,11 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { appendCostEvent, CostEvent, eventsFileExists, getLastEventMetadata } from './events.js';
 import { getPricing, calculateCost, TokenUsage } from '../cost.js';
+import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -504,3 +506,26 @@ export function migrateIfNeeded(): MigrationStats | null {
 
   return migrateAllSessions();
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of migrateAllSessions. Failures surface as FsError. */
+export const migrateAllSessionsEffect = (): Effect.Effect<MigrationStats, FsError> =>
+  Effect.try({
+    try: () => migrateAllSessions(),
+    catch: (cause) => new FsError({ path: '<all sessions>', operation: 'migrateAllSessions', cause }),
+  });
+
+/** Effect variant of needsMigration. */
+export const needsMigrationEffect = (): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => needsMigration(),
+    catch: (cause) => new FsError({ path: '<events>', operation: 'needsMigration', cause }),
+  });
+
+/** Effect variant of migrateIfNeeded. */
+export const migrateIfNeededEffect = (): Effect.Effect<MigrationStats | null, FsError> =>
+  Effect.try({
+    try: () => migrateIfNeeded(),
+    catch: (cause) => new FsError({ path: '<all sessions>', operation: 'migrateIfNeeded', cause }),
+  });

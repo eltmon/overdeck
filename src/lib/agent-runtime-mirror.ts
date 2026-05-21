@@ -2,15 +2,13 @@
  * PAN-800 — in-process mirror of AgentStateService's canonical ref.
  *
  * The dashboard server writes into this mirror on every event fold so lib code
- * running in the same process can read the latest AgentRuntimeSnapshot
- * synchronously. CLI/out-of-process callers should prefer the async HTTP path
- * in agent-runtime.ts.
+ * running in the same process can read the latest AgentRuntimeSnapshot.
+ * CLI/out-of-process callers should prefer the async HTTP path in agent-runtime.ts.
  *
- * This module intentionally has zero server-side imports so both the CLI
- * and the dashboard can pull it in without dragging in SQLite / Effect
- * layer code.
+ * All exports are Effect-native (PAN-1249 wave-1 migration).
  */
 
+import { Effect } from 'effect';
 import type { AgentRuntimeSnapshot } from '@panctl/contracts';
 
 let mirror: Record<string, AgentRuntimeSnapshot> = {};
@@ -23,18 +21,22 @@ let mirror: Record<string, AgentRuntimeSnapshot> = {};
  */
 let inProcessService = false;
 
-export function markAgentStateServiceInProcess(): void {
-  inProcessService = true;
+export function markAgentStateServiceInProcess(): Effect.Effect<void, never> {
+  return Effect.sync(() => {
+    inProcessService = true;
+  });
 }
 
-export function isAgentStateServiceInProcess(): boolean {
-  return inProcessService;
+export function isAgentStateServiceInProcess(): Effect.Effect<boolean, never> {
+  return Effect.sync(() => inProcessService);
 }
 
-export function setAgentRuntimeMirror(next: Record<string, AgentRuntimeSnapshot>): void {
-  mirror = next;
+export function setAgentRuntimeMirror(next: Record<string, AgentRuntimeSnapshot>): Effect.Effect<void, never> {
+  return Effect.sync(() => {
+    mirror = next;
+  });
 }
 
-export function getRuntimeSnapshotSync(agentId: string): AgentRuntimeSnapshot | null {
-  return mirror[agentId] ?? null;
+export function getRuntimeSnapshot(agentId: string): Effect.Effect<AgentRuntimeSnapshot | null, never> {
+  return Effect.sync(() => mirror[agentId] ?? null);
 }

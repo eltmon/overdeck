@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+
 export function parseIssueIdFromText(value: string): string | null {
   const match = value.match(/\b([A-Za-z]+-\d+|F\d+|US\d+|DE\d+|TA\d+|TC\d+)\b/i);
   return match ? match[1]!.toUpperCase() : null;
@@ -28,3 +30,16 @@ export function parseContainerServiceName(fullName: string): string {
   const fallbackParts = withoutInstance.split('-');
   return fallbackParts[fallbackParts.length - 1] || fullName;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Pure-sync string parsing — additive Effect.sync wrappers.
+
+/** Extract an issue id from arbitrary text. Pure. */
+export const parseIssueIdFromTextEffect = (
+  value: string,
+): Effect.Effect<string | null> => Effect.sync(() => parseIssueIdFromText(value));
+
+/** Derive a service name from a docker-compose-style container name. Pure. */
+export const parseContainerServiceNameEffect = (
+  fullName: string,
+): Effect.Effect<string> => Effect.sync(() => parseContainerServiceName(fullName));

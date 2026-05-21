@@ -15,13 +15,123 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { readFile } from 'fs/promises';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'fs';
+import { randomBytes } from 'crypto';
+import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
-import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
-import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
+import { Data, Effect } from 'effect';
+import { findSpecByIssue, getProjectPanPaths } from '../pan-dir/specs.js';
+import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import type { WorkspaceContinueState } from '../pan-dir/types.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
+import { parseVBriefFilename } from './lifecycle.js';
+import { FsError } from '../errors.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
+
+/**
+ * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.
+ * Used by the sync `findPlan` / `readWorkspacePlan` / `updateItemStatus` /
+ * `updateSubItemStatus` call sites which still exist in CLI tooling. The
+ * Effect-based pan-dir `findSpecByIssue` requires async FileSystem operations
+ * (`fs.readDirectory`, `fs.readFileString`) that cannot run under
+ * `Effect.runSync` — so we keep a local sync mirror rather than break CLI
+ * synchronous semantics. Dashboard server code uses `findPlanAsync`.
+ */
+function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
+  const upperIssueId = issueId.toUpperCase();
+  const { specsDir } = getProjectPanPaths(projectRoot);
+  if (!existsSync(specsDir)) return null;
+  let filenames: string[];
+  try {
+    filenames = readdirSync(specsDir);
+  } catch {
+    return null;
+  }
+  filenames.sort();
+  for (const filename of filenames) {
+    const parts = parseVBriefFilename(filename);
+    if (!parts) continue;
+    if (parts.issueId.toUpperCase() === upperIssueId) {
+      return { path: join(specsDir, filename) };
+    }
+  }
+  return null;
+}
+
+/** Async sibling of `findSpecByIssueSync`, used by async sync-mirror helpers. */
+async function findSpecByIssueAsyncLocal(projectRoot: string, issueId: string): Promise<{ path: string } | null> {
+  const upperIssueId = issueId.toUpperCase();
+  const { specsDir } = getProjectPanPaths(projectRoot);
+  if (!existsSync(specsDir)) return null;
+  let filenames: string[];
+  try {
+    filenames = await readdir(specsDir);
+  } catch {
+    return null;
+  }
+  filenames.sort();
+  for (const filename of filenames) {
+    const parts = parseVBriefFilename(filename);
+    if (!parts) continue;
+    if (parts.issueId.toUpperCase() === upperIssueId) {
+      return { path: join(specsDir, filename) };
+    }
+  }
+  return null;
+}
+
+/** Read the workspace continue file synchronously, returning null on any error. */
+export function readWorkspaceContinueSync(workspacePath: string): WorkspaceContinueState | null {
+  const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+  if (!existsSync(continuePath)) return null;
+  try {
+    const raw = readFileSync(continuePath, 'utf-8');
+    return JSON.parse(raw) as WorkspaceContinueState;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the workspace continue file synchronously via temp-file + rename, matching
+ * the atomic-write contract of `pan-dir/continue.ts:writeWorkspaceContinue`
+ * (which is now Effect-based and async). Used by the sync `updateItemStatus` /
+ * `updateSubItemStatus` CLI call sites; dashboard code should prefer the async
+ * Effect API.
+ */
+export function writeWorkspaceContinueSync(workspacePath: string, state: WorkspaceContinueState): void {
+  const panDir = join(workspacePath, PAN_DIRNAME);
+  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
+  mkdirSync(panDir, { recursive: true });
+  const now = new Date().toISOString();
+  const next: WorkspaceContinueState = {
+    ...state,
+    version: '1',
+    created: state.created || now,
+    updated: now,
+  };
+  const tmp = `${continuePath}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`;
+  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
+  renameSync(tmp, continuePath);
+}
+
+// ─── Effect-channel typed errors ─────────────────────────────────────────────
+
+/** vBRIEF document on disk had unresolved git merge conflict markers. */
+export class VBriefMergeConflictTaggedError extends Data.TaggedError('VBriefMergeConflictError')<{
+  readonly planPath: string;
+}> {}
+
+/** vBRIEF document on disk does not match the v0.5 spec shape. */
+export class VBriefInvalidFormatError extends Data.TaggedError('VBriefInvalidFormatError')<{
+  readonly planPath: string;
+  readonly reason: string;
+}> {}
+
+export type VBriefReadError =
+  | FsError
+  | VBriefMergeConflictTaggedError
+  | VBriefInvalidFormatError;
 
 /**
  * Extract issue ID from a workspace directory path.
@@ -87,12 +197,18 @@ export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promis
  * Returns the path to this workspace's vBRIEF source. The canonical main-side
  * spec wins after promotion; before first promotion, the workspace draft is the
  * only valid source.
+ *
+ * NOTE (PAN-1249): Now runs the underlying pan-dir spec resolution via
+ * `Effect.runSync` since findSpecByIssue is Effect-based. The Effect uses
+ * NodeFileSystem under the hood which means this synchronous call path
+ * actually blocks on async I/O — prefer `findPlanAsync` from any
+ * dashboard server code. Kept sync to preserve the CLI call sites.
  */
 export function findPlan(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
-  const entry = findSpecByIssue(projectRoot, issueId);
+  const entry = findSpecByIssueSync(projectRoot, issueId);
   return entry ? entry.path : findWorkspaceDraftPlan(workspacePath);
 }
 
@@ -101,7 +217,7 @@ export async function findPlanAsync(workspacePath: string): Promise<string | nul
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
-  const entry = await findSpecByIssueAsync(projectRoot, issueId);
+  const entry = await findSpecByIssueAsyncLocal(projectRoot, issueId);
   return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);
 }
 
@@ -201,7 +317,7 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
   if (!planPath) return null;
   const doc = readPlan(planPath);
 
-  const continueState = readWorkspaceContinue(workspacePath);
+  const continueState = readWorkspaceContinueSync(workspacePath);
   if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
     return applyStatusOverrides(doc, continueState.statusOverrides);
   }
@@ -214,7 +330,9 @@ export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBr
   if (!planPath) return null;
   const doc = await readPlanAsync(planPath);
 
-  const continueState = await readWorkspaceContinueAsync(workspacePath);
+  const continueState = await Effect.runPromise(
+    readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null))),
+  );
   if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
     return applyStatusOverrides(doc, continueState.statusOverrides);
   }
@@ -308,7 +426,7 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item) return;
 
-  const continueState = readWorkspaceContinue(workspacePath) ?? {
+  const continueState: WorkspaceContinueState = readWorkspaceContinueSync(workspacePath) ?? {
     version: '1' as const,
     issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
     created: new Date().toISOString(),
@@ -325,7 +443,7 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   overrides[itemId] = status;
   continueState.statusOverrides = overrides;
 
-  writeWorkspaceContinue(workspacePath, continueState);
+  writeWorkspaceContinueSync(workspacePath, continueState);
 }
 
 /**
@@ -352,7 +470,7 @@ export function updateSubItemStatus(
   const subItem = item.subItems.find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
-  const continueState = readWorkspaceContinue(workspacePath) ?? {
+  const continueState: WorkspaceContinueState = readWorkspaceContinueSync(workspacePath) ?? {
     version: '1' as const,
     issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
     created: new Date().toISOString(),
@@ -369,5 +487,79 @@ export function updateSubItemStatus(
   overrides[fullSubId] = status;
   continueState.statusOverrides = overrides;
 
-  writeWorkspaceContinue(workspacePath, continueState);
+  writeWorkspaceContinueSync(workspacePath, continueState);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// These wrap the existing async APIs in Effect with typed error channels so
+// callers can compose vBRIEF reads with other Effect-native code. They do NOT
+// replace the sync/Promise variants — CLI and legacy callers continue to use
+// those. Migrate callers individually as they move into Effect.
+
+/**
+ * Effect variant of readPlanAsync — failures surface as typed errors in the
+ * channel instead of thrown exceptions.
+ */
+export const readPlanEffect = (
+  planPath: string,
+): Effect.Effect<VBriefDocument, VBriefReadError> =>
+  Effect.gen(function* () {
+    const raw = yield* Effect.tryPromise({
+      try: () => readFile(planPath, 'utf-8'),
+      catch: (cause) => new FsError({ path: planPath, operation: 'readFile', cause }),
+    });
+    if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+      return yield* Effect.fail(new VBriefMergeConflictTaggedError({ planPath }));
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (cause) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
+      );
+    }
+    const obj = parsed as { vBRIEFInfo?: unknown; plan?: unknown };
+    if (!obj || !obj.vBRIEFInfo || !obj.plan) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({
+          planPath,
+          reason: `missing 'vBRIEFInfo' and/or 'plan' top-level keys`,
+        }),
+      );
+    }
+    return obj as VBriefDocument;
+  });
+
+/**
+ * Effect variant of findPlanAsync. Returns null when the workspace has no
+ * resolvable plan — only IO/decoding failures surface as errors.
+ */
+export const findPlanEffect = (
+  workspacePath: string,
+): Effect.Effect<string | null, FsError> =>
+  Effect.tryPromise({
+    try: () => findPlanAsync(workspacePath),
+    catch: (cause) => new FsError({ path: workspacePath, operation: 'findPlan', cause }),
+  });
+
+/**
+ * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
+ * for the workspace; otherwise returns the merged document with statusOverrides
+ * applied. IO/decoding failures surface as typed errors.
+ */
+export const readWorkspacePlanEffect = (
+  workspacePath: string,
+): Effect.Effect<VBriefDocument | null, VBriefReadError> =>
+  Effect.gen(function* () {
+    const planPath = yield* findPlanEffect(workspacePath);
+    if (!planPath) return null;
+    const doc = yield* readPlanEffect(planPath);
+
+    const continueState = yield* readWorkspaceContinue(workspacePath);
+    if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+      return applyStatusOverrides(doc, continueState.statusOverrides);
+    }
+    return doc;
+  });

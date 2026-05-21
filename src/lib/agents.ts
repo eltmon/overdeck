@@ -36,6 +36,7 @@ import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge
 import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
+import { Effect } from 'effect';
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
@@ -170,7 +171,7 @@ async function resolveEffectiveHarness(harness: unknown, model: string): Promise
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') {
-    const authStatus = await getClaudeAuthStatus();
+    const authStatus = await Effect.runPromise(getClaudeAuthStatus());
     if (authStatus.hasAnthropicApiKey) return 'api-key';
     return authStatus.loggedIn ? 'subscription' : undefined;
   }
@@ -1447,7 +1448,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // SubscriptionRef → projection_cache rows keyed 'agent-runtime:<id>'.
 //
 // Writes: emitAgentEvent POSTs to /api/agents/:id/heartbeat. Reads: in-process
-// lib uses getRuntimeSnapshotSync; CLI/out-of-process uses
+// lib uses getRuntimeSnapshot (Effect-native); CLI/out-of-process uses
 // getAgentRuntimeSnapshot (HTTP).
 //
 // The functions below are adapters over AgentRuntimeSnapshot. Each caller
@@ -1460,7 +1461,7 @@ import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
 } from './agent-runtime.js';
-import { getRuntimeSnapshotSync, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
+import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
@@ -1518,18 +1519,18 @@ export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null 
   // Sync path: read from the in-process mirror (empty in fresh CLI processes,
   // populated inside the dashboard server). CLI commands should prefer
   // getAgentRuntimeStateAsync so they fall through to HTTP.
-  return snapshotToRuntimeState(getRuntimeSnapshotSync(agentId));
+  return snapshotToRuntimeState(Effect.runSync(getRuntimeSnapshot(agentId)));
 }
 
 export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
   // In-process (inside the dashboard): the sync mirror is authoritative. Do
   // NOT fall back to HTTP — that would fetch our own server, which may still
   // be inside Layer construction and cause a startup deadlock.
-  if (isAgentStateServiceInProcess()) {
+  if (Effect.runSync(isAgentStateServiceInProcess())) {
     return getAgentRuntimeState(agentId);
   }
   // Cross-process (CLI, external lib callers): sync mirror is empty, hit HTTP.
-  const snap = await fetchAgentRuntimeSnapshot(agentId);
+  const snap = await Effect.runPromise(fetchAgentRuntimeSnapshot(agentId));
   return snapshotToRuntimeState(snap);
 }
 
@@ -1539,47 +1540,47 @@ export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentR
  */
 export async function saveAgentRuntimeState(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
   if (patch.currentIssue !== undefined) {
-    await emitAgentEvent(agentId, {
+    await Effect.runPromise(emitAgentEvent(agentId, {
       kind: 'current_issue_set',
       currentIssue: patch.currentIssue || undefined,
-    });
+    }));
   }
 
   if (patch.resolution !== undefined && patch.resolutionCount !== undefined) {
-    await emitAgentEvent(agentId, {
+    await Effect.runPromise(emitAgentEvent(agentId, {
       kind: 'resolution_set',
       resolution: patch.resolution,
       resolutionCount: patch.resolutionCount,
-    });
+    }));
   }
 
   if (patch.state !== undefined) {
     if (patch.state === 'waiting-on-human') {
-      await emitAgentEvent(agentId, {
+      await Effect.runPromise(emitAgentEvent(agentId, {
         kind: 'waiting_start',
         reason: (patch.waitingReason as 'tool_permission' | 'user_question' | 'disambiguation' | 'other') || 'other',
         message: patch.waitingNotification,
-      });
+      }));
     } else if (patch.state === 'active') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
     } else if (patch.state === 'idle') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' }));
     } else if (patch.state === 'stopped') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' }));
     }
   } else if (patch.currentTool !== undefined) {
-    await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+    await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
   }
 
   if (patch.claudeSessionId) {
     // model_set requires a model — use existing snapshot's model if present.
     const snap = getAgentRuntimeState(agentId);
     if (snap || patch.claudeSessionId) {
-      await emitAgentEvent(agentId, {
+      await Effect.runPromise(emitAgentEvent(agentId, {
         kind: 'model_set',
         model: 'unknown',
         claudeSessionId: patch.claudeSessionId,
-      });
+      }));
     }
   }
 }
@@ -1861,7 +1862,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   if (projectConfig.github_repo) {
     const [owner, repo] = projectConfig.github_repo.split('/');
     const tracker = createTracker({ type: 'github', owner, repo });
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via GitHub (${projectConfig.github_repo})`);
     return;
   }
@@ -1874,7 +1875,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
       throw new Error(`Project ${projectConfig.name} uses Rally (project: ${projectConfig.rally_project}) but no Rally tracker is configured in config.yaml`);
     }
     const tracker = createTrackerFromConfig(trackersConfig, 'rally');
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via Rally (project: ${projectConfig.rally_project})`);
     return;
   }
@@ -1888,7 +1889,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
       throw new Error(`Project ${projectConfig.name} uses Linear (team: ${getIssuePrefix(projectConfig)}) but no Linear tracker is configured in config.yaml`);
     }
     const tracker = createTrackerFromConfig(trackersConfig, 'linear');
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${getIssuePrefix(projectConfig)})`);
     return;
   }
@@ -1948,7 +1949,7 @@ export async function buildAgentLaunchConfig(opts: {
   // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
   try {
     const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
-    await injectPanopticonInfraDeny(opts.workspace);
+    await Effect.runPromise(injectPanopticonInfraDeny(opts.workspace));
   } catch (err) {
     console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
   }
@@ -2089,7 +2090,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
+  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
   if (health.healthy) return;
 
   const normalizedIssue = issueId.toUpperCase();

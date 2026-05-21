@@ -5,6 +5,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { loadConfig } from '../../../lib/config.js';
 import { createFlyProviderFromConfig, isRemoteAvailable } from '../../../lib/remote/index.js';
@@ -57,7 +58,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Get VM list
     const fly = createFlyProviderFromConfig(remoteConfig);
-    const vms = await fly.listVms();
+    const vms = await Effect.runPromise(fly.listVms());
 
     spinner.succeed('Connected to Fly.io');
 

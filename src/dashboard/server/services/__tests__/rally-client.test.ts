@@ -66,10 +66,10 @@ describe('RallyClient Effect service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRallyConfig.mockReturnValue(RALLY_CONFIG);
-    mockGetIssue.mockResolvedValue(makeRawIssue());
-    mockGetChildIssues.mockResolvedValue([]);
-    mockTransitionIssue.mockResolvedValue(undefined);
-    mockAddComment.mockResolvedValue({ id: 'comment-1' });
+    mockGetIssue.mockReturnValue(Effect.succeed(makeRawIssue()));
+    mockGetChildIssues.mockReturnValue(Effect.succeed([]));
+    mockTransitionIssue.mockReturnValue(Effect.succeed(undefined));
+    mockAddComment.mockReturnValue(Effect.succeed({ id: 'comment-1' }));
   });
 
   describe('RallyClientLive layer', () => {
@@ -106,7 +106,7 @@ describe('RallyClient Effect service', () => {
     });
 
     it('wraps not-found as IssueNotFound', async () => {
-      mockGetIssue.mockRejectedValue(new Error('0 results found'));
+      mockGetIssue.mockReturnValue(Effect.fail(new Error('0 results found')));
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
@@ -120,7 +120,7 @@ describe('RallyClient Effect service', () => {
     });
 
     it('wraps unknown errors as TrackerApiError', async () => {
-      mockGetIssue.mockRejectedValue(new Error('Rally WSAPI error 500'));
+      mockGetIssue.mockReturnValue(Effect.fail(new Error('Rally WSAPI error 500')));
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
@@ -137,10 +137,10 @@ describe('RallyClient Effect service', () => {
 
   describe('getChildIssues', () => {
     it('returns normalized child issues', async () => {
-      mockGetChildIssues.mockResolvedValue([
+      mockGetChildIssues.mockReturnValue(Effect.succeed([
         { id: 'child-1', ref: 'US100', title: 'Child A', state: 'open', description: 'Desc A', labels: [] },
         { id: 'child-2', ref: 'US101', title: 'Child B', state: 'in_progress', description: 'Desc B', labels: [] },
-      ]);
+      ]));
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
@@ -158,7 +158,7 @@ describe('RallyClient Effect service', () => {
     });
 
     it('wraps errors as TrackerApiError', async () => {
-      mockGetChildIssues.mockRejectedValue(new Error('Rally WSAPI error 500'));
+      mockGetChildIssues.mockReturnValue(Effect.fail(new Error('Rally WSAPI error 500')));
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 

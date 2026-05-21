@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, cpSync, rmSync, lstatSync } from 'fs';
 import { join, basename } from 'path';
+import { Effect } from 'effect';
 import { BACKUPS_DIR } from './paths.js';
+import { FsError, FsNotFoundError } from './errors.js';
 
 export interface BackupInfo {
   timestamp: string;
@@ -104,3 +106,62 @@ export function cleanOldBackups(keepCount: number = 10): number {
 
   return removed;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Create a timestamped backup of the supplied source directories.
+ * Effect-native. Fails with FsError on copy failure.
+ */
+export const createBackupEffect = (
+  sourceDirs: readonly string[],
+): Effect.Effect<BackupInfo, FsError> =>
+  Effect.try({
+    try: () => createBackup([...sourceDirs]),
+    catch: (cause) =>
+      new FsError({ path: BACKUPS_DIR, operation: 'createBackup', cause }),
+  });
+
+/**
+ * Enumerate existing backups, sorted newest-first.
+ * Effect-native. Fails with FsError if the backups directory cannot be read.
+ */
+export const listBackupsEffect = (): Effect.Effect<readonly BackupInfo[], FsError> =>
+  Effect.try({
+    try: () => listBackups(),
+    catch: (cause) =>
+      new FsError({ path: BACKUPS_DIR, operation: 'listBackups', cause }),
+  });
+
+/**
+ * Restore a named backup, replacing each target directory. Fails with
+ * FsNotFoundError if the backup does not exist, FsError otherwise.
+ */
+export const restoreBackupEffect = (
+  timestamp: string,
+  targetDirs: Record<string, string>,
+): Effect.Effect<void, FsError | FsNotFoundError> =>
+  Effect.gen(function* () {
+    const backupPath = join(BACKUPS_DIR, timestamp);
+    if (!existsSync(backupPath)) {
+      return yield* Effect.fail(new FsNotFoundError({ path: backupPath }));
+    }
+    return yield* Effect.try({
+      try: () => restoreBackup(timestamp, targetDirs),
+      catch: (cause) =>
+        new FsError({ path: backupPath, operation: 'restoreBackup', cause }),
+    });
+  });
+
+/**
+ * Trim the backups directory to the most recent `keepCount` entries.
+ * Returns the number of backups removed. Fails with FsError on removal error.
+ */
+export const cleanOldBackupsEffect = (
+  keepCount: number = 10,
+): Effect.Effect<number, FsError> =>
+  Effect.try({
+    try: () => cleanOldBackups(keepCount),
+    catch: (cause) =>
+      new FsError({ path: BACKUPS_DIR, operation: 'cleanOldBackups', cause }),
+  });

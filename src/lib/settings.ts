@@ -1,5 +1,7 @@
+import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
+import { FsError } from './errors.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
@@ -295,3 +297,51 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
     args: ['--model', modelId],
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Sync FS wrappers (CLI-only by design); pure helpers stay Effect.sync.
+
+/** Load settings.json (returns defaults if missing). Pure-ish (logs on parse error). */
+export const loadSettingsEffect = (): Effect.Effect<SettingsConfig> =>
+  Effect.sync(() => loadSettings());
+
+/** Persist settings.json; surfaces FsError on failure. */
+export const saveSettingsEffect = (
+  settings: SettingsConfig,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveSettings(settings),
+    catch: (cause) =>
+      new FsError({ path: SETTINGS_FILE, operation: 'save-settings', cause }),
+  });
+
+/** Validate a settings object; returns null when valid, error message otherwise. Pure. */
+export const validateSettingsEffect = (
+  settings: SettingsConfig,
+): Effect.Effect<string | null> => Effect.sync(() => validateSettings(settings));
+
+/** Default settings template. Pure. */
+export const getDefaultSettingsEffect = (): Effect.Effect<SettingsConfig> =>
+  Effect.sync(() => getDefaultSettings());
+
+/** Compute the available-model breakdown for a settings object. Pure. */
+export const getAvailableModelsEffect = (
+  settings: SettingsConfig,
+): Effect.Effect<ReturnType<typeof getAvailableModels>> =>
+  Effect.sync(() => getAvailableModels(settings));
+
+/** True if the model id maps to an Anthropic model. Pure. */
+export const isAnthropicModelEffect = (
+  modelId: ModelId | string,
+): Effect.Effect<boolean> => Effect.sync(() => isAnthropicModel(modelId));
+
+/** Resolve the `--model` flag value for `claude` CLI. Pure. */
+export const getClaudeModelFlagEffect = (
+  modelId: ModelId | string,
+): Effect.Effect<string> => Effect.sync(() => getClaudeModelFlag(modelId));
+
+/** Resolve the full spawn command + args for a model. Pure. */
+export const getAgentCommandEffect = (
+  modelId: ModelId | string,
+): Effect.Effect<{ command: string; args: string[] }> =>
+  Effect.sync(() => getAgentCommand(modelId));

@@ -4,18 +4,19 @@
  * Detects CPU cores, drive type (SSD vs HDD), drive read speed, and
  * available memory. Chooses optimal scan parallelism from these stats.
  *
- * Zero sync FS or execSync calls — uses execAsync + fs/promises only.
+ * PAN-1249: migrated to Effect — uses `ChildProcessSpawner` for `lsblk`
+ * detection and `FileSystem` for the temp-file read-speed sample. Layers
+ * are provided internally so the public Effect has no environment.
+ *
  * Result is cached per-process (probe runs at most once).
  */
 
-import { cpus, freemem } from 'os';
-import { promises as fs } from 'fs';
+import { cpus, freemem, tmpdir } from 'os';
 import { join } from 'path';
-import { tmpdir } from 'os';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { Duration, Effect, FileSystem } from 'effect';
+import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
+import { ChildProcess } from 'effect/unstable/process';
+import { layer as NodeServicesLayer } from '@effect/platform-node/NodeServices';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,16 +56,18 @@ let cachedCapabilities: SystemCapabilities | null = null;
  *
  * @param scanMaxParallel  Optional config override. When set, overrides the probe result.
  */
-export async function getSystemCapabilities(
+export function getSystemCapabilities(
   scanMaxParallel?: number | null,
-): Promise<SystemCapabilities> {
-  if (cachedCapabilities === null) {
-    cachedCapabilities = await probe();
-  }
-  if (scanMaxParallel != null && scanMaxParallel > 0) {
-    return { ...cachedCapabilities, recommendedParallelism: scanMaxParallel };
-  }
-  return cachedCapabilities;
+): Effect.Effect<SystemCapabilities, never> {
+  return Effect.gen(function* () {
+    if (cachedCapabilities === null) {
+      cachedCapabilities = yield* probe();
+    }
+    if (scanMaxParallel != null && scanMaxParallel > 0) {
+      return { ...cachedCapabilities, recommendedParallelism: scanMaxParallel };
+    }
+    return cachedCapabilities;
+  });
 }
 
 /** Reset the cache (for tests). */
@@ -74,29 +77,48 @@ export function resetSystemCapabilitiesCache(): void {
 
 // ─── Probe implementation ─────────────────────────────────────────────────────
 
-async function probe(): Promise<SystemCapabilities> {
+const probeImpl: Effect.Effect<
+  SystemCapabilities,
+  never,
+  FileSystem.FileSystem | ChildProcessSpawner
+> = Effect.gen(function* () {
   const cpuCores = cpus().length;
   const availableMemoryMB = Math.round(freemem() / 1024 / 1024);
 
-  const driveType = await detectDriveType();
-  const driveReadMBps = await measureDriveReadSpeed();
+  const driveType = yield* detectDriveType;
+  const driveReadMBps = yield* measureDriveReadSpeed;
 
   const partial = { cpuCores, driveType, driveReadMBps, availableMemoryMB };
   return { ...partial, recommendedParallelism: computeParallelism(partial) };
+});
+
+function probe(): Effect.Effect<SystemCapabilities, never> {
+  return probeImpl.pipe(
+    Effect.scoped,
+    Effect.provide(NodeServicesLayer),
+  );
 }
 
 /**
  * Detect drive type using lsblk on Linux.
  * Falls back to 'unknown' on macOS/Windows or if lsblk is unavailable.
  */
-async function detectDriveType(): Promise<DriveType> {
-  if (process.platform !== 'linux') return 'unknown';
+const detectDriveType: Effect.Effect<DriveType, never, ChildProcessSpawner> =
+  Effect.gen(function* () {
+    if (process.platform !== 'linux') return 'unknown' as DriveType;
 
-  try {
-    const { stdout } = await execAsync('lsblk -d -o name,rota --noheadings 2>/dev/null');
+    const spawner = yield* ChildProcessSpawner;
+    const cmd = ChildProcess.make('lsblk', ['-d', '-o', 'name,rota', '--noheadings']);
+
+    const stdout = yield* spawner.string(cmd).pipe(
+      Effect.timeout(Duration.seconds(5)),
+      Effect.orElseSucceed(() => null),
+    );
+    if (stdout == null) return 'unknown' as DriveType;
+
     // rota=0 means non-rotational (SSD/NVMe), rota=1 means HDD
     const lines = stdout.trim().split('\n').filter(Boolean);
-    if (lines.length === 0) return 'unknown';
+    if (lines.length === 0) return 'unknown' as DriveType;
 
     const rotaCounts = { ssd: 0, hdd: 0 };
     for (const line of lines) {
@@ -106,37 +128,38 @@ async function detectDriveType(): Promise<DriveType> {
       else if (rota === '1') rotaCounts.hdd++;
     }
 
-    if (rotaCounts.ssd > 0 && rotaCounts.hdd === 0) return 'ssd';
-    if (rotaCounts.hdd > 0 && rotaCounts.ssd === 0) return 'hdd';
+    if (rotaCounts.ssd > 0 && rotaCounts.hdd === 0) return 'ssd' as DriveType;
+    if (rotaCounts.hdd > 0 && rotaCounts.ssd === 0) return 'hdd' as DriveType;
     // Mixed: default to ssd (common in modern systems)
-    if (rotaCounts.ssd >= rotaCounts.hdd) return 'ssd';
-    return 'hdd';
-  } catch {
-    return 'unknown';
-  }
-}
+    if (rotaCounts.ssd >= rotaCounts.hdd) return 'ssd' as DriveType;
+    return 'hdd' as DriveType;
+  });
 
 /** Measure sequential read speed by reading a 10MB temp file. */
-async function measureDriveReadSpeed(): Promise<number> {
-  const SAMPLE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-  const tmpFile = join(tmpdir(), `pan-probe-${process.pid}.bin`);
+const measureDriveReadSpeed: Effect.Effect<number, never, FileSystem.FileSystem> =
+  Effect.gen(function* () {
+    const SAMPLE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+    const tmpFile = join(tmpdir(), `pan-probe-${process.pid}.bin`);
+    const fs = yield* FileSystem.FileSystem;
 
-  try {
-    // Write a 10MB buffer
-    const buf = Buffer.alloc(SAMPLE_SIZE_BYTES, 0x42);
-    await fs.writeFile(tmpFile, buf);
+    const measure = Effect.gen(function* () {
+      // Write a 10MB buffer
+      const buf = new Uint8Array(SAMPLE_SIZE_BYTES);
+      buf.fill(0x42);
+      yield* fs.writeFile(tmpFile, buf);
 
-    // Read it back and measure elapsed time
-    const start = performance.now();
-    await fs.readFile(tmpFile);
-    const elapsedMs = performance.now() - start;
+      // Read it back and measure elapsed time
+      const start = performance.now();
+      yield* fs.readFile(tmpFile);
+      const elapsedMs = performance.now() - start;
 
-    // MB/s = bytes / (elapsed / 1000) / 1024 / 1024
-    const mbps = (SAMPLE_SIZE_BYTES / (elapsedMs / 1000)) / 1024 / 1024;
-    return Math.round(mbps);
-  } catch {
-    return 0;
-  } finally {
-    await fs.unlink(tmpFile).catch(() => {});
-  }
-}
+      // MB/s = bytes / (elapsed / 1000) / 1024 / 1024
+      const mbps = (SAMPLE_SIZE_BYTES / (elapsedMs / 1000)) / 1024 / 1024;
+      return Math.round(mbps);
+    });
+
+    return yield* measure.pipe(
+      Effect.ensuring(fs.remove(tmpFile).pipe(Effect.ignore)),
+      Effect.orElseSucceed(() => 0),
+    );
+  });

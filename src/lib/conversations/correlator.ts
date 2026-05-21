@@ -6,6 +6,7 @@
  * JSONL file was spawned by Panopticon.
  */
 
+import { Effect } from 'effect';
 import { getDatabase } from '../database/index.js';
 import { sessionFilePath } from '../paths.js';
 
@@ -109,4 +110,16 @@ export function buildCorrelationMap(
   }
 
   return map;
+}
+
+// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
+//
+// Additive Effect wrapper — the existing function is purely synchronous DB
+// access, so this is just a sync lift for callers that compose with Effect.
+
+/** Effect variant of buildCorrelationMap — pure sync lift. */
+export function buildCorrelationMapEffect(
+  jsonlPaths: string[],
+): Effect.Effect<Map<string, CorrelationResult>> {
+  return Effect.sync(() => buildCorrelationMap(jsonlPaths));
 }

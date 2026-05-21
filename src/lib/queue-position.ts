@@ -5,6 +5,7 @@
  * can be unit-tested independently of the Express server.
  */
 
+import { Effect } from 'effect';
 import type { ReviewStatus } from './review-status.js';
 import type { HookItem } from './hooks.js';
 
@@ -49,3 +50,18 @@ export function findPositionInQueue(issueId: string, items: HookItem[]): number 
   );
   return idx >= 0 ? idx + 1 : -1;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of {@link computeQueuePositionFromStatus}. Pure; cannot fail. */
+export const computeQueuePositionFromStatusEffect = (
+  status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null,
+): Effect.Effect<QueuePositionResult, never> =>
+  Effect.sync(() => computeQueuePositionFromStatus(status));
+
+/** Effect variant of {@link findPositionInQueue}. Pure; cannot fail. */
+export const findPositionInQueueEffect = (
+  issueId: string,
+  items: HookItem[],
+): Effect.Effect<number, never> =>
+  Effect.sync(() => findPositionInQueue(issueId, items));

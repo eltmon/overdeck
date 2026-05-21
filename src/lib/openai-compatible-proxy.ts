@@ -1,6 +1,15 @@
 import http from 'http';
+import { Data, Effect } from 'effect';
+
 const HOST = '127.0.0.1';
 const PORT = 12436;
+
+/** Tagged error for openai-compatible proxy Effect variants. */
+export class OpenAICompatibleProxyError extends Data.TaggedError('OpenAICompatibleProxyError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const UPSTREAMS: Record<string, string> = {
   nous: 'https://inference-api.nousresearch.com/v1',
@@ -42,6 +51,18 @@ export async function ensureOpenAICompatibleProxyRunning(): Promise<void> {
     });
   });
 }
+
+/** Effect variant of {@link ensureOpenAICompatibleProxyRunning}. */
+export const ensureOpenAICompatibleProxyRunningEffect = (): Effect.Effect<void, OpenAICompatibleProxyError> =>
+  Effect.tryPromise({
+    try: () => ensureOpenAICompatibleProxyRunning(),
+    catch: (cause) =>
+      new OpenAICompatibleProxyError({
+        operation: 'ensureOpenAICompatibleProxyRunning',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
 
 async function isPortOpen(): Promise<boolean> {
   return new Promise((resolve) => {

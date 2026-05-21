@@ -8,7 +8,8 @@
  * Gracefully degrades when no plan.vbrief.json exists — all tasks are ready.
  */
 
-import { readWorkspacePlan } from '../vbrief/io.js';
+import { Effect } from 'effect';
+import { readWorkspacePlan, readWorkspacePlanEffect, type VBriefReadError } from '../vbrief/io.js';
 import type { VBriefItemStatus } from '../vbrief/types.js';
 
 const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
@@ -90,3 +91,75 @@ export function getUnblockedItems(workspacePath: string, justCompletedId: string
 
   return unblocked;
 }
+
+// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link isTaskReady}. Reads the workspace plan asynchronously
+ * via the typed Effect API. Returns `true` when the plan is missing or the item
+ * is unknown (gracefully degrades for legacy flows).
+ */
+export const isTaskReadyEffect = (
+  itemId: string,
+  workspacePath: string,
+): Effect.Effect<boolean, VBriefReadError> =>
+  Effect.gen(function* () {
+    const doc = yield* readWorkspacePlanEffect(workspacePath);
+    if (!doc) return true;
+
+    const itemExists = doc.plan.items.some((i) => i.id === itemId);
+    if (!itemExists) return true;
+
+    const blockerIds = doc.plan.edges
+      .filter((e) => e.type === 'blocks' && e.to === itemId)
+      .map((e) => e.from);
+
+    if (blockerIds.length === 0) return true;
+
+    const itemById = new Map(doc.plan.items.map((i) => [i.id, i]));
+    return blockerIds.every((blockerId) => {
+      const blocker = itemById.get(blockerId);
+      if (!blocker) return true;
+      return TERMINAL_STATUSES.includes(blocker.status);
+    });
+  });
+
+/**
+ * Effect variant of {@link getUnblockedItems}. Returns the list of item IDs
+ * that are newly unblocked after `justCompletedId` reaches a terminal status.
+ */
+export const getUnblockedItemsEffect = (
+  workspacePath: string,
+  justCompletedId: string,
+): Effect.Effect<string[], VBriefReadError> =>
+  Effect.gen(function* () {
+    const doc = yield* readWorkspacePlanEffect(workspacePath);
+    if (!doc) return [];
+
+    const itemById = new Map(doc.plan.items.map((i) => [i.id, i]));
+    const directlyUnblocking = doc.plan.edges
+      .filter((e) => e.type === 'blocks' && e.from === justCompletedId)
+      .map((e) => e.to);
+
+    const unblocked: string[] = [];
+    for (const candidateId of directlyUnblocking) {
+      const candidate = itemById.get(candidateId);
+      if (!candidate) continue;
+      if (TERMINAL_STATUSES.includes(candidate.status)) continue;
+
+      const blockers = doc.plan.edges
+        .filter((e) => e.type === 'blocks' && e.to === candidateId)
+        .map((e) => e.from);
+
+      const allBlockersTerminal = blockers.every((blockerId) => {
+        const blocker = itemById.get(blockerId);
+        if (!blocker) return true;
+        if (blockerId === justCompletedId) return true;
+        return TERMINAL_STATUSES.includes(blocker.status);
+      });
+
+      if (allBlockersTerminal) unblocked.push(candidateId);
+    }
+
+    return unblocked;
+  });

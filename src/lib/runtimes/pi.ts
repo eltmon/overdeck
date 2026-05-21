@@ -30,8 +30,11 @@ import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { Effect } from 'effect'
 import type {
   AgentRuntime,
+  AgentRuntimeEffect,
+  AgentRuntimeError,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -43,6 +46,7 @@ import { sessionExistsAsync, killSessionAsync, createSessionAsync, listSessions 
 import { parsePiSession } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScript } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifo, writePiCommand, piFifoPaths, PiNotReady } from './pi-fifo.js'
+import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 
 const execAsync = promisify(exec)
 
@@ -385,6 +389,100 @@ export class PiRuntime implements AgentRuntime {
 
 export function createPiRuntime(): PiRuntime {
   return new PiRuntime()
+}
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel adapter wrapping the legacy PiRuntime. The class
+// above remains the canonical adapter used by Cloister; this variant is for
+// new Effect-native callers who want typed error channels.
+
+/**
+ * Effect-channel variant of {@link PiRuntime}. Lifts async kill/spawn/send
+ * methods into typed Effects (ProcessSpawnError / ProcessTimeoutError /
+ * TmuxError). PiSpawnTimeout is preserved as the legacy Error class; Effect
+ * callers receive ProcessTimeoutError instead.
+ */
+export class PiRuntimeEffect implements AgentRuntimeEffect {
+  readonly name = 'pi' as const
+  private readonly inner: PiRuntime
+
+  constructor(inner: PiRuntime = new PiRuntime()) {
+    this.inner = inner
+  }
+
+  getSessionPath(agentId: string): string | null {
+    return this.inner.getSessionPath(agentId)
+  }
+  getLastActivity(agentId: string): Date | null {
+    return this.inner.getLastActivity(agentId)
+  }
+  getHeartbeat(agentId: string): Heartbeat | null {
+    return this.inner.getHeartbeat(agentId)
+  }
+  getTokenUsage(agentId: string): TokenUsage | null {
+    return this.inner.getTokenUsage(agentId)
+  }
+  getSessionCost(agentId: string): CostBreakdown | null {
+    return this.inner.getSessionCost(agentId)
+  }
+  listSessions(workspace?: string): Session[] {
+    return this.inner.listSessions(workspace)
+  }
+
+  sendMessage(agentId: string, message: string): Effect.Effect<void, AgentRuntimeError> {
+    return Effect.tryPromise({
+      try: () => Promise.resolve(this.inner.sendMessage(agentId, message)),
+      catch: (cause) =>
+        new TmuxError({
+          command: 'rpc-write',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    })
+  }
+
+  killAgent(agentId: string): Effect.Effect<void, AgentRuntimeError> {
+    return Effect.tryPromise({
+      try: () => this.inner.killAgent(agentId),
+      catch: (cause) =>
+        new TmuxError({
+          command: 'kill-session',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    })
+  }
+
+  spawnAgent(config: SpawnConfig): Effect.Effect<Agent, AgentRuntimeError> {
+    return Effect.tryPromise({
+      try: () => this.inner.spawnAgent(config),
+      catch: (cause) => {
+        if (cause instanceof PiSpawnTimeout) {
+          return new ProcessTimeoutError({
+            command: 'pi',
+            args: ['--mode', 'rpc'],
+            timeoutMs: SPAWN_READY_TIMEOUT_MS,
+          })
+        }
+        return new ProcessSpawnError({
+          command: 'pi',
+          args: ['--mode', 'rpc'],
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        })
+      },
+    })
+  }
+
+  isRunning(agentId: string): Effect.Effect<boolean> {
+    return Effect.promise(() => this.inner.isRunning(agentId))
+  }
+}
+
+/** Effect-flavored constructor companion to {@link createPiRuntime}. */
+export function createPiRuntimeEffect(): PiRuntimeEffect {
+  return new PiRuntimeEffect()
 }
 
 // ────────────────────────────────────────────────────────────────────────

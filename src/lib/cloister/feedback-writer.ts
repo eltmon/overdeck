@@ -8,6 +8,7 @@
 import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
 import { resolveProjectFromIssue } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
 import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
@@ -85,9 +86,10 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
 
   let clearedCount = 0;
   if (existsSync(feedbackDir)) {
-    const feedbackFiles = readFeedback(workspacePath).filter(f => /^\d{3}-/.test(f.filename) && f.filename.endsWith('.md'));
     try {
-      clearFeedback(workspacePath);
+      const feedbackFiles = (await Effect.runPromise(readFeedback(workspacePath)))
+        .filter((f) => /^\d{3}-/.test(f.filename) && f.filename.endsWith('.md'));
+      await Effect.runPromise(clearFeedback(workspacePath));
       clearedCount += feedbackFiles.length;
     } catch (err: any) {
       console.error(`[feedback-writer] Failed to clear .pan/feedback for ${workspacePath}:`, err.message);
@@ -182,7 +184,7 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
   if (workspacePath) {
     try {
-      writeFeedback(workspacePath, filename, opts.markdownBody);
+      await Effect.runPromise(writeFeedback(workspacePath, filename, opts.markdownBody));
     } catch (err: any) {
       console.error(`[feedback-writer] Failed to mirror feedback file for ${opts.issueId}:`, err.message);
       return { success: false, error: err.message };
@@ -194,3 +196,41 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
   );
   return { success: true, relativePath, filePath };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for feedback-writer Effect variants. */
+export class FeedbackWriteError extends Data.TaggedError('FeedbackWriteError')<{
+  readonly issueId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `clearFeedbackFiles`. */
+export const clearFeedbackFilesEffect = (workspacePath: string): Effect.Effect<void, FeedbackWriteError> =>
+  Effect.tryPromise({
+    try: () => clearFeedbackFiles(workspacePath),
+    catch: (cause) =>
+      new FeedbackWriteError({
+        issueId: workspacePath,
+        stage: 'clearFeedbackFiles',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `writeFeedbackFile`. */
+export const writeFeedbackFileEffect = (
+  opts: WriteFeedbackOptions,
+): Effect.Effect<WriteFeedbackResult, FeedbackWriteError> =>
+  Effect.tryPromise({
+    try: () => writeFeedbackFile(opts),
+    catch: (cause) =>
+      new FeedbackWriteError({
+        issueId: opts.issueId,
+        stage: 'writeFeedbackFile',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

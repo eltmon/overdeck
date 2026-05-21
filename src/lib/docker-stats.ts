@@ -1,14 +1,11 @@
 /**
  * DockerStatsCollector — polls `docker stats` every 5 seconds and maintains
  * a rolling 5-minute history (60 samples) per container.
- *
- * Uses execAsync (non-blocking) per CLAUDE.md — never execSync.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { Effect, Schedule, Duration, Stream } from 'effect';
+import { ChildProcess } from 'effect/unstable/process';
+import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
 
 export interface ContainerStats {
   id: string;
@@ -109,53 +106,44 @@ function parseNetIO(s: string): { in: number; out: number } {
   return { in: parseBytes(a ?? '0'), out: parseBytes(b ?? '0') };
 }
 
+// Run a docker subcommand and return its stdout as a string.
+// Returns "" on any failure (docker unavailable, timeout, non-zero exit).
+function runDockerForOutput(
+  args: readonly string[],
+  timeoutMs = 10000,
+): Effect.Effect<string, never, ChildProcessSpawner> {
+  return Effect.gen(function* () {
+    const handle = yield* ChildProcess.make('docker', [...args], { stderr: 'ignore' });
+    const chunks: Uint8Array[] = [];
+    yield* Stream.runForEach(
+      handle.stdout,
+      (chunk) => Effect.sync(() => { chunks.push(chunk); }),
+    );
+    yield* handle.exitCode;
+    return Buffer.concat(chunks).toString('utf-8');
+  }).pipe(
+    Effect.scoped,
+    Effect.timeout(Duration.millis(timeoutMs)),
+    Effect.catch(() => Effect.succeed('')),
+  );
+}
+
 export class DockerStatsCollector {
   private history = new Map<string, ContainerHistory>();
   private current = new Map<string, ContainerStats>();
   private containerStatuses = new Map<string, string>(); // name → status string
-  private timer: ReturnType<typeof setInterval> | null = null;
 
-  async start(intervalMs = 5000): Promise<void> {
-    await this.collect();
-    this.timer = setInterval(() => {
-      this.collect().catch((err) => {
-        console.error('[docker-stats] Collection error:', err.message);
-      });
-    }, intervalMs);
-  }
-
-  stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-  }
-
-  getStats(): ContainerStats[] {
-    return Array.from(this.current.values());
-  }
-
-  getHistory(containerId: string): ContainerHistory {
-    return this.history.get(containerId) ?? { timestamps: [], cpuPercent: [], memoryPercent: [] };
-  }
-
-  private async collect(): Promise<void> {
-    try {
-      // Fetch running container stats and all container statuses in parallel
-      const [statsResult, psResult] = await Promise.all([
-        execAsync(`docker stats --no-stream --format '{{json .}}' 2>/dev/null`, {
-          encoding: 'utf-8',
-          timeout: 10000,
-        }).catch(() => ({ stdout: '', stderr: '' })),
-        execAsync(`docker ps -a --format '{{json .}}' 2>/dev/null`, {
-          encoding: 'utf-8',
-          timeout: 5000,
-        }).catch(() => ({ stdout: '', stderr: '' })),
-      ]);
+  private collect(): Effect.Effect<void, never, ChildProcessSpawner> {
+    const self = this;
+    return Effect.gen(function* () {
+      const [statsOut, psOut] = yield* Effect.all([
+        runDockerForOutput(['stats', '--no-stream', '--format', '{{json .}}'], 10000),
+        runDockerForOutput(['ps', '-a', '--format', '{{json .}}'], 5000),
+      ], { concurrency: 2 });
 
       const lifecycleContainers: DockerContainerLifecycle[] = [];
-      this.containerStatuses.clear();
-      for (const line of psResult.stdout.trim().split('\n')) {
+      self.containerStatuses.clear();
+      for (const line of psOut.trim().split('\n')) {
         if (!line.trim()) continue;
         try {
           const raw = JSON.parse(line) as DockerPsRaw;
@@ -169,7 +157,7 @@ export class DockerStatsCollector {
             createdAt: raw.CreatedAt,
           };
           lifecycleContainers.push(container);
-          this.containerStatuses.set(name, container.status.toLowerCase());
+          self.containerStatuses.set(name, container.status.toLowerCase());
         } catch {
           // Skip malformed JSON lines.
         }
@@ -177,7 +165,7 @@ export class DockerStatsCollector {
       recordDockerContainerLifecycleSnapshot(lifecycleContainers);
 
       const now = Date.now();
-      for (const line of statsResult.stdout.trim().split('\n')) {
+      for (const line of statsOut.trim().split('\n')) {
         if (!line.trim()) continue;
         try {
           const raw: DockerStatsRaw = JSON.parse(line);
@@ -186,7 +174,7 @@ export class DockerStatsCollector {
           const cpu = parsePercent(raw.CPUPerc);
           const memPct = parsePercent(raw.MemPerc);
 
-          const psStatus = this.containerStatuses.get(raw.Name) ?? '';
+          const psStatus = self.containerStatuses.get(raw.Name) ?? '';
           let status: ContainerStats['status'] = 'running';
           if (psStatus.includes('unhealthy')) status = 'unhealthy';
           else if (psStatus.includes('restarting')) status = 'restarting';
@@ -203,12 +191,12 @@ export class DockerStatsCollector {
             networkOut: net.out,
             status,
           };
-          this.current.set(raw.ID, stats);
+          self.current.set(raw.ID, stats);
 
-          let hist = this.history.get(raw.ID);
+          let hist = self.history.get(raw.ID);
           if (!hist) {
             hist = { timestamps: [], cpuPercent: [], memoryPercent: [] };
-            this.history.set(raw.ID, hist);
+            self.history.set(raw.ID, hist);
           }
           hist.timestamps.push(now);
           hist.cpuPercent.push(cpu);
@@ -223,9 +211,29 @@ export class DockerStatsCollector {
           // Skip malformed JSON lines
         }
       }
-    } catch {
-      // Docker not available — skip silently
-    }
+    });
+  }
+
+  start(intervalMs = 5000): Effect.Effect<void, never, ChildProcessSpawner> {
+    const self = this;
+    return Effect.gen(function* () {
+      yield* self.collect();
+      yield* Effect.forkDetach(
+        Effect.repeat(self.collect(), Schedule.fixed(Duration.millis(intervalMs))),
+      );
+    });
+  }
+
+  stop(): void {
+    // No-op: polling fiber lifecycle is managed by the caller's Effect runtime.
+  }
+
+  getStats(): ContainerStats[] {
+    return Array.from(this.current.values());
+  }
+
+  getHistory(containerId: string): ContainerHistory {
+    return this.history.get(containerId) ?? { timestamps: [], cpuPercent: [], memoryPercent: [] };
   }
 }
 
@@ -242,16 +250,9 @@ export interface DockerVolume {
   mountpoint: string;
 }
 
-/**
- * List Docker networks via `docker network ls`.
- * Returns empty array if Docker is not available.
- */
-export async function getDockerNetworks(): Promise<DockerNetwork[]> {
-  try {
-    const { stdout } = await execAsync(
-      `docker network ls --format '{{json .}}' 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 5000 }
-    );
+export function getDockerNetworks(): Effect.Effect<DockerNetwork[], never, ChildProcessSpawner> {
+  return Effect.gen(function* () {
+    const stdout = yield* runDockerForOutput(['network', 'ls', '--format', '{{json .}}'], 5000);
     const networks: DockerNetwork[] = [];
     for (const line of stdout.trim().split('\n')) {
       if (!line.trim()) continue;
@@ -268,21 +269,12 @@ export async function getDockerNetworks(): Promise<DockerNetwork[]> {
       }
     }
     return networks;
-  } catch {
-    return [];
-  }
+  });
 }
 
-/**
- * List Docker volumes via `docker volume ls`.
- * Returns empty array if Docker is not available.
- */
-export async function getDockerVolumes(): Promise<DockerVolume[]> {
-  try {
-    const { stdout } = await execAsync(
-      `docker volume ls --format '{{json .}}' 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 5000 }
-    );
+export function getDockerVolumes(): Effect.Effect<DockerVolume[], never, ChildProcessSpawner> {
+  return Effect.gen(function* () {
+    const stdout = yield* runDockerForOutput(['volume', 'ls', '--format', '{{json .}}'], 5000);
     const volumes: DockerVolume[] = [];
     for (const line of stdout.trim().split('\n')) {
       if (!line.trim()) continue;
@@ -298,7 +290,5 @@ export async function getDockerVolumes(): Promise<DockerVolume[]> {
       }
     }
     return volumes;
-  } catch {
-    return [];
-  }
+  });
 }

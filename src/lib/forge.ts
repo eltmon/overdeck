@@ -3,12 +3,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { unlink, writeFile } from 'node:fs/promises';
+import { Effect, Data } from 'effect';
 import {
   getPullRequestState,
   isGitHubAppConfigured,
   mergePullRequestWithApp,
   parsePullRequestRef,
 } from './github-app.js';
+
+/** A forge (GitHub or GitLab) review-artifact operation failed. */
+export class ForgeError extends Data.TaggedError('ForgeError')<{
+  readonly forge: 'github' | 'gitlab';
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const execAsync = promisify(exec);
 const GITHUB_MERGE_POLL_INTERVAL_MS = 5000;
@@ -330,3 +339,66 @@ const gitlabForgeAdapter: ForgeAdapter = {
 export function getForgeAdapter(forge: ForgeType): ForgeAdapter {
   return forge === 'gitlab' ? gitlabForgeAdapter : githubForgeAdapter;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const wrapForgeOp = <T>(
+  forge: ForgeType,
+  operation: string,
+  thunk: () => Promise<T>,
+): Effect.Effect<T, ForgeError> =>
+  Effect.tryPromise({
+    try: thunk,
+    catch: (cause) =>
+      new ForgeError({
+        forge,
+        operation,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect-native createReviewArtifact bound to the adapter for {@link forge}. */
+export const createReviewArtifactEffect = (
+  forge: ForgeType,
+  input: CreateReviewArtifactInput,
+): Effect.Effect<CreateReviewArtifactResult, ForgeError> =>
+  wrapForgeOp(forge, 'createReviewArtifact', () =>
+    getForgeAdapter(forge).createReviewArtifact(input),
+  );
+
+/** Effect-native mergeReviewArtifact bound to the adapter for {@link forge}. */
+export const mergeReviewArtifactEffect = (
+  forge: ForgeType,
+  input: MergeReviewArtifactInput,
+): Effect.Effect<void, ForgeError> =>
+  wrapForgeOp(forge, 'mergeReviewArtifact', () =>
+    getForgeAdapter(forge).mergeReviewArtifact(input),
+  );
+
+/** Effect-native commentOnArtifact bound to the adapter for {@link forge}. */
+export const commentOnArtifactEffect = (
+  forge: ForgeType,
+  input: CommentOnArtifactInput,
+): Effect.Effect<void, ForgeError> =>
+  wrapForgeOp(forge, 'commentOnArtifact', () =>
+    getForgeAdapter(forge).commentOnArtifact(input),
+  );
+
+/** Effect-native approveReviewArtifact bound to the adapter for {@link forge}. */
+export const approveReviewArtifactEffect = (
+  forge: ForgeType,
+  input: ApproveReviewArtifactInput,
+): Effect.Effect<void, ForgeError> =>
+  wrapForgeOp(forge, 'approveReviewArtifact', () =>
+    getForgeAdapter(forge).approveReviewArtifact(input),
+  );
+
+/** Effect-native discoverArtifact bound to the adapter for {@link forge}. */
+export const discoverArtifactEffect = (
+  forge: ForgeType,
+  input: DiscoverArtifactInput,
+): Effect.Effect<CreateReviewArtifactResult | null, ForgeError> =>
+  wrapForgeOp(forge, 'discoverArtifact', () =>
+    getForgeAdapter(forge).discoverArtifact(input),
+  );

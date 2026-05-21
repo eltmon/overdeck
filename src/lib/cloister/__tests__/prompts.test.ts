@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from '@effect/vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -25,9 +26,10 @@ afterEach(() => {
 
 describe('prompts loader', () => {
   describe('frontmatter parsing', () => {
-    it('parses valid frontmatter', () => {
-      writeScratch(
-        `---
+    it.effect('parses valid frontmatter', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: A scratch template for tests
 requires:
@@ -37,120 +39,144 @@ optional:
   - REMOTE
 ---
 Issue: {{ISSUE_ID}}`
-      );
-      const fm = loadPromptFrontmatter(SCRATCH);
-      expect(fm.name).toBe('scratch');
-      expect(fm.description).toBe('A scratch template for tests');
-      expect(fm.requires).toEqual(['ISSUE_ID']);
-      expect(fm.optional).toEqual(['LOCAL', 'REMOTE']);
-    });
+        );
+        const fm = yield* loadPromptFrontmatter(SCRATCH);
+        expect(fm.name).toBe('scratch');
+        expect(fm.description).toBe('A scratch template for tests');
+        expect(fm.requires).toEqual(['ISSUE_ID']);
+        expect(fm.optional).toEqual(['LOCAL', 'REMOTE']);
+      })
+    );
 
-    it('defaults requires/optional to empty arrays when omitted', () => {
-      writeScratch(
-        `---
+    it.effect('defaults requires/optional to empty arrays when omitted', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: minimal
 ---
 hello`
-      );
-      const fm = loadPromptFrontmatter(SCRATCH);
-      expect(fm.requires).toEqual([]);
-      expect(fm.optional).toEqual([]);
-    });
+        );
+        const fm = yield* loadPromptFrontmatter(SCRATCH);
+        expect(fm.requires).toEqual([]);
+        expect(fm.optional).toEqual([]);
+      })
+    );
 
-    it('throws when frontmatter is missing entirely', () => {
-      writeScratch('hello world');
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(PromptError);
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(/missing YAML frontmatter/);
-    });
+    it.effect('fails when frontmatter is missing entirely', () =>
+      Effect.gen(function* () {
+        writeScratch('hello world');
+        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        expect(err).toBeInstanceOf(PromptError);
+        expect(err.message).toMatch(/missing YAML frontmatter/);
+      })
+    );
 
-    it('throws when name field is missing', () => {
-      writeScratch(
-        `---
+    it.effect('fails when name field is missing', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 description: no name
 ---
 body`
-      );
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(/missing required field "name"/);
-    });
+        );
+        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        expect(err.message).toMatch(/missing required field "name"/);
+      })
+    );
 
-    it('throws when description field is missing', () => {
-      writeScratch(
-        `---
+    it.effect('fails when description field is missing', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 ---
 body`
-      );
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(/missing required field "description"/);
-    });
+        );
+        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        expect(err.message).toMatch(/missing required field "description"/);
+      })
+    );
 
-    it('throws when requires is not a string array', () => {
-      writeScratch(
-        `---
+    it.effect('fails when requires is not a string array', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: bad requires
 requires:
   foo: bar
 ---
 body`
-      );
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(/"requires" must be a list of strings/);
-    });
+        );
+        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        expect(err.message).toMatch(/"requires" must be a list of strings/);
+      })
+    );
 
-    it('throws when YAML is malformed', () => {
-      writeScratch(
-        `---
+    it.effect('fails when YAML is malformed', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: bad
 optional: [unclosed
 ---
 body`
-      );
-      expect(() => loadPromptFrontmatter(SCRATCH)).toThrow(/invalid YAML frontmatter/);
-    });
+        );
+        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        expect(err.message).toMatch(/invalid YAML frontmatter/);
+      })
+    );
 
-    it('throws when template file is missing', () => {
-      expect(() => loadPromptFrontmatter('definitely-not-a-real-template')).toThrow(
-        /Failed to load prompt template/
-      );
-    });
+    it.effect('fails when template file is missing', () =>
+      Effect.gen(function* () {
+        const err = yield* Effect.flip(loadPromptFrontmatter('definitely-not-a-real-template'));
+        expect(err.message).toMatch(/Failed to load prompt template/);
+      })
+    );
   });
 
   describe('rendering', () => {
-    it('substitutes a required variable', () => {
-      writeScratch(
-        `---
+    it.effect('substitutes a required variable', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: simple
 requires:
   - ISSUE_ID
 ---
 Issue {{ISSUE_ID}} is in progress.`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-123' } });
-      expect(out).toBe('Issue PAN-123 is in progress.');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-123' } });
+        expect(out).toBe('Issue PAN-123 is in progress.');
+      })
+    );
 
-    it('does NOT HTML-escape values (markdown output, not HTML)', () => {
-      writeScratch(
-        `---
+    it.effect('does NOT HTML-escape values (markdown output, not HTML)', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: escape check
 requires:
   - DIFF
 ---
 {{DIFF}}`
-      );
-      const out = renderPrompt({
-        name: SCRATCH,
-        vars: { DIFF: '<script>alert("xss")</script> & "quoted"' },
-      });
-      expect(out).toBe('<script>alert("xss")</script> & "quoted"');
-    });
+        );
+        const out = yield* renderPrompt({
+          name: SCRATCH,
+          vars: { DIFF: '<script>alert("xss")</script> & "quoted"' },
+        });
+        expect(out).toBe('<script>alert("xss")</script> & "quoted"');
+      })
+    );
 
-    it('renders a section when the variable is a non-empty string and resolves the variable inside', () => {
-      writeScratch(
-        `---
+    it.effect('renders a section when the variable is a non-empty string and resolves the variable inside', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: section context
 optional:
@@ -158,16 +184,18 @@ optional:
 ---
 {{#BEADS}}Beads:
 {{BEADS}}{{/BEADS}}`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: { BEADS: '- bead-1\n- bead-2' } });
-      expect(out).toContain('Beads:');
-      expect(out).toContain('- bead-1');
-      expect(out).toContain('- bead-2');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '- bead-1\n- bead-2' } });
+        expect(out).toContain('Beads:');
+        expect(out).toContain('- bead-1');
+        expect(out).toContain('- bead-2');
+      })
+    );
 
-    it('hides a section when the variable is an empty string', () => {
-      writeScratch(
-        `---
+    it.effect('hides a section when the variable is an empty string', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: empty section
 optional:
@@ -176,30 +204,34 @@ optional:
 before
 {{#BEADS}}should not appear{{/BEADS}}
 after`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: { BEADS: '' } });
-      expect(out).not.toContain('should not appear');
-      expect(out).toContain('before');
-      expect(out).toContain('after');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '' } });
+        expect(out).not.toContain('should not appear');
+        expect(out).toContain('before');
+        expect(out).toContain('after');
+      })
+    );
 
-    it('hides a section when the variable is undefined and the field is optional', () => {
-      writeScratch(
-        `---
+    it.effect('hides a section when the variable is undefined and the field is optional', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: undefined section
 optional:
   - BEADS
 ---
 {{#BEADS}}hidden{{/BEADS}}done`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: {} });
-      expect(out).toBe('done');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: {} });
+        expect(out).toBe('done');
+      })
+    );
 
-    it('switches between LOCAL and REMOTE blocks via boolean flags', () => {
-      writeScratch(
-        `---
+    it.effect('switches between LOCAL and REMOTE blocks via boolean flags', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: env switching
 optional:
@@ -207,59 +239,65 @@ optional:
   - REMOTE
 ---
 {{#LOCAL}}local-only{{/LOCAL}}{{#REMOTE}}remote-only{{/REMOTE}}`
-      );
-      const local = renderPrompt({ name: SCRATCH, vars: { LOCAL: true, REMOTE: false } });
-      const remote = renderPrompt({ name: SCRATCH, vars: { LOCAL: false, REMOTE: true } });
-      expect(local).toBe('local-only');
-      expect(remote).toBe('remote-only');
-    });
+        );
+        const local = yield* renderPrompt({ name: SCRATCH, vars: { LOCAL: true, REMOTE: false } });
+        const remote = yield* renderPrompt({ name: SCRATCH, vars: { LOCAL: false, REMOTE: true } });
+        expect(local).toBe('local-only');
+        expect(remote).toBe('remote-only');
+      })
+    );
 
-    it('renders Playwright isolation guidance in the uat-agent prompt', () => {
-      const out = renderPrompt({
-        name: 'uat-agent',
-        vars: {
-          ISSUE_ID: 'PAN-611',
-          WORKSPACE: '/workspace',
-          FRONTEND_URL: 'https://pan.localhost',
-          API_URL: 'https://pan.localhost/api',
-          TEST_TOKEN_API: 'test-key',
-        },
-      });
+    it.effect('renders Playwright isolation guidance in the uat-agent prompt', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'uat-agent',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            WORKSPACE: '/workspace',
+            FRONTEND_URL: 'https://pan.localhost',
+            API_URL: 'https://pan.localhost/api',
+            TEST_TOKEN_API: 'test-key',
+          },
+        });
 
-      expect(out).toContain('## Playwright Isolation');
-      expect(out).toContain('isolated Playwright browser instance/profile');
-      expect(out).toContain("Never rely on another agent's browser session");
-    });
+        expect(out).toContain('## Playwright Isolation');
+        expect(out).toContain('isolated Playwright browser instance/profile');
+        expect(out).toContain("Never rely on another agent's browser session");
+      })
+    );
 
-    it('renders Playwright isolation guidance in the work prompt', () => {
-      const out = renderPrompt({
-        name: 'work',
-        vars: {
-          ISSUE_ID: 'PAN-611',
-          ISSUE_ID_LOWER: 'pan-611',
-          WORKSPACE_PATH: '/workspace',
-          LOCAL: true,
-          REMOTE: false,
-          PROJECT_ROOT: '/project',
-          BEADS_TASKS: '',
-          STITCH_DESIGNS: '',
-          POLYREPO_CONTEXT: '',
-          PENDING_FEEDBACK: '',
-          NEW_TRACKER_CONTEXT: '',
-          TLDR_AVAILABLE: false,
-        },
-      });
+    it.effect('renders Playwright isolation guidance in the work prompt', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'work',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            WORKSPACE_PATH: '/workspace',
+            LOCAL: true,
+            REMOTE: false,
+            PROJECT_ROOT: '/project',
+            BEADS_TASKS: '',
+            STITCH_DESIGNS: '',
+            POLYREPO_CONTEXT: '',
+            PENDING_FEEDBACK: '',
+            NEW_TRACKER_CONTEXT: '',
+            TLDR_AVAILABLE: false,
+          },
+        });
 
-      expect(out).toContain('## Playwright Isolation');
-      expect(out).toContain('isolated browser instance/profile');
-      expect(out).toContain("Never rely on another agent's browser session");
-    });
+        expect(out).toContain('## Playwright Isolation');
+        expect(out).toContain('isolated browser instance/profile');
+        expect(out).toContain("Never rely on another agent's browser session");
+      })
+    );
   });
 
   describe('fail-loud validation', () => {
-    it('throws when a required variable is missing', () => {
-      writeScratch(
-        `---
+    it.effect('fails when a required variable is missing', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: requires test
 requires:
@@ -267,54 +305,63 @@ requires:
   - WORKSPACE_PATH
 ---
 {{ISSUE_ID}} {{WORKSPACE_PATH}}`
-      );
-      expect(() => renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1' } })).toThrow(
-        /requires variables that are missing: WORKSPACE_PATH/
-      );
-    });
+        );
+        const err = yield* Effect.flip(
+          renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1' } })
+        );
+        expect(err.message).toMatch(/requires variables that are missing: WORKSPACE_PATH/);
+      })
+    );
 
-    it('throws when an unknown variable is passed', () => {
-      writeScratch(
-        `---
+    it.effect('fails when an unknown variable is passed', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: unknown var test
 requires:
   - ISSUE_ID
 ---
 {{ISSUE_ID}}`
-      );
-      expect(() =>
-        renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', WROKSPACE: '/tmp' } })
-      ).toThrow(/unknown variables: WROKSPACE/);
-    });
+        );
+        const err = yield* Effect.flip(
+          renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', WROKSPACE: '/tmp' } })
+        );
+        expect(err.message).toMatch(/unknown variables: WROKSPACE/);
+      })
+    );
 
-    it('accepts an empty-string value for a required variable (treated as defined)', () => {
-      writeScratch(
-        `---
+    it.effect('accepts an empty-string value for a required variable (treated as defined)', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: empty required
 requires:
   - VALUE
 ---
 [{{VALUE}}]`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: { VALUE: '' } });
-      expect(out).toBe('[]');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { VALUE: '' } });
+        expect(out).toBe('[]');
+      })
+    );
 
-    it('accepts a boolean false value for a required variable', () => {
-      writeScratch(
-        `---
+    it.effect('accepts a boolean false value for a required variable', () =>
+      Effect.gen(function* () {
+        writeScratch(
+          `---
 name: scratch
 description: false required
 requires:
   - FLAG
 ---
 {{#FLAG}}on{{/FLAG}}{{^FLAG}}off{{/FLAG}}`
-      );
-      const out = renderPrompt({ name: SCRATCH, vars: { FLAG: false } });
-      expect(out).toBe('off');
-    });
+        );
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { FLAG: false } });
+        expect(out).toBe('off');
+      })
+    );
   });
 
   describe('live review template', () => {
@@ -329,26 +376,30 @@ requires:
       API_URL: 'http://localhost:3011',
     };
 
-    it('reports stale branches through specialists/done instead of direct review status updates', () => {
-      const out = renderPrompt({
-        name: 'review',
-        vars: baseReviewVars,
-      });
-      expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
-      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
-      expect(out).not.toContain('/api/review/PAN-999/status');
-      expect(out).not.toContain('pan tell PAN-999');
-    });
+    it.effect('reports stale branches through specialists/done instead of direct review status updates', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'review',
+          vars: baseReviewVars,
+        });
+        expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+        expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
+        expect(out).not.toContain('/api/review/PAN-999/status');
+        expect(out).not.toContain('pan tell PAN-999');
+      })
+    );
 
-    it('reports blocked review results through specialists/done instead of pan tell', () => {
-      const out = renderPrompt({
-        name: 'review',
-        vars: baseReviewVars,
-      });
-      expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"failed"');
-      expect(out).toContain('Do NOT message the work agent directly');
-      expect(out).not.toContain('pan tell PAN-999');
-    });
+    it.effect('reports blocked review results through specialists/done instead of pan tell', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'review',
+          vars: baseReviewVars,
+        });
+        expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"failed"');
+        expect(out).toContain('Do NOT message the work agent directly');
+        expect(out).not.toContain('pan tell PAN-999');
+      })
+    );
   });
 
   describe('live merge template', () => {
@@ -360,56 +411,64 @@ requires:
       API_URL: 'http://localhost:3011',
     };
 
-    it('renders push+build flow when DO_PUSH and DO_BUILD are true', () => {
-      const out = renderPrompt({
-        name: 'merge',
-        vars: { ...baseVars, DO_PUSH: true, DO_BUILD: true },
-      });
-      expect(out).toContain('git push origin main');
-      expect(out).toContain('PHASE 4');
-      expect(out).toContain('Build the project');
-      expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
-      expect(out).not.toContain('Do NOT push');
-    });
+    it.effect('renders push+build flow when DO_PUSH and DO_BUILD are true', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'merge',
+          vars: { ...baseVars, DO_PUSH: true, DO_BUILD: true },
+        });
+        expect(out).toContain('git push origin main');
+        expect(out).toContain('PHASE 4');
+        expect(out).toContain('Build the project');
+        expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+        expect(out).not.toContain('Do NOT push');
+      })
+    );
 
-    it('renders validation-only flow when DO_PUSH is false', () => {
-      const out = renderPrompt({
-        name: 'merge',
-        vars: { ...baseVars, DO_PUSH: false, DO_BUILD: false },
-      });
-      expect(out).toContain('Do NOT push to main');
-      expect(out).toContain('NEVER push to `main`');
-      expect(out).not.toContain('13. PUSH');
-      expect(out).not.toContain('Build the project');
-    });
+    it.effect('renders validation-only flow when DO_PUSH is false', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'merge',
+          vars: { ...baseVars, DO_PUSH: false, DO_BUILD: false },
+        });
+        expect(out).toContain('Do NOT push to main');
+        expect(out).toContain('NEVER push to `main`');
+        expect(out).not.toContain('13. PUSH');
+        expect(out).not.toContain('Build the project');
+      })
+    );
 
-    it('hides done-report when SKIP_DONE_REPORT is true', () => {
-      const out = renderPrompt({
-        name: 'merge',
-        vars: {
-          ...baseVars,
-          DO_PUSH: true,
-          DO_BUILD: true,
-          SKIP_DONE_REPORT: true,
-        },
-      });
-      expect(out).toContain('DO NOT call `/api/specialists/done`');
-      expect(out).not.toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
-    });
+    it.effect('hides done-report when SKIP_DONE_REPORT is true', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'merge',
+          vars: {
+            ...baseVars,
+            DO_PUSH: true,
+            DO_BUILD: true,
+            SKIP_DONE_REPORT: true,
+          },
+        });
+        expect(out).toContain('DO NOT call `/api/specialists/done`');
+        expect(out).not.toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+      })
+    );
 
-    it('renders polyrepo header when IS_POLYREPO is true', () => {
-      const out = renderPrompt({
-        name: 'merge',
-        vars: {
-          ...baseVars,
-          DO_PUSH: false,
-          DO_BUILD: false,
-          IS_POLYREPO: true,
-          POLYREPO_DIRS: 'frontend, backend',
-        },
-      });
-      expect(out).toContain('POLYREPO project');
-      expect(out).toContain('frontend, backend');
-    });
+    it.effect('renders polyrepo header when IS_POLYREPO is true', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'merge',
+          vars: {
+            ...baseVars,
+            DO_PUSH: false,
+            DO_BUILD: false,
+            IS_POLYREPO: true,
+            POLYREPO_DIRS: 'frontend, backend',
+          },
+        });
+        expect(out).toContain('POLYREPO project');
+        expect(out).toContain('frontend, backend');
+      })
+    );
   });
 });

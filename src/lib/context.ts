@@ -10,9 +10,11 @@
  * not here.
  */
 
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
+import { FsError } from './errors.js';
 
 export interface SummaryEntry {
   title: string;
@@ -296,3 +298,76 @@ export function readMaterialized(filepath: string): string | null {
   if (!existsSync(filepath)) return null;
   return readFileSync(filepath, 'utf-8');
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Context-engineering helpers — sync FS by design (CLI / agent-local), wrapped
+// for callers in Effect graphs. FsError surfaces only on write paths.
+
+/** Append a work-summary entry for an agent. */
+export const appendSummaryEffect = (
+  agentId: string,
+  summary: SummaryEntry,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => appendSummary(agentId, summary),
+    catch: (cause) =>
+      new FsError({ path: agentId, operation: 'append-summary', cause }),
+  });
+
+/** Append a history entry for an agent. */
+export const logHistoryEffect = (
+  ...args: Parameters<typeof logHistory>
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => logHistory(...args),
+    catch: (cause) =>
+      new FsError({ path: args[0], operation: 'log-history', cause }),
+  });
+
+/** Search agent history for a regex pattern. Pure-ish (logs on error). */
+export const searchHistoryEffect = (
+  agentId: string,
+  pattern: string,
+): Effect.Effect<string[]> => Effect.sync(() => searchHistory(agentId, pattern));
+
+/** Return the most recent history entries for an agent. Pure-ish. */
+export const getRecentHistoryEffect = (
+  agentId: string,
+  limit: number = 20,
+): Effect.Effect<string[]> => Effect.sync(() => getRecentHistory(agentId, limit));
+
+/** Estimate token count from text. Pure. */
+export const estimateTokensEffect = (text: string): Effect.Effect<number> =>
+  Effect.sync(() => estimateTokens(text));
+
+/** Check a context budget against a token estimate. Pure. */
+export const checkContextBudgetEffect = (
+  ...args: Parameters<typeof checkContextBudget>
+): Effect.Effect<ReturnType<typeof checkContextBudget>> =>
+  Effect.sync(() => checkContextBudget(...args));
+
+/** Construct a new context budget. Pure. */
+export const createContextBudgetEffect = (
+  maxTokens: number = 100000,
+): Effect.Effect<ContextBudget> => Effect.sync(() => createContextBudget(maxTokens));
+
+/** Materialize agent output to a file (returns filepath). */
+export const materializeOutputEffect = (
+  ...args: Parameters<typeof materializeOutput>
+): Effect.Effect<ReturnType<typeof materializeOutput>, FsError> =>
+  Effect.try({
+    try: () => materializeOutput(...args),
+    catch: (cause) =>
+      new FsError({ path: args[0], operation: 'materialize-output', cause }),
+  });
+
+/** Enumerate materialized files for an agent. Pure-ish. */
+export const listMaterializedEffect = (
+  agentId: string,
+): Effect.Effect<ReturnType<typeof listMaterialized>> =>
+  Effect.sync(() => listMaterialized(agentId));
+
+/** Read a materialized file's contents (null when missing). Pure-ish. */
+export const readMaterializedEffect = (
+  filepath: string,
+): Effect.Effect<string | null> => Effect.sync(() => readMaterialized(filepath));

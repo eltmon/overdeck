@@ -10,10 +10,11 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+
 const execAsync = promisify(exec);
 
 const MERGED_LABEL = 'merged';
@@ -24,7 +25,18 @@ const LABELS_TO_REMOVE = ['in-review', 'in-progress', 'merge-agent'];
  * Remove workflow labels and apply 'merged' label.
  * Non-fatal: label management failure does not block the merge lifecycle.
  */
-export async function cleanupMergedLabels(ctx: LifecycleContext): Promise<StepResult> {
+export function cleanupMergedLabels(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => cleanupMergedLabelsImpl(ctx),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('label-cleanup:merged', `Label cleanup failed: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function cleanupMergedLabelsImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'label-cleanup:merged';
 
   if (ctx.github) {

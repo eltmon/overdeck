@@ -306,6 +306,7 @@ export const IssueLifecycleWithClientLive = IssueLifecycleLive.pipe(
             const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
             return {
               getIssue: () => fail,
+              getChildIssues: () => fail,
               updateState: () => fail,
               addComment: () => fail,
             };

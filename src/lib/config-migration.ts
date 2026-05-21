@@ -5,6 +5,7 @@
  * Legacy presets are no longer supported - all selection is now smart/capability-based.
  */
 
+import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstatSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -12,6 +13,7 @@ import yaml from 'js-yaml';
 import { loadSettings, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
 import { type ModelId } from './settings.js';
+import { FsError } from './errors.js';
 
 /** Path to legacy settings file */
 const LEGACY_SETTINGS_PATH = join(homedir(), '.panopticon', 'settings.json');
@@ -284,3 +286,47 @@ export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: 
     return { migrated: false, hadNonClaudeTargets: false };
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// One-shot config-migration helpers. Each is run at most once per install at
+// CLI startup. Errors are caught internally (return false / empty result), so
+// Effect.sync is appropriate here.
+
+/** True when legacy settings.json exists and config.yaml doesn't. Pure. */
+export const needsMigrationEffect = (): Effect.Effect<boolean> =>
+  Effect.sync(() => needsMigration());
+
+/** True if any legacy settings.json is present (with or without yaml). Pure. */
+export const hasLegacySettingsEffect = (): Effect.Effect<boolean> =>
+  Effect.sync(() => hasLegacySettings());
+
+/** Convert a SettingsConfig into a YamlConfig. Pure. */
+export const convertToYamlConfigEffect = (
+  settings: SettingsConfig,
+): Effect.Effect<YamlConfig> => Effect.sync(() => convertToYamlConfig(settings));
+
+/** Run the settings.json → config.yaml migration. Surfaces FsError on IO failure. */
+export const migrateConfigEffect = (
+  options: MigrationOptions = {},
+): Effect.Effect<MigrationResult, FsError> =>
+  Effect.try({
+    try: () => migrateConfig(options),
+    catch: (cause) =>
+      new FsError({ path: NEW_CONFIG_PATH, operation: 'migrate-config', cause }),
+  });
+
+/** Inspect migration state without modifying anything. Pure. */
+export const getMigrationStatusEffect = (): Effect.Effect<
+  ReturnType<typeof getMigrationStatus>
+> => Effect.sync(() => getMigrationStatus());
+
+/** Sweep legacy runtime symlinks under ~/.panopticon (idempotent). */
+export const cleanupLegacyRuntimeSymlinksEffect =
+  (): Effect.Effect<LegacyCleanupResult> =>
+    Effect.sync(() => cleanupLegacyRuntimeSymlinks());
+
+/** Migrate `targets = [...]` lines out of config.toml. Pure-ish (catches). */
+export const migrateSyncTargetsEffect = (): Effect.Effect<{
+  migrated: boolean;
+  hadNonClaudeTargets: boolean;
+}> => Effect.sync(() => migrateSyncTargets());

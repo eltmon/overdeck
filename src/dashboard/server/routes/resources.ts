@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
 import { DockerStatsCollector } from '../../../lib/docker-stats.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -35,9 +36,9 @@ let dockerStatsCollector: DockerStatsCollector | null = null;
 export function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
     dockerStatsCollector = new DockerStatsCollector();
-    dockerStatsCollector.start().catch((err: unknown) => {
-      console.error('[resources-route] DockerStatsCollector.start() failed:', err);
-    });
+    Effect.runFork(
+      dockerStatsCollector.start().pipe(Effect.provide(nodeServicesLayer)),
+    );
   }
   return dockerStatsCollector;
 }

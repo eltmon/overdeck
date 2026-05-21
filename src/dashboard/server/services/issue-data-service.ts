@@ -12,6 +12,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { Effect } from 'effect';
 import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
@@ -1268,10 +1269,10 @@ export class IssueDataService {
               project: projConfig.rally_project,
             });
 
-            const issues = await tracker.listIssues({
+            const issues = await Effect.runPromise(tracker.listIssues({
               includeClosed: false,
               limit: 100,
-            });
+            }));
 
             const projectInfo = {
               id: `rally-${key}`,
@@ -1298,10 +1299,10 @@ export class IssueDataService {
           project: globalConfig.project,
         });
 
-        const issues = await tracker.listIssues({
+        const issues = await Effect.runPromise(tracker.listIssues({
           includeClosed: false,
           limit: 100,
-        });
+        }));
 
         const projectInfo = {
           id: 'rally-project',

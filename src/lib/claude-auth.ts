@@ -16,11 +16,14 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { execFile } from 'child_process';
 import { homedir } from 'os';
 import { join } from 'path';
 import { platform } from 'process';
+import { Duration, Effect, FileSystem } from 'effect';
+import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
+import { ChildProcess } from 'effect/unstable/process';
+import { layer as NodeServicesLayer } from '@effect/platform-node/NodeServices';
+import { ClaudeCredentialParseError } from './errors.js';
 
 export interface ClaudeAuthStatus {
   /** True if the ~/.claude directory exists (i.e. Claude Code has been installed). */
@@ -40,54 +43,65 @@ export interface ClaudeAuthStatus {
   hasAnthropicApiKey: boolean;
 }
 
+export function parseOAuthPayload(raw: string): Effect.Effect<
+  {
+    loggedIn: boolean;
+    expired: boolean;
+    subscriptionType: string | null;
+    rateLimitTier: string | null;
+    expiresAt: number | null;
+  },
+  ClaudeCredentialParseError
+> {
+  return Effect.try({
+    try: () => {
+      const creds = JSON.parse(raw) as Record<string, unknown>;
+      const oauth = (creds.claudeAiOauth ?? {}) as Record<string, unknown>;
+
+      if (!oauth.accessToken) {
+        return { loggedIn: false, expired: false, subscriptionType: null, rateLimitTier: null, expiresAt: null };
+      }
+
+      const expiresAt = typeof oauth.expiresAt === 'number' ? oauth.expiresAt : null;
+      const expired = !!(expiresAt && expiresAt < Date.now());
+
+      // Treat as logged in even if expired — Claude Code auto-refreshes tokens
+      // transparently. Only mark as not-logged-in if there's no token at all.
+      return {
+        loggedIn: true,
+        expired,
+        subscriptionType: typeof oauth.subscriptionType === 'string' ? oauth.subscriptionType : null,
+        rateLimitTier: typeof oauth.rateLimitTier === 'string' ? oauth.rateLimitTier : null,
+        expiresAt,
+      };
+    },
+    catch: (cause) => new ClaudeCredentialParseError({ message: 'Failed to parse credentials JSON', cause }),
+  });
+}
+
 /**
  * Read credentials JSON from macOS Keychain.
  * Claude Code ≥2.x stores credentials under service "Claude Code-credentials".
  */
-async function readKeychainCredentials(): Promise<string | null> {
-  if (platform !== 'darwin') return null;
-  return new Promise((resolve) => {
-    execFile(
-      'security',
-      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-      { timeout: 3000 },
-      (err, stdout) => {
-        if (err || !stdout.trim()) return resolve(null);
-        resolve(stdout.trim());
-      },
+const readKeychainCredentials: Effect.Effect<string | null, never, ChildProcessSpawner> =
+  Effect.gen(function* () {
+    if (platform !== 'darwin') return null;
+    const spawner = yield* ChildProcessSpawner;
+    const cmd = ChildProcess.make('security', [
+      'find-generic-password', '-s', 'Claude Code-credentials', '-w',
+    ]);
+    return yield* spawner.string(cmd).pipe(
+      Effect.timeout(Duration.seconds(3)),
+      Effect.map((s) => s.trim() || null),
+      Effect.orElseSucceed(() => null),
     );
   });
-}
 
-export function parseOAuthPayload(raw: string): {
-  loggedIn: boolean;
-  expired: boolean;
-  subscriptionType: string | null;
-  rateLimitTier: string | null;
-  expiresAt: number | null;
-} {
-  const creds = JSON.parse(raw) as Record<string, unknown>;
-  const oauth = (creds.claudeAiOauth ?? {}) as Record<string, unknown>;
-
-  if (!oauth.accessToken) {
-    return { loggedIn: false, expired: false, subscriptionType: null, rateLimitTier: null, expiresAt: null };
-  }
-
-  const expiresAt = typeof oauth.expiresAt === 'number' ? oauth.expiresAt : null;
-  const expired = !!(expiresAt && expiresAt < Date.now());
-
-  // Treat as logged in even if expired — Claude Code auto-refreshes tokens
-  // transparently. Only mark as not-logged-in if there's no token at all.
-  return {
-    loggedIn: true,
-    expired,
-    subscriptionType: typeof oauth.subscriptionType === 'string' ? oauth.subscriptionType : null,
-    rateLimitTier: typeof oauth.rateLimitTier === 'string' ? oauth.rateLimitTier : null,
-    expiresAt,
-  };
-}
-
-export async function getClaudeAuthStatus(): Promise<ClaudeAuthStatus> {
+const getClaudeAuthStatusImpl: Effect.Effect<
+  ClaudeAuthStatus,
+  never,
+  FileSystem.FileSystem | ChildProcessSpawner
+> = Effect.gen(function* () {
   const claudeDir = join(homedir(), '.claude');
   const credPath = join(claudeDir, '.credentials.json');
 
@@ -102,35 +116,43 @@ export async function getClaudeAuthStatus(): Promise<ClaudeAuthStatus> {
 
   // 1. Try flat credentials file (Linux, older Claude Code)
   if (existsSync(credPath)) {
-    try {
-      const raw = await readFile(credPath, 'utf-8');
-      const result = parseOAuthPayload(raw);
+    const fs = yield* FileSystem.FileSystem;
+    const result = yield* fs.readFileString(credPath, 'utf-8').pipe(
+      Effect.flatMap(parseOAuthPayload),
+      Effect.orElseSucceed(() => null),
+    );
+    if (result) {
       loggedIn = result.loggedIn;
       expired = result.expired;
       subscriptionType = result.subscriptionType;
       rateLimitTier = result.rateLimitTier;
       expiresAt = result.expiresAt;
-    } catch {
-      // Credentials file unreadable or malformed — fall through to keychain.
     }
   }
 
   // 2. Fall back to macOS Keychain (Claude Code ≥2.x on macOS)
   if (!loggedIn) {
-    try {
-      const keychainRaw = await readKeychainCredentials();
-      if (keychainRaw) {
-        const result = parseOAuthPayload(keychainRaw);
+    const keychainRaw = yield* readKeychainCredentials;
+    if (keychainRaw) {
+      const result = yield* parseOAuthPayload(keychainRaw).pipe(
+        Effect.orElseSucceed(() => null),
+      );
+      if (result) {
         loggedIn = result.loggedIn;
         expired = result.expired;
         subscriptionType = result.subscriptionType;
         rateLimitTier = result.rateLimitTier;
         expiresAt = result.expiresAt;
       }
-    } catch {
-      // Keychain read failed — treat as not logged in.
     }
   }
 
   return { installed, loggedIn, expired, subscriptionType, rateLimitTier, expiresAt, hasAnthropicApiKey };
+});
+
+export function getClaudeAuthStatus(): Effect.Effect<ClaudeAuthStatus, never> {
+  return getClaudeAuthStatusImpl.pipe(
+    Effect.scoped,
+    Effect.provide(NodeServicesLayer),
+  );
 }

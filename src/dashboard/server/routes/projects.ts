@@ -277,7 +277,7 @@ async function collectSessionTreeNodes(
         duration: 0,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
-        roundMetadata: synthesisRoundMetadata,
+        roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
       });
@@ -291,7 +291,7 @@ async function collectSessionTreeNodes(
         endedAt: undefined,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
-      sections.push(...reviewerNodes);
+      sections.push(...(reviewerNodes as unknown as SessionNode[]));
     }
 
     // Test role — one canonical session (`agent-<issue>-test`) reused across
@@ -357,7 +357,7 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const entry = findSpecByIssue(projectPath, issueId);
+      const entry = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
       if (entry) {
         const specContent = await readOptional(entry.path);
         if (specContent) {

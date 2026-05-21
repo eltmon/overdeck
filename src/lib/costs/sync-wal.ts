@@ -9,8 +9,10 @@
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { listProjects } from '../projects.js';
 import { insertCostEvents } from '../database/cost-events-db.js';
+import { FsError } from '../errors.js';
 import type { CostEvent } from './events.js';
 
 const DEFAULT_EVENTS_SUBDIR = '.pan/events';
@@ -122,6 +124,28 @@ export async function syncWalFromDir(eventsDir: string): Promise<{ imported: num
 }
 
 // ============== Helpers ==============
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of syncWalFromAllProjects. The underlying impl already
+ * collects per-file errors in `result.errors` rather than throwing, so the
+ * Effect channel only sees catastrophic failures (e.g. listProjects throwing).
+ */
+export const syncWalFromAllProjectsEffect = (): Effect.Effect<SyncResult, FsError> =>
+  Effect.tryPromise({
+    try: () => syncWalFromAllProjects(),
+    catch: (cause) => new FsError({ path: '<all projects>', operation: 'syncWalFromAllProjects', cause }),
+  });
+
+/** Effect variant of syncWalFromDir. */
+export const syncWalFromDirEffect = (
+  eventsDir: string,
+): Effect.Effect<{ imported: number; duplicates: number; files: number; errors: string[] }, FsError> =>
+  Effect.tryPromise({
+    try: () => syncWalFromDir(eventsDir),
+    catch: (cause) => new FsError({ path: eventsDir, operation: 'syncWalFromDir', cause }),
+  });
 
 async function parseWalFile(filePath: string, errors: string[]): Promise<CostEvent[]> {
   let content: string;

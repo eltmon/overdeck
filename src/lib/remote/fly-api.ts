@@ -6,6 +6,9 @@
  * Auth: FLY_API_TOKEN environment variable
  */
 
+import { Effect } from 'effect';
+import { ConfigError } from '../errors.js';
+
 export interface FlyMachineConfig {
   image: string;
   env?: Record<string, string>;
@@ -219,3 +222,138 @@ export function createFlyApiClient(token?: string): FlyApiClient {
   }
   return new FlyApiClient(tok);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Additive Effect-typed wrappers around the FlyApiClient methods and the
+// constructor helper, so callers in Effect graphs can stay end-to-end Effect
+// without `Effect.tryPromise`-wrapping every call site. The wrappers surface
+// HTTP failures as `FlyApiError` (already a tagged class) and missing-token
+// failures as `ConfigError`.
+
+const toFlyApiError = (cause: unknown): FlyApiError =>
+  cause instanceof FlyApiError
+    ? cause
+    : new FlyApiError(
+        cause instanceof Error ? cause.message : String(cause),
+        0,
+        '',
+      );
+
+/** Build a FlyApiClient from env or explicit token (Effect variant). */
+export const createFlyApiClientEffect = (
+  token?: string,
+): Effect.Effect<FlyApiClient, ConfigError> =>
+  Effect.try({
+    try: () => createFlyApiClient(token),
+    catch: (cause) =>
+      new ConfigError({
+        message:
+          cause instanceof Error ? cause.message : 'Failed to build FlyApiClient',
+        cause,
+      }),
+  });
+
+/** Create a machine in an app (Effect variant). */
+export const createMachineEffect = (
+  client: FlyApiClient,
+  appName: string,
+  name: string,
+  config: FlyMachineConfig,
+): Effect.Effect<FlyMachine, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.createMachine(appName, name, config),
+    catch: toFlyApiError,
+  });
+
+/** Destroy a machine (Effect variant). */
+export const destroyMachineEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.destroyMachine(appName, machineId),
+    catch: toFlyApiError,
+  });
+
+/** Start a stopped machine (Effect variant). */
+export const startMachineEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.startMachine(appName, machineId),
+    catch: toFlyApiError,
+  });
+
+/** Stop a running machine (Effect variant). */
+export const stopMachineEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+  signal?: string,
+  timeout?: number,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.stopMachine(appName, machineId, signal, timeout),
+    catch: toFlyApiError,
+  });
+
+/** Get a machine by ID (Effect variant). */
+export const getMachineEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+): Effect.Effect<FlyMachine, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.getMachine(appName, machineId),
+    catch: toFlyApiError,
+  });
+
+/** List all machines in an app (Effect variant). */
+export const listMachinesEffect = (
+  client: FlyApiClient,
+  appName: string,
+): Effect.Effect<FlyMachine[], FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.listMachines(appName),
+    catch: toFlyApiError,
+  });
+
+/** Execute a command inside a running machine (Effect variant). */
+export const execCommandEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+  command: string[],
+  timeout?: number,
+): Effect.Effect<FlyExecResult, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.execCommand(appName, machineId, command, timeout),
+    catch: toFlyApiError,
+  });
+
+/** Wait for a machine to reach a target state (Effect variant). */
+export const waitForStateEffect = (
+  client: FlyApiClient,
+  appName: string,
+  machineId: string,
+  state: string,
+  timeout?: number,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.waitForState(appName, machineId, state, timeout),
+    catch: toFlyApiError,
+  });
+
+/** Create a Fly app if it doesn't exist (Effect variant). */
+export const ensureAppEffect = (
+  client: FlyApiClient,
+  appName: string,
+  orgSlug: string,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.ensureApp(appName, orgSlug),
+    catch: toFlyApiError,
+  });

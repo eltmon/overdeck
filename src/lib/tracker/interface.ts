@@ -5,6 +5,22 @@
  * (Linear, GitHub Issues, GitLab Issues, etc.)
  */
 
+import { Data, Effect } from 'effect';
+import type {
+  TrackerError,
+  GitHubApiError,
+  LinearApiError,
+} from '../errors.js';
+
+/**
+ * Union of every typed error a tracker implementation can produce while
+ * communicating with its remote API. Concrete adapters narrow this to the
+ * subset they actually emit (Linear → LinearApiError, GitHub → GitHubApiError,
+ * etc.), but the interface widens to the union so consumers handle them
+ * uniformly.
+ */
+export type TrackerApiError = TrackerError | GitHubApiError | LinearApiError;
+
 // Supported tracker types
 export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 
@@ -122,6 +138,17 @@ export interface IssueUpdate {
 }
 
 /**
+ * Every typed error that any IssueTracker operation can emit. Concrete
+ * adapters narrow this in their own return types; the interface widens to
+ * the full union so consumers can write a single uniform handler.
+ */
+export type AnyTrackerError =
+  | TrackerApiError
+  | TrackerAuthError
+  | IssueNotFoundError
+  | NotImplementedError;
+
+/**
  * Abstract interface for issue trackers.
  * Implementations must handle normalization to/from tracker-specific formats.
  */
@@ -132,77 +159,79 @@ export interface IssueTracker {
   /**
    * List issues matching filters
    */
-  listIssues(filters?: IssueFilters): Promise<Issue[]>;
+  listIssues(filters?: IssueFilters): Effect.Effect<Issue[], AnyTrackerError>;
 
   /**
    * Get a single issue by ID or ref
    * @param id - Issue ID or human-readable ref (e.g., "MIN-630", "#42")
    */
-  getIssue(id: string): Promise<Issue>;
+  getIssue(id: string): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Update an existing issue
    */
-  updateIssue(id: string, update: IssueUpdate): Promise<Issue>;
+  updateIssue(
+    id: string,
+    update: IssueUpdate,
+  ): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Create a new issue
    */
-  createIssue(issue: NewIssue): Promise<Issue>;
+  createIssue(issue: NewIssue): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Get comments on an issue
    */
-  getComments(issueId: string): Promise<Comment[]>;
+  getComments(issueId: string): Effect.Effect<Comment[], AnyTrackerError>;
 
   /**
    * Add a comment to an issue
    */
-  addComment(issueId: string, body: string): Promise<Comment>;
+  addComment(
+    issueId: string,
+    body: string,
+  ): Effect.Effect<Comment, AnyTrackerError>;
 
   /**
    * Transition issue to a new state
    */
-  transitionIssue(id: string, state: IssueState): Promise<void>;
+  transitionIssue(
+    id: string,
+    state: IssueState,
+  ): Effect.Effect<void, AnyTrackerError>;
 
   /**
    * Link a PR/MR to an issue
    */
-  linkPR(issueId: string, prUrl: string): Promise<void>;
+  linkPR(issueId: string, prUrl: string): Effect.Effect<void, AnyTrackerError>;
 
   /**
    * Get child issues for a parent issue (hierarchy support).
    * Returns empty array for trackers that don't support hierarchy.
    */
-  getChildIssues(parentId: string): Promise<Issue[]>;
+  getChildIssues(parentId: string): Effect.Effect<Issue[], AnyTrackerError>;
 }
 
 /**
- * Error thrown when a tracker feature is not implemented
+ * Error surfaced when a tracker feature is not implemented by a given adapter.
  */
-export class NotImplementedError extends Error {
-  constructor(feature: string) {
-    super(`Not implemented: ${feature}`);
-    this.name = 'NotImplementedError';
-  }
-}
+export class NotImplementedError extends Data.TaggedError('NotImplementedError')<{
+  readonly feature: string;
+}> {}
 
 /**
- * Error thrown when an issue is not found
+ * Error surfaced when a requested issue does not exist in the tracker.
  */
-export class IssueNotFoundError extends Error {
-  constructor(id: string, tracker: TrackerType) {
-    super(`Issue not found: ${id} (tracker: ${tracker})`);
-    this.name = 'IssueNotFoundError';
-  }
-}
+export class IssueNotFoundError extends Data.TaggedError('IssueNotFoundError')<{
+  readonly id: string;
+  readonly tracker: TrackerType;
+}> {}
 
 /**
- * Error thrown when tracker authentication fails
+ * Error surfaced when tracker authentication fails (missing or invalid credentials).
  */
-export class TrackerAuthError extends Error {
-  constructor(tracker: TrackerType, message: string) {
-    super(`Authentication failed for ${tracker}: ${message}`);
-    this.name = 'TrackerAuthError';
-  }
-}
+export class TrackerAuthError extends Data.TaggedError('TrackerAuthError')<{
+  readonly tracker: TrackerType;
+  readonly message: string;
+}> {}

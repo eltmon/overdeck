@@ -17,7 +17,7 @@
  */
 
 import { Effect, Layer, Schema } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { EventStoreService } from '../services/domain-services.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -52,7 +52,7 @@ function getRequestHeader(
 export function rejectUntrustedOrigin(
   request: HttpServerRequest.HttpServerRequest,
   options: { requireOriginHeader?: boolean } = {},
-): Response | null {
+): HttpServerResponse.HttpServerResponse | null {
   if (options.requireOriginHeader && !getRequestHeader(request, 'origin') && !getRequestHeader(request, 'referer')) {
     return jsonResponse({ error: 'Missing origin' }, { status: 403 });
   }
@@ -175,14 +175,14 @@ const ConfigResponseSchema = Schema.Struct({
 const OkResponseSchema = Schema.Struct({ ok: Schema.Boolean });
 const TestConnectionResponseSchema = Schema.Struct({ ok: Schema.Boolean, latencyMs: Schema.optional(Schema.Number), error: Schema.optional(Schema.String) });
 
-function validatedJsonResponse<A>(schema: Schema.Schema<A, unknown, never>, data: unknown): ReturnType<typeof jsonResponse> {
+function validatedJsonResponse<A>(schema: Schema.Codec<A>, data: unknown): ReturnType<typeof jsonResponse> {
   Schema.decodeUnknownSync(schema)(data);
   return jsonResponse(data);
 }
 
-function parseRequestBody<A>(schema: Schema.Schema<A, unknown, never>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
+function parseRequestBody<A>(schema: Schema.Codec<A>, raw: unknown): { ok: true; body: A } | { ok: false; response: HttpServerResponse.HttpServerResponse } {
   try {
-    return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) };
+    return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) as A };
   } catch (err) {
     return {
       ok: false,
@@ -429,7 +429,7 @@ const postEnrichByIdRoute = HttpRouter.add(
       const config = yield* Effect.promise(() => getConversationsConfigAsync());
       const eventStore = yield* EventStoreService;
       const result = yield* Effect.promise(() =>
-        runDashboardDbJob('enrichSessions', {
+        runDashboardDbJob<{ enriched: number; errors: number; estimatedCost: number; actualCost: number | null; durationMs: number }>('enrichSessions', {
           tier,
           sessionIds: [id],
           config,
@@ -515,7 +515,7 @@ const postScanRoute = HttpRouter.add(
     yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(startedEvent as ScanStartedEvent)));
 
     const result = yield* Effect.promise(() =>
-      runDashboardDbJob('scanConversations', {
+      runDashboardDbJob<{ inserted: number; updated: number; skipped: number; errors: number; durationMs: number }>('scanConversations', {
         mode,
         watchDirs,
         dirs: body.dirs,
@@ -591,7 +591,7 @@ const postEnrichRoute = HttpRouter.add(
 
     try {
       const result = yield* Effect.promise(() =>
-        runDashboardDbJob('enrichSessions', {
+        runDashboardDbJob<{ enriched: number; errors: number; estimatedCost: number; actualCost: number | null; durationMs: number }>('enrichSessions', {
           tier,
           sessionIds: enrichSessionIds,
           maxParallel: enrichMaxParallel,
@@ -767,12 +767,13 @@ const postTestConnectionRoute = HttpRouter.add(
     const result = yield* Effect.promise(async () => {
       const startTs = Date.now();
       try {
-        await embed(body.provider as 'openai' | 'voyage' | 'ollama', {
+        // embed() returns Effect — must runPromise to actually execute it
+        await Effect.runPromise(embed(body.provider as 'openai' | 'voyage' | 'ollama', {
           text: 'connection test',
           model: body.model,
           apiKey: body.apiKey,
           baseUrl: body.ollamaBaseUrl,
-        });
+        }));
         return { ok: true, latencyMs: Date.now() - startTs };
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), latencyMs: Date.now() - startTs };

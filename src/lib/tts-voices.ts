@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto';
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
+import { FsError } from './errors.js';
 
 export type TtsVoiceKind = 'preset' | 'design' | 'clone';
 
@@ -72,3 +74,69 @@ export async function findVoiceByName(name: string): Promise<TtsVoice | undefine
   const voices = await loadVoices();
   return voices.find((voice) => voice.name === name);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Load all configured TTS voices. FsError on disk failure (ENOENT → []). */
+export const loadVoicesEffect = (): Effect.Effect<readonly TtsVoice[], FsError> =>
+  Effect.tryPromise({
+    try: () => loadVoices(),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'loadVoices', cause }),
+  });
+
+/** Persist the supplied voice list atomically (mode 0o600). */
+export const saveVoicesEffect = (
+  voices: readonly TtsVoice[],
+): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => saveVoices([...voices]),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'saveVoices', cause }),
+  });
+
+/** Append a new voice (generates id + createdAt). */
+export const addVoiceEffect = (
+  voice: Omit<TtsVoice, 'id' | 'createdAt'>,
+): Effect.Effect<TtsVoice, FsError> =>
+  Effect.tryPromise({
+    try: () => addVoice(voice),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'addVoice', cause }),
+  });
+
+/** Delete a voice by id; returns true if anything was removed. */
+export const deleteVoiceEffect = (id: string): Effect.Effect<boolean, FsError> =>
+  Effect.tryPromise({
+    try: () => deleteVoice(id),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'deleteVoice', cause }),
+  });
+
+/** Remove all voices; returns the number removed. */
+export const clearVoicesEffect = (): Effect.Effect<number, FsError> =>
+  Effect.tryPromise({
+    try: () => clearVoices(),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'clearVoices', cause }),
+  });
+
+/** Find a voice by id. */
+export const findVoiceByIdEffect = (
+  id: string,
+): Effect.Effect<TtsVoice | undefined, FsError> =>
+  Effect.tryPromise({
+    try: () => findVoiceById(id),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'findVoiceById', cause }),
+  });
+
+/** Find a voice by name. */
+export const findVoiceByNameEffect = (
+  name: string,
+): Effect.Effect<TtsVoice | undefined, FsError> =>
+  Effect.tryPromise({
+    try: () => findVoiceByName(name),
+    catch: (cause) =>
+      new FsError({ path: getTtsVoicesPath(), operation: 'findVoiceByName', cause }),
+  });

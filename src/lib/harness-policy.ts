@@ -22,6 +22,7 @@
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
+import { Effect } from 'effect'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModel } from './providers.js'
@@ -90,3 +91,21 @@ export function canUseHarness(
 
   return ALLOWED
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Pure-sync policy checks — additive Effect.sync wrappers for callers in Effect graphs.
+
+/** Check whether a (model, authMode) pair is allowed. Pure. */
+export const canUseModelWithAuthEffect = (
+  model: string,
+  authMode: AuthMode | undefined,
+): Effect.Effect<HarnessPolicyDecision> =>
+  Effect.sync(() => canUseModelWithAuth(model, authMode))
+
+/** Check whether a (harness, model, authMode) triple is allowed. Pure. */
+export const canUseHarnessEffect = (
+  harness: RuntimeName,
+  model: string,
+  authMode: AuthMode | undefined,
+): Effect.Effect<HarnessPolicyDecision> =>
+  Effect.sync(() => canUseHarness(harness, model, authMode))

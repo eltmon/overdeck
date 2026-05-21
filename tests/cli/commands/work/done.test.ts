@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -86,7 +87,7 @@ vi.mock('../../../../src/lib/config.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/shadow-utils.js', () => ({
-  getLinearApiKey: vi.fn().mockReturnValue(null),
+  getLinearApiKey: vi.fn().mockReturnValue(Effect.succeed(null)),
 }));
 
 vi.mock('../../../../src/lib/vbrief/beads.js', () => ({

@@ -1,5 +1,16 @@
-import { getDatabase } from './index.js';
+/**
+ * Merge Set SQLite Storage.
+ *
+ * PAN-1249: Effect migration pass — public API stays synchronous to keep
+ * the existing call sites unchanged. The DatabaseError tagged error is
+ * re-exported from ./index.js so callers can surface typed SQLite
+ * failures. Full conversion to @effect/sql-sqlite-bun is deferred to
+ * PAN-447.
+ */
+
+import { getDatabase, DatabaseError } from './index.js';
 import type { MergeSet, MergeSetRepoState } from '../merge-set.js';
+export { DatabaseError };
 
 export function upsertMergeSet(mergeSet: MergeSet): void {
   const db = getDatabase();

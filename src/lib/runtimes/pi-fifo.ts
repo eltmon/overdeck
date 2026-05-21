@@ -34,6 +34,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
+import { Data, Effect } from 'effect'
 
 const execAsync = promisify(exec)
 
@@ -141,3 +142,68 @@ function shellQuote(s: string): string {
   if (/^[A-Za-z0-9._/-]+$/.test(s)) return s
   return `'${s.replace(/'/g, `'\\''`)}'`
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants of the fifo helpers above. Sync/promise
+// variants are preserved so the existing PiRuntime adapter keeps working.
+
+/** Tagged error for pi-fifo Effect variants. */
+export class PiFifoError extends Data.TaggedError('PiFifoError')<{
+  readonly agentId: string
+  readonly stage: 'create' | 'write' | 'destroy'
+  readonly message: string
+  readonly cause?: unknown
+}> {}
+
+/** Effect variant of `createPiFifo`. */
+export const createPiFifoEffect = (
+  agentId: string,
+  home?: string,
+): Effect.Effect<string, PiFifoError> =>
+  Effect.tryPromise({
+    try: () => createPiFifo(agentId, home),
+    catch: (cause) =>
+      new PiFifoError({
+        agentId,
+        stage: 'create',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  })
+
+/**
+ * Effect variant of `writePiCommand`. Lifts the sync FD ops via `Effect.try`.
+ * The PiNotReady signal is preserved in the cause field so callers can branch.
+ */
+export const writePiCommandEffect = (
+  agentId: string,
+  command: unknown,
+  home?: string,
+): Effect.Effect<void, PiFifoError> =>
+  Effect.try({
+    try: () => writePiCommand(agentId, command, home),
+    catch: (cause) =>
+      new PiFifoError({
+        agentId,
+        stage: 'write',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  })
+
+/** Effect variant of `destroyPiFifo`. */
+export const destroyPiFifoEffect = (
+  agentId: string,
+  home?: string,
+): Effect.Effect<void, PiFifoError> =>
+  Effect.try({
+    try: () => destroyPiFifo(agentId, home),
+    catch: (cause) =>
+      new PiFifoError({
+        agentId,
+        stage: 'destroy',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  })

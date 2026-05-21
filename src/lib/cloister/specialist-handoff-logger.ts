@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { getPanopticonHome } from '../paths.js';
 
 /**
@@ -292,3 +293,30 @@ export async function updateSpecialistHandoffStatus(
     return false;
   }
 }
+
+// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+
+export type SpecialistHandoffStats = Awaited<ReturnType<typeof getSpecialistHandoffStats>>;
+
+/**
+ * Effect variant of {@link getSpecialistHandoffStats}. Underlying I/O is
+ * read-only and best-effort; this wrapper preserves the original contract
+ * (never throws) by lifting via `Effect.promise`.
+ */
+export const getSpecialistHandoffStatsEffect = (
+  options?: { agentsDir?: string },
+): Effect.Effect<SpecialistHandoffStats> =>
+  Effect.promise(() => getSpecialistHandoffStats(options));
+
+/**
+ * Effect variant of {@link updateSpecialistHandoffStatus}. The Promise version
+ * already returns `false` rather than throwing on every failure mode, so the
+ * Effect form mirrors that contract.
+ */
+export const updateSpecialistHandoffStatusEffect = (
+  issueId: string,
+  toSpecialist: string,
+  status: 'processing' | 'completed' | 'failed',
+  result?: 'success' | 'failure',
+): Effect.Effect<boolean> =>
+  Effect.promise(() => updateSpecialistHandoffStatus(issueId, toSpecialist, status, result));

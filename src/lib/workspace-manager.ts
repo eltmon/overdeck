@@ -9,6 +9,7 @@ import { join, dirname, basename, extname, resolve, relative } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import {
   ProjectConfig,
   WorkspaceConfig,
@@ -27,6 +28,7 @@ import {
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
 } from './pan-dir/index.js';
+import { FsError, ProcessSpawnError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -1546,3 +1548,104 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   result.success = result.errors.length === 0;
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// workspace-manager.ts is a multi-thousand-line orchestration surface. Per the
+// migration plan we prioritise *additive* Effect wrappers over the
+// public-facing entry points; the file's many internal helpers stay as-is
+// because they're called from within the wrapped functions.
+
+const toWmFsError = (op: string, path: string, cause: unknown): FsError =>
+  new FsError({ path, operation: op, cause });
+
+const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
+  new ProcessSpawnError({
+    command: 'workspace-manager',
+    args: [op],
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Migrate any pre-PAN-967 .panopticon/* subdirs to the .pan/ layout. */
+export const migratePanopticonToPanEffect = (
+  projectPath: string,
+): Effect.Effect<PanMigrationResult, FsError> =>
+  Effect.try({
+    try: () => migratePanopticonToPan(projectPath),
+    catch: (cause) => toWmFsError('migratePanopticonToPan', projectPath, cause),
+  });
+
+/** Mirror ~/.claude settings/agents into the workspace's .claude/ dir. */
+export const copyPanopticonSettingsToWorkspaceEffect = (
+  workspacePath: string,
+): Effect.Effect<{ copied: string[]; errors: string[] }, FsError> =>
+  Effect.try({
+    try: () => copyPanopticonSettingsToWorkspace(workspacePath),
+    catch: (cause) =>
+      toWmFsError('copyPanopticonSettingsToWorkspace', workspacePath, cause),
+  });
+
+/** Ensure the project gitignore covers `.pan/continue.json` (PAN-1124). */
+export const ensurePanGitignoreEffect = (
+  projectPath: string,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => ensurePanGitignore(projectPath),
+    catch: (cause) => toWmFsError('ensurePanGitignore', projectPath, cause),
+  });
+
+/** Create a new workspace (git worktree + scaffolding). */
+export const createWorkspaceEffect = (
+  options: WorkspaceCreateOptions,
+): Effect.Effect<WorkspaceCreateResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => createWorkspace(options),
+    catch: (cause) => toWmProcessError('createWorkspace', cause),
+  });
+
+/** Mark a directory as pre-trusted for Claude Code (idempotent). */
+export const preTrustDirectoryEffect = (
+  dirPath: string,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => preTrustDirectory(dirPath),
+    catch: (cause) => toWmFsError('preTrustDirectory', dirPath, cause),
+  });
+
+/** Add additional repos (worktrees / symlinks) to an existing workspace. */
+export const addReposToWorkspaceEffect = (
+  options: AddReposToWorkspaceOptions,
+): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => addReposToWorkspace(options),
+    catch: (cause) => toWmProcessError('addReposToWorkspace', cause),
+  });
+
+/** Enumerate Docker containers whose compose files live under a workspace. */
+export const getContainersReferencingWorkspacePathEffect = (
+  ...args: Parameters<typeof getContainersReferencingWorkspacePath>
+): Effect.Effect<Awaited<ReturnType<typeof getContainersReferencingWorkspacePath>>, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => getContainersReferencingWorkspacePath(...args),
+    catch: (cause) =>
+      toWmProcessError('getContainersReferencingWorkspacePath', cause),
+  });
+
+/** Stop every Docker resource associated with the supplied workspace. */
+export const stopWorkspaceDockerEffect = (
+  ...args: Parameters<typeof stopWorkspaceDocker>
+): Effect.Effect<DockerCleanupResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => stopWorkspaceDocker(...args),
+    catch: (cause) => toWmProcessError('stopWorkspaceDocker', cause),
+  });
+
+/** Remove a workspace (worktrees, branches, Docker, DNS, tunnel ingress). */
+export const removeWorkspaceEffect = (
+  options: WorkspaceRemoveOptions,
+): Effect.Effect<WorkspaceRemoveResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => removeWorkspace(options),
+    catch: (cause) => toWmProcessError('removeWorkspace', cause),
+  });

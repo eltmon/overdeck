@@ -14,11 +14,22 @@
  */
 
 import type Database from 'better-sqlite3';
+import { Data, Effect } from 'effect';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { getPanopticonHome } from '../paths.js';
 import { runMigrations } from './schema.js';
+
+/**
+ * PAN-1249: Local typed error for SQLite failures against panopticon.db.
+ * Used by callers that want to surface DB faults instead of swallowing them.
+ * Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
+ */
+export class DatabaseError extends Data.TaggedError('DatabaseError')<{
+  readonly operation: string;
+  readonly cause?: unknown;
+}> {}
 
 declare const Bun: unknown;
 
@@ -133,12 +144,18 @@ export function getDatabase(): Database.Database {
   // any single call is short. .unref() so it doesn't block process exit.
   setInterval(() => {
     if (!_db) return;
-    try {
-      const free = _db.pragma('freelist_count', { simple: true }) as number;
-      if (free > 256) {
-        _db.pragma(`incremental_vacuum(${Math.min(free, 10000)})`);
-      }
-    } catch { /* non-fatal */ }
+    const db = _db;
+    Effect.runSync(
+      Effect.try({
+        try: () => {
+          const free = db.pragma('freelist_count', { simple: true }) as number;
+          if (free > 256) {
+            db.pragma(`incremental_vacuum(${Math.min(free, 10000)})`);
+          }
+        },
+        catch: (cause) => new DatabaseError({ operation: 'incremental_vacuum', cause }),
+      }).pipe(Effect.catchTag('DatabaseError', () => Effect.void)), // non-fatal
+    );
   }, 15 * 60 * 1000).unref();
 
   return _db;

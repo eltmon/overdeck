@@ -5,8 +5,10 @@
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { Effect } from 'effect';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
-import { readWorkspaceContinueAsync, writeWorkspaceContinueAsync } from '../pan-dir/continue.js';
+import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import type { WorkspaceContinueState } from '../pan-dir/types.js';
 
 export interface WaveItem {
   id: string;
@@ -829,7 +831,13 @@ async function mirrorTaskOperationToContinueFileAsync(
   doc: VBriefDocument,
   subItemIds?: string[],
 ): Promise<void> {
-  const continueState = (await readWorkspaceContinueAsync(workspacePath)) ?? {
+  // PAN-1249: readWorkspaceContinue/writeWorkspaceContinue are now Effect-based.
+  // Wrap with Effect.runPromise at the async-public boundary to preserve the
+  // existing Promise<void> signature without cascading Effect through every
+  // caller (the additive-variant strategy used elsewhere in this directory).
+  const continueState: WorkspaceContinueState = (await Effect.runPromise(
+    readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null as WorkspaceContinueState | null))),
+  )) ?? {
     version: '1' as const,
     issueId: '',
     created: new Date().toISOString(),
@@ -857,7 +865,7 @@ async function mirrorTaskOperationToContinueFileAsync(
   }
 
   continueState.statusOverrides = overrides;
-  await writeWorkspaceContinueAsync(workspacePath, continueState);
+  await Effect.runPromise(writeWorkspaceContinue(workspacePath, continueState));
 }
 
 export async function applyTaskOperationToPlanFileAsync(

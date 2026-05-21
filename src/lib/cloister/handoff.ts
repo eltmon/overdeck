@@ -8,6 +8,7 @@
 
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
 import type { AgentState } from '../agents.js';
 import { getAgentState, saveAgentState, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
@@ -219,3 +220,39 @@ export function shouldHandoff(agentId: string): boolean {
   // TODO: Implement trigger logic in Phase C
   return false;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// The handoff orchestration touches multiple subsystems (model validation,
+// agent state, tmux session detection, prompt persistence) — failures from any
+// of them surface here. The Effect variant collapses these into a single typed
+// error channel so callers can `Effect.catchTag` the relevant case.
+
+/** Tagged error for `performHandoffEffect` failures. */
+export class HandoffError extends Data.TaggedError('HandoffError')<{
+  readonly agentId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/**
+ * Effect variant of `performHandoff`. Wraps the Promise-based implementation
+ * and maps any thrown error into a typed `HandoffError`. The success result is
+ * the same `HandoffResult` shape as the sync variant — including `success:
+ * false` results when the agent isn't found or the model override is invalid.
+ */
+export const performHandoffEffect = (
+  agentId: string,
+  options: HandoffOptions,
+): Effect.Effect<HandoffResult, HandoffError> =>
+  Effect.tryPromise({
+    try: () => performHandoff(agentId, options),
+    catch: (cause) =>
+      new HandoffError({
+        agentId,
+        stage: 'performHandoff',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

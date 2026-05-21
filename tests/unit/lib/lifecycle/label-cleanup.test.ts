@@ -40,7 +40,11 @@ vi.mock('@linear/sdk', () => ({
   }; }),
 }));
 
-import { cleanupMergedLabels } from '../../../../src/lib/lifecycle/label-cleanup.js';
+import { Effect } from 'effect';
+import { cleanupMergedLabels as cleanupMergedLabelsEffect } from '../../../../src/lib/lifecycle/label-cleanup.js';
+
+const cleanupMergedLabels = (...args: Parameters<typeof cleanupMergedLabelsEffect>) =>
+  Effect.runPromise(cleanupMergedLabelsEffect(...args));
 
 describe('cleanupMergedLabels', () => {
   beforeEach(() => {

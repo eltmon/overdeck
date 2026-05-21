@@ -15,9 +15,11 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, w
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Effect } from 'effect';
 
 import { LOGS_DIR, PANOPTICON_HOME } from './paths.js';
 import { readPlatformConfig } from './platform-lifecycle.js';
+import { ProcessSpawnError } from './errors.js';
 
 const SUPERVISOR_PID_PATH = join(PANOPTICON_HOME, 'supervisor.pid');
 const SUPERVISOR_LOG_PATH = join(LOGS_DIR, 'supervisor.log');
@@ -144,3 +146,38 @@ export function stopSupervisorProcess(): void {
     // ignore
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Read the configured supervisor port. Pure. */
+export const getSupervisorPortEffect = (): Effect.Effect<number> =>
+  Effect.sync(() => getSupervisorPort());
+
+/** Public URL the frontend hits for the Force Restart fallback. Pure. */
+export const getSupervisorUrlEffect = (): Effect.Effect<string> =>
+  Effect.sync(() => getSupervisorUrl());
+
+/** Liveness probe — true if the supervisor pid file maps to a live process. */
+export const isSupervisorRunningEffect = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSupervisorRunning());
+
+/**
+ * Idempotently start the supervisor sidecar. Fails with ProcessSpawnError
+ * if the supervisor bundle could not be resolved or the child failed to
+ * detach. Successful no-op when already running.
+ */
+export const startSupervisorProcessEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+  Effect.try({
+    try: () => startSupervisorProcess(),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: process.execPath,
+        args: ['<supervisor-bundle>'],
+        message: 'startSupervisorProcess failed',
+        cause,
+      }),
+  });
+
+/** Stop the supervisor sidecar and remove its pid file. */
+export const stopSupervisorProcessEffect = (): Effect.Effect<void> =>
+  Effect.sync(() => stopSupervisorProcess());

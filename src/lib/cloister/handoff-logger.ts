@@ -5,7 +5,10 @@
  */
 
 import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'fs';
+import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import type { HandoffContext } from './handoff-context.js';
 import type { TriggerType } from './triggers.js';
@@ -328,3 +331,106 @@ export function getPendingVerificationHandoffs(): HandoffEvent[] {
   const events = readHandoffEvents();
   return events.filter(e => e.success && !e.outcome?.verified);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Async, typed-error variants of the handoff log helpers. The sync variants
+// are preserved for the CLI surfaces (e.g. `pan show`) that already run inside
+// a one-shot Node process where blocking is acceptable; the Effect variants
+// are appropriate for the dashboard server's request handlers.
+
+const ensureLogDirAsync = (): Effect.Effect<void, FsError> => {
+  const logDir = join(PANOPTICON_HOME, 'logs');
+  return Effect.tryPromise({
+    try: () => mkdir(logDir, { recursive: true }),
+    catch: (cause) => new FsError({ path: logDir, operation: 'mkdir', cause }),
+  });
+};
+
+/** Effect variant of `logHandoffEvent`. */
+export const logHandoffEventEffect = (event: HandoffEvent): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    yield* ensureLogDirAsync();
+    const line = JSON.stringify(event) + '\n';
+    yield* Effect.tryPromise({
+      try: () => appendFile(HANDOFF_LOG_FILE, line, 'utf-8'),
+      catch: (cause) => new FsError({ path: HANDOFF_LOG_FILE, operation: 'appendFile', cause }),
+    });
+  });
+
+/** Effect variant of `readHandoffEvents`. */
+export const readHandoffEventsEffect = (limit?: number): Effect.Effect<HandoffEvent[], FsError> =>
+  Effect.gen(function* () {
+    yield* ensureLogDirAsync();
+    if (!existsSync(HANDOFF_LOG_FILE)) return [];
+
+    const content = yield* Effect.tryPromise({
+      try: () => readFile(HANDOFF_LOG_FILE, 'utf-8'),
+      catch: (cause) => new FsError({ path: HANDOFF_LOG_FILE, operation: 'readFile', cause }),
+    });
+
+    const lines = content.trim().split('\n').filter((line) => line.trim());
+    const events = lines.map((line) => JSON.parse(line) as HandoffEvent);
+    events.reverse();
+    return limit ? events.slice(0, limit) : events;
+  });
+
+/** Effect variant of `readIssueHandoffEvents`. */
+export const readIssueHandoffEventsEffect = (
+  issueId: string,
+): Effect.Effect<HandoffEvent[], FsError> =>
+  readHandoffEventsEffect().pipe(Effect.map((events) => events.filter((e) => e.issueId === issueId)));
+
+/** Effect variant of `readAgentHandoffEvents`. */
+export const readAgentHandoffEventsEffect = (
+  agentId: string,
+): Effect.Effect<HandoffEvent[], FsError> =>
+  readHandoffEventsEffect().pipe(Effect.map((events) => events.filter((e) => e.agentId === agentId)));
+
+/** Effect variant of `updateHandoffOutcome`. */
+export const updateHandoffOutcomeEffect = (
+  agentId: string,
+  timestamp: string,
+  outcome: {
+    agentRecovered: boolean;
+    verificationMethod: 'heartbeat' | 'manual' | 'task_complete';
+    notes?: string;
+  },
+): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    yield* ensureLogDirAsync();
+    if (!existsSync(HANDOFF_LOG_FILE)) return;
+
+    const content = yield* Effect.tryPromise({
+      try: () => readFile(HANDOFF_LOG_FILE, 'utf-8'),
+      catch: (cause) => new FsError({ path: HANDOFF_LOG_FILE, operation: 'readFile', cause }),
+    });
+
+    const lines = content.trim().split('\n').filter((line) => line.trim());
+
+    const updatedLines = lines.map((line) => {
+      const event = JSON.parse(line) as HandoffEvent;
+      if (event.agentId === agentId && event.timestamp === timestamp) {
+        event.outcome = {
+          verified: true,
+          agentRecovered: outcome.agentRecovered,
+          verifiedAt: new Date().toISOString(),
+          verificationMethod: outcome.verificationMethod,
+          notes: outcome.notes,
+        };
+        return JSON.stringify(event);
+      }
+      return line;
+    });
+
+    yield* Effect.tryPromise({
+      try: () => writeFile(HANDOFF_LOG_FILE, updatedLines.join('\n') + '\n', 'utf-8'),
+      catch: (cause) => new FsError({ path: HANDOFF_LOG_FILE, operation: 'writeFile', cause }),
+    });
+  });
+
+/** Effect variant of `getPendingVerificationHandoffs`. */
+export const getPendingVerificationHandoffsEffect = (): Effect.Effect<HandoffEvent[], FsError> =>
+  readHandoffEventsEffect().pipe(
+    Effect.map((events) => events.filter((e) => e.success && !e.outcome?.verified)),
+  );

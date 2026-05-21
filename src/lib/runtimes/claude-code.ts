@@ -10,8 +10,11 @@
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import type {
   AgentRuntime,
+  AgentRuntimeEffect,
+  AgentRuntimeError,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -23,6 +26,7 @@ import type {
 import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExists, killSession, sendKeys, sendKeysAsync, getAgentSessions } from '../tmux.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
+import { ProcessSpawnError, TmuxError, FsError } from '../errors.js';
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
 
@@ -432,4 +436,89 @@ export class ClaudeCodeRuntime implements AgentRuntime {
  */
 export function createClaudeCodeRuntime(): ClaudeCodeRuntime {
   return new ClaudeCodeRuntime();
+}
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel adapter wrapping the legacy ClaudeCodeRuntime. The
+// promise/sync class above remains the canonical implementation used by
+// Cloister and the dashboard; this adapter is for new Effect-native callers.
+
+/**
+ * Effect-channel variant of {@link ClaudeCodeRuntime}. Lifts the async
+ * send/kill/spawn methods into typed Effect channels (TmuxError /
+ * ProcessSpawnError) while keeping sync introspection methods sync.
+ */
+export class ClaudeCodeRuntimeEffect implements AgentRuntimeEffect {
+  readonly name = 'claude-code' as const;
+  private readonly inner: ClaudeCodeRuntime;
+
+  constructor(inner: ClaudeCodeRuntime = new ClaudeCodeRuntime()) {
+    this.inner = inner;
+  }
+
+  getSessionPath(agentId: string): string | null {
+    return this.inner.getSessionPath(agentId);
+  }
+  getLastActivity(agentId: string): Date | null {
+    return this.inner.getLastActivity(agentId);
+  }
+  getHeartbeat(agentId: string): Heartbeat | null {
+    return this.inner.getHeartbeat(agentId);
+  }
+  getTokenUsage(agentId: string): TokenUsage | null {
+    return this.inner.getTokenUsage(agentId);
+  }
+  getSessionCost(agentId: string): CostBreakdown | null {
+    return this.inner.getSessionCost(agentId);
+  }
+  listSessions(workspace?: string): Session[] {
+    return this.inner.listSessions(workspace);
+  }
+
+  sendMessage(agentId: string, message: string): Effect.Effect<void, AgentRuntimeError> {
+    return Effect.tryPromise({
+      try: () => this.inner.sendMessage(agentId, message),
+      catch: (cause) =>
+        new TmuxError({
+          command: 'send-keys',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
+  }
+
+  killAgent(agentId: string): Effect.Effect<void, AgentRuntimeError> {
+    return Effect.try({
+      try: () => this.inner.killAgent(agentId),
+      catch: (cause) =>
+        new TmuxError({
+          command: 'kill-session',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
+  }
+
+  spawnAgent(config: SpawnConfig): Effect.Effect<Agent, AgentRuntimeError> {
+    return Effect.tryPromise({
+      try: () => this.inner.spawnAgent(config),
+      catch: (cause) =>
+        new ProcessSpawnError({
+          command: 'claude',
+          args: [],
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
+  }
+
+  isRunning(agentId: string): Effect.Effect<boolean> {
+    return Effect.sync(() => this.inner.isRunning(agentId));
+  }
+}
+
+/** Effect-flavored constructor companion to {@link createClaudeCodeRuntime}. */
+export function createClaudeCodeRuntimeEffect(): ClaudeCodeRuntimeEffect {
+  return new ClaudeCodeRuntimeEffect();
 }

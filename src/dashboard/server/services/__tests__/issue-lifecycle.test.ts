@@ -54,6 +54,7 @@ async function makeTestLayer() {
     getTeamStates: mockLinearGetTeamStates,
     updateState: mockLinearUpdateState,
     addComment: vi.fn(),
+    getComments: vi.fn(),
     findOrCreateLabel: vi.fn(),
     addLabel: vi.fn(),
     removeLabel: vi.fn(),
@@ -72,6 +73,7 @@ async function makeTestLayer() {
 
   const rallyLayer = Layer.succeed(RallyClient, {
     getIssue: vi.fn(),
+    getChildIssues: vi.fn(),
     updateState: mockRallyUpdateState,
     addComment: vi.fn(),
   });

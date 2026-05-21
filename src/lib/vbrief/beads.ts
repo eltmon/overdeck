@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
+import { Data, Effect } from 'effect';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -470,3 +471,66 @@ export function getVBriefACStatus(workspacePath: string): VBriefACStatus | null 
     totalCount,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect wrappers around the existing async APIs. They lift thrown
+// exceptions into a typed error channel so beads operations can compose with
+// other Effect-native code (workspace setup, status reporting). Migrate
+// callers individually.
+
+/** Tagged error for beads Effect variants. */
+export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')<{
+  readonly operation: string;
+  readonly workspacePath: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `createBeadsFromVBrief`. */
+export const createBeadsFromVBriefEffect = (
+  workspacePath: string,
+): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>
+  Effect.tryPromise({
+    try: () => createBeadsFromVBrief(workspacePath),
+    catch: (cause) =>
+      new BeadsOperationError({
+        operation: 'createBeadsFromVBrief',
+        workspacePath,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `syncBeadStatusToVBrief`. */
+export const syncBeadStatusToVBriefEffect = (
+  beadId: string,
+  workspacePath: string,
+  status: VBriefItemStatus = 'completed',
+  knownTitle?: string,
+): Effect.Effect<string | null, BeadsOperationError> =>
+  Effect.tryPromise({
+    try: () => syncBeadStatusToVBrief(beadId, workspacePath, status, knownTitle),
+    catch: (cause) =>
+      new BeadsOperationError({
+        operation: 'syncBeadStatusToVBrief',
+        workspacePath,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getVBriefACStatus`. */
+export const getVBriefACStatusEffect = (
+  workspacePath: string,
+): Effect.Effect<VBriefACStatus | null, BeadsOperationError> =>
+  Effect.try({
+    try: () => getVBriefACStatus(workspacePath),
+    catch: (cause) =>
+      new BeadsOperationError({
+        operation: 'getVBriefACStatus',
+        workspacePath,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

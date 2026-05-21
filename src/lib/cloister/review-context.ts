@@ -12,10 +12,12 @@ import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlan, readPlanAsync } from '../vbrief/io.js';
 import { findVBriefByIssue } from '../vbrief/lifecycle-io.js';
 import { getDevrootPath } from '../config.js';
+import { FsError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
@@ -377,3 +379,26 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
 
   return manifest;
 }
+
+// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link buildReviewContext}. Wraps the Promise-based
+ * implementation in `Effect.tryPromise` so callers in Effect pipelines can
+ * compose it with typed error channels. The git probes inside
+ * {@link buildReviewContext} are best-effort — they fall back to sentinel
+ * strings instead of failing — so the only error this Effect can surface is
+ * the workspace-not-found {@link FsError}.
+ */
+export const buildReviewContextEffect = (
+  opts: BuildReviewContextOpts,
+): Effect.Effect<ReviewContextManifest, FsError> =>
+  Effect.tryPromise({
+    try: () => buildReviewContext(opts),
+    catch: (cause) =>
+      new FsError({
+        path: opts.workspace,
+        operation: 'buildReviewContext',
+        cause,
+      }),
+  });

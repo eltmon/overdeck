@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+
 export function ensurePlaywrightIsolation(mcpConfig: Record<string, any>): boolean {
   const playwright = mcpConfig?.mcpServers?.playwright;
   if (!playwright || typeof playwright !== 'object') {
@@ -78,3 +80,21 @@ export function getIsolatedPlaywrightMcpConfig(
   ensurePlaywrightIsolation(remoteConfig);
   return remoteConfig;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect-native variant of ensurePlaywrightIsolation. */
+export const ensurePlaywrightIsolationEffect = (
+  mcpConfig: Record<string, any>,
+): Effect.Effect<boolean> => Effect.sync(() => ensurePlaywrightIsolation(mcpConfig));
+
+/** Effect-native variant of ensureExcalidrawMcp. */
+export const ensureExcalidrawMcpEffect = (
+  mcpConfig: Record<string, any>,
+): Effect.Effect<boolean> => Effect.sync(() => ensureExcalidrawMcp(mcpConfig));
+
+/** Effect-native variant of getIsolatedPlaywrightMcpConfig. */
+export const getIsolatedPlaywrightMcpConfigEffect = (
+  mcpConfig: Record<string, any>,
+): Effect.Effect<Record<string, any> | null> =>
+  Effect.sync(() => getIsolatedPlaywrightMcpConfig(mcpConfig));

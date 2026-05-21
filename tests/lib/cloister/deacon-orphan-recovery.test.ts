@@ -18,6 +18,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -98,11 +99,20 @@ const mockGetWorkspaceStackHealth = vi.fn();
 const mockRebuildWorkspaceStack = vi.fn();
 
 vi.mock('../../../src/lib/workspace/stack-health.js', () => ({
-  getWorkspaceStackHealth: (...args: unknown[]) => mockGetWorkspaceStackHealth(...args),
+  // getWorkspaceStackHealth is Effect-returning post-PAN-1249. Mocks script
+  // via mockResolvedValue (Promise) — wrap to translate to Effect at the
+  // call site so production's `yield* getWorkspaceStackHealth(...)` works.
+  getWorkspaceStackHealth: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve().then(() => mockGetWorkspaceStackHealth(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../src/lib/workspace/rebuild-stack.js', () => ({
-  rebuildWorkspaceStack: (...args: unknown[]) => mockRebuildWorkspaceStack(...args),
+  rebuildWorkspaceStack: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve().then(() => mockRebuildWorkspaceStack(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 // Import after mocks are in place

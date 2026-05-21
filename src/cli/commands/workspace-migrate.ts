@@ -14,6 +14,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { existsSync, readdirSync, readFileSync, mkdirSync, statSync } from 'fs';
 import { join, basename, dirname } from 'path';
@@ -211,7 +212,7 @@ async function cloneReposOnVm(
     try {
       if (gitDirs.length === 1 && repo.name === 'workspace') {
         // Monorepo - clone directly to ~/workspace
-        const cloneResult = await provider.ssh(vmName, `git clone ${sshUrl} ~/workspace`);
+        const cloneResult = await Effect.runPromise(provider.ssh(vmName, `git clone ${sshUrl} ~/workspace`));
         if (cloneResult.exitCode !== 0) {
           errors.push(`Failed to clone: ${cloneResult.stderr}`);
           continue;
@@ -221,7 +222,7 @@ async function cloneReposOnVm(
         steps.push(`Cloned ${repo.name} and checked out ${branchName}`);
       } else {
         // Polyrepo - clone to ~/workspace/<name>
-        const cloneResult = await provider.ssh(vmName, `git clone ${sshUrl} ~/workspace/${repo.name}`);
+        const cloneResult = await Effect.runPromise(provider.ssh(vmName, `git clone ${sshUrl} ~/workspace/${repo.name}`));
         if (cloneResult.exitCode !== 0) {
           errors.push(`${repo.name}: Failed to clone: ${cloneResult.stderr}`);
           continue;
@@ -336,7 +337,7 @@ async function copyWorkspacePanStateFromRemote(
   const errors: string[] = [];
 
   const remotePanDir = `~/workspace/${PAN_DIRNAME}`;
-  const panCheck = await provider.ssh(vmName, `[ -d ${remotePanDir} ] && echo present`);
+  const panCheck = await Effect.runPromise(provider.ssh(vmName, `[ -d ${remotePanDir} ] && echo present`));
   if (panCheck.exitCode !== 0 || !panCheck.stdout.trim()) {
     steps.push('No workspace .pan state on remote (skipped)');
     return { steps, errors };
@@ -355,7 +356,7 @@ async function copyWorkspacePanStateFromRemote(
 
   for (const file of directFiles) {
     const remotePath = `${remotePanDir}/${file.name}`;
-    const existsResult = await provider.ssh(vmName, `[ -f ${remotePath} ] && echo present`);
+    const existsResult = await Effect.runPromise(provider.ssh(vmName, `[ -f ${remotePath} ] && echo present`));
     if (existsResult.exitCode === 0 && existsResult.stdout.trim()) {
       try {
         await provider.copyFromVm(vmName, remotePath, join(localPanDir, file.name));
@@ -366,7 +367,7 @@ async function copyWorkspacePanStateFromRemote(
     }
   }
 
-  const feedbackList = await provider.ssh(vmName, `ls ${remotePanDir}/${PAN_FEEDBACK_DIRNAME} 2>/dev/null`);
+  const feedbackList = await Effect.runPromise(provider.ssh(vmName, `ls ${remotePanDir}/${PAN_FEEDBACK_DIRNAME} 2>/dev/null`));
   if (feedbackList.exitCode === 0 && feedbackList.stdout.trim()) {
     for (const entry of feedbackList.stdout.trim().split('\n').filter(Boolean)) {
       try {
@@ -438,7 +439,7 @@ async function copyPlanningStateFromRemote(
   const steps = [...workspacePanResult.steps];
   const errors = [...workspacePanResult.errors];
 
-  const beadsCheck = await provider.ssh(vmName, 'ls ~/workspace/.beads/ 2>/dev/null');
+  const beadsCheck = await Effect.runPromise(provider.ssh(vmName, 'ls ~/workspace/.beads/ 2>/dev/null'));
   if (beadsCheck.exitCode === 0 && beadsCheck.stdout.trim()) {
     try {
       const localBeadsDir = join(localPath, '.beads');
@@ -506,7 +507,7 @@ export async function migrateLocalToRemote(
 
     const provider = createFlyProviderFromConfig(config.remote);
 
-    const isAuth = await provider.isAuthenticated();
+    const isAuth = await Effect.runPromise(provider.isAuthenticated());
     if (!isAuth) {
       spinner.fail('Not authenticated with Fly.io');
       result.errors.push('Not authenticated with Fly.io. Run: flyctl auth login');
@@ -523,21 +524,21 @@ export async function migrateLocalToRemote(
 
     // 5. Create VM (or reuse existing if --force)
     spinner.text = `Creating VM: ${vmName}...`;
-    const existingVmStatus = await provider.getStatus(vmName);
+    const existingVmStatus = await Effect.runPromise(provider.getStatus(vmName));
     if (existingVmStatus !== 'unknown') {
       if (options.force) {
         result.steps.push(`VM already exists: ${vmName} (reusing)`);
         // Ensure it's running
         if (existingVmStatus === 'stopped') {
           spinner.text = 'Starting existing VM...';
-          await provider.startVm(vmName);
+          await Effect.runPromise(provider.startVm(vmName));
         }
       } else {
         throw new Error(`VM ${vmName} already exists. Use --force to reuse it.`);
       }
     } else {
       try {
-        await provider.createVm(vmName);
+        await Effect.runPromise(provider.createVm(vmName));
         result.steps.push(`Created VM: ${vmName}`);
       } catch (error: any) {
         throw error;
@@ -786,7 +787,7 @@ export async function migrateRemoteToLocal(
 
     // 4. Verify VM is accessible
     spinner.text = 'Checking remote VM...';
-    const vmStatus = await provider.getStatus(remoteMetadata.vmName);
+    const vmStatus = await Effect.runPromise(provider.getStatus(remoteMetadata.vmName));
     if (vmStatus === 'unknown') {
       spinner.fail('Remote VM not found');
       result.errors.push(`VM ${remoteMetadata.vmName} not found on Fly.io`);

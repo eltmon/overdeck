@@ -112,14 +112,14 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const existingSpec = findSpecByIssue(projectPath, upperIssueId);
+  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
   const proposed = existingSpec
-    ? (() => {
+    ? await (async () => {
         const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-        writeSpec(existingSpec.path, nextDoc);
+        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
         return { path: existingSpec.path, filename: existingSpec.filename };
       })()
-    : writeSpecForIssue(projectPath, workspaceDoc, 'proposed');
+    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
@@ -157,8 +157,9 @@ function getGitHubLocalPaths(): Record<string, string> {
   if (!ghConfig) return {};
   const out: Record<string, string> = {};
   for (const r of ghConfig.repos) {
-    if (r.localPath) {
-      out[`${r.owner}/${r.repo}`] = r.localPath;
+    const localPath = (r as { localPath?: unknown }).localPath;
+    if (typeof localPath === 'string') {
+      out[`${r.owner}/${r.repo}`] = localPath;
     }
   }
   return out;
@@ -249,8 +250,8 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
 
 function buildLifecycleContext(id: string, issueSource: string | undefined) {
   const issuePrefix = extractTeamPrefix(id);
-  const projectPath = getProjectPath(undefined, issuePrefix);
-  const projectConfig = findProjectByTeam(issuePrefix);
+  const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
+  const projectConfig = issuePrefix ? findProjectByTeam(issuePrefix) : null;
   const githubCheck = isGitHubIssue(id);
 
   const ctx: any = {
@@ -316,7 +317,7 @@ async function runDestructiveIssueLifecycle(
   const cleanupLog: string[] = [];
   const issueDataService = getIssueDataService();
   const issueSource = issueDataService.getIssueSource(id);
-  const { ctx, projectConfig } = buildLifecycleContext(id, issueSource);
+  const { ctx, projectConfig } = buildLifecycleContext(id, issueSource ?? undefined);
   const deleteWorkspace = opts.deleteWorkspace ?? true;
 
   cleanupLog.push(...await closeIssuePullRequest(
@@ -326,14 +327,14 @@ async function runDestructiveIssueLifecycle(
 
   const { resetToTodo, cancelIssueWorkflow } = await import('../../../lib/lifecycle/index.js');
   const workflow = mode === 'cancel' ? cancelIssueWorkflow : resetToTodo;
-  const result = await workflow(ctx, {
+  const result = await Effect.runPromise(workflow(ctx, {
     deleteWorkspace,
     deleteBranches: deleteWorkspace,
     resetIssue: true,
     workspaceConfig: projectConfig?.workspace,
     projectName: projectConfig?.name || '',
     onProgress: opts.onProgress ? (event) => opts.onProgress?.({ type: 'progress', ...event }) : undefined,
-  });
+  }));
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
@@ -561,7 +562,7 @@ const postIssueCloseRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* Effect.promise(() => closeWorkflow(ctx, { reason }));
+    const result = yield* closeWorkflow(ctx, { reason });
 
     if (githubCheck.isGitHub) {
       execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 }).catch(() => {});
@@ -1766,7 +1767,8 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
           { status: 409 },
         );
       }
-      return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
+      const errMsg = 'error' in resetResult ? resetResult.error : 'reason' in resetResult ? resetResult.reason : 'unknown error';
+      return jsonResponse({ success: false, error: errMsg }, { status: 400 });
     }
 
     // 4. Reset specialist pipeline states
@@ -2173,7 +2175,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* Effect.promise(() => closeOut(ctx));
+    const result = yield* closeOut(ctx);
 
     if (result.success) {
       // Patch cached labels immediately so the board hides the issue right away
@@ -2235,10 +2237,10 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
-  if (agentState && agentState.status !== 'dead' && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
+  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'error') return true;
 
   const planningState = await getAgentStateAsync(planningId);
-  if (planningState && planningState.status !== 'dead' && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
+  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'error') return true;
 
   return false;
 }
@@ -2365,21 +2367,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
 
-      const closeResult = yield* Effect.tryPromise({
-        try: () => closeOut(ctx),
-        catch: (error) => ({
-          workflow: 'close-out' as const,
-          issueId: id,
-          success: false,
-          steps: [{
-            step: 'close-out',
+      const closeResult = yield* closeOut(ctx).pipe(
+        Effect.catch((error: unknown) =>
+          Effect.succeed({
+            workflow: 'close-out' as const,
+            issueId: id,
             success: false,
-            skipped: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          }],
-          duration: 0,
-        }),
-      });
+            steps: [{
+              step: 'close-out',
+              success: false,
+              skipped: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }],
+            duration: 0,
+          }),
+        ),
+      );
 
       if (closeResult.success) {
         let newLabels: string[] = ['closed-out'];
@@ -2626,7 +2629,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     if (!projectPath) {
-      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, 404);
+      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, { status: 404 });
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2634,7 +2637,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
         { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },
-        409,
+        { status: 409 },
       );
     }
 
@@ -2643,7 +2646,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
-      return jsonResponse({ success: false, created: result.created, errors }, 500);
+      return jsonResponse({ success: false, created: result.created, errors }, { status: 500 });
     }
 
     return jsonResponse({
@@ -2773,7 +2776,7 @@ async function fetchIssuePullRequestFromRef(
   prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
 ): Promise<IssuePrEndpointResponse> {
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, pr: null, error: prRef.error };
+    return { issueId: prRef.issueId, pr: null, error: (prRef as { error?: string }).error};
   }
 
   try {
@@ -2804,7 +2807,7 @@ async function fetchIssuePullRequestDiffFromRef(
   prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
 ): Promise<IssuePrDiffEndpointResponse> {
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, diff: null, error: prRef.error };
+    return { issueId: prRef.issueId, diff: null, error: (prRef as { error?: string }).error};
   }
 
   try {
@@ -2831,7 +2834,7 @@ export async function fetchIssuePullRequestDiff(issueId: string): Promise<IssueP
 export async function fetchIssuePullRequestDetails(issueId: string): Promise<IssuePrDetailsResponse> {
   const prRef = await resolveIssuePullRequestRef(issueId);
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, pr: null, diff: null, error: prRef.error };
+    return { issueId: prRef.issueId, pr: null, diff: null, error: (prRef as { error?: string }).error};
   }
 
   const [prResult, diffResult] = await Promise.all([
@@ -3308,7 +3311,7 @@ const getIssueCostsRoute = HttpRouter.add(
           { cost: stats.cost, tokens: stats.tokens },
         ])
       ),
-      sessions: issueData.sessions ?? [],
+      sessions: (issueData as unknown as { sessions?: unknown[] }).sessions ?? [],
       byStage: Object.fromEntries(
         Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
           stage,

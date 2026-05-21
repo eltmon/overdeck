@@ -1,5 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
+import { GitError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -269,3 +271,80 @@ export function isOlderThanDays(entry: ParsedStashEntry, days: number, now = new
 export function isSalvageableStash(entry: ParsedStashEntry): entry is SalvageableStashEntry {
   return entry.kind === 'salvageable' && !!entry.issueId && !!entry.shortDescription;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const toGitError = (op: string, cause: unknown): GitError =>
+  new GitError({
+    command: ['git', 'stash', op],
+    stderr: cause instanceof Error ? cause.message : String(cause),
+    exitCode: 1,
+    cause,
+  });
+
+/** List parsed stash entries (newest first per git's natural ordering). */
+export const listStashesEffect = (
+  repoPath: string,
+): Effect.Effect<readonly ParsedStashEntry[], GitError> =>
+  Effect.tryPromise({
+    try: () => listStashes(repoPath),
+    catch: (cause) => toGitError('list', cause),
+  });
+
+/** Create a named stash; returns null if there were no changes to save. */
+export const createNamedStashEffect = (
+  repoPath: string,
+  message: string,
+  includeUntracked = true,
+): Effect.Effect<string | null, GitError> =>
+  Effect.tryPromise({
+    try: () => createNamedStash(repoPath, message, includeUntracked),
+    catch: (cause) => toGitError('push', cause),
+  });
+
+/** Pop a stash by SHA (preferred) or stack ref. */
+export const popStashEffect = (
+  repoPath: string,
+  ref: string,
+  stackRef?: string,
+): Effect.Effect<void, GitError> =>
+  Effect.tryPromise({
+    try: () => popStash(repoPath, ref, stackRef),
+    catch: (cause) => toGitError('pop', cause),
+  });
+
+/** Drop a stash by SHA (preferred) or stack ref. */
+export const dropStashEffect = (
+  repoPath: string,
+  ref: string,
+  stackRef?: string,
+): Effect.Effect<void, GitError> =>
+  Effect.tryPromise({
+    try: () => dropStash(repoPath, ref, stackRef),
+    catch: (cause) => toGitError('drop', cause),
+  });
+
+/** Apply a stash without removing it. */
+export const applyStashEffect = (
+  repoPath: string,
+  ref: string,
+  stackRef?: string,
+): Effect.Effect<void, GitError> =>
+  Effect.tryPromise({
+    try: () => applyStash(repoPath, ref, stackRef),
+    catch: (cause) => toGitError('apply', cause),
+  });
+
+/** Materialise a recovery branch from a stash. Returns the new branch name. */
+export const createRecoveryBranchFromStashEffect = (
+  repoPath: string,
+  stashRef: string,
+  issueId: string,
+  shortDescription: string,
+  stackRef?: string,
+): Effect.Effect<string, GitError> =>
+  Effect.tryPromise({
+    try: () =>
+      createRecoveryBranchFromStash(repoPath, stashRef, issueId, shortDescription, stackRef),
+    catch: (cause) => toGitError('branch', cause),
+  });

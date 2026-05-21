@@ -19,10 +19,12 @@
  *     skills/caveman-review/SKILL.md
  */
 
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, copyFileSync, chmodSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
+import { FsError, FsNotFoundError } from '../errors.js';
 
 /** Resolved path for caveman hook dir under ~/.panopticon */
 export function getCavemanHooksDir(): string {
@@ -56,67 +58,75 @@ function findVendoredDir(): string {
  * 'pan admin hooks install' and is never imported by any dashboard server route.
  *
  * Safe to call multiple times (idempotent).
- * Returns true if installation succeeded, false if source files not found.
+ * Fails with FsNotFoundError if source files are missing, FsError on IO failures.
  */
-export function setupCavemanHooks(): boolean {
-  const vendoredDir = findVendoredDir();
+export function setupCavemanHooks(): Effect.Effect<void, FsNotFoundError | FsError> {
+  return Effect.gen(function* () {
+    const vendoredDir = findVendoredDir();
 
-  if (!existsSync(vendoredDir)) {
-    console.error(`Caveman: vendored directory not found at ${vendoredDir}`);
-    console.error(`Run 'npm run build' first to populate dist/cli/caveman/`);
-    return false;
-  }
-
-  const hooksDir = getCavemanHooksDir();
-  const skillsDir = getCavemanSkillsDir();
-
-  // Ensure target directories exist
-  mkdirSync(hooksDir, { recursive: true });
-  mkdirSync(join(skillsDir, 'caveman'), { recursive: true });
-  mkdirSync(join(skillsDir, 'caveman-review'), { recursive: true });
-
-  // JS hook files to copy
-  const jsFiles = [
-    'caveman-activate.js',
-    'caveman-mode-tracker.js',
-    'caveman-config.js',
-    'panopticon-caveman-activate.js',
-  ];
-
-  for (const file of jsFiles) {
-    const src = join(vendoredDir, file);
-    if (!existsSync(src)) {
-      console.error(`Caveman: missing vendored file ${src}`);
-      return false;
+    if (!existsSync(vendoredDir)) {
+      return yield* Effect.fail(
+        new FsNotFoundError({ path: vendoredDir }),
+      );
     }
-    copyFileSync(src, join(hooksDir, file));
-  }
 
-  // Statusline script
-  const statuslineSrc = join(vendoredDir, 'caveman-statusline.sh');
-  if (existsSync(statuslineSrc)) {
-    const statuslineDest = join(hooksDir, 'caveman-statusline.sh');
-    copyFileSync(statuslineSrc, statuslineDest);
-    chmodSync(statuslineDest, 0o755);
-  }
+    const hooksDir = getCavemanHooksDir();
+    const skillsDir = getCavemanSkillsDir();
 
-  // SKILL.md files — placed relative to hooks dir so caveman-activate.js finds them.
-  // caveman-activate.js resolves: path.join(__dirname, '..', 'skills', 'caveman', 'SKILL.md')
-  // where __dirname is hooksDir → resolves to skillsDir/caveman/SKILL.md
-  const skillFiles: Array<[string, string]> = [
-    [join(vendoredDir, 'skills', 'caveman', 'SKILL.md'), join(skillsDir, 'caveman', 'SKILL.md')],
-    [join(vendoredDir, 'skills', 'caveman-review', 'SKILL.md'), join(skillsDir, 'caveman-review', 'SKILL.md')],
-  ];
+    yield* Effect.try({
+      try: () => {
+        mkdirSync(hooksDir, { recursive: true });
+        mkdirSync(join(skillsDir, 'caveman'), { recursive: true });
+        mkdirSync(join(skillsDir, 'caveman-review'), { recursive: true });
+      },
+      catch: (cause) => new FsError({ path: hooksDir, operation: 'mkdir', cause }),
+    });
 
-  for (const [src, dest] of skillFiles) {
-    if (!existsSync(src)) {
-      console.error(`Caveman: missing skill file ${src}`);
-      return false;
+    const jsFiles = [
+      'caveman-activate.js',
+      'caveman-mode-tracker.js',
+      'caveman-config.js',
+      'panopticon-caveman-activate.js',
+    ];
+
+    for (const file of jsFiles) {
+      const src = join(vendoredDir, file);
+      if (!existsSync(src)) {
+        return yield* Effect.fail(new FsNotFoundError({ path: src }));
+      }
+      yield* Effect.try({
+        try: () => copyFileSync(src, join(hooksDir, file)),
+        catch: (cause) => new FsError({ path: src, operation: 'copy', cause }),
+      });
     }
-    copyFileSync(src, dest);
-  }
 
-  return true;
+    const statuslineSrc = join(vendoredDir, 'caveman-statusline.sh');
+    if (existsSync(statuslineSrc)) {
+      const statuslineDest = join(hooksDir, 'caveman-statusline.sh');
+      yield* Effect.try({
+        try: () => {
+          copyFileSync(statuslineSrc, statuslineDest);
+          chmodSync(statuslineDest, 0o755);
+        },
+        catch: (cause) => new FsError({ path: statuslineSrc, operation: 'copy', cause }),
+      });
+    }
+
+    const skillFiles: Array<[string, string]> = [
+      [join(vendoredDir, 'skills', 'caveman', 'SKILL.md'), join(skillsDir, 'caveman', 'SKILL.md')],
+      [join(vendoredDir, 'skills', 'caveman-review', 'SKILL.md'), join(skillsDir, 'caveman-review', 'SKILL.md')],
+    ];
+
+    for (const [src, dest] of skillFiles) {
+      if (!existsSync(src)) {
+        return yield* Effect.fail(new FsNotFoundError({ path: src }));
+      }
+      yield* Effect.try({
+        try: () => copyFileSync(src, dest),
+        catch: (cause) => new FsError({ path: src, operation: 'copy', cause }),
+      });
+    }
+  });
 }
 
 /**
@@ -127,26 +137,34 @@ export function setupCavemanHooks(): boolean {
  * 'pan admin hooks install' and is never imported by any dashboard server route.
  *
  * Safe to call multiple times (idempotent).
- * Returns true if installation succeeded, false if source files not found.
+ * Returns true if installation succeeded, false if source files not found (non-fatal).
+ * Fails with FsError on IO failures.
  */
-export function setupCavemanCompressScripts(): boolean {
-  const bundleDir = dirname(fileURLToPath(import.meta.url));
-  const compressSrc = join(bundleDir, 'caveman-compress');
+export function setupCavemanCompressScripts(): Effect.Effect<boolean, FsError> {
+  return Effect.gen(function* () {
+    const bundleDir = dirname(fileURLToPath(import.meta.url));
+    const compressSrc = join(bundleDir, 'caveman-compress');
 
-  if (!existsSync(compressSrc)) {
-    // Non-fatal — compress scripts are optional
-    return false;
-  }
+    if (!existsSync(compressSrc)) {
+      return false;
+    }
 
-  const compressDest = join(homedir(), '.panopticon', 'hooks', 'caveman-compress');
-  mkdirSync(compressDest, { recursive: true });
+    const compressDest = join(homedir(), '.panopticon', 'hooks', 'caveman-compress');
+    yield* Effect.try({
+      try: () => mkdirSync(compressDest, { recursive: true }),
+      catch: (cause) => new FsError({ path: compressDest, operation: 'mkdir', cause }),
+    });
 
-  const pyFiles = ['__init__.py', '__main__.py', 'cli.py', 'compress.py', 'detect.py', 'validate.py'];
-  for (const file of pyFiles) {
-    const src = join(compressSrc, file);
-    if (!existsSync(src)) continue;
-    copyFileSync(src, join(compressDest, file));
-  }
+    const pyFiles = ['__init__.py', '__main__.py', 'cli.py', 'compress.py', 'detect.py', 'validate.py'];
+    for (const file of pyFiles) {
+      const src = join(compressSrc, file);
+      if (!existsSync(src)) continue;
+      yield* Effect.try({
+        try: () => copyFileSync(src, join(compressDest, file)),
+        catch: (cause) => new FsError({ path: src, operation: 'copy', cause }),
+      });
+    }
 
-  return true;
+    return true;
+  });
 }

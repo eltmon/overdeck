@@ -6,6 +6,8 @@ import { existsSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
+import { GitError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -190,3 +192,55 @@ export async function hasStaleLocks(repoPath: string): Promise<boolean> {
   const hasGitProcesses = await hasRunningGitProcesses(repoPath);
   return !hasGitProcesses;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native cleanupStaleLocks. Removes stale `*.lock` files in `.git/`
+ * when no git processes hold the repo. Fails with FsError if lock removal
+ * throws unexpectedly (e.g. permission denied at unlink); per-file errors
+ * are reported in the `errors` payload like the original.
+ */
+export const cleanupStaleLocksEffect = (
+  repoPath: string,
+): Effect.Effect<
+  {
+    found: string[];
+    removed: string[];
+    errors: Array<{ file: string; error: string }>;
+  },
+  FsError
+> =>
+  Effect.tryPromise({
+    try: () => cleanupStaleLocks(repoPath),
+    catch: (cause) =>
+      new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
+  });
+
+/**
+ * Effect-native getWorkspaceGitInfo. Returns the HEAD SHA and current branch
+ * name. Fails with GitError if rev-parse exits non-zero (e.g. path is not a
+ * git repository).
+ */
+export const getWorkspaceGitInfoEffect = (
+  workspacePath: string,
+): Effect.Effect<WorkspaceCommitInfo, GitError> =>
+  Effect.tryPromise({
+    try: () => getWorkspaceGitInfo(workspacePath),
+    catch: (cause) =>
+      new GitError({
+        command: ['rev-parse', 'HEAD'],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native hasStaleLocks — predicate variant. Never fails; defers to
+ * the Promise implementation which already swallows errors conservatively.
+ */
+export const hasStaleLocksEffect = (
+  repoPath: string,
+): Effect.Effect<boolean, never> =>
+  Effect.promise(() => hasStaleLocks(repoPath));

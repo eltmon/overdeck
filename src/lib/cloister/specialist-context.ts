@@ -8,6 +8,7 @@
  *   ~/.panopticon/specialists/{projectKey}/{specialistType}/context/latest-digest.md
  */
 
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
@@ -390,3 +391,27 @@ export function deleteContextDigest(projectKey: string, specialistType: string):
     return false;
   }
 }
+
+// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link generateContextDigest}. The Promise version already
+ * resolves to `null` on every failure mode (claude unavailable, empty runs,
+ * write error), so the Effect form mirrors that contract via `Effect.promise`.
+ */
+export const generateContextDigestEffect = (
+  projectKey: string,
+  specialistType: string,
+  options: { runCount?: number; model?: string; force?: boolean } = {},
+): Effect.Effect<string | null> =>
+  Effect.promise(() => generateContextDigest(projectKey, specialistType, options));
+
+/**
+ * Effect variant of {@link regenerateContextDigest}. Same swallowed-failure
+ * semantics as the Promise version.
+ */
+export const regenerateContextDigestEffect = (
+  projectKey: string,
+  specialistType: string,
+): Effect.Effect<string | null> =>
+  Effect.promise(() => regenerateContextDigest(projectKey, specialistType));

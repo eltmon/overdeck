@@ -6,8 +6,11 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
+import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
 export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous';
@@ -336,3 +339,60 @@ export function clearCredentialFileAuth(workspacePath: string): void {
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
   } catch { /* non-fatal */ }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of {@link getProviderForModel}. Pure lookup; cannot fail. */
+export const getProviderForModelEffect = (modelId: ModelId | string): Effect.Effect<ProviderConfig, never> =>
+  Effect.sync(() => getProviderForModel(modelId));
+
+/** Effect variant of {@link getProviderEnv}. Pure transform; cannot fail. */
+export const getProviderEnvEffect = (
+  provider: ProviderConfig,
+  apiKey: string,
+): Effect.Effect<Record<string, string>, never> =>
+  Effect.sync(() => getProviderEnv(provider, apiKey));
+
+/** Effect variant of {@link setupCredentialFileAuth}. */
+export const setupCredentialFileAuthEffect = (
+  provider: ProviderConfig,
+  workspacePath: string,
+): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: async () => {
+      if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
+
+      const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
+      const claudeDir = join(workspacePath, '.claude');
+      const settingsPath = join(claudeDir, 'settings.local.json');
+
+      if (!existsSync(claudeDir)) {
+        await mkdir(claudeDir, { recursive: true });
+      }
+
+      let settings: Record<string, unknown> = {};
+      if (existsSync(settingsPath)) {
+        try {
+          settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        } catch { /* start fresh */ }
+      }
+
+      settings.apiKeyHelper = helperPath;
+      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+    },
+    catch: (cause) =>
+      new FsError({ path: workspacePath, operation: 'setupCredentialFileAuth', cause }),
+  });
+
+/** Effect variant of {@link clearCredentialFileAuth}. Swallows all errors (non-fatal). */
+export const clearCredentialFileAuthEffect = (workspacePath: string): Effect.Effect<void, never> =>
+  Effect.promise(async () => {
+    const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
+    if (!existsSync(settingsPath)) return;
+    try {
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      if (!settings.apiKeyHelper) return;
+      delete settings.apiKeyHelper;
+      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+    } catch { /* non-fatal */ }
+  });

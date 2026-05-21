@@ -65,10 +65,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
       const apiKey = configKey || envKey;
 
       if (!apiKey) {
-        throw new TrackerAuthError(
-          'linear',
-          `API key not found. Configure in Settings or set ${config.apiKeyEnv ?? 'LINEAR_API_KEY'} environment variable.`
-        );
+        throw new TrackerAuthError({
+          tracker: 'linear',
+          message: `API key not found. Configure in Settings or set ${config.apiKeyEnv ?? 'LINEAR_API_KEY'} environment variable.`,
+        });
       }
 
       return new LinearTracker(apiKey, { team: config.team });
@@ -82,10 +82,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
       const token = configKey || envToken;
 
       if (!token) {
-        throw new TrackerAuthError(
-          'github',
-          `Token not found. Configure in Settings or set ${config.tokenEnv ?? 'GITHUB_TOKEN'} environment variable.`
-        );
+        throw new TrackerAuthError({
+          tracker: 'github',
+          message: `Token not found. Configure in Settings or set ${config.tokenEnv ?? 'GITHUB_TOKEN'} environment variable.`,
+        });
       }
 
       if (!config.owner || !config.repo) {
@@ -105,10 +105,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
       const token = configKey || envToken;
 
       if (!token) {
-        throw new TrackerAuthError(
-          'gitlab',
-          `Token not found. Configure in Settings or set ${config.tokenEnv ?? 'GITLAB_TOKEN'} environment variable.`
-        );
+        throw new TrackerAuthError({
+          tracker: 'gitlab',
+          message: `Token not found. Configure in Settings or set ${config.tokenEnv ?? 'GITLAB_TOKEN'} environment variable.`,
+        });
       }
 
       if (!config.projectId) {
@@ -126,10 +126,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
       const apiKey = configKey || envKey;
 
       if (!apiKey) {
-        throw new TrackerAuthError(
-          'rally',
-          `API key not found. Configure in Settings or set ${config.apiKeyEnv ?? 'RALLY_API_KEY'} environment variable.`
-        );
+        throw new TrackerAuthError({
+          tracker: 'rally',
+          message: `API key not found. Configure in Settings or set ${config.apiKeyEnv ?? 'RALLY_API_KEY'} environment variable.`,
+        });
       }
 
       return new RallyTracker({

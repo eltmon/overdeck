@@ -1,6 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import { LinearTracker } from '../../../src/lib/tracker/linear.js';
 import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/interface.js';
+
+function isEffect(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  for (const key of Object.getOwnPropertyNames(v)) {
+    if (key.startsWith('~effect/Effect/')) return true;
+  }
+  return false;
+}
+function wrap<T extends object>(t: T): any {
+  return new Proxy(t, {
+    get(target, prop) {
+      const value = (target as any)[prop];
+      if (typeof value !== 'function') return value;
+      return (...args: any[]) => {
+        const result = value.apply(target, args);
+        if (isEffect(result)) {
+          return Effect.runPromise(result as any).catch((err) => {
+            if (err && typeof err === 'object' && 'cause' in err && err.cause) {
+              const cause = (err as any).cause;
+              if (cause && typeof cause === 'object' && '_tag' in cause) throw cause;
+            }
+            throw err;
+          });
+        }
+        return result;
+      };
+    },
+  });
+}
 
 // Mock the Linear SDK
 vi.mock('@linear/sdk', () => ({
@@ -28,13 +58,13 @@ describe('LinearTracker', () => {
     });
 
     it('should create tracker with valid API key', () => {
-      const tracker = new LinearTracker('test-api-key');
-      expect(tracker.name).toBe('linear');
+      const constructorTracker = new LinearTracker('test-api-key');
+      expect(constructorTracker.name).toBe('linear');
     });
 
     it('should accept optional team parameter', () => {
-      const tracker = new LinearTracker('test-api-key', { team: 'MIN' });
-      expect(tracker.name).toBe('linear');
+      const constructorTracker = new LinearTracker('test-api-key', { team: 'MIN' });
+      expect(constructorTracker.name).toBe('linear');
     });
   });
 
@@ -66,7 +96,7 @@ describe('LinearTracker', () => {
         nodes: [mockIssue],
       });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       // Replace internal client with mock
       (tracker as any).client = mockClient;
 
@@ -92,7 +122,7 @@ describe('LinearTracker', () => {
 
       (mockClient.issues as any).mockResolvedValue({ nodes: [] });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       await tracker.listIssues({
@@ -138,7 +168,7 @@ describe('LinearTracker', () => {
 
       (mockClient.issue as any).mockResolvedValue(mockIssue);
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       const issue = await tracker.getIssue('550e8400-e29b-41d4-a716-446655440000');
@@ -171,7 +201,7 @@ describe('LinearTracker', () => {
         nodes: [mockIssue],
       });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       const issue = await tracker.getIssue('MIN-630');
@@ -187,7 +217,7 @@ describe('LinearTracker', () => {
 
       (mockClient.searchIssues as any).mockResolvedValue({ nodes: [] });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       await expect(tracker.getIssue('MIN-999')).rejects.toThrow(IssueNotFoundError);
@@ -223,7 +253,7 @@ describe('LinearTracker', () => {
         issue: Promise.resolve(createdIssue),
       });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       const issue = await tracker.createIssue({
@@ -243,7 +273,7 @@ describe('LinearTracker', () => {
     });
 
     it('should throw error when team is missing', async () => {
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
 
       await expect(
         tracker.createIssue({ title: 'No Team Issue' })
@@ -256,7 +286,7 @@ describe('LinearTracker', () => {
 
       (mockClient.teams as any).mockResolvedValue({ nodes: [] });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       await expect(
@@ -281,7 +311,7 @@ describe('LinearTracker', () => {
         comment: Promise.resolve(mockComment),
       });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       const comment = await tracker.addComment('issue-uuid', 'Test comment');
@@ -320,7 +350,7 @@ describe('LinearTracker', () => {
       (mockClient.searchIssues as any).mockResolvedValue({ nodes: [mockIssue] });
       (mockClient.createAttachment as any).mockResolvedValue({ success: true });
 
-      const tracker = new LinearTracker('test-api-key');
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       await tracker.linkPR('MIN-42', 'https://github.com/org/repo/pull/123');
@@ -364,7 +394,7 @@ describe('LinearTracker', () => {
 
         (mockClient.issue as any).mockResolvedValue(mockIssue);
 
-        const tracker = new LinearTracker('test-api-key');
+        const tracker: any = wrap(new LinearTracker('test-api-key'));
         (tracker as any).client = mockClient;
 
         const issue = await tracker.getIssue('550e8400-e29b-41d4-a716-446655440000');

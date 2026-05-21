@@ -1,4 +1,12 @@
+import { Data, Effect } from 'effect';
+
 export const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:/@-]{0,127})$/;
+
+/** Tagged error for model-validation Effect variants. */
+export class ModelValidationError extends Data.TaggedError('ModelValidationError')<{
+  readonly value: unknown;
+  readonly message: string;
+}> {}
 
 export function normalizeModelOverride(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -25,3 +33,23 @@ export function shellQuoteModelId(model: string): string {
   const normalized = requireModelOverride(model);
   return `'${normalized.replace(/'/g, `'\\''`)}'`;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const wrapValidation = (value: unknown) => (cause: unknown): ModelValidationError =>
+  new ModelValidationError({
+    value,
+    message: cause instanceof Error ? cause.message : String(cause),
+  });
+
+/** Effect variant of {@link normalizeModelOverride}. */
+export const normalizeModelOverrideEffect = (value: unknown): Effect.Effect<string | undefined, ModelValidationError> =>
+  Effect.try({ try: () => normalizeModelOverride(value), catch: wrapValidation(value) });
+
+/** Effect variant of {@link requireModelOverride}. */
+export const requireModelOverrideEffect = (value: unknown): Effect.Effect<string, ModelValidationError> =>
+  Effect.try({ try: () => requireModelOverride(value), catch: wrapValidation(value) });
+
+/** Effect variant of {@link shellQuoteModelId}. */
+export const shellQuoteModelIdEffect = (model: string): Effect.Effect<string, ModelValidationError> =>
+  Effect.try({ try: () => shellQuoteModelId(model), catch: wrapValidation(model) });

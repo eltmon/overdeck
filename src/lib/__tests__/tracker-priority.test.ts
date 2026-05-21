@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 
 // Mock projects module
 vi.mock('../projects.js', () => ({
@@ -34,7 +35,8 @@ const mockCreateTracker = vi.mocked(createTracker);
 const mockCreateTrackerFromConfig = vi.mocked(createTrackerFromConfig);
 
 const mockTracker = {
-  transitionIssue: vi.fn().mockResolvedValue(undefined),
+  // transitionIssue is Effect-returning post-PAN-1249; production calls via Effect.runPromise.
+  transitionIssue: vi.fn().mockReturnValue(Effect.succeed(undefined)),
   getIssue: vi.fn(),
   listIssues: vi.fn(),
   updateIssue: vi.fn(),

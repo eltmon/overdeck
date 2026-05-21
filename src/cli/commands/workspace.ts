@@ -3,7 +3,9 @@ import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync, chmodSync, unlinkSync } from 'fs';
 import { join, basename, resolve } from 'path';
-import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
+import { createWorktree, removeWorktree, listWorktrees, type WorktreeInfo } from '../../lib/worktree.js';
+import { Effect } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME, PAN_CONTEXT_FILENAME, PAN_FEEDBACK_DIRNAME, PAN_SESSIONS_FILENAME } from '../../lib/pan-dir/index.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
 import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
@@ -506,7 +508,9 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
 
     // Create worktree
     spinner.text = 'Creating git worktree...';
-    createWorktree(projectRoot, workspacePath, branchName);
+    await Effect.runPromise(
+      createWorktree(projectRoot, workspacePath, branchName).pipe(Effect.provide(nodeServicesLayer)),
+    );
 
     // Clear stale workspace-local runtime state inherited from main.
     // Keep canonical plan state (.pan/spec.vbrief.json); clear only mutable
@@ -714,20 +718,22 @@ async function listCommand(options: ListOptions): Promise<void> {
     const allWorkspaces: Array<{
       projectName: string;
       projectPath: string;
-      workspaces: ReturnType<typeof listWorktrees>;
+      workspaces: WorktreeInfo[];
     }> = [];
 
     for (const { key, config } of projects) {
       // For polyrepo projects, list worktrees from each sub-repo
       const isPolyrepo = config.workspace?.type === 'polyrepo' && config.workspace?.repos;
-      const workspaces: ReturnType<typeof listWorktrees> = [];
+      const workspaces: WorktreeInfo[] = [];
 
       if (isPolyrepo && config.workspace?.repos) {
         // Polyrepo: scan each configured repo for worktrees
         for (const repo of config.workspace.repos) {
           const repoPath = join(config.path, repo.path);
           if (!existsSync(join(repoPath, '.git'))) continue;
-          const repoWorktrees = listWorktrees(repoPath);
+          const repoWorktrees = await Effect.runPromise(
+            listWorktrees(repoPath).pipe(Effect.provide(nodeServicesLayer)),
+          );
           for (const wt of repoWorktrees) {
             if (wt.path.includes('/workspaces/') || wt.path.includes('\\workspaces\\')) {
               // Deduplicate: polyrepo workspaces share a parent dir (e.g., feature-min-697/fe, feature-min-697/api)
@@ -746,7 +752,9 @@ async function listCommand(options: ListOptions): Promise<void> {
       } else {
         // Monorepo: scan project root
         if (!existsSync(join(config.path, '.git'))) continue;
-        const worktrees = listWorktrees(config.path);
+        const worktrees = await Effect.runPromise(
+          listWorktrees(config.path).pipe(Effect.provide(nodeServicesLayer)),
+        );
         for (const wt of worktrees) {
           if (wt.path.includes('/workspaces/') || wt.path.includes('\\workspaces\\')) {
             workspaces.push(wt);
@@ -798,7 +806,9 @@ async function listCommand(options: ListOptions): Promise<void> {
     process.exit(1);
   }
 
-  const worktrees = listWorktrees(projectRoot);
+  const worktrees = await Effect.runPromise(
+    listWorktrees(projectRoot).pipe(Effect.provide(nodeServicesLayer)),
+  );
 
   // Filter to workspaces directory only
   const workspaces = worktrees.filter((w) =>
@@ -932,7 +942,9 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     const finalWorkspacePath = join(projectRoot, 'workspaces', folderName);
 
     spinner.text = 'Removing git worktree...';
-    removeWorktree(projectRoot, finalWorkspacePath);
+    await Effect.runPromise(
+      removeWorktree(projectRoot, finalWorkspacePath).pipe(Effect.provide(nodeServicesLayer)),
+    );
 
     spinner.succeed(`Workspace destroyed: ${folderName}`);
   } catch (error: any) {
@@ -1021,7 +1033,7 @@ async function createRemoteWorkspace(
   try {
     // Step 1: Create VM
     spinner.text = 'Creating VM (this may take 1-2 minutes)...';
-    const vmInfo = await fly.createVm(vmName);
+    const vmInfo = await Effect.runPromise(fly.createVm(vmName));
 
     // Get git remote URL
     let repoUrl = '';
@@ -1107,7 +1119,7 @@ async function createRemoteWorkspace(
         }
 
         // Clone this repo on the remote VM
-        const cloneResult = await fly.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
+        const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`));
         if (cloneResult.exitCode !== 0) {
           throw new Error(`Failed to clone ${repo.name}: ${cloneResult.stderr}`);
         }
@@ -1115,10 +1127,10 @@ async function createRemoteWorkspace(
         // Create feature branch for this repo
         const repoBranchPrefix = repo.branch_prefix || 'feature/';
         const repoBranchName = `${repoBranchPrefix}${normalizedId}`;
-        const branchResult = await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
+        const branchResult = await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`));
         if (branchResult.exitCode !== 0) {
           // Branch might already exist remotely
-          await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
+          await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`));
         }
       }
 
@@ -1129,17 +1141,17 @@ async function createRemoteWorkspace(
       // Remote VMs use SSH keys, not interactive HTTPS credentials
       const sshRepoUrl = convertToSshUrl(repoUrl);
 
-      const cloneResult = await fly.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
+      const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`));
       if (cloneResult.exitCode !== 0) {
         throw new Error(`Failed to clone: ${cloneResult.stderr}`);
       }
 
       // Step 4: Create feature branch
       spinner.text = 'Creating feature branch...';
-      const branchResult = await fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+      const branchResult = await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`));
       if (branchResult.exitCode !== 0) {
         // Branch might already exist remotely
-        await fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+        await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`));
       }
     }
 

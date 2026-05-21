@@ -3,9 +3,15 @@
  *
  * CRUD operations for the conversations table — session metadata for
  * user-driven Claude conversations spawned from Mission Control.
+ *
+ * PAN-1249: Effect migration pass — public API remains synchronous to keep
+ * the existing call sites unchanged. The DatabaseError tagged error is
+ * re-exported from ./index.js so future SQLite-failure-aware refactors can
+ * use it. Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
-import { getDatabase } from './index.js';
+import { getDatabase, DatabaseError } from './index.js';
+export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

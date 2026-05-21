@@ -15,6 +15,8 @@ import { homedir } from 'os';
 import { createSign } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
+import { GitHubApiError, ConfigError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -475,3 +477,79 @@ export function getAppStatus(): {
   }
   return { configured: false, mode: 'fallback' };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const apiCatch = (operation: string) => (cause: unknown) =>
+  new GitHubApiError({
+    operation,
+    status: 0,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/**
+ * Effect-native generateInstallationToken. Fails with ConfigError if the
+ * GitHub App is not configured locally; GitHubApiError on transport / 4xx.
+ */
+export const generateInstallationTokenEffect = (
+  config?: GitHubAppConfig,
+): Effect.Effect<InstallationToken, GitHubApiError | ConfigError> =>
+  Effect.gen(function* () {
+    const cfg = config ?? loadGitHubAppConfig();
+    if (!cfg) {
+      return yield* Effect.fail(
+        new ConfigError({ message: 'GitHub App not configured' }),
+      );
+    }
+    return yield* Effect.tryPromise({
+      try: () => generateInstallationToken(cfg),
+      catch: apiCatch('generateInstallationToken'),
+    });
+  });
+
+/** Effect-native getPullRequestState — typed-error fetch + check aggregator. */
+export const getPullRequestStateEffect = (
+  owner: string,
+  repo: string,
+  number: number,
+): Effect.Effect<GitHubPullRequestState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getPullRequestState(owner, repo, number),
+    catch: apiCatch('getPullRequestState'),
+  });
+
+/** Effect-native mergePullRequestWithApp — typed-error merge call. */
+export const mergePullRequestWithAppEffect = (
+  owner: string,
+  repo: string,
+  number: number,
+  method: 'merge' | 'squash' | 'rebase' = 'squash',
+  sha?: string,
+): Effect.Effect<{ merged: boolean; message?: string }, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => mergePullRequestWithApp(owner, repo, number, method, sha),
+    catch: apiCatch('mergePullRequestWithApp'),
+  });
+
+/** Effect-native refreshWorkspaceToken — fails with FsError or GitHubApiError. */
+export const refreshWorkspaceTokenEffect = (
+  workspacePath: string,
+): Effect.Effect<void, GitHubApiError | ConfigError | FsError> =>
+  Effect.gen(function* () {
+    const cfg = loadGitHubAppConfig();
+    if (!cfg) {
+      return yield* Effect.fail(
+        new ConfigError({ message: 'GitHub App not configured' }),
+      );
+    }
+    return yield* Effect.tryPromise({
+      try: () => refreshWorkspaceToken(workspacePath),
+      catch: (cause) =>
+        new FsError({
+          path: join(workspacePath, '.git', 'pan-credentials'),
+          operation: 'refreshWorkspaceToken',
+          cause,
+        }),
+    });
+  });

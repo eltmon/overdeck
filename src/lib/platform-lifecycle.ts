@@ -22,6 +22,7 @@ import { promisify } from 'util';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
+import { Effect } from 'effect';
 import { LOGS_DIR, PANOPTICON_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
 
 const execAsync = promisify(exec);
@@ -358,3 +359,70 @@ export function describeStageFailure(err: unknown): StageFailure | null {
   if (err instanceof StageError) return err.failure;
   return null;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const stageErrorOf = (op: string) => (cause: unknown): StageError => {
+  if (cause instanceof StageError) return cause;
+  return new StageError({
+    stage: 'dashboard',
+    reason: `${op} failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+  });
+};
+
+/** Effect variant of {@link stopDashboard}. */
+export const stopDashboardEffect = (
+  config: PlatformConfig,
+  opts: { graceTimeoutMs?: number } = {},
+): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({ try: () => stopDashboard(config, opts), catch: stageErrorOf('stopDashboard') });
+
+/** Effect variant of {@link waitForDashboardHealth}. */
+export const waitForDashboardHealthEffect = (
+  apiPort: number,
+  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({ try: () => waitForDashboardHealth(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
+
+/** Effect variant of {@link isTraefikContainerRunning}. */
+export const isTraefikContainerRunningEffect = (): Effect.Effect<boolean, never> =>
+  Effect.promise(() => isTraefikContainerRunning());
+
+/** Effect variant of {@link startTraefik}. */
+export const startTraefikEffect = (config: PlatformConfig): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({ try: () => startTraefik(config), catch: stageErrorOf('startTraefik') });
+
+/** Effect variant of {@link stopTraefik}. */
+export const stopTraefikEffect = (config: PlatformConfig): Effect.Effect<void, never> =>
+  Effect.promise(() => stopTraefik(config));
+
+/** Effect variant of {@link restartDashboard}. */
+export const restartDashboardEffect = (
+  config: PlatformConfig,
+  startDashboardFn: () => Promise<void> | void,
+  opts: { healthTimeoutMs?: number } = {},
+): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({
+    try: () => restartDashboard(config, startDashboardFn, opts),
+    catch: stageErrorOf('restartDashboard'),
+  });
+
+/** Effect variant of {@link restartCliproxy}. */
+export const restartCliproxyEffect = (
+  cliproxy: {
+    stopCliproxy: () => void;
+    startCliproxy: () => void;
+    isCliproxyRunning: () => boolean;
+    installCliproxy?: (force?: boolean) => void;
+  },
+  opts: { verifyTimeoutMs?: number; force?: boolean } = {},
+): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({ try: () => restartCliproxy(cliproxy, opts), catch: stageErrorOf('restartCliproxy') });
+
+/** Effect variant of {@link restartTraefik}. */
+export const restartTraefikEffect = (config: PlatformConfig): Effect.Effect<void, StageError> =>
+  Effect.tryPromise({ try: () => restartTraefik(config), catch: stageErrorOf('restartTraefik') });
+
+/** Effect variant of {@link readPlatformConfig}. Pure config read; cannot fail. */
+export const readPlatformConfigEffect = (): Effect.Effect<PlatformConfig, never> =>
+  Effect.sync(() => readPlatformConfig());

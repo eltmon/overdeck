@@ -11,6 +11,7 @@ import {
   getReviewStatus,
   setReviewStatus,
 } from './review-status.js';
+import { Data, Effect } from 'effect';
 import { resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 
@@ -119,3 +120,29 @@ export async function reopenWorkspaceState(
 
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for reopen Effect variants. */
+export class ReopenError extends Data.TaggedError('ReopenError')<{
+  readonly issueId: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `reopenWorkspaceState`. */
+export const reopenWorkspaceStateEffect = (
+  issueId: string,
+  workspacePath: string,
+  options: ReopenOptions = {},
+): Effect.Effect<ReopenResult, ReopenError> =>
+  Effect.tryPromise({
+    try: () => reopenWorkspaceState(issueId, workspacePath, options),
+    catch: (cause) =>
+      new ReopenError({
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

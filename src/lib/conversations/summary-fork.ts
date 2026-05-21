@@ -24,6 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { Effect } from 'effect';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
@@ -31,6 +32,7 @@ import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
 import { loadConfig } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { FsError } from '../errors.js';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -325,3 +327,56 @@ export async function createSummaryFork(
 
 // Re-export runModelSummary for any callers that need it directly
 export { runModelSummary };
+
+// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+//
+// Additive Effect surface for fork helpers. Failures from the underlying
+// fs ops or LLM calls surface as FsError (filesystem failures) or Error
+// (LLM / generation failures). The existing Promise functions remain
+// canonical; these are wrappers for Effect-native callers.
+
+/** Effect variant of generateFallbackSummary. */
+export function generateFallbackSummaryEffect(
+  jsonlPath: string,
+): Effect.Effect<string, FsError> {
+  return Effect.tryPromise({
+    try: () => generateFallbackSummary(jsonlPath),
+    catch: (cause) =>
+      new FsError({ path: jsonlPath, operation: 'fallback-summary', cause }),
+  });
+}
+
+/** Effect variant of reserveSummaryForkSession. */
+export function reserveSummaryForkSessionEffect(
+  cwd: string,
+): Effect.Effect<{ sessionId: string; sessionFile: string }, FsError> {
+  return Effect.tryPromise({
+    try: () => reserveSummaryForkSession(cwd),
+    catch: (cause) =>
+      new FsError({ path: cwd, operation: 'reserve-session', cause }),
+  });
+}
+
+/** Effect variant of copySessionFromCompactBoundary. */
+export function copySessionFromCompactBoundaryEffect(
+  sourcePath: string,
+  destPath: string,
+): Effect.Effect<void, FsError> {
+  return Effect.tryPromise({
+    try: () => copySessionFromCompactBoundary(sourcePath, destPath),
+    catch: (cause) =>
+      new FsError({ path: sourcePath, operation: 'copy-session', cause }),
+  });
+}
+
+/** Effect variant of createSummaryFork. */
+export function createSummaryForkEffect(
+  conv: Conversation,
+  options: SummaryForkOptions = {},
+): Effect.Effect<SummaryForkResult, FsError> {
+  return Effect.tryPromise({
+    try: () => createSummaryFork(conv, options),
+    catch: (cause) =>
+      new FsError({ path: conv.name, operation: 'create-summary-fork', cause }),
+  });
+}

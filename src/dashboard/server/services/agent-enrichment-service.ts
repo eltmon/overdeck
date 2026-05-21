@@ -96,7 +96,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 pendingQuestionCount: undefined,
                 pendingQuestionPrompt: undefined,
                 pendingQuestionReason: undefined,
-                resolution: toAgentResolution(agent.resolution),
+                resolution: toAgentResolution((agent as { resolution?: unknown }).resolution),
                 resolutionCount: undefined,
               },
             },

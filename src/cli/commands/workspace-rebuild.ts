@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 
 import {
@@ -14,11 +15,11 @@ export { composeProjectNameForWorkspace };
 export async function workspaceRebuildCommand(issueId: string): Promise<void> {
   const spinner = ora(`Rebuilding workspace stack for ${issueId.toUpperCase()}...`).start();
 
-  const result = await rebuildWorkspaceStack(issueId, {
+  const result = await Effect.runPromise(rebuildWorkspaceStack(issueId, {
     onProgress: (message) => {
       spinner.text = message;
     },
-  });
+  }));
 
   if (!result.success) {
     spinner.fail(`Workspace rebuild failed: ${result.error}`);

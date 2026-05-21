@@ -7,6 +7,7 @@
  * - Custom:    Per-project regex patterns
  */
 
+import { Effect } from 'effect';
 import type { ProjectConfig } from './projects.js';
 
 /**
@@ -197,3 +198,48 @@ export function extractStandardNumber(issueId: string): number | null {
   const match = issueId.match(/^([A-Za-z]+)-(\d+)$/i);
   return match ? parseInt(match[2], 10) : null;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Pure-sync id parsing — additive Effect.sync wrappers. resolveBareNumericId
+// reads the filesystem but is wrapped sync-only to mirror the existing API
+// (it's used from CLI entry points where sync FS is acceptable).
+
+/** Parse an issue id into prefix/number/format. Pure. */
+export const parseIssueIdEffect = (
+  issueId: string,
+  projectConfig?: ProjectConfig,
+): Effect.Effect<ParsedIssueId | null> =>
+  Effect.sync(() => parseIssueId(issueId, projectConfig));
+
+/** Extract the team/project prefix. Pure. */
+export const extractPrefixEffect = (issueId: string): Effect.Effect<string | null> =>
+  Effect.sync(() => extractPrefix(issueId));
+
+/** Extract the numeric portion. Pure. */
+export const extractNumberEffect = (issueId: string): Effect.Effect<number | null> =>
+  Effect.sync(() => extractNumber(issueId));
+
+/** Lowercase filesystem-safe form. Pure. */
+export const normalizeIssueIdEffect = (issueId: string): Effect.Effect<string> =>
+  Effect.sync(() => normalizeIssueId(issueId));
+
+/** Resolve either a raw issue id or an agent session name to canonical id. Pure. */
+export const resolveIssueIdEffect = (input: string): Effect.Effect<string> =>
+  Effect.sync(() => resolveIssueId(input));
+
+/** Resolve a bare numeric id by probing local agent state (sync FS). */
+export const resolveBareNumericIdEffect = (
+  input: string,
+  panopticonHome?: string,
+): Effect.Effect<string | null> =>
+  Effect.sync(() => resolveBareNumericId(input, panopticonHome));
+
+/** Extract prefix from a standard `PREFIX-NUMBER` id only. Pure. */
+export const extractStandardPrefixEffect = (
+  issueId: string,
+): Effect.Effect<string | null> => Effect.sync(() => extractStandardPrefix(issueId));
+
+/** Extract number from a standard `PREFIX-NUMBER` id only. Pure. */
+export const extractStandardNumberEffect = (
+  issueId: string,
+): Effect.Effect<number | null> => Effect.sync(() => extractStandardNumber(issueId));

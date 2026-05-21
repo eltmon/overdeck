@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { readFile, writeFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Data, Effect } from 'effect';
 import type { IssueState } from './tracker/interface.js';
 
 // Storage directory for shadow state files
@@ -398,3 +399,178 @@ export async function getPendingSyncCount(): Promise<number> {
     state.shadowStatus !== state.trackerStatus
   ).length;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants for the async shadow-state surface. The
+// one sync export (`removeShadowState`) is left unwrapped — it uses
+// `unlinkSync` for atomic deletion guarantees the caller relies on.
+
+/** Tagged error for shadow-state Effect variants. */
+export class ShadowStateError extends Data.TaggedError('ShadowStateError')<{
+  readonly operation: string;
+  readonly issueId?: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `getShadowState`. */
+export const getShadowStateEffect = (
+  issueId: string,
+): Effect.Effect<ShadowState | null, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => getShadowState(issueId),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'getShadowState',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `isShadowed`. */
+export const isShadowedEffect = (issueId: string): Effect.Effect<boolean, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => isShadowed(issueId),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'isShadowed',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `createShadowState`. */
+export const createShadowStateEffect = (
+  issueId: string,
+  initialTrackerStatus: IssueState = 'open',
+  triggeredBy: string = 'unknown',
+): Effect.Effect<ShadowState, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => createShadowState(issueId, initialTrackerStatus, triggeredBy),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'createShadowState',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `updateShadowState`. */
+export const updateShadowStateEffect = (
+  issueId: string,
+  newStatus: IssueState,
+  triggeredBy: string,
+  targetCanonicalState?: CanonicalState,
+): Effect.Effect<ShadowState, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => updateShadowState(issueId, newStatus, triggeredBy, targetCanonicalState),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'updateShadowState',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `updateTrackerStatusCache`. */
+export const updateTrackerStatusCacheEffect = (
+  ...args: Parameters<typeof updateTrackerStatusCache>
+): Effect.Effect<Awaited<ReturnType<typeof updateTrackerStatusCache>>, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => updateTrackerStatusCache(...args),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'updateTrackerStatusCache',
+        issueId: args[0],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `markAsSynced`. */
+export const markAsSyncedEffect = (
+  ...args: Parameters<typeof markAsSynced>
+): Effect.Effect<Awaited<ReturnType<typeof markAsSynced>>, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => markAsSynced(...args),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'markAsSynced',
+        issueId: args[0],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `listShadowedIssues`. */
+export const listShadowedIssuesEffect = (): Effect.Effect<ShadowState[], ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => listShadowedIssues(),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'listShadowedIssues',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getDisplayStatus`. */
+export const getDisplayStatusEffect = (
+  ...args: Parameters<typeof getDisplayStatus>
+): Effect.Effect<Awaited<ReturnType<typeof getDisplayStatus>>, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => getDisplayStatus(...args),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'getDisplayStatus',
+        issueId: args[0],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `needsSync`. */
+export const needsSyncEffect = (issueId: string): Effect.Effect<boolean, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => needsSync(issueId),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'needsSync',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getUnsyncedHistory`. */
+export const getUnsyncedHistoryEffect = (
+  issueId: string,
+): Effect.Effect<ShadowHistoryEntry[], ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => getUnsyncedHistory(issueId),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'getUnsyncedHistory',
+        issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getPendingSyncCount`. */
+export const getPendingSyncCountEffect = (): Effect.Effect<number, ShadowStateError> =>
+  Effect.tryPromise({
+    try: () => getPendingSyncCount(),
+    catch: (cause) =>
+      new ShadowStateError({
+        operation: 'getPendingSyncCount',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

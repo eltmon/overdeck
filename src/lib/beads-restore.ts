@@ -22,17 +22,37 @@
  * Once both PRs land, the duplicate should be removed in favour of this file.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { Effect, Layer, Stream } from 'effect';
+import { ChildProcess } from 'effect/unstable/process';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
 
-const execAsync = promisify(exec);
+const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
+);
 
-export async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
-  try {
-    const { stdout } = await execAsync('git status --porcelain -- .beads/issues.jsonl', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
+const runGit = (args: readonly string[], cwd: string): Effect.Effect<string, unknown> =>
+  Effect.gen(function* () {
+    const handle = yield* ChildProcess.make('git', [...args], { cwd });
+    const buf = yield* Stream.runFold(
+      handle.stdout,
+      () => Buffer.alloc(0),
+      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)])
+    );
+    yield* handle.exitCode;
+    return buf.toString('utf-8');
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(spawnerLayer)
+  );
+
+export const restoreTrackedBeadsExport = (workspacePath: string): Effect.Effect<void, never> =>
+  Effect.gen(function* () {
+    const stdout = yield* runGit(
+      ['status', '--porcelain', '--', '.beads/issues.jsonl'],
+      workspacePath
+    );
     // git status --porcelain shows the index column (col 0) and worktree column (col 1).
     // - "_D" = working tree deleted (file removed but still in index)
     // - "D_" = staged deletion (already removed from index — `git restore --` alone
@@ -42,11 +62,9 @@ export async function restoreTrackedBeadsExport(workspacePath: string): Promise<
     // the tracked file in every case.
     const xy = stdout.split('\n').find((line) => line.endsWith(' .beads/issues.jsonl'));
     if (xy && (xy[0] === 'D' || xy[1] === 'D')) {
-      await execAsync('git restore --source=HEAD --staged --worktree -- .beads/issues.jsonl', {
-        cwd: workspacePath,
-      });
+      yield* runGit(
+        ['restore', '--source=HEAD', '--staged', '--worktree', '--', '.beads/issues.jsonl'],
+        workspacePath
+      );
     }
-  } catch {
-    // Best effort — never throw from the safety net.
-  }
-}
+  }).pipe(Effect.catch(() => Effect.void));

@@ -272,9 +272,9 @@ async function getCachedMessages(
       const cachedResult = cached.result;
       const mergedMessages = cachedResult.messages.concat(incremental.messages);
       const mergedWorkLog = cachedResult.workLog.concat(incremental.workLog);
-      const mergedCompactBoundaries = cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
-      const mergedFileEdits = new Map(cachedResult.fileEditsByAssistantId);
-      for (const [k, v] of incremental.fileEditsByAssistantId) {
+      const mergedCompactBoundaries = (cachedResult.compactBoundaries ?? []).concat(incremental.compactBoundaries ?? []);
+      const mergedFileEdits = new Map(cachedResult.fileEditsByAssistantId ?? []);
+      for (const [k, v] of incremental.fileEditsByAssistantId ?? []) {
         const existing = mergedFileEdits.get(k);
         mergedFileEdits.set(k, existing ? [...existing, ...v] : v);
       }
@@ -1438,7 +1438,7 @@ const postConversationStopRoute = HttpRouter.add(
         // not block the HTTP response critical path.
         void (async () => {
           await new Promise((r) => setTimeout(r, 500));
-          await cleanupUnreferencedConversationAttachments(conv);
+          await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile: (conv as { sessionFile?: string | null }).sessionFile ?? null });
         })();
 
         return jsonResponse({ success: true });
@@ -1830,7 +1830,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             streaming: result.streaming,
             totalCost: result.totalCost,
             proposedPlan: result.proposedPlan,
-            compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
+            compactBoundaries: (result.compactBoundaries?.length ?? 0) > 0 ? result.compactBoundaries : undefined,
             compacting: isCompacting(sessionFile) || undefined,
           });
         } catch (parseErr: unknown) {

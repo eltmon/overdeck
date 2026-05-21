@@ -3,6 +3,15 @@
  *
  * Defines the unified schema for panopticon.db.
  * All persistent application state lives here.
+ *
+ * PAN-1249: Schema migration steps still use raw try/catch because each
+ * `ALTER TABLE` / `CREATE INDEX` may legitimately fail on a database that
+ * already has the column/index, and the cleanest way to detect that is to
+ * catch SQLite's "duplicate column"/"index exists" error. Collapsing those
+ * into typed errors would be a semantic change, not a migration. The
+ * DatabaseError tagged error is available via ./index.js for any future
+ * non-migration code paths in this file. Full conversion to
+ * @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
 import type Database from 'better-sqlite3';

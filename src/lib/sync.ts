@@ -2,12 +2,14 @@ import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync,
 import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import {
   SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
   SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SOURCE_SKILLS_DIR, SOURCE_AGENTS_DIR, SOURCE_RULES_DIR,
   CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
   SYNC_TARGET, isDevMode,
 } from './paths.js';
+import { FsError } from './errors.js';
 import {
   buildManifestFromDirectory, writeManifest, readManifest, hashFile,
   setManifestEntry, collectSourceFiles,
@@ -983,3 +985,86 @@ export function syncPiSettings(): PiSettingsSyncResult {
     path: settingsPath,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const toSyncFsError = (op: string, cause: unknown): FsError =>
+  new FsError({ path: SYNC_TARGET.skills, operation: op, cause });
+
+/** True if `targetPath` is a Panopticon-managed symlink. */
+export const isPanopticonSymlinkEffect = (
+  targetPath: string,
+): Effect.Effect<boolean> => Effect.sync(() => isPanopticonSymlink(targetPath));
+
+/** Migrate Panopticon-owned content out of ~/.claude/ (idempotent). */
+export const migrateStalePersonalContentEffect = (): Effect.Effect<MigrationResult, FsError> =>
+  Effect.try({
+    try: () => migrateStalePersonalContent(),
+    catch: (cause) => toSyncFsError('migrateStalePersonalContent', cause),
+  });
+
+/** Remove legacy 0.7.0-era skill directories that were renamed/dropped. */
+export const removeLegacySkills070Effect = (): Effect.Effect<readonly string[], FsError> =>
+  Effect.try({
+    try: () => removeLegacySkills070(),
+    catch: (cause) => toSyncFsError('removeLegacySkills070', cause),
+  });
+
+/** Rebuild the sync cache from sources on disk. */
+export const refreshCacheEffect = (): Effect.Effect<RefreshCacheResult, FsError> =>
+  Effect.try({
+    try: () => refreshCache(),
+    catch: (cause) => toSyncFsError('refreshCache', cause),
+  });
+
+/** Compute the plan: which skills, commands, agents, rules need to be synced. */
+export const planSyncEffect = (): Effect.Effect<SyncPlan, FsError> =>
+  Effect.try({
+    try: () => planSync(),
+    catch: (cause) => toSyncFsError('planSync', cause),
+  });
+
+/** Apply the sync plan to ~/.claude/. */
+export const executeSyncEffect = (options: SyncOptions = {}): Effect.Effect<SyncResult, FsError> =>
+  Effect.try({
+    try: () => executeSync(options),
+    catch: (cause) => toSyncFsError('executeSync', cause),
+  });
+
+/** Plan hook files to be synced (pure). */
+export const planHooksSyncEffect = (): Effect.Effect<readonly HookItem[], FsError> =>
+  Effect.try({
+    try: () => planHooksSync(),
+    catch: (cause) => toSyncFsError('planHooksSync', cause),
+  });
+
+/** Apply the hook sync plan to ~/.claude/. */
+export const syncHooksEffect = (): Effect.Effect<{ synced: string[]; errors: string[] }, FsError> =>
+  Effect.try({
+    try: () => syncHooks(),
+    catch: (cause) => toSyncFsError('syncHooks', cause),
+  });
+
+/** Mirror the statusline binary into ~/.claude/bin/. */
+export const syncStatuslineEffect = (): Effect.Effect<{ synced: string[]; errors: string[] }, FsError> =>
+  Effect.try({
+    try: () => syncStatusline(),
+    catch: (cause) => toSyncFsError('syncStatusline', cause),
+  });
+
+/** Mirror a project's `skills/` dir into ~/.claude/skills/. */
+export const mirrorProjectSkillsEffect = (
+  cwd: string = process.cwd(),
+  opts?: { manifestDir?: string },
+): Effect.Effect<SkillsMirrorResult, FsError> =>
+  Effect.try({
+    try: () => mirrorProjectSkills(cwd, opts),
+    catch: (cause) => toSyncFsError('mirrorProjectSkills', cause),
+  });
+
+/** Inject the Panopticon skills path into `pi` CLI settings (idempotent). */
+export const syncPiSettingsEffect = (): Effect.Effect<PiSettingsSyncResult, FsError> =>
+  Effect.try({
+    try: () => syncPiSettings(),
+    catch: (cause) => toSyncFsError('syncPiSettings', cause),
+  });

@@ -1,4 +1,6 @@
-import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
+import type { ChannelPermissionRequestSnapshot, ResolvedChannelPermissionDecision as ContractsResolvedChannelPermissionDecision } from '@panctl/contracts';
+import { Effect } from 'effect';
+import * as Result from 'effect/Result';
 
 import {
   normalizeChannelPermissionRequestFields,
@@ -7,12 +9,7 @@ import {
 
 const MAX_ACTIVITY_PREVIEW_CHARS = 2048;
 
-export interface ResolvedChannelPermissionDecision {
-  requestId: string;
-  agentId: string;
-  issueId: string;
-  behavior: 'allow' | 'deny';
-}
+export type ResolvedChannelPermissionDecision = ContractsResolvedChannelPermissionDecision;
 
 export function buildPermissionWaitingMessage(toolName: string, description: string): string {
   return `Waiting for permission: ${toolName} — ${description}`;
@@ -25,12 +22,20 @@ export function permissionResolutionVerb(behavior: 'allow' | 'deny'): 'allowed' 
 export function normalizePermissionRequestBody(body: Record<string, unknown>):
   | { ok: true; value: NormalizedChannelPermissionRequestFields }
   | { ok: false; error: string } {
-  return normalizeChannelPermissionRequestFields({
-    requestId: body['requestId'],
-    toolName: body['toolName'],
-    description: body['description'],
-    inputPreview: body['inputPreview'],
-  });
+  const result = Effect.runSync(
+    Effect.result(
+      normalizeChannelPermissionRequestFields({
+        requestId: body['requestId'],
+        toolName: body['toolName'],
+        description: body['description'],
+        inputPreview: body['inputPreview'],
+      }),
+    ),
+  );
+  if (Result.isFailure(result)) {
+    return { ok: false, error: result.failure.message };
+  }
+  return { ok: true, value: result.success };
 }
 
 export function parsePermissionResponseBehavior(body: Record<string, unknown>):

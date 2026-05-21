@@ -48,6 +48,8 @@ export interface LinearComment {
 
 // ─── Service interface ────────────────────────────────────────────────────────
 
+export type LinearClientError = TrackerApiError | RateLimited | TrackerNotConfigured;
+
 export interface LinearClientShape {
   /**
    * Get a Linear issue by UUID or identifier (e.g., "MIN-449").
@@ -55,14 +57,14 @@ export interface LinearClientShape {
    */
   readonly getIssue: (
     id: string,
-  ) => Effect.Effect<LinearIssue, IssueNotFound | TrackerApiError>;
+  ) => Effect.Effect<LinearIssue, IssueNotFound | LinearClientError>;
 
   /**
    * Get all workflow states for a Linear team.
    */
   readonly getTeamStates: (
     teamId: string,
-  ) => Effect.Effect<ReadonlyArray<LinearState>, TrackerApiError>;
+  ) => Effect.Effect<ReadonlyArray<LinearState>, LinearClientError>;
 
   /**
    * Transition an issue to a different workflow state.
@@ -70,7 +72,7 @@ export interface LinearClientShape {
   readonly updateState: (
     issueId: string,
     stateId: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, LinearClientError>;
 
   /**
    * Add a comment to an issue.
@@ -78,7 +80,7 @@ export interface LinearClientShape {
   readonly addComment: (
     issueId: string,
     body: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, LinearClientError>;
 
   /**
    * Find a label by name in a team's label list, or create it if absent.
@@ -87,7 +89,7 @@ export interface LinearClientShape {
     teamId: string,
     name: string,
     color?: string,
-  ) => Effect.Effect<LinearLabel, TrackerApiError>;
+  ) => Effect.Effect<LinearLabel, LinearClientError>;
 
   /**
    * Add a label to an issue.
@@ -95,7 +97,7 @@ export interface LinearClientShape {
   readonly addLabel: (
     issueId: string,
     labelId: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, LinearClientError>;
 
   /**
    * Remove a label from an issue.
@@ -103,14 +105,14 @@ export interface LinearClientShape {
   readonly removeLabel: (
     issueId: string,
     labelId: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, LinearClientError>;
 
   /**
    * Get comments on an issue by UUID.
    */
   readonly getComments: (
     issueId: string,
-  ) => Effect.Effect<ReadonlyArray<LinearComment>, TrackerApiError>;
+  ) => Effect.Effect<ReadonlyArray<LinearComment>, LinearClientError>;
 }
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
@@ -125,11 +127,12 @@ export class LinearClient extends Context.Service<LinearClient, LinearClientShap
  * Retry schedule for Linear API calls: up to 3 retries with exponential backoff,
  * but only when the error is RateLimited (429).
  */
-const rateLimitRetry = Effect.retry({
-  while: (err: unknown) => err instanceof RateLimited,
-  times: 3,
-  schedule: Schedule.exponential(Duration.seconds(1)),
-});
+const rateLimitRetry = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.retry(self, {
+    while: (err) => err instanceof RateLimited,
+    times: 3,
+    schedule: Schedule.exponential(Duration.seconds(1)),
+  });
 
 function wrapLinearError(tracker: string, err: unknown): TrackerApiError | RateLimited {
   const msg = err instanceof Error ? err.message : String(err);
@@ -322,7 +325,7 @@ function getLinearClient(): LinearClientShape {
       getComments: () => fail,
     };
   }
-  if (_linearClientApiKey !== apiKey) {
+  if (_linearClientApiKey !== apiKey || !_linearClientImpl) {
     _linearClientApiKey = apiKey;
     _linearClientImpl = makeLinearClientImpl(new LinearSdkClient({ apiKey }));
   }

@@ -24,6 +24,7 @@ import {
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
+import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
 import { buildCorrelationMap } from './correlator.js';
 import { getModelCapability } from '../model-capabilities.js';
@@ -138,7 +139,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const startTs = Date.now();
   const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0, warnings: [] };
 
-  const parseJsonl = opts.parseJsonl ?? parseSessionJsonl;
+  const parseJsonlEff = opts.parseJsonl ?? parseSessionJsonl;
+  const parseJsonl = (path: string) => Effect.runPromise(parseJsonlEff(path));
 
   // 1. Discover JSONL candidates
   const discoveryEncodings = targetEncodingsForMode(opts);
@@ -188,7 +190,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const correlationMap = buildCorrelationMap(allPaths);
 
   // 4. Determine parallelism from system-probe
-  const caps = await getSystemCapabilities(opts.maxParallel);
+  const caps = await Effect.runPromise(getSystemCapabilities(opts.maxParallel));
   const maxParallel = caps.recommendedParallelism;
 
   // 5. Track progress
@@ -335,11 +337,11 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   });
 
   // 8. Run with bounded parallelism
-  await runWithPool(tasks, maxParallel, (taskResult) => {
+  await Effect.runPromise(runWithPool(tasks, maxParallel, (taskResult) => {
     if (taskResult instanceof Error) {
       result.errors++;
     }
-  });
+  }));
 
   result.durationMs = Date.now() - startTs;
   if (result.warnings?.length === 0) delete result.warnings;

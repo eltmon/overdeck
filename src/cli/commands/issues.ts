@@ -5,6 +5,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { loadConfig } from '../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
@@ -195,10 +196,10 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
       try {
         const tracker = createTracker(trackerConfig);
-        const issues = await tracker.listIssues({
+        const issues = await Effect.runPromise(tracker.listIssues({
           includeClosed: options.all,
           assignee: options.mine ? 'me' : undefined,
-        });
+        }));
         allIssues.push({ tracker: trackerType, issues });
       } catch (error: any) {
         console.log(chalk.yellow(`\nWarning: Failed to fetch from ${trackerType}: ${error.message}`));

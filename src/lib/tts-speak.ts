@@ -1,6 +1,8 @@
+import { Effect } from 'effect';
 import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { getTtsDaemonAuthHeaders } from './tts-daemon.js';
 import { findVoiceById, type TtsVoice } from './tts-voices.js';
+import { TrackerError } from './errors.js';
 
 export type TtsSpeakMode = 'custom' | 'design' | 'clone';
 export type TtsSpeakResult = 'spoken' | 'muted' | 'daemon-unavailable' | 'no-voice';
@@ -173,3 +175,33 @@ export async function resolveAndSpeak(
 
   return postSpeakPayload(buildTtsSpeakPayload(voice, text, config), config, deps);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Build a TTS speak payload from a voice + text. Pure. */
+export const buildTtsSpeakPayloadEffect = (
+  voice: TtsVoice,
+  text: string,
+  config: NormalizedTtsDaemonConfig,
+): Effect.Effect<TtsSpeakPayload> =>
+  Effect.sync(() => buildTtsSpeakPayload(voice, text, config));
+
+/**
+ * Resolve a voice and post a speak request to the TTS daemon. Wraps the
+ * Promise variant. Network failures collapse to `'daemon-unavailable'` in
+ * the success channel; only synchronous mis-use surfaces as TrackerError.
+ */
+export const resolveAndSpeakEffect = (
+  options: ResolveAndSpeakOptions,
+  deps: ResolveAndSpeakDeps,
+): Effect.Effect<TtsSpeakResult, TrackerError> =>
+  Effect.tryPromise({
+    try: () => resolveAndSpeak(options, deps),
+    catch: (cause) =>
+      new TrackerError({
+        tracker: 'tts',
+        operation: 'resolveAndSpeak',
+        message: 'resolveAndSpeak failed',
+        cause,
+      }),
+  });

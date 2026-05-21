@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { Effect } from 'effect';
 
 import { generateVBriefFilename } from './lifecycle.js';
+import { FsError } from '../errors.js';
 import type { VBriefDocument, VBriefSubItem } from './types.js';
 
 export interface AutoSynthesizeIssueInput {
@@ -143,3 +145,21 @@ export async function writeAutoStartVBrief(
     canonicalFilename,
   };
 }
+
+// ─── Effect variant (PAN-1249) ────────────────────────────────────────────────
+
+/**
+ * Effect variant of writeAutoStartVBrief. Wraps mkdir + writeFile in a typed
+ * FsError channel so callers in Effect-native code can compose with this
+ * synthesis step without losing failure typing.
+ */
+export const writeAutoStartVBriefEffect = (
+  projectRoot: string,
+  workspacePath: string,
+  issue: AutoSynthesizeIssueInput,
+): Effect.Effect<AutoSynthesizeResult, FsError> =>
+  Effect.tryPromise({
+    try: () => writeAutoStartVBrief(projectRoot, workspacePath, issue),
+    catch: (cause) =>
+      new FsError({ path: projectRoot, operation: 'writeAutoStartVBrief', cause }),
+  });

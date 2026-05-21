@@ -12,6 +12,7 @@ import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
+import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
@@ -204,7 +205,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         process.exit(1);
       }
     } else {
-      const linearApiKey = getLinearApiKey();
+      const linearApiKey = Effect.runSync(getLinearApiKey());
       if (linearApiKey) {
         try {
           const { LinearClient } = await import('@linear/sdk');
@@ -361,7 +362,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
       }
     } else {
-      const apiKey = getLinearApiKey();
+      const apiKey = Effect.runSync(getLinearApiKey());
       if (apiKey) {
         spinner.text = 'Updating Linear to In Review...';
         trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
@@ -433,10 +434,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     // Append 'end' session entry to workspace continue state.
     try {
-      const continueState = readWorkspaceContinue(workspacePath);
+      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
       if (continueState) {
         const now = new Date().toISOString();
-        writeWorkspaceContinue(workspacePath, {
+        await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
           ...continueState,
           sessionHistory: [
             ...continueState.sessionHistory,
@@ -446,7 +447,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               note: options.comment || 'Agent signaled work complete',
             },
           ],
-        });
+        }));
       }
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
@@ -501,7 +502,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       autoRequeueCount: 0,
     });
 
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');
@@ -605,9 +606,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
   } catch (error: any) {
     spinner.fail(error.message);

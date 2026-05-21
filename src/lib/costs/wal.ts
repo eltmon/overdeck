@@ -9,8 +9,10 @@
 
 import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { listProjects } from '../projects.js';
 import { extractPrefix } from '../issue-id.js';
+import { FsError } from '../errors.js';
 import type { CostEvent } from './events.js';
 
 const DEFAULT_EVENTS_SUBDIR = '.pan/events';
@@ -68,3 +70,31 @@ export function appendToWal(event: CostEvent): boolean {
     return false;
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of appendToWal. Failures surface as typed FsError on the
+ * error channel; the sync variant swallows errors and returns false. Effect
+ * callers that need to distinguish "no matching project" from "write failed"
+ * should prefer this variant.
+ */
+export const appendToWalEffect = (
+  event: CostEvent,
+): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => {
+      const walDir = resolveWalDir(event.issueId);
+      if (!walDir) return false;
+
+      if (!existsSync(walDir)) {
+        mkdirSync(walDir, { recursive: true });
+      }
+
+      const walFile = join(walDir, `${event.issueId.toUpperCase()}.jsonl`);
+      const line = JSON.stringify(event) + '\n';
+      appendFileSync(walFile, line, 'utf-8');
+      return true;
+    },
+    catch: (cause) => new FsError({ path: event.issueId, operation: 'appendToWal', cause }),
+  });

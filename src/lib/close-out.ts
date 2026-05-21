@@ -10,6 +10,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect, Data } from 'effect';
 import {
   PANOPTICON_HOME,
   AGENTS_DIR,
@@ -530,4 +531,33 @@ function findWorkspacePath(projectPath: string, issueLower: string): string | nu
 
   return null;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** A close-out ceremony step failed unexpectedly outside its recovery branches. */
+export class CloseOutError extends Data.TaggedError('CloseOutError')<{
+  readonly issueId: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/**
+ * Effect-native executeCloseOut. The underlying ceremony already aggregates
+ * per-step results into the returned payload (success boolean + steps). The
+ * Effect variant only fails with CloseOutError if the call itself throws
+ * (e.g. dynamic import of @linear/sdk explodes). Step-level failures stay
+ * in the returned `success/steps` shape so callers can display them.
+ */
+export const executeCloseOutEffect = (
+  ctx: CloseOutContext,
+): Effect.Effect<CloseOutResult, CloseOutError> =>
+  Effect.tryPromise({
+    try: () => executeCloseOut(ctx),
+    catch: (cause) =>
+      new CloseOutError({
+        issueId: ctx.issueId,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
 

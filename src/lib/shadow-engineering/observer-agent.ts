@@ -13,6 +13,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Data, Effect } from 'effect';
 import { readInferenceDocument } from './monitoring-agent.js';
 
 const execAsync = promisify(exec);
@@ -215,3 +216,59 @@ export async function runObserverCycle(config: ObserverAgentConfig): Promise<num
 
   return commentsPosted;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Wraps the gh-CLI-backed observer I/O (pollPRs, postPRComment, runObserverCycle)
+// in typed Effect channels. The underlying functions already swallow most
+// errors and return defaults, so the Effect variants only surface truly
+// thrown exceptions (e.g. JSON parse failures, gh missing).
+
+/** Tagged error for observer-agent Effect variants. */
+export class ObserverAgentError extends Data.TaggedError('ObserverAgentError')<{
+  readonly issueId: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+const liftObserverError = (
+  issueId: string,
+  operation: string,
+  cause: unknown,
+): ObserverAgentError =>
+  new ObserverAgentError({
+    issueId,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect variant of `pollPRs`. */
+export const pollPRsEffect = (
+  config: ObserverAgentConfig,
+): Effect.Effect<PRInfo[], ObserverAgentError> =>
+  Effect.tryPromise({
+    try: () => pollPRs(config),
+    catch: (cause) => liftObserverError(config.issueId, 'pollPRs', cause),
+  });
+
+/** Effect variant of `postPRComment`. */
+export const postPRCommentEffect = (
+  repo: string,
+  prNumber: number,
+  comment: string,
+): Effect.Effect<boolean, ObserverAgentError> =>
+  Effect.tryPromise({
+    try: () => postPRComment(repo, prNumber, comment),
+    catch: (cause) => liftObserverError(`${repo}#${prNumber}`, 'postPRComment', cause),
+  });
+
+/** Effect variant of `runObserverCycle`. */
+export const runObserverCycleEffect = (
+  config: ObserverAgentConfig,
+): Effect.Effect<number, ObserverAgentError> =>
+  Effect.tryPromise({
+    try: () => runObserverCycle(config),
+    catch: (cause) => liftObserverError(config.issueId, 'runObserverCycle', cause),
+  });

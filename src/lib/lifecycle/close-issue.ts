@@ -14,6 +14,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
@@ -54,74 +55,77 @@ function markWorkAgentStoppedForIssue(issueId: string): void {
   saveAgentState(state);
 }
 
-export async function closeIssue(
+export function closeIssue(
   ctx: LifecycleContext,
   opts: CloseIssueOptions = {},
-): Promise<StepResult[]> {
-  const results: StepResult[] = [];
-  const { applyLabel = true, labelOnly = false, comment } = opts;
+): Effect.Effect<StepResult[]> {
+  return Effect.gen(function* () {
+    const results: StepResult[] = [];
+    const { applyLabel = true, labelOnly = false, comment } = opts;
 
-  // Step 1: Transition to closed (unless labelOnly)
-  if (!labelOnly) {
-    const closeResult = opts.tracker
-      ? await closeViaTracker(ctx, opts.tracker, comment)
-      : await closeViaDirect(ctx, comment);
-    results.push(closeResult);
+    // Step 1: Transition to closed (unless labelOnly)
+    if (!labelOnly) {
+      const closeResult = opts.tracker
+        ? yield* closeViaTracker(ctx, opts.tracker, comment)
+        : yield* closeViaDirect(ctx, comment);
+      results.push(closeResult);
 
-    // If close failed, don't bother with labels
-    if (!closeResult.success && !closeResult.skipped) {
-      return results;
+      // If close failed, don't bother with labels
+      if (!closeResult.success && !closeResult.skipped) {
+        return results;
+      }
     }
-  }
 
-  // Step 2: Close any open PR for the feature branch (GitHub only)
-  if (ctx.github) {
-    const prResult = await closeGitHubPr(ctx);
-    results.push(prResult);
-  }
+    // Step 2: Close any open PR for the feature branch (GitHub only)
+    if (ctx.github) {
+      const prResult = yield* closeGitHubPr(ctx);
+      results.push(prResult);
+    }
 
-  // Step 3: Apply closed-out label + remove workflow labels
-  if (applyLabel) {
-    const labelResult = await applyClosedOutLabel(ctx, opts.tracker);
-    results.push(labelResult);
-  }
+    // Step 3: Apply closed-out label + remove workflow labels
+    if (applyLabel) {
+      const labelResult = yield* applyClosedOutLabel(ctx, opts.tracker);
+      results.push(labelResult);
+    }
 
-  return results;
+    return results;
+  });
 }
 
 /**
  * Close via IssueTracker abstraction.
  */
-async function closeViaTracker(
+function closeViaTracker(
   ctx: LifecycleContext,
   tracker: IssueTracker,
   comment?: string,
-): Promise<StepResult> {
+): Effect.Effect<StepResult> {
   const step = 'close-issue:transition';
-  try {
-    await tracker.transitionIssue(ctx.issueId, 'closed');
+  return Effect.gen(function* () {
+    yield* tracker.transitionIssue(ctx.issueId, 'closed');
     markWorkAgentStoppedForIssue(ctx.issueId);
     if (comment) {
-      try {
-        await tracker.addComment(ctx.issueId, comment);
-      } catch {
-        // Non-fatal — comment is best-effort
-      }
+      // Best-effort comment — swallow errors
+      yield* tracker.addComment(ctx.issueId, comment).pipe(
+        Effect.catch(() => Effect.void),
+      );
     }
     return stepOk(step, [`Closed ${ctx.issueId} via ${tracker.name} tracker`]);
-  } catch (err) {
-    return stepFailed(step, `Failed to close via tracker: ${(err as Error).message}`);
-  }
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed(step, `Failed to close via tracker: ${(err as Error).message ?? String(err)}`)),
+    ),
+  );
 }
 
 /**
  * Close via direct API calls (fallback when no tracker configured).
  * Determines issue type from context and uses appropriate method.
  */
-async function closeViaDirect(
+function closeViaDirect(
   ctx: LifecycleContext,
   comment?: string,
-): Promise<StepResult> {
+): Effect.Effect<StepResult> {
   const step = 'close-issue:transition';
 
   if (ctx.github) {
@@ -139,13 +143,24 @@ async function closeViaDirect(
     return closeLinearDirect(ctx, linearApiKey);
   }
 
-  return stepFailed(step, 'No tracker available and cannot determine issue type');
+  return Effect.succeed(stepFailed(step, 'No tracker available and cannot determine issue type'));
 }
 
 /**
  * Close a GitHub issue via gh CLI.
  */
-async function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Promise<StepResult> {
+function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => closeGitHubDirectImpl(ctx, comment),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('close-issue:transition', `gh issue close failed: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function closeGitHubDirectImpl(ctx: LifecycleContext, comment?: string): Promise<StepResult> {
   const step = 'close-issue:transition';
   if (!ctx.github) {
     return stepFailed(step, 'GitHub config not provided');
@@ -197,7 +212,18 @@ async function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Promi
 /**
  * Close any open GitHub PR for the feature branch.
  */
-async function closeGitHubPr(ctx: LifecycleContext): Promise<StepResult> {
+function closeGitHubPr(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => closeGitHubPrImpl(ctx),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped('close-issue:close-pr', [`PR close failed (non-fatal): ${(err as Error).message}`])),
+    ),
+  );
+}
+
+async function closeGitHubPrImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-issue:close-pr';
   if (!ctx.github) {
     return stepSkipped(step, ['Not a GitHub issue']);
@@ -258,7 +284,18 @@ const LINEAR_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour (matches Linear'
 /**
  * Close a Linear issue via SDK (find by identifier, transition to Done).
  */
-async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
+function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => closeLinearDirectImpl(ctx, apiKey),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('close-issue:transition', `Linear close failed: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'close-issue:transition';
 
   // Circuit breaker: if we recently hit a rate limit, fail fast without making API calls
@@ -318,35 +355,43 @@ async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise
 /**
  * Close a Rally issue via RallyTracker.
  */
-async function closeRallyDirect(ctx: LifecycleContext): Promise<StepResult> {
+function closeRallyDirect(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => closeRallyDirectImpl(ctx),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('close-issue:transition', `Rally close failed: ${(err as Error).message ?? String(err)}`)),
+    ),
+  );
+}
+
+async function closeRallyDirectImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-issue:transition';
   if (!ctx.rally) {
     return stepFailed(step, 'Rally config not provided');
   }
-  try {
-    const { RallyTracker } = await import('../tracker/rally.js');
-    const tracker = new RallyTracker({
-      apiKey: ctx.rally.apiKey,
-      server: ctx.rally.server,
-      workspace: ctx.rally.workspace,
-      project: ctx.rally.project,
-    });
-    await tracker.transitionIssue(ctx.issueId, 'closed');
-    markWorkAgentStoppedForIssue(ctx.issueId);
-    return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
-  } catch (err) {
-    return stepFailed(step, `Rally close failed: ${(err as Error).message}`);
-  }
+  const { RallyTracker } = await import('../tracker/rally.js');
+  const tracker = new RallyTracker({
+    apiKey: ctx.rally.apiKey,
+    server: ctx.rally.server,
+    workspace: ctx.rally.workspace,
+    project: ctx.rally.project,
+  });
+  // RallyTracker.transitionIssue returns Effect (migrated in PAN-1249).
+  await Effect.runPromise(tracker.transitionIssue(ctx.issueId, 'closed'));
+  markWorkAgentStoppedForIssue(ctx.issueId);
+  return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
 }
 
 /**
  * Apply 'closed-out' label and remove workflow labels.
  * Uses tracker if available, falls back to direct calls.
  */
-async function applyClosedOutLabel(
+function applyClosedOutLabel(
   ctx: LifecycleContext,
   tracker?: IssueTracker,
-): Promise<StepResult> {
+): Effect.Effect<StepResult> {
   const step = 'close-issue:label';
 
   if (tracker) {
@@ -362,29 +407,41 @@ async function applyClosedOutLabel(
     return applyLabelLinear(ctx, linearApiKey);
   }
 
-  return stepSkipped(step, ['No tracker available for label management']);
+  return Effect.succeed(stepSkipped(step, ['No tracker available for label management']));
 }
 
-async function applyLabelViaTracker(
+function applyLabelViaTracker(
   ctx: LifecycleContext,
   tracker: IssueTracker,
-): Promise<StepResult> {
+): Effect.Effect<StepResult> {
   const step = 'close-issue:label';
-  try {
-    const issue = await tracker.getIssue(ctx.issueId);
-    const newLabels = issue.labels.filter(l => !WORKFLOW_LABELS.includes(l));
+  return Effect.gen(function* () {
+    const issue = yield* tracker.getIssue(ctx.issueId);
+    const newLabels = issue.labels.filter((l: string) => !WORKFLOW_LABELS.includes(l));
     if (!newLabels.includes(CLOSED_OUT_LABEL)) {
       newLabels.push(CLOSED_OUT_LABEL);
     }
-    await tracker.updateIssue(ctx.issueId, { labels: newLabels });
+    yield* tracker.updateIssue(ctx.issueId, { labels: newLabels });
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label via ${tracker.name} tracker`]);
-  } catch (err) {
-    // Label management is non-fatal
-    return stepSkipped(step, [`Label management failed (non-fatal): ${(err as Error).message}`]);
-  }
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped(step, [`Label management failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+    ),
+  );
 }
 
-async function applyLabelGitHub(ctx: LifecycleContext): Promise<StepResult> {
+function applyLabelGitHub(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => applyLabelGitHubImpl(ctx),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped('close-issue:label', [`Label management failed (non-fatal): ${(err as Error).message}`])),
+    ),
+  );
+}
+
+async function applyLabelGitHubImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-issue:label';
   if (!ctx.github) return stepSkipped(step);
   const { owner, repo, number } = ctx.github;
@@ -413,7 +470,18 @@ async function applyLabelGitHub(ctx: LifecycleContext): Promise<StepResult> {
   }
 }
 
-async function applyLabelLinear(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
+function applyLabelLinear(ctx: LifecycleContext, apiKey: string): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => applyLabelLinearImpl(ctx, apiKey),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped('close-issue:label', [`Linear label management failed (non-fatal): ${(err as Error).message}`])),
+    ),
+  );
+}
+
+async function applyLabelLinearImpl(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'close-issue:label';
   try {
     const { LinearClient } = await import('@linear/sdk');
@@ -462,4 +530,3 @@ async function applyLabelLinear(ctx: LifecycleContext, apiKey: string): Promise<
     return stepSkipped(step, [`Linear label management failed (non-fatal): ${(err as Error).message}`]);
   }
 }
-

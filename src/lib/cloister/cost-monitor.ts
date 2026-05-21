@@ -6,7 +6,10 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { loadCloisterConfig, type CostLimitsConfig } from './config.js';
 
@@ -353,3 +356,89 @@ export function resetCostTracking(): void {
   };
   saveCostData(costData);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect variants for cost-monitor I/O. The sync variants remain in
+// place because the module-level `costData` cache is populated synchronously at
+// import time; new callers (route handlers, services in the dashboard server)
+// can use these to avoid blocking the event loop on cost ledger writes.
+
+/** Persist the in-memory cost ledger to disk using fs/promises. */
+const saveCostDataAsync = (data: CostData): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    const dir = dirname(COST_DATA_FILE);
+    yield* Effect.tryPromise({
+      try: () => mkdir(dir, { recursive: true }),
+      catch: (cause) => new FsError({ path: dir, operation: 'mkdir', cause }),
+    });
+
+    const persisted: CostDataPersisted = {
+      perAgent: Object.fromEntries(data.perAgent),
+      perIssue: Object.fromEntries(data.perIssue),
+      dailyTotal: data.dailyTotal,
+      lastResetDate: data.lastResetDate,
+    };
+
+    const tempFile = `${COST_DATA_FILE}.tmp`;
+    yield* Effect.tryPromise({
+      try: () => writeFile(tempFile, JSON.stringify(persisted, null, 2), 'utf-8'),
+      catch: (cause) => new FsError({ path: tempFile, operation: 'writeFile', cause }),
+    });
+
+    yield* Effect.tryPromise({
+      try: () => rename(tempFile, COST_DATA_FILE),
+      catch: (cause) => new FsError({ path: COST_DATA_FILE, operation: 'rename', cause }),
+    });
+
+    // Best-effort temp cleanup if rename was a no-op on a foreign FS.
+    yield* Effect.tryPromise({
+      try: () => unlink(tempFile),
+      catch: (cause) => new FsError({ path: tempFile, operation: 'unlink', cause }),
+    }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+  });
+
+/** Effect variant of `recordCost`. */
+export const recordCostEffect = (
+  agentId: string,
+  cost: number,
+  issueId?: string,
+): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    const today = getTodayDate();
+    if (costData.lastResetDate !== today) {
+      costData.dailyTotal = 0;
+      costData.lastResetDate = today;
+      console.log(`🔔 Cost monitor: Daily totals reset for ${today}`);
+    }
+
+    const currentAgentCost = costData.perAgent.get(agentId) || 0;
+    costData.perAgent.set(agentId, currentAgentCost + cost);
+
+    if (issueId) {
+      const currentIssueCost = costData.perIssue.get(issueId) || 0;
+      costData.perIssue.set(issueId, currentIssueCost + cost);
+    }
+
+    costData.dailyTotal += cost;
+
+    yield* saveCostDataAsync(costData);
+  });
+
+/** Effect variant of `resetCostTracking`. */
+export const resetCostTrackingEffect = (): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    costData = {
+      perAgent: new Map(),
+      perIssue: new Map(),
+      dailyTotal: 0,
+      lastResetDate: getTodayDate(),
+    };
+    yield* saveCostDataAsync(costData);
+  });
+
+// Re-export FsError so callers don't need to import it from the shared module.
+export { FsError } from '../errors.js';
+// Silence "unused" warnings for the async fs imports we may use in future
+// extensions of this module.
+void readFile;

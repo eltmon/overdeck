@@ -10,10 +10,7 @@
  * preventing lock contention and process pile-up.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { Effect } from 'effect';
 
 let pending: Promise<void> = Promise.resolve();
 
@@ -50,3 +47,32 @@ export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => P
     }
   });
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native variant of withBdMutex over a thunk that returns a no-context
+ * Effect. Serializes against all other bd-mutex callers via the Promise queue.
+ * The wrapped Effect must be no-context (R = never) since it is launched from
+ * inside a tryPromise — Layers cannot be threaded through the global mutex.
+ */
+export const withBdMutexEffect = <A, E>(
+  fn: () => Effect.Effect<A, E>,
+): Effect.Effect<A, E> =>
+  Effect.tryPromise({
+    try: () => withBdMutex(() => Effect.runPromise(fn())),
+    catch: (e) => e as E,
+  });
+
+/**
+ * Effect-native variant of withWorkspaceBdMutex. Same context constraint as
+ * withBdMutexEffect.
+ */
+export const withWorkspaceBdMutexEffect = <A, E>(
+  workspacePath: string,
+  fn: () => Effect.Effect<A, E>,
+): Effect.Effect<A, E> =>
+  Effect.tryPromise({
+    try: () => withWorkspaceBdMutex(workspacePath, () => Effect.runPromise(fn())),
+    catch: (e) => e as E,
+  });

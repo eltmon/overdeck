@@ -5,6 +5,10 @@
  * Provides typed methods for query, create, and update operations.
  */
 
+import { Effect } from 'effect';
+import { TrackerError } from '../errors.js';
+import { TrackerAuthError } from './interface.js';
+
 export interface RallyQueryConfig {
   type: string;
   fetch?: string[];
@@ -62,6 +66,9 @@ export interface RallyApiConfig {
   };
 }
 
+const trackerErr = (operation: string, message: string, cause?: unknown) =>
+  new TrackerError({ tracker: 'rally', operation, message, cause });
+
 export class RallyRestApi {
   private apiKey: string;
   public server: string;
@@ -76,147 +83,210 @@ export class RallyRestApi {
   /**
    * Query Rally artifacts
    */
-  async query(config: RallyQueryConfig): Promise<RallyQueryResult> {
-    const params = new URLSearchParams();
+  query(
+    config: RallyQueryConfig,
+  ): Effect.Effect<RallyQueryResult, TrackerError | TrackerAuthError> {
+    const self = this;
 
-    if (config.query) {
-      params.set('query', config.query);
-    }
+    return Effect.gen(function* () {
+      const params = new URLSearchParams();
 
-    if (config.fetch && config.fetch.length > 0) {
-      params.set('fetch', config.fetch.join(','));
-    }
-
-    if (config.limit !== undefined) {
-      params.set('pagesize', String(config.limit));
-    }
-
-    if (config.workspace) {
-      params.set('workspace', config.workspace);
-    }
-
-    if (config.project) {
-      params.set('project', config.project);
-      if (config.projectScopeDown) {
-        params.set('projectScopeDown', 'true');
+      if (config.query) params.set('query', config.query);
+      if (config.fetch && config.fetch.length > 0) {
+        params.set('fetch', config.fetch.join(','));
       }
-    }
+      if (config.limit !== undefined) params.set('pagesize', String(config.limit));
+      if (config.workspace) params.set('workspace', config.workspace);
+      if (config.project) {
+        params.set('project', config.project);
+        if (config.projectScopeDown) params.set('projectScopeDown', 'true');
+      }
+      if (config.order) params.set('order', config.order);
 
-    if (config.order) {
-      params.set('order', config.order);
-    }
+      const url = `${self.server}/slm/webservice/v2.0/${config.type}?${params.toString()}`;
 
-    const url = `${this.server}/slm/webservice/v2.0/${config.type}?${params.toString()}`;
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              'ZSESSIONID': self.apiKey,
+              'Content-Type': 'application/json',
+              ...self.customHeaders,
+            },
+          }),
+        catch: (cause) => trackerErr('query', `Network error: ${String(cause)}`, cause),
+      });
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'ZSESSIONID': this.apiKey,
-        'Content-Type': 'application/json',
-        ...this.customHeaders,
-      },
+      if (!response.ok) {
+        if (response.status === 401) {
+          return yield* Effect.fail(
+            new TrackerAuthError({
+              tracker: 'rally',
+              message:
+                'Unauthorized: Invalid API key or insufficient permissions',
+            }),
+          );
+        }
+        return yield* Effect.fail(
+          trackerErr(
+            'query',
+            `Rally API query failed: ${response.status} ${response.statusText}`,
+          ),
+        );
+      }
+
+      const result = (yield* Effect.tryPromise({
+        try: () => response.json() as Promise<RallyQueryResult>,
+        catch: (cause) => trackerErr('query:parse', String(cause), cause),
+      }));
+
+      if (
+        result.QueryResult.Errors &&
+        result.QueryResult.Errors.length > 0
+      ) {
+        const errorDetail = result.QueryResult.Errors.join(', ');
+        const queryDetail = config.query ? ` (Query: ${config.query})` : '';
+        if (process.env.DEBUG?.includes('rally')) {
+          console.error('[Rally WSAPI] Query failed:', {
+            query: config.query,
+            errors: result.QueryResult.Errors,
+          });
+        }
+        return yield* Effect.fail(
+          trackerErr('query', `Rally API query failed: ${errorDetail}${queryDetail}`),
+        );
+      }
+
+      return result;
     });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Unauthorized: Invalid API key or insufficient permissions');
-      }
-      throw new Error(`Rally API query failed: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json() as RallyQueryResult;
-
-    if (result.QueryResult.Errors && result.QueryResult.Errors.length > 0) {
-      const errorDetail = result.QueryResult.Errors.join(', ');
-      const queryDetail = config.query ? ` (Query: ${config.query})` : '';
-      if (process.env.DEBUG?.includes('rally')) {
-        console.error('[Rally WSAPI] Query failed:', { query: config.query, errors: result.QueryResult.Errors });
-      }
-      throw new Error(`Rally API query failed: ${errorDetail}${queryDetail}`);
-    }
-
-    return result;
   }
 
   /**
    * Create a Rally object
    */
-  async create(config: RallyCreateConfig): Promise<RallyCreateResult> {
-    const url = `${this.server}/slm/webservice/v2.0/${config.type}/create`;
+  create(
+    config: RallyCreateConfig,
+  ): Effect.Effect<RallyCreateResult, TrackerError> {
+    const self = this;
+    return Effect.gen(function* () {
+      const url = `${self.server}/slm/webservice/v2.0/${config.type}/create`;
 
-    const body: any = {
-      [config.type]: config.data,
-    };
+      const body: any = { [config.type]: config.data };
 
-    const params = new URLSearchParams();
-    if (config.fetch && config.fetch.length > 0) {
-      params.set('fetch', config.fetch.join(','));
-    }
+      const params = new URLSearchParams();
+      if (config.fetch && config.fetch.length > 0) {
+        params.set('fetch', config.fetch.join(','));
+      }
 
-    const finalUrl = params.toString() ? `${url}?${params.toString()}` : url;
+      const finalUrl = params.toString() ? `${url}?${params.toString()}` : url;
 
-    const response = await fetch(finalUrl, {
-      method: 'POST',
-      headers: {
-        'ZSESSIONID': this.apiKey,
-        'Content-Type': 'application/json',
-        ...this.customHeaders,
-      },
-      body: JSON.stringify(body),
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(finalUrl, {
+            method: 'POST',
+            headers: {
+              'ZSESSIONID': self.apiKey,
+              'Content-Type': 'application/json',
+              ...self.customHeaders,
+            },
+            body: JSON.stringify(body),
+          }),
+        catch: (cause) => trackerErr('create', `Network error: ${String(cause)}`, cause),
+      });
+
+      if (!response.ok) {
+        return yield* Effect.fail(
+          trackerErr(
+            'create',
+            `Rally API create failed: ${response.status} ${response.statusText}`,
+          ),
+        );
+      }
+
+      const result = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<RallyCreateResult>,
+        catch: (cause) => trackerErr('create:parse', String(cause), cause),
+      });
+
+      if (
+        result.CreateResult.Errors &&
+        result.CreateResult.Errors.length > 0
+      ) {
+        return yield* Effect.fail(
+          trackerErr(
+            'create',
+            `Rally API create failed: ${result.CreateResult.Errors.join(', ')}`,
+          ),
+        );
+      }
+
+      return result;
     });
-
-    if (!response.ok) {
-      throw new Error(`Rally API create failed: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json() as RallyCreateResult;
-
-    if (result.CreateResult.Errors && result.CreateResult.Errors.length > 0) {
-      throw new Error(`Rally API create failed: ${result.CreateResult.Errors.join(', ')}`);
-    }
-
-    return result;
   }
 
   /**
    * Update a Rally object
    */
-  async update(config: RallyUpdateConfig): Promise<RallyUpdateResult> {
-    // Extract ObjectID from ref (e.g., "/hierarchicalrequirement/12345" -> "12345")
-    const objectId = config.ref.split('/').pop();
-    const url = `${this.server}/slm/webservice/v2.0/${config.type}/${objectId}`;
+  update(
+    config: RallyUpdateConfig,
+  ): Effect.Effect<RallyUpdateResult, TrackerError> {
+    const self = this;
+    return Effect.gen(function* () {
+      // Extract ObjectID from ref (e.g., "/hierarchicalrequirement/12345" -> "12345")
+      const objectId = config.ref.split('/').pop();
+      const url = `${self.server}/slm/webservice/v2.0/${config.type}/${objectId}`;
 
-    const body: any = {
-      [config.type]: config.data,
-    };
+      const body: any = { [config.type]: config.data };
 
-    const params = new URLSearchParams();
-    if (config.fetch && config.fetch.length > 0) {
-      params.set('fetch', config.fetch.join(','));
-    }
+      const params = new URLSearchParams();
+      if (config.fetch && config.fetch.length > 0) {
+        params.set('fetch', config.fetch.join(','));
+      }
 
-    const finalUrl = params.toString() ? `${url}?${params.toString()}` : url;
+      const finalUrl = params.toString() ? `${url}?${params.toString()}` : url;
 
-    const response = await fetch(finalUrl, {
-      method: 'POST',
-      headers: {
-        'ZSESSIONID': this.apiKey,
-        'Content-Type': 'application/json',
-        ...this.customHeaders,
-      },
-      body: JSON.stringify(body),
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(finalUrl, {
+            method: 'POST',
+            headers: {
+              'ZSESSIONID': self.apiKey,
+              'Content-Type': 'application/json',
+              ...self.customHeaders,
+            },
+            body: JSON.stringify(body),
+          }),
+        catch: (cause) => trackerErr('update', `Network error: ${String(cause)}`, cause),
+      });
+
+      if (!response.ok) {
+        return yield* Effect.fail(
+          trackerErr(
+            'update',
+            `Rally API update failed: ${response.status} ${response.statusText}`,
+          ),
+        );
+      }
+
+      const result = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<RallyUpdateResult>,
+        catch: (cause) => trackerErr('update:parse', String(cause), cause),
+      });
+
+      if (
+        result.OperationResult.Errors &&
+        result.OperationResult.Errors.length > 0
+      ) {
+        return yield* Effect.fail(
+          trackerErr(
+            'update',
+            `Rally API update failed: ${result.OperationResult.Errors.join(', ')}`,
+          ),
+        );
+      }
+
+      return result;
     });
-
-    if (!response.ok) {
-      throw new Error(`Rally API update failed: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json() as RallyUpdateResult;
-
-    if (result.OperationResult.Errors && result.OperationResult.Errors.length > 0) {
-      throw new Error(`Rally API update failed: ${result.OperationResult.Errors.join(', ')}`);
-    }
-
-    return result;
   }
 }

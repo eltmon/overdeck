@@ -3,10 +3,23 @@
  *
  * Provides SQLite-backed storage for CostEvent records.
  * Deduplication is enforced via UNIQUE index on request_id.
+ *
+ * PAN-1249: Effect migration pass — synchronous public API preserved so
+ * existing call sites stay unchanged. The hot insert paths are wrapped in
+ * Effect.try with a local DatabaseError tag, matching prior best-effort
+ * semantics (insert failures are logged and surfaced as `null`).
+ * Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
+import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
 import type { CostEvent } from '../costs/events.js';
+
+/** A SQLite operation against panopticon.db failed. */
+class DatabaseError extends Data.TaggedError('DatabaseError')<{
+  readonly operation: string;
+  readonly cause?: unknown;
+}> {}
 
 // ============== Write operations ==============
 
@@ -15,44 +28,51 @@ import type { CostEvent } from '../costs/events.js';
  * Deduplication is handled by the UNIQUE index on request_id.
  */
 export function insertCostEvent(event: CostEvent, sourceFile?: string): number | null {
-  const db = getDatabase();
-  try {
-    const result = db.prepare(`
-      INSERT OR IGNORE INTO cost_events (
-        ts, agent_id, issue_id, session_type, provider, model,
-        input, output, cache_read, cache_write, cost, request_id,
-        session_id,
-        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-        source_file, caveman_variant
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      event.ts,
-      event.agentId,
-      event.issueId,
-      event.sessionType || 'unknown',
-      event.provider || 'anthropic',
-      event.model,
-      event.input,
-      event.output,
-      event.cacheRead,
-      event.cacheWrite,
-      event.cost,
-      event.requestId ?? null,
-      event.sessionId ?? null,
-      event.tldrInterceptions ?? null,
-      event.tldrBypasses ?? null,
-      event.tldrTokensSaved ?? null,
-      event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
-      sourceFile ?? null,
-      event.cavemanVariant ?? null,
-    );
-    if (result.changes === 0) return null; // Duplicate
-    return result.lastInsertRowid as number;
-  } catch (err) {
-    // Handle non-requestId duplicates gracefully
-    console.error('[cost-events-db] Insert failed:', err);
-    return null;
-  }
+  return Effect.runSync(
+    Effect.try({
+      try: () => {
+        const db = getDatabase();
+        const result = db.prepare(`
+          INSERT OR IGNORE INTO cost_events (
+            ts, agent_id, issue_id, session_type, provider, model,
+            input, output, cache_read, cache_write, cost, request_id,
+            session_id,
+            tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+            source_file, caveman_variant
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          event.ts,
+          event.agentId,
+          event.issueId,
+          event.sessionType || 'unknown',
+          event.provider || 'anthropic',
+          event.model,
+          event.input,
+          event.output,
+          event.cacheRead,
+          event.cacheWrite,
+          event.cost,
+          event.requestId ?? null,
+          event.sessionId ?? null,
+          event.tldrInterceptions ?? null,
+          event.tldrBypasses ?? null,
+          event.tldrTokensSaved ?? null,
+          event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
+          sourceFile ?? null,
+          event.cavemanVariant ?? null,
+        );
+        if (result.changes === 0) return null; // Duplicate
+        return result.lastInsertRowid as number;
+      },
+      catch: (cause) => new DatabaseError({ operation: 'insertCostEvent', cause }),
+    }).pipe(
+      Effect.catchTag('DatabaseError', (err) => {
+        // Handle non-requestId duplicates gracefully (preserves prior behaviour)
+        console.error('[cost-events-db] Insert failed:', err.cause);
+        return Effect.succeed<number | null>(null);
+      }),
+    ),
+  );
 }
 
 /**

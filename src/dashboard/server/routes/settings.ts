@@ -143,7 +143,7 @@ const getClaudeAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/claude-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* Effect.promise(() => getClaudeAuthStatus());
+    const status = yield* getClaudeAuthStatus();
     return jsonResponse(status);
   })),
 );
@@ -793,7 +793,7 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 
       try {
         const providerEnv = await getProviderEnvForModel(model);
-        const conflicts = await detectProviderEnvConflicts(providerEnv);
+        const conflicts = await Effect.runPromise(detectProviderEnvConflicts(providerEnv));
         return jsonResponse({ conflicts });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

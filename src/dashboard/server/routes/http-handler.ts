@@ -13,7 +13,9 @@
  */
 
 import { Cause, Effect, Option } from 'effect';
-import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpServerRequest, HttpServerResponse as HttpServerResponseModule } from 'effect/unstable/http';
+
+type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -54,13 +56,24 @@ let opaqueLastSummaryAt = 0;
  *   Unknown errors                        → 500 Internal Server Error
  */
 export function httpHandler<R, E>(
-  effect: Effect.Effect<typeof HttpServerResponse.Type, E, R>
-): Effect.Effect<typeof HttpServerResponse.Type, never, R> {
+  effect: Effect.Effect<HttpServerResponse, E, R>
+): Effect.Effect<HttpServerResponse, never, R> {
   // Capture the registration call site (where the route called httpHandler(...))
   // so when a fiber emits a typed Fail with no stack — e.g. Effect.fail(null) —
   // we can still tell which route module the handler belongs to.
   const registeredAt = (new Error('httpHandler registered')).stack ?? '<no stack>';
-  return (effect as Effect.Effect<typeof HttpServerResponse.Type, unknown, R>).pipe(
+  type AllKnownErrors =
+    | IssueNotFound
+    | WorkspaceNotFound
+    | TrackerNotConfigured
+    | RateLimited
+    | AgentAlreadyRunning
+    | BeadsNotInitialized
+    | PlanEmpty
+    | TrackerApiError
+    | WorkspaceCreateError
+    | AgentStartError;
+  return (effect as Effect.Effect<HttpServerResponse, AllKnownErrors, R>).pipe(
     Effect.catchTag('IssueNotFound', (err: IssueNotFound) =>
       Effect.succeed(jsonResponse({ error: `Issue not found: ${err.id}` }, { status: 404 }))
     ),
@@ -110,7 +123,7 @@ export function httpHandler<R, E>(
         }
         const error = Cause.squash(cause);
         const message = error instanceof Error ? error.message : 'Internal server error';
-        const reqOption = yield* Effect.serviceOption(HttpServerRequest);
+        const reqOption = yield* Effect.serviceOption(HttpServerRequest.HttpServerRequest);
         const route = Option.match(reqOption, {
           onNone: () => 'unknown',
           onSome: (req) => `${req.method} ${req.url}`,
@@ -154,5 +167,5 @@ export function httpHandler<R, E>(
         return jsonResponse({ error: message }, { status: 500 });
       }),
     )
-  ) as Effect.Effect<typeof HttpServerResponse.Type, never, R>;
+  ) as Effect.Effect<HttpServerResponse, never, R>;
 }

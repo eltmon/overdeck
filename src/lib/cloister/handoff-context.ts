@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Data, Effect } from 'effect';
 import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
@@ -128,7 +129,8 @@ async function captureFiles(
     // Read the live workspace continue state first, then migration fallbacks.
     let continueState: ContinueState | null = null;
     try {
-      continueState = readWorkspaceContinue(workspace);
+      const { Effect: EffectModule } = await import('effect');
+      continueState = await EffectModule.runPromise(readWorkspaceContinue(workspace));
     } catch { /* ignore */ }
     if (!continueState) {
       const resolved = resolveProjectFromIssue(issueId);
@@ -335,7 +337,7 @@ export function buildHandoffPrompt(
   context: HandoffContext,
   additionalInstructions?: string
 ): string {
-  return renderPrompt({
+  return Effect.runSync(renderPrompt({
     name: 'handoff-to-work',
     vars: {
       ISSUE_ID: context.issueId,
@@ -344,5 +346,35 @@ export function buildHandoffPrompt(
       HANDOFF_CONTEXT: serializeHandoffContext(context),
       ADDITIONAL_INSTRUCTIONS_BLOCK: additionalInstructions || '',
     },
-  });
+  }));
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants. The async variants above stay so existing
+// callers keep working; Effect-based callers can compose without runPromise.
+
+/** Tagged error for handoff-context Effect variants. */
+export class HandoffContextError extends Data.TaggedError('HandoffContextError')<{
+  readonly issueId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `captureHandoffContext`. */
+export const captureHandoffContextEffect = (
+  agentState: AgentState,
+  targetModel: string,
+  reason: string,
+): Effect.Effect<HandoffContext, HandoffContextError> =>
+  Effect.tryPromise({
+    try: () => captureHandoffContext(agentState, targetModel, reason),
+    catch: (cause) =>
+      new HandoffContextError({
+        issueId: agentState.issueId,
+        stage: 'captureHandoffContext',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

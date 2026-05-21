@@ -23,7 +23,11 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
   getLinearApiKey: vi.fn().mockReturnValue(null),
 }));
 
-import { closeIssue } from '../../../../src/lib/lifecycle/close-issue.js';
+import { Effect } from 'effect';
+import { closeIssue as closeIssueEffect } from '../../../../src/lib/lifecycle/close-issue.js';
+
+const closeIssue = (...args: Parameters<typeof closeIssueEffect>) =>
+  Effect.runPromise(closeIssueEffect(...args));
 
 describe('close-issue', () => {
   beforeEach(() => {

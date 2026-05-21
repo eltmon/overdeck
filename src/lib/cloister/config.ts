@@ -5,8 +5,11 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { parse, stringify } from '@iarna/toml';
 import { join } from 'path';
+import { Effect } from 'effect';
+import { ConfigError, FsError } from '../errors.js';
 import { PANOPTICON_HOME } from '../paths.js';
 
 const CLOISTER_CONFIG_FILE = join(PANOPTICON_HOME, 'cloister.toml');
@@ -479,3 +482,93 @@ export function getHealthThresholdsMs(): {
     stuck: config.thresholds.stuck * 60 * 1000,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants of the config helpers above. The sync
+// variants are preserved so existing callers (CLI scripts, top-level module
+// initialization) do not have to migrate; new Effect-based callers can compose
+// these directly without `Effect.runSync` round-tripping.
+
+/** Effect variant of `loadCloisterConfig`. Falls back to defaults on read/parse failures. */
+export const loadCloisterConfigEffect = (): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
+  Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: () => mkdir(PANOPTICON_HOME, { recursive: true }),
+      catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation: 'mkdir', cause }),
+    });
+
+    let config: CloisterConfig = DEFAULT_CLOISTER_CONFIG;
+
+    if (!existsSync(CLOISTER_CONFIG_FILE)) {
+      yield* saveCloisterConfigEffect(DEFAULT_CLOISTER_CONFIG);
+    } else {
+      const content: string | null = yield* Effect.tryPromise({
+        try: () => readFile(CLOISTER_CONFIG_FILE, 'utf-8'),
+        catch: (cause) => new FsError({ path: CLOISTER_CONFIG_FILE, operation: 'readFile', cause }),
+      }).pipe(
+        Effect.catch((err: FsError) => {
+          console.error('Failed to load Cloister config:', err);
+          console.error('Using default configuration');
+          return Effect.succeed<string | null>(null);
+        }),
+      );
+
+      if (content !== null) {
+        try {
+          const parsed = parse(content) as unknown as Partial<CloisterConfig>;
+          config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+        } catch (error) {
+          console.error('Failed to parse Cloister config:', error);
+          console.error('Using default configuration');
+          config = DEFAULT_CLOISTER_CONFIG;
+        }
+      }
+    }
+
+    const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
+    if (stashJanitorEnv !== undefined) {
+      const parsedEnv = Number.parseInt(stashJanitorEnv, 10);
+      if (Number.isFinite(parsedEnv) && parsedEnv >= 0) {
+        config = {
+          ...config,
+          monitoring: {
+            ...config.monitoring,
+            stash_janitor_every_cycles: parsedEnv,
+          },
+        };
+      }
+    }
+
+    return config;
+  });
+
+/** Effect variant of `saveCloisterConfig`. */
+export const saveCloisterConfigEffect = (config: CloisterConfig): Effect.Effect<void, FsError | ConfigError> =>
+  Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: () => mkdir(PANOPTICON_HOME, { recursive: true }),
+      catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation: 'mkdir', cause }),
+    });
+
+    const content = yield* Effect.try({
+      try: () => stringify(config as any),
+      catch: (cause) => new ConfigError({ message: 'Failed to serialize Cloister config', cause }),
+    });
+
+    yield* Effect.tryPromise({
+      try: () => writeFile(CLOISTER_CONFIG_FILE, content, 'utf-8'),
+      catch: (cause) => new FsError({ path: CLOISTER_CONFIG_FILE, operation: 'writeFile', cause }),
+    });
+  });
+
+/** Effect variant of `updateCloisterConfig`. */
+export const updateCloisterConfigEffect = (
+  updates: Partial<CloisterConfig>,
+): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
+  Effect.gen(function* () {
+    const current = yield* loadCloisterConfigEffect();
+    const updated = deepMerge(current, updates);
+    yield* saveCloisterConfigEffect(updated);
+    return updated;
+  });

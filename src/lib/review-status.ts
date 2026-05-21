@@ -2,6 +2,7 @@ import { access, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Data, Effect } from 'effect';
 import { findPlanAsync } from './vbrief/io.js';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
@@ -649,3 +650,51 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
     }
   })();
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants for the async surfaces of review-status.
+// The sync DB-backed variants (`setReviewStatus`, `getReviewStatus`) are not
+// re-wrapped here — they're synchronous SQLite calls and existing callers
+// stay on the sync surface. Only the genuinely-async helpers receive Effect
+// variants.
+
+/** Tagged error for review-status Effect variants. */
+export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
+  readonly issueId: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `setReviewStatusAsync`. */
+export const setReviewStatusAsyncEffect = (
+  issueId: string,
+  update: Partial<ReviewStatus>,
+  existing?: ReviewStatus,
+): Effect.Effect<ReviewStatus, ReviewStatusError> =>
+  Effect.tryPromise({
+    try: () => setReviewStatusAsync(issueId, update, existing),
+    catch: (cause) =>
+      new ReviewStatusError({
+        issueId,
+        operation: 'setReviewStatusAsync',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getReviewStatusAsync`. */
+export const getReviewStatusAsyncEffect = (
+  issueId: string,
+): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
+  Effect.tryPromise({
+    try: () => getReviewStatusAsync(issueId),
+    catch: (cause) =>
+      new ReviewStatusError({
+        issueId,
+        operation: 'getReviewStatusAsync',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -7,6 +8,29 @@ import {
   parseIssueRef,
   formatIssueRef,
 } from '../../../src/lib/tracker/linking.js';
+
+function isEffect(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  for (const key of Object.getOwnPropertyNames(v)) {
+    if (key.startsWith('~effect/Effect/')) return true;
+  }
+  return false;
+}
+function wrap<T extends object>(t: T): any {
+  return new Proxy(t, {
+    get(target, prop) {
+      const value = (target as any)[prop];
+      if (typeof value !== 'function') return value;
+      return (...args: any[]) => {
+        const result = value.apply(target, args);
+        if (isEffect(result)) {
+          return Effect.runPromise(result as any);
+        }
+        return result;
+      };
+    },
+  });
+}
 
 describe('parseIssueRef', () => {
   it('should parse GitHub-style refs', () => {
@@ -59,7 +83,7 @@ describe('LinkManager', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-link-test-'));
-    manager = new LinkManager(join(tempDir, 'links.json'));
+    manager = wrap(new LinkManager(join(tempDir, 'links.json')));
   });
 
   afterEach(() => {
@@ -67,8 +91,8 @@ describe('LinkManager', () => {
   });
 
   describe('addLink', () => {
-    it('should add a link between issues', () => {
-      const link = manager.addLink(
+    it('should add a link between issues', async () => {
+      const link = await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' },
         'related'
@@ -82,56 +106,56 @@ describe('LinkManager', () => {
       expect(link.createdAt).toBeDefined();
     });
 
-    it('should not duplicate existing links', () => {
-      manager.addLink(
+    it('should not duplicate existing links', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
-      manager.addLink(
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
-      const links = manager.getAllLinks();
+      const links = await manager.getAllLinks();
       expect(links.length).toBe(1);
     });
 
-    it('should update direction on existing link', () => {
-      manager.addLink(
+    it('should update direction on existing link', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' },
         'related'
       );
-      manager.addLink(
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' },
         'blocks'
       );
 
-      const links = manager.getAllLinks();
+      const links = await manager.getAllLinks();
       expect(links.length).toBe(1);
       expect(links[0].direction).toBe('blocks');
     });
   });
 
   describe('removeLink', () => {
-    it('should remove an existing link', () => {
-      manager.addLink(
+    it('should remove an existing link', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
-      const removed = manager.removeLink(
+      const removed = await manager.removeLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
       expect(removed).toBe(true);
-      expect(manager.getAllLinks().length).toBe(0);
+      expect((await manager.getAllLinks()).length).toBe(0);
     });
 
-    it('should return false for non-existent link', () => {
-      const removed = manager.removeLink(
+    it('should return false for non-existent link', async () => {
+      const removed = await manager.removeLink(
         { ref: 'MIN-999', tracker: 'linear' },
         { ref: '#999', tracker: 'github' }
       );
@@ -141,55 +165,55 @@ describe('LinkManager', () => {
   });
 
   describe('getLinkedIssues', () => {
-    it('should find links where issue is source', () => {
-      manager.addLink(
+    it('should find links where issue is source', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
-      const links = manager.getLinkedIssues('MIN-630', 'linear');
+      const links = await manager.getLinkedIssues('MIN-630', 'linear');
       expect(links.length).toBe(1);
       expect(links[0].targetIssueRef).toBe('#42');
     });
 
-    it('should find links where issue is target', () => {
-      manager.addLink(
+    it('should find links where issue is target', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
-      const links = manager.getLinkedIssues('#42', 'github');
+      const links = await manager.getLinkedIssues('#42', 'github');
       expect(links.length).toBe(1);
       expect(links[0].sourceIssueRef).toBe('MIN-630');
     });
   });
 
   describe('findLinkedIssue', () => {
-    it('should find linked issue in another tracker', () => {
-      manager.addLink(
+    it('should find linked issue in another tracker', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
-      expect(manager.findLinkedIssue('MIN-630', 'linear', 'github')).toBe('#42');
-      expect(manager.findLinkedIssue('#42', 'github', 'linear')).toBe('MIN-630');
+      expect(await manager.findLinkedIssue('MIN-630', 'linear', 'github')).toBe('#42');
+      expect(await manager.findLinkedIssue('#42', 'github', 'linear')).toBe('MIN-630');
     });
 
-    it('should return null when no link exists', () => {
-      expect(manager.findLinkedIssue('MIN-999', 'linear', 'github')).toBeNull();
+    it('should return null when no link exists', async () => {
+      expect(await manager.findLinkedIssue('MIN-999', 'linear', 'github')).toBeNull();
     });
   });
 
   describe('persistence', () => {
-    it('should persist links across manager instances', () => {
-      manager.addLink(
+    it('should persist links across manager instances', async () => {
+      await manager.addLink(
         { ref: 'MIN-630', tracker: 'linear' },
         { ref: '#42', tracker: 'github' }
       );
 
       // Create new manager instance
-      const newManager = new LinkManager(join(tempDir, 'links.json'));
-      const links = newManager.getAllLinks();
+      const newManager: any = wrap(new LinkManager(join(tempDir, 'links.json')));
+      const links = await newManager.getAllLinks();
 
       expect(links.length).toBe(1);
       expect(links[0].sourceIssueRef).toBe('MIN-630');

@@ -23,9 +23,11 @@
 import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { getDatabase } from '../database/index.js';
 import { insertCostEvents } from '../database/cost-events-db.js';
 import { calculateCost, getPricing, type AIProvider, type TokenUsage } from '../cost.js';
+import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -470,3 +472,16 @@ export async function reconcile(): Promise<ReconcileResult> {
 
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of reconcile. Per-file errors are still surfaced via
+ * `result.errors`; only catastrophic failures (e.g. SQLite open failure)
+ * surface on the Effect error channel.
+ */
+export const reconcileEffect = (): Effect.Effect<ReconcileResult, FsError> =>
+  Effect.tryPromise({
+    try: () => reconcile(),
+    catch: (cause) => new FsError({ path: '<reconciler>', operation: 'reconcile', cause }),
+  });

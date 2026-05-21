@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest';
+import { Effect } from 'effect';
 import { execSync } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
@@ -27,74 +28,84 @@ describe('auto-commit', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('commits a queued .pan file change on main', async () => {
-    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-    const path = join(tmp, '.pan', 'continues', 'pan-1.vbrief.json');
-    writeFileSync(path, '{"issue":"PAN-1"}');
+  it.effect('commits a queued .pan file change on main', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+      const path = join(tmp, '.pan', 'continues', 'pan-1.vbrief.json');
+      writeFileSync(path, '{"issue":"PAN-1"}');
 
-    queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-1' });
-    const result = await flushAutoCommits(tmp);
+      queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-1' });
+      const result = yield* flushAutoCommits(tmp);
 
-    expect(result.committed).toBe(true);
-    const log = execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' });
-    expect(log).toContain('chore(state): update continue for PAN-1');
-  });
+      expect(result.committed).toBe(true);
+      const log = execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' });
+      expect(log).toContain('chore(state): update continue for PAN-1');
+    }),
+  );
 
-  it('does not commit when on a non-main branch', async () => {
-    execSync('git checkout -q -b feature/foo', { cwd: tmp });
-    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-    const path = join(tmp, '.pan', 'continues', 'pan-2.vbrief.json');
-    writeFileSync(path, '{"issue":"PAN-2"}');
+  it.effect('does not commit when on a non-main branch', () =>
+    Effect.gen(function* () {
+      execSync('git checkout -q -b feature/foo', { cwd: tmp });
+      mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+      const path = join(tmp, '.pan', 'continues', 'pan-2.vbrief.json');
+      writeFileSync(path, '{"issue":"PAN-2"}');
 
-    queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): noop branch test' });
-    const result = await flushAutoCommits(tmp);
+      queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): noop branch test' });
+      const result = yield* flushAutoCommits(tmp);
 
-    expect(result.committed).toBe(false);
-    expect(result.reason).toMatch(/not on main/);
-  });
-
-  it('coalesces a burst of writes into a single commit', async () => {
-    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-    const p1 = join(tmp, '.pan', 'continues', 'pan-3.vbrief.json');
-    const p2 = join(tmp, '.pan', 'continues', 'pan-4.vbrief.json');
-    writeFileSync(p1, '{"issue":"PAN-3"}');
-    writeFileSync(p2, '{"issue":"PAN-4"}');
-
-    queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): a' });
-    queueAutoCommit({ projectRoot: tmp, paths: [p2], subject: 'chore(state): b' });
-    const result = await flushAutoCommits(tmp);
-    expect(result.committed).toBe(true);
-
-    const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-    // Two seed lines + exactly one auto-commit
-    expect(log.split('\n').filter(Boolean).length).toBe(2);
-  });
-
-  it('is a no-op when the staged diff is empty', async () => {
-    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-    const path = join(tmp, '.pan', 'continues', 'pan-5.vbrief.json');
-    writeFileSync(path, '{"issue":"PAN-5"}');
-    execSync('git add .pan/', { cwd: tmp });
-    execSync('git commit -q -m "pre-commit"', { cwd: tmp });
-
-    queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): nothing changed' });
-    const result = await flushAutoCommits(tmp);
-
-    expect(result.committed).toBe(false);
-    expect(result.reason).toBe('no diff');
-  });
-
-  it('is a no-op outside a git repo', async () => {
-    const noGitTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-nogit-'));
-    try {
-      queueAutoCommit({ projectRoot: noGitTmp, paths: [join(noGitTmp, 'x')], subject: 'chore(state): no repo' });
-      const result = await flushAutoCommits(noGitTmp);
       expect(result.committed).toBe(false);
-      expect(result.reason).toBe('not a git repo');
-    } finally {
-      rmSync(noGitTmp, { recursive: true, force: true });
-    }
-  });
+      expect(result.reason).toMatch(/not on main/);
+    }),
+  );
+
+  it.effect('coalesces a burst of writes into a single commit', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+      const p1 = join(tmp, '.pan', 'continues', 'pan-3.vbrief.json');
+      const p2 = join(tmp, '.pan', 'continues', 'pan-4.vbrief.json');
+      writeFileSync(p1, '{"issue":"PAN-3"}');
+      writeFileSync(p2, '{"issue":"PAN-4"}');
+
+      queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): a' });
+      queueAutoCommit({ projectRoot: tmp, paths: [p2], subject: 'chore(state): b' });
+      const result = yield* flushAutoCommits(tmp);
+      expect(result.committed).toBe(true);
+
+      const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
+      // Two seed lines + exactly one auto-commit
+      expect(log.split('\n').filter(Boolean).length).toBe(2);
+    }),
+  );
+
+  it.effect('is a no-op when the staged diff is empty', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+      const path = join(tmp, '.pan', 'continues', 'pan-5.vbrief.json');
+      writeFileSync(path, '{"issue":"PAN-5"}');
+      execSync('git add .pan/', { cwd: tmp });
+      execSync('git commit -q -m "pre-commit"', { cwd: tmp });
+
+      queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): nothing changed' });
+      const result = yield* flushAutoCommits(tmp);
+
+      expect(result.committed).toBe(false);
+      expect(result.reason).toBe('no diff');
+    }),
+  );
+
+  it.effect('is a no-op outside a git repo', () =>
+    Effect.gen(function* () {
+      const noGitTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-nogit-'));
+      try {
+        queueAutoCommit({ projectRoot: noGitTmp, paths: [join(noGitTmp, 'x')], subject: 'chore(state): no repo' });
+        const result = yield* flushAutoCommits(noGitTmp);
+        expect(result.committed).toBe(false);
+        expect(result.reason).toBe('not a git repo');
+      } finally {
+        rmSync(noGitTmp, { recursive: true, force: true });
+      }
+    }),
+  );
 });
 
 describe('deriveProjectRoot', () => {

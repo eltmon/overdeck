@@ -249,8 +249,8 @@ export const TerminalServiceLive = Layer.effect(
             if (exitCode !== 0) {
               // Non-zero exit (e.g., tmux session doesn't exist yet) — fail with error
               // so WsTransport.subscribe() retries instead of treating it as clean end.
-              Queue.failUnsafe(Queue.asEnqueue(state.queue),
-                new PanRpcError({ message: `PTY exited with code ${exitCode}`, code: 'TERMINAL_PTY_EXIT' }),
+              Queue.failCauseUnsafe(Queue.asEnqueue(state.queue),
+                Cause.fail(new PanRpcError({ message: `PTY exited with code ${exitCode}`, code: 'TERMINAL_PTY_EXIT' })),
               );
             } else {
               Queue.endUnsafe(Queue.asEnqueue(state.queue));

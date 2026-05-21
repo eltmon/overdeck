@@ -68,6 +68,7 @@ import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
 import { sessionExistsAsync, killSessionAsync } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 
 const execAsync = promisify(exec);
 import { emitActivityEntry } from '../activity-logger.js';
@@ -1814,4 +1815,34 @@ export function getCloisterService(): CloisterService {
  */
 export function setCloisterService(service: CloisterService): void {
   globalService = service;
+}
+
+// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
+// service.ts is the top-level Cloister orchestrator (1817 lines, heavy use of
+// closures and direct fs IO). A full Effect rewrite would cascade into half
+// the codebase (review-agent, test-agent-queue, agents.ts) so for the
+// batch-C migration we expose Effect variants only at the two domain-event
+// entry points. The legacy Promise surfaces stay live for existing callers;
+// Effect callers should prefer the *Effect variants. The internal
+// implementations swallow errors (logging via emitActivityEntry instead),
+// so the error channel is `never`.
+
+/**
+ * Effect-typed variant of {@link onIssueStateChange}. Never fails — failures
+ * surface through `emitActivityEntry` inside the legacy implementation.
+ */
+export function onIssueStateChangeEffect(
+  issueId: string,
+  newState: string,
+): Effect.Effect<void> {
+  return Effect.promise(() => onIssueStateChange(issueId, newState));
+}
+
+/**
+ * Effect-typed variant of {@link handleCloisterDomainEvent}. Never fails.
+ */
+export function handleCloisterDomainEventEffect(
+  event: CloisterDomainEventLike,
+): Effect.Effect<void> {
+  return Effect.promise(() => handleCloisterDomainEvent(event));
 }

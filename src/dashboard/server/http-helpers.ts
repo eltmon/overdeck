@@ -8,13 +8,17 @@
  */
 import { HttpServerResponse } from 'effect/unstable/http';
 
-export function jsonResponse(data: unknown, options?: { status?: number; headers?: Record<string, string> }): typeof HttpServerResponse.Type {
+export function jsonResponse(
+  data: unknown,
+  options?: number | { status?: number; headers?: Record<string, string> },
+): HttpServerResponse.HttpServerResponse {
+  const opts = typeof options === 'number' ? { status: options } : options;
   return HttpServerResponse.text(
     JSON.stringify(data),
     {
-      status: options?.status ?? 200,
+      status: opts?.status ?? 200,
       contentType: 'application/json',
-      headers: options?.headers,
+      headers: opts?.headers,
     }
   );
 }

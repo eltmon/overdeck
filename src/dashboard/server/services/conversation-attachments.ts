@@ -215,7 +215,7 @@ async function readSessionAttachmentBasenames(sessionFile: string, name: string)
   }
 }
 
-export async function cleanupUnreferencedConversationAttachments(conversation: Pick<Conversation, 'name' | 'sessionFile'>): Promise<void> {
+export async function cleanupUnreferencedConversationAttachments(conversation: { name: string; sessionFile: string | null }): Promise<void> {
   const attachmentPaths = await listConversationAttachmentPaths(conversation.name);
   if (attachmentPaths.length === 0) {
     return;

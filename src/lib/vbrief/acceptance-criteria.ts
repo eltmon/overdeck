@@ -6,7 +6,8 @@
  * verification gates, and completion checks.
  */
 
-import { readWorkspacePlan } from './io.js';
+import { Effect } from 'effect';
+import { readWorkspacePlan, readWorkspacePlanEffect, type VBriefReadError } from './io.js';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus, VBriefSubItem } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
@@ -132,3 +133,33 @@ export function checkAllCriteriaCompleted(workspacePath: string): ACCompletionRe
 
   return { allCompleted: incomplete.length === 0, incomplete };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Compose with `readWorkspacePlanEffect` from io.ts so AC extraction and AC
+// completion checks can participate in Effect-native pipelines without
+// blocking the event loop. extractACFromDocument and the AC-completion logic
+// itself are pure-sync — only the plan read is wrapped.
+
+/** Effect variant of `extractAcceptanceCriteria`. */
+export const extractAcceptanceCriteriaEffect = (
+  workspacePath: string,
+): Effect.Effect<AcceptanceCriterion[], VBriefReadError> =>
+  Effect.gen(function* () {
+    const doc = yield* readWorkspacePlanEffect(workspacePath);
+    if (!doc) return [];
+    return extractACFromDocument(doc);
+  });
+
+/** Effect variant of `checkAllCriteriaCompleted`. */
+export const checkAllCriteriaCompletedEffect = (
+  workspacePath: string,
+): Effect.Effect<ACCompletionResult, VBriefReadError> =>
+  Effect.gen(function* () {
+    const criteria = yield* extractAcceptanceCriteriaEffect(workspacePath);
+    if (criteria.length === 0) return { allCompleted: true, incomplete: [] };
+    const incomplete = criteria.filter(
+      (ac) => ac.status !== 'completed' && ac.status !== 'cancelled',
+    );
+    return { allCompleted: incomplete.length === 0, incomplete };
+  });

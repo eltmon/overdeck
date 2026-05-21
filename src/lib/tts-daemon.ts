@@ -4,8 +4,10 @@ import { access, chmod, mkdir, open, readFile, rm, stat, writeFile } from 'node:
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 import { LOGS_DIR, PANOPTICON_HOME, packageRoot } from './paths.js';
 import { loadConfig, type NormalizedTtsDaemonConfig } from './config-yaml.js';
+import { ProcessSpawnError, FsError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -720,3 +722,133 @@ export async function ttsDaemonInstallState(): Promise<{ venvDir: string; instal
     return { venvDir, installed: false };
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const ttsProcessError = (op: string, cause: unknown): ProcessSpawnError =>
+  new ProcessSpawnError({
+    command: 'tts-daemon',
+    args: [op],
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+const ttsFsError = (op: string, path: string, cause: unknown): FsError =>
+  new FsError({ path, operation: op, cause });
+
+/** Path to the bundled qwen-tts package on disk. */
+export const resolveQwenTtsPackageDirEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => resolveQwenTtsPackageDir(),
+    catch: (cause) => ttsFsError('resolveQwenTtsPackageDir', packageRoot, cause),
+  });
+
+/** Path to the daemon entry script inside the qwen-tts package. */
+export const resolveTtsDaemonScriptEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => resolveTtsDaemonScript(),
+    catch: (cause) => ttsFsError('resolveTtsDaemonScript', packageRoot, cause),
+  });
+
+/** Resolved venv directory for the TTS daemon. */
+export const getTtsDaemonVenvDirEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => getTtsDaemonVenvDir(),
+    catch: (cause) => ttsFsError('getTtsDaemonVenvDir', PANOPTICON_HOME, cause),
+  });
+
+/** Resolved python interpreter inside the TTS daemon venv. */
+export const getTtsDaemonPythonEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => getTtsDaemonPython(),
+    catch: (cause) => ttsFsError('getTtsDaemonPython', PANOPTICON_HOME, cause),
+  });
+
+/** True if a daemon state file exists on disk. */
+export const hasTtsDaemonStateEffect = (): Effect.Effect<boolean> =>
+  Effect.promise(() => hasTtsDaemonState());
+
+/** True if the manual-stop sentinel file exists. */
+export const isTtsDaemonManuallyStoppedEffect = (): Effect.Effect<boolean> =>
+  Effect.promise(() => isTtsDaemonManuallyStopped());
+
+/** Lazily-materialised auth token shared with the daemon. */
+export const getTtsDaemonAuthTokenEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => getTtsDaemonAuthToken(),
+    catch: (cause) => ttsFsError('getTtsDaemonAuthToken', QWEN_TTS_AUTH_TOKEN_PATH, cause),
+  });
+
+/** Auth headers (token + content-type) for daemon HTTP calls. */
+export const getTtsDaemonAuthHeadersEffect = (): Effect.Effect<Record<string, string>, FsError> =>
+  Effect.tryPromise({
+    try: () => getTtsDaemonAuthHeaders(),
+    catch: (cause) => ttsFsError('getTtsDaemonAuthHeaders', QWEN_TTS_AUTH_TOKEN_PATH, cause),
+  });
+
+/** Query the daemon's live status (health probe + state read). */
+export const getTtsDaemonStatusEffect = (
+  config: NormalizedTtsDaemonConfig,
+): Effect.Effect<TtsDaemonStatus, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => getTtsDaemonStatus(config),
+    catch: (cause) => ttsProcessError('status', cause),
+  });
+
+/** Poll until the daemon reports a healthy phase or the timeout elapses. */
+export const waitForTtsDaemonHealthEffect = (
+  config: NormalizedTtsDaemonConfig,
+  timeoutMs = 120_000,
+): Effect.Effect<TtsDaemonStatus, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => waitForTtsDaemonHealth(config, timeoutMs),
+    catch: (cause) => ttsProcessError('wait-health', cause),
+  });
+
+/** Start the daemon (detached). Idempotent — returns the existing PID when alive. */
+export const startTtsDaemonEffect = (
+  options: TtsDaemonStartOptions,
+): Effect.Effect<TtsDaemonStartResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => startTtsDaemon(options),
+    catch: (cause) => ttsProcessError('start', cause),
+  });
+
+/** Run the daemon in the foreground (debugging / CLI mode). */
+export const runTtsDaemonForegroundEffect = (
+  config: NormalizedTtsDaemonConfig,
+): Effect.Effect<TtsDaemonForegroundResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => runTtsDaemonForeground(config),
+    catch: (cause) => ttsProcessError('foreground', cause),
+  });
+
+/** Stop the daemon, waiting up to `timeoutMs` for graceful shutdown. */
+export const stopTtsDaemonEffect = (
+  timeoutMs = 5_000,
+): Effect.Effect<TtsDaemonStopResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => stopTtsDaemon(timeoutMs),
+    catch: (cause) => ttsProcessError('stop', cause),
+  });
+
+/** Install the daemon's Python dependencies into the venv. */
+export const installTtsDaemonDependenciesEffect = (): Effect.Effect<TtsDaemonInstallResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => installTtsDaemonDependencies(),
+    catch: (cause) => ttsProcessError('install-deps', cause),
+  });
+
+/** Write a systemd unit for the daemon. Returns the unit-file path. */
+export const installTtsSystemdUnitEffect = (): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => installTtsSystemdUnit(),
+    catch: (cause) => ttsFsError('installTtsSystemdUnit', PANOPTICON_HOME, cause),
+  });
+
+/** Reports whether the daemon venv is materialised. */
+export const ttsDaemonInstallStateEffect = (): Effect.Effect<{ venvDir: string; installed: boolean }, FsError> =>
+  Effect.tryPromise({
+    try: () => ttsDaemonInstallState(),
+    catch: (cause) => ttsFsError('ttsDaemonInstallState', PANOPTICON_HOME, cause),
+  });

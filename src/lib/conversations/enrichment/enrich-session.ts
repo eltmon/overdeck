@@ -9,12 +9,14 @@
 import { promises as fs } from 'fs';
 import * as readline from 'readline';
 import { createReadStream } from 'fs';
+import { Effect } from 'effect';
 
 import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
 import { calculateCost, getPricing } from '../../cost.js';
 import { applyFallback, selectEnrichmentModelForTier } from '../../model-fallback.js';
 import { loadConfig as loadYamlConfig } from '../../config-yaml.js';
 import { getProviderEnv, getProviderForModel } from '../../providers.js';
+import { FsError } from '../../errors.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
 import type { ModelId } from '../../settings.js';
@@ -418,4 +420,22 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
     markEnrichmentFailed(sessionId);
     return { sessionId, tier, model, error: message };
   }
+}
+
+// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
+//
+// Additive Effect surface. The underlying `enrichSession` already catches
+// internally and returns a result with `error` set on failure, so this
+// Effect variant rarely fails — FsError is declared for the rare case of
+// an unexpected throw from updateEnrichment / DB mutation.
+
+/** Effect variant of enrichSession. */
+export function enrichSessionEffect(
+  opts: EnrichSessionOptions,
+): Effect.Effect<EnrichSessionResult, FsError> {
+  return Effect.tryPromise({
+    try: () => enrichSession(opts),
+    catch: (cause) =>
+      new FsError({ path: opts.jsonlPath, operation: 'enrich-session', cause }),
+  });
 }

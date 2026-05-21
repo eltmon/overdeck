@@ -13,6 +13,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Data, Effect } from 'effect';
 
 import { PAN_DIRNAME } from '../pan-dir/index.js';
 
@@ -222,3 +223,58 @@ export function readInferenceDocument(workspacePath: string): string | null {
   if (!existsSync(filePath)) return null;
   return readFileSync(filePath, 'utf-8');
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Lifts the monitoring-agent I/O surface (gh issue view, git log, fs reads,
+// fs writes) into typed Effect channels so callers can compose Shadow
+// Engineering monitoring with other Effect-native pipelines without raw
+// try/catch.
+
+/** Tagged error for monitoring-agent Effect variants. */
+export class MonitoringAgentError extends Data.TaggedError('MonitoringAgentError')<{
+  readonly issueId: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+const liftMonitoringError = (
+  issueId: string,
+  operation: string,
+  cause: unknown,
+): MonitoringAgentError =>
+  new MonitoringAgentError({
+    issueId,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect variant of `gatherArtifacts`. */
+export const gatherArtifactsEffect = (
+  config: MonitoringAgentConfig,
+): Effect.Effect<Awaited<ReturnType<typeof gatherArtifacts>>, MonitoringAgentError> =>
+  Effect.tryPromise({
+    try: () => gatherArtifacts(config),
+    catch: (cause) => liftMonitoringError(config.issueId, 'gatherArtifacts', cause),
+  });
+
+/** Effect variant of `updateInferenceDocument`. */
+export const updateInferenceDocumentEffect = (
+  workspacePath: string,
+  content: string,
+): Effect.Effect<void, MonitoringAgentError> =>
+  Effect.try({
+    try: () => updateInferenceDocument(workspacePath, content),
+    catch: (cause) => liftMonitoringError(workspacePath, 'updateInferenceDocument', cause),
+  });
+
+/** Effect variant of `readInferenceDocument`. */
+export const readInferenceDocumentEffect = (
+  workspacePath: string,
+): Effect.Effect<string | null, MonitoringAgentError> =>
+  Effect.try({
+    try: () => readInferenceDocument(workspacePath),
+    catch: (cause) => liftMonitoringError(workspacePath, 'readInferenceDocument', cause),
+  });

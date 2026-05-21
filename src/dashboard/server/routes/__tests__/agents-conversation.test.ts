@@ -77,6 +77,10 @@ describe('buildConversationResponse', () => {
       streaming: true, // parser sees it as still streaming — we must override this
       totalCost: 0.42,
       byteOffset: 1024,
+      pendingToolUse: new Map(),
+      unresolvedResults: new Map(),
+      lastSequence: 0,
+      mtimeMs: 0,
     });
 
     const result = await buildConversationResponse('agent-PAN-473');

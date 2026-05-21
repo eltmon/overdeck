@@ -26,6 +26,7 @@
 
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { stepOk, stepSkipped, stepFailed } from '../lifecycle/types.js';
 import type { StepResult } from '../lifecycle/types.js';
 import {
@@ -136,3 +137,15 @@ function pathLeaf(p: string): string {
   const idx = p.lastIndexOf('/');
   return idx >= 0 ? p.slice(idx + 1) : p;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Additive Effect wrapper around the self-heal entry point. `ensureDevcontainer`
+// already encodes failure inside the returned `StepResult`, so the Effect
+// channel for the wrapper is `never` — the wrapper just makes the call
+// composable inside Effect graphs.
+
+/** Idempotently render `<workspace>/.devcontainer/` (Effect variant). */
+export const ensureDevcontainerEffect = (
+  input: EnsureDevcontainerInput,
+): Effect.Effect<EnsureDevcontainerResult> =>
+  Effect.sync(() => ensureDevcontainer(input));

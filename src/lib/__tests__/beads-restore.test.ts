@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
 import { execSync } from 'child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
@@ -27,7 +28,7 @@ describe('restoreTrackedBeadsExport', () => {
     unlinkSync(join(workspace, '.beads', 'issues.jsonl'));
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(false);
 
-    await restoreTrackedBeadsExport(workspace);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(true);
   });
@@ -41,7 +42,7 @@ describe('restoreTrackedBeadsExport', () => {
     expect(before).toMatch(/^D\s+\.beads\/issues\.jsonl/m);
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(false);
 
-    await restoreTrackedBeadsExport(workspace);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(true);
     const after = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
@@ -52,7 +53,7 @@ describe('restoreTrackedBeadsExport', () => {
     const before = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
     expect(before).toBe('');
 
-    await restoreTrackedBeadsExport(workspace);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
     const after = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
     expect(after).toBe('');
@@ -61,7 +62,7 @@ describe('restoreTrackedBeadsExport', () => {
   it('is a no-op when the export was modified but not deleted', async () => {
     writeFileSync(join(workspace, '.beads', 'issues.jsonl'), '{"id":"y"}\n');
 
-    await restoreTrackedBeadsExport(workspace);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
     // The modified content should still be there — only deletions get reverted.
     const content = execSync('cat .beads/issues.jsonl', { cwd: workspace, encoding: 'utf-8' });
@@ -71,7 +72,7 @@ describe('restoreTrackedBeadsExport', () => {
   it('does not throw on a non-git directory', async () => {
     const notGit = mkdtempSync(join(tmpdir(), 'not-a-git-'));
     try {
-      await expect(restoreTrackedBeadsExport(notGit)).resolves.toBeUndefined();
+      await expect(Effect.runPromise(restoreTrackedBeadsExport(notGit))).resolves.toBeUndefined();
     } finally {
       rmSync(notGit, { recursive: true, force: true });
     }

@@ -5,6 +5,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -141,7 +142,7 @@ repo = "your-repo"
 
         let sourceIssue: Issue;
         try {
-          sourceIssue = await secondaryTracker.getIssue(id);
+          sourceIssue = await Effect.runPromise(secondaryTracker.getIssue(id));
         } catch (error: any) {
           spinner.fail(`Issue ${issueRef} not found in ${secondaryType}`);
           return;
@@ -158,18 +159,18 @@ repo = "your-repo"
         }
 
         // Create issue in primary tracker with link to secondary
-        const newIssue = await primaryTracker.createIssue({
+        const newIssue = await Effect.runPromise(primaryTracker.createIssue({
           title: sourceIssue.title,
           description: `${sourceIssue.description}\n\n---\n\n**From ${secondaryType}:** ${sourceIssue.url}`,
           team: primaryConfig.team,
-        });
+        }));
 
         // Add comment to secondary issue linking to primary
         try {
-          await secondaryTracker.addComment(
+          await Effect.runPromise(secondaryTracker.addComment(
             id,
             `Internal tracking: ${newIssue.ref} (${primaryType})`
-          );
+          ));
         } catch {
           // Non-fatal - just log warning
           console.log(chalk.yellow('\nNote: Could not add link comment to source issue'));
@@ -197,7 +198,7 @@ repo = "your-repo"
       return;
     }
 
-    const issues = await secondaryTracker.listIssues({ includeClosed: false });
+    const issues = await Effect.runPromise(secondaryTracker.listIssues({ includeClosed: false }));
 
     // Filter out dismissed and already created
     const pending = issues.filter(

@@ -6,11 +6,13 @@
  * Only tests and CLI tools that explicitly need JSON file I/O should import this module.
  */
 
+import { Effect } from 'effect';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 import type { ReviewStatus } from './review-status.js';
+import { FsError } from './errors.js';
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
@@ -109,3 +111,55 @@ export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FIL
   delete statuses[issueId];
   saveReviewStatuses(statuses, filePath);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Sync FS wrappers (the underlying impl uses sync FS by design — CLI-only).
+// FsError is surfaced when a JSON file is unreadable / unparseable so callers
+// can distinguish a real failure from an empty-result.
+
+/** Load all statuses from disk. Pure (logs but does not throw). */
+export const loadReviewStatusesEffect = (
+  filePath: string = DEFAULT_STATUS_FILE,
+): Effect.Effect<Record<string, ReviewStatus>> =>
+  Effect.sync(() => loadReviewStatuses(filePath));
+
+/** Persist all statuses to disk; surfaces FsError on failure. */
+export const saveReviewStatusesEffect = (
+  statuses: Record<string, ReviewStatus>,
+  filePath: string = DEFAULT_STATUS_FILE,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveReviewStatuses(statuses, filePath),
+    catch: (cause) =>
+      new FsError({ path: filePath, operation: 'save-review-statuses', cause }),
+  });
+
+/** Atomically merge + persist a single issue's review status. */
+export const setReviewStatusEffect = (
+  issueId: string,
+  update: Partial<ReviewStatus>,
+  filePath: string = DEFAULT_STATUS_FILE,
+): Effect.Effect<ReviewStatus, FsError> =>
+  Effect.try({
+    try: () => setReviewStatus(issueId, update, filePath),
+    catch: (cause) =>
+      new FsError({ path: filePath, operation: 'set-review-status', cause }),
+  });
+
+/** Read one issue's status. Pure. */
+export const getReviewStatusEffect = (
+  issueId: string,
+  filePath: string = DEFAULT_STATUS_FILE,
+): Effect.Effect<ReviewStatus | null> =>
+  Effect.sync(() => getReviewStatus(issueId, filePath));
+
+/** Remove one issue's status from disk. */
+export const clearReviewStatusEffect = (
+  issueId: string,
+  filePath: string = DEFAULT_STATUS_FILE,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => clearReviewStatus(issueId, filePath),
+    catch: (cause) =>
+      new FsError({ path: filePath, operation: 'clear-review-status', cause }),
+  });

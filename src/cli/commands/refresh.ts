@@ -11,6 +11,7 @@ import {
   updateTrackerStatusCache,
 } from '../../lib/shadow-state.js';
 import type { IssueState } from '../../lib/tracker/interface.js';
+import { Effect } from 'effect';
 import { getLinearApiKey, isLinearIssue, formatState } from '../../lib/shadow-utils.js';
 
 interface RefreshOptions {
@@ -81,7 +82,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   };
 
   if (isLinearIssue(issueId)) {
-    const apiKey = getLinearApiKey();
+    const apiKey = Effect.runSync(getLinearApiKey());
     if (apiKey) {
       result = await refreshFromLinear(apiKey, issueId);
     } else {

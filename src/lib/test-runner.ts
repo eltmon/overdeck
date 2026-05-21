@@ -10,7 +10,9 @@ import { join, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
+import { ProcessSpawnError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -382,3 +384,24 @@ export async function runTests(options: RunTestsOptions): Promise<TestRunResult>
 
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Run the configured test suites (maven, vitest, jest, playwright, ...) for a
+ * project. Wraps the Promise variant; spawn / wiring failures surface as
+ * ProcessSpawnError, but individual test failures stay inside `TestRunResult`.
+ */
+export const runTestsEffect = (
+  options: RunTestsOptions,
+): Effect.Effect<TestRunResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => runTests(options),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: 'test-runner',
+        args: [options.featureName ?? ''],
+        message: 'runTests failed',
+        cause,
+      }),
+  });

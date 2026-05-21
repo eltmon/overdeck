@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
+
+// Helper: provider methods are Effect-returning post-migration.
+const run = <A, E>(eff: Effect.Effect<A, E, never>): Promise<A> => Effect.runPromise(eff);
 
 // Hoist mocks so they're available inside vi.mock factories
 const { execAsyncMock, spawnMock, mockApi } = vi.hoisted(() => {
@@ -72,7 +76,7 @@ describe('FlyProvider', () => {
       mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
       mockApi.waitForState.mockResolvedValue(undefined);
 
-      const result = await provider.createVm('ws-123');
+      const result = await run(provider.createVm('ws-123'));
 
       expect(mockApi.ensureApp).toHaveBeenCalledWith('test-app', 'test-org');
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
@@ -87,7 +91,7 @@ describe('FlyProvider', () => {
     it('resolves vm then calls destroyMachine', async () => {
       mockApi.destroyMachine.mockResolvedValue(undefined);
 
-      await provider.deleteVm('test-vm');
+      await run(provider.deleteVm('test-vm'));
 
       expect(mockApi.destroyMachine).toHaveBeenCalledWith('test-app', 'machine-1');
     });
@@ -100,7 +104,7 @@ describe('FlyProvider', () => {
         { id: 'm2', name: 'ws-2', state: 'stopped', region: 'iad' },
       ]);
 
-      const vms = await provider.listVms();
+      const vms = await run(provider.listVms());
 
       expect(vms).toHaveLength(2);
       expect(vms[0]).toMatchObject({ name: 'ws-1', status: 'running', machineId: 'm1' });
@@ -111,12 +115,12 @@ describe('FlyProvider', () => {
   describe('getStatus', () => {
     it('maps Fly states to VmStatus', async () => {
       mockApi.getMachine.mockResolvedValue({ id: 'm1', name: 'test-vm', state: 'started', region: 'iad' });
-      expect(await provider.getStatus('test-vm')).toBe('running');
+      expect(await run(provider.getStatus('test-vm'))).toBe('running');
     });
 
     it('returns unknown on error', async () => {
       mockApi.listMachines.mockResolvedValue([]);
-      expect(await provider.getStatus('nonexistent')).toBe('unknown');
+      expect(await run(provider.getStatus('nonexistent'))).toBe('unknown');
     });
   });
 
@@ -124,7 +128,7 @@ describe('FlyProvider', () => {
     it('calls Fly exec API with /bin/sh -c wrapper', async () => {
       mockApi.execCommand.mockResolvedValue({ stdout: 'output', stderr: '', exit_code: 0 });
 
-      const result = await provider.ssh('test-vm', 'echo hello');
+      const result = await run(provider.ssh('test-vm', 'echo hello'));
 
       expect(mockApi.execCommand).toHaveBeenCalledWith(
         'test-app', 'machine-1', ['/bin/sh', '-c', 'echo hello'], expect.any(Number)
@@ -137,14 +141,14 @@ describe('FlyProvider', () => {
       const { FlyApiError } = await import('../../../src/lib/remote/fly-api.js');
       mockApi.execCommand.mockRejectedValue(new FlyApiError('exec failed', 500, 'error'));
 
-      const result = await provider.ssh('test-vm', 'bad-cmd');
+      const result = await run(provider.ssh('test-vm', 'bad-cmd'));
       expect(result.exitCode).toBe(1);
     });
   });
 
   describe('exposePort', () => {
     it('throws NotImplementedError', async () => {
-      await expect(provider.exposePort('test-vm', 3000)).rejects.toThrow('not supported');
+      await expect(run(provider.exposePort('test-vm', 3000))).rejects.toThrow('not supported');
     });
   });
 
@@ -158,19 +162,19 @@ describe('FlyProvider', () => {
     // Test through listVms which uses the mapping
     it('maps started → running', async () => {
       mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'vm', state: 'started', region: 'iad' }]);
-      const [vm] = await provider.listVms();
+      const [vm] = await run(provider.listVms());
       expect(vm.status).toBe('running');
     });
 
     it('maps stopped → stopped', async () => {
       mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'vm', state: 'stopped', region: 'iad' }]);
-      const [vm] = await provider.listVms();
+      const [vm] = await run(provider.listVms());
       expect(vm.status).toBe('stopped');
     });
 
     it('maps destroying → deleting', async () => {
       mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'vm', state: 'destroying', region: 'iad' }]);
-      const [vm] = await provider.listVms();
+      const [vm] = await run(provider.listVms());
       expect(vm.status).toBe('deleting');
     });
   });

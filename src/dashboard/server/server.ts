@@ -112,9 +112,9 @@ function requestHeader(request: HttpServerRequest.HttpServerRequest, name: strin
 }
 
 function allowDashboardSessionCors(
-  response: typeof HttpServerResponse.Type,
+  response: HttpServerResponse.HttpServerResponse,
   request: HttpServerRequest.HttpServerRequest,
-): typeof HttpServerResponse.Type {
+): HttpServerResponse.HttpServerResponse {
   const origin = requestHeader(request, 'origin');
   if (!origin) return response;
   return HttpServerResponse.setHeader(

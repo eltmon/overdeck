@@ -5,8 +5,10 @@
  * review_status blockerReasons based on GitHub-native merge blockers.
  */
 
+import { Effect } from 'effect';
 import { setReviewStatusAsync, getReviewStatusAsync, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
+import { GitHubApiError } from './errors.js';
 
 export interface WebhookPayload {
   action?: string;
@@ -551,3 +553,73 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
     }
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const toGhError = (op: string, cause: unknown): GitHubApiError =>
+  new GitHubApiError({
+    operation: op,
+    status: 0,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect: handle a `check_suite` GitHub webhook payload. */
+export const handleCheckSuiteEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handleCheckSuite(payload),
+    catch: (cause) => toGhError('handleCheckSuite', cause),
+  });
+
+/** Effect: handle a `check_run` GitHub webhook payload. */
+export const handleCheckRunEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handleCheckRun(payload),
+    catch: (cause) => toGhError('handleCheckRun', cause),
+  });
+
+/** Effect: handle a `pull_request` GitHub webhook payload. */
+export const handlePullRequestEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handlePullRequest(payload),
+    catch: (cause) => toGhError('handlePullRequest', cause),
+  });
+
+/** Effect: handle a `pull_request_review` GitHub webhook payload. */
+export const handlePullRequestReviewEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handlePullRequestReview(payload),
+    catch: (cause) => toGhError('handlePullRequestReview', cause),
+  });
+
+/** Effect: handle a `pull_request_review_thread` GitHub webhook payload. */
+export const handlePullRequestReviewThreadEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handlePullRequestReviewThread(payload),
+    catch: (cause) => toGhError('handlePullRequestReviewThread', cause),
+  });
+
+/** Effect: handle a `status` GitHub webhook payload. */
+export const handleStatusEffect = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handleStatus(payload),
+    catch: (cause) => toGhError('handleStatus', cause),
+  });
+
+/** True if the repo is in the cached tracked-repos allowlist. Pure. */
+export const isTrackedRepositoryEffect = (
+  fullName: string | undefined,
+): Effect.Effect<boolean> =>
+  Effect.sync(() => isTrackedRepository(fullName));

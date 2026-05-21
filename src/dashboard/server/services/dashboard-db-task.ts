@@ -141,9 +141,8 @@ function getWorker(lane: WorkerLane): Worker {
   if (existing) return existing;
 
   const worker = new Worker(workerScriptUrl(), {
-    type: 'module',
     execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
-  });
+  } as ConstructorParameters<typeof Worker>[1]);
   workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {

@@ -18,6 +18,7 @@ import {
   SOURCE_SKILLS_DIR
 } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
+import { Effect } from 'effect';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
@@ -56,7 +57,7 @@ interface PrereqResult {
   fix?: string;
 }
 
-// detectPlatform() is now in src/lib/platform.ts
+// Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
 
 /**
  * Recursively copy directory contents
@@ -215,7 +216,7 @@ function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolea
 async function installCommand(options: InstallOptions): Promise<void> {
   console.log(chalk.bold('\nPanopticon Installation\n'));
 
-  const plat = detectPlatform();
+  const plat = Effect.runSync(detectPlatform());
   console.log(`Platform: ${chalk.cyan(plat)}\n`);
 
   // Step 1: Check prerequisites
@@ -273,7 +274,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     if (!hasMkcert) {
       spinner.start('Installing mkcert...');
       try {
-        const plat = detectPlatform();
+        const plat = Effect.runSync(detectPlatform());
         if (plat === 'darwin') {
           execSync('brew install mkcert', { stdio: 'pipe', timeout: 120000 });
           spinner.succeed('mkcert installed via Homebrew');
@@ -343,7 +344,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
       const ttydPath = join(binDir, 'ttyd');
 
       // Determine platform and download appropriate binary
-      const plat = detectPlatform();
+      const plat = Effect.runSync(detectPlatform());
       let downloadUrl = '';
       if (plat === 'darwin') {
         // macOS - try homebrew first
@@ -378,7 +379,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   if (!hasAstGrepNow) {
     spinner.start('Installing ast-grep...');
     try {
-      const plat = detectPlatform();
+      const plat = Effect.runSync(detectPlatform());
       if (plat === 'darwin') {
         try {
           execSync('brew install ast-grep', { stdio: 'pipe', timeout: 120000 });
@@ -406,7 +407,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     if (!hasBeadsNow) {
     spinner.start('Installing beads CLI (bd)...');
     try {
-      const plat = detectPlatform();
+      const plat = Effect.runSync(detectPlatform());
       if (plat === 'darwin') {
         // macOS - try homebrew
         try {
@@ -450,7 +451,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
         const recommendedVersion = 1 * 10000 + 0 * 100 + 4; // v1.0.4 required for ping, doctor, prune
         if (currentVersion < recommendedVersion) {
           spinner.start(`Upgrading beads from v${major}.${minor}.${patch} to v1.0.4+...`);
-          const plat = detectPlatform();
+          const plat = Effect.runSync(detectPlatform());
           if (plat === 'darwin') {
             execSync('brew upgrade gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
           } else {

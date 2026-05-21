@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
@@ -297,4 +298,40 @@ export async function checkAndRotateIfNeeded(
 
   console.log(`🔔 Session rotation needed for ${specialistName}`);
   return rotateSpecialistSession(specialistName, workingDir);
+}
+
+// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
+
+/**
+ * Effect-typed variant of {@link buildMergeAgentMemory}. The underlying
+ * function swallows git errors and returns a fallback string, so this Effect
+ * never fails.
+ */
+export function buildMergeAgentMemoryEffect(
+  workingDir: string,
+  tiers: MemoryTiers = DEFAULT_MEMORY_TIERS,
+): Effect.Effect<string> {
+  return Effect.promise(() => buildMergeAgentMemory(workingDir, tiers));
+}
+
+/**
+ * Effect-typed variant of {@link rotateSpecialistSession}. Never fails — the
+ * Promise version returns `{ success: false, error }` instead of throwing.
+ */
+export function rotateSpecialistSessionEffect(
+  specialistName: SpecialistAgentName,
+  workingDir?: string,
+): Effect.Effect<SessionRotationResult> {
+  return Effect.promise(() => rotateSpecialistSession(specialistName, workingDir));
+}
+
+/**
+ * Effect-typed variant of {@link checkAndRotateIfNeeded}. Resolves to `null`
+ * when no rotation was needed (mirrors the Promise contract).
+ */
+export function checkAndRotateIfNeededEffect(
+  specialistName: SpecialistAgentName,
+  workingDir?: string,
+): Effect.Effect<SessionRotationResult | null> {
+  return Effect.promise(() => checkAndRotateIfNeeded(specialistName, workingDir));
 }

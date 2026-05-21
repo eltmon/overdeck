@@ -3,10 +3,17 @@
  *
  * Spawn and manage Claude agents on remote Fly.io machines.
  * Agents run in tmux sessions for persistence and monitoring.
+ *
+ * PAN-1249: Effect migration. FlyProvider methods now return Effects.
+ * Internal helpers run the Effects via `Effect.runPromise` at the boundary
+ * with the existing async function shape so existing callers keep working
+ * (caller migration is intentionally out of scope for this batch).
  */
 
+import { Effect } from 'effect';
 import { createFlyProvider } from './fly-provider.js';
-import type { RemoteProvider, RemoteWorkspaceMetadata } from './interface.js';
+import type { FlyProvider } from './fly-provider.js';
+import type { RemoteWorkspaceMetadata, ExecResult } from './interface.js';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
@@ -68,18 +75,28 @@ export function loadRemoteAgentState(agentId: string): RemoteAgentState | null {
   }
 }
 
+/** Run a FlyProvider Effect at the async/Promise boundary. */
+function runSsh(
+  provider: FlyProvider,
+  vmName: string,
+  command: string,
+): Promise<ExecResult> {
+  return Effect.runPromise(provider.ssh(vmName, command));
+}
+
 /**
  * Check if remote agent session exists
  */
 async function remoteSessionExists(
-  provider: RemoteProvider,
+  provider: FlyProvider,
   vmName: string,
   sessionName: string
 ): Promise<boolean> {
   await ensureRemoteTmuxContext(provider, vmName);
-  const result = await provider.ssh(
+  const result = await runSsh(
+    provider,
     vmName,
-    `${buildRemoteTmuxCommand(['has-session', '-t', sessionName])} 2>/dev/null && echo exists || echo not-found`
+    `${buildRemoteTmuxCommand(['has-session', '-t', sessionName])} 2>/dev/null && echo exists || echo not-found`,
   );
   return result.stdout.trim() === 'exists';
 }
@@ -104,11 +121,12 @@ function buildRemoteTmuxCommand(args: string[]): string {
   return ['tmux', ...getRemoteTmuxBaseArgs(), ...args].map(shellQuote).join(' ');
 }
 
-async function ensureRemoteTmuxContext(provider: RemoteProvider, vmName: string): Promise<void> {
+async function ensureRemoteTmuxContext(provider: FlyProvider, vmName: string): Promise<void> {
   const configBase64 = Buffer.from(REMOTE_TMUX_CONFIG_CONTENT).toString('base64');
-  await provider.ssh(
+  await runSsh(
+    provider,
     vmName,
-    `mkdir -p ${shellQuote(REMOTE_TMUX_DIR)} && echo ${shellQuote(configBase64)} | base64 -d > ${shellQuote(REMOTE_TMUX_CONFIG_PATH)}`
+    `mkdir -p ${shellQuote(REMOTE_TMUX_DIR)} && echo ${shellQuote(configBase64)} | base64 -d > ${shellQuote(REMOTE_TMUX_CONFIG_PATH)}`,
   );
 }
 
@@ -124,7 +142,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   const fly = createFlyProvider();
 
   // Check if VM is running
-  const vmStatus = await fly.getStatus(vmName);
+  const vmStatus = await Effect.runPromise(fly.getStatus(vmName));
   if (vmStatus !== 'running') {
     throw new Error(`VM ${vmName} is not running. Start it with: pan workspace start ${issueId}`);
   }
@@ -153,9 +171,9 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   if (prompt) {
     // Write prompt to file on VM using base64 to avoid escaping issues
     const promptFile = `/workspace/.pan/prompts/${agentId}.md`;
-    await fly.ssh(vmName, `mkdir -p /workspace/.pan/prompts`);
+    await runSsh(fly, vmName, `mkdir -p /workspace/.pan/prompts`);
     const promptBase64 = Buffer.from(prompt).toString('base64');
-    await fly.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
+    await runSsh(fly, vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
 
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
@@ -171,7 +189,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       model,
     });
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-    await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
+    await runSsh(fly, vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
@@ -184,7 +202,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
   // Create tmux session on remote VM
   const tmuxCmd = buildRemoteTmuxCommand(['new-session', '-d', '-s', agentId, '-c', '/workspace', claudeCmd]);
-  const result = await fly.ssh(vmName, tmuxCmd);
+  const result = await runSsh(fly, vmName, tmuxCmd);
 
   if (result.exitCode !== 0) {
     state.status = 'error';
@@ -210,7 +228,11 @@ export async function getRemoteAgentOutput(
   const fly = createFlyProvider();
   await ensureRemoteTmuxContext(fly, vmName);
 
-  const result = await fly.ssh(vmName, buildRemoteTmuxCommand(['capture-pane', '-t', agentId, '-p', '-S', `-${lines}`]));
+  const result = await runSsh(
+    fly,
+    vmName,
+    buildRemoteTmuxCommand(['capture-pane', '-t', agentId, '-p', '-S', `-${lines}`]),
+  );
   return result.stdout;
 }
 
@@ -227,15 +249,16 @@ export async function sendToRemoteAgent(
 
   const promptFile = `${REMOTE_PAN_DIR}/prompts/${agentId}-message.txt`;
   const messageBase64 = Buffer.from(message).toString('base64');
-  await fly.ssh(
+  await runSsh(
+    fly,
     vmName,
-    `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`
+    `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
   );
-  await fly.ssh(vmName, buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile]));
-  await fly.ssh(vmName, buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', agentId, '-d']));
+  await runSsh(fly, vmName, buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile]));
+  await runSsh(fly, vmName, buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', agentId, '-d']));
   await new Promise(resolve => setTimeout(resolve, 300));
-  await fly.ssh(vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
-  await fly.ssh(vmName, `rm -f ${shellQuote(promptFile)}`);
+  await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
+  await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
 }
 
 /**
@@ -258,7 +281,11 @@ export async function killRemoteAgent(
 ): Promise<void> {
   const fly = createFlyProvider();
   await ensureRemoteTmuxContext(fly, vmName);
-  await fly.ssh(vmName, `${buildRemoteTmuxCommand(['kill-session', '-t', agentId])} 2>/dev/null || true`);
+  await runSsh(
+    fly,
+    vmName,
+    `${buildRemoteTmuxCommand(['kill-session', '-t', agentId])} 2>/dev/null || true`,
+  );
 
   // Update state
   const state = loadRemoteAgentState(agentId);
@@ -275,7 +302,11 @@ export async function listRemoteAgents(vmName: string): Promise<string[]> {
   const fly = createFlyProvider();
   await ensureRemoteTmuxContext(fly, vmName);
 
-  const result = await fly.ssh(vmName, `${buildRemoteTmuxCommand(['list-sessions', '-F', '#{session_name}'])} 2>/dev/null || true`);
+  const result = await runSsh(
+    fly,
+    vmName,
+    `${buildRemoteTmuxCommand(['list-sessions', '-F', '#{session_name}'])} 2>/dev/null || true`,
+  );
   if (!result.stdout.trim()) {
     return [];
   }

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import type { ReviewStatus } from './review-status.js';
 
 export function normalizeReviewStatus(status: ReviewStatus): ReviewStatus {
@@ -15,3 +16,10 @@ export function normalizeReviewStatus(status: ReviewStatus): ReviewStatus {
     ...(shouldClearReadyForMerge ? { readyForMerge: false } : {}),
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Normalize a review status record (clear stale fields). Pure. */
+export const normalizeReviewStatusEffect = (
+  status: ReviewStatus,
+): Effect.Effect<ReviewStatus> => Effect.sync(() => normalizeReviewStatus(status));

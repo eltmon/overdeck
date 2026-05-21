@@ -75,7 +75,7 @@ function toJsonish(value: unknown, seen = new WeakSet<object>()): Jsonish | unde
   return undefined;
 }
 
-function cleanIssues(issues: unknown[]): DashboardSnapshot['issues'] {
+function cleanIssues(issues: unknown[]): unknown[] {
   return issues.map((issue) => toJsonish(issue) ?? null);
 }
 
@@ -127,7 +127,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'uatStatus' | 'uatNotes' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'uatStatus' | 'uatNotes' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string; queuePosition?: number }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -413,8 +413,8 @@ export const ReadModelServiceLive = Layer.effect(
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
-            issuesRaw: cached.issues ?? [],
-            resources: cached.resources,
+            issuesRaw: cached.issues ? [...cached.issues] : [],
+            resources: cached.resources as ReadModelState['resources'],
           };
           usedProjectionCache = true;
           console.log(
@@ -583,6 +583,7 @@ export const ReadModelServiceLive = Layer.effect(
             if (shouldSkipCheckpointReconciliation(agent)) continue;
 
             const workspace = agent.workspace;
+            if (!workspace) continue;
             const existingSummaries = state.turnDiffSummariesByAgentId[agent.id];
             if (existingSummaries && existingSummaries.length > 0) continue;
 
@@ -608,6 +609,7 @@ export const ReadModelServiceLive = Layer.effect(
               for (let i = 0; i < retainedCheckpoints.length; i++) {
                 const absoluteIndex = checkpointOffset + i;
                 const turnId = retainedCheckpoints[i];
+                if (!turnId) continue;
                 const prevTurnId = absoluteIndex > 0 ? checkpoints[absoluteIndex - 1] : null;
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {

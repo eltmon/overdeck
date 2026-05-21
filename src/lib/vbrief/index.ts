@@ -36,6 +36,16 @@ export {
   updateSubItemStatus,
 } from './io.js';
 
+// Effect-typed IO variants (PAN-1249)
+export {
+  readPlanEffect,
+  findPlanEffect,
+  readWorkspacePlanEffect,
+  VBriefMergeConflictTaggedError,
+  VBriefInvalidFormatError,
+} from './io.js';
+export type { VBriefReadError } from './io.js';
+
 // Beads integration
 export { createBeadsFromVBrief, syncBeadStatusToVBrief, getVBriefACStatus } from './beads.js';
 export type { CreateBeadsResult, VBriefACStatus, ItemACStatus } from './beads.js';

@@ -88,6 +88,7 @@ import {
   determineModel,
   getProviderAuthMode,
   setAgentDeliveryMethod,
+  normalizeAgentId,
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
@@ -1017,7 +1018,7 @@ export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServer
   return { ok: true as const };
 }
 
-function postAgentMessageLikeRoute(path: string) {
+function postAgentMessageLikeRoute(path: `/${string}`) {
   return HttpRouter.add(
     'POST',
     path,
@@ -1094,7 +1095,7 @@ export function createAgentStopHandler(
 
 function agentStopRoute(
   method: 'DELETE' | 'POST',
-  path: string,
+  path: `/${string}`,
   lifecycleEvent: 'agent.delete_requested' | 'agent.stop_requested',
 ) {
   return HttpRouter.add(method, path, createAgentStopHandler(lifecycleEvent));
@@ -1578,8 +1579,8 @@ const postAgentSuspendRoute = HttpRouter.add(
     yield* Effect.promise(() => killSessionAsync(id).catch(() => { /* no tmux session to kill */ }));
     saveAgentRuntimeState(id, {
       state: 'suspended',
-      suspendedAt: new Date().toISOString(),
-      sessionId: effectiveSessionId,
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: effectiveSessionId,
     });
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
@@ -1633,8 +1634,9 @@ const postAgentPauseRoute = HttpRouter.add(
     }
 
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
-      updatedState = markAgentStoppedState(updatedState);
-      yield* Effect.promise(() => saveAgentStateAsync(updatedState));
+      const stoppedState = markAgentStoppedState(updatedState);
+      updatedState = stoppedState;
+      yield* Effect.promise(() => saveAgentStateAsync(stoppedState));
       yield* Effect.promise(() => saveAgentRuntimeState(id, {
         state: 'stopped',
         lastActivity: new Date().toISOString(),
@@ -2478,7 +2480,7 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!isRemote) {
-      const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+      const stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
           issueId,
@@ -3143,7 +3145,7 @@ const postAgentsRoute = HttpRouter.add(
     } catch (error: any) {
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
-        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+        const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
         emitActivityEntry({
           source: 'dashboard',
           level: 'error',

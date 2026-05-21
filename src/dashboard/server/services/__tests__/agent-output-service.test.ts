@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
-const mockAppendAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(1)))
+const mockAppendAsync = vi.hoisted(() => vi.fn((_event: unknown) => Promise.resolve(1)))
 const mockEventStore = { appendAsync: mockAppendAsync }
 
 vi.mock('../../event-store.js', () => ({
@@ -96,7 +96,7 @@ describe('AgentOutputService', () => {
 
   it('emits agent.output_received when a running agent produces new lines', async () => {
     mockListRunningAgentsAsync.mockResolvedValue([
-      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true },
+      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as Awaited<ReturnType<typeof listRunningAgentsAsync>>[number],
     ])
     mockCapturePaneAsync
       .mockResolvedValueOnce('boot\nworking on PAN-TEST')
@@ -128,7 +128,7 @@ describe('AgentOutputService', () => {
 
   it('does not emit when output is unchanged', async () => {
     mockListRunningAgentsAsync.mockResolvedValue([
-      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true },
+      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as Awaited<ReturnType<typeof listRunningAgentsAsync>>[number],
     ])
     mockCapturePaneAsync.mockResolvedValue('same output')
 
@@ -144,7 +144,7 @@ describe('AgentOutputService', () => {
 
   it('does not emit for agents without tmuxActive', async () => {
     mockListRunningAgentsAsync.mockResolvedValue([
-      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: false },
+      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: false } as unknown as Awaited<ReturnType<typeof listRunningAgentsAsync>>[number],
     ])
     mockCapturePaneAsync.mockResolvedValue('some output')
 
@@ -157,7 +157,7 @@ describe('AgentOutputService', () => {
   it('cleans up state for stopped agents', async () => {
     mockListRunningAgentsAsync
       .mockResolvedValueOnce([
-        { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true },
+        { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as Awaited<ReturnType<typeof listRunningAgentsAsync>>[number],
       ])
       .mockResolvedValueOnce([])
 
@@ -179,7 +179,7 @@ describe('AgentOutputService', () => {
 
   it('skips Session not found output', async () => {
     mockListRunningAgentsAsync.mockResolvedValue([
-      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true },
+      { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as Awaited<ReturnType<typeof listRunningAgentsAsync>>[number],
     ])
     mockCapturePaneAsync.mockResolvedValue('Session not found')
 

@@ -10,12 +10,17 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
-import { readWorkspaceContinue } from '../../src/lib/pan-dir/continue.js';
+import { readWorkspaceContinue as readWorkspaceContinueEffect } from '../../src/lib/pan-dir/continue.js';
 import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
+
+// readWorkspaceContinue is Effect-returning post-PAN-1249.
+const readWorkspaceContinue = (workspacePath: string) =>
+  Effect.runPromise(readWorkspaceContinueEffect(workspacePath));
 
 let PROJECT_ROOT: string;
 let TEST_DIR: string;
@@ -176,12 +181,12 @@ describe('VBriefItem created/completed fields', () => {
 // ─── updateItemStatus: statusOverrides in continue.json ─────────────────────
 
 describe('updateItemStatus: writes to continue.json statusOverrides', () => {
-  it('writes status to continue.json statusOverrides', () => {
+  it('writes status to continue.json statusOverrides', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const cont = readWorkspaceContinue(TEST_DIR);
+    const cont = await readWorkspaceContinue(TEST_DIR);
     expect(cont?.statusOverrides?.['update-types']).toBe('running');
   });
 
@@ -234,12 +239,12 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
 // ─── updateSubItemStatus: statusOverrides in continue.json ──────────────────
 
 describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
-  it('writes status to continue.json with dotted key', () => {
+  it('writes status to continue.json with dotted key', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const cont = readWorkspaceContinue(TEST_DIR);
+    const cont = await readWorkspaceContinue(TEST_DIR);
     expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
   });
 
@@ -278,13 +283,13 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
     expect(subItem?.completed).toBeUndefined();
   });
 
-  it('accumulates both item and subItem overrides', () => {
+  it('accumulates both item and subItem overrides', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const cont = readWorkspaceContinue(TEST_DIR);
+    const cont = await readWorkspaceContinue(TEST_DIR);
     expect(cont?.statusOverrides?.['update-types']).toBe('completed');
     expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
   });

@@ -1,6 +1,13 @@
 import { open, readFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect, Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
+
+/** Wrapper error for Codex auth probing — preserves the underlying cause. */
+export class CodexAuthCheckError extends Data.TaggedError('CodexAuthCheckError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 export interface CodexAuthValid {
   status: 'valid';
@@ -184,3 +191,24 @@ async function applyBurnedTokenOverride(
 
   return { status: 'burned', email, expiresAt };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native checkCodexAuthStatus. The Promise version is designed to
+ * swallow all I/O errors and report the auth state through the typed status
+ * union. The Effect variant wraps that to make it composable; it only fails
+ * with CodexAuthCheckError if the underlying call itself throws unexpectedly
+ * (i.e., not from the documented "missing/unknown" branches).
+ */
+export const checkCodexAuthStatusEffect = (
+  options: { ignoreBurnBefore?: number } = {},
+): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
+  Effect.tryPromise({
+    try: () => checkCodexAuthStatus(options),
+    catch: (cause) =>
+      new CodexAuthCheckError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

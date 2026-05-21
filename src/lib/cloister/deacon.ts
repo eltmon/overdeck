@@ -12,14 +12,116 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
-import { readdir } from 'fs/promises';
+// PAN-1249: readFile / writeFile / unlink are consumed by the additive Effect
+// helpers below (`readFileEffect`, `writeFileEffect`, `unlinkEffect`).
+import { readdir, readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
+import { Effect } from 'effect';
+import {
+  FsError,
+  GitError,
+  ProcessSpawnError,
+  ProcessTimeoutError,
+} from '../errors.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+// ---------------------------------------------------------------------------
+// PAN-1249 Effect helpers (additive — internal use only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap an `execAsync` call in Effect with a typed `ProcessSpawnError`. Used
+ * internally so callers can keep their Promise-returning signatures while the
+ * implementation drifts towards Effect.
+ */
+const execAsyncEffect = (
+  command: string,
+  options?: Parameters<typeof execAsync>[1],
+): Effect.Effect<{ stdout: string; stderr: string }, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const result = await execAsync(command, options);
+      return {
+        stdout: typeof result.stdout === 'string' ? result.stdout : result.stdout.toString('utf-8'),
+        stderr: typeof result.stderr === 'string' ? result.stderr : result.stderr.toString('utf-8'),
+      };
+    },
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command,
+        args: [],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Wrap `execFileAsync` in Effect with a typed error. */
+const execFileAsyncEffect = (
+  command: string,
+  args: readonly string[],
+  options?: Parameters<typeof execFileAsync>[2],
+): Effect.Effect<{ stdout: string; stderr: string }, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const result = await execFileAsync(command, args as string[], options);
+      return {
+        stdout: typeof result.stdout === 'string' ? result.stdout : result.stdout.toString('utf-8'),
+        stderr: typeof result.stderr === 'string' ? result.stderr : result.stderr.toString('utf-8'),
+      };
+    },
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command,
+        args,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises read in Effect with a typed FsError. */
+const readFileEffect = (path: string): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => readFile(path, 'utf-8'),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'readFile',
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises write in Effect with a typed FsError. */
+const writeFileEffect = (path: string, data: string): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => writeFile(path, data, 'utf-8'),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'writeFile',
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises unlink in Effect with a typed FsError. */
+const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => unlink(path),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'unlink',
+        cause,
+      }),
+  });
+
+/** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
+export { GitError, ProcessTimeoutError };
+
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
@@ -592,36 +694,46 @@ const ACTIVE_STATUS_PATTERNS = [
  * bottom of the pane — only those lines are relevant, not the full visible
  * area which may contain completed tool calls like "● Bash(...)" from prior output.
  */
-export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
-  try {
-    const stdout = await capturePaneAsync(sessionName, 5);
+/**
+ * PAN-1249: Effect-typed implementation of `isAgentActiveInTmux`. Never fails
+ * — capture errors collapse to `false`. The public Promise function is a
+ * thin `Effect.runPromise` wrapper.
+ */
+const isAgentActiveInTmuxEffect = (sessionName: string): Effect.Effect<boolean, never> =>
+  Effect.tryPromise({
+    try: () => capturePaneAsync(sessionName, 5),
+    catch: () => 'capture-failed' as const,
+  }).pipe(
+    Effect.map((stdout) => {
+      if (!stdout.trim()) return false;
 
-    if (!stdout.trim()) return false;
+      // Only scan the bottom of the pane where Claude Code's live status bar lives.
+      // Scanning the full visible area causes false positives: completed tool calls
+      // like "● Bash(npm run typecheck...)" are visible but the agent may be idle.
+      const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
+      const tail = lines.slice(-8).join('\n');
 
-    // Only scan the bottom of the pane where Claude Code's live status bar lives.
-    // Scanning the full visible area causes false positives: completed tool calls
-    // like "● Bash(npm run typecheck...)" are visible but the agent may be idle.
-    const lines = stdout.split('\n').filter(l => l.trim().length > 0);
-    const tail = lines.slice(-8).join('\n');
-
-    for (const pattern of ACTIVE_STATUS_PATTERNS) {
-      if (pattern.test(tail)) {
-        // Extended computation (Thinking/Fermenting) over threshold = stuck.
-        // Don't let stuck agents masquerade as active.
-        if (/thinking|fermenting/i.test(tail)) {
-          const thinkingMs = parseThinkingDuration(tail);
-          if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
-            return false; // Stuck, not active
+      for (const pattern of ACTIVE_STATUS_PATTERNS) {
+        if (pattern.test(tail)) {
+          // Extended computation (Thinking/Fermenting) over threshold = stuck.
+          // Don't let stuck agents masquerade as active.
+          if (/thinking|fermenting/i.test(tail)) {
+            const thinkingMs = parseThinkingDuration(tail);
+            if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
+              return false; // Stuck, not active
+            }
           }
+          return true;
         }
-        return true;
       }
-    }
 
-    return false;
-  } catch {
-    return false;
-  }
+      return false;
+    }),
+    Effect.catch(() => Effect.succeed(false)),
+  );
+
+export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
+  return Effect.runPromise(isAgentActiveInTmuxEffect(sessionName));
 }
 
 /**
@@ -1301,7 +1413,10 @@ async function recoverUnhealthyTestStack(
   const key = issueId.toUpperCase();
   const { getWorkspaceStackHealth } = await import('../workspace/stack-health.js');
 
-  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
+  // PAN-1249: getWorkspaceStackHealth now returns an Effect — run it at this
+  // Promise boundary. The Effect never fails (error channel: never), so
+  // Effect.runPromise is safe and the result is the plain WorkspaceStackHealth.
+  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
   if (health.healthy) {
     testStackRebuildState.delete(key);
     return 'healthy';
@@ -1342,9 +1457,15 @@ async function recoverUnhealthyTestStack(
   );
 
   const { rebuildWorkspaceStack } = await import('../workspace/rebuild-stack.js');
-  const result = await rebuildWorkspaceStack(issueId, {
-    onProgress: (m) => console.log(`[deacon]   ${key} stack rebuild: ${m}`),
-  });
+  // PAN-1249: rebuildWorkspaceStack returns Effect<RebuildWorkspaceStackResult>
+  // with error channel `never` — the Effect captures any failure into
+  // result.error. Run at this Promise boundary so the deacon's recovery loop
+  // keeps its current Promise-based shape.
+  const result = await Effect.runPromise(
+    rebuildWorkspaceStack(issueId, {
+      onProgress: (m) => console.log(`[deacon]   ${key} stack rebuild: ${m}`),
+    }),
+  );
   if (!result.success) {
     console.warn(`[deacon] Test stack rebuild failed for ${key}: ${result.error}`);
     emitActivityEntry({
@@ -3499,7 +3620,7 @@ async function reconcileAndCheckIfMerged(
     }
 
     const tracker = createTracker(trackerConfig);
-    await tracker.getIssue(issueId);
+    await Effect.runPromise(tracker.getIssue(issueId));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);

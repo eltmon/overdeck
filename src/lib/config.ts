@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { promises as fs } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
@@ -5,6 +6,7 @@ import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
 import type { TrackerType } from './tracker/interface.js';
+import { FsError } from './errors.js';
 
 // Individual tracker configuration
 export interface LinearConfig {
@@ -374,3 +376,78 @@ export function getConversationsConfig(): ConversationsConfig {
 export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
   return resolveConversationsConfig(await loadConfigAsync());
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Both sync and async config IO surfaces get Effect variants. The async paths
+// (preferred in dashboard-reachable code) wrap the existing Promise functions
+// via Effect.tryPromise; the sync paths route through Effect.try.
+
+/** Load config.toml (sync). Surfaces FsError on read/parse failure. */
+export const loadConfigEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
+  Effect.try({
+    try: () => loadConfig(),
+    catch: (cause) =>
+      new FsError({ path: CONFIG_FILE, operation: 'load-config', cause }),
+  });
+
+/** Persist config.toml (sync). Surfaces FsError on write failure. */
+export const saveConfigEffect = (
+  config: PanopticonConfig,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveConfig(config),
+    catch: (cause) =>
+      new FsError({ path: CONFIG_FILE, operation: 'save-config', cause }),
+  });
+
+/** Load config.toml (async; dashboard-safe). */
+export const loadConfigAsyncEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
+  Effect.tryPromise({
+    try: () => loadConfigAsync(),
+    catch: (cause) =>
+      new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
+  });
+
+/** Persist config.toml (async; dashboard-safe). */
+export const saveConfigAsyncEffect = (
+  config: PanopticonConfig,
+): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => saveConfigAsync(config),
+    catch: (cause) =>
+      new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
+  });
+
+/** Default config template. Pure. */
+export const getDefaultConfigEffect = (): Effect.Effect<PanopticonConfig> =>
+  Effect.sync(() => getDefaultConfig());
+
+/** Compute the dashboard's external API URL. Pure (reads env). */
+export const getDashboardApiUrlEffect = (): Effect.Effect<string> =>
+  Effect.sync(() => getDashboardApiUrl());
+
+/** Resolve the configured devroot path. Pure (reads config). */
+export const getDevrootPathEffect = (): Effect.Effect<string | null> =>
+  Effect.sync(() => getDevrootPath());
+
+/** Compute the devroot for a project path. Pure. */
+export const findDevrootForProjectEffect = (
+  projectPath: string,
+): Effect.Effect<string> => Effect.sync(() => findDevrootForProject(projectPath));
+
+/** Resolve conversations sub-config (sync). */
+export const getConversationsConfigEffect = (): Effect.Effect<ConversationsConfig> =>
+  Effect.sync(() => getConversationsConfig());
+
+/** Resolve conversations sub-config (async). */
+export const getConversationsConfigAsyncEffect =
+  (): Effect.Effect<ConversationsConfig, FsError> =>
+    Effect.tryPromise({
+      try: () => getConversationsConfigAsync(),
+      catch: (cause) =>
+        new FsError({
+          path: CONFIG_FILE,
+          operation: 'get-conversations-config-async',
+          cause,
+        }),
+    });

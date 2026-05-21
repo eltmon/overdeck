@@ -196,7 +196,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
           completed: true,
           success: false,
           authStatus,
-          error: !bridged ? 'Codex credentials were not bridged' : (authStatus.message || `Codex authentication is ${authStatus.status}`),
+          error: !bridged ? 'Codex credentials were not bridged' : ((authStatus as { message?: string }).message || `Codex authentication is ${authStatus.status}`),
         });
       }
 

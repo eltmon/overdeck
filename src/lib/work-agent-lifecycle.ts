@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
+import { Data, Effect } from 'effect';
 import { getAgentState, getAgentStateAsync, getAgentRuntimeState, getAgentRuntimeStateAsync, getLatestSessionId, getLatestSessionIdAsync, normalizeAgentId } from './agents.js';
 import { sessionExists, sessionExistsAsync } from './tmux.js';
 
@@ -225,3 +226,53 @@ export function assertCanResumeSession(agentOrIssueId: string): WorkAgentLifecyc
   }
   return lifecycle;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Asserts about agent lifecycle (cannot start fresh / cannot resume) fail in
+ * the typed error channel as `WorkAgentLifecycleViolation`.
+ */
+export class WorkAgentLifecycleViolation extends Data.TaggedError('WorkAgentLifecycleViolation')<{
+  readonly agentId: string;
+  readonly reason: string;
+}> {}
+
+/** Pure snapshot of the work-agent lifecycle state for an agent or issue. */
+export const getWorkAgentLifecycleStateEffect = (
+  agentOrIssueId: string,
+): Effect.Effect<WorkAgentLifecycleState> =>
+  Effect.sync(() => getWorkAgentLifecycleState(agentOrIssueId));
+
+/** Async-FS snapshot of the work-agent lifecycle state. */
+export const getWorkAgentLifecycleStateAsyncEffect = (
+  agentOrIssueId: string,
+): Effect.Effect<WorkAgentLifecycleState> =>
+  Effect.promise(() => getWorkAgentLifecycleStateAsync(agentOrIssueId));
+
+/** Assert the agent can start fresh; lifts the synchronous throw to a typed error. */
+export const assertCanStartFreshEffect = (
+  agentOrIssueId: string,
+  options: { allowPausedForce?: boolean } = {},
+): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
+  Effect.try({
+    try: () => assertCanStartFresh(agentOrIssueId, options),
+    catch: (cause) =>
+      new WorkAgentLifecycleViolation({
+        agentId: agentOrIssueId,
+        reason: cause instanceof Error ? cause.message : String(cause),
+      }),
+  });
+
+/** Assert the agent can resume; lifts the synchronous throw to a typed error. */
+export const assertCanResumeSessionEffect = (
+  agentOrIssueId: string,
+): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
+  Effect.try({
+    try: () => assertCanResumeSession(agentOrIssueId),
+    catch: (cause) =>
+      new WorkAgentLifecycleViolation({
+        agentId: agentOrIssueId,
+        reason: cause instanceof Error ? cause.message : String(cause),
+      }),
+  });

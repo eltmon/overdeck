@@ -7,7 +7,15 @@
  * Pattern mirrors tunnel.ts — stateless CRUD against external API.
  */
 
+import { Effect, Data } from 'effect';
 import { HumeConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
+
+/** A Hume EVI API call failed (HTTP, timeout, or auth). */
+export class HumeApiError extends Data.TaggedError('HumeApiError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 export interface HumeResult {
   success: boolean;
@@ -224,3 +232,45 @@ export async function deleteHumeConfig(
 
   return { success: allOk, steps };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native createHumeConfig. The Promise version reports failure through
+ * the `success: false` branch with step logs rather than throwing; this Effect
+ * variant wraps it so callers can compose with other Effect work. Only the
+ * underlying call itself throwing (network exception, JSON parse outside
+ * humeFetch) surfaces as HumeApiError.
+ */
+export const createHumeConfigEffect = (
+  config: HumeConfig,
+  placeholders: TemplatePlaceholders,
+): Effect.Effect<HumeResult, HumeApiError> =>
+  Effect.tryPromise({
+    try: () => createHumeConfig(config, placeholders),
+    catch: (cause) =>
+      new HumeApiError({
+        operation: 'createHumeConfig',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native deleteHumeConfig. Same shape as createHumeConfigEffect:
+ * step-level failures stay in the returned payload, transport-level throws
+ * become HumeApiError on the typed error channel.
+ */
+export const deleteHumeConfigEffect = (
+  config: HumeConfig,
+  placeholders: TemplatePlaceholders,
+): Effect.Effect<HumeResult, HumeApiError> =>
+  Effect.tryPromise({
+    try: () => deleteHumeConfig(config, placeholders),
+    catch: (cause) =>
+      new HumeApiError({
+        operation: 'deleteHumeConfig',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

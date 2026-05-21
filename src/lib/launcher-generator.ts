@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import type { Role } from './agents.js';
 import { shellQuoteModelId } from './model-validation.js';
 
@@ -564,3 +565,16 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
 
   return [useExec ? `exec ${cmd}` : cmd];
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Pure-sync launcher emission — additive Effect.sync wrappers.
+
+/** Build the bash launcher script body for a Cloister role spawn. Pure. */
+export const generateLauncherScriptEffect = (
+  config: LauncherConfig,
+): Effect.Effect<string> => Effect.sync(() => generateLauncherScript(config));
+
+/** Build an optional launcher wrapper (returns null when not needed). Pure. */
+export const generateLauncherWrapperEffect = (
+  config: LauncherConfig,
+): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapper(config));

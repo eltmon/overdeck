@@ -38,8 +38,11 @@ describe('ConversationLifecycleService — pollConversations', () => {
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
+    // No claudeSessionId on the conversation → sessionFile should resolve to null
+    // (production computes sessionFile via sessionFilePath(cwd, claudeSessionId)
+    // and falls back to null when claudeSessionId is missing).
     mockListActiveConversations.mockReturnValue([
-      { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', sessionFile: '/tmp/gone.jsonl' },
+      { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
     ]);
     mockListSessionNamesAsync.mockResolvedValue([]); // no sessions alive
 
@@ -50,7 +53,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockListSessionNamesAsync).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'gone-session', sessionFile: '/tmp/gone.jsonl' }),
+      expect.objectContaining({ name: 'gone-session', sessionFile: null }),
     );
   });
 

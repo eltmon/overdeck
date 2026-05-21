@@ -111,56 +111,46 @@ export const RallyClientLive = Layer.effect(
 
     return {
       getIssue: (id) =>
-        Effect.tryPromise({
-          try: async () => {
-            const raw = await tracker.getIssue(id);
-            return {
-              id: raw.id,
-              ref: raw.ref,
-              title: raw.title,
-              description: raw.description,
-              url: raw.url,
-              state: raw.state,
-              labels: raw.labels,
-              artifactType: raw.artifactType || 'artifact',
-            } satisfies RallyIssue;
-          },
-          catch: (err) => wrapRallyError(err),
-        }),
+        tracker.getIssue(id).pipe(
+          Effect.mapError(wrapRallyError),
+          Effect.map((raw) => ({
+            id: raw.id,
+            ref: raw.ref,
+            title: raw.title,
+            description: raw.description,
+            url: raw.url,
+            state: raw.state,
+            labels: raw.labels,
+            artifactType: raw.artifactType || 'artifact',
+          } satisfies RallyIssue)),
+        ),
 
       getChildIssues: (id) =>
-        Effect.tryPromise({
-          try: async () => {
-            const children = await tracker.getChildIssues(id);
-            return children.map((raw) => ({
+        tracker.getChildIssues(id).pipe(
+          Effect.mapError(wrapRallyError),
+          Effect.map((children) =>
+            children.map((raw) => ({
               id: raw.id,
               ref: raw.ref,
               title: raw.title,
               status: raw.state,
               description: raw.description,
-            })) satisfies RallyChildIssue[];
-          },
-          catch: (err) => wrapRallyError(err),
-        }),
+            }))),
+        ),
 
       updateState: (id, state) =>
-        Effect.tryPromise({
-          try: () => tracker.transitionIssue(id, state),
-          catch: (err) => wrapRallyError(err),
-        }),
+        tracker.transitionIssue(id, state).pipe(Effect.mapError(wrapRallyError)),
 
       addComment: (id, body) =>
-        Effect.tryPromise({
-          try: async () => {
-            await tracker.addComment(id, body);
-          },
-          catch: (err) => {
+        tracker.addComment(id, body).pipe(
+          Effect.mapError((err: unknown) => {
             if (err instanceof RateLimited) {
               return new TrackerApiError({ tracker: 'rally', message: 'rate limited', cause: err });
             }
             return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
-          },
-        }),
+          }),
+          Effect.asVoid,
+        ),
     } satisfies RallyClientShape;
   }),
 );
@@ -210,10 +200,7 @@ function makeRallyClientImpl(config: NonNullable<ReturnType<typeof getRallyConfi
     getIssue: (id) =>
       Effect.gen(function* () {
         const t = yield* Effect.promise(() => getTracker());
-        const raw = yield* Effect.tryPromise({
-          try: () => t.getIssue(id),
-          catch: (err) => wrapRallyError(err),
-        });
+        const raw = yield* t.getIssue(id).pipe(Effect.mapError(wrapRallyError));
         return {
           id: raw.id,
           ref: raw.ref,
@@ -229,10 +216,7 @@ function makeRallyClientImpl(config: NonNullable<ReturnType<typeof getRallyConfi
     getChildIssues: (id) =>
       Effect.gen(function* () {
         const t = yield* Effect.promise(() => getTracker());
-        const children = yield* Effect.tryPromise({
-          try: () => t.getChildIssues(id),
-          catch: (err) => wrapRallyError(err),
-        });
+        const children = yield* t.getChildIssues(id).pipe(Effect.mapError(wrapRallyError));
         return children.map((raw) => ({
           id: raw.id,
           ref: raw.ref,
@@ -245,24 +229,20 @@ function makeRallyClientImpl(config: NonNullable<ReturnType<typeof getRallyConfi
     updateState: (id, state) =>
       Effect.gen(function* () {
         const t = yield* Effect.promise(() => getTracker());
-        yield* Effect.tryPromise({
-          try: () => t.transitionIssue(id, state),
-          catch: (err) => wrapRallyError(err),
-        });
+        yield* t.transitionIssue(id, state).pipe(Effect.mapError(wrapRallyError));
       }),
 
     addComment: (id, body) =>
       Effect.gen(function* () {
         const t = yield* Effect.promise(() => getTracker());
-        yield* Effect.tryPromise({
-          try: () => t.addComment(id, body),
-          catch: (err) => {
+        yield* t.addComment(id, body).pipe(
+          Effect.mapError((err: unknown) => {
             if (err instanceof RateLimited) {
               return new TrackerApiError({ tracker: 'rally', message: 'rate limited', cause: err });
             }
             return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
-          },
-        });
+          }),
+        );
       }),
   };
 }

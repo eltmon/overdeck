@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile, readdir, rename, stat } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join, basename } from 'path';
+import { Effect, FileSystem } from 'effect';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import { join } from 'path';
 import { homedir, tmpdir } from 'os';
 import { randomUUID } from 'crypto';
+import { FsError } from './errors.js';
 
 const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_API_KEY',
@@ -93,38 +94,101 @@ const INVALID_LEGACY_PATTERNS = new Set<string>([
   'Bash(rm:**/.claude/projects/**)',
 ]);
 
+function atomicWrite(
+  path: string,
+  content: string,
+): Effect.Effect<void, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const tmpPath = join(tmpdir(), `pan-settings-${randomUUID()}.tmp`);
+    yield* fs.writeFileString(tmpPath, content).pipe(
+      Effect.mapError(e => new FsError({ path: tmpPath, operation: 'writeFileString', cause: e })),
+    );
+    yield* fs.rename(tmpPath, path).pipe(
+      Effect.mapError(e => new FsError({ path, operation: 'rename', cause: e })),
+    );
+  });
+}
+
+function findNewestBackup(
+  claudeDir: string,
+): Effect.Effect<string | undefined, never, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const entries = yield* fs.readDirectory(claudeDir).pipe(
+      Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
+    );
+    const backups = [...entries]
+      .filter(e => e.startsWith(BACKUP_PREFIX))
+      .sort()
+      .reverse();
+    return backups.length > 0 ? join(claudeDir, backups[0]) : undefined;
+  });
+}
+
+function backupIfNeeded(
+  claudeDir: string,
+  currentContent: string,
+): Effect.Effect<boolean, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const newest = yield* findNewestBackup(claudeDir);
+    if (newest) {
+      const backupContent = yield* fs.readFileString(newest, 'utf-8').pipe(
+        Effect.catch(() => Effect.succeed(null as string | null)),
+      );
+      if (backupContent === currentContent) return false;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = join(claudeDir, `${BACKUP_PREFIX}${timestamp}`);
+    yield* fs.writeFileString(backupPath, currentContent).pipe(
+      Effect.mapError(e => new FsError({ path: backupPath, operation: 'writeFileString', cause: e })),
+    );
+    return true;
+  });
+}
+
 /**
  * Inject Panopticon-infrastructure permission deny rules into the workspace's
  * .claude/settings.local.json. Idempotent — re-running merges patterns into
  * any existing permissions.deny block without disturbing other entries.
  */
-export async function injectPanopticonInfraDeny(workingDir: string): Promise<void> {
-  const claudeDir = join(workingDir, '.claude');
-  const settingsPath = join(claudeDir, 'settings.local.json');
+export function injectPanopticonInfraDeny(workingDir: string): Effect.Effect<void, FsError> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const claudeDir = join(workingDir, '.claude');
+    const settingsPath = join(claudeDir, 'settings.local.json');
 
-  if (!existsSync(claudeDir)) {
-    await mkdir(claudeDir, { recursive: true });
-  }
+    yield* fs.makeDirectory(claudeDir, { recursive: true }).pipe(
+      Effect.mapError(e => new FsError({ path: claudeDir, operation: 'makeDirectory', cause: e })),
+    );
 
-  let existing: Record<string, unknown> = {};
-  if (existsSync(settingsPath)) {
-    try {
-      existing = JSON.parse(await readFile(settingsPath, 'utf-8')) as Record<string, unknown>;
-    } catch {
-      existing = {};
-    }
-  }
+    const settingsExists = yield* fs.exists(settingsPath).pipe(Effect.catch(() => Effect.succeed(false)));
+    const existing = settingsExists
+      ? yield* fs.readFileString(settingsPath, 'utf-8').pipe(
+          Effect.mapError(
+            e => new FsError({ path: settingsPath, operation: 'readFileString', cause: e }),
+          ),
+          Effect.flatMap(raw =>
+            Effect.try({
+              try: () => JSON.parse(raw) as Record<string, unknown>,
+              catch: e => new FsError({ path: settingsPath, operation: 'JSON.parse', cause: e }),
+            }),
+          ),
+          Effect.catch(() => Effect.succeed({} as Record<string, unknown>)),
+        )
+      : ({} as Record<string, unknown>);
 
-  const permissions = (existing.permissions as Record<string, unknown> | undefined) ?? {};
-  const denyList = (permissions.deny as string[] | undefined) ?? [];
-  // Strip any legacy invalid patterns (would block agent startup with a
-  // Settings Warning dialog) and merge in the current valid set.
-  const cleaned = denyList.filter(p => !INVALID_LEGACY_PATTERNS.has(p));
-  const merged = new Set<string>([...cleaned, ...PANOPTICON_INFRA_DENY_PATTERNS]);
-  permissions.deny = Array.from(merged).sort();
-  existing.permissions = permissions;
+    const permissions = (existing.permissions as Record<string, unknown> | undefined) ?? {};
+    const denyList = (permissions.deny as string[] | undefined) ?? [];
+    const cleaned = denyList.filter(p => !INVALID_LEGACY_PATTERNS.has(p));
+    const merged = new Set<string>([...cleaned, ...PANOPTICON_INFRA_DENY_PATTERNS]);
+    permissions.deny = Array.from(merged).sort();
+    existing.permissions = permissions;
 
-  await atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
+    yield* atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
+  }).pipe(Effect.provide(NodeFileSystem.layer));
 }
 
 /**
@@ -139,55 +203,64 @@ export async function injectPanopticonInfraDeny(workingDir: string): Promise<voi
  * Creates a timestamped backup before modifying, unless an identical backup
  * already exists.
  */
-export async function injectProviderEnvOverlay(
+export function injectProviderEnvOverlay(
   workingDir: string,
   providerEnv: Record<string, string>,
-): Promise<OverlayResult> {
-  const claudeDir = join(workingDir, '.claude');
-  const settingsPath = join(claudeDir, 'settings.local.json');
+): Effect.Effect<OverlayResult, FsError> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const claudeDir = join(workingDir, '.claude');
+    const settingsPath = join(claudeDir, 'settings.local.json');
 
-  if (!existsSync(claudeDir)) {
-    await mkdir(claudeDir, { recursive: true });
-  }
+    yield* fs.makeDirectory(claudeDir, { recursive: true }).pipe(
+      Effect.mapError(e => new FsError({ path: claudeDir, operation: 'makeDirectory', cause: e })),
+    );
 
-  let existing: Record<string, unknown> = {};
-  let existingRaw = '';
-  if (existsSync(settingsPath)) {
-    try {
-      existingRaw = await readFile(settingsPath, 'utf-8');
-      existing = JSON.parse(existingRaw);
-    } catch {
-      existing = {};
-      existingRaw = '';
+    const settingsExists = yield* fs.exists(settingsPath).pipe(Effect.catch(() => Effect.succeed(false)));
+    let existingRaw = '';
+    const existing = settingsExists
+      ? yield* fs.readFileString(settingsPath, 'utf-8').pipe(
+          Effect.mapError(
+            e => new FsError({ path: settingsPath, operation: 'readFileString', cause: e }),
+          ),
+          Effect.flatMap(raw =>
+            Effect.try({
+              try: () => {
+                existingRaw = raw;
+                return JSON.parse(raw) as Record<string, unknown>;
+              },
+              catch: e => new FsError({ path: settingsPath, operation: 'JSON.parse', cause: e }),
+            }),
+          ),
+          Effect.catch(() => Effect.succeed({} as Record<string, unknown>)),
+        )
+      : ({} as Record<string, unknown>);
+
+    const backedUp = existingRaw ? yield* backupIfNeeded(claudeDir, existingRaw) : false;
+    const backupPath = backedUp ? yield* findNewestBackup(claudeDir) : undefined;
+
+    const envBlock = (existing.env as Record<string, string> | undefined) ?? {};
+    const keysInjected: string[] = [];
+
+    for (const key of PROVIDER_ENV_KEYS) {
+      if (key in providerEnv) {
+        envBlock[key] = providerEnv[key];
+        keysInjected.push(key);
+      } else {
+        // Blank the key so project-level overrides user-level settings.json.
+        // Claude Code deep-merges configs — deleting a key lets user-level win.
+        envBlock[key] = '';
+        keysInjected.push(key);
+      }
     }
-  }
 
-  const backedUp = existingRaw ? await backupIfNeeded(claudeDir, existingRaw) : false;
-  const backupPath = backedUp
-    ? (await findNewestBackup(claudeDir))
-    : undefined;
+    existing.env = Object.keys(envBlock).length > 0 ? envBlock : undefined;
+    if (existing.env === undefined) delete existing.env;
 
-  const envBlock = (existing.env as Record<string, string> | undefined) ?? {};
-  const keysInjected: string[] = [];
+    yield* atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
 
-  for (const key of PROVIDER_ENV_KEYS) {
-    if (key in providerEnv) {
-      envBlock[key] = providerEnv[key];
-      keysInjected.push(key);
-    } else {
-      // Blank the key so project-level overrides user-level settings.json.
-      // Claude Code deep-merges configs — deleting a key lets user-level win.
-      envBlock[key] = '';
-      keysInjected.push(key);
-    }
-  }
-
-  existing.env = Object.keys(envBlock).length > 0 ? envBlock : undefined;
-  if (existing.env === undefined) delete existing.env;
-
-  await atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
-
-  return { settingsPath, backedUp, backupPath, keysInjected };
+    return { settingsPath, backedUp, backupPath, keysInjected };
+  }).pipe(Effect.provide(NodeFileSystem.layer));
 }
 
 /**
@@ -195,15 +268,25 @@ export async function injectProviderEnvOverlay(
  * Restores the file to its pre-overlay state by removing only the
  * provider env keys we injected.
  */
-export async function removeProviderEnvOverlay(
-  workingDir: string,
-): Promise<void> {
-  const settingsPath = join(workingDir, '.claude', 'settings.local.json');
-  if (!existsSync(settingsPath)) return;
+export function removeProviderEnvOverlay(workingDir: string): Effect.Effect<void, never> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const settingsPath = join(workingDir, '.claude', 'settings.local.json');
 
-  try {
-    const raw = await readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(raw) as Record<string, unknown>;
+    const exists = yield* fs.exists(settingsPath).pipe(Effect.catch(() => Effect.succeed(false)));
+    if (!exists) return;
+
+    const raw = yield* fs.readFileString(settingsPath, 'utf-8').pipe(
+      Effect.catch(() => Effect.succeed(null as string | null)),
+    );
+    if (!raw) return;
+
+    const settings = yield* Effect.try({
+      try: () => JSON.parse(raw) as Record<string, unknown>,
+      catch: e => new FsError({ path: settingsPath, operation: 'JSON.parse', cause: e }),
+    }).pipe(Effect.catch(() => Effect.succeed(null as Record<string, unknown> | null)));
+    if (!settings) return;
+
     const envBlock = settings.env as Record<string, string> | undefined;
     if (!envBlock) return;
 
@@ -215,10 +298,10 @@ export async function removeProviderEnvOverlay(
       delete settings.env;
     }
 
-    await atomicWrite(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-  } catch {
-    // If we can't parse the file, leave it alone
-  }
+    yield* atomicWrite(settingsPath, JSON.stringify(settings, null, 2) + '\n').pipe(
+      Effect.catch(() => Effect.void),
+    );
+  }).pipe(Effect.provide(NodeFileSystem.layer));
 }
 
 /**
@@ -226,72 +309,42 @@ export async function removeProviderEnvOverlay(
  * and what Panopticon would set for the given model.
  * Returns only keys where the user's value DIFFERS from the proposed value.
  */
-export async function detectProviderEnvConflicts(
+export function detectProviderEnvConflicts(
   proposedEnv: Record<string, string>,
-): Promise<ProviderEnvConflict[]> {
-  const userSettingsPath = join(homedir(), '.claude', 'settings.json');
-  const conflicts: ProviderEnvConflict[] = [];
+): Effect.Effect<ProviderEnvConflict[], never> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const userSettingsPath = join(homedir(), '.claude', 'settings.json');
+    const conflicts: ProviderEnvConflict[] = [];
 
-  let userSettings: Record<string, unknown> = {};
-  try {
-    const raw = await readFile(userSettingsPath, 'utf-8');
-    userSettings = JSON.parse(raw);
-  } catch {
-    return conflicts;
-  }
+    const raw = yield* fs.readFileString(userSettingsPath, 'utf-8').pipe(
+      Effect.catch(() => Effect.succeed(null as string | null)),
+    );
+    if (!raw) return conflicts;
 
-  const userEnv = (userSettings.env as Record<string, string> | undefined) ?? {};
+    const userSettings = yield* Effect.try({
+      try: () => JSON.parse(raw) as Record<string, unknown>,
+      catch: e => new FsError({ path: userSettingsPath, operation: 'JSON.parse', cause: e }),
+    }).pipe(Effect.catch(() => Effect.succeed(null as Record<string, unknown> | null)));
+    if (!userSettings) return conflicts;
 
-  for (const key of PROVIDER_ENV_KEYS) {
-    const userValue = userEnv[key];
-    if (userValue === undefined) continue;
+    const userEnv = (userSettings.env as Record<string, string> | undefined) ?? {};
 
-    const proposedValue = proposedEnv[key];
-    if (userValue === proposedValue) continue;
+    for (const key of PROVIDER_ENV_KEYS) {
+      const userValue = userEnv[key];
+      if (userValue === undefined) continue;
 
-    conflicts.push({
-      key,
-      userValue,
-      proposedValue,
-      source: userSettingsPath,
-    });
-  }
+      const proposedValue = proposedEnv[key];
+      if (userValue === proposedValue) continue;
 
-  return conflicts;
-}
-
-async function backupIfNeeded(claudeDir: string, currentContent: string): Promise<boolean> {
-  const newest = await findNewestBackup(claudeDir);
-  if (newest) {
-    try {
-      const backupContent = await readFile(newest, 'utf-8');
-      if (backupContent === currentContent) return false;
-    } catch {
-      // Can't read backup — create a new one
+      conflicts.push({
+        key,
+        userValue,
+        proposedValue,
+        source: userSettingsPath,
+      });
     }
-  }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupPath = join(claudeDir, `${BACKUP_PREFIX}${timestamp}`);
-  await writeFile(backupPath, currentContent, 'utf-8');
-  return true;
-}
-
-async function findNewestBackup(claudeDir: string): Promise<string | undefined> {
-  try {
-    const entries = await readdir(claudeDir);
-    const backups = entries
-      .filter(e => e.startsWith(BACKUP_PREFIX))
-      .sort()
-      .reverse();
-    return backups.length > 0 ? join(claudeDir, backups[0]) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function atomicWrite(path: string, content: string): Promise<void> {
-  const tmpPath = join(tmpdir(), `pan-settings-${randomUUID()}.tmp`);
-  await writeFile(tmpPath, content, 'utf-8');
-  await rename(tmpPath, path);
+    return conflicts;
+  }).pipe(Effect.provide(NodeFileSystem.layer));
 }

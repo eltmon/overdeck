@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
-import { mkdir, readFile, rename, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
+import { Effect, FileSystem } from 'effect'
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
+import { FsError } from '../errors.js'
 
 import type { WorkspaceContinueState, WorkspacePanPaths } from './types.js'
 import {
@@ -33,11 +34,20 @@ export function getWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
   return workspacePanPaths(workspacePath)
 }
 
-export function ensureWorkspacePanDir(workspacePath: string): WorkspacePanPaths {
-  const paths = workspacePanPaths(workspacePath)
-  mkdirSync(paths.panDir, { recursive: true })
-  mkdirSync(paths.feedbackDir, { recursive: true })
-  return paths
+export function ensureWorkspacePanDir(
+  workspacePath: string,
+): Effect.Effect<WorkspacePanPaths, FsError> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const paths = workspacePanPaths(workspacePath)
+    yield* fs.makeDirectory(paths.panDir, { recursive: true }).pipe(
+      Effect.mapError((cause) => new FsError({ path: paths.panDir, operation: 'makeDirectory', cause })),
+    )
+    yield* fs.makeDirectory(paths.feedbackDir, { recursive: true }).pipe(
+      Effect.mapError((cause) => new FsError({ path: paths.feedbackDir, operation: 'makeDirectory', cause })),
+    )
+    return paths
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
 function validateWorkspaceContinueState(value: unknown, path: string): asserts value is WorkspaceContinueState {
@@ -67,62 +77,66 @@ function validateWorkspaceContinueState(value: unknown, path: string): asserts v
   }
 }
 
-export function readWorkspaceContinue(workspacePath: string): WorkspaceContinueState | null {
-  const { continuePath } = workspacePanPaths(workspacePath)
-  if (!existsSync(continuePath)) return null
-  const raw = readFileSync(continuePath, 'utf-8')
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch (error) {
-    throw new Error(`Invalid JSON in continue file ${continuePath}: ${(error as Error).message}`)
-  }
-  validateWorkspaceContinueState(parsed, continuePath)
-  return parsed
+export function readWorkspaceContinue(
+  workspacePath: string,
+): Effect.Effect<WorkspaceContinueState | null, FsError> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const { continuePath } = workspacePanPaths(workspacePath)
+    const exists = yield* fs.exists(continuePath).pipe(Effect.catch(() => Effect.succeed(false)))
+    if (!exists) return null
+    const raw = yield* fs.readFileString(continuePath, 'utf-8').pipe(
+      Effect.mapError((cause) => new FsError({ path: continuePath, operation: 'readFileString', cause })),
+    )
+    return yield* Effect.try({
+      try: () => {
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(raw)
+        } catch (error) {
+          throw new Error(`Invalid JSON in continue file ${continuePath}: ${(error as Error).message}`)
+        }
+        validateWorkspaceContinueState(parsed, continuePath)
+        return parsed
+      },
+      catch: (cause) => new FsError({ path: continuePath, operation: 'parse', cause }),
+    })
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
-export function writeWorkspaceContinue(workspacePath: string, state: WorkspaceContinueState): WorkspaceContinueState {
-  const { continuePath } = ensureWorkspacePanDir(workspacePath)
-  const now = new Date().toISOString()
-  const next: WorkspaceContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  }
-  const tmp = uniqueTmpPath(continuePath)
-  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8')
-  renameSync(tmp, continuePath)
-  return next
+export function writeWorkspaceContinue(
+  workspacePath: string,
+  state: WorkspaceContinueState,
+): Effect.Effect<WorkspaceContinueState, FsError> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const { continuePath, panDir, feedbackDir } = workspacePanPaths(workspacePath)
+    yield* fs.makeDirectory(panDir, { recursive: true }).pipe(
+      Effect.mapError((cause) => new FsError({ path: panDir, operation: 'makeDirectory', cause })),
+    )
+    yield* fs.makeDirectory(feedbackDir, { recursive: true }).pipe(
+      Effect.mapError((cause) => new FsError({ path: feedbackDir, operation: 'makeDirectory', cause })),
+    )
+    const now = new Date().toISOString()
+    const next: WorkspaceContinueState = {
+      ...state,
+      version: '1',
+      created: state.created || now,
+      updated: now,
+    }
+    const tmp = uniqueTmpPath(continuePath)
+    yield* fs.writeFileString(tmp, JSON.stringify(next, null, 2)).pipe(
+      Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
+    )
+    yield* fs.rename(tmp, continuePath).pipe(
+      Effect.mapError((cause) => new FsError({ path: continuePath, operation: 'rename', cause })),
+    )
+    return next
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
-export async function readWorkspaceContinueAsync(workspacePath: string): Promise<WorkspaceContinueState | null> {
-  const { continuePath } = workspacePanPaths(workspacePath)
-  if (!existsSync(continuePath)) return null
-  const raw = await readFile(continuePath, 'utf-8')
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch (error) {
-    throw new Error(`Invalid JSON in continue file ${continuePath}: ${(error as Error).message}`)
-  }
-  validateWorkspaceContinueState(parsed, continuePath)
-  return parsed
-}
+/** @deprecated use `readWorkspaceContinue` (now returns an Effect). */
+export const readWorkspaceContinueAsync = readWorkspaceContinue
 
-export async function writeWorkspaceContinueAsync(workspacePath: string, state: WorkspaceContinueState): Promise<WorkspaceContinueState> {
-  const { continuePath, panDir, feedbackDir } = workspacePanPaths(workspacePath)
-  await mkdir(panDir, { recursive: true })
-  await mkdir(feedbackDir, { recursive: true })
-  const now = new Date().toISOString()
-  const next: WorkspaceContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  }
-  const tmp = uniqueTmpPath(continuePath)
-  await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8')
-  await rename(tmp, continuePath)
-  return next
-}
+/** @deprecated use `writeWorkspaceContinue` (now returns an Effect). */
+export const writeWorkspaceContinueAsync = writeWorkspaceContinue

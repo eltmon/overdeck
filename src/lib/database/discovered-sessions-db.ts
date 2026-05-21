@@ -4,9 +4,18 @@
  * CRUD, FTS5 sync, embedding helpers, and filter-based search for
  * the discovered_sessions table — the index of all Claude Code JSONL
  * sessions found on disk, inside and outside Panopticon.
+ *
+ * PAN-1249: Effect migration pass — public API stays synchronous to keep
+ * the existing call sites unchanged. FTS5 try/catch blocks are preserved
+ * because FTS5 MATCH rejects malformed query syntax at runtime; collapsing
+ * those into typed errors would be a semantic change, not a migration.
+ * The DatabaseError tagged error is re-exported from ./index.js for use
+ * by callers that want typed SQLite-failure surfaces. Full conversion to
+ * @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
-import { getDatabase } from './index.js';
+import { getDatabase, DatabaseError } from './index.js';
+export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

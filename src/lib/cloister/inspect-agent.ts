@@ -13,6 +13,8 @@ import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
+import { ProcessSpawnError } from '../errors.js';
 import {
   getDiffBase,
   getDiffStats,
@@ -278,4 +280,57 @@ export async function onInspectComplete(
   } else {
     console.log(`[inspect] Bead ${beadId} blocked for ${issueId} — no checkpoint saved`);
   }
+}
+
+// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
+
+/**
+ * Effect-typed variant of {@link buildInspectPrompt}.
+ * Fails with `ProcessSpawnError` when the prompt template is missing or the
+ * underlying git/bd helpers throw (the legacy Promise version throws on the
+ * missing-template path).
+ */
+export function buildInspectPromptEffect(
+  context: InspectContext,
+): Effect.Effect<string, ProcessSpawnError> {
+  return Effect.tryPromise({
+    try: () => buildInspectPrompt(context),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: 'inspect-agent',
+        args: ['buildInspectPrompt', context.beadId],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+}
+
+/**
+ * Effect-typed variant of {@link spawnInspectAgent}. Never fails — the legacy
+ * Promise returns `{ success: false, error }` instead of throwing.
+ */
+export function spawnInspectAgentEffect(
+  context: InspectContext,
+  opts: { deep?: boolean } = {},
+): Effect.Effect<{
+  success: boolean;
+  runId?: string;
+  tmuxSession?: string;
+  message: string;
+  error?: string;
+}> {
+  return Effect.promise(() => spawnInspectAgent(context, opts));
+}
+
+/**
+ * Effect-typed variant of {@link onInspectComplete}. Never fails.
+ */
+export function onInspectCompleteEffect(
+  projectKey: string,
+  issueId: string,
+  beadId: string,
+  status: 'passed' | 'failed',
+  workspacePath: string,
+): Effect.Effect<void> {
+  return Effect.promise(() => onInspectComplete(projectKey, issueId, beadId, status, workspacePath));
 }

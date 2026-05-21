@@ -17,6 +17,7 @@
  * - Official provider pricing pages
  */
 
+import { Effect } from 'effect';
 import { ModelId } from './settings.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
@@ -846,3 +847,39 @@ export function getAllSkillDimensions(): SkillDimension[] {
     'context-length',
   ];
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// All capability queries are pure lookups — additive Effect.sync wrappers.
+
+/** Resolve a (possibly-deprecated) model id to its canonical id. Pure. */
+export const resolveModelIdEffect = (modelId: string): Effect.Effect<ModelId> =>
+  Effect.sync(() => resolveModelId(modelId));
+
+/** Look up a model's capability matrix. Pure. */
+export const getModelCapabilityEffect = (
+  model: ModelId,
+): Effect.Effect<ModelCapability> => Effect.sync(() => getModelCapability(model));
+
+/** List models ranked best-first for a given skill. Pure. */
+export const getModelsBySkillEffect = (
+  skill: SkillDimension,
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsBySkill(skill));
+
+/** List models for a specific provider. Pure. */
+export const getModelsForProviderEffect = (
+  provider: ModelCapability['provider'],
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsForProvider(provider));
+
+/** List the cheapest models ranked best-first. Pure. */
+export const getCheapestModelsEffect = (): Effect.Effect<ModelId[]> =>
+  Effect.sync(() => getCheapestModels());
+
+/** Compute the cost-adjusted value score for a model + skill. Pure. */
+export const getValueScoreEffect = (
+  model: ModelId,
+  skill: SkillDimension,
+): Effect.Effect<number> => Effect.sync(() => getValueScore(model, skill));
+
+/** Enumerate all known skill dimensions. Pure. */
+export const getAllSkillDimensionsEffect = (): Effect.Effect<SkillDimension[]> =>
+  Effect.sync(() => getAllSkillDimensions());

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 
 // Stub the agents module so statusCommand sees our scripted agents.
 vi.mock('../../../lib/agents.js', () => ({
@@ -14,8 +15,8 @@ vi.mock('../../../lib/tldr-daemon.js', () => ({
   getTldrDaemonService: vi.fn(),
 }))
 vi.mock('../../../lib/workspace/stack-health.js', () => ({
-  collectDockerContainerLifecycleSnapshot: vi.fn(async () => []),
-  getWorkspaceStackHealth: vi.fn(async () => ({ healthy: true, reasons: [], lastObserved: '2026-05-17T00:00:00.000Z' })),
+  collectDockerContainerLifecycleSnapshot: vi.fn(() => Effect.succeed([])),
+  getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-05-17T00:00:00.000Z' })),
   inferIssueIdFromStackContainerName: vi.fn((name: string) => {
     const match = name.toLowerCase().match(/(?:^|[-_])feature-([a-z]+-\d+)(?=$|[-_])/)
     return match?.[1]?.toUpperCase() ?? null
@@ -36,13 +37,13 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
-    ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
     ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null)
-    ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: true,
       reasons: [],
       lastObserved: '2026-05-17T00:00:00.000Z',
-    })
+    }))
   })
 
   afterEach(() => {
@@ -152,19 +153,19 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   it('prints broken Docker workspace stacks without agent state', async () => {
     ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
-    ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+    ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([
       {
         id: 'init1',
         name: 'panopticon-feature-pan-1140-init-1',
         status: 'Exited (1) 2 minutes ago',
         state: 'exited',
       },
-    ])
-    ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ]))
+    ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: false,
       reasons: ['panopticon-feature-pan-1140-init-1 init exited non-zero (1)'],
       lastObserved: '2026-05-17T00:00:00.000Z',
-    })
+    }))
 
     await statusCommand({} as any)
 

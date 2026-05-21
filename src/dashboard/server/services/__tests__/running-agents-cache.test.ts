@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearRunningAgentsCache, getCachedRunningAgents } from '../running-agents-cache.js';
+import type { listRunningAgentsAsync } from '../../../../lib/agents.js';
+
+type ListAgentsFn = typeof listRunningAgentsAsync;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -22,8 +25,8 @@ describe('running-agents-cache', () => {
       .mockResolvedValueOnce(firstAgents)
       .mockResolvedValueOnce(secondAgents);
 
-    const first = await getCachedRunningAgents(listAgents);
-    const second = await getCachedRunningAgents(listAgents);
+    const first = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    const second = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
 
     expect(first).toBe(firstAgents);
     expect(second).toBe(firstAgents);
@@ -38,9 +41,9 @@ describe('running-agents-cache', () => {
       .mockResolvedValueOnce(firstAgents)
       .mockResolvedValueOnce(secondAgents);
 
-    await getCachedRunningAgents(listAgents);
+    await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
     await vi.advanceTimersByTimeAsync(3_001);
-    const refreshed = await getCachedRunningAgents(listAgents);
+    const refreshed = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
 
     expect(refreshed).toBe(secondAgents);
     expect(listAgents).toHaveBeenCalledTimes(2);
@@ -54,8 +57,8 @@ describe('running-agents-cache', () => {
       }),
     );
 
-    const firstPromise = getCachedRunningAgents(listAgents);
-    const secondPromise = getCachedRunningAgents(listAgents);
+    const firstPromise = getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    const secondPromise = getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
 
     expect(listAgents).toHaveBeenCalledTimes(1);
 

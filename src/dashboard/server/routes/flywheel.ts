@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Effect, Layer, Option, Schema } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
@@ -444,6 +445,8 @@ const postFlywheelBriefRoute = HttpRouter.add(
       return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
     }
 
+    const bodyContent: string = body.content;
+
     const resolved = resolveBriefAbsolutePath(process.cwd());
     if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
 
@@ -451,7 +454,7 @@ const postFlywheelBriefRoute = HttpRouter.add(
       await mkdir(dirname(resolved.absolutePath), { recursive: true });
       const containment = await assertWritePathInsideRoot(process.cwd(), resolved.absolutePath);
       if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
-      await writeFile(resolved.absolutePath, body.content, 'utf8');
+      await writeFile(resolved.absolutePath, bodyContent, 'utf8');
       return jsonResponse({ ok: true, path: resolved.displayPath });
     });
   })),
@@ -465,7 +468,11 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
       const status = await readCurrentFlywheelStatusForDashboard();
       if (!status) return jsonResponse([]);
       const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
-      const queue = await computeMergeQueue(status.activePipeline, process.cwd());
+      const queue = await Effect.runPromise(
+        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
+          Effect.provide(nodeServicesLayer),
+        ),
+      );
       return jsonResponse(queue);
     });
   })),

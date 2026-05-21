@@ -9,12 +9,19 @@
  * This module is host/CLI-safe: it never calls `process.exit` and never writes
  * to a terminal. The CLI command wraps it for spinner/exit handling; the deacon
  * calls it directly during patrol recovery.
+ *
+ * PAN-1249: migrated to Effect. External entry point `rebuildWorkspaceStack`
+ * returns `Effect.Effect<RebuildWorkspaceStackResult>` (errors are encoded in
+ * the result, not the error channel, to preserve the existing API contract
+ * where callers branch on `success`).
  */
 
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+
+import { Effect } from 'effect';
 
 import { getProject, resolveProjectFromIssue } from '../projects.js';
 import { ensureDevcontainer } from './ensure-devcontainer.js';
@@ -69,14 +76,17 @@ function findDevcontainerComposeFile(workspacePath: string): string | null {
   return null;
 }
 
-async function dockerCompose(args: string[], cwd: string): Promise<void> {
-  await execFileAsync('docker', ['compose', ...args], {
-    cwd,
-    encoding: 'utf-8',
-    timeout: 300_000,
-    maxBuffer: 10 * 1024 * 1024,
+const dockerCompose = (args: string[], cwd: string): Effect.Effect<void, Error> =>
+  Effect.tryPromise({
+    try: () =>
+      execFileAsync('docker', ['compose', ...args], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 300_000,
+        maxBuffer: 10 * 1024 * 1024,
+      }).then(() => undefined),
+    catch: (err) => (err instanceof Error ? err : new Error(String(err))),
   });
-}
 
 export interface RebuildWorkspaceStackOptions {
   /** Progress callback for each rebuild phase. Optional. */
@@ -95,25 +105,26 @@ export interface RebuildWorkspaceStackResult {
  * Tear down, re-render, and restart a single workspace docker stack.
  *
  * Returns a result object instead of throwing/exiting so server-side callers
- * (the deacon) can branch on `success`.
+ * (the deacon) can branch on `success`. The Effect itself never fails — any
+ * error is captured into `result.error`.
  */
-export async function rebuildWorkspaceStack(
+export const rebuildWorkspaceStack = (
   issueId: string,
   options: RebuildWorkspaceStackOptions = {},
-): Promise<RebuildWorkspaceStackResult> {
+): Effect.Effect<RebuildWorkspaceStackResult> => {
   const progress = options.onProgress ?? (() => {});
   const normalizedIssueId = issueId.toLowerCase();
 
   const resolvedProject = resolveProjectFromIssue(issueId);
   const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
   if (!resolvedProject || !projectConfig) {
-    return { success: false, error: `No project found for issue ${issueId}` };
+    return Effect.succeed({ success: false, error: `No project found for issue ${issueId}` });
   }
   if (!projectConfig.workspace?.docker?.compose_template) {
-    return {
+    return Effect.succeed({
       success: false,
       error: `Project ${projectConfig.name} has no workspace docker compose_template configured`,
-    };
+    });
   }
 
   const workspacePath = join(
@@ -122,16 +133,16 @@ export async function rebuildWorkspaceStack(
     `feature-${normalizedIssueId}`,
   );
   if (!existsSync(workspacePath)) {
-    return { success: false, error: `Workspace not found: ${workspacePath}` };
+    return Effect.succeed({ success: false, error: `Workspace not found: ${workspacePath}` });
   }
 
-  try {
+  return Effect.gen(function* () {
     const composeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
 
     const existingComposeFile = findDevcontainerComposeFile(workspacePath);
     if (existingComposeFile) {
       progress('Tearing down existing workspace stack...');
-      await dockerCompose(
+      yield* dockerCompose(
         ['-f', existingComposeFile, '-p', composeProjectName, 'down', '-v', '--remove-orphans'],
         dirname(existingComposeFile),
       );
@@ -148,7 +159,7 @@ export async function rebuildWorkspaceStack(
         success: false,
         error: ensured.step.error ?? 'Failed to render .devcontainer/',
         workspacePath,
-      };
+      } satisfies RebuildWorkspaceStackResult;
     }
 
     const composeFile = findDevcontainerComposeFile(workspacePath);
@@ -157,21 +168,20 @@ export async function rebuildWorkspaceStack(
         success: false,
         error: `No devcontainer compose file found in ${devcontainerDir}`,
         workspacePath,
-      };
+      } satisfies RebuildWorkspaceStackResult;
     }
 
     progress('Starting workspace stack...');
-    await dockerCompose(
+    yield* dockerCompose(
       ['-f', composeFile, '-p', composeProjectName, 'up', '-d', '--build'],
       dirname(composeFile),
     );
 
-    return { success: true, workspacePath, composeFile, composeProjectName };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error?.message ? String(error.message) : String(error),
-      workspacePath,
-    };
-  }
-}
+    return { success: true, workspacePath, composeFile, composeProjectName } satisfies RebuildWorkspaceStackResult;
+  }).pipe(
+    Effect.catch((error: unknown) => {
+      const message = error instanceof Error && error.message ? error.message : String(error);
+      return Effect.succeed<RebuildWorkspaceStackResult>({ success: false, error: message, workspacePath });
+    }),
+  );
+};
