@@ -1447,7 +1447,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // SubscriptionRef → projection_cache rows keyed 'agent-runtime:<id>'.
 //
 // Writes: emitAgentEvent POSTs to /api/agents/:id/heartbeat. Reads: in-process
-// lib uses getRuntimeSnapshotSync; CLI/out-of-process uses
+// lib uses getRuntimeSnapshot (Effect-native); CLI/out-of-process uses
 // getAgentRuntimeSnapshot (HTTP).
 //
 // The functions below are adapters over AgentRuntimeSnapshot. Each caller
@@ -1460,7 +1460,8 @@ import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
 } from './agent-runtime.js';
-import { getRuntimeSnapshotSync, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
+import { Effect } from 'effect';
+import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
@@ -1518,14 +1519,14 @@ export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null 
   // Sync path: read from the in-process mirror (empty in fresh CLI processes,
   // populated inside the dashboard server). CLI commands should prefer
   // getAgentRuntimeStateAsync so they fall through to HTTP.
-  return snapshotToRuntimeState(getRuntimeSnapshotSync(agentId));
+  return snapshotToRuntimeState(Effect.runSync(getRuntimeSnapshot(agentId)));
 }
 
 export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
   // In-process (inside the dashboard): the sync mirror is authoritative. Do
   // NOT fall back to HTTP — that would fetch our own server, which may still
   // be inside Layer construction and cause a startup deadlock.
-  if (isAgentStateServiceInProcess()) {
+  if (Effect.runSync(isAgentStateServiceInProcess())) {
     return getAgentRuntimeState(agentId);
   }
   // Cross-process (CLI, external lib callers): sync mirror is empty, hit HTTP.

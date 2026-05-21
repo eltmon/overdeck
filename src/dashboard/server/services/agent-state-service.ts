@@ -32,7 +32,7 @@ import type {
 } from '@panctl/contracts';
 import { initEventStore, getSharedDb } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
-import { setAgentRuntimeMirror, getRuntimeSnapshotSync as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
+import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ export class AgentStateService extends Context.Service<
 // ─── Live implementation ──────────────────────────────────────────────────────
 
 // Re-export the cross-process-safe mirror accessor.
-export const getRuntimeSnapshotSync = getMirrorSnapshot;
+export const getRuntimeSnapshot = getMirrorSnapshot;
 
 export const AgentStateServiceLive = Layer.effect(
   AgentStateService,
@@ -98,7 +98,7 @@ export const AgentStateServiceLive = Layer.effect(
     // Flag lib-side adapters to prefer the in-process mirror over HTTP.
     // Without this, agent-enrichment / ReadModel bootstrap would fetch() our
     // own HTTP server before it finished listening — a circular deadlock.
-    markAgentStateServiceInProcess();
+    yield* markAgentStateServiceInProcess();
     const store = yield* Effect.promise(() => initEventStore());
     const ref = yield* SubscriptionRef.make<Record<string, AgentRuntimeSnapshot>>({});
 
@@ -147,7 +147,7 @@ export const AgentStateServiceLive = Layer.effect(
         if (snap.updatedAtSequence > maxCachedSequence) maxCachedSequence = snap.updatedAtSequence;
       }
       yield* SubscriptionRef.set(ref, initial);
-      setAgentRuntimeMirror(initial);
+      yield* setAgentRuntimeMirror(initial);
       console.log(
         `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache (seq=${maxCachedSequence})`,
       );
@@ -228,7 +228,7 @@ function applyEventToRef(
       }
     }
 
-    setAgentRuntimeMirror(next);
+    Effect.runSync(setAgentRuntimeMirror(next));
     return next;
   });
 }
