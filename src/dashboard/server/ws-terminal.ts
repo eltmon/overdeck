@@ -37,6 +37,7 @@ type ClientControlMessage =
   | { type: 'resize'; cols: number; rows: number };
 
 const ATTACH_TIMEOUT_MS = 5000;
+const READY_TIMEOUT_MS = 10_000;
 const PRE_ATTACH_MAX_MESSAGES = 32;
 const PRE_ATTACH_MAX_BYTES = 64 * 1024;
 
@@ -63,6 +64,24 @@ function sendControl(ws: WebSocket, payload: unknown): void {
 function rejectUpgrade(socket: import('net').Socket, status: number, message: string): void {
   socket.write(`HTTP/1.1 ${status} ${message}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   socket.destroy();
+}
+
+function armReadyTimeout(hub: PtyHub, ws: WebSocket, sessionName: string): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(() => {
+    const state = hub.clientStates.get(ws);
+    if (ws.readyState === WebSocket.OPEN && state && !state.ready) {
+      console.warn(`[ws-terminal] Closing unready terminal client for ${sessionName}`);
+      ws.close(1008, 'terminal-ready-timeout');
+    }
+  }, READY_TIMEOUT_MS);
+  ws.once('close', () => clearTimeout(timer));
+  ws.once('error', () => clearTimeout(timer));
+  return timer;
+}
+
+function markClientReady(hub: PtyHub, ws: WebSocket, readyTimer: ReturnType<typeof setTimeout>): void {
+  clearTimeout(readyTimer);
+  setClientReady(hub, ws);
 }
 
 function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } | { ok: false; status: number; message: string } {
@@ -363,10 +382,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
           sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: '' });
         }
 
+        const readyTimer = armReadyTimeout(existingHub, ws, sessionName);
         const handleJoinMessage = (message: string) => {
           const parsed = parseControlMessage(message);
           if (parsed?.type === 'ready') {
-            setClientReady(existingHub, ws);
+            markClientReady(existingHub, ws, readyTimer);
             return;
           }
           if (parsed?.type === 'resize') {
@@ -530,17 +550,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
         return;
       }
       sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
-      // Start PTY immediately — don't wait for client 'ready'. The hub buffers
-      // live data for not-yet-ready clients (pty-hub.ts broadcastToHub), so data
-      // that arrives before the client finishes processing its snapshot is queued
-      // and flushed when setClientReady fires. This eliminates the visible black
-      // screen gap between snapshot delivery and first live byte.
+      const readyTimer = armReadyTimeout(hub, ws, sessionName);
       void startLocalPty();
 
       const handleLocalMessage = (message: string) => {
         const parsed = parseControlMessage(message);
         if (parsed?.type === 'ready') {
-          setClientReady(hub, ws);
+          markClientReady(hub, ws, readyTimer);
           return;
         }
         if (parsed?.type === 'resize') {
