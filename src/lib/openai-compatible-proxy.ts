@@ -1,4 +1,6 @@
 import http from 'http';
+import { Data, Effect } from 'effect';
+
 const HOST = '127.0.0.1';
 const PORT = 12436;
 
@@ -9,6 +11,11 @@ const UPSTREAMS: Record<string, string> = {
 let server: http.Server | null = null;
 let started = false;
 
+export class ProxyStartError extends Data.TaggedError('ProxyStartError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 export function getOpenAICompatibleProxyBaseUrl(provider: string): string {
   return `http://${HOST}:${PORT}/${provider}`;
 }
@@ -17,44 +24,54 @@ export function getProxyPathname(url: string | undefined): string {
   return new URL(url ?? '/', `http://${HOST}:${PORT}`).pathname;
 }
 
-export async function ensureOpenAICompatibleProxyRunning(): Promise<void> {
-  if (started && server?.listening) return;
-  if (await isPortOpen()) {
-    started = true;
-    return;
-  }
+export function ensureOpenAICompatibleProxyRunning(): Effect.Effect<void, ProxyStartError> {
+  return Effect.gen(function* () {
+    if (started && server?.listening) return;
 
-  server = http.createServer((req, res) => {
-    void handleRequest(req, res).catch((err) => {
-      if (!res.headersSent) {
-        res.writeHead(500, { 'content-type': 'application/json' });
-      }
-      res.end(JSON.stringify({ error: { message: err instanceof Error ? err.message : String(err) } }));
-    });
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server!.once('error', reject);
-    server!.listen(PORT, HOST, () => {
-      server!.off('error', reject);
+    const portOpen = yield* isPortOpen();
+    if (portOpen) {
       started = true;
-      resolve();
+      return;
+    }
+
+    yield* Effect.tryPromise({
+      try: () =>
+        new Promise<void>((resolve, reject) => {
+          server = http.createServer((req, res) => {
+            void handleRequest(req, res).catch((err) => {
+              if (!res.headersSent) {
+                res.writeHead(500, { 'content-type': 'application/json' });
+              }
+              res.end(JSON.stringify({ error: { message: err instanceof Error ? err.message : String(err) } }));
+            });
+          });
+          server.once('error', reject);
+          server.listen(PORT, HOST, () => {
+            server!.off('error', reject);
+            started = true;
+            resolve();
+          });
+        }),
+      catch: (e) => new ProxyStartError({ message: e instanceof Error ? e.message : String(e), cause: e }),
     });
   });
 }
 
-async function isPortOpen(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const req = http.get({ host: HOST, port: PORT, path: '/health', timeout: 1000 }, (res) => {
-      res.resume();
-      resolve(res.statusCode === 200);
-    });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve(false);
-    });
-  });
+function isPortOpen(): Effect.Effect<boolean, never> {
+  return Effect.promise(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const req = http.get({ host: HOST, port: PORT, path: '/health', timeout: 1000 }, (res) => {
+          res.resume();
+          resolve(res.statusCode === 200);
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => {
+          req.destroy();
+          resolve(false);
+        });
+      }),
+  );
 }
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
