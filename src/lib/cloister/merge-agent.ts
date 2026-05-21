@@ -3,15 +3,89 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-import { writeFile } from 'fs/promises';
+// PAN-1249: readFile / unlink consumed by `readFileEffect` / `unlinkEffect` helpers below.
+import { writeFile, readFile, unlink } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
+import {
+  FsError,
+  GitError,
+  ProcessSpawnError,
+  ProcessTimeoutError,
+  MergeConflictError,
+} from '../errors.js';
 import { capturePaneAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
 import { emitActivityEntry, emitActivityTts, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
+
+// ---------------------------------------------------------------------------
+// PAN-1249 Effect helpers (additive — internal use only)
+// ---------------------------------------------------------------------------
+
+/** Wrap `execAsync` in Effect with a typed `ProcessSpawnError`. */
+const execAsyncEffect = (
+  command: string,
+  options?: Parameters<typeof execAsync>[1],
+): Effect.Effect<{ stdout: string; stderr: string }, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const result = await execAsync(command, options);
+      return {
+        stdout: typeof result.stdout === 'string' ? result.stdout : result.stdout.toString('utf-8'),
+        stderr: typeof result.stderr === 'string' ? result.stderr : result.stderr.toString('utf-8'),
+      };
+    },
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command,
+        args: [],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises read in Effect with a typed FsError. */
+const readFileEffect = (path: string): Effect.Effect<string, FsError> =>
+  Effect.tryPromise({
+    try: () => readFile(path, 'utf-8'),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'readFile',
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises write in Effect with a typed FsError. */
+const writeFileEffect = (path: string, data: string): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => writeFile(path, data, 'utf-8'),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'writeFile',
+        cause,
+      }),
+  });
+
+/** Wrap a fs/promises unlink in Effect with a typed FsError. */
+const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => unlink(path),
+    catch: (cause) =>
+      new FsError({
+        path,
+        operation: 'unlink',
+        cause,
+      }),
+  });
+
+/** Re-export for symmetry with the additive pattern. */
+export { GitError, ProcessTimeoutError, MergeConflictError };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -79,10 +153,18 @@ interface MergeHistoryEntry {
 const MERGE_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
- * Notify TLDR daemon to reindex changed files after merge
+ * Notify TLDR daemon to reindex changed files after merge.
+ *
+ * PAN-1249: Internal implementation is Effect-based; the public Promise
+ * signature is preserved via `Effect.runPromise` at the boundary. The Effect
+ * never fails — TLDR notification is best-effort and any error is logged but
+ * not propagated.
  */
-export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
-  try {
+const notifyTldrDaemonEffect = (
+  projectPath: string,
+  _sourceBranch: string,
+): Effect.Effect<void, never> => {
+  const inner = Effect.gen(function* () {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
     // Check if TLDR daemon is available
@@ -93,16 +175,16 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
     }
 
     // Get changed files from the merge
-    const { stdout } = await execAsync(`git diff --name-only HEAD~1 HEAD`, {
+    const { stdout } = yield* execAsyncEffect(`git diff --name-only HEAD~1 HEAD`, {
       cwd: projectPath,
-      encoding: 'utf-8'
+      encoding: 'utf-8',
     });
 
     const changedFiles = stdout
       .trim()
       .split('\n')
-      .filter(f => f.trim().length > 0)
-      .filter(f => {
+      .filter((f: string) => f.trim().length > 0)
+      .filter((f: string) => {
         // Only include source code files (skip docs, configs, etc)
         const ext = f.split('.').pop()?.toLowerCase();
         return ext && ['ts', 'js', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'h'].includes(ext);
@@ -115,28 +197,48 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
 
     console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
 
-    // Get TLDR daemon service
-    const { getTldrDaemonService } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonService(projectPath, venvPath);
+    // Get TLDR daemon service + trigger warm. Wrapped in tryPromise so any
+    // failure flows into the outer Effect.catch.
+    const tldrOk = yield* Effect.tryPromise({
+      try: async () => {
+        const { getTldrDaemonService } = await import('../tldr-daemon.js');
+        const tldrService = getTldrDaemonService(projectPath, venvPath);
+        const status = await tldrService.getStatus();
+        if (!status.running) {
+          console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
+          return false;
+        }
+        console.log(`[merge-agent] Triggering TLDR index warm...`);
+        await tldrService.warm(true); // background mode
+        return true;
+      },
+      catch: (cause) => cause as Error,
+    });
 
-    // Check if daemon is running
-    const status = await tldrService.getStatus();
-    if (!status.running) {
-      console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
-      return;
+    if (tldrOk) {
+      console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
+      logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
     }
+  });
 
-    // Trigger warm to reindex (this will update the index incrementally)
-    console.log(`[merge-agent] Triggering TLDR index warm...`);
-    await tldrService.warm(true);  // background mode
+  return inner.pipe(
+    Effect.catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Failed to notify TLDR daemon: ${msg}`);
+      logActivity('tldr_notify_error', `TLDR notification failed: ${msg}`);
+      return Effect.void;
+    }),
+  );
+};
 
-    console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
-    logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
-  } catch (error: any) {
-    // Non-fatal - log warning and continue
-    console.warn(`[merge-agent] Failed to notify TLDR daemon: ${error.message}`);
-    logActivity('tldr_notify_error', `TLDR notification failed: ${error.message}`);
-  }
+/**
+ * Notify TLDR daemon to reindex changed files after merge.
+ *
+ * Public Promise-returning surface preserved for caller compatibility — this
+ * is a thin Effect.runPromise wrapper around the Effect implementation.
+ */
+export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+  return Effect.runPromise(notifyTldrDaemonEffect(projectPath, sourceBranch));
 }
 
 /**
@@ -419,7 +521,10 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // 1. Move PRD from active to completed (via lifecycle module)
   try {
     const { movePrd } = await import('../lifecycle/archive-planning.js');
-    const prdResult = await movePrd({ issueId, projectPath });
+    // PAN-1249: movePrd returns Effect<StepResult> (never fails — failures
+    // are captured into StepResult.error). Bridge to Promise here so the
+    // surrounding orchestration retains its Promise shape.
+    const prdResult = await Effect.runPromise(movePrd({ issueId, projectPath }));
     if (prdResult.success && !prdResult.skipped) {
       console.log(`[merge-agent] ✓ ${prdResult.details?.join('; ')}`);
       logActivity('prd_moved', `Moved ${issueId} PRD to completed directory`);
@@ -441,7 +546,9 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const labelCtx = ghResolved.isGitHub
       ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
       : { issueId, projectPath };
-    const labelResult = await cleanupMergedLabels(labelCtx);
+    // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to
+    // Promise at this boundary.
+    const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx));
     if (labelResult.success && !labelResult.skipped) {
       console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
       logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
@@ -463,7 +570,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // 4. Compact old beads (via lifecycle module)
   try {
     const { compactBeads } = await import('../lifecycle/compact-beads.js');
-    const beadsResult = await compactBeads({ issueId, projectPath });
+    // PAN-1249: compactBeads returns Effect<StepResult>; bridge here.
+    const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
     if (beadsResult.success && !beadsResult.skipped) {
       console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
       logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
@@ -604,7 +712,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   try {
     const { teardownWorkspace } = await import('../lifecycle/teardown-workspace.js');
     const ctx = { issueId, projectPath };
-    const teardownResults = await teardownWorkspace(ctx, { deleteBranches: true });
+    // PAN-1249: teardownWorkspace returns Effect<StepResult[]>; bridge here.
+    const teardownResults = await Effect.runPromise(teardownWorkspace(ctx, { deleteBranches: true }));
     const completedSteps = teardownResults.filter(r => r.success && !r.skipped);
     if (completedSteps.length > 0) {
       const summary = completedSteps.map(r => r.details?.join('; ') || r.step).join(' | ');
@@ -680,7 +789,10 @@ function closeIssueWithCircuitBreaker(issueId: string, projectPath: string): voi
       const ctx = ghResolved.isGitHub
         ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
         : { issueId, projectPath };
-      const results = await closeIssue(ctx, { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' });
+      // PAN-1249: closeIssue returns Effect<StepResult[]>; bridge here.
+      const results = await Effect.runPromise(
+        closeIssue(ctx, { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' }),
+      );
 
       let anyFailure = false;
       for (const r of results) {
@@ -1420,24 +1532,34 @@ export interface SyncMainResult {
 }
 
 /**
- * Scan workspace for leftover git conflict markers (async)
+ * Scan workspace for leftover git conflict markers (Effect-typed core).
+ *
+ * PAN-1249: Internal implementation is Effect.gen; public Promise function
+ * preserves caller compatibility via Effect.runPromise. Errors collapse to
+ * an empty array (Effect.catch → `[]`).
+ */
+const scanForConflictMarkersEffect = (projectPath: string): Effect.Effect<readonly string[], never> =>
+  execAsyncEffect('git diff --check 2>&1 || true', {
+    cwd: projectPath,
+    encoding: 'utf-8',
+  }).pipe(
+    Effect.map(({ stdout }) => {
+      const files = stdout
+        .split('\n')
+        .filter((line: string) => line.includes('leftover conflict marker'))
+        .map((line: string) => line.split(':')[0].trim())
+        .filter((f: string) => f.length > 0);
+      return [...new Set(files)];
+    }),
+    Effect.catch(() => Effect.succeed([] as readonly string[])),
+  );
+
+/**
+ * Scan workspace for leftover git conflict markers (async).
  */
 export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
-  try {
-    // git diff --check exits non-zero and prints filenames when conflict markers exist
-    const { stdout } = await execAsync('git diff --check 2>&1 || true', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    const files = stdout
-      .split('\n')
-      .filter(line => line.includes('leftover conflict marker'))
-      .map(line => line.split(':')[0].trim())
-      .filter(f => f.length > 0);
-    return [...new Set(files)];
-  } catch {
-    return [];
-  }
+  const result = await Effect.runPromise(scanForConflictMarkersEffect(projectPath));
+  return [...result];
 }
 
 /**
