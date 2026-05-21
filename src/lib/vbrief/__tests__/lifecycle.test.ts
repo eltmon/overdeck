@@ -58,6 +58,10 @@ describe('generateVBriefFilename', () => {
     expect(() => generateVBriefFilename('not-an-issue', 'slug', '2026-05-03')).toThrow();
     expect(() => generateVBriefFilename('PAN-', 'slug', '2026-05-03')).toThrow();
   });
+  it('normalizes a lowercase issue ID to uppercase (PAN-1050)', () => {
+    const fname = generateVBriefFilename('pan-1194', 'foo', '2026-05-18');
+    expect(fname).toBe('2026-05-18-PAN-1194-foo.vbrief.json');
+  });
 });
 
 describe('parseVBriefFilename', () => {

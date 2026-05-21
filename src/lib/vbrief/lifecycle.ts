@@ -64,7 +64,10 @@ function formatDate(value: Date | string): string {
  * Example: `2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json`
  *
  * @param issueId - Issue identifier in the form `PREFIX-NUMBER` (e.g. `PAN-946`).
- *                  Case-preserved in the filename so trackers stay readable.
+ *                  Normalized to uppercase in the filename — issue IDs are
+ *                  uppercase by convention, and case-preservation let a
+ *                  lowercased caller produce a duplicate, case-colliding
+ *                  spec file (PAN-1050).
  * @param slug    - Free-form slug (will be normalized via slugify).
  * @param createdDate - Date or ISO string used for the YYYY-MM-DD prefix.
  *                      Defaults to "now". Always interpreted in UTC so filenames
@@ -78,9 +81,13 @@ export function generateVBriefFilename(
   if (!/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(issueId)) {
     throw new Error(`Invalid issue ID for vBRIEF filename: ${issueId} (expected e.g. PAN-946)`);
   }
+  // Issue IDs are uppercase by convention (PAN-, MIN-, AUR-). Normalize so a
+  // lowercased issueId from an upstream caller cannot produce a second spec
+  // file that case-collides with the canonical one (PAN-1050).
+  const canonicalIssueId = issueId.toUpperCase();
   const date = formatDate(createdDate);
   const normalized = slugify(slug);
-  return `${date}-${issueId}-${normalized}.vbrief.json`;
+  return `${date}-${canonicalIssueId}-${normalized}.vbrief.json`;
 }
 
 /**
