@@ -134,6 +134,10 @@ export function IssueDrawer() {
                 <DrawerBeadsList />
                 <DrawerReviewSpecialists />
               </div>
+            ) : drawer.tab === 'beads' ? (
+              <div data-testid="drawer-tab-panel-beads">
+                <DrawerBeadsList />
+              </div>
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
