@@ -1,4 +1,4 @@
-import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
+import type { ChannelPermissionRequestSnapshot, ResolvedChannelPermissionDecision as ContractsResolvedChannelPermissionDecision } from '@panctl/contracts';
 import { Effect } from 'effect';
 import * as Result from 'effect/Result';
 
@@ -9,12 +9,7 @@ import {
 
 const MAX_ACTIVITY_PREVIEW_CHARS = 2048;
 
-export interface ResolvedChannelPermissionDecision {
-  requestId: string;
-  agentId: string;
-  issueId: string;
-  behavior: 'allow' | 'deny';
-}
+export type ResolvedChannelPermissionDecision = ContractsResolvedChannelPermissionDecision;
 
 export function buildPermissionWaitingMessage(toolName: string, description: string): string {
   return `Waiting for permission: ${toolName} — ${description}`;

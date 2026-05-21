@@ -26,7 +26,7 @@ const getAdminTldrRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
 
     const project = resolveProjectFromIssue(issueId);
-    const projectPath = project?.path ?? process.cwd();
+    const projectPath = project?.projectPath ?? process.cwd();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
     const venvPath = join(workspacePath, '.venv');
 

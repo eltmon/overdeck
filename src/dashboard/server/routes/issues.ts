@@ -157,8 +157,9 @@ function getGitHubLocalPaths(): Record<string, string> {
   if (!ghConfig) return {};
   const out: Record<string, string> = {};
   for (const r of ghConfig.repos) {
-    if (r.localPath) {
-      out[`${r.owner}/${r.repo}`] = r.localPath;
+    const localPath = (r as { localPath?: unknown }).localPath;
+    if (typeof localPath === 'string') {
+      out[`${r.owner}/${r.repo}`] = localPath;
     }
   }
   return out;
@@ -249,8 +250,8 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
 
 function buildLifecycleContext(id: string, issueSource: string | undefined) {
   const issuePrefix = extractTeamPrefix(id);
-  const projectPath = getProjectPath(undefined, issuePrefix);
-  const projectConfig = findProjectByTeam(issuePrefix);
+  const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
+  const projectConfig = issuePrefix ? findProjectByTeam(issuePrefix) : null;
   const githubCheck = isGitHubIssue(id);
 
   const ctx: any = {
@@ -316,7 +317,7 @@ async function runDestructiveIssueLifecycle(
   const cleanupLog: string[] = [];
   const issueDataService = getIssueDataService();
   const issueSource = issueDataService.getIssueSource(id);
-  const { ctx, projectConfig } = buildLifecycleContext(id, issueSource);
+  const { ctx, projectConfig } = buildLifecycleContext(id, issueSource ?? undefined);
   const deleteWorkspace = opts.deleteWorkspace ?? true;
 
   cleanupLog.push(...await closeIssuePullRequest(
@@ -1766,7 +1767,8 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
           { status: 409 },
         );
       }
-      return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
+      const errMsg = 'error' in resetResult ? resetResult.error : 'reason' in resetResult ? resetResult.reason : 'unknown error';
+      return jsonResponse({ success: false, error: errMsg }, { status: 400 });
     }
 
     // 4. Reset specialist pipeline states
@@ -2235,10 +2237,10 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
-  if (agentState && agentState.status !== 'dead' && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
+  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'error') return true;
 
   const planningState = await getAgentStateAsync(planningId);
-  if (planningState && planningState.status !== 'dead' && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
+  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'error') return true;
 
   return false;
 }
@@ -2774,7 +2776,7 @@ async function fetchIssuePullRequestFromRef(
   prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
 ): Promise<IssuePrEndpointResponse> {
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, pr: null, error: prRef.error };
+    return { issueId: prRef.issueId, pr: null, error: (prRef as { error?: string }).error};
   }
 
   try {
@@ -2805,7 +2807,7 @@ async function fetchIssuePullRequestDiffFromRef(
   prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
 ): Promise<IssuePrDiffEndpointResponse> {
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, diff: null, error: prRef.error };
+    return { issueId: prRef.issueId, diff: null, error: (prRef as { error?: string }).error};
   }
 
   try {
@@ -2832,7 +2834,7 @@ export async function fetchIssuePullRequestDiff(issueId: string): Promise<IssueP
 export async function fetchIssuePullRequestDetails(issueId: string): Promise<IssuePrDetailsResponse> {
   const prRef = await resolveIssuePullRequestRef(issueId);
   if (!prRef.repoArg || !prRef.prNumber) {
-    return { issueId: prRef.issueId, pr: null, diff: null, error: prRef.error };
+    return { issueId: prRef.issueId, pr: null, diff: null, error: (prRef as { error?: string }).error};
   }
 
   const [prResult, diffResult] = await Promise.all([
@@ -3309,7 +3311,7 @@ const getIssueCostsRoute = HttpRouter.add(
           { cost: stats.cost, tokens: stats.tokens },
         ])
       ),
-      sessions: issueData.sessions ?? [],
+      sessions: (issueData as unknown as { sessions?: unknown[] }).sessions ?? [],
       byStage: Object.fromEntries(
         Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
           stage,

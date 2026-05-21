@@ -17,7 +17,7 @@
  */
 
 import { Effect, Layer, Schema } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { EventStoreService } from '../services/domain-services.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -52,7 +52,7 @@ function getRequestHeader(
 export function rejectUntrustedOrigin(
   request: HttpServerRequest.HttpServerRequest,
   options: { requireOriginHeader?: boolean } = {},
-): Response | null {
+): HttpServerResponse.HttpServerResponse | null {
   if (options.requireOriginHeader && !getRequestHeader(request, 'origin') && !getRequestHeader(request, 'referer')) {
     return jsonResponse({ error: 'Missing origin' }, { status: 403 });
   }
@@ -180,7 +180,7 @@ function validatedJsonResponse<A>(schema: Schema.Codec<A>, data: unknown): Retur
   return jsonResponse(data);
 }
 
-function parseRequestBody<A>(schema: Schema.Codec<A>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
+function parseRequestBody<A>(schema: Schema.Codec<A>, raw: unknown): { ok: true; body: A } | { ok: false; response: HttpServerResponse.HttpServerResponse } {
   try {
     return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) as A };
   } catch (err) {

@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { HttpServerRequest } from 'effect/unstable/http';
+import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -83,7 +83,7 @@ export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): 
 
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
-): Response | null {
+): HttpServerResponse.HttpServerResponse | null {
   const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
@@ -96,7 +96,7 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
 
 export function rejectUnauthorizedDashboardRequest(
   request: HttpServerRequest.HttpServerRequest,
-): Response | null {
+): HttpServerResponse.HttpServerResponse | null {
   const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });

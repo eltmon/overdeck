@@ -143,7 +143,7 @@ async function readWorkspacePlanAsync(workspacePath: string, resolvedPlanPath?: 
     }
     const parsed = JSON.parse(raw);
     if (parsed.vBRIEFInfo && parsed.plan) {
-      const continueState = await readWorkspaceContinueAsync(workspacePath);
+      const continueState = await Effect.runPromise(readWorkspaceContinueAsync(workspacePath));
       if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
         return applyStatusOverrides(parsed as VBriefDocument, continueState.statusOverrides);
       }

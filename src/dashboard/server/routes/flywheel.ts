@@ -445,6 +445,8 @@ const postFlywheelBriefRoute = HttpRouter.add(
       return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
     }
 
+    const bodyContent: string = body.content;
+
     const resolved = resolveBriefAbsolutePath(process.cwd());
     if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
 
@@ -452,7 +454,7 @@ const postFlywheelBriefRoute = HttpRouter.add(
       await mkdir(dirname(resolved.absolutePath), { recursive: true });
       const containment = await assertWritePathInsideRoot(process.cwd(), resolved.absolutePath);
       if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
-      await writeFile(resolved.absolutePath, body.content, 'utf8');
+      await writeFile(resolved.absolutePath, bodyContent, 'utf8');
       return jsonResponse({ ok: true, path: resolved.displayPath });
     });
   })),

@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { getHeaderFromMap, validateOrigin, type HeaderMap } from './origin-validation.js';
@@ -123,7 +123,7 @@ function isBoundedText(value: unknown, maxChars: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= maxChars;
 }
 
-function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest): Response | undefined {
+function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | undefined {
   const rawContentLength = getHeaderFromMap(request.headers as HeaderMap, 'content-length');
   if (!rawContentLength) return undefined;
   const contentLength = Number.parseInt(rawContentLength, 10);
@@ -325,7 +325,7 @@ function parseJsonBody(text: string): unknown | undefined {
   }
 }
 
-export function originErrorResponse(request: HttpServerRequest.HttpServerRequest): Response | undefined {
+export function originErrorResponse(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | undefined {
   const originCheck = validateOrigin(request);
   if (originCheck.ok) return undefined;
   return jsonResponse({ error: originCheck.error }, { status: 403 });

@@ -187,8 +187,9 @@ function getGitHubLocalPaths(): Record<string, string> {
   if (!ghConfig) return {};
   const out: Record<string, string> = {};
   for (const r of ghConfig.repos) {
-    if (r.localPath) {
-      out[`${r.owner}/${r.repo}`] = r.localPath;
+    const localPath = (r as { localPath?: unknown }).localPath;
+    if (typeof localPath === 'string') {
+      out[`${r.owner}/${r.repo}`] = localPath;
     }
   }
   return out;
@@ -568,7 +569,7 @@ const getTrackerStatusRoute = HttpRouter.add(
 
       // Only report trackers that have at least one project using them
       const projects = listProjects();
-      const cfgs = projects.map(p => p.config as Record<string, unknown>);
+      const cfgs = projects.map(p => p.config as unknown as Record<string, unknown>);
       const trackerHasProjects: Record<string, boolean> = {
         linear: cfgs.some(c => !!c.linear_project),
         github: cfgs.some(c => !!c.github_repo),
@@ -583,7 +584,7 @@ const getTrackerStatusRoute = HttpRouter.add(
 
         const envVar = trackerEnvVars[trackerType] || `${trackerType.toUpperCase()}_API_KEY`;
         const hasEnvKey = !!process.env[envVar];
-        const hasConfigKey = !!((yamlConfig.trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
+        const hasConfigKey = !!(((yamlConfig as { trackerKeys?: Record<string, string | undefined> }).trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
 
         let hasEnvFileKey = false;
         if (trackerType === 'linear') hasEnvFileKey = !!getLinearApiKeyShared();
@@ -633,14 +634,14 @@ const postRallyValidateRoute = HttpRouter.add(
           server: server || 'https://rally1.rallydev.com',
         });
 
-        const result = await api.query({
+        const result = await Effect.runPromise(api.query({
           type: 'artifact',
           fetch: ['FormattedID'],
           query: '((State = "Open"))',
           limit: 1,
           workspace,
           project,
-        });
+        }));
 
         return jsonResponse({
           valid: true,
@@ -827,7 +828,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           path: p.config.path,
           linearTeam: getIssuePrefix(p.config) || null,
           githubRepo: p.config.github_repo || null,
-          linearProject: p.config.linear_project || null,
+          linearProject: (p.config as { linear_project?: string }).linear_project || null,
         })),
       );
     },

@@ -101,7 +101,7 @@ import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vb
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
-import { queryBeadsForIssue } from '../../../lib/beads-query.js';
+import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
@@ -237,7 +237,7 @@ function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'review
   return status.readyForMerge === true
     || status.reviewStatus === 'passed'
     || status.testStatus === 'passed'
-    || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed');
+    || status.mergeStatus === 'failed';
 }
 
 async function deliverQueuedFeedback(
@@ -556,12 +556,13 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   try {
     const meta = loadWorkspaceMetadata(issueId);
     if (meta?.location === 'remote' && meta.vmName) {
+      const metaRecord = meta as unknown as Record<string, unknown>;
       return {
         exists: true,
         isRemote: true,
         vmName: meta.vmName,
-        remotePath: meta.remotePath,
-        agentId: meta.agentId,
+        remotePath: typeof metaRecord['remotePath'] === 'string' ? metaRecord['remotePath'] : undefined,
+        agentId: typeof metaRecord['agentId'] === 'string' ? metaRecord['agentId'] : undefined,
       };
     }
   } catch { /* non-fatal */ }
@@ -760,9 +761,13 @@ async function getContainerStatusAsync(
           Name?: string;
           Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
           NetworkSettings?: { Ports?: Record<string, unknown> };
-          State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+          State?: { Health?: { Status?: string; LastExecution?: { End?: string; ExitCode?: number }; FailingStreak?: number; ExitCode?: number } };
         }> = JSON.parse(inspectStdout);
-        inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+        inspectByName = new Map(
+          inspects
+            .map((i): [string | undefined, typeof i] => [i.Name?.replace(/^\//, ''), i])
+            .filter((entry): entry is [string, (typeof inspects)[number]] => typeof entry[0] === 'string')
+        );
       } catch (err: any) {
         // Docker inspect may return partial JSON on stderr even when one container is missing.
         // Try to salvage valid results from stdout so one missing container doesn't drop all health data.
@@ -851,7 +856,7 @@ function extractContainerServiceHealth(
   inspect?: {
     Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
     NetworkSettings?: { Ports?: Record<string, unknown> };
-    State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+    State?: { Health?: { Status?: string; LastExecution?: { End?: string; ExitCode?: number }; FailingStreak?: number; ExitCode?: number } };
   }
 ): ContainerServiceHealth {
   if (!inspect) return { health: 'unknown', ports: [], bindings: [] };
@@ -960,20 +965,25 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
  * Fallback bead reader that parses .beads/issues.jsonl directly.
  * Used when the bd CLI is unavailable (e.g. in tests).
  */
-async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<Array<{ title: string; status: string }>> {
+async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
   try {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
     if (!existsSync(jsonlPath)) return [];
     const raw = await readFile(jsonlPath, 'utf-8');
     const issueLower = issueId.toLowerCase();
-    const beads: Array<{ title: string; status: string }> = [];
+    const beads: BeadEntry[] = [];
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue;
       try {
         const entry = JSON.parse(line);
         const labels = Array.isArray(entry.labels) ? entry.labels : [];
         if (labels.some((l: string) => l.toLowerCase() === issueLower)) {
-          beads.push({ title: String(entry.title ?? ''), status: String(entry.status ?? 'open') });
+          beads.push({
+            id: String(entry.id ?? ''),
+            title: String(entry.title ?? ''),
+            status: String(entry.status ?? 'open'),
+            labels: labels as string[],
+          });
         }
       } catch { /* skip malformed lines */ }
     }
@@ -1362,6 +1372,13 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       }
 
       const projectConfig = getProject(resolved.projectKey);
+      if (!projectConfig) {
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: false, issueId: normalizedIssueId },
+        };
+      }
       const workspacePath = join(
         resolved.projectPath,
         projectConfig.workspace?.workspaces_dir ?? 'workspaces',
@@ -1667,7 +1684,7 @@ const getWorkspaceRoute = HttpRouter.add(
                     { cost: stats.cost, tokens: stats.tokens },
                   ])
                 ),
-                sessions: issueData.sessions ?? [],
+                sessions: (issueData as unknown as { sessions?: unknown[] }).sessions ?? [],
                 byStage: Object.fromEntries(
                   Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
                     stage,
@@ -2719,7 +2736,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
           ),
         ]
       : listProjects().map(p =>
-          join(p.path, 'workspaces', `feature-${issueId.toLowerCase()}`)
+          join(p.config.path, 'workspaces', `feature-${issueId.toLowerCase()}`)
         );
 
     let workspacePath: string | null = null;
@@ -3131,9 +3148,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     if (reviewStatus === 'passed') {
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);
       if (workspaceInfo.exists && workspaceInfo.localPath) {
+        const localPath = workspaceInfo.localPath;
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.localPath));
+          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(localPath));
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
           }
@@ -3291,9 +3309,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         // commit. Mirrors what verification-runner does at the pre-review gate.
         yield* Effect.promise(async () => {
           try {
-            const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+            const { resolveProjectFromIssue, getProject } = await import('../../../lib/projects.js');
             const project = resolveProjectFromIssue(issueId);
-            const repo = project?.github_repo;
+            const projectCfg = project ? getProject(project.projectKey) : null;
+            const repo = projectCfg?.github_repo;
             if (!repo || !repo.includes('/')) return;
             const [owner, name] = repo.split('/');
             const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -3466,7 +3485,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	              try {
 	                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
 	                const commits = await getWorkspaceGitInfo(workspacePath);
-	                setReviewStatus(issueId, { lastReviewCommits: commits });
+	                setReviewStatus(issueId, {
+	                  lastReviewCommits: {
+	                    ahead: 0,
+	                    behind: 0,
+	                    branch: commits.branch,
+	                    commits: [commits.HEAD],
+	                  },
+	                });
 	              } catch {}
 	            }
 
@@ -3846,7 +3872,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (!workspaceInfo.isRemote) {
       try {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
-        requestReviewCommits = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
+        const commitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
+        requestReviewCommits = { HEAD: commitInfo.HEAD, branch: commitInfo.branch };
       } catch {}
     }
 
@@ -3884,7 +3911,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       testStatus: 'pending',
       autoRequeueCount: newCount,
       reviewNotes,
-      ...(requestReviewCommits ? { lastReviewCommits: requestReviewCommits } : {}),
+      ...(requestReviewCommits ? {
+        lastReviewCommits: {
+          ahead: 0,
+          behind: 0,
+          branch: requestReviewCommits['branch'] ?? '',
+          commits: requestReviewCommits['HEAD'] ? [requestReviewCommits['HEAD']] : [],
+        },
+      } : {}),
     });
 
     console.log(
@@ -4499,14 +4533,14 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
   // NOTE: Commit status reporting moved to AFTER rebase — see below.
   // The rebase changes the HEAD SHA, so statuses must be reported on the new commit.
-  if (false && reviewStatus.prUrl) {
+  if (false && reviewStatus?.prUrl) {
     try {
       const { isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
       if (isGitHubAppConfigured()) {
-        const prMatch = reviewStatus.prUrl.match(/\/pull\/(\d+)/);
+        const prMatch = reviewStatus!.prUrl!.match(/\/pull\/(\d+)/);
         if (prMatch) {
           const { stdout } = await execAsync(
-            `gh pr view ${prMatch[1]} --json headRefOid --jq .headRefOid`,
+            `gh pr view ${prMatch![1]} --json headRefOid --jq .headRefOid`,
             { encoding: 'utf-8', timeout: 10000 }
           );
           const sha = stdout.trim();
@@ -4630,10 +4664,11 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
         await postMergeLifecycle(issueId, projectPath);
 
+        const remotePrNumber = prResult.prUrl.match(/\/pull\/(\d+)/)?.[1] ?? '?';
         return {
           success: true,
           statusCode: 200,
-          message: `Successfully merged PR #${prNumber} for ${issueId}`,
+          message: `Successfully merged PR #${remotePrNumber} for ${issueId}`,
           prUrl: prResult.prUrl,
           remote: true,
         };

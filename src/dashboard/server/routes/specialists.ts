@@ -193,7 +193,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       const name = specialist.name;
       let killed = false;
 
-      if (isRunning(name)) {
+      if (yield* Effect.promise(() => isRunning(name))) {
         const tmuxSession = getTmuxSessionName(name);
         const killResult = yield* Effect.promise(() =>
           killSessionAsync(tmuxSession).then(() => true).catch(() => false),
@@ -308,7 +308,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
 
       case 'test':
-        update.testStatus = status;
+        update.testStatus = status as typeof update.testStatus;
         if (notes) update.testNotes = notes;
         break;
 
@@ -317,12 +317,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
 
       case 'inspect':
-        update.inspectStatus = status;
+        update.inspectStatus = status as typeof update.inspectStatus;
         if (notes) update.inspectNotes = notes;
         break;
 
       case 'uat':
-        update.uatStatus = status;
+        update.uatStatus = status as typeof update.uatStatus;
         if (notes) update.uatNotes = notes;
         if (status === 'passed') {
           update.readyForMerge = true;
@@ -370,7 +370,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const registryKey = makeSpecialistRegistryKey(`${specialist}-agent`, normalizedIssueId);
           updateRunMetadata(projectKey, registryKey, {
             currentRun: null,
-            writeScope: null,
+            writeScope: undefined,
             workspace: null,
             currentActivity: null,
           });
@@ -497,7 +497,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             );
             if (existsSync(workspacePath)) {
               setReviewStatusBase(normalizedIssueId, { testStatus: 'passed' });
-              const { initEventStore } = await import('../services/domain-services.js');
+              const { initEventStore } = await import('../event-store.js');
               const store = await initEventStore();
               await store.appendAsync({
                 type: 'test.passed',
@@ -1377,7 +1377,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
 
     const { signalSpecialistCompletion } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    signalSpecialistCompletion(project, type, { status, notes }, issueId);
+    signalSpecialistCompletion(project, type, { status: status as 'passed' | 'failed' | 'blocked', notes }, issueId);
     return jsonResponse({
       success: true,
       message: 'Specialist completion signaled, grace period started',
@@ -1432,7 +1432,7 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
     const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../lib/projects.js'));
 
     const retention = getSpecialistRetention(project);
-    const deleted = cleanupOldLogs(project, type, retention);
+    const deleted = cleanupOldLogs(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
     return jsonResponse({
       success: true,
@@ -1579,7 +1579,7 @@ const getModelsResolveRoute = HttpRouter.add(
     const resolved: Record<string, string | null> = {};
     for (const route of routes) {
       try {
-        resolved[route.key] = resolveModel(route.role, route.subRole, config);
+        resolved[route.key] = resolveModel(route.role, (route as { subRole?: string }).subRole, config);
       } catch {
         resolved[route.key] = null;
       }

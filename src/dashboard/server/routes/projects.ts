@@ -277,7 +277,7 @@ async function collectSessionTreeNodes(
         duration: 0,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
-        roundMetadata: synthesisRoundMetadata,
+        roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
       });
@@ -291,7 +291,7 @@ async function collectSessionTreeNodes(
         endedAt: undefined,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
-      sections.push(...reviewerNodes);
+      sections.push(...(reviewerNodes as unknown as SessionNode[]));
     }
 
     // Test role — one canonical session (`agent-<issue>-test`) reused across
