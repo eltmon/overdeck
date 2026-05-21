@@ -1,6 +1,6 @@
 import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
 import { Effect } from 'effect';
-import * as Either from 'effect/Either';
+import * as Result from 'effect/Result';
 
 import {
   normalizeChannelPermissionRequestFields,
@@ -27,8 +27,8 @@ export function permissionResolutionVerb(behavior: 'allow' | 'deny'): 'allowed' 
 export function normalizePermissionRequestBody(body: Record<string, unknown>):
   | { ok: true; value: NormalizedChannelPermissionRequestFields }
   | { ok: false; error: string } {
-  const either = Effect.runSync(
-    Effect.either(
+  const result = Effect.runSync(
+    Effect.result(
       normalizeChannelPermissionRequestFields({
         requestId: body['requestId'],
         toolName: body['toolName'],
@@ -37,10 +37,10 @@ export function normalizePermissionRequestBody(body: Record<string, unknown>):
       }),
     ),
   );
-  if (Either.isLeft(either)) {
-    return { ok: false, error: either.left.message };
+  if (Result.isFailure(result)) {
+    return { ok: false, error: result.failure.message };
   }
-  return { ok: true, value: either.right };
+  return { ok: true, value: result.success };
 }
 
 export function parsePermissionResponseBehavior(body: Record<string, unknown>):
