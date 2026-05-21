@@ -7,6 +7,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
 import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
@@ -64,8 +65,8 @@ export async function inspectCommand(issueId: string, options: InspectOptions): 
   }
 
   // Show what we're inspecting
-  const diffBase = await getDiffBase(project.projectKey, normalizedIssueId, workspacePath);
-  const diffStats = await getDiffStats(workspacePath, diffBase);
+  const diffBase = await Effect.runPromise(getDiffBase(project.projectKey, normalizedIssueId, workspacePath));
+  const diffStats = await Effect.runPromise(getDiffStats(workspacePath, diffBase));
 
   console.log('');
   console.log(chalk.bold('Requesting inspection'));

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { Command } from 'commander';
 
 const { mockResolveProjectFromIssue, mockSpawnInspectAgent, mockGetDiffBase, mockGetDiffStats } = vi.hoisted(() => ({
@@ -34,8 +35,8 @@ describe('inspect command', () => {
       projectKey: 'panopticon',
       projectPath: '/repo',
     });
-    mockGetDiffBase.mockResolvedValue('abcdef1234567890');
-    mockGetDiffStats.mockResolvedValue('1 file changed');
+    mockGetDiffBase.mockReturnValue(Effect.succeed('abcdef1234567890'));
+    mockGetDiffStats.mockReturnValue(Effect.succeed('1 file changed'));
     mockSpawnInspectAgent.mockResolvedValue({
       success: true,
       runId: 'run-1',

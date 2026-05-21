@@ -7,11 +7,14 @@
  * First inspection: diff from branch base (main...HEAD)
  * Subsequent: diff from last checkpoint SHA to HEAD
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
+import { FsError, GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
@@ -45,24 +48,31 @@ function getCheckpointPath(projectKey: string, issueId: string): string {
 /**
  * Load checkpoints for an issue. Returns null if no checkpoints exist.
  */
-export function loadCheckpoints(projectKey: string, issueId: string): InspectCheckpointFile | null {
+export function loadCheckpoints(
+  projectKey: string,
+  issueId: string,
+): Effect.Effect<InspectCheckpointFile | null> {
   const filePath = getCheckpointPath(projectKey, issueId);
-  if (!existsSync(filePath)) return null;
+  if (!existsSync(filePath)) return Effect.succeed(null);
 
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8'));
-  } catch {
-    return null;
-  }
+  return Effect.tryPromise({
+    try: async () => JSON.parse(await readFile(filePath, 'utf-8')) as InspectCheckpointFile,
+    catch: (e) => new FsError({ path: filePath, operation: 'read', cause: e }),
+  }).pipe(Effect.catch(() => Effect.succeed(null)));
 }
 
 /**
  * Get the last checkpoint for an issue, or null if none exist.
  */
-export function getLastCheckpoint(projectKey: string, issueId: string): InspectCheckpoint | null {
-  const data = loadCheckpoints(projectKey, issueId);
-  if (!data || data.checkpoints.length === 0) return null;
-  return data.checkpoints[data.checkpoints.length - 1];
+export function getLastCheckpoint(
+  projectKey: string,
+  issueId: string,
+): Effect.Effect<InspectCheckpoint | null> {
+  return Effect.gen(function* () {
+    const data = yield* loadCheckpoints(projectKey, issueId);
+    if (!data || data.checkpoints.length === 0) return null;
+    return data.checkpoints[data.checkpoints.length - 1] ?? null;
+  });
 }
 
 /**
@@ -72,28 +82,39 @@ export function saveCheckpoint(
   projectKey: string,
   issueId: string,
   beadId: string,
-  commitSha: string
-): InspectCheckpoint {
-  const dir = getCheckpointDir(projectKey);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
+  commitSha: string,
+): Effect.Effect<InspectCheckpoint, FsError> {
+  return Effect.gen(function* () {
+    const dir = getCheckpointDir(projectKey);
+    if (!existsSync(dir)) {
+      yield* Effect.tryPromise({
+        try: () => mkdir(dir, { recursive: true }),
+        catch: (e) => new FsError({ path: dir, operation: 'mkdir', cause: e }),
+      });
+    }
 
-  const data = loadCheckpoints(projectKey, issueId) || {
-    issueId: issueId.toUpperCase(),
-    checkpoints: [],
-  };
+    const existing = yield* loadCheckpoints(projectKey, issueId);
+    const data: InspectCheckpointFile = existing ?? {
+      issueId: issueId.toUpperCase(),
+      checkpoints: [],
+    };
 
-  const checkpoint: InspectCheckpoint = {
-    beadId,
-    commitSha,
-    passedAt: new Date().toISOString(),
-  };
+    const checkpoint: InspectCheckpoint = {
+      beadId,
+      commitSha,
+      passedAt: new Date().toISOString(),
+    };
 
-  data.checkpoints.push(checkpoint);
-  writeFileSync(getCheckpointPath(projectKey, issueId), JSON.stringify(data, null, 2));
+    data.checkpoints.push(checkpoint);
 
-  return checkpoint;
+    const filePath = getCheckpointPath(projectKey, issueId);
+    yield* Effect.tryPromise({
+      try: () => writeFile(filePath, JSON.stringify(data, null, 2)),
+      catch: (e) => new FsError({ path: filePath, operation: 'write', cause: e }),
+    });
+
+    return checkpoint;
+  });
 }
 
 /**
@@ -104,52 +125,73 @@ export function saveCheckpoint(
  *
  * Returns the commit SHA or ref to diff from.
  */
-export async function getDiffBase(projectKey: string, issueId: string, workspacePath: string): Promise<string> {
-  const lastCheckpoint = getLastCheckpoint(projectKey, issueId);
+export function getDiffBase(
+  projectKey: string,
+  issueId: string,
+  workspacePath: string,
+): Effect.Effect<string> {
+  return Effect.gen(function* () {
+    const lastCheckpoint = yield* getLastCheckpoint(projectKey, issueId);
+    if (lastCheckpoint) {
+      return lastCheckpoint.commitSha;
+    }
 
-  if (lastCheckpoint) {
-    return lastCheckpoint.commitSha;
-  }
-
-  // No checkpoint — use the merge-base with main
-  try {
-    const { stdout } = await execAsync('git merge-base main HEAD', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return stdout.trim();
-  } catch {
-    // Fallback to 'main' if merge-base fails
-    return 'main';
-  }
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const { stdout } = await execAsync('git merge-base main HEAD', {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        });
+        return stdout.trim();
+      },
+      catch: (e) => new GitError({
+        command: ['git', 'merge-base', 'main', 'HEAD'],
+        stderr: String(e),
+        exitCode: 1,
+        cause: e,
+      }),
+    }).pipe(Effect.catch(() => Effect.succeed('main')));
+  });
 }
 
 /**
  * Get the diff stats (files changed, insertions, deletions) for the inspection scope.
  */
-export async function getDiffStats(workspacePath: string, diffBase: string): Promise<string> {
-  try {
-    const { stdout } = await execAsync(`git diff --stat ${diffBase}...HEAD`, {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return stdout.trim() || 'No changes detected';
-  } catch {
-    return 'Unable to compute diff stats';
-  }
+export function getDiffStats(workspacePath: string, diffBase: string): Effect.Effect<string> {
+  return Effect.tryPromise({
+    try: async () => {
+      const { stdout } = await execAsync(`git diff --stat ${diffBase}...HEAD`, {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+      });
+      return stdout.trim() || 'No changes detected';
+    },
+    catch: (e) => new GitError({
+      command: ['git', 'diff', '--stat', `${diffBase}...HEAD`],
+      stderr: String(e),
+      exitCode: 1,
+      cause: e,
+    }),
+  }).pipe(Effect.catch(() => Effect.succeed('Unable to compute diff stats')));
 }
 
 /**
  * Get the current HEAD commit SHA.
  */
-export async function getCurrentHead(workspacePath: string): Promise<string> {
-  try {
-    const { stdout } = await execAsync('git rev-parse HEAD', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return stdout.trim();
-  } catch {
-    return 'unknown';
-  }
+export function getCurrentHead(workspacePath: string): Effect.Effect<string> {
+  return Effect.tryPromise({
+    try: async () => {
+      const { stdout } = await execAsync('git rev-parse HEAD', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+      });
+      return stdout.trim();
+    },
+    catch: (e) => new GitError({
+      command: ['git', 'rev-parse', 'HEAD'],
+      stderr: String(e),
+      exitCode: 1,
+      cause: e,
+    }),
+  }).pipe(Effect.catch(() => Effect.succeed('unknown')));
 }

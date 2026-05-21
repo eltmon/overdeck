@@ -2,10 +2,11 @@
  * PAN-382: Tests for inspect checkpoint system
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, vi, beforeEach, afterEach } from 'vitest';
+import { it } from '@effect/vitest';
+import { Effect } from 'effect';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
 
 // Hoist mocks to avoid TDZ
 const TEST_HOME = vi.hoisted(() => {
@@ -62,126 +63,146 @@ describe('inspect-checkpoints', () => {
   });
 
   describe('loadCheckpoints', () => {
-    it('returns null when no checkpoint file exists', () => {
-      expect(loadCheckpoints(projectKey, issueId)).toBeNull();
-    });
+    it.effect('returns null when no checkpoint file exists', () =>
+      Effect.gen(function* () {
+        const result = yield* loadCheckpoints(projectKey, issueId);
+        expect(result).toBeNull();
+      })
+    );
 
-    it('loads existing checkpoints from file', () => {
-      const dir = join(TEST_HOME, '.panopticon', 'specialists', projectKey, 'inspect-agent', 'checkpoints');
-      mkdirSync(dir, { recursive: true });
-      const data = {
-        issueId: 'MIN-796',
-        checkpoints: [
-          { beadId: 'myn-80', commitSha: 'abc123', passedAt: '2026-03-22T10:00:00Z' },
-        ],
-      };
-      writeFileSync(join(dir, 'MIN-796.json'), JSON.stringify(data));
+    it.effect('loads existing checkpoints from file', () =>
+      Effect.gen(function* () {
+        const dir = join(TEST_HOME, '.panopticon', 'specialists', projectKey, 'inspect-agent', 'checkpoints');
+        mkdirSync(dir, { recursive: true });
+        const data = {
+          issueId: 'MIN-796',
+          checkpoints: [
+            { beadId: 'myn-80', commitSha: 'abc123', passedAt: '2026-03-22T10:00:00Z' },
+          ],
+        };
+        writeFileSync(join(dir, 'MIN-796.json'), JSON.stringify(data));
 
-      const result = loadCheckpoints(projectKey, issueId);
-      expect(result).not.toBeNull();
-      expect(result!.checkpoints).toHaveLength(1);
-      expect(result!.checkpoints[0].beadId).toBe('myn-80');
-    });
+        const result = yield* loadCheckpoints(projectKey, issueId);
+        expect(result).not.toBeNull();
+        expect(result!.checkpoints).toHaveLength(1);
+        expect(result!.checkpoints[0].beadId).toBe('myn-80');
+      })
+    );
   });
 
   describe('getLastCheckpoint', () => {
-    it('returns null when no checkpoints exist', () => {
-      expect(getLastCheckpoint(projectKey, issueId)).toBeNull();
-    });
+    it.effect('returns null when no checkpoints exist', () =>
+      Effect.gen(function* () {
+        const result = yield* getLastCheckpoint(projectKey, issueId);
+        expect(result).toBeNull();
+      })
+    );
 
-    it('returns the last checkpoint', () => {
-      // Save two checkpoints
-      saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
-      saveCheckpoint(projectKey, issueId, 'myn-81', 'def456');
+    it.effect('returns the last checkpoint', () =>
+      Effect.gen(function* () {
+        yield* saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
+        yield* saveCheckpoint(projectKey, issueId, 'myn-81', 'def456');
 
-      const last = getLastCheckpoint(projectKey, issueId);
-      expect(last).not.toBeNull();
-      expect(last!.beadId).toBe('myn-81');
-      expect(last!.commitSha).toBe('def456');
-    });
+        const last = yield* getLastCheckpoint(projectKey, issueId);
+        expect(last).not.toBeNull();
+        expect(last!.beadId).toBe('myn-81');
+        expect(last!.commitSha).toBe('def456');
+      })
+    );
   });
 
   describe('saveCheckpoint', () => {
-    it('creates checkpoint file if it does not exist', () => {
-      const checkpoint = saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
+    it.effect('creates checkpoint file if it does not exist', () =>
+      Effect.gen(function* () {
+        const checkpoint = yield* saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
 
-      expect(checkpoint.beadId).toBe('myn-80');
-      expect(checkpoint.commitSha).toBe('abc123');
-      expect(checkpoint.passedAt).toBeTruthy();
+        expect(checkpoint.beadId).toBe('myn-80');
+        expect(checkpoint.commitSha).toBe('abc123');
+        expect(checkpoint.passedAt).toBeTruthy();
 
-      const data = loadCheckpoints(projectKey, issueId);
-      expect(data!.checkpoints).toHaveLength(1);
-    });
+        const data = yield* loadCheckpoints(projectKey, issueId);
+        expect(data!.checkpoints).toHaveLength(1);
+      })
+    );
 
-    it('appends to existing checkpoints', () => {
-      saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
-      saveCheckpoint(projectKey, issueId, 'myn-81', 'def456');
-      saveCheckpoint(projectKey, issueId, 'myn-82', 'ghi789');
+    it.effect('appends to existing checkpoints', () =>
+      Effect.gen(function* () {
+        yield* saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
+        yield* saveCheckpoint(projectKey, issueId, 'myn-81', 'def456');
+        yield* saveCheckpoint(projectKey, issueId, 'myn-82', 'ghi789');
 
-      const data = loadCheckpoints(projectKey, issueId);
-      expect(data!.checkpoints).toHaveLength(3);
-      expect(data!.checkpoints[2].beadId).toBe('myn-82');
-    });
+        const data = yield* loadCheckpoints(projectKey, issueId);
+        expect(data!.checkpoints).toHaveLength(3);
+        expect(data!.checkpoints[2].beadId).toBe('myn-82');
+      })
+    );
   });
 
   describe('getDiffBase', () => {
-    it('uses merge-base when no checkpoint exists', async () => {
-      execSyncMock.mockReturnValue('abc123def456\n');
+    it.effect('uses merge-base when no checkpoint exists', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockReturnValue('abc123def456\n');
+        const base = yield* getDiffBase(projectKey, issueId, '/tmp/workspace');
+        expect(base).toBe('abc123def456');
+      })
+    );
 
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('abc123def456');
-    });
+    it.effect('uses last checkpoint SHA when checkpoints exist', () =>
+      Effect.gen(function* () {
+        yield* saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
+        const base = yield* getDiffBase(projectKey, issueId, '/tmp/workspace');
+        expect(base).toBe('checkpoint-sha');
+      })
+    );
 
-    it('uses last checkpoint SHA when checkpoints exist', async () => {
-      saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
-
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('checkpoint-sha');
-    });
-
-    it('falls back to main when merge-base fails', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('not a git repo');
-      });
-
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('main');
-    });
+    it.effect('falls back to main when merge-base fails', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockImplementation(() => {
+          throw new Error('not a git repo');
+        });
+        const base = yield* getDiffBase(projectKey, issueId, '/tmp/workspace');
+        expect(base).toBe('main');
+      })
+    );
   });
 
   describe('getDiffStats', () => {
-    it('returns diff stats from git', async () => {
-      execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
+    it.effect('returns diff stats from git', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
+        const stats = yield* getDiffStats('/tmp/workspace', 'abc123');
+        expect(stats).toContain('3 files changed');
+      })
+    );
 
-      const stats = await getDiffStats('/tmp/workspace', 'abc123');
-      expect(stats).toContain('3 files changed');
-    });
-
-    it('returns fallback message on error', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('git error');
-      });
-
-      const stats = await getDiffStats('/tmp/workspace', 'abc123');
-      expect(stats).toBe('Unable to compute diff stats');
-    });
+    it.effect('returns fallback message on error', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockImplementation(() => {
+          throw new Error('git error');
+        });
+        const stats = yield* getDiffStats('/tmp/workspace', 'abc123');
+        expect(stats).toBe('Unable to compute diff stats');
+      })
+    );
   });
 
   describe('getCurrentHead', () => {
-    it('returns HEAD sha', async () => {
-      execSyncMock.mockReturnValue('abc123def456\n');
+    it.effect('returns HEAD sha', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockReturnValue('abc123def456\n');
+        const head = yield* getCurrentHead('/tmp/workspace');
+        expect(head).toBe('abc123def456');
+      })
+    );
 
-      const head = await getCurrentHead('/tmp/workspace');
-      expect(head).toBe('abc123def456');
-    });
-
-    it('returns unknown on error', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('not a git repo');
-      });
-
-      const head = await getCurrentHead('/tmp/workspace');
-      expect(head).toBe('unknown');
-    });
+    it.effect('returns unknown on error', () =>
+      Effect.gen(function* () {
+        execSyncMock.mockImplementation(() => {
+          throw new Error('not a git repo');
+        });
+        const head = yield* getCurrentHead('/tmp/workspace');
+        expect(head).toBe('unknown');
+      })
+    );
   });
 });

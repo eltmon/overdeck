@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import {
   getDiffBase,
   getDiffStats,
@@ -111,8 +112,8 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
   const beadDescription = await getBeadDescription(context.beadId, context.workspace);
 
   // Get diff scope
-  const diffBase = await getDiffBase(context.projectKey, context.issueId, context.workspace);
-  const diffStats = await getDiffStats(context.workspace, diffBase);
+  const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
+  const diffStats = await Effect.runPromise(getDiffStats(context.workspace, diffBase));
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
@@ -271,8 +272,8 @@ export async function onInspectComplete(
   workspacePath: string
 ): Promise<void> {
   if (status === 'passed') {
-    const commitSha = await getCurrentHead(workspacePath);
-    saveCheckpoint(projectKey, issueId, beadId, commitSha);
+    const commitSha = await Effect.runPromise(getCurrentHead(workspacePath));
+    await Effect.runPromise(saveCheckpoint(projectKey, issueId, beadId, commitSha));
     console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
 
   } else {
