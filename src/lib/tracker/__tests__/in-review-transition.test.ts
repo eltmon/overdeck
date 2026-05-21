@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import { GitHubTracker } from '../github.js';
 import { LinearTracker } from '../linear.js';
 
@@ -39,7 +40,7 @@ describe('GitHubTracker.transitionIssue(in_review)', () => {
     addLabelsMock = vi.fn().mockResolvedValue({});
     removeLabelMock = vi.fn().mockResolvedValue({});
     getLabelMock = vi.fn().mockResolvedValue({}); // label exists
-    getIssueMock = vi.fn().mockResolvedValue(makeIssue(['in-progress']));
+    getIssueMock = vi.fn().mockReturnValue(Effect.succeed(makeIssue(['in-progress'])));
 
     tracker = new GitHubTracker('fake-token', 'owner', 'repo');
 
@@ -56,32 +57,34 @@ describe('GitHubTracker.transitionIssue(in_review)', () => {
   });
 
   it('adds in-review label', async () => {
-    await tracker.transitionIssue('1', 'in_review');
+    await Effect.runPromise(tracker.transitionIssue('1', 'in_review'));
     expect(addLabelsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ labels: ['in-review'] })
+      expect.objectContaining({ labels: ['in-review'] }),
     );
   });
 
   it('removes in-progress label when it is present', async () => {
-    await tracker.transitionIssue('1', 'in_review');
+    await Effect.runPromise(tracker.transitionIssue('1', 'in_review'));
     expect(removeLabelMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'in-progress' })
+      expect.objectContaining({ name: 'in-progress' }),
     );
   });
 
   it('does not throw when in-progress label is absent and removeLabel fails', async () => {
-    getIssueMock.mockResolvedValue(makeIssue([]));
+    getIssueMock.mockReturnValue(Effect.succeed(makeIssue([])));
     removeLabelMock.mockRejectedValue(new Error('Label not found'));
-    // Should not throw — removeLabel errors are swallowed
-    await expect(tracker.transitionIssue('1', 'in_review')).resolves.not.toThrow();
+    // Should not throw — removeLabel errors are swallowed by orElseSucceed
+    await expect(
+      Effect.runPromise(tracker.transitionIssue('1', 'in_review')),
+    ).resolves.not.toThrow();
   });
 
   it('adds in-review label for issue with no prior labels', async () => {
-    getIssueMock.mockResolvedValue(makeIssue([]));
+    getIssueMock.mockReturnValue(Effect.succeed(makeIssue([])));
     removeLabelMock.mockRejectedValue(new Error('Label not found'));
-    await tracker.transitionIssue('1', 'in_review');
+    await Effect.runPromise(tracker.transitionIssue('1', 'in_review'));
     expect(addLabelsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ labels: ['in-review'] })
+      expect.objectContaining({ labels: ['in-review'] }),
     );
   });
 });
@@ -94,7 +97,9 @@ describe('LinearTracker.transitionIssue(in_review)', () => {
   let updateIssueMock: ReturnType<typeof vi.fn>;
   let tracker: LinearTracker;
 
-  const makeTeamStates = (states: Array<{ id: string; name: string; type: string; position: number }>) => ({
+  const makeTeamStates = (
+    states: Array<{ id: string; name: string; type: string; position: number }>,
+  ) => ({
     nodes: states,
   });
 
@@ -135,9 +140,13 @@ describe('LinearTracker.transitionIssue(in_review)', () => {
     ]);
     (tracker as any).client.issue = vi.fn().mockResolvedValue(makeLinearIssue(states));
 
-    await tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review');
+    await Effect.runPromise(
+      tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review'),
+    );
 
-    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, { stateId: 'state-in-review' });
+    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, {
+      stateId: 'state-in-review',
+    });
   });
 
   it('falls back to lowest-position started state when no "In Review" state exists', async () => {
@@ -147,10 +156,14 @@ describe('LinearTracker.transitionIssue(in_review)', () => {
     ]);
     (tracker as any).client.issue = vi.fn().mockResolvedValue(makeLinearIssue(states));
 
-    await tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review');
+    await Effect.runPromise(
+      tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review'),
+    );
 
     // Should pick the lowest-position started state
-    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, { stateId: 'state-started-1' });
+    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, {
+      stateId: 'state-started-1',
+    });
   });
 
   it('is case-insensitive when matching "In Review" state name', async () => {
@@ -159,9 +172,13 @@ describe('LinearTracker.transitionIssue(in_review)', () => {
     ]);
     (tracker as any).client.issue = vi.fn().mockResolvedValue(makeLinearIssue(states));
 
-    await tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review');
+    await Effect.runPromise(
+      tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review'),
+    );
 
-    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, { stateId: 'state-in-review' });
+    expect(updateIssueMock).toHaveBeenCalledWith(LINEAR_ISSUE_UUID, {
+      stateId: 'state-in-review',
+    });
   });
 
   it('throws when no started states exist at all', async () => {
@@ -170,9 +187,9 @@ describe('LinearTracker.transitionIssue(in_review)', () => {
     ]);
     (tracker as any).client.issue = vi.fn().mockResolvedValue(makeLinearIssue(states));
 
-    await expect(tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review')).rejects.toThrow(
-      /No "In Review" or "started" state found/
-    );
+    await expect(
+      Effect.runPromise(tracker.transitionIssue(LINEAR_ISSUE_UUID, 'in_review')),
+    ).rejects.toThrow(/No "In Review" or "started" state found/);
   });
 });
 

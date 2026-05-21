@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import { RallyTracker } from '../rally.js';
 
 const mockQuery = vi.fn();
@@ -6,12 +7,14 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
 vi.mock('../rally-api.js', () => ({
-  RallyRestApi: vi.fn().mockImplementation(function () { return {
-    query: mockQuery,
-    create: mockCreate,
-    update: mockUpdate,
-    server: 'https://rally1.rallydev.com',
-  }; }),
+  RallyRestApi: vi.fn().mockImplementation(function () {
+    return {
+      query: mockQuery,
+      create: mockCreate,
+      update: mockUpdate,
+      server: 'https://rally1.rallydev.com',
+    };
+  }),
 }));
 
 describe('RallyTracker.getChildIssues', () => {
@@ -27,16 +30,18 @@ describe('RallyTracker.getChildIssues', () => {
       project: '/project/456',
     });
 
-    mockQuery.mockResolvedValue({
-      QueryResult: {
-        Results: [],
-        TotalResultCount: 0,
-        Errors: [],
-        Warnings: [],
-      },
-    });
+    mockQuery.mockReturnValue(
+      Effect.succeed({
+        QueryResult: {
+          Results: [],
+          TotalResultCount: 0,
+          Errors: [],
+          Warnings: [],
+        },
+      }),
+    );
 
-    const result = await tracker.getChildIssues('F123');
+    const result = await Effect.runPromise(tracker.getChildIssues('F123'));
 
     expect(result).toEqual([]);
     expect(mockQuery).toHaveBeenCalledTimes(2);
@@ -64,7 +69,7 @@ describe('RallyTracker.getChildIssues', () => {
 
     mockQuery.mockImplementation((config: any) => {
       if (config.type === 'hierarchicalrequirement') {
-        return Promise.resolve({
+        return Effect.succeed({
           QueryResult: {
             Results: [
               {
@@ -96,12 +101,12 @@ describe('RallyTracker.getChildIssues', () => {
         });
       }
       // defect query returns empty
-      return Promise.resolve({
+      return Effect.succeed({
         QueryResult: { Results: [], TotalResultCount: 0, Errors: [], Warnings: [] },
       });
     });
 
-    const result = await tracker.getChildIssues('F123');
+    const result = await Effect.runPromise(tracker.getChildIssues('F123'));
 
     expect(result).toHaveLength(2);
     expect(result[0].ref).toBe('US100');
@@ -121,9 +126,19 @@ describe('RallyTracker.getChildIssues', () => {
       project: '/project/456',
     });
 
-    mockQuery.mockRejectedValue(new Error('Network error'));
+    mockQuery.mockReturnValue(
+      Effect.fail(
+        // Use a TrackerError so the per-type catchTag swallows it (matches production
+        // behaviour where downstream RallyRestApi only emits TrackerError | TrackerAuthError).
+        new (await import('../../errors.js')).TrackerError({
+          tracker: 'rally',
+          operation: 'test',
+          message: 'Network error',
+        }),
+      ),
+    );
 
-    const result = await tracker.getChildIssues('F123');
+    const result = await Effect.runPromise(tracker.getChildIssues('F123'));
     expect(result).toEqual([]);
   });
 });

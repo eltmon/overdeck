@@ -5,6 +5,7 @@
  * Supports all Rally work item types: User Stories, Defects, Tasks, and Features.
  */
 
+import { Effect } from 'effect';
 import { RallyRestApi } from './rally-api.js';
 import type {
   Issue,
@@ -16,7 +17,8 @@ import type {
   Comment,
   TrackerType,
 } from './interface.js';
-import { IssueNotFoundError, TrackerAuthError, NotImplementedError } from './interface.js';
+import { IssueNotFoundError, TrackerAuthError } from './interface.js';
+import { TrackerError } from '../errors.js';
 
 // Map Rally ScheduleState/State to normalized IssueState.
 // Covers all standard states for User Stories, Defects, Tasks, and Features.
@@ -40,9 +42,6 @@ const STATE_MAP: Record<string, IssueState> = {
   'Developing': 'in_progress',
   'Done': 'closed',
 };
-
-// Rally artifact types we support
-type RallyArtifactType = 'HierarchicalRequirement' | 'Defect' | 'Task' | 'PortfolioItem/Feature';
 
 /**
  * Type-specific query configuration.
@@ -125,6 +124,9 @@ export interface RallyConfig {
   project?: string; // Rally project OID (e.g., "/project/67890")
 }
 
+const trackerErr = (operation: string, message: string, cause?: unknown) =>
+  new TrackerError({ tracker: 'rally', operation, message, cause });
+
 export class RallyTracker implements IssueTracker {
   readonly name: TrackerType = 'rally' as TrackerType;
   private restApi: RallyRestApi;
@@ -133,7 +135,10 @@ export class RallyTracker implements IssueTracker {
 
   constructor(config: RallyConfig) {
     if (!config.apiKey) {
-      throw new TrackerAuthError('rally' as TrackerType, 'API key is required');
+      throw new TrackerAuthError({
+        tracker: 'rally',
+        message: 'API key is required',
+      });
     }
 
     this.restApi = new RallyRestApi({
@@ -160,7 +165,10 @@ export class RallyTracker implements IssueTracker {
    * endpoint because not all subtypes have that field. We query each type with
    * its own state field, then merge and sort. (PAN-168)
    */
-  async listIssues(filters?: IssueFilters): Promise<Issue[]> {
+  listIssues(
+    filters?: IssueFilters,
+  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError> {
+    const self = this;
     if (process.env.DEBUG?.includes('rally')) {
       console.debug('[Rally] Query filters:', JSON.stringify(filters));
     }
@@ -170,15 +178,19 @@ export class RallyTracker implements IssueTracker {
     // Extract ObjectID from project ref for explicit query scoping
     // e.g., "/project/822404704163" → "822404704163"
     let projectObjectId: string | undefined;
-    if (this.project) {
-      const match = this.project.match(/\/project\/(\d+)/);
+    if (self.project) {
+      const match = self.project.match(/\/project\/(\d+)/);
       if (match) projectObjectId = match[1];
     }
 
     const perTypeLimit = Math.ceil(limit / QUERYABLE_TYPES.length) * 2;
 
-    const queries = QUERYABLE_TYPES.map(async (artifactType) => {
-      const queryString = this.buildQueryStringForType(filters, artifactType, projectObjectId);
+    const typeQueries = QUERYABLE_TYPES.map((artifactType) => {
+      const queryString = self.buildQueryStringForType(
+        filters,
+        artifactType,
+        projectObjectId,
+      );
 
       if (process.env.DEBUG?.includes('rally')) {
         console.debug(`[Rally] ${artifactType.type} query:`, queryString);
@@ -191,89 +203,98 @@ export class RallyTracker implements IssueTracker {
         query: queryString,
       };
 
-      if (this.workspace) {
-        query.workspace = this.workspace;
-      }
-      if (this.project) {
-        query.project = this.project;
+      if (self.workspace) query.workspace = self.workspace;
+      if (self.project) {
+        query.project = self.project;
         query.projectScopeDown = true;
       }
 
-      try {
-        const result = await this.queryRally(query);
-        return result.Results.map((artifact: any) => this.normalizeIssue(artifact));
-      } catch (error: any) {
-        if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-          throw new TrackerAuthError('rally' as TrackerType, 'Invalid API key or insufficient permissions');
-        }
-        // Log and skip individual type failures so other types still return
-        if (process.env.DEBUG?.includes('rally')) {
-          console.debug(`[Rally] Failed to query ${artifactType.type}:`, error.message);
-        }
-        return [];
-      }
+      return self.restApi.query(query).pipe(
+        Effect.map((result) =>
+          result.QueryResult.Results.map((artifact: any) =>
+            self.normalizeIssue(artifact),
+          ),
+        ),
+        // Log + swallow per-type errors so other types still return.
+        // Auth errors propagate up.
+        Effect.catchTag('TrackerError', (err) => {
+          if (process.env.DEBUG?.includes('rally')) {
+            console.debug(
+              `[Rally] Failed to query ${artifactType.type}:`,
+              err.message,
+            );
+          }
+          return Effect.succeed([] as Issue[]);
+        }),
+      );
     });
 
-    const results = await Promise.all(queries);
-    const allIssues = results.flat();
-
-    // Sort by most recently updated first, then apply overall limit
-    allIssues.sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    return Effect.all(typeQueries, { concurrency: 'unbounded' }).pipe(
+      Effect.map((results) => {
+        const allIssues = results.flat();
+        allIssues.sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        );
+        return allIssues.slice(0, limit);
+      }),
     );
-
-    return allIssues.slice(0, limit);
   }
 
-  async getIssue(id: string): Promise<Issue> {
+  getIssue(
+    id: string,
+  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError> {
+    const self = this;
     if (!validateRallyId(id)) {
-      throw new IssueNotFoundError(id, 'rally' as TrackerType);
+      return Effect.fail(new IssueNotFoundError({ id, tracker: 'rally' }));
     }
-    try {
-      // Rally FormattedIDs look like: US123, DE456, TA789, F012
-      const query: any = {
-        type: 'artifact',
-        fetch: [
-          'FormattedID',
-          'Name',
-          'Description',
-          'ScheduleState',
-          'State',
-          'Tags',
-          'Owner',
-          'Priority',
-          'DueDate',
-          'CreationDate',
-          'LastUpdateDate',
-          'Parent',
-          '_type',
-        ],
-        query: `(FormattedID = "${escapeQueryValue(id)}")`,
-      };
 
-      if (this.workspace) {
-        query.workspace = this.workspace;
-      }
+    const query: any = {
+      type: 'artifact',
+      fetch: [
+        'FormattedID',
+        'Name',
+        'Description',
+        'ScheduleState',
+        'State',
+        'Tags',
+        'Owner',
+        'Priority',
+        'DueDate',
+        'CreationDate',
+        'LastUpdateDate',
+        'Parent',
+        '_type',
+      ],
+      query: `(FormattedID = "${escapeQueryValue(id)}")`,
+    };
 
-      const result = await this.queryRally(query);
+    if (self.workspace) query.workspace = self.workspace;
 
-      if (!result.Results || result.Results.length === 0) {
-        throw new IssueNotFoundError(id, 'rally' as TrackerType);
-      }
-
-      return this.normalizeIssue(result.Results[0]);
-    } catch (error: any) {
-      if (error instanceof IssueNotFoundError) throw error;
-      throw new IssueNotFoundError(id, 'rally' as TrackerType);
-    }
+    return self.restApi.query(query).pipe(
+      Effect.flatMap((result) => {
+        if (!result.QueryResult.Results || result.QueryResult.Results.length === 0) {
+          return Effect.fail(new IssueNotFoundError({ id, tracker: 'rally' }));
+        }
+        return Effect.succeed(self.normalizeIssue(result.QueryResult.Results[0]));
+      }),
+      // Preserve legacy behaviour: convert generic API failures to not-found.
+      Effect.catchTag('TrackerError', () =>
+        Effect.fail(new IssueNotFoundError({ id, tracker: 'rally' })),
+      ),
+    );
   }
 
-  async updateIssue(id: string, update: IssueUpdate): Promise<Issue> {
+  updateIssue(
+    id: string,
+    update: IssueUpdate,
+  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError> {
+    const self = this;
+
     if (!validateRallyId(id)) {
-      throw new IssueNotFoundError(id, 'rally' as TrackerType);
+      return Effect.fail(new IssueNotFoundError({ id, tracker: 'rally' }));
     }
 
-    // Single query: fetch display fields + ObjectID/_ref/_type needed for update
     const query: any = {
       type: 'artifact',
       fetch: [
@@ -284,66 +305,88 @@ export class RallyTracker implements IssueTracker {
       query: `(FormattedID = "${escapeQueryValue(id)}")`,
     };
 
-    if (this.workspace) {
-      query.workspace = this.workspace;
-    }
+    if (self.workspace) query.workspace = self.workspace;
 
-    const result = await this.queryRally(query);
-    if (!result.Results || result.Results.length === 0) {
-      throw new IssueNotFoundError(id, 'rally' as TrackerType);
-    }
+    return self.restApi.query(query).pipe(
+      Effect.flatMap((result): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError> => {
+        if (!result.QueryResult.Results || result.QueryResult.Results.length === 0) {
+          return Effect.fail(new IssueNotFoundError({ id, tracker: 'rally' }));
+        }
 
-    const artifact = result.Results[0];
-    const updatePayload: Record<string, unknown> = {};
+        const artifact = result.QueryResult.Results[0];
+        const updatePayload: Record<string, unknown> = {};
 
-    if (update.title !== undefined) {
-      updatePayload.Name = update.title;
-    }
-    if (update.description !== undefined) {
-      updatePayload.Description = update.description;
-    }
-    if (update.state !== undefined) {
-      const artifactType = (artifact._type || '').toLowerCase();
-      const kind = artifactType.startsWith('portfolioitem') ? 'feature'
-        : artifactType === 'defect' ? 'defect' : 'story';
-      const rallyState = this.reverseMapState(update.state, kind);
-      if (kind === 'story') {
-        updatePayload.ScheduleState = rallyState;
-      } else {
-        updatePayload.State = rallyState;
-      }
-    }
-    if (update.priority !== undefined) {
-      updatePayload.Priority = REVERSE_PRIORITY_MAP[update.priority] || 'Normal';
-    }
-    if (update.dueDate !== undefined) {
-      updatePayload.DueDate = update.dueDate;
-    }
+        if (update.title !== undefined) updatePayload.Name = update.title;
+        if (update.description !== undefined) updatePayload.Description = update.description;
+        if (update.state !== undefined) {
+          const artifactType = (artifact._type || '').toLowerCase();
+          const kind = artifactType.startsWith('portfolioitem') ? 'feature'
+            : artifactType === 'defect' ? 'defect' : 'story';
+          const rallyState = self.reverseMapState(update.state, kind);
+          if (kind === 'story') {
+            updatePayload.ScheduleState = rallyState;
+          } else {
+            updatePayload.State = rallyState;
+          }
+        }
+        if (update.priority !== undefined) {
+          updatePayload.Priority = REVERSE_PRIORITY_MAP[update.priority] || 'Normal';
+        }
+        if (update.dueDate !== undefined) {
+          updatePayload.DueDate = update.dueDate;
+        }
 
-    if (Object.keys(updatePayload).length > 0) {
-      await this.updateRally(artifact._type.toLowerCase(), artifact._ref, updatePayload);
-    }
+        const applyUpdate: Effect.Effect<void, TrackerError> =
+          Object.keys(updatePayload).length > 0
+            ? self.restApi
+                .update({
+                  type: artifact._type.toLowerCase(),
+                  ref: artifact._ref,
+                  data: updatePayload,
+                  fetch: ['FormattedID', 'ObjectID'],
+                })
+                .pipe(Effect.asVoid)
+            : Effect.succeed(undefined);
 
-    // Reconstruct the normalized issue from the pre-update artifact merged with
-    // the update payload — avoids an extra ~300ms WSAPI round-trip.
-    const updatedArtifact = { ...artifact };
-    if (updatePayload.Name !== undefined) updatedArtifact.Name = updatePayload.Name;
-    if (updatePayload.Description !== undefined) updatedArtifact.Description = updatePayload.Description;
-    if (updatePayload.ScheduleState !== undefined) updatedArtifact.ScheduleState = updatePayload.ScheduleState;
-    if (updatePayload.State !== undefined) updatedArtifact.State = updatePayload.State;
-    if (updatePayload.Priority !== undefined) updatedArtifact.Priority = updatePayload.Priority;
-    if (updatePayload.DueDate !== undefined) updatedArtifact.DueDate = updatePayload.DueDate;
-    return this.normalizeIssue(updatedArtifact);
+        return applyUpdate.pipe(
+          Effect.map(() => {
+            // Reconstruct the normalized issue from the pre-update artifact merged
+            // with the update payload to avoid an extra WSAPI round-trip.
+            const updatedArtifact = { ...artifact };
+            if (updatePayload.Name !== undefined) updatedArtifact.Name = updatePayload.Name;
+            if (updatePayload.Description !== undefined)
+              updatedArtifact.Description = updatePayload.Description;
+            if (updatePayload.ScheduleState !== undefined)
+              updatedArtifact.ScheduleState = updatePayload.ScheduleState;
+            if (updatePayload.State !== undefined)
+              updatedArtifact.State = updatePayload.State;
+            if (updatePayload.Priority !== undefined)
+              updatedArtifact.Priority = updatePayload.Priority;
+            if (updatePayload.DueDate !== undefined)
+              updatedArtifact.DueDate = updatePayload.DueDate;
+            return self.normalizeIssue(updatedArtifact);
+          }),
+        );
+      }),
+    );
   }
 
-  async createIssue(newIssue: NewIssue): Promise<Issue> {
-    if (!this.project && !newIssue.team) {
-      throw new Error('Project is required to create an issue. Set it in config or provide team field.');
+  createIssue(
+    newIssue: NewIssue,
+  ): Effect.Effect<Issue, TrackerError | TrackerAuthError> {
+    const self = this;
+
+    if (!self.project && !newIssue.team) {
+      return Effect.fail(
+        trackerErr(
+          'createIssue',
+          'Project is required to create an issue. Set it in config or provide team field.',
+        ),
+      );
     }
 
-    const project = newIssue.team || this.project;
+    const project = newIssue.team || self.project;
 
-    // Default to HierarchicalRequirement (User Story) for new issues
     const createPayload: Record<string, unknown> = {
       Name: newIssue.title,
       Description: newIssue.description || '',
@@ -356,141 +399,165 @@ export class RallyTracker implements IssueTracker {
     if (newIssue.dueDate) {
       createPayload.DueDate = newIssue.dueDate;
     }
-    if (this.workspace) {
-      createPayload.Workspace = this.workspace;
+    if (self.workspace) {
+      createPayload.Workspace = self.workspace;
     }
 
-    const result = await this.createRally('hierarchicalrequirement', createPayload);
-
-    // Fetch the created issue to return normalized format
-    return this.getIssue(result.Object.FormattedID);
+    return self.restApi
+      .create({
+        type: 'hierarchicalrequirement',
+        data: createPayload,
+        fetch: ['FormattedID', 'ObjectID', '_ref'],
+      })
+      .pipe(
+        Effect.flatMap((result) =>
+          self.getIssue(result.CreateResult.Object.FormattedID).pipe(
+            // getIssue surfaces IssueNotFoundError; map to TrackerError for the
+            // narrower error type expected by createIssue's signature.
+            Effect.catchTag('IssueNotFoundError', (err) =>
+              Effect.fail(
+                trackerErr(
+                  'createIssue:fetchCreated',
+                  `Created issue ${err.id} but could not refetch it`,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
   }
 
-  async getComments(issueId: string): Promise<Comment[]> {
+  getComments(
+    issueId: string,
+  ): Effect.Effect<Comment[], TrackerError | TrackerAuthError> {
+    const self = this;
+
     if (!validateRallyId(issueId)) {
-      return [];
+      return Effect.succeed([]);
     }
 
-    // Get the Rally object to find its Discussion
     const query: any = {
       type: 'artifact',
       fetch: ['ObjectID', '_ref', 'Discussion'],
       query: `(FormattedID = "${escapeQueryValue(issueId)}")`,
     };
 
-    if (this.workspace) {
-      query.workspace = this.workspace;
-    }
+    if (self.workspace) query.workspace = self.workspace;
 
-    const result = await this.queryRally(query);
-    if (!result.Results || result.Results.length === 0) {
-      return [];
-    }
+    return self.restApi.query(query).pipe(
+      Effect.flatMap((result) => {
+        if (!result.QueryResult.Results || result.QueryResult.Results.length === 0) {
+          return Effect.succeed([] as Comment[]);
+        }
 
-    const artifact = result.Results[0];
-    if (!artifact.Discussion) {
-      return [];
-    }
+        const artifact = result.QueryResult.Results[0];
+        if (!artifact.Discussion) {
+          return Effect.succeed([] as Comment[]);
+        }
 
-    // Query ConversationPosts for this Discussion
-    const postsQuery: any = {
-      type: 'conversationpost',
-      fetch: ['ObjectID', 'Text', 'User', 'CreationDate', 'PostNumber'],
-      query: `(Discussion = "${artifact.Discussion._ref}")`,
-      order: 'PostNumber',
-    };
+        const postsQuery: any = {
+          type: 'conversationpost',
+          fetch: ['ObjectID', 'Text', 'User', 'CreationDate', 'PostNumber'],
+          query: `(Discussion = "${artifact.Discussion._ref}")`,
+          order: 'PostNumber',
+        };
 
-    const postsResult = await this.queryRally(postsQuery);
-
-    return (postsResult.Results || []).map((post: any) => ({
-      id: post.ObjectID,
-      issueId,
-      body: post.Text || '',
-      author: post.User?._refObjectName || 'Unknown',
-      createdAt: post.CreationDate,
-      updatedAt: post.CreationDate, // Rally doesn't track comment updates separately
-    }));
+        return self.restApi.query(postsQuery).pipe(
+          Effect.map((postsResult) =>
+            (postsResult.QueryResult.Results || []).map((post: any) => ({
+              id: post.ObjectID,
+              issueId,
+              body: post.Text || '',
+              author: post.User?._refObjectName || 'Unknown',
+              createdAt: post.CreationDate,
+              updatedAt: post.CreationDate, // Rally doesn't track comment updates separately
+            })),
+          ),
+        );
+      }),
+    );
   }
 
-  async addComment(issueId: string, body: string): Promise<Comment> {
+  addComment(
+    issueId: string,
+    body: string,
+  ): Effect.Effect<Comment, TrackerError | TrackerAuthError> {
+    const self = this;
+
     if (!validateRallyId(issueId)) {
-      throw new IssueNotFoundError(issueId, 'rally' as TrackerType);
+      return Effect.fail(
+        trackerErr('addComment', `Invalid Rally id: ${issueId}`),
+      );
     }
 
-    // Get the Rally object to find its Discussion
     const query: any = {
       type: 'artifact',
       fetch: ['ObjectID', '_ref', 'Discussion'],
       query: `(FormattedID = "${escapeQueryValue(issueId)}")`,
     };
 
-    if (this.workspace) {
-      query.workspace = this.workspace;
-    }
+    if (self.workspace) query.workspace = self.workspace;
 
-    const result = await this.queryRally(query);
-    if (!result.Results || result.Results.length === 0) {
-      throw new IssueNotFoundError(issueId, 'rally' as TrackerType);
-    }
+    return self.restApi.query(query).pipe(
+      Effect.flatMap((result) => {
+        if (!result.QueryResult.Results || result.QueryResult.Results.length === 0) {
+          return Effect.fail(
+            trackerErr('addComment', `Issue not found: ${issueId}`),
+          );
+        }
 
-    const artifact = result.Results[0];
+        const artifact = result.QueryResult.Results[0];
 
-    // If no Discussion exists, create one
-    let discussionRef = artifact.Discussion?._ref;
-    if (!discussionRef) {
-      const discussionResult = await this.createRally('conversationpost', {
-        Artifact: artifact._ref,
-        Text: body,
-      });
-
-      return {
-        id: discussionResult.Object.ObjectID,
-        issueId,
-        body,
-        author: 'Panopticon',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
-
-    // Add a post to existing Discussion
-    const postResult = await this.createRally('conversationpost', {
-      Artifact: artifact._ref,
-      Text: body,
-    });
-
-    return {
-      id: postResult.Object.ObjectID,
-      issueId,
-      body,
-      author: 'Panopticon',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+        return self.restApi
+          .create({
+            type: 'conversationpost',
+            data: { Artifact: artifact._ref, Text: body },
+            fetch: ['FormattedID', 'ObjectID', '_ref'],
+          })
+          .pipe(
+            Effect.map((postResult) => ({
+              id: postResult.CreateResult.Object.ObjectID,
+              issueId,
+              body,
+              author: 'Panopticon',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })),
+          );
+      }),
+    );
   }
 
-  async transitionIssue(id: string, state: IssueState): Promise<void> {
-    await this.updateIssue(id, { state });
+  transitionIssue(
+    id: string,
+    state: IssueState,
+  ): Effect.Effect<void, IssueNotFoundError | TrackerError | TrackerAuthError> {
+    return this.updateIssue(id, { state }).pipe(Effect.asVoid);
   }
 
-  async linkPR(issueId: string, prUrl: string): Promise<void> {
-    // Add a comment with the PR link
-    await this.addComment(issueId, `Linked Pull Request: ${prUrl}`);
+  linkPR(
+    issueId: string,
+    prUrl: string,
+  ): Effect.Effect<void, TrackerError | TrackerAuthError> {
+    return this.addComment(issueId, `Linked Pull Request: ${prUrl}`).pipe(
+      Effect.asVoid,
+    );
   }
 
-  async getChildIssues(parentId: string): Promise<Issue[]> {
+  getChildIssues(
+    parentId: string,
+  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError> {
+    const self = this;
     if (!validateRallyId(parentId)) {
-      return [];
+      return Effect.succeed([]);
     }
 
-    // Query Rally for HierarchicalRequirement and Defect artifacts
-    // whose PortfolioItem matches the given feature FormattedID.
     const childTypes = [
       { type: 'hierarchicalrequirement', stateField: 'ScheduleState' },
       { type: 'defect', stateField: 'State' },
     ];
 
-    const queries = childTypes.map(async (childType) => {
+    const queries = childTypes.map((childType) => {
       const query: any = {
         type: childType.type,
         fetch: FETCH_FIELDS,
@@ -498,32 +565,37 @@ export class RallyTracker implements IssueTracker {
         limit: 200,
       };
 
-      if (this.workspace) {
-        query.workspace = this.workspace;
-      }
-      if (this.project) {
-        query.project = this.project;
+      if (self.workspace) query.workspace = self.workspace;
+      if (self.project) {
+        query.project = self.project;
         query.projectScopeDown = true;
       }
 
-      try {
-        const result = await this.queryRally(query);
-        return result.Results.map((artifact: any) => this.normalizeIssue(artifact));
-      } catch (error: any) {
-        if (process.env.DEBUG?.includes('rally')) {
-          console.debug(`[Rally] Failed to query ${childType.type} children:`, error.message);
-        }
-        return [];
-      }
+      return self.restApi.query(query).pipe(
+        Effect.map((result) =>
+          result.QueryResult.Results.map((artifact: any) =>
+            self.normalizeIssue(artifact),
+          ),
+        ),
+        Effect.catchTag('TrackerError', (err) => {
+          if (process.env.DEBUG?.includes('rally')) {
+            console.debug(
+              `[Rally] Failed to query ${childType.type} children:`,
+              err.message,
+            );
+          }
+          return Effect.succeed([] as Issue[]);
+        }),
+      );
     });
 
-    const results = await Promise.all(queries);
-    const allChildren = results.flat();
-
-    // Sort by FormattedID for stable ordering
-    allChildren.sort((a, b) => a.ref.localeCompare(b.ref));
-
-    return allChildren;
+    return Effect.all(queries, { concurrency: 'unbounded' }).pipe(
+      Effect.map((results) => {
+        const allChildren = results.flat();
+        allChildren.sort((a, b) => a.ref.localeCompare(b.ref));
+        return allChildren;
+      }),
+    );
   }
 
   // Private helper methods
@@ -546,7 +618,6 @@ export class RallyTracker implements IssueTracker {
   ): string {
     const conditions: string[] = [];
 
-    // Explicit project scoping — more reliable than WSAPI project param alone
     if (projectObjectId) {
       conditions.push(`(Project.ObjectID = "${projectObjectId}")`);
     }
@@ -559,11 +630,9 @@ export class RallyTracker implements IssueTracker {
     }
 
     if (!filters?.includeClosed) {
-      // Exclude closed states for this specific artifact type
       const closedConditions = artifactType.closedStates.map(
-        (state) => `(${artifactType.stateField} != "${state}")`
+        (state) => `(${artifactType.stateField} != "${state}")`,
       );
-      // Rally WSAPI only supports binary AND — nest into pairs
       const closedExpr = closedConditions.reduce(
         (acc, cond) => (acc ? `(${acc} AND ${cond})` : cond),
         '',
@@ -577,31 +646,36 @@ export class RallyTracker implements IssueTracker {
 
     if (filters?.labels && filters.labels.length > 0) {
       const labelConditions = filters.labels.map(
-        (label) => `(Tags.Name contains "${escapeQueryValue(label)}")`
+        (label) => `(Tags.Name contains "${escapeQueryValue(label)}")`,
       );
-      // Rally WSAPI only supports binary AND — nest into pairs
-      const labelExpr = labelConditions.reduce((acc, cond) => acc ? `(${acc} AND ${cond})` : cond, '');
+      const labelExpr = labelConditions.reduce(
+        (acc, cond) => (acc ? `(${acc} AND ${cond})` : cond),
+        '',
+      );
       conditions.push(labelExpr);
     }
 
     if (filters?.query) {
-      conditions.push(`((Name contains "${escapeQueryValue(filters.query)}") OR (Description contains "${escapeQueryValue(filters.query)}"))`);
+      conditions.push(
+        `((Name contains "${escapeQueryValue(filters.query)}") OR (Description contains "${escapeQueryValue(filters.query)}"))`,
+      );
     }
 
-    // Rally WSAPI only supports binary (expr AND expr) — reduce into nested pairs
-    return conditions.reduce((acc, cond) => acc ? `(${acc} AND ${cond})` : cond, '');
+    return conditions.reduce(
+      (acc, cond) => (acc ? `(${acc} AND ${cond})` : cond),
+      '',
+    );
   }
 
   private normalizeIssue(rallyArtifact: any): Issue {
-    // Determine state from ScheduleState (User Stories, Tasks) or State (Defects, Features)
-    // For PortfolioItem/Feature, State is a Rally ref object with Name/_refObjectName, not a string
-    const rawStateValue = rallyArtifact.ScheduleState || rallyArtifact.State || 'Defined';
-    const stateValue = typeof rawStateValue === 'object' && rawStateValue !== null
-      ? (rawStateValue.Name || rawStateValue._refObjectName || 'Defined')
-      : rawStateValue;
+    const rawStateValue =
+      rallyArtifact.ScheduleState || rallyArtifact.State || 'Defined';
+    const stateValue =
+      typeof rawStateValue === 'object' && rawStateValue !== null
+        ? (rawStateValue.Name || rawStateValue._refObjectName || 'Defined')
+        : rawStateValue;
     const state = this.mapState(stateValue);
 
-    // Extract tags — ensure all entries are strings
     const labels: string[] = [];
     if (rallyArtifact.Tags && rallyArtifact.Tags._tagsNameArray) {
       for (const tag of rallyArtifact.Tags._tagsNameArray) {
@@ -613,23 +687,16 @@ export class RallyTracker implements IssueTracker {
       }
     }
 
-    // Map priority
     const priority = rallyArtifact.Priority
       ? PRIORITY_MAP[rallyArtifact.Priority] ?? 2
       : undefined;
 
-    // Use ObjectID if available, fall back to FormattedID
     const objectId = rallyArtifact.ObjectID || rallyArtifact.FormattedID;
     const artifactType = rallyArtifact._type || 'artifact';
 
-    // Build URL - Rally's web UI detail path
     const baseUrl = this.restApi.server.replace('/slm/webservice/', '');
     const url = `${baseUrl}/#/detail/${artifactType.toLowerCase()}/${objectId}`;
 
-    // Resolve parent reference.
-    // For User Stories, PortfolioItem links to the parent Feature (F-prefixed),
-    // while Parent links to a parent Story in the hierarchy. Prefer PortfolioItem
-    // so that stories are correctly grouped under their Feature. (PAN-202)
     let parentRef: string | undefined;
     if (rallyArtifact.PortfolioItem) {
       if (rallyArtifact.PortfolioItem.FormattedID) {
@@ -669,9 +736,11 @@ export class RallyTracker implements IssueTracker {
     return STATE_MAP[rallyState] ?? 'open';
   }
 
-  private reverseMapState(state: IssueState, kind: 'story' | 'defect' | 'feature' = 'story'): string {
+  private reverseMapState(
+    state: IssueState,
+    kind: 'story' | 'defect' | 'feature' = 'story',
+  ): string {
     if (kind === 'feature') {
-      // Features / PortfolioItems use State: Discovering, Developing, Done
       switch (state) {
         case 'open': return 'Discovering';
         case 'in_progress':
@@ -681,7 +750,6 @@ export class RallyTracker implements IssueTracker {
       }
     }
     if (kind === 'defect') {
-      // Defects use State: Submitted, Open, Fixed, Closed
       switch (state) {
         case 'open': return 'Submitted';
         case 'in_progress':
@@ -690,7 +758,6 @@ export class RallyTracker implements IssueTracker {
         default: return 'Submitted';
       }
     }
-    // User Stories / Tasks use ScheduleState: Defined, In-Progress, Completed
     switch (state) {
       case 'open': return 'Defined';
       case 'in_progress':
@@ -698,40 +765,5 @@ export class RallyTracker implements IssueTracker {
       case 'closed': return 'Completed';
       default: return 'Defined';
     }
-  }
-
-  // Rally API wrapper methods
-  private async queryRally(queryConfig: any): Promise<any> {
-    const result = await this.restApi.query(queryConfig);
-    // Extract Results from WSAPI response format
-    return {
-      Results: result.QueryResult.Results,
-      TotalResultCount: result.QueryResult.TotalResultCount,
-    };
-  }
-
-  private async createRally(type: string, data: any): Promise<any> {
-    const result = await this.restApi.create({
-      type,
-      data,
-      fetch: ['FormattedID', 'ObjectID', '_ref'],
-    });
-    // Extract Object from WSAPI response format
-    return {
-      Object: result.CreateResult.Object,
-    };
-  }
-
-  private async updateRally(type: string, ref: string, data: any): Promise<any> {
-    const result = await this.restApi.update({
-      type,
-      ref,
-      data,
-      fetch: ['FormattedID', 'ObjectID'],
-    });
-    // Extract Object from WSAPI response format
-    return {
-      Object: result.OperationResult.Object,
-    };
   }
 }

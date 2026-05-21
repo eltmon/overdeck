@@ -6,7 +6,20 @@
  */
 
 import { Data, Effect } from 'effect';
-import type { TrackerError } from '../errors.js';
+import type {
+  TrackerError,
+  GitHubApiError,
+  LinearApiError,
+} from '../errors.js';
+
+/**
+ * Union of every typed error a tracker implementation can produce while
+ * communicating with its remote API. Concrete adapters narrow this to the
+ * subset they actually emit (Linear → LinearApiError, GitHub → GitHubApiError,
+ * etc.), but the interface widens to the union so consumers handle them
+ * uniformly.
+ */
+export type TrackerApiError = TrackerError | GitHubApiError | LinearApiError;
 
 // Supported tracker types
 export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
@@ -125,6 +138,17 @@ export interface IssueUpdate {
 }
 
 /**
+ * Every typed error that any IssueTracker operation can emit. Concrete
+ * adapters narrow this in their own return types; the interface widens to
+ * the full union so consumers can write a single uniform handler.
+ */
+export type AnyTrackerError =
+  | TrackerApiError
+  | TrackerAuthError
+  | IssueNotFoundError
+  | NotImplementedError;
+
+/**
  * Abstract interface for issue trackers.
  * Implementations must handle normalization to/from tracker-specific formats.
  */
@@ -135,17 +159,13 @@ export interface IssueTracker {
   /**
    * List issues matching filters
    */
-  listIssues(
-    filters?: IssueFilters,
-  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError>;
+  listIssues(filters?: IssueFilters): Effect.Effect<Issue[], AnyTrackerError>;
 
   /**
    * Get a single issue by ID or ref
    * @param id - Issue ID or human-readable ref (e.g., "MIN-630", "#42")
    */
-  getIssue(
-    id: string,
-  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError>;
+  getIssue(id: string): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Update an existing issue
@@ -153,21 +173,17 @@ export interface IssueTracker {
   updateIssue(
     id: string,
     update: IssueUpdate,
-  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError>;
+  ): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Create a new issue
    */
-  createIssue(
-    issue: NewIssue,
-  ): Effect.Effect<Issue, TrackerError | TrackerAuthError>;
+  createIssue(issue: NewIssue): Effect.Effect<Issue, AnyTrackerError>;
 
   /**
    * Get comments on an issue
    */
-  getComments(
-    issueId: string,
-  ): Effect.Effect<Comment[], TrackerError | TrackerAuthError>;
+  getComments(issueId: string): Effect.Effect<Comment[], AnyTrackerError>;
 
   /**
    * Add a comment to an issue
@@ -175,7 +191,7 @@ export interface IssueTracker {
   addComment(
     issueId: string,
     body: string,
-  ): Effect.Effect<Comment, TrackerError | TrackerAuthError>;
+  ): Effect.Effect<Comment, AnyTrackerError>;
 
   /**
    * Transition issue to a new state
@@ -183,26 +199,18 @@ export interface IssueTracker {
   transitionIssue(
     id: string,
     state: IssueState,
-  ): Effect.Effect<
-    void,
-    IssueNotFoundError | TrackerError | TrackerAuthError | NotImplementedError
-  >;
+  ): Effect.Effect<void, AnyTrackerError>;
 
   /**
    * Link a PR/MR to an issue
    */
-  linkPR(
-    issueId: string,
-    prUrl: string,
-  ): Effect.Effect<void, TrackerError | TrackerAuthError | NotImplementedError>;
+  linkPR(issueId: string, prUrl: string): Effect.Effect<void, AnyTrackerError>;
 
   /**
    * Get child issues for a parent issue (hierarchy support).
    * Returns empty array for trackers that don't support hierarchy.
    */
-  getChildIssues(
-    parentId: string,
-  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError>;
+  getChildIssues(parentId: string): Effect.Effect<Issue[], AnyTrackerError>;
 }
 
 /**

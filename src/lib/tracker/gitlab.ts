@@ -5,6 +5,7 @@
  * Full implementation will use @gitbeaker/rest.
  */
 
+import { Effect } from 'effect';
 import type {
   Issue,
   IssueFilters,
@@ -17,66 +18,71 @@ import type {
 } from './interface.js';
 import { NotImplementedError } from './interface.js';
 
+const notImplemented = (feature: string) =>
+  Effect.fail(new NotImplementedError({ feature }));
+
 export class GitLabTracker implements IssueTracker {
   readonly name: TrackerType = 'gitlab';
 
   constructor(
     private token: string,
-    private projectId: string
+    private projectId: string,
   ) {
     // Stub - will initialize @gitbeaker client when implemented
+    void this.token;
+    void this.projectId;
   }
 
-  async listIssues(_filters?: IssueFilters): Promise<Issue[]> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  listIssues(
+    _filters?: IssueFilters,
+  ): Effect.Effect<Issue[], NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async getIssue(_id: string): Promise<Issue> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  getIssue(_id: string): Effect.Effect<Issue, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async updateIssue(_id: string, _update: IssueUpdate): Promise<Issue> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  updateIssue(
+    _id: string,
+    _update: IssueUpdate,
+  ): Effect.Effect<Issue, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async createIssue(_issue: NewIssue): Promise<Issue> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  createIssue(_issue: NewIssue): Effect.Effect<Issue, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async getComments(_issueId: string): Promise<Comment[]> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  getComments(
+    _issueId: string,
+  ): Effect.Effect<Comment[], NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async addComment(_issueId: string, _body: string): Promise<Comment> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  addComment(
+    _issueId: string,
+    _body: string,
+  ): Effect.Effect<Comment, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async transitionIssue(_id: string, _state: IssueState): Promise<void> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  transitionIssue(
+    _id: string,
+    _state: IssueState,
+  ): Effect.Effect<void, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async linkPR(_issueId: string, _prUrl: string): Promise<void> {
-    throw new NotImplementedError(
-      'GitLab tracker is not yet implemented. Coming soon!'
-    );
+  linkPR(
+    _issueId: string,
+    _prUrl: string,
+  ): Effect.Effect<void, NotImplementedError> {
+    return notImplemented('GitLab tracker is not yet implemented. Coming soon!');
   }
 
-  async getChildIssues(_parentId: string): Promise<Issue[]> {
+  getChildIssues(_parentId: string): Effect.Effect<Issue[], never> {
     // GitLab tracker is not yet implemented
-    return [];
+    return Effect.succeed([]);
   }
 }
