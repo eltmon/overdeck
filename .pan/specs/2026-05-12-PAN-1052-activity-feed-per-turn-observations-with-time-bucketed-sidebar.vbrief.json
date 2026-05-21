@@ -4,17 +4,17 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-20T12:43:27.533Z"
+    "updated": "2026-05-21T18:39:54.877Z"
   },
   "plan": {
     "id": "pan-1052",
     "title": "Activity feed: per-turn observations with time-bucketed sidebar",
-    "status": "running",
+    "status": "completed",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 204,
+    "sequence": 212,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-20T12:43:27.533Z",
+    "updated": "2026-05-21T18:39:54.877Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2276,60 +2276,62 @@
     "metadata": {
       "canonicalFilename": "2026-05-12-PAN-1052-activity-feed-per-turn-observations-with-time-bucketed-sidebar.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "done",
         "issueId": "PAN-1052",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T12:43:27.532Z",
+        "updatedAt": "2026-05-21T18:39:51.701Z",
         "work": {
-          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-20T12:43:27.532Z",
-          "notes": "Verification FAILED at frontend-typecheck (4578ms):\n\nCommand failed: nice -n 19 sh -c 'npx tsc --noEmit'\n",
+          "status": "passed",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-20T12:43:27.532Z",
-              "notes": "Verification FAILED at frontend-typecheck (4578ms):\n\nCommand failed: nice -n 19 sh -c 'npx tsc --noEmit'\n"
+              "status": "passed",
+              "at": "2026-05-21T18:39:51.701Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-05-20T12:43:27.532Z",
-          "notes": "Verification failed at frontend-typecheck",
+          "status": "passed",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
+          "notes": "All 4 reviewers ready; 0 blockers (6 ~ findings non-blocking per gate 8); fire-and-forget inject route recommended as follow-up hardening.",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-20T12:43:27.532Z",
-              "notes": "Verification failed at frontend-typecheck"
+              "status": "passed",
+              "at": "2026-05-21T18:39:51.701Z",
+              "notes": "All 4 reviewers ready; 0 blockers (6 ~ findings non-blocking per gate 8); fire-and-forget inject route recommended as follow-up hardening."
             }
           ],
-          "approval": "changes_requested"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "status": "passed",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T12:43:27.532Z"
+              "status": "passed",
+              "at": "2026-05-21T18:39:51.701Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T12:43:27.532Z",
+          "status": "merged",
+          "updatedAt": "2026-05-21T18:39:51.701Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T12:43:27.532Z"
+              "status": "merged",
+              "at": "2026-05-21T18:39:51.701Z"
             }
           ],
           "readyForMerge": false,
@@ -2338,5 +2340,5 @@
       }
     }
   },
-  "status": "active"
+  "status": "completed"
 }
