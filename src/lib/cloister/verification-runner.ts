@@ -14,6 +14,7 @@ import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -510,4 +511,23 @@ export async function runVerificationForIssue(
     console.error(`[${logPrefix}] Verification infrastructure error for ${issueId}:`, verifyErr);
     return { outcome: 'error', message: verifyErr.message };
   }
+}
+
+// ─── PAN-1249: additive Effect variant ────────────────────────────────────────
+
+/**
+ * Effect-typed variant of {@link runVerificationForIssue}.
+ *
+ * Always succeeds — the legacy Promise already collapses every failure mode
+ * into a discriminated `VerificationRunnerOutcome` union (`{ outcome: 'error' }`),
+ * so the Effect error channel stays empty.
+ */
+export function runVerificationForIssueEffect(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  logPrefix: string,
+  options: VerificationRunnerOptions = {},
+): Effect.Effect<VerificationRunnerOutcome> {
+  return Effect.promise(() => runVerificationForIssue(issueId, workspacePath, workspaceInfo, logPrefix, options));
 }

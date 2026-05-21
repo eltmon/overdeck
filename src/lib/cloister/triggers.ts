@@ -12,6 +12,7 @@ import { existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfig } from './config.js';
@@ -394,4 +395,34 @@ export async function checkAllTriggers(
   if (completionCheck.triggered) triggers.push(completionCheck);
 
   return triggers;
+}
+
+// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
+
+/**
+ * Effect-typed variant of {@link checkTaskCompletion}. Wraps the Promise-based
+ * implementation; never fails (the underlying function swallows errors and
+ * returns a "not triggered" detection on failure).
+ */
+export function checkTaskCompletionEffect(
+  issueId: string,
+  config?: CloisterConfig,
+  workspace?: string,
+): Effect.Effect<TriggerDetection> {
+  return Effect.promise(() => checkTaskCompletion(issueId, config, workspace));
+}
+
+/**
+ * Effect-typed variant of {@link checkAllTriggers}. Never fails — uses
+ * `Effect.promise` because the underlying async path absorbs bd / fs errors.
+ */
+export function checkAllTriggersEffect(
+  agentId: string,
+  workspace: string,
+  issueId: string,
+  currentModel: string,
+  health: AgentHealth,
+  config?: CloisterConfig,
+): Effect.Effect<TriggerDetection[]> {
+  return Effect.promise(() => checkAllTriggers(agentId, workspace, issueId, currentModel, health, config));
 }

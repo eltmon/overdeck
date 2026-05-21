@@ -3,12 +3,19 @@
  *
  * Replaces spawnRebaseAgentForBranch with direct git operations via execAsync.
  * No specialist, no polling, no tmux session — just git commands.
+ *
+ * PAN-1249: Additive Effect variant `rebaseFeatureBranchEffect` exposed for
+ * Effect-typed callers. The Promise-based `rebaseFeatureBranch` retains its
+ * legacy "result-object on success-or-failure" contract used by existing
+ * cloister merge plumbing.
  */
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
+import { GitError, MergeConflictError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
@@ -129,4 +136,50 @@ export async function rebaseFeatureBranch(
     console.error(`${logPrefix} ${reason}`);
     return { success: false, reason };
   }
+}
+
+/**
+ * Effect-typed variant of {@link rebaseFeatureBranch} (PAN-1249).
+ *
+ * Returns a typed error channel:
+ * - `MergeConflictError` when rebase produced conflicts (which are then aborted)
+ * - `GitError` for any other git failure (fetch / rev-list / push)
+ *
+ * On success resolves to the same `RebaseResult` shape.
+ */
+export function rebaseFeatureBranchEffect(
+  workspacePath: string,
+  featureBranch: string,
+  baseBranch: string,
+  issueId: string,
+): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
+  const wrapped: Effect.Effect<RebaseResult, GitError> = Effect.tryPromise({
+    try: () => rebaseFeatureBranch(workspacePath, featureBranch, baseBranch, issueId),
+    catch: (cause) =>
+      new GitError({
+        command: ['git', 'rebase', baseBranch],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
+  return Effect.flatMap(wrapped, (result): Effect.Effect<RebaseResult, GitError | MergeConflictError> => {
+    if (result.success) return Effect.succeed(result);
+    if (result.conflictFiles && result.conflictFiles.length > 0) {
+      return Effect.fail(
+        new MergeConflictError({
+          branch: featureBranch,
+          targetBranch: baseBranch,
+          conflictedFiles: result.conflictFiles,
+        }),
+      );
+    }
+    return Effect.fail(
+      new GitError({
+        command: ['git', 'rebase', baseBranch],
+        stderr: result.reason ?? 'rebase failed',
+        exitCode: 1,
+      }),
+    );
+  });
 }
