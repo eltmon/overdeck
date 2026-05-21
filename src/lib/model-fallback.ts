@@ -26,21 +26,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models (current — per developers.openai.com/codex/models)
+  // OpenAI models (supported catalog — PAN-1122)
   'gpt-5.5': 'openai',
   'gpt-5.5-pro': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
-  'gpt-5.4-pro': 'openai',
-  'gpt-5.3-codex': 'openai',
-  'gpt-5.2': 'openai',
-  'o3': 'openai',
-  'o4-mini': 'openai',
-
-  // OpenAI legacy (for backward compat with existing configs/tests)
-  'o3-deep-research': 'openai',
-  'gpt-4o': 'openai',
-  'gpt-4o-mini': 'openai',
+  'gpt-5.4-nano': 'openai',
 
   // Google models (current)
   'gemini-3.1-pro-preview': 'google',
@@ -87,22 +78,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  * Users who want Opus can explicitly set it in their config.
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
-  // OpenAI → Anthropic
-  'gpt-5.5': 'claude-sonnet-4-6', // Flagship model → Sonnet
-  'gpt-5.5-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
-  'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
-  'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
-  'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
-  'gpt-5.3-codex': 'claude-sonnet-4-6', // Coding flagship → Sonnet
-  'gpt-5.2': 'claude-sonnet-4-6', // Previous-gen flagship → Sonnet
-  'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
-  'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
-  // Retired OpenAI IDs — mappings preserve semantic tier intent
-  'o3-deep-research': 'claude-sonnet-4-6',
-  // Active OpenAI API names — NOT deprecated. Included here so configs using these
-  // IDs still fall back correctly if the OpenAI provider is disabled.
-  'gpt-4o': 'claude-sonnet-4-6', // flagship-tier → Sonnet
-  'gpt-4o-mini': 'claude-haiku-4-5', // economy-tier → Haiku
+  // OpenAI → Anthropic (supported catalog — PAN-1122)
+  'gpt-5.5': 'claude-sonnet-4-6',
+  'gpt-5.5-pro': 'claude-sonnet-4-6',
+  'gpt-5.4': 'claude-sonnet-4-6',
+  'gpt-5.4-mini': 'claude-haiku-4-5',
+  'gpt-5.4-nano': 'claude-haiku-4-5',
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
@@ -149,16 +130,12 @@ const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
  * Used for within-provider tier-aware fallback.
  */
 const MODEL_TIER_RANK: Record<string, number> = {
-  // OpenAI tiers
+  // OpenAI tiers (supported catalog — PAN-1122)
   'gpt-5.5-pro': 3,
   'gpt-5.5': 2,
-  'gpt-5.4-pro': 3,
   'gpt-5.4': 2,
-  'gpt-5.3-codex': 2,
-  'gpt-5.2': 2,
-  'o3': 2,
-  'o4-mini': 1,
   'gpt-5.4-mini': 0,
+  'gpt-5.4-nano': 0,
 };
 
 /**

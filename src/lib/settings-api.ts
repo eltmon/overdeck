@@ -879,14 +879,10 @@ export function getAvailableModelsApi(): {
     }
   }
 
-  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
+  // Order OpenAI models: 5.5 flagship first, then 5.4 family by cost descending.
   const openaiOrder: Record<string, number> = {
-    'gpt-5.5': 0, 'gpt-5.5-pro': 1,
-    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12,
-    'gpt-5.3-codex': 20,
-    'gpt-5.2': 30,
-    'o3': 40, 'o4-mini': 41,
-    'gpt-4o': 50, 'gpt-4o-mini': 51,
+    'gpt-5.5-pro': 0, 'gpt-5.5': 1,
+    'gpt-5.4': 10, 'gpt-5.4-mini': 11, 'gpt-5.4-nano': 12,
   };
   result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
 

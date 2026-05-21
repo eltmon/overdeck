@@ -32,7 +32,7 @@ export interface RouterConfig {
  */
 function getModelProvider(modelId: ModelId): 'anthropic' | 'openai' | 'google' {
   if (modelId.startsWith('claude-')) return 'anthropic';
-  if (modelId.startsWith('gpt-') || modelId === 'o3') return 'openai';
+  if (modelId.startsWith('gpt-')) return 'openai';
   if (modelId.startsWith('gemini-')) return 'google';
   // Default to anthropic for unknown models
   return 'anthropic';

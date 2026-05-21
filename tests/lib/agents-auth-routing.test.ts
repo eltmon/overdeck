@@ -139,8 +139,8 @@ describe('agents auth routing', () => {
   it('maps OpenAI -pro aliases to CLIProxy-supported model IDs', async () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
-    expect(await getAgentRuntimeBaseCommand('gpt-5.4-pro')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'gpt-5.4'"
+    expect(await getAgentRuntimeBaseCommand('gpt-5.5-pro')).toBe(
+      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'gpt-5.5'"
     );
   });
 

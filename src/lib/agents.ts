@@ -191,11 +191,9 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
   return undefined;
 }
 
-/** Map abstract/future model names to CLIProxy-supported names.
- *  The CLIProxy registry has gpt-5.4 but not gpt-5.4-pro. */
+/** Map model names to CLIProxy-supported names where the registry uses a different ID. */
 const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.5-pro': 'gpt-5.5',
-  'gpt-5.4-pro': 'gpt-5.4',
 };
 
 /**

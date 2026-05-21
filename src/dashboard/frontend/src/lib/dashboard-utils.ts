@@ -115,24 +115,15 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('haiku-3')) return 'Haiku 3';
   if (backingModel.includes('haiku')) return 'Haiku 4.5';
 
-  // OpenAI models
+  // OpenAI models (supported catalog — PAN-1122)
   if (backingModel.includes('gpt-5.5-pro')) return 'GPT-5.5 Pro';
   if (backingModel.includes('gpt-5.5')) return 'GPT-5.5';
-  if (backingModel.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
+  if (backingModel.includes('gpt-5.4-nano')) return 'GPT-5.4 Nano';
   if (backingModel.includes('gpt-5.4-mini')) return 'GPT-5.4 Mini';
   if (backingModel.includes('gpt-5.4')) return 'GPT-5.4';
-  if (backingModel.includes('gpt-5.3-codex')) return 'GPT-5.3 Codex';
-  if (backingModel.includes('gpt-5.3')) return 'GPT-5.3';
-  if (backingModel.includes('gpt-5.2')) return 'GPT-5.2';
-  if (backingModel.includes('gpt-5.1')) return 'GPT-5.1';
   if (backingModel.includes('gpt-5')) return 'GPT-5';
-  if (backingModel.includes('gpt-4o')) return 'GPT-4o';
   if (backingModel.includes('gpt-4')) return 'GPT-4';
   if (backingModel.includes('gpt-3')) return 'GPT-3';
-  if (backingModel.includes('o4-mini') || backingModel === 'o4-mini') return 'O4 Mini';
-  if (backingModel.includes('o3-mini')) return 'O3 Mini';
-  if (backingModel.includes('o3')) return 'O3';
-  if (backingModel.includes('o1')) return 'O1';
 
   // Google models
   if (backingModel.includes('gemini-3.1-pro-preview') || backingModel.includes('gemini-3.1-pro')) return 'Gemini 3.1 Pro';

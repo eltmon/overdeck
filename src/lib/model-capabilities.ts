@@ -34,19 +34,7 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'claude-opus-4-5': 'claude-opus-4-7',
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
   // OpenAI retired/superseded models
-  'gpt-5.2-codex': 'gpt-5.3-codex', // superseded by gpt-5.3-codex (April 2026)
-  'gpt-5.4-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  // OpenAI IDs dropped from Panopticon catalog (PAN-1122) — redirect to balanced default
-  'gpt-5.5-mini': 'gpt-5.4',
-  'gpt-5.5-nano': 'gpt-5.4',
-  'gpt-5.4-pro': 'gpt-5.4',
-  'o3': 'gpt-5.4',
-  'o4-mini': 'gpt-5.4',
-  'gpt-4o': 'gpt-5.4',
-  'gpt-4o-mini': 'gpt-5.4',
-  'o3-deep-research': 'gpt-5.4',
-  'gpt-5.3-codex': 'gpt-5.4',
-  'gpt-5.2': 'gpt-5.4',
+  'gpt-5.2-codex': 'gpt-5.4', // superseded by gpt-5.3-codex then dropped (PAN-1122)
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
   'gemini-3-flash': 'gemini-3-flash-preview',
@@ -311,73 +299,27 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers.',
   },
 
-  'o3': {
-    model: 'o3',
+  'gpt-5.4-nano': {
+    model: 'gpt-5.4-nano',
     provider: 'openai',
-    displayName: 'O3',
-    costPer1MTokens: 5.0, // $2 in / $8 out
+    displayName: 'GPT-5.4 Nano',
+    costPer1MTokens: 0.25, // $0.075 in / $0.45 out
     contextWindow: 200000,
-    minTier: 'plus', // ChatGPT Plus/Pro only
+    minTier: 'free',
     skills: {
-      'code-generation': 90,
-      'code-review': 95,
-      debugging: 98, // Best for debugging
-      planning: 95,
-      documentation: 88,
-      testing: 88,
-      security: 92,
-      performance: 92,
-      synthesis: 95,
-      speed: 25, // Slow (reasoning chains)
-      'context-length': 95,
+      'code-generation': 68,
+      'code-review': 62,
+      debugging: 60,
+      planning: 55,
+      documentation: 66,
+      testing: 60,
+      security: 50,
+      performance: 55,
+      synthesis: 60,
+      speed: 98,
+      'context-length': 85,
     },
-    notes: 'Deep reasoning model. Excels at complex debugging, math, scientific reasoning.',
-  },
-
-  'o4-mini': {
-    model: 'o4-mini',
-    provider: 'openai',
-    displayName: 'O4 Mini',
-    costPer1MTokens: 2.75, // $1.10 in / $4.40 out
-    contextWindow: 200000,
-    minTier: 'plus', // ChatGPT Plus/Pro only
-    skills: {
-      'code-generation': 85,
-      'code-review': 90,
-      debugging: 94,
-      planning: 88,
-      documentation: 84,
-      testing: 85,
-      security: 86,
-      performance: 88,
-      synthesis: 88,
-      speed: 70, // Fast for a reasoning model
-      'context-length': 90,
-    },
-    notes: 'Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable.',
-  },
-
-  'gpt-5.4-pro': {
-    model: 'gpt-5.4-pro',
-    provider: 'openai',
-    displayName: 'GPT-5.4 Pro',
-    costPer1MTokens: 105.0, // $15 in / $195 out
-    contextWindow: 1050000,
-    minTier: 'pro', // ChatGPT Pro only
-    skills: {
-      'code-generation': 98,
-      'code-review': 98,
-      debugging: 98,
-      planning: 99,
-      documentation: 96,
-      testing: 96,
-      security: 96,
-      performance: 95,
-      synthesis: 99,
-      speed: 45,
-      'context-length': 100,
-    },
-    notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
+    notes: 'Ultra-cheap OpenAI model for simple tasks. Fastest in the GPT-5.4 family.',
   },
 
   'gpt-5.5': {
@@ -425,57 +367,6 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     },
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only.',
   },
-
-  'gpt-5.3-codex': {
-    model: 'gpt-5.3-codex',
-    provider: 'openai',
-    displayName: 'GPT-5.3 Codex',
-    costPer1MTokens: 7.875, // $1.75 in / $14.00 out
-    contextWindow: 400000,
-    skills: {
-      'code-generation': 96,
-      'code-review': 95,
-      debugging: 94,
-      planning: 90,
-      documentation: 88,
-      testing: 90,
-      security: 86,
-      performance: 88,
-      synthesis: 92,
-      speed: 75,
-      'context-length': 90,
-    },
-    notes: 'Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API.',
-  },
-
-  'gpt-5.2': {
-    model: 'gpt-5.2',
-    provider: 'openai',
-    displayName: 'GPT-5.2',
-    costPer1MTokens: 5.625, // $1.25 in / $10 out (estimate)
-    contextWindow: 200000,
-    skills: {
-      'code-generation': 88,
-      'code-review': 86,
-      debugging: 84,
-      planning: 82,
-      documentation: 84,
-      testing: 82,
-      security: 78,
-      performance: 80,
-      synthesis: 84,
-      speed: 70,
-      'context-length': 85,
-    },
-    notes: 'Previous-generation general-purpose model (Oct 2025). Superseded by GPT-5.4.',
-  },
-
-  // Retired OpenAI model IDs — kept for backward compat
-  'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
-  // Active OpenAI API names — NOT deprecated. Kept in MODEL_CAPABILITIES for backward compat
-  // with saved configs. These are real OpenAI model IDs that still work via the OpenAI API.
-  'gpt-4o': { model: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o', costPer1MTokens: 7.5, contextWindow: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 78, planning: 76, documentation: 80, testing: 76, security: 74, performance: 74, synthesis: 80, speed: 75, 'context-length': 75 } },
-  'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'openai', displayName: 'GPT-4o Mini', costPer1MTokens: 0.6, contextWindow: 128000, skills: { 'code-generation': 68, 'code-review': 64, debugging: 60, planning: 56, documentation: 66, testing: 60, security: 52, performance: 56, synthesis: 62, speed: 92, 'context-length': 75 } },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GOOGLE MODELS

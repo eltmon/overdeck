@@ -99,11 +99,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.3-codex', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.2', inputPer1k: 0.00125, outputPer1k: 0.010, currency: 'USD' },
-  { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
-  { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-nano', inputPer1k: 0.000075, outputPer1k: 0.00045, cacheReadPer1k: 0.0000075, currency: 'USD' },
   // Google
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
   { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
