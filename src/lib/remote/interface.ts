@@ -5,6 +5,8 @@
  * Remote providers manage VM lifecycle and enable offloading workloads from local machine.
  */
 
+import { Data, Effect, Stream } from 'effect';
+
 export type VmStatus = 'running' | 'stopped' | 'creating' | 'deleting' | 'unknown';
 
 export interface VmInfo {
@@ -30,6 +32,13 @@ export interface RemoteProviderConfig {
   autoHibernateMinutes?: number;
 }
 
+/** A remote VM operation (lifecycle, SSH exec, file copy, tunnel) failed. */
+export class RemoteError extends Data.TaggedError('RemoteError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 /**
  * Remote Provider Interface
  *
@@ -43,46 +52,46 @@ export interface RemoteProvider {
   readonly name: string;
 
   /** Check if the provider is authenticated */
-  isAuthenticated(): Promise<boolean>;
+  isAuthenticated(): Effect.Effect<boolean, RemoteError>;
 
   /** Create a new VM */
-  createVm(name: string): Promise<VmInfo>;
+  createVm(name: string): Effect.Effect<VmInfo, RemoteError>;
 
   /** Delete a VM */
-  deleteVm(name: string): Promise<void>;
+  deleteVm(name: string): Effect.Effect<void, RemoteError>;
 
   /** List all VMs */
-  listVms(): Promise<VmInfo[]>;
+  listVms(): Effect.Effect<VmInfo[], RemoteError>;
 
   /** Get VM status */
-  getStatus(name: string): Promise<VmStatus>;
+  getStatus(name: string): Effect.Effect<VmStatus, RemoteError>;
 
   /** Get detailed VM info */
-  getVmInfo(name: string): Promise<VmInfo | null>;
+  getVmInfo(name: string): Effect.Effect<VmInfo | null, RemoteError>;
 
   /** Start a stopped VM */
-  startVm(name: string): Promise<void>;
+  startVm(name: string): Effect.Effect<void, RemoteError>;
 
   /** Stop a running VM (hibernate) */
-  stopVm(name: string): Promise<void>;
+  stopVm(name: string): Effect.Effect<void, RemoteError>;
 
   /** Execute a command on a VM via SSH */
-  ssh(vm: string, command: string): Promise<ExecResult>;
+  ssh(vm: string, command: string): Effect.Effect<ExecResult, RemoteError>;
 
   /** Execute a command and stream output */
-  sshStream(vm: string, command: string): AsyncIterable<string>;
+  sshStream(vm: string, command: string): Stream.Stream<string, RemoteError>;
 
   /** Copy file to VM */
-  copyToVm(vm: string, localPath: string, remotePath: string): Promise<void>;
+  copyToVm(vm: string, localPath: string, remotePath: string): Effect.Effect<void, RemoteError>;
 
   /** Copy file from VM */
-  copyFromVm(vm: string, remotePath: string, localPath: string): Promise<void>;
+  copyFromVm(vm: string, remotePath: string, localPath: string): Effect.Effect<void, RemoteError>;
 
   /** Expose a port on VM (returns public URL) */
-  exposePort(vm: string, port: number): Promise<string>;
+  exposePort(vm: string, port: number): Effect.Effect<string, RemoteError>;
 
   /** Create SSH tunnel to VM */
-  tunnel(vm: string, remotePort: number, localPort: number): Promise<{ close: () => void }>;
+  tunnel(vm: string, remotePort: number, localPort: number): Effect.Effect<{ close: () => void }, RemoteError>;
 }
 
 /**
