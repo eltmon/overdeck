@@ -1461,7 +1461,6 @@ import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
 } from './agent-runtime.js';
-import { Effect } from 'effect';
 import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
