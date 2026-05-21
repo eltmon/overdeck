@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Cause, Effect, Exit } from 'effect';
 
 import {
   buildAgentLaunchConfig,
@@ -10,26 +11,44 @@ import {
   spawnRun,
 } from '../agents.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from '../model-validation.js';
+import { ModelValidationError } from '../errors.js';
 
 const MALICIOUS_MODEL = 'claude-sonnet-4-6; touch /tmp/pan-model-pwned #';
+
+async function runEffect<A>(effect: Effect.Effect<A, never, never>): Promise<A> {
+  const exit = await Effect.runPromise(Effect.exit(effect));
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw Cause.squash(exit.cause);
+}
+
+async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+  const exit = await Effect.runPromise(Effect.exit(effect));
+  if (Exit.isSuccess(exit))
+    throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
+  return Cause.squash(exit.cause) as E;
+}
 
 function expectModelRejection(fn: () => unknown | Promise<unknown>) {
   return expect(fn()).rejects.toThrow(/model must match/);
 }
 
 describe('model override validation', () => {
-  it('normalizes safe provider model identifiers and rejects shell metacharacters', () => {
-    expect(normalizeModelOverride(' qwen/qwen3.6-plus:free ')).toBe('qwen/qwen3.6-plus:free');
-    expect(normalizeModelOverride(' oai@gpt-5.5 ')).toBe('oai@gpt-5.5');
-    expect(normalizeModelOverride('')).toBeUndefined();
-    expect(() => normalizeModelOverride(MALICIOUS_MODEL)).toThrow(/model must match/);
-    expect(() => normalizeModelOverride('claude-sonnet-4-6 && whoami')).toThrow(/model must match/);
-    expect(() => normalizeModelOverride('claude-sonnet-4-6\nwhoami')).toThrow(/model must match/);
+  it('normalizes safe provider model identifiers and rejects shell metacharacters', async () => {
+    expect(await runEffect(normalizeModelOverride(' qwen/qwen3.6-plus:free '))).toBe('qwen/qwen3.6-plus:free');
+    expect(await runEffect(normalizeModelOverride(' oai@gpt-5.5 '))).toBe('oai@gpt-5.5');
+    expect(await runEffect(normalizeModelOverride(''))).toBeUndefined();
+    const err1 = await runEffectFail(normalizeModelOverride(MALICIOUS_MODEL));
+    expect(err1).toBeInstanceOf(ModelValidationError);
+    expect(err1.message).toMatch(/model must match/);
+    const err2 = await runEffectFail(normalizeModelOverride('claude-sonnet-4-6 && whoami'));
+    expect(err2.message).toMatch(/model must match/);
+    const err3 = await runEffectFail(normalizeModelOverride('claude-sonnet-4-6\nwhoami'));
+    expect(err3.message).toMatch(/model must match/);
   });
 
-  it('quotes validated model ids before launcher command interpolation', () => {
-    expect(requireModelOverride('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
-    expect(shellQuoteModelId('qwen/qwen3.6-plus:free')).toBe("'qwen/qwen3.6-plus:free'");
+  it('quotes validated model ids before launcher command interpolation', async () => {
+    expect(await runEffect(requireModelOverride('claude-sonnet-4-6'))).toBe('claude-sonnet-4-6');
+    expect(await runEffect(shellQuoteModelId('qwen/qwen3.6-plus:free'))).toBe("'qwen/qwen3.6-plus:free'");
   });
 
   it('rejects malicious model overrides in agent model resolution', () => {

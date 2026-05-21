@@ -120,7 +120,7 @@ function buildHostOverrideConfirmation(issueId: string): string {
 
 function validateModelId(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
   try {
-    return { ok: true, value: normalizeModelOverride(value) };
+    return { ok: true, value: Effect.runSync(normalizeModelOverride(value)) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

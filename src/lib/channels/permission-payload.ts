@@ -1,3 +1,5 @@
+import { Data, Effect } from 'effect';
+
 export const CHANNEL_PERMISSION_LIMITS = {
   requestIdBytes: 128,
   toolNameBytes: 128,
@@ -12,6 +14,14 @@ export interface NormalizedChannelPermissionRequestFields {
   inputPreview: string;
 }
 
+/** A permission request field failed validation. */
+export class PermissionPayloadValidationError extends Data.TaggedError(
+  'PermissionPayloadValidationError',
+)<{
+  readonly field: string;
+  readonly message: string;
+}> {}
+
 export function utf8ByteLength(value: string): number {
   return Buffer.byteLength(value, 'utf8');
 }
@@ -25,57 +35,66 @@ export function normalizeChannelPermissionRequestFields(input: {
   toolName: unknown;
   description: unknown;
   inputPreview?: unknown;
-}):
-  | { ok: true; value: NormalizedChannelPermissionRequestFields }
-  | { ok: false; error: string } {
-  const requestId = typeof input.requestId === 'string' ? input.requestId.trim() : '';
-  if (!requestId) {
-    return { ok: false, error: 'requestId is required' };
-  }
-  if (utf8ByteLength(requestId) > CHANNEL_PERMISSION_LIMITS.requestIdBytes) {
-    return {
-      ok: false,
-      error: `requestId exceeds ${CHANNEL_PERMISSION_LIMITS.requestIdBytes} bytes`,
-    };
-  }
+}): Effect.Effect<NormalizedChannelPermissionRequestFields, PermissionPayloadValidationError> {
+  return Effect.gen(function* () {
+    const requestId = typeof input.requestId === 'string' ? input.requestId.trim() : '';
+    if (!requestId) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({ field: 'requestId', message: 'requestId is required' }),
+      );
+    }
+    if (utf8ByteLength(requestId) > CHANNEL_PERMISSION_LIMITS.requestIdBytes) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({
+          field: 'requestId',
+          message: `requestId exceeds ${CHANNEL_PERMISSION_LIMITS.requestIdBytes} bytes`,
+        }),
+      );
+    }
 
-  const toolName = typeof input.toolName === 'string' ? input.toolName.trim() : '';
-  if (!toolName) {
-    return { ok: false, error: 'toolName is required' };
-  }
-  if (utf8ByteLength(toolName) > CHANNEL_PERMISSION_LIMITS.toolNameBytes) {
-    return {
-      ok: false,
-      error: `toolName exceeds ${CHANNEL_PERMISSION_LIMITS.toolNameBytes} bytes`,
-    };
-  }
+    const toolName = typeof input.toolName === 'string' ? input.toolName.trim() : '';
+    if (!toolName) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({ field: 'toolName', message: 'toolName is required' }),
+      );
+    }
+    if (utf8ByteLength(toolName) > CHANNEL_PERMISSION_LIMITS.toolNameBytes) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({
+          field: 'toolName',
+          message: `toolName exceeds ${CHANNEL_PERMISSION_LIMITS.toolNameBytes} bytes`,
+        }),
+      );
+    }
 
-  const description = typeof input.description === 'string' ? input.description.trim() : '';
-  if (!description) {
-    return { ok: false, error: 'description is required' };
-  }
-  if (utf8ByteLength(description) > CHANNEL_PERMISSION_LIMITS.descriptionBytes) {
-    return {
-      ok: false,
-      error: `description exceeds ${CHANNEL_PERMISSION_LIMITS.descriptionBytes} bytes`,
-    };
-  }
+    const description = typeof input.description === 'string' ? input.description.trim() : '';
+    if (!description) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({
+          field: 'description',
+          message: 'description is required',
+        }),
+      );
+    }
+    if (utf8ByteLength(description) > CHANNEL_PERMISSION_LIMITS.descriptionBytes) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({
+          field: 'description',
+          message: `description exceeds ${CHANNEL_PERMISSION_LIMITS.descriptionBytes} bytes`,
+        }),
+      );
+    }
 
-  const inputPreview = normalizePermissionInputPreview(input.inputPreview);
-  if (utf8ByteLength(inputPreview) > CHANNEL_PERMISSION_LIMITS.inputPreviewBytes) {
-    return {
-      ok: false,
-      error: `inputPreview exceeds ${CHANNEL_PERMISSION_LIMITS.inputPreviewBytes} bytes`,
-    };
-  }
+    const inputPreview = normalizePermissionInputPreview(input.inputPreview);
+    if (utf8ByteLength(inputPreview) > CHANNEL_PERMISSION_LIMITS.inputPreviewBytes) {
+      return yield* Effect.fail(
+        new PermissionPayloadValidationError({
+          field: 'inputPreview',
+          message: `inputPreview exceeds ${CHANNEL_PERMISSION_LIMITS.inputPreviewBytes} bytes`,
+        }),
+      );
+    }
 
-  return {
-    ok: true,
-    value: {
-      requestId,
-      toolName,
-      description,
-      inputPreview,
-    },
-  };
+    return { requestId, toolName, description, inputPreview };
+  });
 }

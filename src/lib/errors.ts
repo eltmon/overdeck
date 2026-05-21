@@ -133,3 +133,10 @@ export class ProcessTimeoutError extends Data.TaggedError('ProcessTimeoutError')
   readonly args: readonly string[];
   readonly timeoutMs: number;
 }> {}
+
+// ─── Model validation errors ──────────────────────────────────────────────────
+
+/** A model identifier failed validation (type mismatch, disallowed characters, length). */
+export class ModelValidationError extends Data.TaggedError('ModelValidationError')<{
+  readonly message: string;
+}> {}

@@ -27,6 +27,7 @@ import { readWorkspacePlan } from '../../lib/vbrief/io.js';
 import { groupItemsByWave, getDispatchableItems, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 import { runTaskCommand } from '../../lib/vbrief/dag-cli.js';
 import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../lib/internal-token.js';
+import { Effect } from 'effect';
 import { normalizeModelOverride } from '../../lib/model-validation.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
@@ -172,7 +173,7 @@ export async function swarmCommand(
   parseFiniteInteger(options.maxSlots, '--max-slots');
   parseFiniteInteger(options.sequence, '--sequence');
   try {
-    const model = normalizeModelOverride(options.model);
+    const model = Effect.runSync(normalizeModelOverride(options.model));
     if (model) options.model = model;
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));

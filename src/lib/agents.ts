@@ -36,6 +36,7 @@ import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge
 import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
+import { Effect } from 'effect';
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
@@ -215,8 +216,8 @@ export async function getAgentRuntimeBaseCommand(
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
 ): Promise<string> {
-  const validatedModel = requireModelOverride(model);
-  const quotedModel = shellQuoteModelId(validatedModel);
+  const validatedModel = Effect.runSync(requireModelOverride(model));
+  const quotedModel = Effect.runSync(shellQuoteModelId(validatedModel));
   if (harness === 'pi') {
     return `pi --mode rpc --model ${quotedModel}`;
   }
@@ -250,9 +251,9 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${Effect.runSync(shellQuoteModelId(resolvedModel))}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${Effect.runSync(shellQuoteModelId(resolvedModel))}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -302,8 +303,8 @@ export async function getRoleRuntimeBaseCommand(
   subRole?: string,
   effort?: 'low' | 'medium' | 'high',
 ): Promise<string> {
-  const validatedModel = requireModelOverride(model);
-  const quotedModel = shellQuoteModelId(validatedModel);
+  const validatedModel = Effect.runSync(requireModelOverride(model));
+  const quotedModel = Effect.runSync(shellQuoteModelId(validatedModel));
   if (harness === 'pi') {
     return `pi --mode rpc --model ${quotedModel}`;
   }
@@ -324,7 +325,7 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${Effect.runSync(shellQuoteModelId(resolvedModel))}${effortFlag}${nameFlag}`;
   }
 
   return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
@@ -1813,12 +1814,12 @@ export async function buildCavemanExports(
  * is a real configuration bug the user must see.
  */
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
-  const modelOverride = normalizeModelOverride(options.model);
+  const modelOverride = Effect.runSync(normalizeModelOverride(options.model));
   if (modelOverride) {
     return modelOverride;
   }
 
-  return requireModelOverride(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+  return Effect.runSync(requireModelOverride(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config)));
 }
 
 /**
@@ -1939,7 +1940,7 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
 }): Promise<AgentLaunchConfig> {
-  const model = requireModelOverride(opts.model);
+  const model = Effect.runSync(requireModelOverride(opts.model));
 
   // Substrate guard: inject permission deny rules for Panopticon infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
@@ -3178,7 +3179,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  */
 export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
-  const requestedModel = normalizeModelOverride(opts?.model);
+  const requestedModel = Effect.runSync(normalizeModelOverride(opts?.model));
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
@@ -3278,7 +3279,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = requestedModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
+    const model = requestedModel || Effect.runSync(requireModelOverride(agentState.model || 'claude-sonnet-4-6'));
     if (requestedModel && requestedModel !== agentState.model) {
       agentState.model = requestedModel;
       saveAgentState(agentState);
@@ -3381,7 +3382,7 @@ export async function restartAgent(
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const { graceful = true, model: rawNewModel, harness: newHarness, message } = opts;
-  const newModel = normalizeModelOverride(rawNewModel);
+  const newModel = Effect.runSync(normalizeModelOverride(rawNewModel));
 
   const agentState = getAgentState(normalizedId);
   if (!agentState) {
@@ -3432,7 +3433,7 @@ export async function restartAgent(
 
   await stopAgentAsync(normalizedId);
 
-  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
+  const effectiveModel = newModel || Effect.runSync(requireModelOverride(agentState.model || 'claude-sonnet-4-6'));
   const requestedHarness = newHarness ?? agentState.harness;
   const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
@@ -3558,7 +3559,7 @@ export async function recoverAgent(
     logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateBlockReason}. Clear the gate before recovering.`);
     return null;
   }
-  const modelOverride = normalizeModelOverride(opts.modelOverride);
+  const modelOverride = Effect.runSync(normalizeModelOverride(opts.modelOverride));
   if (modelOverride) {
     state.model = modelOverride;
     logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);

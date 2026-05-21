@@ -45,6 +45,7 @@ import { chmod, mkdir, unlink, appendFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { Effect } from 'effect';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
 import {
   normalizeChannelPermissionRequestFields,
@@ -123,23 +124,26 @@ function parsePermissionRequestNotification(payload: unknown): ChannelPermission
     throw new Error('invalid permission request notification params');
   }
 
-  const normalized = normalizeChannelPermissionRequestFields({
-    requestId: (params as { request_id?: unknown }).request_id,
-    toolName: (params as { tool_name?: unknown }).tool_name,
-    description: (params as { description?: unknown }).description,
-    inputPreview: (params as { input_preview?: unknown }).input_preview,
-  });
-  if (!normalized.ok) {
-    throw new Error(`invalid permission request notification params: ${normalized.error}`);
-  }
+  const normalized = Effect.runSync(
+    normalizeChannelPermissionRequestFields({
+      requestId: (params as { request_id?: unknown }).request_id,
+      toolName: (params as { tool_name?: unknown }).tool_name,
+      description: (params as { description?: unknown }).description,
+      inputPreview: (params as { input_preview?: unknown }).input_preview,
+    }).pipe(
+      Effect.mapError(
+        (e) => new Error(`invalid permission request notification params: ${e.message}`),
+      ),
+    ),
+  );
 
   return {
     method: 'notifications/claude/channel/permission_request',
     params: {
-      request_id: normalized.value.requestId,
-      tool_name: normalized.value.toolName,
-      description: normalized.value.description,
-      input_preview: normalized.value.inputPreview,
+      request_id: normalized.requestId,
+      tool_name: normalized.toolName,
+      description: normalized.description,
+      input_preview: normalized.inputPreview,
     },
   };
 }
@@ -147,16 +151,18 @@ function parsePermissionRequestNotification(payload: unknown): ChannelPermission
 function normalizePermissionRequest(
   notification: ChannelPermissionRequestNotification,
 ): ChannelPermissionRequest {
-  const normalized = normalizeChannelPermissionRequestFields({
-    requestId: notification.params.request_id,
-    toolName: notification.params.tool_name,
-    description: notification.params.description,
-    inputPreview: notification.params.input_preview,
-  });
-  if (!normalized.ok) {
-    throw new Error(`invalid permission request notification params: ${normalized.error}`);
-  }
-  return normalized.value;
+  return Effect.runSync(
+    normalizeChannelPermissionRequestFields({
+      requestId: notification.params.request_id,
+      toolName: notification.params.tool_name,
+      description: notification.params.description,
+      inputPreview: notification.params.input_preview,
+    }).pipe(
+      Effect.mapError(
+        (e) => new Error(`invalid permission request notification params: ${e.message}`),
+      ),
+    ),
+  );
 }
 
 export const server: Server = new Server(

@@ -1,4 +1,5 @@
 import type { Role } from './agents.js';
+import { Effect } from 'effect';
 import { shellQuoteModelId } from './model-validation.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
@@ -461,7 +462,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelId(config.model)}`;
+    cmd += ` --model ${Effect.runSync(shellQuoteModelId(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -527,7 +528,7 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelId(config.model));
+    tokens.push('--model', Effect.runSync(shellQuoteModelId(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {

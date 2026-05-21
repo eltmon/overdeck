@@ -1,4 +1,5 @@
 import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
+import { Effect, Result } from 'effect';
 
 import {
   normalizeChannelPermissionRequestFields,
@@ -25,12 +26,20 @@ export function permissionResolutionVerb(behavior: 'allow' | 'deny'): 'allowed' 
 export function normalizePermissionRequestBody(body: Record<string, unknown>):
   | { ok: true; value: NormalizedChannelPermissionRequestFields }
   | { ok: false; error: string } {
-  return normalizeChannelPermissionRequestFields({
-    requestId: body['requestId'],
-    toolName: body['toolName'],
-    description: body['description'],
-    inputPreview: body['inputPreview'],
-  });
+  const res = Effect.runSync(
+    Effect.result(
+      normalizeChannelPermissionRequestFields({
+        requestId: body['requestId'],
+        toolName: body['toolName'],
+        description: body['description'],
+        inputPreview: body['inputPreview'],
+      }),
+    ),
+  );
+  if (Result.isFailure(res)) {
+    return { ok: false, error: res.failure.message };
+  }
+  return { ok: true, value: res.success };
 }
 
 export function parsePermissionResponseBehavior(body: Record<string, unknown>):

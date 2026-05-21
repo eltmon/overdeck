@@ -13,6 +13,7 @@ import { getAgentState, saveAgentState, stopAgent, spawnAgent, spawnRun, getAgen
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
+import { Effect } from 'effect';
 import { requireModelOverride } from '../model-validation.js';
 
 /**
@@ -70,7 +71,7 @@ export async function performHandoff(
 
   let targetModel: string;
   try {
-    targetModel = requireModelOverride(options.targetModel);
+    targetModel = Effect.runSync(requireModelOverride(options.targetModel));
   } catch (error) {
     return {
       success: false,

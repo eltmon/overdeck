@@ -1742,7 +1742,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const { message, model } = body as any;
     let resumeModel: string | undefined;
     try {
-      resumeModel = normalizeModelOverride(model);
+      resumeModel = Effect.runSync(normalizeModelOverride(model));
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
@@ -1834,7 +1834,7 @@ const postAgentRestartRoute = HttpRouter.add(
     };
     let restartModel: string | undefined;
     try {
-      restartModel = normalizeModelOverride(model);
+      restartModel = Effect.runSync(normalizeModelOverride(model));
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
@@ -2026,7 +2026,7 @@ const postAgentHandoffRoute = HttpRouter.add(
     const { toModel, reason } = body as any;
     let targetModel: string;
     try {
-      targetModel = requireModelOverride(toModel);
+      targetModel = Effect.runSync(requireModelOverride(toModel));
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
@@ -3445,7 +3445,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     const { model: rawNewModel } = body as { model?: string; message?: string };
     let newModel: string;
     try {
-      newModel = requireModelOverride(rawNewModel);
+      newModel = Effect.runSync(requireModelOverride(rawNewModel));
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
