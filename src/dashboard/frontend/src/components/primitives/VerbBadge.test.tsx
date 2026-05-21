@@ -43,7 +43,7 @@ describe('VerbBadge', () => {
         >
           <span
             aria-hidden="true"
-            class="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
           />
           <span>
             WORK RUNNING
@@ -56,7 +56,7 @@ describe('VerbBadge', () => {
         >
           <span
             aria-hidden="true"
-            class="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
           />
           <span>
             REVIEW RUNNING
@@ -69,7 +69,7 @@ describe('VerbBadge', () => {
         >
           <span
             aria-hidden="true"
-            class="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
           />
           <span>
             SHIP RUNNING
@@ -82,7 +82,7 @@ describe('VerbBadge', () => {
         >
           <span
             aria-hidden="true"
-            class="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
           />
           <span>
             PLANNING
@@ -95,7 +95,7 @@ describe('VerbBadge', () => {
         >
           <span
             aria-hidden="true"
-            class="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
           />
           <span>
             INPUT
@@ -156,7 +156,7 @@ describe('VerbBadge', () => {
       const badge = screen.getByText(variant).closest('[data-component="verb-badge"]');
 
       expect(badge).toHaveAttribute('data-variant', variant);
-      expect(container.querySelector('.verb-badge-pulse')).toBe(PULSING_VARIANTS.has(variant) ? badge?.firstChild : null);
+      expect(container.querySelector('.pulse')).toBe(PULSING_VARIANTS.has(variant) ? badge?.firstChild : null);
       unmount();
     }
   });
@@ -166,6 +166,6 @@ describe('VerbBadge', () => {
 
     expect(screen.getByText('STUCK · 12h')).toBeTruthy();
     expect(screen.getByText('STUCK · 12h').closest('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'STUCK · Nh');
-    expect(container.querySelector('.verb-badge-pulse')).toBeNull();
+    expect(container.querySelector('.pulse')).toBeNull();
   });
 });
