@@ -143,7 +143,7 @@ const getClaudeAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/claude-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* Effect.promise(() => getClaudeAuthStatus());
+    const status = yield* getClaudeAuthStatus();
     return jsonResponse(status);
   })),
 );

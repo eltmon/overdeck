@@ -117,6 +117,14 @@ export class ConfigParseError extends Data.TaggedError('ConfigParseError')<{
   readonly cause?: unknown;
 }> {}
 
+// ─── Authentication errors ────────────────────────────────────────────────────
+
+/** Claude Code credential JSON could not be parsed. */
+export class ClaudeCredentialParseError extends Data.TaggedError('ClaudeCredentialParseError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 // ─── Process errors ───────────────────────────────────────────────────────────
 
 /** A child process failed to spawn. */
