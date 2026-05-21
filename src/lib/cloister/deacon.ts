@@ -2656,6 +2656,133 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 }
 
 /**
+ * PAN-1178: detect swarm slot PRs that merged into their parent feature branch
+ * but whose `/api/swarm/slot-merged` callback never fired.
+ *
+ * Slot branches merge into `feature/<parent>`, NOT into main. Neither
+ * `reconcileStaleMergeStatus` (which scans for branches merged to main) nor the
+ * GitHub-app `reviewStatus.prUrl` patrol (which tracks the issue's single main
+ * PR) ever sees them. With no detector, `postMergeLifecycle` is never called
+ * for the slot branch, `onSlotMergeComplete` never runs, and the swarm's
+ * auto-advance stalls — every wave then needs a manual `pan swarm <id>` plus a
+ * hand-rolled `/api/swarm/slot-merged` POST.
+ *
+ * This patrol closes that gap. For every active swarm (a feature workspace
+ * whose continue vBRIEF carries a `swarmRuntime` with at least one `running`
+ * slot) it asks GitHub which PRs merged into the parent feature branch, then
+ * fires `postMergeLifecycle(issueId, projectPath, slotBranch, { skipDeploy })`
+ * for each running slot whose slot branch is among them — exactly the loopback
+ * the merge-agent drives on the happy path.
+ *
+ * Re-firing is guarded two ways: the durable gate is the runtime slot status
+ * itself (once `onSlotMergeComplete` flips the slot to `merged` it is no longer
+ * `running`, so the patrol skips it), and a short per-branch cooldown bridges
+ * the window while the async loopback POST is still in flight.
+ */
+const recentSlotMergeFires = new Map<string, number>();
+const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5 * 60 * 1000;
+
+interface MergedSlotPr {
+  number: number;
+  headRefName: string;
+  mergedAt: string | null;
+  url: string;
+}
+
+export async function detectMergedSwarmSlots(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { parseSlotBranch, postMergeLifecycle } = await import('./merge-agent.js');
+    const { resolveGitHubIssue } = await import('../tracker-utils.js');
+    const { readContinueStateAsync } = await import('../vbrief/continue-state.js');
+
+    const now = Date.now();
+    // Drop cooldown entries that can no longer suppress anything, so the map
+    // stays bounded to slot branches fired within the last cooldown window.
+    for (const [branch, firedAt] of recentSlotMergeFires) {
+      if (now - firedAt >= SLOT_MERGE_REFIRE_COOLDOWN_MS) recentSlotMergeFires.delete(branch);
+    }
+
+    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+      // Slot sub-workspaces (`feature-<parent>-slot-N`) are not swarm parents.
+      if (/-slot-\d+$/i.test(issueId)) continue;
+
+      let runtime;
+      try {
+        const cont = await readContinueStateAsync(workspacePath, issueId);
+        runtime = cont?.swarmRuntime;
+      } catch {
+        continue; // unreadable / malformed continue file — skip this workspace
+      }
+      if (!runtime) continue;
+
+      // Only `running` slots can have a lost slot-merged callback: a `pending`
+      // slot has no branch yet, and `merged`/`failed`/`failed-merge` slots are
+      // already terminal.
+      const runningSlots = runtime.slots.filter(slot => slot.status === 'running');
+      if (runningSlots.length === 0) continue;
+
+      const gh = resolveGitHubIssue(issueId);
+      if (!gh.isGitHub) continue;
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+
+      const issueLower = issueId.toLowerCase();
+      const featureBranch = `feature/${issueLower}`;
+
+      let mergedPrs: MergedSlotPr[];
+      try {
+        const { stdout } = await execFileAsync(
+          'gh',
+          ['pr', 'list', '--repo', `${gh.owner}/${gh.repo}`, '--base', featureBranch,
+            '--state', 'merged', '--json', 'number,headRefName,mergedAt,url', '--limit', '50'],
+          { cwd: project.projectPath },
+        );
+        mergedPrs = JSON.parse(stdout || '[]') as MergedSlotPr[];
+      } catch {
+        continue; // gh query failed — leave it for the next patrol cycle
+      }
+
+      // Index merged slot PRs by head branch for an O(1) per-slot lookup.
+      const mergedSlotPrs = new Map<string, MergedSlotPr>();
+      for (const pr of mergedPrs) {
+        if (!pr.mergedAt) continue;
+        const slotInfo = parseSlotBranch(pr.headRefName);
+        if (!slotInfo) continue;
+        // Defensive: the base branch matched but the head encodes a different
+        // parent (should not happen, but never fire across issues).
+        if (slotInfo.issueLower !== issueLower) continue;
+        mergedSlotPrs.set(pr.headRefName, pr);
+      }
+      if (mergedSlotPrs.size === 0) continue;
+
+      for (const slot of runningSlots) {
+        const slotBranch = `feature/${issueLower}-slot-${slot.slotId}`;
+        const pr = mergedSlotPrs.get(slotBranch);
+        if (!pr) continue; // this slot's PR has not merged — nothing to do
+
+        const lastFired = recentSlotMergeFires.get(slotBranch);
+        if (lastFired !== undefined && now - lastFired < SLOT_MERGE_REFIRE_COOLDOWN_MS) continue;
+        recentSlotMergeFires.set(slotBranch, now);
+
+        const msg = `Detected merged swarm slot PR #${pr.number} (${slotBranch}) — firing postMergeLifecycle for ${issueId} slot ${slot.slotId}`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+        // postMergeLifecycle routes slot branches straight to the loopback
+        // `/api/swarm/slot-merged` POST and returns; projectPath is unused on
+        // that path but kept for signature parity with the main-branch case.
+        postMergeLifecycle(issueId, project.projectPath, slotBranch, { skipDeploy: true }).catch(err =>
+          console.warn(`[deacon] postMergeLifecycle (swarm slot) failed for ${issueId} slot ${slot.slotId}: ${err}`),
+        );
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in detectMergedSwarmSlots: ${err.message}`);
+  }
+  return actions;
+}
+
+/**
  * PAN-1027 reverse direction: detect issues whose internal mergeStatus='merged' but
  * whose GitHub PR is NOT merged (open, closed-without-merge, or reverted). When the
  * dashboard previously detected a merge that later got reverted (or the deacon's
@@ -4227,6 +4354,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   const staleMergeActions = await reconcileStaleMergeStatus();
   actions.push(...staleMergeActions);
   for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1178: detect swarm slot PRs merged into a feature branch (not main) so
+  // the slot-merged loopback fires and the swarm's auto-advance is not stranded.
+  const swarmSlotActions = await detectMergedSwarmSlots();
+  actions.push(...swarmSlotActions);
+  for (const a of swarmSlotActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
   // (closed-without-merge, reopened after revert, or false positive from squash detection).

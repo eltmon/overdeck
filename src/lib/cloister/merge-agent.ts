@@ -254,8 +254,8 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
  * leaf and a sub-tree at the same path. Sibling names (`feature/<parent>` and
  * `feature/<parent>-slot-N`) avoid the collision.
  */
-const SLOT_BRANCH_PATTERN = /^feature\/(.+)-slot-(\d+)$/;
-function parseSlotBranch(branch: string | undefined | null): { itemSlot: number; issueLower: string } | null {
+export const SLOT_BRANCH_PATTERN = /^feature\/(.+)-slot-(\d+)$/;
+export function parseSlotBranch(branch: string | undefined | null): { itemSlot: number; issueLower: string } | null {
   if (!branch) return null;
   const match = SLOT_BRANCH_PATTERN.exec(branch);
   if (!match) return null;

@@ -97,8 +97,8 @@ Dispatch one or more slots for an issue. Privileged.
 Loopback signal that a slot branch has merged into its parent feature branch.
 
 - **Auth:** `INTERNAL_TOKEN_HEADER` only (no same-origin alternative).
-- **Caller:** `postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`, when it parses a merged source branch matching `^feature/<parent>/slot-(\d+)$`.
-- **Body:** `{ issueId, slot, synthesisOutput? }` (the route resolves the canonical `itemId` from runtime state by matching slot number; `synthesisOutput` is size-capped).
+- **Caller:** `postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`, when it parses a merged source branch matching `SLOT_BRANCH_PATTERN` (`^feature/(.+)-slot-(\d+)$`). The Deacon's `detectMergedSwarmSlots` patrol is a host-side safety net that drives the same loopback when the merge-agent callback is lost (PAN-1178).
+- **Body:** `{ issueId, itemId, slotId, synthesisOutput? }`. `slotId` is a positive integer (the field is `slotId`, **not** `slot`). `itemId` is a string that may be empty — when empty the route resolves the canonical item id from runtime state by matching `slotId`. `synthesisOutput` is optional and size-capped.
 - **Side effects:** Updates the slot's `SwarmSlotRuntime.status` to `merged`, re-evaluates `getDispatchableItems`, dispatches any newly-ready items (respecting capacity + overlap rules), and persists `SynthesisOutput` records.
 
 ### `GET /api/swarm/:issueId`
