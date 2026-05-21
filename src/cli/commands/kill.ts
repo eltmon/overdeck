@@ -5,6 +5,8 @@ import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
+import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 
 interface KillOptions {
   force?: boolean;
@@ -59,14 +61,25 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     process.exit(1);
   }
 
-  // PAN-1316: tear down the workspace Docker stack so dev-server containers
-  // don't outlive their owning agent. Restart goes through a different path
-  // that re-asserts stack health, so this is safe for user-initiated kills only.
-  if (state?.workspace && state?.issueId) {
+  // PAN-1316/PAN-1326: tear down the workspace Docker stack so dev-server
+  // containers don't outlive their owning agent. Restart goes through a
+  // different path that re-asserts stack health, so this is safe for
+  // user-initiated kills only.
+  //
+  // Resolve the workspace from the issue (not from the agent's own state) so
+  // killing a specialist (review/test/ship) — whose state.workspace may not
+  // point at the work agent's workspace — still tears down the right stack.
+  if (state?.issueId) {
     try {
-      const dockerResult = await stopWorkspaceDocker(state.workspace, state.issueId.toLowerCase());
-      if (dockerResult.containersFound) {
-        console.log(chalk.gray(`Stopped Docker stack: ${dockerResult.steps.join('; ')}`));
+      const issueLower = state.issueId.toLowerCase();
+      const project = resolveProjectFromIssue(state.issueId);
+      const projectPath = project?.projectPath ?? process.cwd();
+      const workspacePath = findWorkspacePath(projectPath, issueLower);
+      if (workspacePath) {
+        const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
+        if (dockerResult.containersFound) {
+          console.log(chalk.gray(`Stopped Docker stack: ${dockerResult.steps.join('; ')}`));
+        }
       }
     } catch (err: any) {
       console.warn(chalk.yellow(`Docker teardown warning: ${err?.message ?? err}`));

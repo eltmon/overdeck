@@ -1070,21 +1070,34 @@ export function createAgentStopHandler(
     yield* Effect.promise(() => appendAgentLifecycleLog(id, lifecycleEvent));
     yield* Effect.promise(() => stopAgentAsync(id));
 
-    // PAN-1316: tear down the workspace Docker stack on user-initiated stop.
+    // PAN-1316/PAN-1326: tear down the workspace Docker stack on user-initiated stop.
     // Without this, dev-server containers (Vite/Webpack) outlive their owning
     // agent and can degrade the host via inotify-fallback polling storms.
     // Internal stops (restart) take a different path and don't reach here.
-    if (stateBeforeStop?.workspace && stateBeforeStop?.issueId) {
-      try {
-        const dockerResult = yield* Effect.promise(() =>
-          stopWorkspaceDocker(stateBeforeStop.workspace!, stateBeforeStop.issueId!.toLowerCase()),
-        );
-        if (dockerResult.containersFound) {
-          console.log(`[agents] ✓ Stopped Docker stack for ${id}: ${dockerResult.steps.join('; ')}`);
+    //
+    // Resolve the workspace from the issue (not from the agent's own state) so
+    // killing a specialist (review/test/ship) — whose state.workspace may not
+    // point at the work agent's workspace — still tears down the right stack.
+    // Mirrors the postMergeLifecycle pattern in merge-agent.ts.
+    if (stateBeforeStop?.issueId) {
+      yield* Effect.promise(async () => {
+        try {
+          const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+          const { findWorkspacePath } = await import('../../../lib/lifecycle/archive-planning.js');
+          const issueLower = stateBeforeStop.issueId!.toLowerCase();
+          const project = resolveProjectFromIssue(stateBeforeStop.issueId!);
+          const projectPath = project?.projectPath ?? process.cwd();
+          const workspacePath = findWorkspacePath(projectPath, issueLower);
+          if (workspacePath) {
+            const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
+            if (dockerResult.containersFound) {
+              console.log(`[agents] ✓ Stopped Docker stack for ${id}: ${dockerResult.steps.join('; ')}`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[agents] Docker teardown failed for ${id} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
         }
-      } catch (err) {
-        console.warn(`[agents] Docker teardown failed for ${id} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-      }
+      });
     }
 
     // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
