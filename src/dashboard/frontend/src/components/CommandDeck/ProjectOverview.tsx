@@ -8,7 +8,7 @@ import PhaseHeader from '../primitives/PhaseHeader';
 import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
 import { LiveCounter } from './LiveCounter';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
-import type { Agent, Issue } from '../../types';
+import type { Agent, Issue, CanonicalState } from '../../types';
 
 export interface IssueCostBreakdown {
   byModel: Record<string, { cost: number; tokens: number }>;
@@ -66,13 +66,13 @@ function reviewStatusForClassifier(
   } as ReviewStatusSnapshot;
 }
 
-function featureState(feature: ProjectFeature): string | undefined {
+function featureState(feature: ProjectFeature): CanonicalState | undefined {
   const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
   if (raw.includes('review')) return 'in_review';
   if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
   if (raw.includes('done') || raw.includes('complete')) return 'done';
   if (raw.includes('cancel')) return 'canceled';
-  return feature.status;
+  return feature.status as CanonicalState | undefined;
 }
 
 function classifierIssue(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): PipelineClassifierIssue {
