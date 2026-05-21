@@ -4,17 +4,17 @@
     "created": "2026-05-20T02:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1231: PAN-1148 follow-up — Agents page gaps (drawer wiring / ship accent / TopBar segmented control / font)",
-    "updated": "2026-05-20T09:05:13.420Z"
+    "updated": "2026-05-21T18:15:55.596Z"
   },
   "plan": {
     "id": "pan-1231",
     "title": "PAN-1148 follow-up — Agents page gaps (drawer wiring / ship accent / TopBar segmented control / font)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "cbff9200-1ed8-4105-8715-6cc69d80324f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 32,
+    "sequence": 37,
     "created": "2026-05-20T02:45:00.000Z",
-    "updated": "2026-05-20T09:05:13.420Z",
+    "updated": "2026-05-21T18:15:55.596Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1231",
@@ -333,69 +333,67 @@
     "metadata": {
       "canonicalFilename": "2026-05-20-PAN-1231-pan-1148-follow-up-agents-page-gaps-drawer-wiring-ship-accent-topbar-segmented-control-font.vbrief.json",
       "pipeline": {
-        "phase": "merge",
+        "phase": "done",
         "issueId": "PAN-1231",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T09:05:13.420Z",
+        "updatedAt": "2026-05-21T18:15:49.828Z",
         "work": {
-          "updatedAt": "2026-05-20T09:05:13.420Z",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-20T09:05:13.420Z",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T09:05:13.420Z",
+              "at": "2026-05-21T18:15:49.828Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-05-20T09:05:13.420Z",
-          "notes": "All 4 sub-reviews clean; 22/22 AC satisfied; PR ready to merge",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T09:05:13.420Z",
-              "notes": "All 4 sub-reviews clean; 22/22 AC satisfied; PR ready to merge"
+              "at": "2026-05-21T18:15:49.828Z"
             }
           ],
           "approval": "approved"
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-05-20T09:05:13.420Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T09:05:13.420Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "at": "2026-05-21T18:15:49.828Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T09:05:13.420Z",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T09:05:13.420Z",
+          "status": "merged",
+          "updatedAt": "2026-05-21T18:15:49.828Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T09:05:13.420Z"
+              "status": "merged",
+              "at": "2026-05-21T18:15:49.828Z"
             }
           ],
-          "readyForMerge": true,
+          "readyForMerge": false,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1237"
         }
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
