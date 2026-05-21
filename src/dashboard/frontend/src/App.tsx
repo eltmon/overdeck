@@ -898,7 +898,7 @@ export default function App() {
         {activeTab === 'agents' && (
           <BootstrapGate fallback={<AgentsSkeleton />}>
             <div className="h-full w-full overflow-y-auto">
-              <FleetAgentsView />
+              <FleetAgentsView onNavigateToIssues={() => setActiveTab('kanban')} />
             </div>
           </BootstrapGate>
         )}

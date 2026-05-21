@@ -9,6 +9,8 @@ import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
 import MetricStrip from '../primitives/MetricStrip';
+import TopBar from '../primitives/TopBar';
+import Button from '../primitives/Button';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
 
 const ROLE_ORDER = {
@@ -34,6 +36,27 @@ type FilterOption = {
   id: string;
   name: string;
 };
+
+type AgentsViewMode = 'grid' | 'table' | 'timeline';
+const VIEW_MODES: AgentsViewMode[] = ['grid', 'table', 'timeline'];
+
+function readViewMode(): AgentsViewMode {
+  if (typeof window === 'undefined') return 'grid';
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get('view');
+  return VIEW_MODES.includes(view as AgentsViewMode) ? (view as AgentsViewMode) : 'grid';
+}
+
+function replaceViewUrl(view: AgentsViewMode) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (view === 'grid') {
+    url.searchParams.delete('view');
+  } else {
+    url.searchParams.set('view', view);
+  }
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
 
 function sumIssueCostEvents(events: CostEvent[] | undefined) {
   return (events ?? []).reduce(
@@ -219,17 +242,21 @@ function DropdownFilter({ label, selected, options, onToggle }: {
   );
 }
 
-export function FleetAgentsView() {
+export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: () => void } = {}) {
   const now = useSharedTick();
   const agents = useDashboardStore(selectAgents) as Agent[];
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
+  const [viewMode, setViewMode] = useState<AgentsViewMode>(readViewMode);
   const { eventsByIssue } = useCostStream({ limit: 500 });
 
   useEffect(() => {
-    const handlePopState = () => setFilter(readFilterState());
+    const handlePopState = () => {
+      setFilter(readFilterState());
+      setViewMode(readViewMode());
+    };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -328,6 +355,11 @@ export function FleetAgentsView() {
     replaceFilterUrl(next);
   }
 
+  function updateViewMode(view: AgentsViewMode) {
+    setViewMode(view);
+    replaceViewUrl(view);
+  }
+
   function togglePhase(phase: AgentPhaseFilter) {
     updateFilter({ ...filter, phases: toggleValue(filter.phases, phase) as AgentPhaseFilter[] });
   }
@@ -351,91 +383,154 @@ export function FleetAgentsView() {
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   }
 
-  if (fleetAgents.length === 0) {
-    return (
-      <section data-component="fleet-agents-view" className="p-6">
-        <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-          No running or stuck agents.
-        </div>
-      </section>
-    );
-  }
+  const runningCount = fleetAgents.filter(isRunningAgent).length;
+  const stuckCount = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status) || agent.troubled).length;
+  const cumulativeRuntimeMs = fleetAgents
+    .filter(isRunningAgent)
+    .reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0);
+  const metaString = `${runningCount} active · ${stuckCount} stuck · ${formatDuration(cumulativeRuntimeMs)} cumulative runtime`;
 
-  return (
-    <section data-component="fleet-agents-view" className="p-6">
-      <MetricStrip tiles={metricTiles} columns={6} variant="agents" className="mb-[14px]" />
-      <div className="mb-[14px] flex flex-wrap items-center gap-[8px] rounded-[18px] border border-border bg-background/80 px-[12px] py-[10px]" data-component="agents-filter-row">
-        <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Agents phase filter">
-          <button
-            type="button"
-            className={cn(
-              'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground',
-              filter.phases.length === 0 && 'bg-accent text-foreground',
-            )}
-            aria-pressed={filter.phases.length === 0}
-            onClick={clearPhases}
-          >
-            All
-          </button>
-          {PHASE_FILTERS.map((phase) => (
+  const content = (() => {
+    if (fleetAgents.length === 0) {
+      return (
+        <div className="p-6">
+          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+            No running or stuck agents.
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-6">
+        <MetricStrip tiles={metricTiles} columns={6} variant="agents" className="mb-[14px]" />
+        <div className="mb-[14px] flex flex-wrap items-center gap-[8px] rounded-[18px] border border-border bg-background/80 px-[12px] py-[10px]" data-component="agents-filter-row">
+          <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Agents phase filter">
             <button
-              key={phase}
               type="button"
               className={cn(
-                'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
-                filter.phases.includes(phase) && 'bg-accent text-foreground',
+                'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+                filter.phases.length === 0 && 'bg-accent text-foreground',
               )}
-              aria-pressed={filter.phases.includes(phase)}
-              onClick={() => togglePhase(phase)}
+              aria-pressed={filter.phases.length === 0}
+              onClick={clearPhases}
             >
-              {phase}
+              All
             </button>
-          ))}
+            {PHASE_FILTERS.map((phase) => (
+              <button
+                key={phase}
+                type="button"
+                className={cn(
+                  'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
+                  filter.phases.includes(phase) && 'bg-accent text-foreground',
+                )}
+                aria-pressed={filter.phases.includes(phase)}
+                onClick={() => togglePhase(phase)}
+              >
+                {phase}
+              </button>
+            ))}
+          </div>
+          <DropdownFilter label="Project" selected={filter.projects} options={projectOptions} onToggle={toggleProject} />
+          <DropdownFilter label="Model" selected={filter.models} options={modelOptions} onToggle={toggleModel} />
+          <span className="ml-auto text-[11px] font-medium text-muted-foreground">{filteredAgents.length} / {fleetAgents.length} agents</span>
         </div>
-        <DropdownFilter label="Project" selected={filter.projects} options={projectOptions} onToggle={toggleProject} />
-        <DropdownFilter label="Model" selected={filter.models} options={modelOptions} onToggle={toggleModel} />
-        <span className="ml-auto text-[11px] font-medium text-muted-foreground">{filteredAgents.length} / {fleetAgents.length} agents</span>
-      </div>
-      {filteredAgents.length === 0 ? (
-        <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-          No agents match the selected filters.
-        </div>
-      ) : (
-        <div className="grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
-          {filteredAgents.map((agent) => {
-            const issue = issuesById.get(issueKey(agent.issueId));
-            const role = agentRole(agent);
-            const output = agentOutputById[agent.id] ?? [];
-            const stuck = isAgentProblemStatus(agent.status) || agent.troubled;
-            const lastHeard = agent.lastActivity ? formatRelativeTime(agent.lastActivity, now) : '—';
-            const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
+        {viewMode === 'grid' && (
+          filteredAgents.length === 0 ? (
+            <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+              No agents match the selected filters.
+            </div>
+          ) : (
+            <div className="grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
+              {filteredAgents.map((agent) => {
+                const issue = issuesById.get(issueKey(agent.issueId));
+                const role = agentRole(agent);
+                const output = agentOutputById[agent.id] ?? [];
+                const stuck = isAgentProblemStatus(agent.status) || agent.troubled;
+                const lastHeard = agent.lastActivity ? formatRelativeTime(agent.lastActivity, now) : '—';
+                const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
 
-            return (
-              <AgentCard
-                key={agent.id}
-                id={agent.id}
-                name={agent.issueId ?? agent.id}
-                role={role}
-                issue={agent.issueId ? {
-                  id: agent.issueId,
-                  title: issue?.title ?? agent.issueId,
-                  project: issueProject(issue),
-                } : undefined}
-                meta={[
-                  { label: 'Model', value: compactModel(agent.model) },
-                  { label: 'Runtime', value: runtime },
-                  { label: 'Last heard', value: lastHeard },
-                ]}
-                streamLines={output.slice(-8)}
-                verbBadge={verbBadgeForAgent(agent, now)}
-                stuck={stuck}
-                stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
-                onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
-              />
-            );
-          })}
-        </div>
-      )}
+                return (
+                  <AgentCard
+                    key={agent.id}
+                    id={agent.id}
+                    name={agent.issueId ?? agent.id}
+                    role={role}
+                    issue={agent.issueId ? {
+                      id: agent.issueId,
+                      title: issue?.title ?? agent.issueId,
+                      project: issueProject(issue),
+                    } : undefined}
+                    meta={[
+                      { label: 'Model', value: compactModel(agent.model) },
+                      { label: 'Runtime', value: runtime },
+                      { label: 'Last heard', value: lastHeard },
+                    ]}
+                    streamLines={output.slice(-8)}
+                    verbBadge={verbBadgeForAgent(agent, now)}
+                    stuck={stuck}
+                    stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
+                    onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
+                  />
+                );
+              })}
+            </div>
+          )
+        )}
+        {viewMode === 'table' && (
+          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground" data-component="agents-coming-soon">
+            Coming soon
+          </div>
+        )}
+        {viewMode === 'timeline' && (
+          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground" data-component="agents-coming-soon">
+            Coming soon
+          </div>
+        )}
+      </div>
+    );
+  })();
+
+  return (
+    <section data-component="fleet-agents-view" className="flex h-full w-full flex-col">
+      <TopBar
+        breadcrumb="Eltmon / Agents"
+        meta={metaString}
+        search={
+          <div className="flex items-center gap-[6px] rounded-[var(--radius-sm)] border border-border bg-card px-[10px] py-[6px] text-[12px] text-muted-foreground">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            Search agents by name, issue, model…
+          </div>
+        }
+        segmentedControl={
+          <div className="flex items-center gap-[2px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]">
+            {VIEW_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={cn(
+                  'rounded-[calc(var(--radius-sm)-2px)] px-[10px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
+                  viewMode === mode && 'bg-accent text-foreground',
+                )}
+                aria-pressed={viewMode === mode}
+                onClick={() => updateViewMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        }
+        actions={
+          onNavigateToIssues && (
+            <Button size="sm" variant="primary" onClick={onNavigateToIssues}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mr-[6px]"><path d="M5 4 19 12 5 20Z" fill="currentColor" /></svg>
+              Start agent
+            </Button>
+          )
+        }
+      />
+      {content}
     </section>
   );
 }

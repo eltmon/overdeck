@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../lib/store';
 import type { Agent, Issue } from '../../types';
 import { FleetAgentsView } from './FleetAgentsView';
+import { IssueDrawer } from '../drawer/IssueDrawer';
+import { DialogProvider } from '../DialogProvider';
 
 function agent(overrides: Partial<Agent>): Agent {
   return {
@@ -36,7 +38,7 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
-function renderFleetView() {
+function renderFleetView(props: { onNavigateToIssues?: () => void } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -53,7 +55,7 @@ function renderFleetView() {
 
   return render(
     <QueryClientProvider client={client}>
-      <FleetAgentsView />
+      <FleetAgentsView {...props} />
     </QueryClientProvider>,
   );
 }
@@ -163,14 +165,51 @@ describe('FleetAgentsView', () => {
     expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
   });
 
-  it('opens the drawer from a fleet card issue action at the active-agent anchor', () => {
-    renderFleetView();
+  it('opens the drawer from a fleet card and scrolls to the active-agent element', () => {
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    const cafSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
+    client.setQueryData(['cost-stream', undefined, 500], {
+      events: [],
+      byIssue: {
+        'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+      },
+      count: 1,
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <FleetAgentsView />
+          <IssueDrawer />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getAllByText('Open issue')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
     expect(window.location.hash).toBe('#active-agent');
+
+    const activeAgent = document.getElementById('active-agent');
+    expect(activeAgent).toBeTruthy();
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'start' });
+
+    scrollSpy.mockRestore();
+    rafSpy.mockRestore();
+    cafSpy.mockRestore();
   });
 
   it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {
@@ -254,5 +293,65 @@ describe('FleetAgentsView', () => {
 
     const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
     expect(within(tiles[4] as HTMLElement).getByText('0m')).toBeInTheDocument();
+  });
+
+  it('renders TopBar with breadcrumb, meta, search placeholder, segmented control, and Start agent button', () => {
+    renderFleetView({ onNavigateToIssues: vi.fn() });
+
+    expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
+    expect(screen.getByText(/1 active · 1 stuck · 3h 0m cumulative runtime/)).toBeInTheDocument();
+    expect(screen.getByText('Search agents by name, issue, model…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
+  });
+
+  it('defaults to grid view and renders the existing card grid', () => {
+    renderFleetView();
+
+    expect(screen.getByRole('button', { name: 'grid', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+  });
+
+  it('switches to table view with Coming soon placeholder and updates URL', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'table' }));
+    expect(screen.getByRole('button', { name: 'table', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
+    expect(screen.queryByText('agent-running')).not.toBeInTheDocument();
+  });
+
+  it('switches to timeline view with Coming soon placeholder and updates URL', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'timeline' }));
+    expect(screen.getByRole('button', { name: 'timeline', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
+  });
+
+  it('preserves existing filters when switching view mode', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    expect(window.location.search).toBe('?phase=work');
+
+    fireEvent.click(screen.getByRole('button', { name: 'table' }));
+    expect(new URLSearchParams(window.location.search).get('phase')).toBe('work');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
+  });
+
+  it('calls onNavigateToIssues when Start agent is clicked', () => {
+    const onNavigateToIssues = vi.fn();
+    renderFleetView({ onNavigateToIssues });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start agent' }));
+    expect(onNavigateToIssues).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render Start agent button when onNavigateToIssues is omitted', () => {
+    renderFleetView();
+
+    expect(screen.queryByRole('button', { name: 'Start agent' })).not.toBeInTheDocument();
   });
 });
