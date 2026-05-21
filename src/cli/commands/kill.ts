@@ -4,6 +4,7 @@ import { sessionExists } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
+import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 
 interface KillOptions {
   force?: boolean;
@@ -56,5 +57,19 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
     process.exit(1);
+  }
+
+  // PAN-1316: tear down the workspace Docker stack so dev-server containers
+  // don't outlive their owning agent. Restart goes through a different path
+  // that re-asserts stack health, so this is safe for user-initiated kills only.
+  if (state?.workspace && state?.issueId) {
+    try {
+      const dockerResult = await stopWorkspaceDocker(state.workspace, state.issueId.toLowerCase());
+      if (dockerResult.containersFound) {
+        console.log(chalk.gray(`Stopped Docker stack: ${dockerResult.steps.join('; ')}`));
+      }
+    } catch (err: any) {
+      console.warn(chalk.yellow(`Docker teardown warning: ${err?.message ?? err}`));
+    }
   }
 }
