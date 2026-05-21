@@ -373,6 +373,19 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
             </div>
           ) : undefined
         }
+        actions={
+          onSearchOpen ? (
+            <button
+              type="button"
+              data-component="pipeline-start-agent"
+              onClick={onSearchOpen}
+              className="flex h-[32px] items-center gap-[6px] rounded-[var(--radius-lg)] bg-primary px-[14px] text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <span aria-hidden="true">▶</span>
+              Start agent
+            </button>
+          ) : undefined
+        }
       />
       <MetricStrip columns={5} tiles={metricTiles} />
       <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-border bg-background px-[22px] py-[10px]" data-component="pipeline-filter-row">
