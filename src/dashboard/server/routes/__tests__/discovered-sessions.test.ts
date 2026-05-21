@@ -31,6 +31,7 @@ import {
   rejectUnauthorizedDashboardSessionMintRequest,
 } from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -66,6 +67,7 @@ beforeEach(() => {
   process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
 });
 
 afterEach(async () => {
@@ -76,6 +78,7 @@ afterEach(async () => {
   delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
