@@ -426,13 +426,16 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // 8. Install caveman hook files and compress scripts to ~/.panopticon/hooks/caveman/
   try {
     const { setupCavemanHooks, setupCavemanCompressScripts } = await import('../../../lib/caveman/setup.js');
-    const cavemanOk = setupCavemanHooks();
+    const { Effect } = await import('effect');
+    const cavemanOk = await Effect.runPromise(
+      Effect.match(setupCavemanHooks(), { onFailure: () => false, onSuccess: () => true }),
+    );
     if (cavemanOk) {
       console.log(chalk.green('✓ Installed caveman hook files to ~/.panopticon/hooks/caveman/'));
     } else {
       console.log(chalk.yellow('⚠ Caveman hook files not found — skipping (non-fatal)'));
     }
-    const compressOk = setupCavemanCompressScripts();
+    const compressOk = await Effect.runPromise(setupCavemanCompressScripts());
     if (compressOk) {
       console.log(chalk.green('✓ Installed caveman-compress scripts to ~/.panopticon/hooks/caveman-compress/'));
     }
