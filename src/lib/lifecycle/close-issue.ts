@@ -378,9 +378,8 @@ async function closeRallyDirectImpl(ctx: LifecycleContext): Promise<StepResult> 
     workspace: ctx.rally.workspace,
     project: ctx.rally.project,
   });
-  // RallyTracker still returns Promise<void> from transitionIssue today —
-  // it will be Effect-migrated in its own slot. Cast to satisfy the interface.
-  await (tracker.transitionIssue(ctx.issueId, 'closed') as unknown as Promise<void>);
+  // RallyTracker.transitionIssue returns Effect (migrated in PAN-1249).
+  await Effect.runPromise(tracker.transitionIssue(ctx.issueId, 'closed'));
   markWorkAgentStoppedForIssue(ctx.issueId);
   return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
 }

@@ -767,12 +767,13 @@ const postTestConnectionRoute = HttpRouter.add(
     const result = yield* Effect.promise(async () => {
       const startTs = Date.now();
       try {
-        await embed(body.provider as 'openai' | 'voyage' | 'ollama', {
+        // embed() returns Effect — must runPromise to actually execute it
+        await Effect.runPromise(embed(body.provider as 'openai' | 'voyage' | 'ollama', {
           text: 'connection test',
           model: body.model,
           apiKey: body.apiKey,
           baseUrl: body.ollamaBaseUrl,
-        });
+        }));
         return { ok: true, latencyMs: Date.now() - startTs };
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), latencyMs: Date.now() - startTs };
