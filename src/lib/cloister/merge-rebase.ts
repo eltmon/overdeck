@@ -1,24 +1,77 @@
 /**
  * In-Process Rebase (PAN-632)
  *
- * Replaces spawnRebaseAgentForBranch with direct git operations via execAsync.
+ * Replaces spawnRebaseAgentForBranch with direct git operations via Effect.
  * No specialist, no polling, no tmux session — just git commands.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { join } from 'path';
-
-const execAsync = promisify(exec);
+import { Effect, FileSystem } from 'effect';
+import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
+import { ChildProcess } from 'effect/unstable/process';
+import { layer as NodeServicesLayer } from '@effect/platform-node/NodeServices';
+import { GitError, MergeConflictError } from '../errors.js';
 
 export interface RebaseResult {
-  success: boolean;
+  newHead: string;
   skipped?: boolean;
-  conflictFiles?: string[];
-  reason?: string;
-  newHead?: string;
 }
+
+const runGit = (args: readonly string[], cwd: string): Effect.Effect<string, GitError> =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner;
+    const cmd = ChildProcess.make('git', args, { cwd });
+    return yield* spawner.string(cmd).pipe(
+      Effect.mapError(
+        (cause) =>
+          new GitError({
+            command: ['git', ...args],
+            stderr: cause instanceof Error ? cause.message : String(cause),
+            exitCode: -1,
+            cause,
+          }),
+      ),
+    );
+  }).pipe(Effect.provide(NodeServicesLayer));
+
+const removeLockFile = (path: string): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    yield* fs.remove(path).pipe(Effect.orElseSucceed(() => undefined));
+  }).pipe(Effect.provide(NodeServicesLayer));
+
+/**
+ * On rebase conflict: collect conflict files, abort, and fail with MergeConflictError.
+ * Used as the catchTag handler for the rebase step.
+ */
+const onRebaseFailure = (
+  workspacePath: string,
+  featureBranch: string,
+  baseBranch: string,
+  logPrefix: string,
+): Effect.Effect<never, MergeConflictError> =>
+  runGit(['diff', '--name-only', '--diff-filter=U'], workspacePath).pipe(
+    Effect.orElseSucceed(() => ''),
+    Effect.flatMap((conflictOutput) => {
+      const conflictFiles = conflictOutput.trim().split('\n').filter(Boolean);
+      return runGit(['rebase', '--abort'], workspacePath).pipe(
+        Effect.orElseSucceed(() => ''),
+        Effect.flatMap(() => {
+          console.log(
+            `${logPrefix} Rebase failed, conflicts: ${conflictFiles.join(', ') || 'none detected'}`,
+          );
+          return Effect.fail(
+            new MergeConflictError({
+              branch: featureBranch,
+              targetBranch: baseBranch,
+              conflictedFiles: conflictFiles,
+            }),
+          );
+        }),
+      );
+    }),
+  );
 
 /**
  * Rebase a feature branch onto a base branch in-process.
@@ -27,106 +80,71 @@ export interface RebaseResult {
  * Steps:
  * 1. Fetch latest base branch
  * 2. Check if rebase is needed (commits behind)
- * 3. Remove .planning/ artifacts (always conflict during rebase)
- * 4. Rebase onto base branch
- * 5. Push with --force-with-lease
+ * 3. Rebase onto base branch
+ * 4. Push with --force-with-lease
  *
- * On conflict: aborts rebase and returns conflict file list.
+ * On conflict: aborts rebase and fails with MergeConflictError.
  */
-export async function rebaseFeatureBranch(
+export function rebaseFeatureBranch(
   workspacePath: string,
   featureBranch: string,
   baseBranch: string,
   issueId: string,
-): Promise<RebaseResult> {
-  const execOpts = { cwd: workspacePath, encoding: 'utf-8' as const, timeout: 120_000 };
+): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
   const logPrefix = `[merge-rebase] ${issueId}`;
 
-  try {
+  return Effect.gen(function* () {
     // Pre-flight: clean up stale git locks
     const lockFile = join(workspacePath, '.git', 'index.lock');
     if (existsSync(lockFile)) {
-      try {
-        const { unlinkSync } = await import('fs');
-        unlinkSync(lockFile);
-        console.log(`${logPrefix} Removed stale git index.lock`);
-      } catch { /* non-fatal */ }
+      yield* removeLockFile(lockFile);
+      console.log(`${logPrefix} Removed stale git index.lock`);
     }
 
     // Step 1: Fetch latest base branch
     console.log(`${logPrefix} Fetching origin/${baseBranch}...`);
-    await execAsync(`git fetch origin ${baseBranch}`, execOpts);
+    yield* runGit(['fetch', 'origin', baseBranch], workspacePath);
 
     // Step 2: Check if rebase is needed
-    const { stdout: behindCount } = await execAsync(
-      `git rev-list --count HEAD..origin/${baseBranch}`,
-      execOpts,
+    const behindOutput = yield* runGit(
+      ['rev-list', '--count', `HEAD..origin/${baseBranch}`],
+      workspacePath,
     );
-    const behind = parseInt(behindCount.trim(), 10);
+    const behind = parseInt(behindOutput.trim(), 10);
 
     if (behind === 0) {
       console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
-      // Push any cleanup commit we just made.
-      try {
-        await execAsync(
-          `git push --force-with-lease origin HEAD:${featureBranch}`,
-          execOpts,
-        );
-      } catch { /* up-to-date push is non-fatal */ }
-      const { stdout: currentHead } = await execAsync('git rev-parse HEAD', execOpts);
-      return { success: true, skipped: true, newHead: currentHead.trim() };
+      // Push any cleanup commit we just made (non-fatal).
+      yield* runGit(
+        ['push', '--force-with-lease', 'origin', `HEAD:${featureBranch}`],
+        workspacePath,
+      ).pipe(Effect.orElseSucceed(() => ''));
+      const currentHead = yield* runGit(['rev-parse', 'HEAD'], workspacePath);
+      return { newHead: currentHead.trim(), skipped: true };
     }
 
     console.log(`${logPrefix} ${behind} commits behind origin/${baseBranch}, rebasing...`);
 
-    // Step 4: Rebase onto base branch
-    try {
-      await execAsync(`git rebase origin/${baseBranch}`, execOpts);
-      console.log(`${logPrefix} Rebase successful`);
-    } catch (rebaseErr: any) {
-      // Rebase failed — likely conflicts
-      console.log(`${logPrefix} Rebase failed, checking for conflicts...`);
-
-      // Get conflict files
-      let conflictFiles: string[] = [];
-      try {
-        const { stdout: conflictOutput } = await execAsync(
-          'git diff --name-only --diff-filter=U 2>/dev/null || true',
-          execOpts,
-        );
-        conflictFiles = conflictOutput.trim().split('\n').filter(Boolean);
-      } catch { /* ignore */ }
-
-      // Abort the rebase
-      try {
-        await execAsync('git rebase --abort', execOpts);
-        console.log(`${logPrefix} Rebase aborted`);
-      } catch {
-        // May not be in rebase state
-      }
-
-      const reason = conflictFiles.length > 0
-        ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
-        : `Rebase failed: ${rebaseErr.message?.slice(0, 200) || 'unknown error'}`;
-
-      return { success: false, conflictFiles, reason };
-    }
-
-    // Step 5: Push with --force-with-lease
-    console.log(`${logPrefix} Pushing rebased branch...`);
-    await execAsync(
-      `git push --force-with-lease origin HEAD:${featureBranch}`,
-      execOpts,
+    // Step 3: Rebase — on GitError, collect conflict files, abort, fail with MergeConflictError
+    yield* runGit(['rebase', `origin/${baseBranch}`], workspacePath).pipe(
+      Effect.asVoid,
+      Effect.catchTag('GitError', () =>
+        onRebaseFailure(workspacePath, featureBranch, baseBranch, logPrefix),
+      ),
     );
 
-    // Get new HEAD
-    const { stdout: newHead } = await execAsync('git rev-parse HEAD', execOpts);
+    console.log(`${logPrefix} Rebase successful`);
+
+    // Step 4: Push with --force-with-lease
+    console.log(`${logPrefix} Pushing rebased branch...`);
+    yield* runGit(
+      ['push', '--force-with-lease', 'origin', `HEAD:${featureBranch}`],
+      workspacePath,
+    );
+
+    const newHead = yield* runGit(['rev-parse', 'HEAD'], workspacePath);
     console.log(`${logPrefix} Rebase complete, new HEAD: ${newHead.trim().slice(0, 8)}`);
 
-    return { success: true, newHead: newHead.trim() };
-  } catch (err: any) {
-    const reason = `Rebase error: ${err.message?.slice(0, 300) || 'unknown'}`;
-    console.error(`${logPrefix} ${reason}`);
-    return { success: false, reason };
-  }
+    return { newHead: newHead.trim() };
+  });
 }
