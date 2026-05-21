@@ -118,12 +118,7 @@ export const PROJECT_PRDS_COMPLETED_SUBDIR = 'completed';
  * 2. The SOURCE_DEV_SKILLS_DIR exists (only present in repo, not in npm package)
  */
 export function isDevMode(): boolean {
-  try {
-    // Check if dev-skills directory exists - this is only in the repo, not npm package
-    return existsSync(SOURCE_DEV_SKILLS_DIR);
-  } catch {
-    return false;
-  }
+  return existsSync(SOURCE_DEV_SKILLS_DIR);
 }
 
 /**
