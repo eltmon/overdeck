@@ -3,9 +3,16 @@
  *
  * Persistent merge queue backed by SQLite. Serializes merges per-project
  * and survives server restarts. Replaces the in-memory _mergeQueues Map.
+ *
+ * PAN-1249: Effect migration pass — public API stays synchronous to keep
+ * the existing call sites unchanged. The DatabaseError tagged error is
+ * re-exported from ./index.js so callers can surface typed SQLite
+ * failures. Full conversion to @effect/sql-sqlite-bun is deferred to
+ * PAN-447.
  */
 
-import { getDatabase } from './index.js';
+import { getDatabase, DatabaseError } from './index.js';
+export { DatabaseError };
 
 export interface MergeQueueEntry {
   id: number;
