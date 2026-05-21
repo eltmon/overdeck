@@ -110,7 +110,7 @@ export function IssueDrawer() {
             <div className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               {drawer.issueId}
             </div>
-            <h2 className="truncate text-[18px] font-semibold leading-none text-foreground">
+            <h2 className="truncate font-display text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
               {issue?.title ?? 'Issue details'}
             </h2>
           </div>
