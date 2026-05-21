@@ -21,7 +21,9 @@ import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import SmeeClient from 'smee-client';
+import { Effect } from 'effect';
 import { loadConfig } from './config.js';
+import { ProcessSpawnError } from './errors.js';
 
 const SMEE_URL_PATH = join(homedir(), '.panopticon', 'github-app', 'smee-url');
 const SMEE_PID_PATH = join(homedir(), '.panopticon', 'github-app', 'smee.pid');
@@ -237,3 +239,47 @@ export function stopSmeeProcess(): void {
 
   console.log('[smee] Process stopped');
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Start the in-process smee client. Library mode. */
+export const startSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => startSmeeClient(),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: 'smee-client',
+        args: [],
+        message: 'startSmeeClient failed',
+        cause,
+      }),
+  });
+
+/** Stop the in-process smee client. Library mode. */
+export const stopSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => stopSmeeClient(),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: 'smee-client',
+        args: [],
+        message: 'stopSmeeClient failed',
+        cause,
+      }),
+  });
+
+/** Liveness probe — true if the in-process client is connected. */
+export const isSmeeRunningEffect = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSmeeRunning());
+
+/** Start the detached smee subprocess (idempotent). */
+export const startSmeeProcessEffect = (): Effect.Effect<void> =>
+  Effect.sync(() => startSmeeProcess());
+
+/** Stop the detached smee subprocess and clean up the pid file. */
+export const stopSmeeProcessEffect = (): Effect.Effect<void> =>
+  Effect.sync(() => stopSmeeProcess());
+
+/** Probe the smee subprocess via its pidfile. */
+export const isSmeeProcessRunningEffect = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSmeeProcessRunning());

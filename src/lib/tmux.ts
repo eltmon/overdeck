@@ -5,9 +5,11 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
+import { Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnv } from './child-env.js';
+import { TmuxError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -836,3 +838,177 @@ export async function getAgentSessionsAsync(): Promise<TmuxSession[]> {
 export async function getReviewSessionsAsync(): Promise<TmuxSession[]> {
   return (await listSessionsAsync()).filter(s => /^review-/.test(s.name));
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// New tmux interactions in Effect-native code paths should use the variants
+// below. The Promise-returning helpers above are preserved so existing
+// non-Effect callers keep working — but per .claude/rules/prefer-async.md and
+// .claude/rules/async-tmux.md, *new* code should not add to the sync surface.
+
+const toTmuxError = (op: string, cause: unknown): TmuxError =>
+  new TmuxError({
+    command: op,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Prepare the managed tmux config + server (idempotent). */
+export const ensureManagedTmuxContextOnceEffect = (): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => ensureManagedTmuxContextOnce(),
+    catch: (cause) => toTmuxError('ensureManagedTmuxContext', cause),
+  });
+
+/** Async enumeration of tmux sessions on the managed socket. */
+export const listSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  Effect.tryPromise({
+    try: () => listSessionsAsync(),
+    catch: (cause) => toTmuxError('list-sessions', cause),
+  });
+
+/** Async enumeration of session names on the managed socket. */
+export const listSessionNamesAsyncEffect = (): Effect.Effect<readonly string[], TmuxError> =>
+  Effect.tryPromise({
+    try: () => listSessionNamesAsync(),
+    catch: (cause) => toTmuxError('list-session-names', cause),
+  });
+
+/** Read the current window dimensions for a session (null if not found). */
+export const getWindowDimensionsAsyncEffect = (
+  sessionName: string,
+): Effect.Effect<{ cols: number; rows: number } | null, TmuxError> =>
+  Effect.tryPromise({
+    try: () => getWindowDimensionsAsync(sessionName),
+    catch: (cause) => toTmuxError('window-dimensions', cause),
+  });
+
+/** True if a tmux session with the supplied name exists. */
+export const sessionExistsAsyncEffect = (
+  name: string,
+): Effect.Effect<boolean, TmuxError> =>
+  Effect.tryPromise({
+    try: () => sessionExistsAsync(name),
+    catch: (cause) => toTmuxError('session-exists', cause),
+  });
+
+/** Create a detached tmux session via the async path. */
+export const createSessionAsyncEffect = (
+  ...args: Parameters<typeof createSessionAsync>
+): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => createSessionAsync(...args),
+    catch: (cause) => toTmuxError('create-session', cause),
+  });
+
+/** Kill a tmux session by name (async). */
+export const killSessionAsyncEffect = (name: string): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => killSessionAsync(name),
+    catch: (cause) => toTmuxError('kill-session', cause),
+  });
+
+/** Set an option on a target (session or pane). */
+export const setOptionAsyncEffect = (
+  target: string,
+  option: string,
+  value: string,
+): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => setOptionAsync(target, option, value),
+    catch: (cause) => toTmuxError('set-option', cause),
+  });
+
+/** Resize the window for a target session. */
+export const resizeWindowAsyncEffect = (
+  target: string,
+  cols: number,
+  rows: number,
+): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => resizeWindowAsync(target, cols, rows),
+    catch: (cause) => toTmuxError('resize-window', cause),
+  });
+
+/** Send a single raw keystroke (e.g. C-m) to a session. */
+export const sendRawKeystrokeAsyncEffect = (
+  sessionName: string,
+  key: string,
+  caller?: string,
+): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => sendRawKeystrokeAsync(sessionName, key, caller),
+    catch: (cause) => toTmuxError('send-raw-key', cause),
+  });
+
+/**
+ * Effect-native send-keys (the additive variant the rule set asks for).
+ * Uses the load-buffer + paste-buffer + 300ms + C-m pattern under the hood.
+ */
+export const sendKeysEffect = (
+  sessionName: string,
+  keys: string,
+  caller?: string,
+): Effect.Effect<void, TmuxError> =>
+  Effect.tryPromise({
+    try: () => sendKeysAsync(sessionName, keys, caller),
+    catch: (cause) => toTmuxError('send-keys', cause),
+  });
+
+/** Capture pane output (async). */
+export const capturePaneAsyncEffect = (
+  ...args: Parameters<typeof capturePaneAsync>
+): Effect.Effect<string, TmuxError> =>
+  Effect.tryPromise({
+    try: () => capturePaneAsync(...args),
+    catch: (cause) => toTmuxError('capture-pane', cause),
+  });
+
+/** Read a formatted list-panes value (async). */
+export const listPaneValuesAsyncEffect = (
+  target: string,
+  format: string,
+): Effect.Effect<readonly string[], TmuxError> =>
+  Effect.tryPromise({
+    try: () => listPaneValuesAsync(target, format),
+    catch: (cause) => toTmuxError('list-pane-values', cause),
+  });
+
+/** True if the named session's pane is dead (process exited). */
+export const isPaneDeadAsyncEffect = (
+  sessionName: string,
+): Effect.Effect<boolean, TmuxError> =>
+  Effect.tryPromise({
+    try: () => isPaneDeadAsync(sessionName),
+    catch: (cause) => toTmuxError('is-pane-dead', cause),
+  });
+
+/** Heuristic terminal-API error detection from a pane snapshot. Pure. */
+export const detectTerminalApiErrorEffect = (
+  paneOutput: string,
+): Effect.Effect<TerminalApiError | null> =>
+  Effect.sync(() => detectTerminalApiError(paneOutput));
+
+/** Wait for the Claude prompt to appear in the supplied session. */
+export const waitForClaudePromptEffect = (
+  sessionName: string,
+  timeoutMs: number = 15000,
+): Effect.Effect<boolean, TmuxError> =>
+  Effect.tryPromise({
+    try: () => waitForClaudePrompt(sessionName, timeoutMs),
+    catch: (cause) => toTmuxError('wait-claude-prompt', cause),
+  });
+
+/** Async list of agent-* tmux sessions. */
+export const getAgentSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  Effect.tryPromise({
+    try: () => getAgentSessionsAsync(),
+    catch: (cause) => toTmuxError('agent-sessions', cause),
+  });
+
+/** Async list of review-* tmux sessions. */
+export const getReviewSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  Effect.tryPromise({
+    try: () => getReviewSessionsAsync(),
+    catch: (cause) => toTmuxError('review-sessions', cause),
+  });

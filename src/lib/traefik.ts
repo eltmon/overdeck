@@ -9,9 +9,11 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { execSync } from 'child_process';
+import { Effect } from 'effect';
 import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SOURCE_TRAEFIK_TEMPLATES } from './paths.js';
 import { loadConfig } from './config.js';
 import { loadProjectsConfig } from './projects.js';
+import { FsError } from './errors.js';
 
 /**
 /**
@@ -234,3 +236,67 @@ export function cleanupStaleTlsSections(): void {
     }
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Render the dashboard Traefik config from the template. */
+export const generatePanopticonTraefikConfigEffect = (
+  mode?: TraefikRenderMode,
+): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => generatePanopticonTraefikConfig(mode),
+    catch: (cause) =>
+      new FsError({
+        path: TRAEFIK_DYNAMIC_DIR,
+        operation: 'generatePanopticonTraefikConfig',
+        cause,
+      }),
+  });
+
+/** Strip stray .template files from the runtime dynamic dir. */
+export const cleanupTemplateFilesEffect = (): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => cleanupTemplateFiles(),
+    catch: (cause) =>
+      new FsError({
+        path: TRAEFIK_DYNAMIC_DIR,
+        operation: 'cleanupTemplateFiles',
+        cause,
+      }),
+  });
+
+/** Generate the TLS dynamic config file from discovered certs. */
+export const generateTlsConfigEffect = (): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => generateTlsConfig(),
+    catch: (cause) =>
+      new FsError({
+        path: TRAEFIK_DYNAMIC_DIR,
+        operation: 'generateTlsConfig',
+        cause,
+      }),
+  });
+
+/** Ensure wildcard mkcert certs exist for every project's domain. */
+export const ensureProjectCertsEffect = (): Effect.Effect<readonly string[], FsError> =>
+  Effect.try({
+    try: () => ensureProjectCerts(),
+    catch: (cause) =>
+      new FsError({
+        path: TRAEFIK_CERTS_DIR,
+        operation: 'ensureProjectCerts',
+        cause,
+      }),
+  });
+
+/** Strip stale tls: sections from legacy runtime configs. */
+export const cleanupStaleTlsSectionsEffect = (): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => cleanupStaleTlsSections(),
+    catch: (cause) =>
+      new FsError({
+        path: TRAEFIK_DIR,
+        operation: 'cleanupStaleTlsSections',
+        cause,
+      }),
+  });

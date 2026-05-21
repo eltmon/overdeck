@@ -8,8 +8,10 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { loadProjectsConfig, getIssuePrefix } from './projects.js';
 import { extractPrefix, extractNumber, parseIssueId } from './issue-id.js';
+import { ConfigError } from './errors.js';
 
 export interface GitHubRepoConfig {
   owner: string;
@@ -168,3 +170,47 @@ export function resolveTrackerType(issueId: string): TrackerTypeResolution {
   // Default to Linear for unknown prefixes
   return 'linear';
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Parse configured GitHub repo entries from env + projects.yaml. Wraps the
+ * sync implementation so callers in Effect graphs can stay Effect-native.
+ */
+export const parseGitHubReposEffect = (): Effect.Effect<readonly GitHubRepoConfig[], ConfigError> =>
+  Effect.try({
+    try: () => parseGitHubRepos(),
+    catch: (cause) =>
+      new ConfigError({ message: 'parseGitHubRepos failed', cause }),
+  });
+
+/** Resolve an issue ID to a GitHub repo, or signal it's not a GitHub issue. */
+export const resolveGitHubIssueEffect = (
+  issueId: string,
+): Effect.Effect<IssueResolution, ConfigError> =>
+  Effect.try({
+    try: () => resolveGitHubIssue(issueId),
+    catch: (cause) =>
+      new ConfigError({ message: `resolveGitHubIssue(${issueId}) failed`, cause }),
+  });
+
+/** True if the issue prefix matches a configured github_repo project. */
+export const isGitHubIssueEffect = (issueId: string): Effect.Effect<boolean, ConfigError> =>
+  Effect.try({
+    try: () => isGitHubIssue(issueId),
+    catch: (cause) =>
+      new ConfigError({ message: `isGitHubIssue(${issueId}) failed`, cause }),
+  });
+
+/**
+ * Resolve the tracker type for an issue ID via projects.yaml.
+ * Falls back to 'linear' for unknown prefixes.
+ */
+export const resolveTrackerTypeEffect = (
+  issueId: string,
+): Effect.Effect<TrackerTypeResolution, ConfigError> =>
+  Effect.try({
+    try: () => resolveTrackerType(issueId),
+    catch: (cause) =>
+      new ConfigError({ message: `resolveTrackerType(${issueId}) failed`, cause }),
+  });

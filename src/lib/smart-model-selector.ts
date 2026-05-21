@@ -9,6 +9,7 @@
  * Users control cost by which providers they enable, not a sensitivity slider.
  */
 
+import { Effect } from 'effect';
 import { ModelId } from './settings.js';
 import {
   MODEL_CAPABILITIES,
@@ -475,3 +476,28 @@ export function formatSelectionResults(
   return lines.join('\n');
 }
 
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// These mirror the pure synchronous selectors so callers in Effect graphs can
+// stay end-to-end Effect without `Effect.sync`-wrapping every call site.
+
+/** Select the best model for a single work type. Pure. */
+export const selectModelEffect = (
+  workType: string,
+  availableModels: readonly ModelId[],
+  options: SelectionOptions = {},
+): Effect.Effect<ModelSelectionResult> =>
+  Effect.sync(() => selectModel(workType, [...availableModels], options));
+
+/** Select the best model for every known work type. Pure. */
+export const selectAllModelsEffect = (
+  availableModels: readonly ModelId[],
+  options: SelectionOptions = {},
+): Effect.Effect<Record<string, ModelSelectionResult>> =>
+  Effect.sync(() => selectAllModels([...availableModels], options));
+
+/** Compact map { workType → selected model } for preset compatibility. Pure. */
+export const getSimpleModelMappingEffect = (
+  availableModels: readonly ModelId[],
+  options: SelectionOptions = {},
+): Effect.Effect<Record<string, ModelId>> =>
+  Effect.sync(() => getSimpleModelMapping([...availableModels], options));

@@ -13,3 +13,6 @@ export type SubscriptionPlan = 'free' | 'plus' | 'pro';
  * Provider authentication mode
  */
 export type AuthMode = 'api-key' | 'subscription';
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Types-only module. No runtime functions to wrap.
