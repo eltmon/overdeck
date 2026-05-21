@@ -4,6 +4,8 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
+
 import { messageAgent } from '../agents.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { getReviewStatus } from '../review-status.js';
@@ -137,3 +139,18 @@ export async function deliverReviewVerdictFeedback(
     agentMessageSent,
   };
 }
+
+// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link deliverReviewVerdictFeedback}. The Promise version
+ * already swallows recoverable errors (PR comment failures, agent messaging,
+ * synthesis lookup), so the Effect form mirrors that contract: callers see a
+ * successful Effect carrying the same result shape and inspect the flags to
+ * decide what surfaced. The single non-recoverable boundary — feedback file
+ * write — keeps its existing error reporting through {@link writeFeedbackFile}.
+ */
+export const deliverReviewVerdictFeedbackEffect = (
+  opts: DeliverReviewVerdictFeedbackOptions,
+): Effect.Effect<DeliverReviewVerdictFeedbackResult> =>
+  Effect.promise(() => deliverReviewVerdictFeedback(opts));

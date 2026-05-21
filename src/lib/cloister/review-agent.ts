@@ -43,6 +43,7 @@ import { exec } from 'child_process';
 import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
@@ -721,3 +722,76 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
 
   return { killed, failed };
 }
+
+// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link cleanupReviewTempStash}. The Promise version swallows
+ * its own errors (stash listing / drop failures), so the Effect form mirrors
+ * that contract.
+ */
+export const cleanupReviewTempStashEffect = (
+  issueId: string,
+  workspace: string,
+): Effect.Effect<void> =>
+  Effect.promise(() => cleanupReviewTempStash(issueId, workspace));
+
+/**
+ * Effect variant of {@link buildConvoyPrompt}. Template reads are the only
+ * fallible step; any failure here is fatal and propagates via Effect's defect
+ * channel through `Effect.promise`.
+ */
+export const buildConvoyPromptEffect = (opts: {
+  issueId: string;
+  subRole: string;
+  outputPath: string;
+  synthesisAgentId: string;
+  contextManifestPath?: string;
+  tier1Summary?: string;
+}): Effect.Effect<string> => Effect.promise(() => buildConvoyPrompt(opts));
+
+/**
+ * Effect variant of {@link spawnReviewSubRoleForIssue}. The Promise version
+ * already aggregates errors into the structured result shape, so the Effect
+ * form lifts via `Effect.promise`.
+ */
+export const spawnReviewSubRoleForIssueEffect = (opts: {
+  issueId: string;
+  workspace: string;
+  subRole: ReviewSubRole;
+  runId: string;
+  outputPath?: string;
+  contextManifestPath?: string;
+  synthesisAgentId?: string;
+  model?: string;
+  allowHost?: boolean;
+}): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
+  Effect.promise(() => spawnReviewSubRoleForIssue(opts));
+
+/**
+ * Effect variant of {@link spawnReviewRoleForIssue}. The Promise version
+ * returns a structured result instead of throwing, so the Effect form lifts
+ * via `Effect.promise`.
+ */
+export const spawnReviewRoleForIssueEffect = (
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
+): Effect.Effect<{ success: boolean; message: string; error?: string }> =>
+  Effect.promise(() => spawnReviewRoleForIssue(opts));
+
+/**
+ * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
+ * already aggregated into the `failed` array — this wrapper preserves that
+ * contract.
+ */
+export const killAllReviewerSessionsEffect = (
+  projectKey: string | undefined,
+  issueId: string,
+): Effect.Effect<{ killed: string[]; failed: string[] }> =>
+  Effect.promise(() => killAllReviewerSessions(projectKey, issueId));
+
+/**
+ * Effect variant of {@link killAllReviewSessions}. Same aggregation semantics
+ * as the Promise version.
+ */
+export const killAllReviewSessionsEffect = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
+  Effect.promise(() => killAllReviewSessions());

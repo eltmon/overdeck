@@ -15,6 +15,7 @@
 import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
+import { Effect, Schedule, Duration } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { sessionExistsAsync, isPaneDeadAsync } from '../tmux.js';
 
@@ -174,3 +175,109 @@ export function reviewerOutputPath(
 ): string {
   return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
+
+// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link waitForReviewerOutputs}. Drives the same poll loop
+ * via Effect's `Schedule.spaced` and yields after each tick instead of using
+ * raw `setTimeout`. Errors thrown by stat / tmux probes are tolerated the same
+ * way as the Promise version.
+ */
+export const waitForReviewerOutputsEffect = (
+  opts: WaitForReviewerOutputsOpts,
+): Effect.Effect<ReviewerResult[]> =>
+  Effect.gen(function* () {
+    const {
+      issueId,
+      runId,
+      workspace,
+      subRoles = REVIEW_SUB_ROLES,
+      pollIntervalMs = 10_000,
+      timeoutMs = 20 * 60 * 1_000,
+      staleAfterMs = 8 * 60 * 1_000,
+    } = opts;
+
+    const reviewDir = join(workspace, PAN_DIRNAME, 'review', runId);
+    const deadline = Date.now() + timeoutMs;
+
+    const states: ReviewerState[] = subRoles.map((subRole) => ({
+      subRole,
+      outputPath: join(reviewDir, `${subRole}.md`),
+      sessionId: `agent-${issueId.toLowerCase()}-review-${subRole}`,
+      settled: false,
+      lastModifiedMs: 0,
+    }));
+
+    const tick = Effect.gen(function* () {
+      const now = Date.now();
+
+      for (const s of states) {
+        if (s.settled) continue;
+
+        if (existsSync(s.outputPath)) {
+          const mtime = yield* Effect.tryPromise({
+            try: () => stat(s.outputPath).then((st) => st.mtimeMs),
+            catch: () => 0,
+          }).pipe(Effect.orElseSucceed(() => 0));
+
+          if (mtime) {
+            if (mtime === s.lastModifiedMs && now - mtime > staleAfterMs) {
+              s.settled = true;
+              s.stalledAt = undefined;
+              continue;
+            }
+            s.lastModifiedMs = mtime;
+          }
+        }
+
+        const dead = yield* Effect.tryPromise({
+          try: () => isPaneDeadAsync(s.sessionId),
+          catch: () => null as boolean | null,
+        }).pipe(Effect.orElseSucceed(() => null));
+
+        if (dead === true) {
+          s.settled = true;
+          if (!existsSync(s.outputPath)) {
+            s.stalledAt = now;
+          } else if (s.lastModifiedMs > 0 && now - s.lastModifiedMs <= staleAfterMs) {
+            s.stalledAt = now;
+          }
+          continue;
+        } else if (dead === null) {
+          const exists = yield* Effect.tryPromise({
+            try: () => sessionExistsAsync(s.sessionId),
+            catch: () => true,
+          }).pipe(Effect.orElseSucceed(() => true));
+          if (!exists) {
+            s.settled = true;
+            if (!existsSync(s.outputPath)) s.stalledAt = now;
+          }
+        }
+
+        if (Date.now() >= deadline) {
+          s.settled = true;
+          s.stalledAt = Date.now();
+        }
+      }
+
+      return states.every((s) => s.settled);
+    });
+
+    yield* tick.pipe(
+      Effect.repeat({
+        until: (done) => done,
+        schedule: Schedule.spaced(Duration.millis(pollIntervalMs)),
+      }),
+    );
+
+    return states.map((s) => {
+      if (!existsSync(s.outputPath)) {
+        return { subRole: s.subRole, outputPath: s.outputPath, status: 'missing' as const };
+      }
+      if (s.stalledAt !== undefined) {
+        return { subRole: s.subRole, outputPath: s.outputPath, status: 'stalled' as const };
+      }
+      return { subRole: s.subRole, outputPath: s.outputPath, status: 'done' as const };
+    });
+  });

@@ -11,9 +11,11 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { Effect } from 'effect';
 import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-config.js';
 import { replacePlaceholders } from '../workspace-config.js';
 import { loadConfig } from '../config.js';
+import { GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
@@ -546,3 +548,49 @@ async function runHttpHealthGate(
     };
   }
 }
+
+// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link runMergeValidation}. The Promise version swallows
+ * its own errors and returns a structured {@link ValidationResult}, so the
+ * Effect form simply lifts it via `Effect.promise`.
+ */
+export const runMergeValidationEffect = (
+  context: ValidationContext,
+): Effect.Effect<ValidationResult> =>
+  Effect.promise(() => runMergeValidation(context));
+
+/**
+ * Effect variant of {@link autoRevertMerge}. Surfaces git failure through a
+ * typed {@link GitError} channel instead of returning `false` silently.
+ */
+export const autoRevertMergeEffect = (
+  projectPath: string,
+): Effect.Effect<void, GitError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const ok = await autoRevertMerge(projectPath);
+      if (!ok) throw new Error('autoRevertMerge returned false');
+    },
+    catch: (cause) =>
+      new GitError({
+        command: ['git', 'reset', '--hard', 'ORIG_HEAD'],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
+
+/**
+ * Effect variant of {@link runQualityGates}. Wraps the Promise implementation
+ * with `Effect.promise` because the existing function already aggregates per-
+ * gate failures into the returned array — it does not throw on gate failure.
+ */
+export const runQualityGatesEffect = (
+  gates: Record<string, QualityGateConfig>,
+  projectPath: string,
+  phase: 'pre_push' | 'post_push' = 'pre_push',
+  opts: QualityGateRunOptions = {},
+): Effect.Effect<QualityGateResult[]> =>
+  Effect.promise(() => runQualityGates(gates, projectPath, phase, opts));
