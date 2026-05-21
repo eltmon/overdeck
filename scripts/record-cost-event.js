@@ -11,6 +11,3313 @@ import { promisify } from "util";
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 //#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Pipeable.js
+/**
+* @since 2.0.0
+*/
+/**
+* @since 2.0.0
+* @category utilities
+* @example
+* ```ts
+* import { Pipeable } from "effect"
+*
+* // pipeArguments is used internally to implement efficient piping
+* function customPipe<A>(self: A, ...fns: Array<(a: any) => any>): unknown {
+*   return Pipeable.pipeArguments(self, arguments as any)
+* }
+*
+* // Example usage
+* const add = (x: number) => (y: number) => x + y
+* const multiply = (x: number) => (y: number) => x * y
+*
+* const result = customPipe(5, add(2), multiply(3))
+* console.log(result) // 21
+* ```
+*/
+const pipeArguments = (self, args) => {
+	switch (args.length) {
+		case 0: return self;
+		case 1: return args[0](self);
+		case 2: return args[1](args[0](self));
+		case 3: return args[2](args[1](args[0](self)));
+		case 4: return args[3](args[2](args[1](args[0](self))));
+		case 5: return args[4](args[3](args[2](args[1](args[0](self)))));
+		case 6: return args[5](args[4](args[3](args[2](args[1](args[0](self))))));
+		case 7: return args[6](args[5](args[4](args[3](args[2](args[1](args[0](self)))))));
+		case 8: return args[7](args[6](args[5](args[4](args[3](args[2](args[1](args[0](self))))))));
+		case 9: return args[8](args[7](args[6](args[5](args[4](args[3](args[2](args[1](args[0](self)))))))));
+		default: {
+			let ret = self;
+			for (let i = 0, len = args.length; i < len; i++) ret = args[i](ret);
+			return ret;
+		}
+	}
+};
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Function.js
+/**
+* Creates a function that can be used in a data-last (aka `pipe`able) or
+* data-first style.
+*
+* The first parameter to `dual` is either the arity of the uncurried function
+* or a predicate that determines if the function is being used in a data-first
+* or data-last style.
+*
+* Using the arity is the most common use case, but there are some cases where
+* you may want to use a predicate. For example, if you have a function that
+* takes an optional argument, you can use a predicate to determine if the
+* function is being used in a data-first or data-last style.
+*
+* You can pass either the arity of the uncurried function or a predicate
+* which determines if the function is being used in a data-first or
+* data-last style.
+*
+* @example
+* ```ts
+* import { dual, pipe } from "effect/Function"
+*
+* // Using arity to determine data-first or data-last style
+* const sum = dual<
+*   (that: number) => (self: number) => number,
+*   (self: number, that: number) => number
+* >(2, (self, that) => self + that)
+*
+* console.log(sum(2, 3)) // 5 (data-first)
+* console.log(pipe(2, sum(3))) // 5 (data-last)
+* ```
+*
+* **Example** (Using arity to determine data-first or data-last style)
+*
+* ```ts
+* import { dual, pipe } from "effect/Function"
+*
+* const sum = dual<
+*   (that: number) => (self: number) => number,
+*   (self: number, that: number) => number
+* >(2, (self, that) => self + that)
+*
+* console.log(sum(2, 3)) // 5
+* console.log(pipe(2, sum(3))) // 5
+* ```
+*
+* **Example** (Using call signatures to define the overloads)
+*
+* ```ts
+* import { dual, pipe } from "effect/Function"
+*
+* const sum: {
+*   (that: number): (self: number) => number
+*   (self: number, that: number): number
+* } = dual(2, (self: number, that: number): number => self + that)
+*
+* console.log(sum(2, 3)) // 5
+* console.log(pipe(2, sum(3))) // 5
+* ```
+*
+* **Example** (Using a predicate to determine data-first or data-last style)
+*
+* ```ts
+* import { dual, pipe } from "effect/Function"
+*
+* const sum = dual<
+*   (that: number) => (self: number) => number,
+*   (self: number, that: number) => number
+* >(
+*   (args) => args.length === 2,
+*   (self, that) => self + that
+* )
+*
+* console.log(sum(2, 3)) // 5
+* console.log(pipe(2, sum(3))) // 5
+* ```
+*
+* @category combinators
+* @since 2.0.0
+*/
+const dual = function(arity, body) {
+	if (typeof arity === "function") return function() {
+		return arity(arguments) ? body.apply(this, arguments) : (self) => body(self, ...arguments);
+	};
+	switch (arity) {
+		case 0:
+		case 1: throw new RangeError(`Invalid arity ${arity}`);
+		case 2: return function(a, b) {
+			if (arguments.length >= 2) return body(a, b);
+			return function(self) {
+				return body(self, a);
+			};
+		};
+		case 3: return function(a, b, c) {
+			if (arguments.length >= 3) return body(a, b, c);
+			return function(self) {
+				return body(self, a, b);
+			};
+		};
+		default: return function() {
+			if (arguments.length >= arity) return body.apply(this, arguments);
+			const args = arguments;
+			return function(self) {
+				return body(self, ...args);
+			};
+		};
+	}
+};
+/**
+* The identity function, i.e. A function that returns its input argument.
+*
+* @example
+* ```ts
+* import { identity } from "effect/Function"
+* import * as assert from "node:assert"
+*
+* assert.deepStrictEqual(identity(5), 5)
+* ```
+*
+* @category combinators
+* @since 2.0.0
+*/
+const identity = (a) => a;
+/**
+* Creates a constant value that never changes.
+*
+* This is useful when you want to pass a value to a higher-order function (a function that takes another function as its argument)
+* and want that inner function to always use the same value, no matter how many times it is called.
+*
+* @example
+* ```ts
+* import { constant } from "effect/Function"
+* import * as assert from "node:assert"
+*
+* const constNull = constant(null)
+*
+* assert.deepStrictEqual(constNull(), null)
+* assert.deepStrictEqual(constNull(), null)
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const constant = (value) => () => value;
+/**
+* A thunk that returns always `undefined`.
+*
+* @example
+* ```ts
+* import { constUndefined } from "effect/Function"
+* import * as assert from "node:assert"
+*
+* assert.deepStrictEqual(constUndefined(), undefined)
+* ```
+*
+* @category constants
+* @since 2.0.0
+*/
+const constUndefined = /* @__PURE__ */ constant(void 0);
+/**
+* A thunk that returns always `void`.
+*
+* @example
+* ```ts
+* import { constVoid } from "effect/Function"
+* import * as assert from "node:assert"
+*
+* assert.deepStrictEqual(constVoid(), undefined)
+* ```
+*
+* @category constants
+* @since 2.0.0
+*/
+const constVoid = constUndefined;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/equal.js
+/** @internal */
+const getAllObjectKeys = (obj) => {
+	const keys = new Set(Reflect.ownKeys(obj));
+	if (obj.constructor === Object) return keys;
+	if (obj instanceof Error) keys.delete("stack");
+	const proto = Object.getPrototypeOf(obj);
+	let current = proto;
+	while (current !== null && current !== Object.prototype) {
+		const ownKeys = Reflect.ownKeys(current);
+		for (let i = 0; i < ownKeys.length; i++) keys.add(ownKeys[i]);
+		current = Object.getPrototypeOf(current);
+	}
+	if (keys.has("constructor") && typeof obj.constructor === "function" && proto === obj.constructor.prototype) keys.delete("constructor");
+	return keys;
+};
+/** @internal */
+const byReferenceInstances = /* @__PURE__ */ new WeakSet();
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Predicate.js
+/**
+* Predicate and Refinement helpers for runtime checks, filtering, and type narrowing.
+* This module provides small, pure functions you can combine to decide whether a
+* value matches a condition and, when using refinements, narrow TypeScript types.
+*
+* Mental model:
+* - A `Predicate<A>` is just `(a: A) => boolean`.
+* - A `Refinement<A, B>` is a predicate that narrows `A` to `B` when true.
+* - Guards like `isString` are predicates/refinements for common runtime types.
+* - Combinators like `and`/`or` build new predicates from existing ones.
+* - `Tuple` and `Struct` lift element/property predicates to compound values.
+*
+* Common tasks:
+* - Reuse an existing predicate on a different input shape -> {@link mapInput}
+* - Combine checks -> {@link and}, {@link or}, {@link not}, {@link xor}
+* - Build tuple/object checks -> {@link Tuple}, {@link Struct}
+* - Narrow `unknown` to a concrete type -> {@link Refinement}, {@link compose}
+* - Check runtime types -> {@link isString}, {@link isNumber}, {@link isObject}
+*
+* Gotchas:
+* - `isTruthy` uses JavaScript truthiness; `0`, "", and `false` are false.
+* - `isObject` excludes arrays; use {@link isObjectOrArray} for both.
+* - `isIterable` treats strings as iterable.
+* - `isPromise`/`isPromiseLike` are structural checks (then/catch), not `instanceof`.
+* - `isTupleOf` and `isTupleOfAtLeast` only check length, not element types.
+*
+* **Example** (Filter by a predicate)
+*
+* ```ts
+* import * as Predicate from "effect/Predicate"
+*
+* const isPositive = (n: number) => n > 0
+* const data = [2, -1, 3]
+*
+* console.log(data.filter(isPositive))
+* ```
+*
+* See also: {@link Predicate}, {@link Refinement}, {@link and}, {@link or}, {@link mapInput}
+*
+* @since 2.0.0
+*/
+/**
+* Checks whether a value is a `function`.
+*
+* When to use:
+* - You need to guard an `unknown` value as callable.
+*
+* Behavior:
+* - Pure; does not mutate input.
+* - Uses `typeof input === "function"`.
+*
+* **Example** (Guard function)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const data: unknown = () => 1
+*
+* if (Predicate.isFunction(data)) {
+*   console.log(data())
+* }
+* ```
+*
+* See also: {@link isObjectKeyword}
+*
+* @category guards
+* @since 2.0.0
+*/
+function isFunction(input) {
+	return typeof input === "function";
+}
+/**
+* Checks whether a value is an `object` in the JavaScript sense (objects, arrays, functions).
+*
+* When to use:
+* - You want to accept arrays and functions as well as objects.
+*
+* Behavior:
+* - Pure; does not mutate input.
+* - Returns `true` for arrays and functions, `false` for `null`.
+*
+* **Example** (Object keyword)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* console.log(Predicate.isObjectKeyword(() => 1))
+* console.log(Predicate.isObjectKeyword(null))
+* ```
+*
+* See also: {@link isObject}, {@link isObjectOrArray}
+*
+* @category guards
+* @since 2.0.0
+*/
+function isObjectKeyword(input) {
+	return typeof input === "object" && input !== null || isFunction(input);
+}
+/**
+* Checks whether a value has a given property key.
+*
+* When to use:
+* - You need to guard property access on `unknown` values.
+* - You want a simple structural guard for objects.
+*
+* Behavior:
+* - Pure; does not mutate input.
+* - Uses the `in` operator and {@link isObjectKeyword}.
+* - Does not check property value types.
+*
+* **Example** (Guard property)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const hasName = Predicate.hasProperty("name")
+* const data: unknown = { name: "Ada" }
+*
+* if (hasName(data)) {
+*   console.log(data.name)
+* }
+* ```
+*
+* See also: {@link isTagged}, {@link isObjectKeyword}
+*
+* @category guards
+* @since 2.0.0
+*/
+const hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(self) && property in self);
+/**
+* Checks whether a value has a `_tag` property equal to the given tag.
+*
+* When to use:
+* - You model tagged unions with a `_tag` field.
+* - You want a quick, structural guard for tagged values.
+*
+* Behavior:
+* - Pure; does not mutate input.
+* - Uses {@link hasProperty} and strict equality on `_tag`.
+*
+* **Example** (Guard tagged)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const isOk = Predicate.isTagged("Ok")
+*
+* console.log(isOk({ _tag: "Ok", value: 1 }))
+* ```
+*
+* See also: {@link hasProperty}
+*
+* @category guards
+* @since 2.0.0
+*/
+const isTagged = /* @__PURE__ */ dual(2, (self, tag) => hasProperty(self, "_tag") && self["_tag"] === tag);
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Hash.js
+/**
+* This module provides utilities for hashing values in TypeScript.
+*
+* Hashing is the process of converting data into a fixed-size numeric value,
+* typically used for data structures like hash tables, equality comparisons,
+* and efficient data storage.
+*
+* @since 2.0.0
+*/
+/**
+* The unique identifier used to identify objects that implement the Hash interface.
+*
+* @since 2.0.0
+*/
+const symbol$1 = "~effect/interfaces/Hash";
+/**
+* Computes a hash value for any given value.
+*
+* This function can hash primitives (numbers, strings, booleans, etc.) as well as
+* objects, arrays, and other complex data structures. It automatically handles
+* different types and provides a consistent hash value for equivalent inputs.
+*
+* **⚠️ CRITICAL IMMUTABILITY REQUIREMENT**: Objects being hashed must be treated as
+* immutable after their first hash computation. Hash results are cached, so mutating
+* an object after hashing will lead to stale cached values and broken hash-based
+* operations. For mutable objects, use referential equality by implementing custom
+* `Hash` interface that hashes the object reference, not its content.
+*
+* **FORBIDDEN**: Modifying objects after `Hash.hash()` has been called on them
+* **ALLOWED**: Using immutable objects, or mutable objects with custom `Hash` interface
+* that uses referential equality (hashes the object reference, not content)
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* // Hash primitive values
+* console.log(Hash.hash(42)) // numeric hash
+* console.log(Hash.hash("hello")) // string hash
+* console.log(Hash.hash(true)) // boolean hash
+*
+* // Hash objects and arrays
+* console.log(Hash.hash({ name: "John", age: 30 }))
+* console.log(Hash.hash([1, 2, 3]))
+* console.log(Hash.hash(new Date("2023-01-01")))
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const hash = (self) => {
+	switch (typeof self) {
+		case "number": return number(self);
+		case "bigint": return string(self.toString(10));
+		case "boolean": return string(String(self));
+		case "symbol": return string(String(self));
+		case "string": return string(self);
+		case "undefined": return string("undefined");
+		case "function":
+		case "object": if (self === null) return string("null");
+		else if (self instanceof Date) return string(self.toISOString());
+		else if (self instanceof RegExp) return string(self.toString());
+		else {
+			if (byReferenceInstances.has(self)) return random(self);
+			if (hashCache.has(self)) return hashCache.get(self);
+			const h = withVisitedTracking$1(self, () => {
+				if (isHash(self)) return self[symbol$1]();
+				else if (typeof self === "function") return random(self);
+				else if (Array.isArray(self) || ArrayBuffer.isView(self)) return array(self);
+				else if (self instanceof Map) return hashMap(self);
+				else if (self instanceof Set) return hashSet(self);
+				return structure(self);
+			});
+			hashCache.set(self, h);
+			return h;
+		}
+		default: throw new Error(`BUG: unhandled typeof ${typeof self} - please report an issue at https://github.com/Effect-TS/effect/issues`);
+	}
+};
+/**
+* Generates a random hash value for an object and caches it.
+*
+* This function creates a random hash value for objects that don't have their own
+* hash implementation. The hash value is cached using a WeakMap, so the same object
+* will always return the same hash value during its lifetime.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* const obj1 = { a: 1 }
+* const obj2 = { a: 1 }
+*
+* // Same object always returns the same hash
+* console.log(Hash.random(obj1) === Hash.random(obj1)) // true
+*
+* // Different objects get different hashes
+* console.log(Hash.random(obj1) === Hash.random(obj2)) // false
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const random = (self) => {
+	if (!randomHashCache.has(self)) randomHashCache.set(self, number(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)));
+	return randomHashCache.get(self);
+};
+/**
+* Combines two hash values into a single hash value.
+*
+* This function takes two hash values and combines them using a mathematical
+* operation to produce a new hash value. It's useful for creating hash values
+* of composite structures.
+*
+* @example
+* ```ts
+* import { Hash } from "effect" // combined hash value
+*
+* // Can also be used with pipe
+* import { pipe } from "effect"
+*
+* const hash1 = Hash.hash("hello")
+* const hash2 = Hash.hash("world")
+*
+* // Combine two hash values
+* const combined = Hash.combine(hash2)(hash1)
+* console.log(combined)
+* const result = pipe(hash1, Hash.combine(hash2))
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const combine = /* @__PURE__ */ dual(2, (self, b) => self * 53 ^ b);
+/**
+* Optimizes a hash value by applying bit manipulation techniques.
+*
+* This function takes a hash value and applies bitwise operations to improve
+* the distribution of hash values, reducing the likelihood of collisions.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* const rawHash = 1234567890
+* const optimizedHash = Hash.optimize(rawHash)
+* console.log(optimizedHash) // optimized hash value
+*
+* // Often used internally by other hash functions
+* const stringHash = Hash.optimize(Hash.string("hello"))
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const optimize = (n) => n & 3221225471 | n >>> 1 & 1073741824;
+/**
+* Checks if a value implements the Hash interface.
+*
+* This function determines whether a given value has the Hash symbol property,
+* indicating that it can provide its own hash value implementation.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* class MyHashable implements Hash.Hash {
+*   [Hash.symbol]() {
+*     return 42
+*   }
+* }
+*
+* const obj = new MyHashable()
+* console.log(Hash.isHash(obj)) // true
+* console.log(Hash.isHash({})) // false
+* console.log(Hash.isHash("string")) // false
+* ```
+*
+* @category guards
+* @since 2.0.0
+*/
+const isHash = (u) => hasProperty(u, symbol$1);
+/**
+* Computes a hash value for a number.
+*
+* This function creates a hash value for numeric inputs, handling special cases
+* like NaN, Infinity, and -Infinity with distinct hash values. It uses bitwise operations to ensure good distribution
+* of hash values across different numeric inputs.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* console.log(Hash.number(42)) // hash of 42
+* console.log(Hash.number(3.14)) // hash of 3.14
+* console.log(Hash.number(NaN)) // hash of "NaN"
+* console.log(Hash.number(Infinity)) // 0 (special case)
+*
+* // Same numbers produce the same hash
+* console.log(Hash.number(100) === Hash.number(100)) // true
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const number = (n) => {
+	if (n !== n) return string("NaN");
+	if (n === Infinity) return string("Infinity");
+	if (n === -Infinity) return string("-Infinity");
+	let h = n | 0;
+	if (h !== n) h ^= n * 4294967295;
+	while (n > 4294967295) h ^= n /= 4294967295;
+	return optimize(h);
+};
+/**
+* Computes a hash value for a string using the djb2 algorithm.
+*
+* This function implements a variation of the djb2 hash algorithm, which is
+* known for its good distribution properties and speed. It processes each
+* character of the string to produce a consistent hash value.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* console.log(Hash.string("hello")) // hash of "hello"
+* console.log(Hash.string("world")) // hash of "world"
+* console.log(Hash.string("")) // hash of empty string
+*
+* // Same strings produce the same hash
+* console.log(Hash.string("test") === Hash.string("test")) // true
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const string = (str) => {
+	let h = 5381, i = str.length;
+	while (i) h = h * 33 ^ str.charCodeAt(--i);
+	return optimize(h);
+};
+/**
+* Computes a hash value for an object using only the specified keys.
+*
+* This function allows you to hash an object by considering only specific keys,
+* which is useful when you want to create a hash based on a subset of an object's
+* properties.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* const person = { name: "John", age: 30, city: "New York" }
+*
+* // Hash only specific keys
+* const hash1 = Hash.structureKeys(person, ["name", "age"])
+* const hash2 = Hash.structureKeys(person, ["name", "city"])
+*
+* console.log(hash1) // hash based on name and age
+* console.log(hash2) // hash based on name and city
+*
+* // Same keys produce the same hash
+* const person2 = { name: "John", age: 30, city: "Boston" }
+* const hash3 = Hash.structureKeys(person2, ["name", "age"])
+* console.log(hash1 === hash3) // true
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const structureKeys = (o, keys) => {
+	let h = 12289;
+	for (const key of keys) h ^= combine(hash(key), hash(o[key]));
+	return optimize(h);
+};
+/**
+* Computes a hash value for an object using all of its enumerable keys.
+*
+* This function creates a hash value based on all enumerable properties of an object.
+* It's a convenient way to hash an entire object structure when you want to consider
+* all its properties.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* const obj1 = { name: "John", age: 30 }
+* const obj2 = { name: "Jane", age: 25 }
+* const obj3 = { name: "John", age: 30 }
+*
+* console.log(Hash.structure(obj1)) // hash of obj1
+* console.log(Hash.structure(obj2)) // different hash
+* console.log(Hash.structure(obj3)) // same as obj1
+*
+* // Objects with same properties produce same hash
+* console.log(Hash.structure(obj1) === Hash.structure(obj3)) // true
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const structure = (o) => structureKeys(o, getAllObjectKeys(o));
+const iterableWith = (seed, f) => (iter) => {
+	let h = seed;
+	for (const element of iter) h ^= f(element);
+	return optimize(h);
+};
+/**
+* Computes a hash value for an array by hashing all of its elements.
+*
+* This function creates a hash value based on all elements in the array.
+* The order of elements matters, so arrays with the same elements in different
+* orders will produce different hash values.
+*
+* @example
+* ```ts
+* import { Hash } from "effect"
+*
+* const arr1 = [1, 2, 3]
+* const arr2 = [1, 2, 3]
+* const arr3 = [3, 2, 1]
+*
+* console.log(Hash.array(arr1)) // hash of [1, 2, 3]
+* console.log(Hash.array(arr2)) // same hash as arr1
+* console.log(Hash.array(arr3)) // different hash (different order)
+*
+* // Arrays with same elements in same order produce same hash
+* console.log(Hash.array(arr1) === Hash.array(arr2)) // true
+* console.log(Hash.array(arr1) === Hash.array(arr3)) // false
+* ```
+*
+* @category hashing
+* @since 2.0.0
+*/
+const array = /* @__PURE__ */ iterableWith(6151, hash);
+const hashMap = /* @__PURE__ */ iterableWith(/* @__PURE__ */ string("Map"), ([k, v]) => combine(hash(k), hash(v)));
+const hashSet = /* @__PURE__ */ iterableWith(/* @__PURE__ */ string("Set"), hash);
+const randomHashCache = /* @__PURE__ */ new WeakMap();
+const hashCache = /* @__PURE__ */ new WeakMap();
+const visitedObjects = /* @__PURE__ */ new WeakSet();
+function withVisitedTracking$1(obj, fn) {
+	if (visitedObjects.has(obj)) return string("[Circular]");
+	visitedObjects.add(obj);
+	const result = fn();
+	visitedObjects.delete(obj);
+	return result;
+}
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Equal.js
+/**
+* The unique string identifier for the {@link Equal} interface.
+*
+* Use this as a computed property key when implementing custom equality on a
+* class or object literal.
+*
+* When to use:
+* - As the method name when implementing the {@link Equal} interface.
+* - To check manually whether an object carries an equality method (prefer
+*   {@link isEqual} instead).
+*
+* Behavior:
+* - Pure constant — no allocation or side effects.
+*
+* **Example** (implementing Equal on a class)
+*
+* ```ts
+* import { Equal, Hash } from "effect"
+*
+* class UserId implements Equal.Equal {
+*   constructor(readonly id: string) {}
+*
+*   [Equal.symbol](that: Equal.Equal): boolean {
+*     return that instanceof UserId && this.id === that.id
+*   }
+*
+*   [Hash.symbol](): number {
+*     return Hash.string(this.id)
+*   }
+* }
+* ```
+*
+* @see {@link Equal} — the interface that uses this symbol
+* @see {@link isEqual} — type guard for `Equal` implementors
+*
+* @since 2.0.0
+*/
+const symbol = "~effect/interfaces/Equal";
+function equals() {
+	if (arguments.length === 1) return (self) => compareBoth(self, arguments[0]);
+	return compareBoth(arguments[0], arguments[1]);
+}
+function compareBoth(self, that) {
+	if (self === that) return true;
+	if (self == null || that == null) return false;
+	const selfType = typeof self;
+	if (selfType !== typeof that) return false;
+	if (selfType === "number" && self !== self && that !== that) return true;
+	if (selfType !== "object" && selfType !== "function") return false;
+	if (byReferenceInstances.has(self) || byReferenceInstances.has(that)) return false;
+	return withCache(self, that, compareObjects);
+}
+/** Helper to run comparison with proper visited tracking */
+function withVisitedTracking(self, that, fn) {
+	const hasLeft = visitedLeft.has(self);
+	const hasRight = visitedRight.has(that);
+	if (hasLeft && hasRight) return true;
+	if (hasLeft || hasRight) return false;
+	visitedLeft.add(self);
+	visitedRight.add(that);
+	const result = fn();
+	visitedLeft.delete(self);
+	visitedRight.delete(that);
+	return result;
+}
+const visitedLeft = /* @__PURE__ */ new WeakSet();
+const visitedRight = /* @__PURE__ */ new WeakSet();
+/** Helper to perform cached object comparison */
+function compareObjects(self, that) {
+	if (hash(self) !== hash(that)) return false;
+	else if (self instanceof Date) {
+		if (!(that instanceof Date)) return false;
+		return self.toISOString() === that.toISOString();
+	} else if (self instanceof RegExp) {
+		if (!(that instanceof RegExp)) return false;
+		return self.toString() === that.toString();
+	}
+	const selfIsEqual = isEqual(self);
+	const thatIsEqual = isEqual(that);
+	if (selfIsEqual !== thatIsEqual) return false;
+	const bothEquals = selfIsEqual && thatIsEqual;
+	if (typeof self === "function" && !bothEquals) return false;
+	return withVisitedTracking(self, that, () => {
+		if (bothEquals) return self[symbol](that);
+		else if (Array.isArray(self)) {
+			if (!Array.isArray(that) || self.length !== that.length) return false;
+			return compareArrays(self, that);
+		} else if (ArrayBuffer.isView(self)) {
+			if (!ArrayBuffer.isView(that) || self.byteLength !== that.byteLength) return false;
+			return compareTypedArrays(self, that);
+		} else if (self instanceof Map) {
+			if (!(that instanceof Map) || self.size !== that.size) return false;
+			return compareMaps(self, that);
+		} else if (self instanceof Set) {
+			if (!(that instanceof Set) || self.size !== that.size) return false;
+			return compareSets(self, that);
+		}
+		return compareRecords(self, that);
+	});
+}
+function withCache(self, that, f) {
+	let selfMap = equalityCache.get(self);
+	if (!selfMap) {
+		selfMap = /* @__PURE__ */ new WeakMap();
+		equalityCache.set(self, selfMap);
+	} else if (selfMap.has(that)) return selfMap.get(that);
+	const result = f(self, that);
+	selfMap.set(that, result);
+	let thatMap = equalityCache.get(that);
+	if (!thatMap) {
+		thatMap = /* @__PURE__ */ new WeakMap();
+		equalityCache.set(that, thatMap);
+	}
+	thatMap.set(self, result);
+	return result;
+}
+const equalityCache = /* @__PURE__ */ new WeakMap();
+function compareArrays(self, that) {
+	for (let i = 0; i < self.length; i++) if (!compareBoth(self[i], that[i])) return false;
+	return true;
+}
+function compareTypedArrays(self, that) {
+	if (self.length !== that.length) return false;
+	for (let i = 0; i < self.length; i++) if (self[i] !== that[i]) return false;
+	return true;
+}
+function compareRecords(self, that) {
+	const selfKeys = getAllObjectKeys(self);
+	const thatKeys = getAllObjectKeys(that);
+	if (selfKeys.size !== thatKeys.size) return false;
+	for (const key of selfKeys) if (!thatKeys.has(key) || !compareBoth(self[key], that[key])) return false;
+	return true;
+}
+/** @internal */
+function makeCompareMap(keyEquivalence, valueEquivalence) {
+	return function compareMaps(self, that) {
+		for (const [selfKey, selfValue] of self) {
+			let found = false;
+			for (const [thatKey, thatValue] of that) if (keyEquivalence(selfKey, thatKey) && valueEquivalence(selfValue, thatValue)) {
+				found = true;
+				break;
+			}
+			if (!found) return false;
+		}
+		return true;
+	};
+}
+const compareMaps = /* @__PURE__ */ makeCompareMap(compareBoth, compareBoth);
+/** @internal */
+function makeCompareSet(equivalence) {
+	return function compareSets(self, that) {
+		for (const selfValue of self) {
+			let found = false;
+			for (const thatValue of that) if (equivalence(selfValue, thatValue)) {
+				found = true;
+				break;
+			}
+			if (!found) return false;
+		}
+		return true;
+	};
+}
+const compareSets = /* @__PURE__ */ makeCompareSet(compareBoth);
+/**
+* Checks whether a value implements the {@link Equal} interface.
+*
+* When to use:
+* - To branch on whether a value supports custom equality before calling
+*   its `[Equal.symbol]` method directly.
+* - In generic utility code that needs to distinguish `Equal` implementors
+*   from plain values.
+*
+* Behavior:
+* - Pure function, no side effects.
+* - Returns `true` if and only if `u` has a property keyed by
+*   {@link symbol}.
+* - Acts as a TypeScript type guard, narrowing the input to {@link Equal}.
+*
+* **Example** (type guard)
+*
+* ```ts
+* import { Equal, Hash } from "effect"
+*
+* class Token implements Equal.Equal {
+*   constructor(readonly value: string) {}
+*   [Equal.symbol](that: Equal.Equal): boolean {
+*     return that instanceof Token && this.value === that.value
+*   }
+*   [Hash.symbol](): number {
+*     return Hash.string(this.value)
+*   }
+* }
+*
+* console.log(Equal.isEqual(new Token("abc"))) // true
+* console.log(Equal.isEqual({ x: 1 }))         // false
+* console.log(Equal.isEqual(42))                // false
+* ```
+*
+* @see {@link Equal} — the interface being checked
+* @see {@link symbol} — the property key that signals `Equal` support
+*
+* @category guards
+* @since 2.0.0
+*/
+const isEqual = (u) => hasProperty(u, symbol);
+/**
+* Wraps {@link equals} as an `Equivalence<A>`.
+*
+* When to use:
+* - When an API (e.g. `Array.dedupeWith`, `Equivalence.mapInput`) requires an
+*   `Equivalence` and you want to reuse `Equal.equals`.
+*
+* Behavior:
+* - Returns a function `(a: A, b: A) => boolean` that delegates to
+*   {@link equals}.
+* - Pure; allocates a thin wrapper on each call.
+*
+* **Example** (deduplicating with Equal semantics)
+*
+* ```ts
+* import { Array, Equal } from "effect"
+*
+* const eq = Equal.asEquivalence<number>()
+* const result = Array.dedupeWith([1, 2, 2, 3, 1], eq)
+* console.log(result) // [1, 2, 3]
+* ```
+*
+* @see {@link equals} — the underlying comparison function
+*
+* @category instances
+* @since 2.0.0
+*/
+const asEquivalence = () => equals;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/array.js
+/**
+* @since 2.0.0
+*/
+/** @internal */
+const isArrayNonEmpty = (self) => self.length > 0;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Redactable.js
+/**
+* Symbol used to identify objects that implement the {@link Redactable}
+* protocol.
+*
+* Add a method under this key to make an object redactable. The method
+* receives the current `Context` and must return the replacement value.
+*
+* - Use this symbol as the property key when implementing {@link Redactable}.
+* - Registered globally via `Symbol.for("~effect/Redactable")`,
+*   so it is identical across multiple copies of the library at runtime.
+*
+* **Example** (Masking an API key)
+*
+* ```ts
+* import { Context, Redactable } from "effect"
+*
+* class ApiKey {
+*   constructor(readonly raw: string) {}
+*
+*   [Redactable.symbolRedactable](_ctx: Context.Context<never>) {
+*     return this.raw.slice(0, 4) + "..."
+*   }
+* }
+* ```
+*
+* See also:
+* - {@link Redactable} - the interface this symbol belongs to
+* - {@link isRedactable} - check whether a value has this symbol
+*
+* @since 4.0.0
+* @category symbol
+*/
+const symbolRedactable = /* @__PURE__ */ Symbol.for("~effect/Redactable");
+/**
+* Type guard that checks whether a value implements the {@link Redactable}
+* interface.
+*
+* See also:
+* - {@link Redactable} - the interface being checked
+* - {@link redact} - applies redaction if the value is redactable
+*
+* @since 4.0.0
+* @category guards
+*/
+const isRedactable = (u) => hasProperty(u, symbolRedactable);
+/**
+* Redacts a value if it implements {@link Redactable}, otherwise returns it
+* unchanged.
+*
+* - Use this as the general-purpose entry point for redaction: it is safe to
+*   call on any value.
+* - Internally calls {@link isRedactable} and, if `true`, delegates to
+*   {@link getRedacted}.
+* - Not recursive: nested redactable values inside the returned object are not
+*   automatically redacted.
+* - Pure with respect to its argument (does not mutate the input).
+*
+* See also:
+* - {@link isRedactable} - check before redacting
+* - {@link getRedacted} - lower-level variant for known redactables
+*
+* @since 4.0.0
+*/
+function redact(u) {
+	if (isRedactable(u)) return getRedacted(u);
+	return u;
+}
+/**
+* Calls `[symbolRedactable]` on a value that is already known to be
+* {@link Redactable} and returns the result.
+*
+* - Use this when you have already verified the value is `Redactable` (e.g.,
+*   via {@link isRedactable}) and want to avoid a second check.
+* - Reads the current fiber's `Context` from the global fiber reference. If
+*   no fiber is active, an empty `Context` is passed to the redaction
+*   method.
+* - Does not mutate the input.
+*
+* See also:
+* - {@link redact} - higher-level variant that handles non-redactable values
+* - {@link isRedactable} - type guard to verify before calling this
+*
+* @since 4.0.0
+*/
+function getRedacted(redactable) {
+	return redactable[symbolRedactable](globalThis["~effect/Fiber/currentFiber"]?.context ?? emptyContext$1);
+}
+/** @internal */
+const currentFiberTypeId = "~effect/Fiber/currentFiber";
+const emptyContext$1 = {
+	"~effect/Context": {},
+	mapUnsafe: /* @__PURE__ */ new Map(),
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Formatter.js
+/**
+* Utilities for converting arbitrary JavaScript values into human-readable
+* strings, with support for circular references, redaction, and common JS
+* types that `JSON.stringify` handles poorly.
+*
+* Mental model:
+* - A `Formatter<Value, Format>` is a callable `(value: Value) => Format`.
+* - {@link format} is the general-purpose pretty-printer: it handles
+*   primitives, arrays, objects, `BigInt`, `Symbol`, `Date`, `RegExp`,
+*   `Set`, `Map`, class instances, and circular references.
+* - {@link formatJson} is a safe `JSON.stringify` wrapper that silently
+*   drops circular references and applies redaction.
+* - Both functions accept a `space` option for indentation control.
+*
+* Common tasks:
+* - Pretty-print any value for debugging / logging -> {@link format}
+* - Serialize to JSON safely (no circular throws) -> {@link formatJson}
+* - Format a single object property key -> {@link formatPropertyKey}
+* - Format a property path like `["a"]["b"]` -> {@link formatPath}
+* - Format a `Date` to ISO string safely -> {@link formatDate}
+*
+* Gotchas:
+* - {@link format} output is **not** valid JSON; use {@link formatJson} when
+*   you need parseable JSON.
+* - {@link format} calls `toString()` on objects by default; pass
+*   `ignoreToString: true` to disable.
+* - {@link formatJson} silently omits circular references (the key is
+*   dropped from the output).
+* - Values implementing the `Redactable` protocol are automatically
+*   redacted by both {@link format} and {@link formatJson}.
+*
+* **Example** (Pretty-print a value)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* const obj = { name: "Alice", scores: [100, 97] }
+* console.log(Formatter.format(obj))
+* // {"name":"Alice","scores":[100,97]}
+*
+* console.log(Formatter.format(obj, { space: 2 }))
+* // {
+* //   "name": "Alice",
+* //   "scores": [
+* //     100,
+* //     97
+* //   ]
+* // }
+* ```
+*
+* See also: {@link Formatter}, {@link format}, {@link formatJson}
+*
+* @since 4.0.0
+*/
+/**
+* Converts any JavaScript value into a human-readable string.
+*
+* When to use:
+* - Pretty-printing values for debugging, logging, or error messages.
+* - You need to handle `BigInt`, `Symbol`, `Set`, `Map`, `Date`, `RegExp`,
+*   or class instances that `JSON.stringify` cannot represent.
+* - You want circular references shown as `"[Circular]"` instead of
+*   throwing.
+*
+* Behavior:
+* - Does not mutate input.
+* - Output is **not** valid JSON; use {@link formatJson} when you need
+*   parseable JSON.
+* - Primitives: stringified naturally (`null`, `undefined`, `123`, `true`).
+*   Strings are JSON-quoted.
+* - Objects with a custom `toString` (not `Object.prototype.toString`):
+*   `toString()` is called unless `ignoreToString` is `true`.
+* - Errors with a `cause`: formatted as `"<message> (cause: <cause>)"`.
+* - Iterables (`Set`, `Map`, etc.): formatted as
+*   `ClassName([...elements])`.
+* - Class instances: wrapped as `ClassName({...})`.
+* - `Redactable` values are automatically redacted.
+* - Arrays/objects with 0–1 entries are inline; larger ones are
+*   pretty-printed when `space` is set.
+* - Circular references are replaced with `"[Circular]"`.
+*
+* Options:
+* - `space` — indentation unit (number of spaces, or a string like
+*   `"\t"`). Defaults to `0` (compact).
+* - `ignoreToString` — skip calling `toString()`. Defaults to `false`.
+*
+* **Example** (Compact output)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.format({ a: 1, b: [2, 3] }))
+* // {"a":1,"b":[2,3]}
+* ```
+*
+* **Example** (Pretty-printed output)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.format({ a: 1, b: [2, 3] }, { space: 2 }))
+* // {
+* //   "a": 1,
+* //   "b": [
+* //     2,
+* //     3
+* //   ]
+* // }
+* ```
+*
+* **Example** (Circular reference handling)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* const obj: any = { name: "loop" }
+* obj.self = obj
+* console.log(Formatter.format(obj))
+* // {"name":"loop","self":[Circular]}
+* ```
+*
+* See also: {@link formatJson}, {@link Formatter}
+*
+* @since 4.0.0
+*/
+function format(input, options) {
+	const space = options?.space ?? 0;
+	const seen = /* @__PURE__ */ new WeakSet();
+	const gap = !space ? "" : typeof space === "number" ? " ".repeat(space) : space;
+	const ind = (d) => gap.repeat(d);
+	const wrap = (v, body) => {
+		const ctor = v?.constructor;
+		return ctor && ctor !== Object.prototype.constructor && ctor.name ? `${ctor.name}(${body})` : body;
+	};
+	const ownKeys = (o) => {
+		try {
+			return Reflect.ownKeys(o);
+		} catch {
+			return ["[ownKeys threw]"];
+		}
+	};
+	function recur(v, d = 0) {
+		if (Array.isArray(v)) {
+			if (seen.has(v)) return CIRCULAR;
+			seen.add(v);
+			if (!gap || v.length <= 1) return `[${v.map((x) => recur(x, d)).join(",")}]`;
+			const inner = v.map((x) => recur(x, d + 1)).join(",\n" + ind(d + 1));
+			return `[\n${ind(d + 1)}${inner}\n${ind(d)}]`;
+		}
+		if (v instanceof Date) return formatDate(v);
+		if (!options?.ignoreToString && hasProperty(v, "toString") && typeof v["toString"] === "function" && v["toString"] !== Object.prototype.toString && v["toString"] !== Array.prototype.toString) {
+			const s = safeToString(v);
+			if (v instanceof Error && v.cause) return `${s} (cause: ${recur(v.cause, d)})`;
+			return s;
+		}
+		if (typeof v === "string") return JSON.stringify(v);
+		if (typeof v === "number" || v == null || typeof v === "boolean" || typeof v === "symbol") return String(v);
+		if (typeof v === "bigint") return String(v) + "n";
+		if (typeof v === "object" || typeof v === "function") {
+			if (seen.has(v)) return CIRCULAR;
+			seen.add(v);
+			if (symbolRedactable in v) return format(getRedacted(v));
+			if (Symbol.iterator in v) return `${v.constructor.name}(${recur(Array.from(v), d)})`;
+			const keys = ownKeys(v);
+			if (!gap || keys.length <= 1) return wrap(v, `{${keys.map((k) => `${formatPropertyKey(k)}:${recur(v[k], d)}`).join(",")}}`);
+			return wrap(v, `{\n${keys.map((k) => `${ind(d + 1)}${formatPropertyKey(k)}: ${recur(v[k], d + 1)}`).join(",\n")}\n${ind(d)}}`);
+		}
+		return String(v);
+	}
+	return recur(input, 0);
+}
+const CIRCULAR = "[Circular]";
+/**
+* Formats a single property key for display.
+*
+* When to use:
+* - You are building a custom formatter that needs to render object keys.
+*
+* Behavior:
+* - String keys are JSON-quoted (e.g. `"foo"`).
+* - Symbol and number keys are converted with `String()`.
+* - Pure function; does not mutate input.
+*
+* **Example** (Format property keys)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.formatPropertyKey("name"))
+* // "name"
+*
+* console.log(Formatter.formatPropertyKey(Symbol.for("id")))
+* // Symbol(id)
+* ```
+*
+* See also: {@link formatPath}, {@link format}
+*
+* @internal
+*/
+function formatPropertyKey(name) {
+	return typeof name === "string" ? JSON.stringify(name) : String(name);
+}
+/**
+* Formats a `Date` as an ISO 8601 string, returning `"Invalid Date"` for
+* invalid dates instead of throwing.
+*
+* When to use:
+* - You want a safe `toISOString()` that never throws.
+*
+* Behavior:
+* - Returns `date.toISOString()` on success.
+* - Returns `"Invalid Date"` if `toISOString()` throws (e.g. for
+*   `new Date(NaN)`).
+* - Pure function; does not mutate input.
+*
+* **Example** (Safe date formatting)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.formatDate(new Date("2024-01-15T10:30:00Z")))
+* // 2024-01-15T10:30:00.000Z
+*
+* console.log(Formatter.formatDate(new Date("invalid")))
+* // Invalid Date
+* ```
+*
+* See also: {@link format}
+*
+* @internal
+*/
+function formatDate(date) {
+	try {
+		return date.toISOString();
+	} catch {
+		return "Invalid Date";
+	}
+}
+function safeToString(input) {
+	try {
+		const s = input.toString();
+		return typeof s === "string" ? s : String(s);
+	} catch {
+		return "[toString threw]";
+	}
+}
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Inspectable.js
+/**
+* Symbol used by Node.js for custom object inspection.
+*
+* This symbol is recognized by Node.js's `util.inspect()` function and the REPL
+* for custom object representation. When an object has a method with this symbol,
+* it will be called to determine how the object should be displayed.
+*
+* @example
+* ```ts
+* import { Inspectable } from "effect"
+*
+* class CustomObject {
+*   constructor(private value: string) {}
+*
+*   [Inspectable.NodeInspectSymbol]() {
+*     return `CustomObject(${this.value})`
+*   }
+* }
+*
+* const obj = new CustomObject("hello")
+* console.log(obj) // Displays: CustomObject(hello)
+* ```
+*
+* @since 2.0.0
+* @category symbols
+*/
+const NodeInspectSymbol = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
+/**
+* Safely converts a value to a JSON-serializable representation, useful for
+* implementing the `toJSON` method of the {@link Inspectable} interface.
+*
+* This function attempts to extract JSON data from objects that implement the
+* `toJSON` method, recursively processes arrays, and handles errors gracefully.
+* For objects that don't have a `toJSON` method, it applies redaction to
+* protect sensitive information.
+*
+* @since 2.0.0
+*/
+const toJson = (input) => {
+	try {
+		if (hasProperty(input, "toJSON") && isFunction(input["toJSON"]) && input["toJSON"].length === 0) return input.toJSON();
+		else if (Array.isArray(input)) return input.map(toJson);
+	} catch {
+		return "[toJSON threw]";
+	}
+	return redact(input);
+};
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Utils.js
+/**
+* An `IterableIterator` that yields its wrapped value exactly once.
+*
+* When to use:
+*
+* - Implement `[Symbol.iterator]()` on Effect-like types so they can be
+*   `yield*`-ed inside generator functions (e.g. `Effect.gen`, `Option.gen`).
+* - You almost never construct this directly — it is created internally by
+*   yieldable types.
+*
+* Behavior:
+*
+* - The first call to `next()` returns `{ value: self, done: false }`.
+* - Every subsequent call returns `{ value: a, done: true }` where `a` is
+*   the argument passed to `next()`.
+* - `[Symbol.iterator]()` returns a **new** `SingleShotGen` wrapping the same
+*   value, so the outer type can be iterated multiple times.
+* - Does not mutate the wrapped value.
+*
+* **Example** (Yielding a wrapped value in a generator)
+*
+* ```ts
+* import { Utils } from "effect"
+*
+* const gen = new Utils.SingleShotGen<string, number>("hello")
+*
+* // First call yields the wrapped value
+* console.log(gen.next(0))
+* // { value: "hello", done: false }
+*
+* // Second call signals completion with the provided value
+* console.log(gen.next(42))
+* // { value: 42, done: true }
+* ```
+*
+* @see {@link Gen} — the type-level signature that relies on `SingleShotGen`
+*
+* @category constructors
+* @since 2.0.0
+*/
+var SingleShotGen = class SingleShotGen {
+	called = false;
+	self;
+	constructor(self) {
+		this.self = self;
+	}
+	/**
+	* @since 2.0.0
+	*/
+	next(a) {
+		return this.called ? {
+			value: a,
+			done: true
+		} : (this.called = true, {
+			value: this.self,
+			done: false
+		});
+	}
+	/**
+	* @since 2.0.0
+	*/
+	[Symbol.iterator]() {
+		return new SingleShotGen(this.self);
+	}
+};
+const InternalTypeId = "~effect/Utils/internal";
+const standard = { [InternalTypeId]: (body) => {
+	return body();
+} };
+const forced = { [InternalTypeId]: (body) => {
+	try {
+		return body();
+	} finally {}
+} };
+/** @internal */
+const internalCall = /* @__PURE__ */ standard[InternalTypeId](() => (/* @__PURE__ */ new Error()).stack)?.includes(InternalTypeId) === true ? standard[InternalTypeId] : forced[InternalTypeId];
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/core.js
+/** @internal */
+const EffectTypeId = `~effect/Effect`;
+/** @internal */
+const ExitTypeId = `~effect/Exit`;
+const effectVariance = {
+	_A: identity,
+	_E: identity,
+	_R: identity
+};
+/** @internal */
+const identifier = `${EffectTypeId}/identifier`;
+/** @internal */
+const args = `${EffectTypeId}/args`;
+/** @internal */
+const evaluate = `${EffectTypeId}/evaluate`;
+/** @internal */
+const contA = `${EffectTypeId}/successCont`;
+/** @internal */
+const contE = `${EffectTypeId}/failureCont`;
+/** @internal */
+const contAll = `${EffectTypeId}/ensureCont`;
+/** @internal */
+const Yield = /* @__PURE__ */ Symbol.for("effect/Effect/Yield");
+/** @internal */
+const PipeInspectableProto = {
+	pipe() {
+		return pipeArguments(this, arguments);
+	},
+	toJSON() {
+		return { ...this };
+	},
+	toString() {
+		return format(this.toJSON(), {
+			ignoreToString: true,
+			space: 2
+		});
+	},
+	[NodeInspectSymbol]() {
+		return this.toJSON();
+	}
+};
+/** @internal */
+const YieldableProto = { [Symbol.iterator]() {
+	return new SingleShotGen(this);
+} };
+/** @internal */
+const YieldableErrorProto = {
+	...YieldableProto,
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/** @internal */
+const EffectProto = {
+	[EffectTypeId]: effectVariance,
+	...PipeInspectableProto,
+	[Symbol.iterator]() {
+		return new SingleShotGen(this);
+	},
+	asEffect() {
+		return this;
+	},
+	toJSON() {
+		return {
+			_id: "Effect",
+			op: this[identifier],
+			...args in this ? { args: this[args] } : void 0
+		};
+	}
+};
+/** @internal */
+const isEffect = (u) => hasProperty(u, EffectTypeId);
+/** @internal */
+const isExit = (u) => hasProperty(u, ExitTypeId);
+/** @internal */
+const CauseTypeId = "~effect/Cause";
+/** @internal */
+const CauseReasonTypeId = "~effect/Cause/Reason";
+/** @internal */
+const isCause = (self) => hasProperty(self, CauseTypeId);
+/** @internal */
+var CauseImpl = class {
+	[CauseTypeId];
+	reasons;
+	constructor(failures) {
+		this[CauseTypeId] = CauseTypeId;
+		this.reasons = failures;
+	}
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+	toJSON() {
+		return {
+			_id: "Cause",
+			failures: this.reasons.map((f) => f.toJSON())
+		};
+	}
+	toString() {
+		return `Cause(${format(this.reasons)})`;
+	}
+	[NodeInspectSymbol]() {
+		return this.toJSON();
+	}
+	[symbol](that) {
+		return isCause(that) && this.reasons.length === that.reasons.length && this.reasons.every((e, i) => equals(e, that.reasons[i]));
+	}
+	[symbol$1]() {
+		return array(this.reasons);
+	}
+};
+const annotationsMap = /* @__PURE__ */ new WeakMap();
+/** @internal */
+var ReasonBase = class {
+	[CauseReasonTypeId];
+	annotations;
+	_tag;
+	constructor(_tag, annotations, originalError) {
+		this[CauseReasonTypeId] = CauseReasonTypeId;
+		this._tag = _tag;
+		if (annotations !== constEmptyAnnotations && typeof originalError === "object" && originalError !== null && annotations.size > 0) {
+			const prevAnnotations = annotationsMap.get(originalError);
+			if (prevAnnotations) annotations = new Map([...prevAnnotations, ...annotations]);
+			annotationsMap.set(originalError, annotations);
+		}
+		this.annotations = annotations;
+	}
+	annotate(annotations, options) {
+		if (annotations.mapUnsafe.size === 0) return this;
+		const newAnnotations = new Map(this.annotations);
+		annotations.mapUnsafe.forEach((value, key) => {
+			if (options?.overwrite !== true && newAnnotations.has(key)) return;
+			newAnnotations.set(key, value);
+		});
+		const self = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+		self.annotations = newAnnotations;
+		return self;
+	}
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+	toString() {
+		return format(this);
+	}
+	[NodeInspectSymbol]() {
+		return this.toString();
+	}
+};
+/** @internal */
+const constEmptyAnnotations = /* @__PURE__ */ new Map();
+/** @internal */
+var Fail = class extends ReasonBase {
+	error;
+	constructor(error, annotations = constEmptyAnnotations) {
+		super("Fail", annotations, error);
+		this.error = error;
+	}
+	toString() {
+		return `Fail(${format(this.error)})`;
+	}
+	toJSON() {
+		return {
+			_tag: "Fail",
+			error: this.error
+		};
+	}
+	[symbol](that) {
+		return isFailReason(that) && equals(this.error, that.error) && equals(this.annotations, that.annotations);
+	}
+	[symbol$1]() {
+		return combine(string(this._tag))(combine(hash(this.error))(hash(this.annotations)));
+	}
+};
+/** @internal */
+const causeFail = (error) => new CauseImpl([new Fail(error)]);
+/** @internal */
+var Die = class extends ReasonBase {
+	defect;
+	constructor(defect, annotations = constEmptyAnnotations) {
+		super("Die", annotations, defect);
+		this.defect = defect;
+	}
+	toString() {
+		return `Die(${format(this.defect)})`;
+	}
+	toJSON() {
+		return {
+			_tag: "Die",
+			defect: this.defect
+		};
+	}
+	[symbol](that) {
+		return isDieReason(that) && equals(this.defect, that.defect) && equals(this.annotations, that.annotations);
+	}
+	[symbol$1]() {
+		return combine(string(this._tag))(combine(hash(this.defect))(hash(this.annotations)));
+	}
+};
+/** @internal */
+const causeDie = (defect) => new CauseImpl([new Die(defect)]);
+/** @internal */
+const causeAnnotate = /* @__PURE__ */ dual((args) => isCause(args[0]), (self, annotations, options) => {
+	if (annotations.mapUnsafe.size === 0) return self;
+	return new CauseImpl(self.reasons.map((f) => f.annotate(annotations, options)));
+});
+/** @internal */
+const isFailReason = (self) => self._tag === "Fail";
+/** @internal */
+const isDieReason = (self) => self._tag === "Die";
+/** @internal */
+const isInterruptReason = (self) => self._tag === "Interrupt";
+function defaultEvaluate(_fiber) {
+	return exitDie(`Effect.evaluate: Not implemented`);
+}
+/** @internal */
+const makePrimitiveProto = (options) => ({
+	...EffectProto,
+	[identifier]: options.op,
+	[evaluate]: options[evaluate] ?? defaultEvaluate,
+	[contA]: options[contA],
+	[contE]: options[contE],
+	[contAll]: options[contAll]
+});
+/** @internal */
+const makePrimitive = (options) => {
+	const Proto = makePrimitiveProto(options);
+	return function() {
+		const self = Object.create(Proto);
+		self[args] = options.single === false ? arguments : arguments[0];
+		return self;
+	};
+};
+/** @internal */
+const makeExit = (options) => {
+	const Proto = {
+		...makePrimitiveProto(options),
+		[ExitTypeId]: ExitTypeId,
+		_tag: options.op,
+		get [options.prop]() {
+			return this[args];
+		},
+		toString() {
+			return `${options.op}(${format(this[args])})`;
+		},
+		toJSON() {
+			return {
+				_id: "Exit",
+				_tag: options.op,
+				[options.prop]: this[args]
+			};
+		},
+		[symbol](that) {
+			return isExit(that) && that._tag === this._tag && equals(this[args], that[args]);
+		},
+		[symbol$1]() {
+			return combine(string(options.op), hash(this[args]));
+		}
+	};
+	return function(value) {
+		const self = Object.create(Proto);
+		self[args] = value;
+		return self;
+	};
+};
+/** @internal */
+const exitSucceed = /* @__PURE__ */ makeExit({
+	op: "Success",
+	prop: "value",
+	[evaluate](fiber) {
+		const cont = fiber.getCont(contA);
+		return cont ? cont[contA](this[args], fiber, this) : fiber.yieldWith(this);
+	}
+});
+/** @internal */
+const StackTraceKey = { key: "effect/Cause/StackTrace" };
+/** @internal */
+const exitFailCause = /* @__PURE__ */ makeExit({
+	op: "Failure",
+	prop: "cause",
+	[evaluate](fiber) {
+		let cause = this[args];
+		let annotated = false;
+		if (fiber.currentStackFrame) {
+			cause = causeAnnotate(cause, { mapUnsafe: new Map([[StackTraceKey.key, fiber.currentStackFrame]]) });
+			annotated = true;
+		}
+		let cont = fiber.getCont(contE);
+		while (fiber.interruptible && fiber._interruptedCause && cont) cont = fiber.getCont(contE);
+		return cont ? cont[contE](cause, fiber, annotated ? void 0 : this) : fiber.yieldWith(annotated ? this : exitFailCause(cause));
+	}
+});
+/** @internal */
+const exitFail = (e) => exitFailCause(causeFail(e));
+/** @internal */
+const exitDie = (defect) => exitFailCause(causeDie(defect));
+/** @internal */
+const withFiber = /* @__PURE__ */ makePrimitive({
+	op: "WithFiber",
+	[evaluate](fiber) {
+		return this[args](fiber);
+	}
+});
+/** @internal */
+const YieldableError = /* @__PURE__ */ function() {
+	class YieldableError extends globalThis.Error {
+		asEffect() {
+			return exitFail(this);
+		}
+	}
+	Object.assign(YieldableError.prototype, YieldableErrorProto);
+	return YieldableError;
+}();
+/** @internal */
+const Error$1 = /* @__PURE__ */ function() {
+	const plainArgsSymbol = /* @__PURE__ */ Symbol.for("effect/Data/Error/plainArgs");
+	return class Base extends YieldableError {
+		constructor(args) {
+			super(args?.message, args?.cause ? { cause: args.cause } : void 0);
+			if (args) {
+				Object.assign(this, args);
+				Object.defineProperty(this, plainArgsSymbol, {
+					value: args,
+					enumerable: false
+				});
+			}
+		}
+		toJSON() {
+			return {
+				...this[plainArgsSymbol],
+				...this
+			};
+		}
+	};
+}();
+/** @internal */
+const TaggedError$1 = (tag) => {
+	class Base extends Error$1 {
+		_tag = tag;
+	}
+	Base.prototype.name = tag;
+	return Base;
+};
+TaggedError$1("NoSuchElementError");
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/result.js
+const TypeId$1 = "~effect/data/Result";
+const CommonProto = {
+	[TypeId$1]: {
+		/* v8 ignore next 2 */
+		_A: (_) => _,
+		_E: (_) => _
+	},
+	...PipeInspectableProto,
+	...YieldableProto
+};
+const SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+	_tag: "Success",
+	_op: "Success",
+	[symbol](that) {
+		return isResult(that) && isSuccess(that) && equals(this.success, that.success);
+	},
+	[symbol$1]() {
+		return combine(hash(this._tag))(hash(this.success));
+	},
+	toString() {
+		return `success(${format(this.success)})`;
+	},
+	toJSON() {
+		return {
+			_id: "Result",
+			_tag: this._tag,
+			value: toJson(this.success)
+		};
+	},
+	asEffect() {
+		return exitSucceed(this.success);
+	}
+});
+const FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+	_tag: "Failure",
+	_op: "Failure",
+	[symbol](that) {
+		return isResult(that) && isFailure$1(that) && equals(this.failure, that.failure);
+	},
+	[symbol$1]() {
+		return combine(hash(this._tag))(hash(this.failure));
+	},
+	toString() {
+		return `failure(${format(this.failure)})`;
+	},
+	toJSON() {
+		return {
+			_id: "Result",
+			_tag: this._tag,
+			failure: toJson(this.failure)
+		};
+	},
+	asEffect() {
+		return exitFail(this.failure);
+	}
+});
+/** @internal */
+const isResult = (input) => hasProperty(input, TypeId$1);
+/** @internal */
+const isFailure$1 = (result) => result._tag === "Failure";
+/** @internal */
+const isSuccess = (result) => result._tag === "Success";
+/** @internal */
+const fail$2 = (failure) => {
+	const a = Object.create(FailureProto);
+	a.failure = failure;
+	return a;
+};
+/** @internal */
+const succeed$3 = (success) => {
+	const a = Object.create(SuccessProto);
+	a.success = success;
+	return a;
+};
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Result.js
+/**
+* Creates a `Result` holding a `Success` value.
+*
+* - Use when you have a value and want to lift it into the `Result` type
+* - The error type `E` defaults to `never`
+* - Does not mutate input; allocates a new `Success` wrapper
+*
+* **Previously Known As**
+*
+* This API replaces the following from Effect 3.x:
+*
+* - `Either.right`
+*
+* **Example** (Wrapping a value)
+*
+* ```ts
+* import { Result } from "effect"
+*
+* const result = Result.succeed(42)
+*
+* console.log(Result.isSuccess(result))
+* // Output: true
+* ```
+*
+* @see {@link fail} to create a Failure
+* @see {@link void} for a pre-built `Success<void>`
+*
+* @category Constructors
+* @since 4.0.0
+*/
+const succeed$2 = succeed$3;
+/**
+* Creates a `Result` holding a `Failure` value.
+*
+* - Use when you want to represent a failed computation
+* - The success type `A` defaults to `never`
+* - Does not mutate input; allocates a new `Failure` wrapper
+*
+* **Previously Known As**
+*
+* This API replaces the following from Effect 3.x:
+*
+* - `Either.left`
+*
+* **Example** (Creating a failure)
+*
+* ```ts
+* import { Result } from "effect"
+*
+* const result = Result.fail("Something went wrong")
+*
+* console.log(Result.isFailure(result))
+* // Output: true
+* ```
+*
+* @see {@link succeed} to create a Success
+* @see {@link mapError} to transform the error
+*
+* @category Constructors
+* @since 4.0.0
+*/
+const fail$1 = fail$2;
+/**
+* Checks whether a `Result` is a `Failure`.
+*
+* - Acts as a TypeScript type guard, narrowing to `Failure<A, E>`
+* - After narrowing, you can access `.failure` to read the error value
+*
+* **Example** (Narrowing to Failure)
+*
+* ```ts
+* import { Result } from "effect"
+*
+* const result = Result.fail("oops")
+*
+* if (Result.isFailure(result)) {
+*   console.log(result.failure)
+*   // Output: "oops"
+* }
+* ```
+*
+* @see {@link isSuccess} for the opposite check
+* @see {@link isResult} to check if a value is any Result
+*
+* @category Type Guards
+* @since 4.0.0
+*/
+const isFailure = isFailure$1;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Array.js
+/**
+* Utilities for working with immutable arrays (and non-empty arrays) in a
+* functional style. All functions treat arrays as immutable — they return new
+* arrays rather than mutating the input.
+*
+* ## Mental model
+*
+* - **`Array<A>`** is a standard JS array. All functions in this module return
+*   new arrays; the input is never mutated.
+* - **`NonEmptyReadonlyArray<A>`** (`readonly [A, ...Array<A>]`) is a readonly
+*   array guaranteed to have at least one element. Many functions preserve or
+*   require this guarantee at the type level.
+* - **`NonEmptyArray<A>`** is the mutable counterpart: `[A, ...Array<A>]`.
+* - Most functions are **dual** — they can be called either as
+*   `Array.fn(array, arg)` (data-first) or piped as
+*   `pipe(array, Array.fn(arg))` (data-last).
+* - Functions that access elements by index return `Option<A>` for safety; use
+*   the `*NonEmpty` variants (e.g. {@link headNonEmpty}) when you already know
+*   the array is non-empty.
+* - Set-like operations ({@link union}, {@link intersection},
+*   {@link difference}) use `Equal.equivalence()` by default; use the `*With`
+*   variants for custom equality.
+*
+* ## Common tasks
+*
+* - **Create** an array: {@link make}, {@link of}, {@link empty},
+*   {@link fromIterable}, {@link range}, {@link makeBy}, {@link replicate},
+*   {@link unfold}
+* - **Access** elements: {@link head}, {@link last}, {@link get}, {@link tail},
+*   {@link init}
+* - **Transform**: {@link map}, {@link flatMap}, {@link flatten}
+* - **Filter**: {@link filter}, {@link partition}, {@link dedupe}
+* - **Combine**: {@link append}, {@link prepend}, {@link appendAll},
+*   {@link prependAll}, {@link zip}, {@link cartesian}
+* - **Split**: {@link splitAt}, {@link chunksOf}, {@link span}, {@link window}
+* - **Search**: {@link findFirst}, {@link findLast}, {@link contains}
+* - **Sort**: {@link sort}, {@link sortBy}, {@link sortWith}
+* - **Fold**: {@link reduce}, {@link scan}, {@link join}
+* - **Group**: {@link groupBy}, {@link group}, {@link groupWith}
+* - **Set operations**: {@link union}, {@link intersection},
+*   {@link difference}
+* - **Match** on empty vs non-empty: {@link match}, {@link matchLeft},
+*   {@link matchRight}
+* - **Check** properties: {@link isArray}, {@link isArrayNonEmpty},
+*   {@link every}, {@link some}
+*
+* ## Gotchas
+*
+* - {@link fromIterable} returns the original array reference when given an
+*   array; if you need a copy, use {@link copy}.
+* - `sort`, `reverse`, etc. always allocate a new array — the input is never
+*   mutated.
+* - {@link makeBy} and {@link replicate} normalize `n` to an integer >= 1 —
+*   they never produce an empty array.
+* - {@link range}`(start, end)` is inclusive on both ends. If `start > end` it
+*   returns `[start]`.
+* - Functions returning `Option` (e.g. {@link head}, {@link findFirst}) return
+*   `Option.none()` for empty inputs — they never throw.
+*
+* ## Quickstart
+*
+* **Example** (Basic array operations)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* const numbers = Array.make(1, 2, 3, 4, 5)
+*
+* const doubled = Array.map(numbers, (n) => n * 2)
+* console.log(doubled) // [2, 4, 6, 8, 10]
+*
+* const evens = Array.filter(numbers, (n) => n % 2 === 0)
+* console.log(evens) // [2, 4]
+*
+* const sum = Array.reduce(numbers, 0, (acc, n) => acc + n)
+* console.log(sum) // 15
+* ```
+*
+* @see {@link make} — create a non-empty array from elements
+* @see {@link map} — transform each element
+* @see {@link filter} — keep elements matching a predicate
+* @see {@link reduce} — fold an array to a single value
+*
+* @since 2.0.0
+*/
+/**
+* Reference to the global `Array` constructor.
+*
+* Use this when you need the native `Array` constructor while the `Array`
+* namespace is in scope (e.g. `Array.Array.isArray`, `Array.Array.from`).
+*
+* **Example** (Using the Array constructor)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* const arr = new Array.Array(3)
+* console.log(arr) // [undefined, undefined, undefined]
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const Array$1 = globalThis.Array;
+/**
+* Converts an `Iterable` to an `Array`.
+*
+* - If the input is already an array, returns it **by reference** (no copy).
+* - Otherwise, creates a new array from the iterable.
+* - Use {@link copy} if you need a fresh array even when the input is already
+*   an array.
+*
+* **Example** (Converting a Set to an array)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* const result = Array.fromIterable(new Set([1, 2, 3]))
+* console.log(result) // [1, 2, 3]
+* ```
+*
+* @see {@link ensure} — wrap a single value or return an existing array
+* @see {@link copy} — create a shallow copy of an array
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fromIterable = (collection) => Array$1.isArray(collection) ? collection : Array$1.from(collection);
+/**
+* Concatenates two iterables into a single array.
+*
+* - If either input is non-empty, the result is a `NonEmptyArray`.
+* - Does not mutate the inputs.
+*
+* **Example** (Concatenating arrays)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* const result = Array.appendAll([1, 2], [3, 4])
+* console.log(result) // [1, 2, 3, 4]
+* ```
+*
+* @see {@link append} — add a single element to the end
+* @see {@link prependAll} — add elements to the front
+*
+* @category concatenating
+* @since 2.0.0
+*/
+const appendAll = /* @__PURE__ */ dual(2, (self, that) => fromIterable(self).concat(fromIterable(that)));
+Array$1.isArray;
+/**
+* Tests whether a `ReadonlyArray` is non-empty, narrowing the type to
+* `NonEmptyReadonlyArray`.
+*
+* **Example** (Checking for a non-empty readonly array)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.isReadonlyArrayNonEmpty([])) // false
+* console.log(Array.isReadonlyArrayNonEmpty([1, 2, 3])) // true
+* ```
+*
+* @see {@link isArrayNonEmpty} — mutable variant
+* @see {@link isReadonlyArrayEmpty} — opposite check
+*
+* @category guards
+* @since 2.0.0
+*/
+const isReadonlyArrayNonEmpty = isArrayNonEmpty;
+/** @internal */
+function isOutOfBounds(i, as) {
+	return i < 0 || i >= as.length;
+}
+/**
+* Returns the first element of a `NonEmptyReadonlyArray` directly (no `Option`
+* wrapper).
+*
+* **Example** (Getting the head of a non-empty array)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.headNonEmpty([1, 2, 3, 4])) // 1
+* ```
+*
+* @see {@link head} — safe version for possibly-empty arrays
+*
+* @category getters
+* @since 2.0.0
+*/
+const headNonEmpty = /* @__PURE__ */ (/* @__PURE__ */ dual(2, (self, index) => {
+	const i = Math.floor(index);
+	if (isOutOfBounds(i, self)) throw new Error(`Index out of bounds: ${i}`);
+	return self[i];
+}))(0);
+/**
+* Returns all elements except the first of a `NonEmptyReadonlyArray`.
+*
+* **Example** (Getting the tail of a non-empty array)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.tailNonEmpty([1, 2, 3, 4])) // [2, 3, 4]
+* ```
+*
+* @see {@link tail} — safe version for possibly-empty arrays
+* @see {@link initNonEmpty} — all elements except the last
+*
+* @category getters
+* @since 2.0.0
+*/
+const tailNonEmpty = (self) => self.slice(1);
+/**
+* Computes the union of two arrays using a custom equivalence, removing
+* duplicates.
+*
+* **Example** (Union with custom equality)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.unionWith([1, 2], [2, 3], (a, b) => a === b)) // [1, 2, 3]
+* ```
+*
+* @see {@link union} — uses default equality
+* @see {@link intersection} — elements in both arrays
+* @see {@link difference} — elements only in the first array
+*
+* @category elements
+* @since 2.0.0
+*/
+const unionWith = /* @__PURE__ */ dual(3, (self, that, isEquivalent) => {
+	const a = fromIterable(self);
+	const b = fromIterable(that);
+	if (isReadonlyArrayNonEmpty(a)) {
+		if (isReadonlyArrayNonEmpty(b)) return dedupeWith(isEquivalent)(appendAll(a, b));
+		return a;
+	}
+	return b;
+});
+/**
+* Computes the union of two arrays, removing duplicates using
+* `Equal.equivalence()`.
+*
+* **Example** (Array union)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.union([1, 2], [2, 3])) // [1, 2, 3]
+* ```
+*
+* @see {@link unionWith} — use custom equality
+* @see {@link intersection} — elements in both arrays
+* @see {@link difference} — elements only in the first array
+*
+* @category elements
+* @since 2.0.0
+*/
+const union = /* @__PURE__ */ dual(2, (self, that) => unionWith(self, that, asEquivalence()));
+/**
+* Removes duplicates using a custom equivalence, preserving the order of the
+* first occurrence.
+*
+* **Example** (Deduplicating with custom equality)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.dedupeWith([1, 2, 2, 3, 3, 3], (a, b) => a === b)) // [1, 2, 3]
+* ```
+*
+* @see {@link dedupe} — uses default equality
+* @see {@link dedupeAdjacentWith} — only dedupes consecutive elements
+*
+* @category elements
+* @since 2.0.0
+*/
+const dedupeWith = /* @__PURE__ */ dual(2, (self, isEquivalent) => {
+	const input = fromIterable(self);
+	if (isReadonlyArrayNonEmpty(input)) {
+		const out = [headNonEmpty(input)];
+		const rest = tailNonEmpty(input);
+		for (const r of rest) if (out.every((a) => !isEquivalent(r, a))) out.push(r);
+		return out;
+	}
+	return [];
+});
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Context.js
+/**
+* @since 4.0.0
+* @category Type Identifiers
+*/
+const ServiceTypeId = "~effect/Context/Service";
+/**
+* @example
+* ```ts
+* import { Context } from "effect"
+*
+* // Create a simple service
+* const Database = Context.Service<{
+*   query: (sql: string) => string
+* }>("Database")
+*
+* // Create a service class
+* class Config extends Context.Service<Config, {
+*   port: number
+* }>()("Config") {}
+*
+* // Use the services to create contexts
+* const db = Context.make(Database, {
+*   query: (sql) => `Result: ${sql}`
+* })
+* const config = Context.make(Config, { port: 8080 })
+* ```
+*
+* @since 4.0.0
+* @category Constructors
+*/
+const Service = function() {
+	const prevLimit = Error.stackTraceLimit;
+	Error.stackTraceLimit = 2;
+	const err = /* @__PURE__ */ new Error();
+	Error.stackTraceLimit = prevLimit;
+	function KeyClass() {}
+	const self = KeyClass;
+	Object.setPrototypeOf(self, ServiceProto);
+	Object.defineProperty(self, "stack", { get() {
+		return err.stack;
+	} });
+	if (arguments.length > 0) {
+		self.key = arguments[0];
+		if (arguments[1]?.defaultValue) {
+			self[ReferenceTypeId] = ReferenceTypeId;
+			self.defaultValue = arguments[1].defaultValue;
+		}
+		return self;
+	}
+	return function(key, options) {
+		self.key = key;
+		if (options?.make) self.make = options.make;
+		return self;
+	};
+};
+const ServiceProto = {
+	[ServiceTypeId]: ServiceTypeId,
+	...PipeInspectableProto,
+	...YieldableProto,
+	toJSON() {
+		return {
+			_id: "Service",
+			key: this.key,
+			stack: this.stack
+		};
+	},
+	asEffect() {
+		return (this.asEffect = constant(withFiber((fiber) => exitSucceed(get(fiber.context, this)))))();
+	},
+	of(self) {
+		return self;
+	},
+	context(self) {
+		return make(this, self);
+	},
+	use(f) {
+		return withFiber((fiber) => f(get(fiber.context, this)));
+	},
+	useSync(f) {
+		return withFiber((fiber) => exitSucceed(f(get(fiber.context, this))));
+	}
+};
+const ReferenceTypeId = "~effect/Context/Reference";
+const TypeId = "~effect/Context";
+/**
+* @example
+* ```ts
+* import { Context } from "effect"
+*
+* // Create a context from a Map (unsafe)
+* const map = new Map([
+*   ["Logger", { log: (msg: string) => console.log(msg) }]
+* ])
+*
+* const context = Context.makeUnsafe(map)
+* ```
+*
+* @since 4.0.0
+* @category Constructors
+*/
+const makeUnsafe = (mapUnsafe) => {
+	const self = Object.create(Proto);
+	self.mapUnsafe = mapUnsafe;
+	self.mutable = false;
+	return self;
+};
+const Proto = {
+	...PipeInspectableProto,
+	[TypeId]: { _Services: (_) => _ },
+	toJSON() {
+		return {
+			_id: "Context",
+			services: Array.from(this.mapUnsafe).map(([key, value]) => ({
+				key,
+				value
+			}))
+		};
+	},
+	[symbol](that) {
+		if (!isContext(that) || this.mapUnsafe.size !== that.mapUnsafe.size) return false;
+		for (const k of this.mapUnsafe.keys()) if (!that.mapUnsafe.has(k) || !equals(this.mapUnsafe.get(k), that.mapUnsafe.get(k))) return false;
+		return true;
+	},
+	[symbol$1]() {
+		return number(this.mapUnsafe.size);
+	}
+};
+/**
+* Checks if the provided argument is a `Context`.
+*
+* @example
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* assert.strictEqual(Context.isContext(Context.empty()), true)
+* ```
+*
+* @since 4.0.0
+* @category Guards
+*/
+const isContext = (u) => hasProperty(u, TypeId);
+/**
+* Returns an empty `Context`.
+*
+* @example
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* assert.strictEqual(Context.isContext(Context.empty()), true)
+* ```
+*
+* @since 4.0.0
+* @category Constructors
+*/
+const empty = () => emptyContext;
+const emptyContext = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map());
+/**
+* Creates a new `Context` with a single service associated to the key.
+*
+* @example
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+*
+* const context = Context.make(Port, { PORT: 8080 })
+*
+* assert.deepStrictEqual(Context.get(context, Port), { PORT: 8080 })
+* ```
+*
+* @since 4.0.0
+* @category Constructors
+*/
+const make = (key, service) => makeUnsafe(new Map([[key.key, service]]));
+/**
+* Adds a service to a given `Context`.
+*
+* @example
+* ```ts
+* import { pipe, Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+*
+* const someContext = Context.make(Port, { PORT: 8080 })
+*
+* const context = pipe(
+*   someContext,
+*   Context.add(Timeout, { TIMEOUT: 5000 })
+* )
+*
+* assert.deepStrictEqual(Context.get(context, Port), { PORT: 8080 })
+* assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
+* ```
+*
+* @since 4.0.0
+* @category Adders
+*/
+const add = /* @__PURE__ */ dual(3, (self, key, service) => withMapUnsafe(self, (map) => {
+	map.set(key.key, service);
+}));
+/**
+* Get a service from the context that corresponds to the given key.
+*
+* @param self - The `Context` to search for the service.
+* @param service - The `Service` of the service to retrieve.
+*
+* @example
+* ```ts
+* import { pipe, Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+*
+* const context = pipe(
+*   Context.make(Port, { PORT: 8080 }),
+*   Context.add(Timeout, { TIMEOUT: 5000 })
+* )
+*
+* assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
+* ```
+*
+* @since 4.0.0
+* @category Getters
+*/
+const get = /* @__PURE__ */ dual(2, (self, service) => {
+	if (!self.mapUnsafe.has(service.key)) {
+		if (ReferenceTypeId in service) return getDefaultValue(service);
+		throw serviceNotFoundError(service);
+	}
+	return self.mapUnsafe.get(service.key);
+});
+/**
+* @example
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const LoggerRef = Context.Reference("Logger", {
+*   defaultValue: () => ({ log: (msg: string) => console.log(msg) })
+* })
+*
+* const context = Context.empty()
+* const logger = Context.getReferenceUnsafe(context, LoggerRef)
+*
+* assert.deepStrictEqual(logger, { log: (msg: string) => console.log(msg) })
+* ```
+*
+* @since 4.0.0
+* @category unsafe
+*/
+const getReferenceUnsafe = (self, service) => {
+	if (!self.mapUnsafe.has(service.key)) return getDefaultValue(service);
+	return self.mapUnsafe.get(service.key);
+};
+const defaultValueCacheKey = "~effect/Context/defaultValue";
+const getDefaultValue = (ref) => {
+	if (defaultValueCacheKey in ref) return ref[defaultValueCacheKey];
+	return ref[defaultValueCacheKey] = ref.defaultValue();
+};
+const serviceNotFoundError = (service) => {
+	const error = /* @__PURE__ */ new Error(`Service not found${service.key ? `: ${String(service.key)}` : ""}`);
+	if (service.stack) {
+		const lines = service.stack.split("\n");
+		if (lines.length > 2) {
+			const afterAt = lines[2].match(/at (.*)/);
+			if (afterAt) error.message = error.message + ` (defined at ${afterAt[1]})`;
+		}
+	}
+	if (error.stack) {
+		const lines = error.stack.split("\n");
+		lines.splice(1, 3);
+		error.stack = lines.join("\n");
+	}
+	return error;
+};
+const withMapUnsafe = (self, f) => {
+	if (self.mutable) {
+		f(self.mapUnsafe);
+		return self;
+	}
+	const map = new Map(self.mapUnsafe);
+	f(map);
+	return makeUnsafe(map);
+};
+/**
+* Creates a context key with a default value.
+*
+* **Details**
+*
+* `Context.Reference` allows you to create a key that can hold a value. You
+* can provide a default value for the service, which will automatically be used
+* when the context is accessed, or override it with a custom implementation
+* when needed.
+*
+* @example
+* ```ts
+* import { Context } from "effect"
+*
+* // Create a reference with a default value
+* const LoggerRef = Context.Reference("Logger", {
+*   defaultValue: () => ({ log: (msg: string) => console.log(msg) })
+* })
+*
+* // The reference provides the default value when accessed from an empty context
+* const context = Context.empty()
+* const logger = Context.get(context, LoggerRef)
+*
+* // You can also override the default value
+* const customContext = Context.make(LoggerRef, {
+*   log: (msg: string) => `Custom: ${msg}`
+* })
+* const customLogger = Context.get(customContext, LoggerRef)
+* ```
+*
+* @since 4.0.0
+* @category References
+*/
+const Reference = Service;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Scheduler.js
+/**
+* @since 2.0.0
+*/
+/**
+* @since 4.0.0
+* @category references
+*/
+const Scheduler = /* @__PURE__ */ Reference("effect/Scheduler", { defaultValue: () => new MixedScheduler() });
+const setImmediate = "setImmediate" in globalThis ? (f) => {
+	const timer = globalThis.setImmediate(f);
+	return () => globalThis.clearImmediate(timer);
+} : (f) => {
+	const timer = setTimeout(f, 0);
+	return () => clearTimeout(timer);
+};
+var PriorityBuckets = class {
+	buckets = [];
+	scheduleTask(task, priority) {
+		const buckets = this.buckets;
+		const len = buckets.length;
+		let bucket;
+		let index = 0;
+		for (; index < len; index++) {
+			if (buckets[index][0] > priority) break;
+			bucket = buckets[index];
+		}
+		if (bucket && bucket[0] === priority) bucket[1].push(task);
+		else if (index === len) buckets.push([priority, [task]]);
+		else buckets.splice(index, 0, [priority, [task]]);
+	}
+	drain() {
+		const buckets = this.buckets;
+		this.buckets = [];
+		return buckets;
+	}
+};
+/**
+* A scheduler implementation that provides efficient task scheduling
+* with support for both synchronous and asynchronous execution modes.
+*
+* Features:
+* - Batches tasks for efficient execution
+* - Supports priority-based task scheduling
+* - Configurable execution mode (sync/async)
+* - Automatic yielding based on operation count
+* - Optimized for high-throughput scenarios
+*
+* @since 2.0.0
+* @category schedulers
+*/
+var MixedScheduler = class {
+	executionMode;
+	setImmediate;
+	constructor(executionMode = "async", setImmediateFn = setImmediate) {
+		this.executionMode = executionMode;
+		this.setImmediate = setImmediateFn;
+	}
+	/**
+	* @since 2.0.0
+	*/
+	shouldYield(fiber) {
+		return fiber.currentOpCount >= fiber.maxOpsBeforeYield;
+	}
+	/**
+	* @since 2.0.0
+	*/
+	makeDispatcher() {
+		return new MixedSchedulerDispatcher(this.setImmediate);
+	}
+};
+var MixedSchedulerDispatcher = class {
+	tasks = /* @__PURE__ */ new PriorityBuckets();
+	running = void 0;
+	setImmediate;
+	constructor(setImmediateFn = setImmediate) {
+		this.setImmediate = setImmediateFn;
+	}
+	/**
+	* @since 2.0.0
+	*/
+	scheduleTask(task, priority) {
+		this.tasks.scheduleTask(task, priority);
+		if (this.running === void 0) this.running = this.setImmediate(this.afterScheduled);
+	}
+	/**
+	* @since 2.0.0
+	*/
+	afterScheduled = () => {
+		this.running = void 0;
+		this.runTasks();
+	};
+	/**
+	* @since 2.0.0
+	*/
+	runTasks() {
+		const buckets = this.tasks.drain();
+		for (let i = 0; i < buckets.length; i++) {
+			const toRun = buckets[i][1];
+			for (let j = 0; j < toRun.length; j++) toRun[j]();
+		}
+	}
+	/**
+	* @since 2.0.0
+	*/
+	flush() {
+		while (this.tasks.buckets.length > 0) {
+			if (this.running !== void 0) {
+				this.running();
+				this.running = void 0;
+			}
+			this.runTasks();
+		}
+	}
+};
+/**
+* A service reference that controls the maximum number of operations a fiber
+* can perform before yielding control back to the scheduler. This helps
+* prevent long-running fibers from monopolizing the execution thread.
+*
+* The default value is 2048 operations, which provides a good balance between
+* performance and fairness in concurrent execution.
+*
+* @since 4.0.0
+* @category references
+*/
+const MaxOpsBeforeYield = /* @__PURE__ */ Reference("effect/Scheduler/MaxOpsBeforeYield", { defaultValue: () => 2048 });
+/**
+* A service reference that controls whether the runtime should bypass scheduler
+* yield checks. When set to `true`, the fiber run loop won't call
+* `Scheduler.shouldYield`.
+*
+* @since 4.0.0
+* @category references
+*/
+const PreventSchedulerYield = /* @__PURE__ */ Reference("effect/Scheduler/PreventSchedulerYield", { defaultValue: () => false });
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Tracer.js
+/**
+* @since 2.0.0
+*/
+/**
+* @since 2.0.0
+* @category tags
+* @example
+* ```ts
+* import { Tracer } from "effect"
+*
+* // The key used to identify parent spans in the context
+* console.log(Tracer.ParentSpanKey) // "effect/Tracer/ParentSpan"
+* ```
+*/
+const ParentSpanKey = "effect/Tracer/ParentSpan";
+Service()(ParentSpanKey);
+/**
+* @since 4.0.0
+* @category references
+*/
+const TracerKey = "effect/Tracer";
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/metric.js
+/** @internal */
+const FiberRuntimeMetricsKey = "effect/observability/Metric/FiberRuntimeMetricsKey";
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/references.js
+/** @internal */
+const CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStackFrame", { defaultValue: constUndefined });
+/** @internal */
+const CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogLevel", { defaultValue: () => "Info" });
+/** @internal */
+const MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", { defaultValue: () => "Info" });
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/effect.js
+/** @internal */
+var Interrupt = class extends ReasonBase {
+	fiberId;
+	constructor(fiberId, annotations = constEmptyAnnotations) {
+		super("Interrupt", annotations, "Interrupted");
+		this.fiberId = fiberId;
+	}
+	toString() {
+		return `Interrupt(${this.fiberId})`;
+	}
+	toJSON() {
+		return {
+			_tag: "Interrupt",
+			fiberId: this.fiberId
+		};
+	}
+	[symbol](that) {
+		return isInterruptReason(that) && this.fiberId === that.fiberId && this.annotations === that.annotations;
+	}
+	[symbol$1]() {
+		return combine(string(`${this._tag}:${this.fiberId}`))(random(this.annotations));
+	}
+};
+/** @internal */
+const causeInterrupt = (fiberId) => new CauseImpl([new Interrupt(fiberId)]);
+/** @internal */
+const findError = (self) => {
+	for (let i = 0; i < self.reasons.length; i++) {
+		const reason = self.reasons[i];
+		if (reason._tag === "Fail") return succeed$2(reason.error);
+	}
+	return fail$1(self);
+};
+/** @internal */
+const causeCombine = /* @__PURE__ */ dual(2, (self, that) => {
+	if (self.reasons.length === 0) return that;
+	else if (that.reasons.length === 0) return self;
+	const newCause = new CauseImpl(union(self.reasons, that.reasons));
+	return equals(self, newCause) ? self : newCause;
+});
+/** @internal */
+const causePartition = (self) => {
+	const obj = {
+		Fail: [],
+		Die: [],
+		Interrupt: []
+	};
+	for (let i = 0; i < self.reasons.length; i++) obj[self.reasons[i]._tag].push(self.reasons[i]);
+	return obj;
+};
+/** @internal */
+const causeSquash = (self) => {
+	const partitioned = causePartition(self);
+	if (partitioned.Fail.length > 0) return partitioned.Fail[0].error;
+	else if (partitioned.Die.length > 0) return partitioned.Die[0].defect;
+	else if (partitioned.Interrupt.length > 0) return new globalThis.Error("All fibers interrupted without error");
+	return new globalThis.Error("Empty cause");
+};
+/** @internal */
+const FiberTypeId = `~effect/Fiber/dev`;
+const fiberVariance = {
+	_A: identity,
+	_E: identity
+};
+const fiberIdStore = { id: 0 };
+/** @internal */
+var FiberImpl = class {
+	constructor(context, interruptible = true) {
+		this[FiberTypeId] = fiberVariance;
+		this.setContext(context);
+		this.id = ++fiberIdStore.id;
+		this.currentOpCount = 0;
+		this.currentLoopCount = 0;
+		this.interruptible = interruptible;
+		this._stack = [];
+		this._observers = [];
+		this._exit = void 0;
+		this._children = void 0;
+		this._interruptedCause = void 0;
+		this._yielded = void 0;
+	}
+	[FiberTypeId];
+	id;
+	interruptible;
+	currentOpCount;
+	currentLoopCount;
+	_stack;
+	_observers;
+	_exit;
+	_currentExit;
+	_children;
+	_interruptedCause;
+	_yielded;
+	context;
+	currentScheduler;
+	currentTracerContext;
+	currentSpan;
+	currentLogLevel;
+	minimumLogLevel;
+	currentStackFrame;
+	runtimeMetrics;
+	maxOpsBeforeYield;
+	currentPreventYield;
+	_dispatcher = void 0;
+	get currentDispatcher() {
+		return this._dispatcher ??= this.currentScheduler.makeDispatcher();
+	}
+	getRef(ref) {
+		return getReferenceUnsafe(this.context, ref);
+	}
+	addObserver(cb) {
+		if (this._exit) {
+			cb(this._exit);
+			return constVoid;
+		}
+		this._observers.push(cb);
+		return () => {
+			const index = this._observers.indexOf(cb);
+			if (index >= 0) this._observers.splice(index, 1);
+		};
+	}
+	interruptUnsafe(fiberId, annotations) {
+		if (this._exit) return;
+		let cause = causeInterrupt(fiberId);
+		if (this.currentStackFrame) cause = causeAnnotate(cause, make(StackTraceKey, this.currentStackFrame));
+		if (annotations) cause = causeAnnotate(cause, annotations);
+		this._interruptedCause = this._interruptedCause ? causeCombine(this._interruptedCause, cause) : cause;
+		if (this.interruptible) this.evaluate(failCause(this._interruptedCause));
+	}
+	pollUnsafe() {
+		return this._exit;
+	}
+	evaluate(effect) {
+		this.runtimeMetrics?.recordFiberStart(this.context);
+		if (this._exit) return;
+		else if (this._yielded !== void 0) {
+			const yielded = this._yielded;
+			this._yielded = void 0;
+			yielded();
+		}
+		const exit = this.runLoop(effect);
+		if (exit === Yield) return;
+		const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
+		if (interruptChildren !== void 0) return this.evaluate(flatMap(interruptChildren, () => exit));
+		this._exit = exit;
+		this.runtimeMetrics?.recordFiberEnd(this.context, this._exit);
+		for (let i = 0; i < this._observers.length; i++) this._observers[i](exit);
+		this._observers.length = 0;
+	}
+	runLoop(effect) {
+		const prevFiber = globalThis[currentFiberTypeId];
+		globalThis[currentFiberTypeId] = this;
+		let yielding = false;
+		let current = effect;
+		this.currentOpCount = 0;
+		const currentLoop = ++this.currentLoopCount;
+		try {
+			while (true) {
+				this.currentOpCount++;
+				if (!yielding && !this.currentPreventYield && this.currentScheduler.shouldYield(this)) {
+					yielding = true;
+					const prev = current;
+					current = flatMap(yieldNow, () => prev);
+				}
+				current = this.currentTracerContext ? this.currentTracerContext(current, this) : current[evaluate](this);
+				if (currentLoop !== this.currentLoopCount) return Yield;
+				else if (current === Yield) {
+					const yielded = this._yielded;
+					if (ExitTypeId in yielded) {
+						this._yielded = void 0;
+						return yielded;
+					}
+					return Yield;
+				}
+			}
+		} catch (error) {
+			if (!hasProperty(current, evaluate)) return exitDie(`Fiber.runLoop: Not a valid effect: ${String(current)}`);
+			return this.runLoop(exitDie(error));
+		} finally {
+			globalThis[currentFiberTypeId] = prevFiber;
+		}
+	}
+	getCont(symbol) {
+		while (true) {
+			const op = this._stack.pop();
+			if (!op) return void 0;
+			const cont = op[contAll] && op[contAll](this);
+			if (cont) {
+				cont[symbol] = cont;
+				return cont;
+			}
+			if (op[symbol]) return op;
+		}
+	}
+	yieldWith(value) {
+		this._yielded = value;
+		return Yield;
+	}
+	children() {
+		return this._children ??= /* @__PURE__ */ new Set();
+	}
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+	setContext(context) {
+		this.context = context;
+		const scheduler = this.getRef(Scheduler);
+		if (scheduler !== this.currentScheduler) {
+			this.currentScheduler = scheduler;
+			this._dispatcher = void 0;
+		}
+		this.currentSpan = context.mapUnsafe.get(ParentSpanKey);
+		this.currentLogLevel = this.getRef(CurrentLogLevel);
+		this.minimumLogLevel = this.getRef(MinimumLogLevel);
+		this.currentStackFrame = context.mapUnsafe.get(CurrentStackFrame.key);
+		this.maxOpsBeforeYield = this.getRef(MaxOpsBeforeYield);
+		this.currentPreventYield = this.getRef(PreventSchedulerYield);
+		this.runtimeMetrics = context.mapUnsafe.get(FiberRuntimeMetricsKey);
+		const currentTracer = context.mapUnsafe.get(TracerKey);
+		this.currentTracerContext = currentTracer ? currentTracer["context"] : void 0;
+	}
+	get currentSpanLocal() {
+		return this.currentSpan?._tag === "Span" ? this.currentSpan : void 0;
+	}
+};
+const fiberMiddleware = { interruptChildren: void 0 };
+/** @internal */
+const succeed$1 = exitSucceed;
+/** @internal */
+const failCause = exitFailCause;
+/** @internal */
+const fail = exitFail;
+/** @internal */
+const suspend = /* @__PURE__ */ makePrimitive({
+	op: "Suspend",
+	[evaluate](_fiber) {
+		return this[args]();
+	}
+});
+/** @internal */
+const yieldNow = /* @__PURE__ */ (/* @__PURE__ */ makePrimitive({
+	op: "Yield",
+	[evaluate](fiber) {
+		let resumed = false;
+		fiber.currentDispatcher.scheduleTask(() => {
+			if (resumed) return;
+			fiber.evaluate(exitVoid);
+		}, this[args] ?? 0);
+		return fiber.yieldWith(() => {
+			resumed = true;
+		});
+	}
+}))(0);
+/** @internal */
+const void_$1 = /* @__PURE__ */ succeed$1(void 0);
+/** @internal */
+const try_$1 = (options) => suspend(() => {
+	try {
+		return succeed$1(internalCall(options.try));
+	} catch (err) {
+		return fail(internalCall(() => options.catch(err)));
+	}
+});
+/** @internal */
+const flatMap = /* @__PURE__ */ dual(2, (self, f) => {
+	const onSuccess = Object.create(OnSuccessProto);
+	onSuccess[args] = self;
+	onSuccess[contA] = f.length !== 1 ? (a) => f(a) : f;
+	return onSuccess;
+});
+const OnSuccessProto = /* @__PURE__ */ makePrimitiveProto({
+	op: "OnSuccess",
+	[evaluate](fiber) {
+		fiber._stack.push(this);
+		return this[args];
+	}
+});
+/** @internal */
+const effectIsExit = (effect) => ExitTypeId in effect;
+/** @internal */
+const exitVoid = /* @__PURE__ */ exitSucceed(void 0);
+/** @internal */
+const catchCause = /* @__PURE__ */ dual(2, (self, f) => {
+	const onFailure = Object.create(OnFailureProto);
+	onFailure[args] = self;
+	onFailure[contE] = f.length !== 1 ? (cause) => f(cause) : f;
+	return onFailure;
+});
+const OnFailureProto = /* @__PURE__ */ makePrimitiveProto({
+	op: "OnFailure",
+	[evaluate](fiber) {
+		fiber._stack.push(this);
+		return this[args];
+	}
+});
+/** @internal */
+const catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate, f, orElse) => catchCause(self, (cause) => {
+	const error = findError(cause);
+	if (isFailure(error)) return failCause(error.failure);
+	if (!predicate(error.success)) return orElse ? internalCall(() => orElse(error.success)) : failCause(cause);
+	return internalCall(() => f(error.success));
+}));
+/** @internal */
+const catchTag$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, k, f, orElse) => {
+	return catchIf(self, Array.isArray(k) ? (e) => hasProperty(e, "_tag") && k.includes(e._tag) : isTagged(k), f, orElse);
+});
+/** @internal */
+const runForkWith = (context) => (effect, options) => {
+	const fiber = new FiberImpl(options?.scheduler ? add(context, Scheduler, options.scheduler) : context, options?.uninterruptible !== true);
+	fiber.evaluate(effect);
+	if (fiber._exit) return fiber;
+	if (options?.signal) if (options.signal.aborted) fiber.interruptUnsafe();
+	else {
+		const abort = () => fiber.interruptUnsafe();
+		options.signal.addEventListener("abort", abort, { once: true });
+		fiber.addObserver(() => options.signal.removeEventListener("abort", abort));
+	}
+	if (options?.onFiberStart) options.onFiberStart(fiber);
+	return fiber;
+};
+/** @internal */
+const runSyncExitWith = (context) => {
+	const runFork = runForkWith(context);
+	return (effect) => {
+		if (effectIsExit(effect)) return effect;
+		const fiber = runFork(effect, { scheduler: new MixedScheduler("sync") });
+		fiber.currentDispatcher?.flush();
+		return fiber._exit ?? exitDie(new AsyncFiberError(fiber));
+	};
+};
+/** @internal */
+const runSyncWith = (context) => {
+	const runSyncExit = runSyncExitWith(context);
+	return (effect) => {
+		const exit = runSyncExit(effect);
+		if (exit._tag === "Failure") throw causeSquash(exit.cause);
+		return exit.value;
+	};
+};
+/** @internal */
+const runSync$1 = /* @__PURE__ */ runSyncWith(/* @__PURE__ */ empty());
+TaggedError$1("TimeoutError");
+TaggedError$1("IllegalArgumentError");
+TaggedError$1("ExceededCapacityError");
+/** @internal */
+const AsyncFiberErrorTypeId = "~effect/Cause/AsyncFiberError";
+/** @internal */
+var AsyncFiberError = class extends TaggedError$1("AsyncFiberError") {
+	[AsyncFiberErrorTypeId] = AsyncFiberErrorTypeId;
+	constructor(fiber) {
+		super({
+			message: "An asynchronous Effect was executed with Effect.runSync",
+			fiber
+		});
+	}
+};
+TaggedError$1("UnknownError");
+const colors = {
+	bold: "1",
+	red: "31",
+	green: "32",
+	yellow: "33",
+	blue: "34",
+	cyan: "36",
+	white: "37",
+	gray: "90",
+	black: "30",
+	bgBrightRed: "101"
+};
+colors.gray, colors.blue, colors.green, colors.yellow, colors.red, colors.bgBrightRed, colors.black;
+const hasProcessStdout = typeof process === "object" && process !== null && typeof process.stdout === "object" && process.stdout !== null;
+hasProcessStdout && process.stdout.isTTY;
+hasProcessStdout || "Deno" in globalThis;
+/**
+* Creates a tagged error class with a `_tag` discriminator.
+*
+* Like {@link Error}, but instances also carry a `readonly _tag` property,
+* enabling `Effect.catchTag` and `Effect.catchTags` for tag-based recovery.
+* The `_tag` is excluded from the constructor argument.
+*
+* - Use for domain errors in Effect applications where you want
+*   discriminated-union error handling.
+* - Yielding an instance inside `Effect.gen` fails the effect with this error.
+*
+* **Example** (tag-based error recovery)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class NotFound extends Data.TaggedError("NotFound")<{
+*   readonly resource: string
+* }> {}
+*
+* class Forbidden extends Data.TaggedError("Forbidden")<{
+*   readonly reason: string
+* }> {}
+*
+* const program = Effect.gen(function*() {
+*   return yield* new NotFound({ resource: "/users/42" })
+* })
+*
+* const recovered = program.pipe(
+*   Effect.catchTag("NotFound", (e) =>
+*     Effect.succeed(`missing: ${e.resource}`))
+* )
+* ```
+*
+* @see {@link Error} — without a `_tag`
+* @see {@link TaggedClass} — tagged class that is not an error
+*
+* @category constructors
+* @since 2.0.0
+*/
+const TaggedError = TaggedError$1;
+//#endregion
+//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Effect.js
+/**
+* Creates an `Effect` that always succeeds with a given value.
+*
+* **When to Use**
+*
+* Use this function when you need an effect that completes successfully with a
+* specific value without any errors or external dependencies.
+*
+* @see {@link fail} to create an effect that represents a failure.
+*
+* @example
+* ```ts
+* // Title: Creating a Successful Effect
+* import { Effect } from "effect"
+*
+* // Creating an effect that represents a successful scenario
+* //
+* //      ┌─── Effect<number, never, never>
+* //      ▼
+* const success = Effect.succeed(42)
+* ```
+*
+* @since 2.0.0
+* @category Creating Effects
+*/
+const succeed = succeed$1;
+const void_ = void_$1;
+const try_ = try_$1;
+/**
+* Catches and handles specific errors by their `_tag` field, which is used as a
+* discriminator.
+*
+* **When to Use**
+*
+* `catchTag` is useful when your errors are tagged with a readonly `_tag` field
+* that identifies the error type. You can use this function to handle specific
+* error types by matching the `_tag` value. This allows for precise error
+* handling, ensuring that only specific errors are caught and handled.
+*
+* The error type must have a readonly `_tag` field to use `catchTag`. This
+* field is used to identify and match errors.
+*
+* @example
+* ```ts
+* import { Effect } from "effect"
+*
+* class NetworkError {
+*   readonly _tag = "NetworkError"
+*   constructor(readonly message: string) {}
+* }
+*
+* class ValidationError {
+*   readonly _tag = "ValidationError"
+*   constructor(readonly message: string) {}
+* }
+*
+* declare const task: Effect.Effect<string, NetworkError | ValidationError>
+*
+* const program = Effect.catchTag(
+*   task,
+*   "NetworkError",
+*   (error) => Effect.succeed(`Recovered from network error: ${error.message}`)
+* )
+* ```
+*
+* @since 2.0.0
+* @category Error Handling
+*/
+const catchTag = catchTag$1;
+/**
+* Executes an effect synchronously, running it immediately and returning the
+* result.
+*
+* **When to Use**
+*
+* Use `runSync` to run an effect that does not fail and does not include
+* any asynchronous operations.
+*
+* If the effect fails or involves asynchronous work, it will throw an error,
+* and execution will stop where the failure or async operation occurs.
+*
+* @see {@link runSyncExit} for a version that returns an `Exit` type instead of
+* throwing an error.
+*
+* @example
+* ```ts
+* // Title: Synchronous Logging
+* import { Effect } from "effect"
+*
+* const program = Effect.sync(() => {
+*   console.log("Hello, World!")
+*   return 1
+* })
+*
+* const result = Effect.runSync(program)
+* // Output: Hello, World!
+*
+* console.log(result)
+* // Output: 1
+* ```
+*
+* @example
+* // Title: Incorrect Usage with Failing or Async Effects
+* import { Effect } from "effect"
+*
+* try {
+*   // Attempt to run an effect that fails
+*   Effect.runSync(Effect.fail("my error"))
+* } catch (e) {
+*   console.error(e)
+* }
+* // Output:
+* // (FiberFailure) Error: my error
+*
+* try {
+*   // Attempt to run an effect that involves async work
+*   Effect.runSync(Effect.promise(() => Promise.resolve(1)))
+* } catch (e) {
+*   console.error(e)
+* }
+* // Output:
+* // (FiberFailure) AsyncFiberException: Fiber #0 cannot be resolved synchronously. This is caused by using runSync on an effect that performs async work
+*
+* @since 2.0.0
+* @category Running Effects
+*/
+const runSync = runSync$1;
+Service()("effect/Effect/Transaction");
+//#endregion
 //#region ../src/lib/paths.ts
 const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), ".panopticon");
 /** Get PANOPTICON_HOME dynamically (reads env var on each call, useful for testing) */
@@ -77,6 +3384,23 @@ join(PRDS_DIR, "published");
 function encodeClaudeProjectDir(cwdPath) {
 	return cwdPath.replace(/[^a-zA-Z0-9-]/g, "-");
 }
+TaggedError("VcsError");
+TaggedError("VcsTimeoutError");
+TaggedError("FsError");
+TaggedError("FsNotFoundError");
+TaggedError("GitError");
+TaggedError("MergeConflictError");
+TaggedError("TmuxError");
+TaggedError("TrackerError");
+TaggedError("GitHubApiError");
+TaggedError("LinearApiError");
+TaggedError("CheckpointError");
+TaggedError("InvalidAgentIdError");
+TaggedError("ConfigError");
+TaggedError("ConfigParseError");
+TaggedError("ClaudeCredentialParseError");
+TaggedError("ProcessSpawnError");
+TaggedError("ProcessTimeoutError");
 //#endregion
 //#region ../src/lib/cost.ts
 const DEFAULT_PRICING = [
@@ -1283,6 +4607,12 @@ function runMigrations(db) {
 }
 //#endregion
 //#region ../src/lib/database/index.ts
+/**
+* PAN-1249: Local typed error for SQLite failures against panopticon.db.
+* Used by callers that want to surface DB faults instead of swallowing them.
+* Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
+*/
+var DatabaseError$1 = class extends TaggedError("DatabaseError") {};
 function isBunRuntime() {
 	return typeof Bun !== "undefined";
 }
@@ -1334,10 +4664,17 @@ function getDatabase() {
 	}
 	setInterval(() => {
 		if (!_db) return;
-		try {
-			const free = _db.pragma("freelist_count", { simple: true });
-			if (free > 256) _db.pragma(`incremental_vacuum(${Math.min(free, 1e4)})`);
-		} catch {}
+		const db = _db;
+		runSync(try_({
+			try: () => {
+				const free = db.pragma("freelist_count", { simple: true });
+				if (free > 256) db.pragma(`incremental_vacuum(${Math.min(free, 1e4)})`);
+			},
+			catch: (cause) => new DatabaseError$1({
+				operation: "incremental_vacuum",
+				cause
+			})
+		}).pipe(catchTag("DatabaseError", () => void_)));
 	}, 900 * 1e3).unref();
 	return _db;
 }
@@ -1348,29 +4685,42 @@ function getDatabase() {
 *
 * Provides SQLite-backed storage for CostEvent records.
 * Deduplication is enforced via UNIQUE index on request_id.
+*
+* PAN-1249: Effect migration pass — synchronous public API preserved so
+* existing call sites stay unchanged. The hot insert paths are wrapped in
+* Effect.try with a local DatabaseError tag, matching prior best-effort
+* semantics (insert failures are logged and surfaced as `null`).
+* Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
 */
+/** A SQLite operation against panopticon.db failed. */
+var DatabaseError = class extends TaggedError("DatabaseError") {};
 /**
 * Insert a cost event. Returns the new row ID, or null if it was a duplicate.
 * Deduplication is handled by the UNIQUE index on request_id.
 */
 function insertCostEvent(event, sourceFile) {
-	const db = getDatabase();
-	try {
-		const result = db.prepare(`
-      INSERT OR IGNORE INTO cost_events (
-        ts, agent_id, issue_id, session_type, provider, model,
-        input, output, cache_read, cache_write, cost, request_id,
-        session_id,
-        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-        source_file, caveman_variant
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, sourceFile ?? null, event.cavemanVariant ?? null);
-		if (result.changes === 0) return null;
-		return result.lastInsertRowid;
-	} catch (err) {
-		console.error("[cost-events-db] Insert failed:", err);
-		return null;
-	}
+	return runSync(try_({
+		try: () => {
+			const result = getDatabase().prepare(`
+          INSERT OR IGNORE INTO cost_events (
+            ts, agent_id, issue_id, session_type, provider, model,
+            input, output, cache_read, cache_write, cost, request_id,
+            session_id,
+            tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+            source_file, caveman_variant
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, sourceFile ?? null, event.cavemanVariant ?? null);
+			if (result.changes === 0) return null;
+			return result.lastInsertRowid;
+		},
+		catch: (cause) => new DatabaseError({
+			operation: "insertCostEvent",
+			cause
+		})
+	}).pipe(catchTag("DatabaseError", (err) => {
+		console.error("[cost-events-db] Insert failed:", err.cause);
+		return succeed(null);
+	})));
 }
 //#endregion
 //#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js

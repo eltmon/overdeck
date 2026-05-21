@@ -129,7 +129,8 @@ async function captureFiles(
     // Read the live workspace continue state first, then migration fallbacks.
     let continueState: ContinueState | null = null;
     try {
-      continueState = readWorkspaceContinue(workspace);
+      const { Effect: EffectModule } = await import('effect');
+      continueState = await EffectModule.runPromise(readWorkspaceContinue(workspace));
     } catch { /* ignore */ }
     if (!continueState) {
       const resolved = resolveProjectFromIssue(issueId);
