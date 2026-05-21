@@ -90,6 +90,7 @@ import {
   setAgentDeliveryMethod,
   normalizeAgentId,
 } from '../../../lib/agents.js';
+import { stopWorkspaceDocker } from '../../../lib/workspace-manager.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
@@ -1068,6 +1069,24 @@ export function createAgentStopHandler(
     const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
     yield* Effect.promise(() => appendAgentLifecycleLog(id, lifecycleEvent));
     yield* Effect.promise(() => stopAgentAsync(id));
+
+    // PAN-1316: tear down the workspace Docker stack on user-initiated stop.
+    // Without this, dev-server containers (Vite/Webpack) outlive their owning
+    // agent and can degrade the host via inotify-fallback polling storms.
+    // Internal stops (restart) take a different path and don't reach here.
+    if (stateBeforeStop?.workspace && stateBeforeStop?.issueId) {
+      try {
+        const dockerResult = yield* Effect.promise(() =>
+          stopWorkspaceDocker(stateBeforeStop.workspace!, stateBeforeStop.issueId!.toLowerCase()),
+        );
+        if (dockerResult.containersFound) {
+          console.log(`[agents] ✓ Stopped Docker stack for ${id}: ${dockerResult.steps.join('; ')}`);
+        }
+      } catch (err) {
+        console.warn(`[agents] Docker teardown failed for ${id} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
     // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
     // ws-rpc drops events that fail Schema validation, so emits without issueId
