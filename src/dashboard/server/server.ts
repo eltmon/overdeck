@@ -61,7 +61,7 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
-import { dashboardSessionCookieHeader, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
+import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
@@ -125,7 +125,7 @@ function allowDashboardSessionCors(
         'true',
       ),
       'Access-Control-Allow-Headers',
-      'x-panopticon-internal-token, authorization, content-type',
+      'x-panopticon-internal-token, x-panopticon-csrf-token, authorization, content-type',
     ),
     'Vary',
     'Origin',
@@ -166,19 +166,21 @@ const dashboardSessionRouteLayer = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
-    const authError = rejectUnauthorizedDashboardSessionMintRequest(request);
-    if (authError) return authError;
+    const mintAuthError = rejectUnauthorizedDashboardSessionMintRequest(request);
+    const sessionAuthError = rejectUnauthorizedDashboardRequest(request);
+    if (mintAuthError && sessionAuthError) return mintAuthError;
+
+    let response = jsonResponse({ ok: true, csrfToken: dashboardCsrfToken() });
+    if (!mintAuthError) {
+      response = HttpServerResponse.setHeader(
+        response,
+        'Set-Cookie',
+        dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
+      );
+    }
 
     return allowDashboardSessionCors(
-      HttpServerResponse.setHeader(
-        HttpServerResponse.setHeader(
-          jsonResponse({ ok: true }),
-          'Set-Cookie',
-          dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
-        ),
-        'Cache-Control',
-        'no-store',
-      ),
+      HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store'),
       request,
     );
   }),

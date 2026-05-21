@@ -53,6 +53,11 @@ async function forgeApprove(issueId: string): Promise<unknown> {
   return res.json();
 }
 
+function isVerifyingIssue(issue?: Issue): boolean {
+  const state = (issue?.state ?? issue?.status ?? '').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  return state === 'verifying' || state === 'verifying_on_main';
+}
+
 async function mergeIssue(issueId: string): Promise<unknown> {
   const res = await fetch(`/api/issues/${issueId}/merge`, {
     method: 'POST',
@@ -93,7 +98,8 @@ export function AwaitingMergePage() {
       .filter((rs) => {
         const issue = issuesById.get(rs.issueId.toLowerCase());
         // Filter out issues the tracker has marked as cancelled/wontfix.
-        if (issue?.state === 'canceled' || issue?.state === 'cancelled') return false;
+        if (issue?.state === 'canceled') return false;
+        if (isVerifyingIssue(issue)) return false;
         // Filter out issues that are 'done' with a failed merge OR a 'merged' tracker label —
         // they were completed outside Panopticon (PR merged manually on GitHub).
         // Only keep 'done' issues whose Panopticon mergeStatus is still non-failed with no
@@ -117,6 +123,10 @@ export function AwaitingMergePage() {
 
   const blocked = useDashboardStore(selectBlockedFromMerge);
   const openMergeRequests = useDashboardStore(selectOpenMergeRequests);
+  const visibleOpenMergeRequests = useMemo(
+    () => openMergeRequests.filter((rs) => !isVerifyingIssue(issuesById.get(rs.issueId.toLowerCase()))),
+    [openMergeRequests, issuesById],
+  );
 
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
@@ -167,9 +177,9 @@ export function AwaitingMergePage() {
                   mergeStep={rs.mergeStep}
                   mergeNotes={rs.mergeNotes}
                   onMerged={() => {
-                    queryClient.invalidateQueries({
-                      queryKey: ['workspace', rs.issueId],
-                    });
+                    queryClient.invalidateQueries({ queryKey: ['workspace', rs.issueId] });
+                    queryClient.invalidateQueries({ queryKey: ['review-status', rs.issueId] });
+                    queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
                   }}
                 />
               );
@@ -212,9 +222,9 @@ export function AwaitingMergePage() {
           </div>
         )}
         {/* Pipeline Override — PRs still in pipeline, manual merge bypasses everything */}
-        {openMergeRequests.length > 0 && (
+        {visibleOpenMergeRequests.length > 0 && (
           <PipelineOverrideSection
-            openMergeRequests={openMergeRequests}
+            openMergeRequests={visibleOpenMergeRequests}
             issuesById={issuesById}
           />
         )}

@@ -123,13 +123,15 @@ const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
 export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfig, loadCloisterConfigAsync } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssue, listProjects, getProject } from '../projects.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
@@ -147,6 +149,7 @@ import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunning
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 // ============================================================================
@@ -2755,7 +2758,7 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
-        // PAN-1027: also run the post-merge cleanup so labels get cleaned, work agent
+        // PAN-1027: also run the post-merge handoff so labels get cleaned, work agent
         // tmux session is killed, beads compacted, etc. Without this the dashboard knows
         // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
         // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
@@ -3535,7 +3538,7 @@ async function reconcileAndCheckIfMerged(
           const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
           if (prState.merged) {
             setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-            // PAN-1027: also run the post-merge cleanup so labels get cleaned and the
+            // PAN-1027: also run the post-merge handoff so labels get cleaned and the
             // work-agent tmux session is killed. Without this, GitHub-detected merges
             // leave stale "in-progress" / "in-review" labels and leaked tmux sessions.
             try {
@@ -3548,7 +3551,7 @@ async function reconcileAndCheckIfMerged(
                 );
               }
             } catch (err) {
-              console.warn(`[deacon] Could not run post-merge cleanup for ${issueId}: ${err}`);
+              console.warn(`[deacon] Could not run post-merge handoff for ${issueId}: ${err}`);
             }
             return remember(true);
           }
@@ -3741,6 +3744,152 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
 const firstCompletionCooldowns = new Map<string, number>();
 const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
+
+function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
+  if (state.paused !== true || !state.issueId) return false;
+  return getReviewStatus(state.issueId)?.mergeStatus === 'merged';
+}
+
+// Cache for auto-close-out canonical state queries to avoid N+1 shell execs on patrol
+const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
+const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function sweepAutoCloseOutCache(): void {
+  const now = Date.now();
+  for (const [issueId, entry] of autoCloseOutCache.entries()) {
+    if (now - entry.timestamp > AUTO_CLOSE_OUT_CACHE_TTL_MS) {
+      autoCloseOutCache.delete(issueId);
+    }
+  }
+}
+
+async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
+  const cached = autoCloseOutCache.get(issueId);
+  if (cached && Date.now() - cached.timestamp < AUTO_CLOSE_OUT_CACHE_TTL_MS) {
+    return cached.state;
+  }
+
+  const ghResolved = resolveGitHubIssue(issueId);
+  if (!ghResolved.isGitHub) {
+    autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
+    return null;
+  }
+
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'issue',
+      'view',
+      String(ghResolved.number),
+      '--repo',
+      `${ghResolved.owner}/${ghResolved.repo}`,
+      '--json',
+      'state,labels',
+    ], { encoding: 'utf-8' });
+    const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
+    const labels = (parsed.labels ?? [])
+      .map(label => typeof label === 'string' ? label : label.name)
+      .filter((label): label is string => typeof label === 'string');
+    const result = mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+    autoCloseOutCache.set(issueId, { state: result, timestamp: Date.now() });
+    return result;
+  } catch {
+    autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
+    return null;
+  }
+}
+
+function recordAutoCloseOutFailure(issueId: string, message: string): void {
+  console.warn(`[deacon] Auto close-out failed for ${issueId}: ${message}`);
+  setReviewStatus(issueId, {
+    mergeNotes: `Auto close-out failed: ${message}`,
+    updatedAt: new Date().toISOString(),
+  });
+  emitActivityEntry({
+    source: 'cloister',
+    level: 'warn',
+    issueId,
+    message: `Auto close-out failed for ${issueId}: ${message}`,
+  });
+}
+
+export async function autoCloseOut(now = new Date()): Promise<string[]> {
+  const closeOutConfig = (await loadCloisterConfigAsync()).close_out;
+  if (closeOutConfig?.auto !== true) return [];
+
+  // Evict stale cache entries before each patrol cycle
+  sweepAutoCloseOutCache();
+
+  const delayMinutes = Math.max(0, closeOutConfig.auto_delay_minutes ?? 60);
+  const cutoff = now.getTime() - delayMinutes * 60 * 1000;
+  const actions: string[] = [];
+  const statuses = loadReviewStatuses();
+
+  const candidates: Array<{ issueId: string }> = [];
+  for (const [key, status] of Object.entries(statuses)) {
+    const issueId = (status.issueId || key).toUpperCase();
+    if (status.mergeStatus !== 'merged') continue;
+    if (status.stuck || status.deaconIgnored) continue;
+
+    const updatedAt = Date.parse(status.updatedAt || '');
+    if (!Number.isFinite(updatedAt) || updatedAt > cutoff) continue;
+
+    candidates.push({ issueId });
+  }
+
+  const tasks = candidates.map(({ issueId }) => async () => {
+    let canonicalState: string | null;
+    try {
+      canonicalState = await getAutoCloseOutCanonicalState(issueId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordAutoCloseOutFailure(issueId, message);
+      return `Auto close-out failed for ${issueId}: ${message}`;
+    }
+    if (canonicalState !== 'verifying_on_main') return null;
+
+    const resolvedProject = resolveProjectFromIssue(issueId);
+    if (!resolvedProject) {
+      const message = 'no project configured';
+      recordAutoCloseOutFailure(issueId, message);
+      return `Auto close-out failed for ${issueId}: ${message}`;
+    }
+
+    const ghResolved = resolveGitHubIssue(issueId);
+    const ctx = {
+      issueId,
+      projectPath: resolvedProject.projectPath,
+      auto: true,
+      ...(ghResolved.isGitHub
+        ? { github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
+        : {}),
+    };
+
+    try {
+      const { closeOut } = await import('../lifecycle/workflows.js');
+      // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+      const result = await Effect.runPromise(closeOut(ctx));
+      if (!result.success) {
+        const failed = result.steps.find(step => !step.success && !step.skipped);
+        throw new Error(failed?.error ?? 'closeOut workflow failed');
+      }
+      const message = `Auto close-out completed for ${issueId}`;
+      console.log(`[deacon] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', issueId, message });
+      return message;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordAutoCloseOutFailure(issueId, message);
+      return `Auto close-out failed for ${issueId}: ${message}`;
+    }
+  });
+
+  const results = await withConcurrencyLimit(tasks, 5);
+  for (const result of results) {
+    if (result !== null) actions.push(result);
+  }
+
+  return actions;
+}
 
 /**
  * Detect work agents that finished implementation but never called `pan done`.
@@ -4496,6 +4645,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...mergedReviewingActions);
   for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
 
+  const autoCloseOutActions = await autoCloseOut();
+  actions.push(...autoCloseOutActions);
+  for (const a of autoCloseOutActions) addLog('action', a, state.patrolCycle);
+
   // Closed-PR readyForMerge reconciler: stops the "Awaiting Merge" view from
   // listing issues whose PR was closed without merging (PAN-1111-style stale
   // state). Best-effort against the forge; 10-min per-issue cooldown.
@@ -4871,6 +5024,10 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       if (state.status !== 'running' && state.status !== 'starting') continue;
+      if (isVerifyPausedAgentState(state)) {
+        logDeaconEvent(`recoverOrphanedAgents: ${dir} skipped — verify-paused (mergeStatus=merged, tmux session intentionally absent)`);
+        continue;
+      }
 
       // PAN-977: headless review sub-role agents run via `claude --print` in a
       // detached, HUP-immune launcher with NO tmux session. "No tmux session"
@@ -5428,7 +5585,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
 
     if (state.paused === true) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
+      const pauseKind = isVerifyPausedAgentState(state) ? 'verify-paused' : 'manually-paused';
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — ${pauseKind} (${state.pausedReason ?? 'no reason'})`);
       continue;
     }
 

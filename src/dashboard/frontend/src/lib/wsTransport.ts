@@ -45,6 +45,7 @@ function dashboardSessionUrl(url?: string): string {
 }
 
 let dashboardSessionPromise: Promise<void> | null = null
+let dashboardCsrfToken: string | null = null
 
 function consumeDashboardBootstrapToken(): string | null {
   if (typeof window === 'undefined') return null
@@ -66,14 +67,25 @@ export function ensureDashboardSession(url?: string): Promise<void> {
     method: 'POST',
     credentials: 'include',
     headers: token ? { 'x-panopticon-internal-token': token } : undefined,
-  }).then((response) => {
+  }).then(async (response) => {
     if (response.status === 401) return
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
+    const data = await response.json().catch(() => null) as { csrfToken?: unknown } | null
+    if (typeof data?.csrfToken === 'string') dashboardCsrfToken = data.csrfToken
   }).catch((err) => {
     dashboardSessionPromise = null
     throw err
   })
   return dashboardSessionPromise
+}
+
+export async function dashboardMutationJsonHeaders(url?: string): Promise<Record<string, string>> {
+  await ensureDashboardSession(url)
+  if (!dashboardCsrfToken) throw new Error('Dashboard CSRF token unavailable')
+  return {
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': dashboardCsrfToken,
+  }
 }
 
 function createPanRpcProtocolLayer(url?: string) {

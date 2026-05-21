@@ -366,7 +366,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
       steps.push({ name: 'Close issue on tracker', status: 'passed', message: `GitHub issue #${ctx.number} closed` });
     } else {
       // Linear issue
-      const linearApiKey = getLinearApiKey();
+      const linearApiKey = await getLinearApiKey();
       if (!linearApiKey) {
         steps.push({ name: 'Close issue on tracker', status: 'failed', message: 'LINEAR_API_KEY not configured' });
         return { success: false, issueId: ctx.issueId, steps, error: 'LINEAR_API_KEY not configured' };
@@ -441,7 +441,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     } else {
       // Linear: add label if possible
       try {
-        const linearApiKey = getLinearApiKey();
+        const linearApiKey = await getLinearApiKey();
         if (linearApiKey) {
           const { LinearClient } = await import('@linear/sdk');
           const client = new LinearClient({ apiKey: linearApiKey });

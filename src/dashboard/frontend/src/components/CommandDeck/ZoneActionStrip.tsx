@@ -16,7 +16,7 @@ import {
   MoreHorizontal, FileText, ListTodo, Brain, MessageSquare,
   Upload, Send, XCircle, GitMerge, ChevronDown,
 } from 'lucide-react';
-import type { Agent, Issue } from '../../types';
+import { STATUS_LABELS, type Agent, type Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useZoneAActions } from './useZoneAActions';
@@ -25,6 +25,7 @@ import { StopAgentButton } from '../StopAgentButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ResetIssueButton } from '../ResetIssueButton';
+import { CloseOutIssueButton } from '../CloseOutIssueButton';
 import { useAvailableModels, HarnessSelect } from '../shared/ModelPicker/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
@@ -100,7 +101,7 @@ export function ZoneActionStrip({
       hasInference: false,
       hasTranscripts: false,
       hasDiscussions: false,
-      issueCanonicalState: issue?.status?.toLowerCase() ?? null,
+      issueCanonicalState: issue?.state ?? issue?.status ?? null,
       isMerged: reviewStatus?.mergeStatus === 'merged',
     });
   }, [reviewStatus, reviewStatusLoading, agent, lifecycle, workspace, planningState, issue, reviewStatus?.mergeStatus]);
@@ -142,6 +143,7 @@ export function ZoneActionStrip({
             issueId={issueId}
             reviewStatus={reviewStatus}
             variant="inspector"
+            issueState={issue?.state ?? (issue?.status ? STATUS_LABELS[issue.status] : undefined)}
           />
         );
 
@@ -174,6 +176,9 @@ export function ZoneActionStrip({
             variant="inspector"
           />
         );
+
+      case 'closeOut':
+        return <CloseOutIssueButton key={key} issueId={issueId} variant="inspector" stopPropagation={false} />;
 
       case 'stopAgent':
         return agent ? (

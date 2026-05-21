@@ -69,6 +69,7 @@ export interface ReviewStatus {
   readyForMerge: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
+  queuePosition?: number | null;
   prUrl?: string;
   /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
   prHeadSha?: string;

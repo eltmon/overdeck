@@ -20,6 +20,8 @@ export function getTrustedOrigins(): string[] {
   addTrustedOrigin(origins, dashboardUrl);
   addTrustedOrigin(origins, `http://localhost:${port}`);
   addTrustedOrigin(origins, `http://127.0.0.1:${port}`);
+  addTrustedOrigin(origins, 'http://localhost:3010');
+  addTrustedOrigin(origins, 'http://127.0.0.1:3010');
 
   const trustedOrigins = process.env['PANOPTICON_TRUSTED_ORIGINS'];
   for (const origin of trustedOrigins?.split(',') ?? []) {
@@ -107,24 +109,15 @@ export function _resetTrustedOriginsForTests(): void {
 
 /**
  * Origin trust check used by raw WebSocket upgrade paths (autopreso, voice).
- * Accepts a parsed Origin string and the Host header; returns true if the
- * origin is in the trusted set OR matches the request's own host (loopback
- * dev case where the origin is the same as the host being served from).
+ * Only explicitly configured dashboard origins are trusted; the request Host
+ * header is attacker-controlled and must not influence this decision.
  */
 export function isTrustedOriginForHost(
   origin: string | undefined,
-  host: string | string[] | undefined,
+  _host: string | string[] | undefined,
 ): boolean {
   if (!origin) return false;
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
-  if (getTrustedOrigins().includes(normalized)) return true;
-  const hostStr = Array.isArray(host) ? host[0] : host;
-  if (!hostStr) return false;
-  try {
-    const url = new URL(origin);
-    return url.host === hostStr;
-  } catch {
-    return false;
-  }
+  return getTrustedOrigins().includes(normalized);
 }

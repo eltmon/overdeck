@@ -13,7 +13,7 @@ import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import TopBar from '../primitives/TopBar';
 import VerbBadge from '../primitives/VerbBadge';
 
-const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
+const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'verifying', 'work', 'plan', 'todo'];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
 
 const PRIORITY_MAP: Record<number, IssueRowPriority> = {
@@ -172,6 +172,7 @@ function MetricIcon({ label }: { label: string }) {
 function verbBadgeForPhase(phase: PipelineIssuePhase) {
   if (phase === 'ship') return <VerbBadge variant="READY TO MERGE" />;
   if (phase === 'review') return <VerbBadge variant="REVIEW RUNNING" />;
+  if (phase === 'verifying') return <VerbBadge variant="MERGED" />;
   if (phase === 'work') return <VerbBadge variant="WORK RUNNING" />;
   if (phase === 'plan') return <VerbBadge variant="PLANNING" />;
   return <VerbBadge variant="QUEUED FOR PLAN" />;
@@ -194,6 +195,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
     review: null,
+    verifying: null,
     work: null,
     plan: null,
     todo: null,
@@ -244,6 +246,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
     const groups: Record<PipelineIssuePhase, Issue[]> = {
       ship: [],
       review: [],
+      verifying: [],
       work: [],
       plan: [],
       todo: [],

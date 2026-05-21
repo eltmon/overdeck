@@ -15,9 +15,18 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { loadCloisterConfig } from '../config.js';
+import { DEFAULT_CLOISTER_CONFIG, loadCloisterConfig } from '../config.js';
 
 describe('loadCloisterConfig', () => {
+  it('defines conservative close-out defaults', () => {
+    expect(DEFAULT_CLOISTER_CONFIG.close_out).toEqual({
+      remove_workspace: false,
+      delete_feature_branch: false,
+      auto: false,
+      auto_delay_minutes: 60,
+    });
+  });
+
   afterEach(() => {
     delete process.env.PAN_STASH_JANITOR_CYCLES;
   });

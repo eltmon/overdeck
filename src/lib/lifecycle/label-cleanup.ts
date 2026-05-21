@@ -43,7 +43,7 @@ async function cleanupMergedLabelsImpl(ctx: LifecycleContext): Promise<StepResul
     return cleanupLabelsGitHub(ctx);
   }
 
-  const linearApiKey = getLinearApiKey();
+  const linearApiKey = await getLinearApiKey();
   if (linearApiKey) {
     return cleanupLabelsLinear(ctx, linearApiKey);
   }

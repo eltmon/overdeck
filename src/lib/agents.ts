@@ -2127,7 +2127,7 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
  * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
  */
-const REVIEW_SUBROLE_TIMEOUT_SECONDS = 20 * 60;
+const REVIEW_SUBROLE_TIMEOUT_SECONDS = 30 * 60;
 
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,

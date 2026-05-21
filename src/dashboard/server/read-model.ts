@@ -22,7 +22,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -127,7 +127,14 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'uatStatus' | 'uatNotes' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string; queuePosition?: number }): ReviewStatusSnapshot {
+type ReviewStatusSnapshotInput = ReviewStatus & {
+  reviewCoordinatorSessionName?: string;
+  reviewSessionNames?: string[];
+  reviewSubStatuses?: Record<string, 'running' | 'done'>;
+  activeSpecialist?: string;
+};
+
+export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -426,8 +433,8 @@ export const ReadModelServiceLive = Layer.effect(
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
-            issuesRaw: cached.issues ? [...cached.issues] : [],
-            resources: cached.resources as ReadModelState['resources'],
+            issuesRaw: [...(cached.issues ?? [])] as unknown[],
+            resources: (cached.resources as ResourceStats | null) ?? null,
             observationsByIssueId: cachedMemory?.observationsByIssueId ?? INITIAL_READ_MODEL_STATE.observationsByIssueId,
             statusByIssueId: cachedMemory?.statusByIssueId ?? INITIAL_READ_MODEL_STATE.statusByIssueId,
             rollupsByIssueId: cachedMemory?.rollupsByIssueId ?? INITIAL_READ_MODEL_STATE.rollupsByIssueId,
@@ -628,7 +635,7 @@ export const ReadModelServiceLive = Layer.effect(
                 const absoluteIndex = checkpointOffset + i;
                 const turnId = retainedCheckpoints[i];
                 if (!turnId) continue;
-                const prevTurnId = absoluteIndex > 0 ? checkpoints[absoluteIndex - 1] : null;
+                const prevTurnId = absoluteIndex > 0 ? checkpoints[absoluteIndex - 1] ?? null : null;
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {
                   try {

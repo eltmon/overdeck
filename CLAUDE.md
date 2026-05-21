@@ -400,13 +400,22 @@ infinite loops. NEVER remove these guards. The loop: specialists/done → onMerg
 → postMergeLifecycle → (re-trigger) → specialists/done burned 24,626 Linear API calls
 before guards were added (PAN-328).
 
-## postMergeLifecycle Docker Cleanup
+## postMergeLifecycle Verify Handoff and Docker Cleanup
 
-`postMergeLifecycle()` in `merge-agent.ts` stops Docker containers and networks after
-merge (step 6). This prevents Docker network pool exhaustion — orphaned networks from
-merged workspaces accumulate and eventually block new workspace creation with
-"all predefined address pools have been fully subnetted". Docker's default pool only
-supports ~31 bridge networks. NEVER remove this cleanup step.
+`postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
+merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
+pauses the work/planning agents, preserves workspace/state/vBRIEF/branches, and stops
+Docker containers and networks.
+
+Docker cleanup still happens at merge time because orphaned networks from merged
+workspaces accumulate and eventually block new workspace creation with "all predefined
+address pools have been fully subnetted". Docker's default pool only supports ~31 bridge
+networks. NEVER remove this cleanup step.
+
+The destructive/non-reversible completion steps are owned by close-out, not merge:
+`pan close <id>` / dashboard Close Out completes the vBRIEF, archives planning artifacts,
+optionally tears down the workspace or deletes feature branches according to `close_out`
+config, closes the tracker issue, and clears review status.
 
 ## CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation
 
@@ -520,7 +529,8 @@ If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`,
 - `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` overlay from workspace continue.json.
 - `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
-- `postMergeLifecycle` flips the main-side `plan.status` to `"completed"` after merge.
+- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the vBRIEF in its running/active state.
+- `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification.
 - `findPlan(workspacePath)` resolves main-side spec via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.pan/spec.vbrief.json` for migration compat.
 
 ### Dashboard Viewer

@@ -50,11 +50,14 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
   if (normalized === 'todo' || normalized === 'to do' || normalized === 'ready' || normalized === 'unstarted') {
     return 'todo';
   }
-  if (normalized === 'in progress' || normalized === 'started' || normalized === 'active' || normalized === 'in planning') {
+  if (normalized === 'in progress' || normalized === 'in_progress' || normalized === 'started' || normalized === 'active' || normalized === 'in planning') {
     return 'in_progress';
   }
-  if (normalized === 'in review' || normalized === 'review' || normalized === 'qa' || normalized === 'testing') {
+  if (normalized === 'in review' || normalized === 'in_review' || normalized === 'review' || normalized === 'qa' || normalized === 'testing') {
     return 'in_review';
+  }
+  if (normalized === 'verifying' || normalized === 'verifying on main' || normalized === 'verifying_on_main') {
+    return 'verifying_on_main';
   }
   if (normalized === 'done' || normalized === 'completed' || normalized === 'closed') {
     return 'done';
@@ -436,7 +439,19 @@ export class IssueDataService {
       const key = issue.identifier?.toUpperCase();
       const rs = key ? this.reviewStatusesCache[key] : null;
       if (rs?.mergeStatus) {
-        return { ...issue, mergeStatus: rs.mergeStatus };
+        const issueWithMerge = { ...issue, mergeStatus: rs.mergeStatus };
+        if (rs.mergeStatus === 'merged') {
+          const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
+          if (canonical !== 'done' && canonical !== 'canceled') {
+            return {
+              ...issueWithMerge,
+              status: 'Verifying',
+              canonicalStatus: 'verifying_on_main',
+              state: 'verifying_on_main',
+            };
+          }
+        }
+        return issueWithMerge;
       }
       return issue;
     });
@@ -861,6 +876,7 @@ export class IssueDataService {
           status: canonicalStatus === 'todo' ? 'Todo' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
                   canonicalStatus === 'in_review' ? 'In Review' :
+                  canonicalStatus === 'verifying_on_main' ? 'Verifying' :
                   canonicalStatus === 'done' ? 'Done' :
                   canonicalStatus === 'backlog' ? 'Backlog' : 'Todo',
           canonicalStatus,

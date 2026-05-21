@@ -19,13 +19,13 @@ import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
-import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
+import { getAgentStateAsync, markAgentStoppedState, saveAgentStateAsync } from '../agents.js';
 
 const execAsync = promisify(exec);
 
 const CLOSED_OUT_LABEL = 'closed-out';
 const CLOSED_OUT_COLOR = '1d4ed8';
-const WORKFLOW_LABELS = ['in-progress', 'in-review', 'needs-close-out'];
+const WORKFLOW_LABELS = ['in-progress', 'in-review', 'needs-close-out', 'verifying-on-main'];
 
 /** Options for close-issue */
 export interface CloseIssueOptions {
@@ -47,12 +47,12 @@ export interface CloseIssueOptions {
  * If a tracker is provided, uses the abstraction layer.
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
-function markWorkAgentStoppedForIssue(issueId: string): void {
+async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
   const agentId = `agent-${normalizeIssueId(issueId)}`;
-  const state = getAgentState(agentId);
+  const state = await getAgentStateAsync(agentId);
   if (!state) return;
   markAgentStoppedState(state);
-  saveAgentState(state);
+  await saveAgentStateAsync(state);
 }
 
 export function closeIssue(
@@ -103,7 +103,7 @@ function closeViaTracker(
   const step = 'close-issue:transition';
   return Effect.gen(function* () {
     yield* tracker.transitionIssue(ctx.issueId, 'closed');
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    yield* Effect.promise(() => markWorkAgentStoppedForIssue(ctx.issueId));
     if (comment) {
       // Best-effort comment — swallow errors
       yield* tracker.addComment(ctx.issueId, comment).pipe(
@@ -138,12 +138,13 @@ function closeViaDirect(
   }
 
   // Try Linear
-  const linearApiKey = getLinearApiKey();
-  if (linearApiKey) {
-    return closeLinearDirect(ctx, linearApiKey);
-  }
-
-  return Effect.succeed(stepFailed(step, 'No tracker available and cannot determine issue type'));
+  return Effect.gen(function* () {
+    const linearApiKey = yield* Effect.promise(() => getLinearApiKey());
+    if (linearApiKey) {
+      return yield* closeLinearDirect(ctx, linearApiKey);
+    }
+    return stepFailed(step, 'No tracker available and cannot determine issue type');
+  });
 }
 
 /**
@@ -202,7 +203,7 @@ async function closeGitHubDirectImpl(ctx: LifecycleContext, comment?: string): P
       `gh issue close ${number} --repo ${owner}/${repo}${commentArg}`,
       { encoding: 'utf-8' },
     );
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Closed GitHub issue #${number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepFailed(step, `gh issue close failed: ${(err as Error).message}`);
@@ -336,7 +337,7 @@ async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Pro
       }
     }
 
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Moved Linear issue ${ctx.issueId} to Done`]);
   } catch (err) {
     const message = (err as Error).message;
@@ -380,7 +381,7 @@ async function closeRallyDirectImpl(ctx: LifecycleContext): Promise<StepResult> 
   });
   // RallyTracker.transitionIssue returns Effect (migrated in PAN-1249).
   await Effect.runPromise(tracker.transitionIssue(ctx.issueId, 'closed'));
-  markWorkAgentStoppedForIssue(ctx.issueId);
+  await markWorkAgentStoppedForIssue(ctx.issueId);
   return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
 }
 
@@ -402,12 +403,13 @@ function applyClosedOutLabel(
     return applyLabelGitHub(ctx);
   }
 
-  const linearApiKey = getLinearApiKey();
-  if (linearApiKey) {
-    return applyLabelLinear(ctx, linearApiKey);
-  }
-
-  return Effect.succeed(stepSkipped(step, ['No tracker available for label management']));
+  return Effect.gen(function* () {
+    const linearApiKey = yield* Effect.promise(() => getLinearApiKey());
+    if (linearApiKey) {
+      return yield* applyLabelLinear(ctx, linearApiKey);
+    }
+    return stepSkipped(step, ['No tracker available for label management']);
+  });
 }
 
 function applyLabelViaTracker(
@@ -452,18 +454,13 @@ async function applyLabelGitHubImpl(ctx: LifecycleContext): Promise<StepResult> 
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
-    // Add label
+    const removeLabelArgs = WORKFLOW_LABELS
+      .map(label => `--remove-label "${label}"`)
+      .join(' ');
     await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`,
+      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}" ${removeLabelArgs}`,
       { encoding: 'utf-8' },
     );
-    // Remove workflow labels
-    for (const label of WORKFLOW_LABELS) {
-      await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}" 2>/dev/null || true`,
-        { encoding: 'utf-8' },
-      );
-    }
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);
   } catch (err) {
     return stepSkipped(step, [`Label management failed (non-fatal): ${(err as Error).message}`]);

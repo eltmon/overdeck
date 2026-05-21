@@ -29,6 +29,7 @@ import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
@@ -39,6 +40,7 @@ import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
+import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -162,6 +164,17 @@ export function applyReviewStateToIssue(
   labels.delete('Review Ready');
   labels.add('merged');
 
+  // PAN-1190: keep verifying_on_main visible after merge until close-out completes.
+  const canonicalState = issue.targetCanonicalState ?? issue.state ?? STATUS_LABELS[issue.status];
+  if (canonicalState === 'verifying_on_main') {
+    return {
+      ...issue,
+      mergeStatus: 'merged',
+      labels: Array.from(labels),
+      targetCanonicalState: 'verifying_on_main',
+    };
+  }
+
   return {
     ...issue,
     status: 'Done',
@@ -252,6 +265,7 @@ export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): 
     todo: [],
     in_progress: [],
     in_review: [],
+    verifying_on_main: [],
     done: [],
     canceled: [],
   };
@@ -788,6 +802,7 @@ export function CompactChildCard({
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const dotColor = canonical === 'done' ? 'bg-success' :
+                   canonical === 'verifying_on_main' ? 'bg-info' :
                    canonical === 'in_progress' ? 'bg-warning' :
                    canonical === 'in_review' ? 'bg-signal-review' :
                    'bg-muted-foreground';
@@ -867,6 +882,7 @@ export function ListIssueRow({
 
   // Status indicator color
   const statusColor = canonical === 'done' ? 'bg-success' :
+                      canonical === 'verifying_on_main' ? 'bg-info' :
                       canonical === 'in_review' ? 'bg-signal-review' :
                       canonical === 'in_progress' ? 'bg-warning' :
                       canonical === 'todo' ? 'bg-primary' :
@@ -1057,6 +1073,7 @@ const COLUMN_COLORS: Record<string, string> = {
   todo: 'border-border',
   in_progress: 'border-primary',
   in_review: 'border-warning',
+  verifying_on_main: 'border-info',
   done: 'border-success',
 };
 
@@ -1065,6 +1082,7 @@ const COLUMN_TITLES: Record<string, string> = {
   todo: 'To Do',
   in_progress: 'In Progress',
   in_review: 'In Review',
+  verifying_on_main: 'Verifying',
   done: 'Done',
 };
 
@@ -1180,7 +1198,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     mutationFn: async (issueIds: string[]) => {
       const res = await fetch('/api/issues/bulk-close-out', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ issueIds }),
       });
       if (!res.ok) {
@@ -1224,11 +1242,13 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   );
   const issuesWithAgents = useMemo(() => {
     // Build a Set of issueIds that have at least one active agent
+    const selectedIssueById = new Map(selectedIssues.map(issue => [issue.identifier.toLowerCase(), issue]));
     const activeAgentIssueIds = new Set<string>();
     for (const agent of agents) {
-      if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped' && agent.status !== 'failed') {
-        activeAgentIssueIds.add(agent.issueId.toLowerCase());
-      }
+      if (!agent.issueId || agent.status === 'dead' || agent.status === 'stopped' || agent.status === 'failed') continue;
+      const issue = selectedIssueById.get(agent.issueId.toLowerCase());
+      if (agent.paused && issue?.mergeStatus === 'merged') continue;
+      activeAgentIssueIds.add(agent.issueId.toLowerCase());
     }
     return selectedIssues.filter(issue => activeAgentIssueIds.has(issue.identifier.toLowerCase()));
   }, [selectedIssues, agents]);
@@ -2729,6 +2749,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
   const cardVerbBadge =
+    canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     isTerminal ? <VerbBadge variant="MERGED" /> :
     isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
     isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :

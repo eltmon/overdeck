@@ -43,6 +43,14 @@ function writePlanDoc(doc: VBriefDocument): string {
   return writeMainSpec(doc);
 }
 
+function writeWorkspaceSpec(doc: VBriefDocument): string {
+  const specsDir = join(WORKSPACE_PATH, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  const specPath = join(specsDir, SPEC_FILENAME);
+  writeFileSync(specPath, JSON.stringify({ ...doc, status: 'active' }, null, 2));
+  return specPath;
+}
+
 function writeWorkspaceDraft(doc: VBriefDocument): string {
   const panDir = join(WORKSPACE_PATH, '.pan');
   mkdirSync(panDir, { recursive: true });
@@ -78,6 +86,15 @@ describe('findPlan', () => {
     expect(result).toContain('.pan/specs/');
     expect(result).toContain(SPEC_FILENAME);
     expect(existsSync(result!)).toBe(true);
+  });
+
+  it('resolves the parent project spec (PAN-1124: single spec on main, workspace-first lookup removed)', () => {
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    // Workspace spec is no longer preferred — verify the canonical project spec wins.
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+
+    expect(findPlan(WORKSPACE_PATH)).toBe(projectSpec);
+    expect(readWorkspacePlan(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {

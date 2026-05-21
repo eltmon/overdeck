@@ -43,7 +43,8 @@ import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
-import { clearReviewStatus } from '../review-status.js';
+import { clearReviewStatus, getReviewStatus } from '../review-status.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
@@ -62,7 +63,8 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
-import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
+import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -1437,6 +1439,11 @@ const postIssueReopenRoute = HttpRouter.add(
     if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -1448,21 +1455,28 @@ const postIssueReopenRoute = HttpRouter.add(
     const issueDataService = getIssueDataService();
     const issueSource = issueDataService.getIssueSource(id);
 
-    let newState = 'In Progress';
+    const reviewStatus = getReviewStatus(id.toUpperCase());
+    const cachedIssue = issueDataService.getIssues()
+      .find((issue: any) => String(issue.identifier ?? issue.id ?? '').toUpperCase() === id.toUpperCase());
+    const reopenToVerifying = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+    const targetState: IssueState = reopenToVerifying ? 'verifying_on_main' : 'in_progress';
+    const targetCanonicalStatus = targetState;
+
+    let newState = reopenToVerifying ? 'Verifying on Main' : 'In Progress';
     let issueIdentifier = id;
 
-    // Transition to 'in_progress' via IssueLifecycle (handles all three trackers)
-    yield* lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void));
+    yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
 
     if (issueSource === 'rally') {
       issueDataService.invalidateTracker('rally').catch(() => {});
-      newState = 'Open';
+      if (!reopenToVerifying) newState = 'Open';
 
     } else if (githubCheck.isGitHub) {
-      // Also clean up done/needs-close-out/merged labels and ensure in-progress is set
-      yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
-      yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
-      yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+      if (!reopenToVerifying) {
+        yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
+        yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
+        yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+      }
 
       // Reopen closed (not merged) PR for the feature branch if one exists
       yield* Effect.promise(async () => {
@@ -1483,13 +1497,12 @@ const postIssueReopenRoute = HttpRouter.add(
       });
 
       issueDataService.invalidateTracker('github').catch(() => {});
-      newState = 'In Progress';
+      if (!reopenToVerifying) newState = 'In Progress';
 
     } else {
-      // Linear: fetch updated state name
       const updatedIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));
       issueIdentifier = updatedIssue?.identifier ?? id;
-      newState = updatedIssue?.state.name ?? 'In Progress';
+      if (!reopenToVerifying) newState = updatedIssue?.state.name ?? 'In Progress';
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
 
@@ -1566,7 +1579,7 @@ const postIssueReopenRoute = HttpRouter.add(
     yield* eventStore.append({
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
-      payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
+      payload: { issueId: issueIdentifier, status: newState, canonicalStatus: targetCanonicalStatus },
     });
     // Emit pipeline reset so frontend read model clears the stale readyForMerge badge
     yield* eventStore.append({
@@ -1582,7 +1595,7 @@ const postIssueReopenRoute = HttpRouter.add(
         },
       },
     });
-    try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+    try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: targetCanonicalStatus }); } catch { /* non-fatal */ }
 
     return jsonResponse({
       success: true,
@@ -2123,6 +2136,73 @@ const postIssueCopySettingsRoute = HttpRouter.add(
   })),
 );
 
+function buildCloseOutContext(id: string): LifecycleContext | null {
+  const resolvedProject = resolveProjectFromIssue(id);
+  if (!resolvedProject) return null;
+
+  const githubCheck = isGitHubIssue(id);
+  return {
+    issueId: id,
+    projectPath: resolvedProject.projectPath,
+    projectName: resolvedProject.projectName,
+    ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+      ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+      : {}),
+  };
+}
+
+function closeOutFailureResponse(result: WorkflowResult) {
+  const failedStep = result.steps.find((s: StepResult) => !s.success && !s.skipped);
+  return jsonResponse({
+    ...result,
+    error: failedStep?.error ?? 'Close-out workflow failed',
+    failedStep,
+  }, { status: 422 });
+}
+
+const CLOSED_OUT_CACHE_WORKFLOW_LABELS = new Set([
+  'in-review',
+  'in-progress',
+  'needs-close-out',
+  'verifying-on-main',
+]);
+
+function buildClosedOutCacheLabels(labels: string[]): string[] {
+  return [
+    ...labels.filter((label) => {
+      const normalized = label.toLowerCase();
+      return normalized !== 'closed-out' && !CLOSED_OUT_CACHE_WORKFLOW_LABELS.has(normalized);
+    }),
+    'closed-out',
+  ];
+}
+
+function sanitizeCloseOutError(error: unknown): string {
+  console.error('Close-out route failed:', error);
+  return 'Internal server error';
+}
+
+function getCachedIssueForCloseOut(issueDataService: IssueDataService, issueId: string): any | undefined {
+  return issueDataService.getIssues().find(
+    (issue: any) => String(issue.identifier ?? issue.id ?? '').toUpperCase() === issueId.toUpperCase(),
+  );
+}
+
+function isCachedIssueClosedOut(issue: any | undefined): boolean {
+  return Array.isArray(issue?.labels)
+    && issue.labels.some((label: unknown) => String(label).toLowerCase() === 'closed-out');
+}
+
+function closeOutAlreadyCompletedResult(issueId: string): WorkflowResult {
+  return {
+    workflow: 'close-out',
+    issueId,
+    success: true,
+    steps: [{ step: 'close-out:idempotent', success: true, skipped: true, details: ['Issue already closed out'] }],
+    duration: 0,
+  };
+}
+
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
 
 const postIssueCloseOutRoute = HttpRouter.add(
@@ -2134,33 +2214,21 @@ const postIssueCloseOutRoute = HttpRouter.add(
     if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
+    const ctx = buildCloseOutContext(id);
+    if (!ctx) {
+      return jsonResponse({ error: `Could not resolve project for ${id}` }, { status: 404 });
+    }
+
     const eventStore = yield* EventStoreService;
-
-    const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
-      projectPath = getProjectPath(undefined, issuePrefix);
-    }
-    if (!projectPath) {
-      return jsonResponse({ error: `Could not resolve project path for ${id}` }, { status: 400 });
-    }
-
-    const ctx: any = {
-      issueId: id,
-      projectPath,
-      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-        : {}),
-    };
-
     const issueDataService = getIssueDataService();
+    if (isCachedIssueClosedOut(getCachedIssueForCloseOut(issueDataService, id))) {
+      return jsonResponse(closeOutAlreadyCompletedResult(id));
+    }
     const issueSource = issueDataService.getIssueSource(id);
 
     if (issueSource === 'rally') {
@@ -2175,46 +2243,55 @@ const postIssueCloseOutRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* closeOut(ctx);
-
-    if (result.success) {
-      // Patch cached labels immediately so the board hides the issue right away
-      // without waiting for the background tracker refresh.
-      let newLabels: string[] = ['closed-out'];
+    const closeOutResult = yield* Effect.promise(async () => {
       try {
-        const cachedIssues = issueDataService.getIssues();
-        const cachedIssue = cachedIssues.find(
-          (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
-        );
-        const currentLabels: string[] = cachedIssue?.labels || [];
-        newLabels = [
-          ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
-          'closed-out',
-        ];
-        issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
-      } catch { /* non-fatal */ }
+        const { closeOut } = await import('../../../lib/lifecycle/index.js');
+        // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+        const result = await Effect.runPromise(closeOut(ctx));
+        return { ok: true as const, result };
+      } catch (error) {
+        return { ok: false as const, error };
+      }
+    });
 
-      yield* eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
-      });
-
-      // Refresh tracker data in background so cache stays consistent
-      issueDataService.invalidateTracker('github').catch(() => {});
-      issueDataService.invalidateTracker('linear').catch(() => {});
+    if (!closeOutResult.ok) {
+      return jsonResponse({ error: sanitizeCloseOutError(closeOutResult.error) }, { status: 500 });
     }
 
-    return jsonResponse({
-      success: result.success,
-      issueId: result.issueId,
-      steps: result.steps.map((s: StepResult) => ({
-        name: s.step,
-        status: s.success ? (s.skipped ? 'skipped' : 'passed') : 'failed',
-        message: s.error || (s.details ? s.details.join('; ') : undefined),
-      })),
-      error: result.success ? undefined : result.steps.find((s: StepResult) => !s.success)?.error,
+    const result = closeOutResult.result;
+    if (!result.success) {
+      return closeOutFailureResponse(result);
+    }
+
+    let newLabels: string[] = ['closed-out'];
+    try {
+      const cachedIssues = issueDataService.getIssues();
+      const cachedIssue = cachedIssues.find(
+        (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
+      );
+      const currentLabels: string[] = cachedIssue?.labels || [];
+      newLabels = buildClosedOutCacheLabels(currentLabels);
+      issueDataService.patchIssue(id, {
+        status: 'Done',
+        state: 'done',
+        canonicalStatus: 'done',
+        targetCanonicalState: 'done',
+        mergeStatus: undefined,
+        labels: newLabels,
+      });
+    } catch { /* non-fatal */ }
+
+    yield* eventStore.append({
+      type: 'issue.statusChanged',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id, status: 'Done', state: 'done', canonicalStatus: 'done', labels: newLabels },
     });
+
+    issueDataService.invalidateTracker('github').catch(() => {});
+    issueDataService.invalidateTracker('linear').catch(() => {});
+    issueDataService.invalidateTracker('rally').catch(() => {});
+
+    return jsonResponse(result);
   })),
 );
 
@@ -2228,7 +2305,15 @@ function normalizePlanningId(issueId: string): string {
   return `planning-${issueId.toLowerCase()}`;
 }
 
-async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
+function isInactiveAgentStatus(status: string | undefined): boolean {
+  return status === 'dead' || status === 'stopped' || status === 'failed';
+}
+
+function isPausedMergedAgentSafe(agentState: { paused?: boolean } | null | undefined, allowPausedMerged: boolean): boolean {
+  return allowPausedMerged && agentState?.paused === true;
+}
+
+async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false): Promise<boolean> {
   const agentId = normalizeAgentId(issueId);
   const planningId = normalizePlanningId(issueId);
 
@@ -2237,10 +2322,10 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
-  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'error') return true;
+  if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
 
   const planningState = await getAgentStateAsync(planningId);
-  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'error') return true;
+  if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
 
   return false;
 }
@@ -2251,7 +2336,7 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
 function isValidIssueId(id: string): boolean {
   if (typeof id !== 'string') return false;
   // Linear-style: PREFIX-123
-  if (/^[A-Z][A-Z0-9]*-\d+$/.test(id)) return true;
+  if (/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(id)) return true;
   // GitHub-style: owner/repo#number (alphanumeric, hyphens, underscores, periods only)
   if (/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+#\d+$/.test(id)) return true;
   return false;
@@ -2262,44 +2347,13 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   '/api/issues/bulk-close-out',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-
-    // Content-Type enforcement — exact match, no substring trickery
-    const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
-    const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-    const isJsonContentType = (() => {
-      if (!contentTypeStr) return false;
-      const [mime] = contentTypeStr.toLowerCase().split(';');
-      return mime.trim() === 'application/json';
-    })();
-    if (!isJsonContentType) {
-      return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
-    }
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
 
     const text = yield* request.text;
     const body: Record<string, unknown> = (() => { try { return text ? JSON.parse(text) : {}; } catch { return {}; } })();
     const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
     const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
-
-    // Origin check — parse as URL and validate hostname exactly
-    const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
-    const originStr = Array.isArray(origin) ? origin[0] : origin;
-    const isValidOrigin = (() => {
-      // Same-origin requests omit the Origin header — accept them.
-      if (!originStr) return true;
-      try {
-        const url = new URL(originStr);
-        return (
-          url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname.endsWith('.localhost')
-        );
-      } catch {
-        return false;
-      }
-    })();
-    if (!isValidOrigin) {
-      return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
-    }
 
     // Input validation
     if (issueIds.length === 0) {
@@ -2318,13 +2372,28 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
     const issueDataService = getIssueDataService();
 
-    // Sequential execution — closeOut touches filesystem/git, parallel runs risk index-lock races
-    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
-    for (const id of issueIds) {
-      // Server-side active-agent guardrail
-      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
+    // Pre-validate all issues: run agent checks in parallel, then build contexts.
+    // CloseOut runs with bounded concurrency (max 3) to avoid unbounded
+    // resource use while keeping git index-lock risk low for independent issues.
+    type CloseOutTask = { id: string; ctx: LifecycleContext } | { id: string; skipped: true; error: string };
+    const tasks: CloseOutTask[] = [];
+
+    const agentChecks = yield* Effect.promise(() => withConcurrencyLimit(
+      issueIds.map(id => async () => {
+        const cachedIssue = issueDataService.getIssues().find(
+          (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
+        );
+        const reviewStatus = getReviewStatus(id.toUpperCase());
+        const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+        const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
+        return { id, hasActiveAgent };
+      }),
+      10
+    ));
+
+    for (const { id, hasActiveAgent } of agentChecks) {
       if (hasActiveAgent) {
-        results.push({ issueId: id, success: false, error: 'Skipped: active agent running', skipped: true });
+        tasks.push({ id, skipped: true, error: 'Skipped: active agent running' });
         continue;
       }
 
@@ -2342,7 +2411,7 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
       if (!projectPath) {
-        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false });
+        tasks.push({ id, skipped: true, error: `Could not resolve project path for ${id}` });
         continue;
       }
 
@@ -2367,10 +2436,19 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
 
-      const closeResult = yield* closeOut(ctx).pipe(
-        Effect.catch((error: unknown) =>
-          Effect.succeed({
-            workflow: 'close-out' as const,
+      tasks.push({ id, ctx });
+    }
+
+    const closeOutTasks = tasks
+      .filter((t): t is { id: string; ctx: LifecycleContext } => !('skipped' in t))
+      .map(({ id, ctx }) => async () => {
+        try {
+          // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+          const closeResult = await Effect.runPromise(closeOut(ctx));
+          return { id, closeResult };
+        } catch (error) {
+          const closeResult: WorkflowResult = {
+            workflow: 'close-out',
             issueId: id,
             success: false,
             steps: [{
@@ -2380,10 +2458,15 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
               error: error instanceof Error ? error.message : 'Unknown error',
             }],
             duration: 0,
-          }),
-        ),
-      );
+          };
+          return { id, closeResult };
+        }
+      });
 
+    const closeOutResults = yield* Effect.promise(() => withConcurrencyLimit(closeOutTasks, 3));
+
+    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
+    for (const { id, closeResult } of closeOutResults) {
       if (closeResult.success) {
         let newLabels: string[] = ['closed-out'];
         try {
@@ -2392,18 +2475,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
             (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
           );
           const currentLabels: string[] = cachedIssue?.labels || [];
-          newLabels = [
-            ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
-            'closed-out',
-          ];
-          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
+          newLabels = buildClosedOutCacheLabels(currentLabels);
+          issueDataService.patchIssue(id, {
+            status: 'Done',
+            state: 'done',
+            canonicalStatus: 'done',
+            targetCanonicalState: 'done',
+            mergeStatus: undefined,
+            labels: newLabels,
+          });
         } catch (e) {
           console.error('Failed to patch issue status:', e);
         }
         yield* eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
-          payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+          payload: { issueId: id, status: 'Done', state: 'done', canonicalStatus: 'done', labels: newLabels },
         });
       }
 
@@ -2414,6 +2501,12 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         error: closeResult.success ? undefined : failedStep?.error,
         skipped: false,
       });
+    }
+
+    for (const task of tasks) {
+      if ('skipped' in task) {
+        results.push({ issueId: task.id, success: false, error: task.error, skipped: true });
+      }
     }
 
     // Invalidate trackers once if any issue closed successfully

@@ -20,7 +20,7 @@ import { randomBytes } from 'crypto';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
-import { findSpecByIssue, getProjectPanPaths } from '../pan-dir/specs.js';
+import { getProjectPanPaths } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { WorkspaceContinueState } from '../pan-dir/types.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';

@@ -11,8 +11,10 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockClearReviewStatus: vi.fn(),
+  mockResetPostMergeState: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -28,7 +30,7 @@ vi.mock('util', async (importOriginal) => {
 });
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
-  sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
   listSessionNamesAsync: vi.fn().mockResolvedValue([]),
 }));
@@ -49,7 +51,11 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
-  clearReviewStatus: vi.fn(),
+  clearReviewStatus: mockClearReviewStatus,
+}));
+
+vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
+  resetPostMergeState: mockResetPostMergeState,
 }));
 
 vi.mock('@linear/sdk', () => ({
@@ -75,6 +81,40 @@ const deepWipe = (...args: Parameters<typeof deepWipeEffect>) => Effect.runPromi
 const close = (...args: Parameters<typeof closeEffect>) => Effect.runPromise(closeEffect(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoEffect>) => Effect.runPromise(resetToTodoEffect(...args));
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
+import { findSpecByIssue as findSpecByIssueEffect, writeSpecForIssue as writeSpecForIssueEffect } from '../../../../src/lib/pan-dir/specs.js';
+
+// PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
+const findSpecByIssue = (projectRoot: string, issueId: string) =>
+  Effect.runPromise(findSpecByIssueEffect(projectRoot, issueId) as Effect.Effect<any, any, never>);
+const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
+  Effect.runPromise(writeSpecForIssueEffect(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
+import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+
+function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
+  return {
+    vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+    plan: {
+      id: issueId,
+      title: `Plan for ${issueId}`,
+      status,
+      sequence: 1,
+      created: '2026-05-18T00:00:00Z',
+      items: [],
+      edges: [],
+    },
+  };
+}
+
+function successfulTracker() {
+  // PAN-1249: IssueTracker methods return Effect now, not Promise.
+  return {
+    name: 'github',
+    transitionIssue: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    addComment: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    updateIssue: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    getIssue: vi.fn().mockReturnValue(Effect.succeed({ labels: [] })),
+  } as any;
+}
 
 describe('workflows', () => {
   let testDir: string;
@@ -184,10 +224,144 @@ describe('workflows', () => {
     it('should abort if archive fails', async () => {
       // Since there's no active PRD, it will skip — that's success
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       // Should complete without abort since skipped == success
       expect(result.steps.some(s => s.step === 'close-out:abort')).toBe(false);
+    });
+
+    it('should preserve workspace and branches by default', async () => {
+      const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+      mkdirSync(wsPath, { recursive: true });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.steps.find(s => s.step === 'teardown:branches')).toBeUndefined();
+      expect(existsSync(wsPath)).toBe(true);
+    });
+
+    it('should honor close_out branch deletion config', async () => {
+      writeFileSync(
+        join(PANOPTICON_HOME, 'cloister.toml'),
+        '[close_out]\nremove_workspace = false\ndelete_feature_branch = true\nauto = false\nauto_delay_minutes = 60\n',
+      );
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
+    });
+
+    it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
+      writeFileSync(
+        join(PANOPTICON_HOME, 'cloister.toml'),
+        '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
+      );
+      const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+      mkdirSync(wsPath, { recursive: true });
+      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git worktree remove')) {
+          rmSync(wsPath, { recursive: true, force: true });
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+      };
+      const result = await closeOut(ctx);
+
+      expect(result.success).toBe(true);
+      expect(existsSync(wsPath)).toBe(false);
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.status).toBe('completed');
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.document.plan.status).toBe('completed');
+
+      const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
+      expect(commands.some(command => command.includes('gh issue close 100'))).toBe(true);
+      expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
+    it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
+      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
+      const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
+      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(teardownIdx).toBeGreaterThanOrEqual(0);
+      expect(closeIdx).toBeGreaterThanOrEqual(0);
+      expect(vbriefIdx).toBeLessThan(teardownIdx);
+      expect(teardownIdx).toBeLessThan(closeIdx);
+
+      const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));
+      expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/agent-pan-100/'))).toBe(true);
+      expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/planning-pan-100/'))).toBe(true);
+
+      const spec = await findSpecByIssue(testDir, 'PAN-100');
+      expect(spec?.status).toBe('completed');
+      expect(spec?.document.plan.status).toBe('completed');
+      expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
+    });
+
+    it('should abort before closing the tracker issue on teardown failure', async () => {
+      mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+        if (command === 'git' && Array.isArray(args) && args.includes('for-each-ref')) {
+          throw new Error('ref storage unavailable');
+        }
+        return { stdout: '', stderr: '' };
+      });
+      const tracker = successfulTracker();
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')?.success).toBe(true);
+      expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
+      expect(result.steps.some(s => s.step === 'close-issue:transition')).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
+      expect(tracker.transitionIssue).not.toHaveBeenCalled();
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('should preserve review status when tracker close fails', async () => {
+      const tracker = successfulTracker();
+      // PAN-1249: tracker methods return Effect; failure surfaces as Effect.fail.
+      tracker.transitionIssue.mockReturnValueOnce(Effect.fail(new Error('tracker unavailable')));
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')?.success).toBe(true);
+      expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(true);
+      expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('should remove verifying labels when applying the closed-out label', async () => {
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+      };
+
+      await closeOut(ctx);
+
+      const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
+      expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
   });
 

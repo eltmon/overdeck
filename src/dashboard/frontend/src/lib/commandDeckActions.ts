@@ -48,6 +48,7 @@ export type ActionKey =
   | 'resetSession'
   | 'createWorkspace'
   | 'copySettings'
+  | 'closeOut'
   // Issue artifact / planning surface
   | 'beads'
   | 'inference'
@@ -121,19 +122,28 @@ type PipelineState =
   | 'testing_failures'
   | 'ready_to_merge'
   | 'merging'
+  | 'verifying'
   | 'merged'
   | 'done'
   | 'canceled'
   | 'generic';
 
+function normalizeCanonicalState(state?: string | null): string | null {
+  if (!state) return null;
+  return state.trim().toLowerCase().replace(/[-\s]+/g, '_');
+}
+
 function derivePipelineState(input: ZoneAInput): PipelineState {
-  const { reviewStatus, agent, issueCanonicalState } = input;
+  const { reviewStatus, agent } = input;
+  const issueCanonicalState = normalizeCanonicalState(input.issueCanonicalState);
   const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
+  const verifying = issueCanonicalState === 'verifying_on_main' || issueCanonicalState === 'verifying';
   const agentRunning = !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
 
-  if (merged) return 'merged';
   if (issueCanonicalState === 'done') return 'done';
   if (issueCanonicalState === 'canceled') return 'canceled';
+  if (verifying) return 'verifying';
+  if (merged) return 'merged';
   if (reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying') return 'merging';
   if (reviewStatus?.readyForMerge) return 'ready_to_merge';
   if (reviewStatus?.reviewStatus === 'reviewing') return 'in_review_reviewers_running';
@@ -160,13 +170,15 @@ function derivePipelineState(input: ZoneAInput): PipelineState {
  */
 export function getZoneAActions(input: ZoneAInput): ActionLayout {
   const { reviewStatus, agent, lifecycle, workspace } = input;
+  const issueCanonicalState = normalizeCanonicalState(input.issueCanonicalState);
   const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
+  const verifying = issueCanonicalState === 'verifying_on_main' || issueCanonicalState === 'verifying';
   const agentRunning = !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
   const noAgentOrStopped = !agent || agent.status === 'stopped' || agent.status === 'failed' || agent.status === 'dead';
   const isResume = noAgentOrStopped && lifecycle?.canResumeSession === true;
 
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
-  const readyForMerge = !!reviewStatus?.readyForMerge && !merged;
+  const readyForMerge = !!reviewStatus?.readyForMerge && !merged && !verifying;
   const state = derivePipelineState(input);
 
   const primary: ActionKey[] = [];
@@ -257,6 +269,9 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
         if (isResume) secondary.push('resetSession');
       }
       break;
+    case 'verifying':
+      primary.push('closeOut');
+      break;
     case 'merged':
       break;
     case 'done':
@@ -307,12 +322,12 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   secondary.push('statusReview', 'syncDiscussions', 'upload');
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
-  if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
+  if (!merged && !verifying && state !== 'merged' && state !== 'done' && state !== 'canceled') {
     if (agent && agent.status !== 'failed' && agent.status !== 'dead') {
       overflow.push('restartAgent');
     }
     overflow.push('restartFromPlan');
-    if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
+    if (issueCanonicalState !== 'done' && issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');
     }
     overflow.push('cancel');

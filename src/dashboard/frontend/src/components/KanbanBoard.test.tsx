@@ -167,6 +167,26 @@ describe('applyReviewStateToIssue', () => {
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('in-review');
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
   });
+
+  it('preserves verifying-on-main issues after merge', () => {
+    const issue = createMockIssue({
+      status: 'Verifying On Main',
+      state: 'verifying_on_main',
+      labels: ['verifying-on-main', 'Review Ready'],
+    });
+
+    const result = applyReviewStateToIssue(issue, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+    });
+
+    expect(result.status).toBe('Verifying On Main');
+    expect(result.mergeStatus).toBe('merged');
+    expect(result.targetCanonicalState).toBe('verifying_on_main');
+    expect(result.labels).toContain('verifying-on-main');
+    expect(result.labels).toContain('merged');
+    expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
+  });
 });
 
 describe('shouldShowReviewReadyBadge', () => {

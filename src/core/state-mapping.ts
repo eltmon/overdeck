@@ -11,6 +11,7 @@ export type CanonicalState =
   | 'todo'
   | 'in_progress'
   | 'in_review'
+  | 'verifying_on_main'
   | 'done'
   | 'canceled';
 
@@ -30,6 +31,7 @@ export const CANONICAL_STATES: CanonicalStateDefinition[] = [
   { name: 'todo', type: 'unstarted', description: 'Prioritized and ready', color: '#3b82f6' },
   { name: 'in_progress', type: 'started', description: 'Agent executing', color: '#eab308' },
   { name: 'in_review', type: 'started', description: 'PR awaiting review', color: '#ec4899' },
+  { name: 'verifying_on_main', type: 'started', description: 'Merged and awaiting verification on main', color: '#f59e0b' },
   { name: 'done', type: 'completed', description: 'Work complete', color: '#22c55e' },
   { name: 'canceled', type: 'canceled', description: "Won't do", color: '#71717a' },
 ];
@@ -39,6 +41,7 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   todo: 'unstarted',
   in_progress: 'started',
   in_review: 'started',
+  verifying_on_main: 'started',
   done: 'completed',
   canceled: 'canceled',
 };
@@ -85,6 +88,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         todo: 'Todo',
         in_progress: 'In Progress',
         in_review: 'In Review',
+        verifying_on_main: 'In Review',
         done: 'Done',
         canceled: 'Canceled',
       },
@@ -97,6 +101,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         todo: { status: 'open', label: null },
         in_progress: { status: 'open', label: 'in-progress' },
         in_review: { status: 'open', label: 'in-review' },
+        verifying_on_main: { status: 'open', label: 'verifying-on-main' },
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
@@ -109,6 +114,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
           todo: 'Todo',
           in_progress: 'In Progress',
           in_review: 'Review',
+          verifying_on_main: 'Verifying',
           done: 'Done',
           canceled: 'Done',
         },
@@ -121,6 +127,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         todo: { status: 'opened', label: 'todo' },
         in_progress: { status: 'opened', label: 'in-progress' },
         in_review: { status: 'opened', label: 'in-review' },
+        verifying_on_main: { status: 'opened', label: 'in-review' },
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
@@ -133,6 +140,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         todo: 'To Do',
         in_progress: 'In Progress',
         in_review: 'In Review',
+        verifying_on_main: 'In Review',
         done: 'Done',
         canceled: 'Canceled',
       },
@@ -145,6 +153,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         todo: 'To Do',
         in_progress: 'Doing',
         in_review: 'Review',
+        verifying_on_main: 'Review',
         done: 'Done',
         canceled: 'Archived',
       },
@@ -251,6 +260,7 @@ export const WORKFLOW_LABELS = [
   'planning',
   'done',
   'merged',
+  'verifying-on-main',
   'needs-close-out',
   'wontfix',
   'duplicate',
@@ -265,6 +275,8 @@ export function getStateLabel(state: CanonicalState): string | null {
       return 'in-progress';
     case 'in_review':
       return 'in-review';
+    case 'verifying_on_main':
+      return 'verifying-on-main';
     case 'done':
       return 'done';
     default:
@@ -303,10 +315,14 @@ export function mapGitHubStateToCanonical(state: string, labels: string[]): Cano
   // Order matters: more progressed states take precedence.
 
   // Most progressed states first
-  // merged = postMergeLifecycle applied label; issue may still be open if auto-close failed
-  // needs-close-out = merged work reopened for close-out ceremony
-  // Both belong in the done column — awaiting close-out ceremony
-  if (labelNames.some(l => l === 'merged' || l === 'needs-close-out')) {
+  if (labelNames.some(l => l === 'verifying-on-main' || l === 'needs-close-out')) {
+    return 'verifying_on_main';
+  }
+  if (labelNames.some(l => l === 'closed-out')) {
+    return 'in_progress';
+  }
+  // merged = legacy postMergeLifecycle label; issue may still be open if auto-close failed
+  if (labelNames.some(l => l === 'merged')) {
     return 'done';
   }
   // "done" label on OPEN issues = work complete, pending merge/closure → in_review

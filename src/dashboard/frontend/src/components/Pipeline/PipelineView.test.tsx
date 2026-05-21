@@ -126,7 +126,7 @@ describe('PipelineView', () => {
     expect(within(workPhase).getByText('agent-pan-2')).toBeInTheDocument();
     expect(within(planPhase).getByText('Planned work')).toBeInTheDocument();
     expect(container.querySelector('[data-component="phase-header"]')).toHaveClass('sticky', 'top-0');
-    expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(5);
+    expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {

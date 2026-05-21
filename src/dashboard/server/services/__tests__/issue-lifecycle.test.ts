@@ -20,6 +20,7 @@ const mockGitHubAddLabel = vi.fn();
 const mockGitHubRemoveLabel = vi.fn();
 const mockGitHubCloseIssue = vi.fn();
 const mockGitHubReopenIssue = vi.fn();
+const mockGitHubEnsureLabel = vi.fn();
 const mockRallyUpdateState = vi.fn();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ async function makeTestLayer() {
     removeLabel: mockGitHubRemoveLabel,
     closeIssue: mockGitHubCloseIssue,
     reopenIssue: mockGitHubReopenIssue,
-    ensureLabel: vi.fn(),
+    ensureLabel: mockGitHubEnsureLabel,
     addComment: vi.fn(),
     getComments: vi.fn(),
   });
@@ -111,6 +112,7 @@ describe('IssueLifecycle Effect service', () => {
     mockGitHubRemoveLabel.mockReturnValue(ok(undefined));
     mockGitHubCloseIssue.mockReturnValue(ok(undefined));
     mockGitHubReopenIssue.mockReturnValue(ok(undefined));
+    mockGitHubEnsureLabel.mockReturnValue(ok({ id: 1, name: 'label', color: 'fbca04' }));
     mockRallyUpdateState.mockReturnValue(ok(undefined));
   });
 
@@ -154,6 +156,27 @@ describe('IssueLifecycle Effect service', () => {
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inreview');
+    });
+
+    it('prefers a verifying state by name', async () => {
+      mockLinearGetTeamStates.mockReturnValue(
+        ok([
+          { id: 'state-open', name: 'Todo', type: 'unstarted' },
+          { id: 'state-inprogress', name: 'In Progress', type: 'started' },
+          { id: 'state-verifying', name: 'Verifying On Main', type: 'started' },
+          { id: 'state-inreview', name: 'In Review', type: 'started' },
+        ]),
+      );
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+      const layer = await makeTestLayer();
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('MIN-1', 'verifying_on_main');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-verifying');
     });
 
     it('transitions to "closed" using completed type', async () => {
@@ -208,6 +231,36 @@ describe('IssueLifecycle Effect service', () => {
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
+    });
+
+    it('transitions to verifying_on_main without closing the GitHub issue', async () => {
+      const ensuredLabels = new Set<string>();
+      mockGitHubEnsureLabel.mockImplementation((owner: string, repo: string, label: string) => {
+        ensuredLabels.add(`${owner}/${repo}:${label}`);
+        return ok({ id: 1, name: label, color: 'fbca04' });
+      });
+      mockGitHubAddLabel.mockImplementation((owner: string, repo: string, _number: number, label: string) => {
+        if (!ensuredLabels.has(`${owner}/${repo}:${label}`)) {
+          return Effect.fail(new Error(`label ${label} was not ensured first`));
+        }
+        return ok(undefined);
+      });
+
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+      const layer = await makeTestLayer();
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('APP-42', 'verifying_on_main');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockGitHubEnsureLabel).toHaveBeenCalledWith('acme', 'myapp', 'verifying-on-main', 'fbca04', 'Merged — awaiting verification on main');
+      expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'verifying-on-main');
+      expect(mockGitHubEnsureLabel.mock.invocationCallOrder[0]).toBeLessThan(mockGitHubAddLabel.mock.invocationCallOrder[0]);
+      expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
+      expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
+      expect(mockGitHubCloseIssue).not.toHaveBeenCalled();
     });
 
     it('closes GitHub issue on closed state', async () => {

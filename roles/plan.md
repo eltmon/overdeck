@@ -49,7 +49,7 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
 5. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
 6. Run `pan plan finalize` — that materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `<projectRoot>/.pan/specs/`, commits on main, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required.
-7. Stop after `pan plan finalize` returns; do not start implementation work. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
+7. Stop after `pan plan finalize` returns; do not start implementation work. Stop after planning is complete. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
 
 ## TLDR: prefer code summaries over full reads
 

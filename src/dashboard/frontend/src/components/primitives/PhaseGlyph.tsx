@@ -2,13 +2,14 @@ import type { SVGProps } from 'react';
 
 import { cn } from '../../lib/utils';
 
-export type PhaseGlyphPhase = 'todo' | 'plan' | 'work' | 'review' | 'ship' | 'done';
+export type PhaseGlyphPhase = 'todo' | 'plan' | 'work' | 'review' | 'verifying' | 'ship' | 'done';
 
 const PHASE_CLASSES = {
   todo: 'text-muted-foreground',
   plan: 'text-signal-review-foreground',
   work: 'text-info-foreground',
   review: 'text-warning-foreground',
+  verifying: 'text-info-foreground',
   ship: 'text-signal-review-foreground',
   done: 'text-success-foreground',
 } satisfies Record<PhaseGlyphPhase, string>;
@@ -45,6 +46,13 @@ function renderGlyph(phase: PhaseGlyphPhase) {
         <>
           <path d="M7 2.5 12 5v3.4c0 2.1-1.9 3.3-5 4-3.1-.7-5-1.9-5-4V5l5-2.5Z" />
           <path d="M5 7h4" />
+        </>
+      );
+    case 'verifying':
+      return (
+        <>
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M7 4v3.5l2.5 1.5" />
         </>
       );
     case 'ship':

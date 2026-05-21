@@ -66,6 +66,8 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
+  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
   killSession: vi.fn(),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
 }));
@@ -83,6 +85,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: false }),
+  resolveTrackerType: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
@@ -240,6 +243,16 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
   }, 30_000);
+
+  it('coalesces concurrent post-merge lifecycle calls before step 0 repeats', async () => {
+    const first = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    const second = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    await Promise.all([first, second]);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
 });
 
 describe('postMergeLifecycle — repoRoot derivation', () => {

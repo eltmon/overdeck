@@ -19,6 +19,7 @@ import { LinearClient } from './linear-client.js';
 import { LinearClientOptionalLive } from './linear-client.js';
 import { RallyClient } from './rally-client.js';
 import { RallyClientLive } from './rally-client.js';
+import type { RallyClientShape } from './rally-client.js';
 import type { LinearState } from './linear-client.js';
 import { TrackerNotConfigured, TrackerApiError, IssueNotFound, RateLimited } from './typed-errors.js';
 import { EventStoreService } from './domain-services.js';
@@ -41,7 +42,7 @@ function emitEvent(event: Record<string, unknown>): Effect.Effect<void, never> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type IssueState = 'open' | 'in_planning' | 'in_progress' | 'in_review' | 'closed' | 'canceled';
+export type IssueState = 'open' | 'in_planning' | 'in_progress' | 'in_review' | 'verifying_on_main' | 'closed' | 'canceled';
 
 // ─── Service interface ────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ function linearStateType(state: IssueState): string {
     case 'in_planning':
     case 'in_progress':
     case 'in_review':
+    case 'verifying_on_main':
       return 'started';
     case 'closed':
       return 'completed';
@@ -121,9 +123,11 @@ function linearStateType(state: IssueState): string {
 
 /** Find the best matching Linear state from a list given a target normalized state. */
 function findLinearState(states: ReadonlyArray<LinearState>, state: IssueState): LinearState | null {
-  if (state === 'in_review') {
-    // Prefer a state named exactly "In Review"
-    const explicit = states.find((s) => s.name.toLowerCase() === 'in review');
+  if (state === 'in_review' || state === 'verifying_on_main') {
+    const names = state === 'verifying_on_main'
+      ? ['verifying on main', 'verifying', 'in review']
+      : ['in review'];
+    const explicit = states.find((s) => names.includes(s.name.toLowerCase()));
     if (explicit) return explicit;
     // Fall back to first "started" state
     return states.filter((s) => s.type === 'started')[0] ?? null;
@@ -147,13 +151,26 @@ function findLinearState(states: ReadonlyArray<LinearState>, state: IssueState):
 // ─── GitHub label helpers ─────────────────────────────────────────────────────
 
 const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] }> = {
-  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'duplicate'] },
+  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  verifying_on_main: { add: ['verifying-on-main'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'ready-for-merge', 'done', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'duplicate'] },
 };
+
+const GITHUB_LABEL_METADATA: Record<string, { color: string; description: string }> = {
+  'planned': { color: 'cfd3d7', description: 'Planning complete' },
+  'in-progress': { color: 'fbca04', description: 'Implementation in progress' },
+  'in-review': { color: 'd4c5f9', description: 'Under review' },
+  'verifying-on-main': { color: 'fbca04', description: 'Merged — awaiting verification on main' },
+  'wontfix': { color: 'ffffff', description: 'Will not be fixed' },
+};
+
+function githubLabelMetadata(label: string): { color: string; description: string } {
+  return GITHUB_LABEL_METADATA[label] ?? { color: '0075ca', description: '' };
+}
 
 // ─── Live layer implementation ────────────────────────────────────────────────
 
@@ -164,6 +181,7 @@ function canonicalStatus(state: IssueState): string {
     case 'in_planning': return 'in_planning';
     case 'in_progress': return 'in_progress';
     case 'in_review': return 'in_review';
+    case 'verifying_on_main': return 'verifying_on_main';
     case 'closed': return 'closed';
     case 'canceled': return 'canceled';
   }
@@ -187,6 +205,8 @@ export const IssueLifecycleLive = Layer.effect(
             if (!ghInfo.isGitHub) return;
             const labelOps = GITHUB_STATE_LABELS[state];
             for (const label of labelOps.add) {
+              const metadata = githubLabelMetadata(label);
+              yield* github.ensureLabel(ghInfo.owner, ghInfo.repo, label, metadata.color, metadata.description);
               yield* github.addLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
             for (const label of labelOps.remove) {
@@ -203,7 +223,7 @@ export const IssueLifecycleLive = Layer.effect(
           } else if (trackerType === 'rally') {
             const normalizedState =
               state === 'in_planning' || state === 'open' ? 'open'
-              : state === 'in_progress' || state === 'in_review' ? 'in_progress'
+              : state === 'in_progress' || state === 'in_review' || state === 'verifying_on_main' ? 'in_progress'
               : 'closed';
             yield* rally.updateState(issueId, normalizedState);
           } else {
@@ -253,8 +273,8 @@ export const IssueLifecycleLive = Layer.effect(
           if (trackerType === 'github') {
             const ghInfo = resolveGitHubIssue(issueId);
             if (!ghInfo.isGitHub) return;
-            // Remove planning/in-review labels then close
-            for (const label of ['in-progress', 'in-review', 'planned', 'in-planning']) {
+            // Remove workflow labels then close
+            for (const label of ['in-progress', 'in-review', 'planned', 'in-planning', 'verifying-on-main', 'ready-for-merge']) {
               yield* github.removeLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
             yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
@@ -303,13 +323,14 @@ export const IssueLifecycleWithClientLive = IssueLifecycleLive.pipe(
           );
           const config = getRallyConfig();
           if (!config) {
-            const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
-            return {
-              getIssue: () => fail,
-              getChildIssues: () => fail,
-              updateState: () => fail,
-              addComment: () => fail,
+            const fail = <A>(): Effect.Effect<A, TrackerNotConfigured> => Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
+            const fallback: RallyClientShape = {
+              getIssue: () => fail(),
+              getChildIssues: () => fail(),
+              updateState: () => fail(),
+              addComment: () => fail(),
             };
+            return fallback;
           }
           // Delegate to RallyClientLive's logic
           return yield* RallyClient;
