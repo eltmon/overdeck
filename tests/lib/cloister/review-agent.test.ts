@@ -32,11 +32,7 @@ const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessage
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
   mockNotifyPipeline: vi.fn(),
-<<<<<<< HEAD
   mockGetAgentState: vi.fn(() => null),
-=======
-  mockGetAgentState: vi.fn().mockReturnValue(null),
->>>>>>> 7e4a88e3e (test(review): align verification mocks with rebase logic)
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {

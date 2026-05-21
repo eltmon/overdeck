@@ -347,7 +347,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
       // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
-      ...(opts.allowHost ? { allowHost: true } : {}),
+      allowHost: opts.allowHost ?? false,
     });
     run.reviewSubRole = opts.subRole;
     run.reviewRunId = opts.runId;

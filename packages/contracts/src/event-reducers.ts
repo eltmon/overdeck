@@ -17,16 +17,18 @@ import type {
   EmbedProgressSnapshot,
   EnrichProgressSnapshot,
   EnrichStatsSnapshot,
-  MemoryObservation,
-  MemoryStatus,
-  PendingTurn,
-  RagDecision,
-  ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
   ScanProgressSnapshot,
   TurnDiffSummary,
 } from './types'
+import type {
+  MemoryObservation,
+  MemoryStatus,
+  PendingTurn,
+  RagDecision,
+  ResetMarker,
+} from './memory'
 import type { DomainEvent } from './events'
 
 // ─── Read model state shape ──────────────────────────────────────────────────

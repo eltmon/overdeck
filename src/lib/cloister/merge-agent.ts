@@ -516,6 +516,23 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     await killPostMergeRoleSessions(issueId);
 
+    // 3c. Create a workspace-scoped memory reset marker so old review-blocker noise stays archived but out of retrieval.
+    try {
+      const { createResetMarker } = await import('../memory/cli.js');
+      const timestamp = new Date().toISOString();
+      const marker = await createResetMarker({
+        projectId: basename(projectPath),
+        scope: 'workspace',
+        scopeId: `feature-${issueId.toLowerCase()}`,
+        reason: 'post-merge cleanup',
+        fromTimestamp: timestamp,
+        createdAt: timestamp,
+      });
+      console.log(`[merge-agent] ✓ Created memory reset marker ${marker.id} for ${marker.scope}:${marker.scopeId}`);
+    } catch (err) {
+      console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
+    }
+
     // 4. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
     // Orphaned Docker networks accumulate when workspaces are merged but containers are never
     // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
