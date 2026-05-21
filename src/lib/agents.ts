@@ -36,6 +36,7 @@ import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge
 import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
+import { Effect } from 'effect';
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
@@ -1456,12 +1457,10 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // every field access in one PR would have been mechanical noise.
 
 import type { AgentRuntimeSnapshot } from '@panctl/contracts';
-import { Effect } from 'effect';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
 } from './agent-runtime.js';
-import { Effect } from 'effect';
 import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
