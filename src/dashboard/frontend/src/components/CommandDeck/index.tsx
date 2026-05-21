@@ -387,14 +387,14 @@ function ProjectRightPaneTabs({
             onSelectFeature={openPipelineFeature}
           />
         )}
-        {activeTab !== 'pipeline' && !effectiveActiveIssueId && (
+        {activeTab !== 'pipeline' && activeTab !== 'conversations' && !effectiveActiveIssueId && (
           <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
             No project issue is available for {tabLabel}.
           </div>
         )}
         {activeTab === 'plans' && effectiveActiveIssueId && <VBriefTab issueId={effectiveActiveIssueId} />}
         {activeTab === 'beads' && effectiveActiveIssueId && <BeadsTab issueId={effectiveActiveIssueId} />}
-        {activeTab === 'conversations' && effectiveActiveIssueId && (
+        {activeTab === 'conversations' && (
           <div className="flex min-h-full flex-col gap-4 p-4">
             {selectedConversation ? (
               (() => {
@@ -428,7 +428,7 @@ function ProjectRightPaneTabs({
               })()
             ) : (
               <>
-                <DiscussionsTab issueId={effectiveActiveIssueId} />
+                {effectiveActiveIssueId && <DiscussionsTab issueId={effectiveActiveIssueId} />}
                 <div className="flex flex-col gap-2">
                   {conversations.length > 0 ? conversations.map((conversation) => (
                     <button
