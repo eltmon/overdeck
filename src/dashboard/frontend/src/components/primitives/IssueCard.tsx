@@ -43,13 +43,6 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
   className,
   testId,
 }, ref) {
-  const tone = unhealthyCard || stuckCard
-    ? 'from-destructive/12 via-destructive/5 to-transparent'
-    : mergeReadyCard
-      ? 'from-success/20 via-success/6 to-transparent'
-      : runningCard
-        ? 'from-primary/16 via-primary/6 to-transparent'
-        : 'from-surface-overlay/60 via-surface/40 to-transparent';
   const accent = unhealthyCard || stuckCard
     ? 'bg-destructive'
     : mergeReadyCard
@@ -69,7 +62,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
       data-testid={testId}
       onClick={onClick}
       className={cn(
-        'group relative overflow-hidden rounded-2xl border cursor-pointer bg-card shadow-sm transition-all',
+        'group relative overflow-hidden rounded-2xl border cursor-pointer issue-card-surface shadow-sm transition-all',
         sessionLostCard && 'border-warning/50',
         selected
           ? 'ring-2 ring-warning/70 shadow-lg'
@@ -83,8 +76,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
         className,
       )}
     >
-      <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br', tone)} />
-      <div className={cn('absolute bottom-[12px] left-0 top-[12px] w-1.5 rounded-r-[2px]', accent)} />
+      <div className={cn('absolute bottom-[12px] left-0 top-[12px] w-0.5 rounded-r-[2px]', accent)} />
       {children}
     </div>
   );

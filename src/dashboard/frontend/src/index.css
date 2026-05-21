@@ -292,6 +292,12 @@ body::after {
   }
 }
 
+@layer components {
+  .issue-card-surface {
+    background: color-mix(in srgb, var(--background) 92%, var(--color-white));
+  }
+}
+
 /* ─── Ready-to-merge shimmer animation ─── */
 @keyframes badge-shimmer {
   0%   { background-position: 150% 50%; }
