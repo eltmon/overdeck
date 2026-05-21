@@ -169,6 +169,49 @@ export interface RuntimeRegistry {
   syncToAll(sourceDir: string, force?: boolean): Promise<Map<RuntimeType, number>>;
 }
 
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel companion interface for RuntimeAdapter. The legacy
+// Promise-based RuntimeAdapter shape above is preserved so existing dashboard
+// and CLI callers keep working without churn. New consumers can implement or
+// consume RuntimeAdapterEffect to get typed error channels.
+
+import type { Effect } from 'effect';
+import type {
+  ProcessSpawnError,
+  ProcessTimeoutError,
+  FsError,
+} from '../errors.js';
+
+/** Tagged-error union the Effect runtime methods can fail with. */
+export type RuntimeAdapterError =
+  | ProcessSpawnError
+  | ProcessTimeoutError
+  | FsError;
+
+/**
+ * Effect-channel variant of {@link RuntimeAdapter}. Methods that previously
+ * returned a Promise now return an Effect; failure channels carry tagged errors
+ * for typed `Effect.catchTag` branching.
+ */
+export interface RuntimeAdapterEffect {
+  readonly type: RuntimeType;
+  readonly config: RuntimeConfig;
+
+  isAvailable(): Effect.Effect<boolean>;
+  getVersion(): Effect.Effect<string | null>;
+  initialize(): Effect.Effect<void, FsError>;
+  spawnAgent(id: string, options: AgentSpawnOptions): Effect.Effect<boolean>;
+  sendMessage(id: string, message: AgentMessage): Effect.Effect<boolean>;
+  getAgentStatus(id: string): Effect.Effect<AgentStatus | null>;
+  stopAgent(id: string): Effect.Effect<boolean>;
+  listAgents(): Effect.Effect<AgentStatus[]>;
+  syncSkills(sourceDir: string, force?: boolean): Effect.Effect<number, FsError>;
+  syncCommands?(sourceDir: string, force?: boolean): Effect.Effect<number, FsError>;
+  getSkillsDir(): string;
+  getCommandsDir?(): string;
+}
+
 /**
  * Default feature set for runtimes
  */

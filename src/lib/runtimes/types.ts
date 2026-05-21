@@ -226,6 +226,47 @@ export interface AgentRuntime {
   isRunning(agentId: string): boolean | Promise<boolean>;
 }
 
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel companion interface for AgentRuntime. The legacy
+// sync/promise AgentRuntime shape above is preserved; Effect callers can use
+// the *Effect interface to compose typed pipelines.
+
+import type { Effect } from 'effect';
+import type {
+  ProcessSpawnError,
+  ProcessTimeoutError,
+  TmuxError,
+  FsError,
+} from '../errors.js';
+
+/** Tagged-error union the Effect runtime methods can fail with. */
+export type AgentRuntimeError =
+  | ProcessSpawnError
+  | ProcessTimeoutError
+  | TmuxError
+  | FsError;
+
+/**
+ * Effect-channel variant of {@link AgentRuntime}. Methods that previously
+ * returned `void | Promise<void>` or `boolean | Promise<boolean>` return an
+ * Effect with a typed failure channel. Pure-sync introspection methods stay
+ * sync because they read in-memory state.
+ */
+export interface AgentRuntimeEffect {
+  readonly name: RuntimeName;
+  getSessionPath(agentId: string): string | null;
+  getLastActivity(agentId: string): Date | null;
+  getHeartbeat(agentId: string): Heartbeat | null;
+  getTokenUsage(agentId: string): TokenUsage | null;
+  getSessionCost(agentId: string): CostBreakdown | null;
+  sendMessage(agentId: string, message: string): Effect.Effect<void, AgentRuntimeError>;
+  killAgent(agentId: string): Effect.Effect<void, AgentRuntimeError>;
+  spawnAgent(config: SpawnConfig): Effect.Effect<Agent, AgentRuntimeError>;
+  listSessions(workspace?: string): Session[];
+  isRunning(agentId: string): Effect.Effect<boolean>;
+}
+
 /**
  * Registry for managing multiple runtimes
  */

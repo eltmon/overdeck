@@ -6,7 +6,9 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
 import { PANOPTICON_HOME } from '../paths.js';
+import { FsError } from '../errors.js';
 import { RuntimeType } from './interface.js';
 
 const METRICS_FILE = join(PANOPTICON_HOME, 'runtime-metrics.json');
@@ -317,3 +319,75 @@ export function getRecentTasks(limit: number = 50): TaskRecord[] {
 export function clearMetrics(): void {
   saveMetrics({ ...DEFAULT_METRICS });
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants of the sync helpers above. Sync variants are
+// preserved so existing CLI callers keep working; new callers can use the
+// Effect variants to compose with typed error channels.
+
+/** Tagged error for metrics parse failures. */
+export class MetricsParseError extends Data.TaggedError('MetricsParseError')<{
+  readonly path: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `loadMetrics`. Returns DEFAULT_METRICS on any failure. */
+export const loadMetricsEffect = (): Effect.Effect<MetricsData> =>
+  Effect.try({
+    try: () => loadMetrics(),
+    catch: () => null,
+  }).pipe(Effect.orElseSucceed(() => ({ ...DEFAULT_METRICS })));
+
+/** Effect variant of `saveMetrics`. Lifts FS errors into the FsError channel. */
+export const saveMetricsEffect = (data: MetricsData): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveMetrics(data),
+    catch: (cause) =>
+      new FsError({ path: METRICS_FILE, operation: 'write', cause }),
+  });
+
+/** Effect variant of `recordTask`. Lifts FS errors into the FsError channel. */
+export const recordTaskEffect = (
+  task: Omit<TaskRecord, 'id'>,
+): Effect.Effect<TaskRecord, FsError> =>
+  Effect.try({
+    try: () => recordTask(task),
+    catch: (cause) =>
+      new FsError({ path: METRICS_FILE, operation: 'recordTask', cause }),
+  });
+
+/** Effect variant of `getRuntimeMetrics`. */
+export const getRuntimeMetricsEffect = (
+  runtime: RuntimeType,
+): Effect.Effect<RuntimeMetrics | null> =>
+  Effect.sync(() => getRuntimeMetrics(runtime));
+
+/** Effect variant of `getAllRuntimeMetrics`. */
+export const getAllRuntimeMetricsEffect = (): Effect.Effect<
+  Partial<Record<RuntimeType, RuntimeMetrics>>
+> => Effect.sync(() => getAllRuntimeMetrics());
+
+/** Effect variant of `getAggregatedMetrics`. */
+export const getAggregatedMetricsEffect = (): Effect.Effect<
+  ReturnType<typeof getAggregatedMetrics>
+> => Effect.sync(() => getAggregatedMetrics());
+
+/** Effect variant of `getIssueTasks`. */
+export const getIssueTasksEffect = (
+  issueId: string,
+): Effect.Effect<TaskRecord[]> => Effect.sync(() => getIssueTasks(issueId));
+
+/** Effect variant of `getRecentTasks`. */
+export const getRecentTasksEffect = (
+  limit: number = 50,
+): Effect.Effect<TaskRecord[]> => Effect.sync(() => getRecentTasks(limit));
+
+/** Effect variant of `clearMetrics`. */
+export const clearMetricsEffect = (): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => clearMetrics(),
+    catch: (cause) =>
+      new FsError({ path: METRICS_FILE, operation: 'clearMetrics', cause }),
+  });

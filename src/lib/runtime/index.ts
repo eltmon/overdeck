@@ -5,9 +5,14 @@
  */
 
 export * from './interface.js';
-export { createClaudeAdapter } from './claude.js';
+export { createClaudeAdapter, createClaudeAdapterEffect } from './claude.js';
 
-import type { RuntimeAdapter, RuntimeType, RuntimeRegistry } from './interface.js';
+import { Effect } from 'effect';
+import type {
+  RuntimeAdapter,
+  RuntimeType,
+  RuntimeRegistry,
+} from './interface.js';
 import { createClaudeAdapter } from './claude.js';
 
 /**
@@ -101,3 +106,32 @@ export async function getInstalledRuntimes(): Promise<RuntimeType[]> {
 
   return installed;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants of the registry/install helpers. Sync and
+// promise variants above remain the canonical API for existing callers.
+
+/** Effect variant of {@link isRuntimeInstalled}. */
+export const isRuntimeInstalledEffect = (
+  type: RuntimeType,
+): Effect.Effect<boolean> =>
+  Effect.promise(() => isRuntimeInstalled(type));
+
+/** Effect variant of {@link getInstalledRuntimes}. */
+export const getInstalledRuntimesEffect = (): Effect.Effect<RuntimeType[]> =>
+  Effect.promise(() => getInstalledRuntimes());
+
+/** Effect variant of {@link RuntimeRegistry.getAvailable}. */
+export const registryGetAvailableEffect = (
+  registry: RuntimeRegistry,
+): Effect.Effect<RuntimeAdapter[]> =>
+  Effect.promise(() => registry.getAvailable());
+
+/** Effect variant of {@link RuntimeRegistry.syncToAll}. */
+export const registrySyncToAllEffect = (
+  registry: RuntimeRegistry,
+  sourceDir: string,
+  force?: boolean,
+): Effect.Effect<Map<RuntimeType, number>> =>
+  Effect.promise(() => registry.syncToAll(sourceDir, force));

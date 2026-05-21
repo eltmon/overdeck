@@ -6,8 +6,19 @@
  */
 
 export * from './types.js';
-export { ClaudeCodeRuntime, createClaudeCodeRuntime } from './claude-code.js';
-export { PiRuntime, createPiRuntime, PiSpawnTimeout } from './pi.js';
+export {
+  ClaudeCodeRuntime,
+  ClaudeCodeRuntimeEffect,
+  createClaudeCodeRuntime,
+  createClaudeCodeRuntimeEffect,
+} from './claude-code.js';
+export {
+  PiRuntime,
+  PiRuntimeEffect,
+  createPiRuntime,
+  createPiRuntimeEffect,
+  PiSpawnTimeout,
+} from './pi.js';
 
 import type {
   AgentRuntime,
