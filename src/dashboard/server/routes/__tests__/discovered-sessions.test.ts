@@ -206,6 +206,25 @@ describe('parseSearchParams', () => {
 // ─── Origin validation ────────────────────────────────────────────────────────
 
 describe('dashboard conversation route guards', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const ORIGIN_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL', 'PANOPTICON_TRUSTED_ORIGINS', 'PANOPTICON_TRAEFIK_ENABLED', 'PANOPTICON_TRAEFIK_DOMAIN', 'NODE_ENV'] as const;
+
+  beforeEach(() => {
+    for (const key of ORIGIN_ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+    _resetTrustedOriginsForTests();
+  });
+
+  afterEach(() => {
+    for (const key of ORIGIN_ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    _resetTrustedOriginsForTests();
+  });
+
   function request(headers: Record<string, string> = {}, method = 'GET') {
     return { headers, method } as never;
   }
