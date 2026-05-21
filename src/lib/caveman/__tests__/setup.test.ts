@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, copyFileSync, existsSync, rmSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
+import { Effect } from 'effect';
 
 // Mock homedir so installation goes to a temp dir, not ~/.panopticon
 vi.mock('os', async (importOriginal) => {
@@ -58,7 +59,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// ─── getCavemanHooksDir / getCavemanSkillsDir ──────────────��──────────────────
+// ─── getCavemanHooksDir / getCavemanSkillsDir ─────────────────────────────────
 
 describe('getCavemanHooksDir', () => {
   it('builds path from homedir', () => {
@@ -77,32 +78,36 @@ describe('getCavemanSkillsDir', () => {
 // ─── setupCavemanHooks ────────────────────────────────────────────────────────
 
 describe('setupCavemanHooks', () => {
-  it('returns false when vendored directory does not exist', () => {
-    expect(setupCavemanHooks()).toBe(false);
+  it('fails with FsNotFoundError when vendored directory does not exist', async () => {
+    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    expect(exit._tag).toBe('Failure');
   });
 
-  it('returns false when a required JS file is missing', () => {
+  it('fails with FsNotFoundError when a required JS file is missing', async () => {
     mkdirSync(fakeVendoredDir, { recursive: true });
     // Create all except caveman-activate.js
     for (const f of ['caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
-    expect(setupCavemanHooks()).toBe(false);
+    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    expect(exit._tag).toBe('Failure');
   });
 
-  it('returns false when SKILL.md files are missing', () => {
+  it('fails with FsNotFoundError when SKILL.md files are missing', async () => {
     mkdirSync(fakeVendoredDir, { recursive: true });
     for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
     // No skills/ directory — SKILL.md files are missing
-    expect(setupCavemanHooks()).toBe(false);
+    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    expect(exit._tag).toBe('Failure');
   });
 
-  it('returns true and installs all files on success', () => {
+  it('succeeds and installs all files on success', async () => {
     createFakeVendoredFiles();
 
-    expect(setupCavemanHooks()).toBe(true);
+    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    expect(exit._tag).toBe('Success');
 
     const hooksDir = getCavemanHooksDir();
     expect(existsSync(join(hooksDir, 'panopticon-caveman-activate.js'))).toBe(true);
@@ -114,21 +119,22 @@ describe('setupCavemanHooks', () => {
     expect(existsSync(join(skillsDir, 'caveman-review', 'SKILL.md'))).toBe(true);
   });
 
-  it('is idempotent — returns true on repeated calls', () => {
+  it('is idempotent — succeeds on repeated calls', async () => {
     createFakeVendoredFiles();
-    expect(setupCavemanHooks()).toBe(true);
-    expect(setupCavemanHooks()).toBe(true);
+    expect((await Effect.runPromiseExit(setupCavemanHooks()))._tag).toBe('Success');
+    expect((await Effect.runPromiseExit(setupCavemanHooks()))._tag).toBe('Success');
   });
 });
 
-// ─── setupCavemanCompressScripts ──────────────────────────���──────────────────
+// ─── setupCavemanCompressScripts ──────────────────────────────────────────────
 
 describe('setupCavemanCompressScripts', () => {
-  it('returns false when compress source directory does not exist', () => {
-    expect(setupCavemanCompressScripts()).toBe(false);
+  it('returns false when compress source directory does not exist', async () => {
+    const result = await Effect.runPromise(setupCavemanCompressScripts());
+    expect(result).toBe(false);
   });
 
-  it('returns true and installs .py files on success', () => {
+  it('returns true and installs .py files on success', async () => {
     const compressSrc = join(fakeDistCliDir, 'caveman-compress');
     mkdirSync(compressSrc, { recursive: true });
     const pyFiles = ['__init__.py', '__main__.py', 'cli.py', 'compress.py', 'detect.py'];
@@ -136,7 +142,8 @@ describe('setupCavemanCompressScripts', () => {
       writeFileSync(join(compressSrc, f), `# ${f}`);
     }
 
-    expect(setupCavemanCompressScripts()).toBe(true);
+    const result = await Effect.runPromise(setupCavemanCompressScripts());
+    expect(result).toBe(true);
 
     const destDir = join(fakeHome, '.panopticon', 'hooks', 'caveman-compress');
     for (const f of pyFiles) {
