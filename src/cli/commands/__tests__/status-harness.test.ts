@@ -9,10 +9,13 @@ vi.mock('../../../lib/shadow-state.js', () => ({
   isShadowed: vi.fn(async () => false),
   getShadowState: vi.fn(async () => null),
 }))
-vi.mock('../../../lib/tldr-daemon.js', () => ({
-  getTldrMetrics: vi.fn(() => ({ interceptions: 0, bypasses: 0, estimatedTokensSaved: 0 })),
-  getTldrDaemonService: vi.fn(),
-}))
+vi.mock('../../../lib/tldr-daemon.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    getTldrMetrics: vi.fn(() => Effect.succeed({ interceptions: 0, bypasses: 0, estimatedTokensSaved: 0, filesAnalyzed: [], bypassReasons: {} })),
+    getTldrDaemonService: vi.fn(),
+  };
+})
 vi.mock('../../../lib/workspace/stack-health.js', () => ({
   collectDockerContainerLifecycleSnapshot: vi.fn(async () => []),
   getWorkspaceStackHealth: vi.fn(async () => ({ healthy: true, reasons: [], lastObserved: '2026-05-17T00:00:00.000Z' })),

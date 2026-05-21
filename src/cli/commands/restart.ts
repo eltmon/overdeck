@@ -274,8 +274,10 @@ async function runFullRestart(
 
   if (tldrAvailable) {
     try {
+      const { Effect } = await import('effect');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonService(projectRoot, venvPath).stop();
+      await Effect.runPromise(getTldrDaemonService(projectRoot, venvPath).stop().pipe(Effect.provide(NodeServicesLayer)));
     } catch {
       // non-fatal — daemon may already be down
     }
@@ -311,8 +313,10 @@ async function runFullRestart(
 
   if (tldrAvailable) {
     try {
+      const { Effect } = await import('effect');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonService(projectRoot, venvPath).start(true);
+      await Effect.runPromise(getTldrDaemonService(projectRoot, venvPath).start(true).pipe(Effect.provide(NodeServicesLayer)));
     } catch {
       // non-fatal — dashboard is already healthy; TLDR just won't be available
     }

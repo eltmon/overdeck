@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -15,8 +16,14 @@ vi.mock('chalk', () => ({
   },
 }));
 
+// Prevent @effect/platform-node from loading NodeRedis.js (which requires ioredis, not installed)
+vi.mock('@effect/platform-node', async () => {
+  const { Layer } = await import('effect');
+  return { NodeServices: { layer: Layer.empty } };
+});
+
 // Declare the mock function at module scope so vi.mock factory can close over it
-const mockGetStatus = vi.fn().mockResolvedValue({ running: false, healthy: false, workspacePath: '', venvPath: '' });
+const mockGetStatus = vi.fn(() => Effect.succeed({ running: false, healthy: false, workspacePath: '', venvPath: '' }));
 
 vi.mock('../../src/lib/tldr-daemon.js', () => ({
   getTldrDaemonService: () => ({ getStatus: mockGetStatus }),
@@ -35,7 +42,7 @@ describe('tldrIndexStatusCommand', () => {
     vi.spyOn(console, 'log').mockImplementation((...args) => {
       consoleLogs.push(args.join(' '));
     });
-    mockGetStatus.mockResolvedValue({ running: false, healthy: false, workspacePath: tempDir, venvPath: '' });
+    mockGetStatus.mockReturnValue(Effect.succeed({ running: false, healthy: false, workspacePath: tempDir, venvPath: '' }));
   });
 
   afterEach(() => {
@@ -61,7 +68,7 @@ describe('tldrIndexStatusCommand', () => {
     writeFileSync(join(tempDir, '.tldr', 'languages.json'), JSON.stringify({
       timestamp: Math.floor((Date.now() - 5 * 60 * 1000) / 1000),
     }));
-    mockGetStatus.mockResolvedValue({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' });
+    mockGetStatus.mockReturnValue(Effect.succeed({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' }));
 
     await tldrIndexStatusCommand(tempDir);
     const output = consoleLogs.join('\n');
@@ -89,7 +96,7 @@ describe('tldrIndexStatusCommand', () => {
     writeFileSync(join(tempDir, '.tldr', 'languages.json'), JSON.stringify({
       timestamp: Math.floor((Date.now() - 10 * 60 * 1000) / 1000),
     }));
-    mockGetStatus.mockResolvedValue({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' });
+    mockGetStatus.mockReturnValue(Effect.succeed({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' }));
 
     await tldrIndexStatusCommand(tempDir);
     const output = consoleLogs.join('\n');
@@ -105,7 +112,7 @@ describe('tldrIndexStatusCommand', () => {
     writeFileSync(join(tempDir, '.tldr', 'languages.json'), JSON.stringify({
       timestamp: Math.floor((Date.now() - 2 * 60 * 60 * 1000) / 1000),
     }));
-    mockGetStatus.mockResolvedValue({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' });
+    mockGetStatus.mockReturnValue(Effect.succeed({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' }));
 
     await tldrIndexStatusCommand(tempDir);
     const output = consoleLogs.join('\n');
@@ -140,7 +147,7 @@ describe('tldrIndexStatusCommand', () => {
       join(tempDir, 'workspaces', 'feature-test', '.tldr', 'languages.json'),
       JSON.stringify({ timestamp: Math.floor(Date.now() / 1000) })
     );
-    mockGetStatus.mockResolvedValue({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' });
+    mockGetStatus.mockReturnValue(Effect.succeed({ running: true, healthy: true, workspacePath: tempDir, venvPath: '' }));
 
     await tldrIndexStatusCommand(tempDir);
     const output = consoleLogs.join('\n');

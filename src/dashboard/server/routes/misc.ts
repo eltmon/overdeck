@@ -1283,6 +1283,7 @@ const getTldrStatusRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1299,7 +1300,7 @@ const getTldrStatusRoute = HttpRouter.add(
 
       if (existsSync(venvPath)) {
         const service = getTldrDaemonService(projectRoot, venvPath);
-        const status = await service.getStatus();
+        const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
         const indexStats = getIndexStats(projectRoot, true);
 
         results.push({
@@ -1324,7 +1325,7 @@ const getTldrStatusRoute = HttpRouter.add(
 
           if (existsSync(wsVenvPath)) {
             const service = getTldrDaemonService(wsPath, wsVenvPath);
-            const status = await service.getStatus();
+            const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
             const indexStats = getIndexStats(wsPath, false);
 
             results.push({
@@ -1355,6 +1356,7 @@ const postTldrStartRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1366,7 +1368,7 @@ const postTldrStartRoute = HttpRouter.add(
       }
 
       const service = getTldrDaemonService(projectRoot, venvPath);
-      await service.start();
+      await Effect.runPromise(service.start().pipe(Effect.provide(NodeServicesLayer)));
       return jsonResponse({ success: true, message: 'TLDR daemon started' });
     }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -1383,6 +1385,7 @@ const postTldrStopRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1394,7 +1397,7 @@ const postTldrStopRoute = HttpRouter.add(
       }
 
       const service = getTldrDaemonService(projectRoot, venvPath);
-      await service.stop();
+      await Effect.runPromise(service.stop().pipe(Effect.provide(NodeServicesLayer)));
       return jsonResponse({ success: true, message: 'TLDR daemon stopped' });
     }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -820,15 +820,17 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       }
 
       // Start TLDR daemon for this workspace
+      const { Effect } = await import('effect');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const { getTldrDaemonService } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonService(workspacePath, venvPath);
-      await tldrService.start(true);
+      await Effect.runPromise(tldrService.start(true).pipe(Effect.provide(NodeServicesLayer)));
       result.steps.push('Started TLDR daemon');
 
       // Warm the index in the background — ensures workspaces always have a working index
       // even when the main branch cache was empty (nothing to copy)
       try {
-        await tldrService.warm(true);  // background=true: non-blocking
+        await Effect.runPromise(tldrService.warm(true).pipe(Effect.provide(NodeServicesLayer)));
         result.steps.push('TLDR index warm initiated (background)');
       } catch {
         // Non-fatal — daemon may not support warm yet
@@ -1436,9 +1438,11 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   const venvPath = join(workspacePath, '.venv');
   if (existsSync(venvPath)) {
     try {
+      const { Effect } = await import('effect');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const { getTldrDaemonService } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonService(workspacePath, venvPath);
-      await tldrService.stop();
+      await Effect.runPromise(tldrService.stop().pipe(Effect.provide(NodeServicesLayer)));
       result.steps.push('Stopped TLDR daemon');
     } catch (error: any) {
       // Non-fatal - daemon may not be running

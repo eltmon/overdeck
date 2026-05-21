@@ -24,6 +24,7 @@ import {
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
+import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
 import { buildCorrelationMap } from './correlator.js';
 import { getModelCapability } from '../model-capabilities.js';
@@ -188,7 +189,12 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const correlationMap = buildCorrelationMap(allPaths);
 
   // 4. Determine parallelism from system-probe
-  const caps = await getSystemCapabilities(opts.maxParallel);
+  // Adapter boundary: scanner.ts is still Promise-based; provide services and bridge to Promise.
+  // This will be replaced with yield* when scanner.ts is migrated in its own wave-5 slot.
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
+  const caps = await Effect.runPromise(
+    getSystemCapabilities(opts.maxParallel).pipe(Effect.provide(NodeServicesLayer)),
+  );
   const maxParallel = caps.recommendedParallelism;
 
   // 5. Track progress

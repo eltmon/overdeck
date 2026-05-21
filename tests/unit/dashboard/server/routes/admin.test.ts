@@ -7,6 +7,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect, Layer } from 'effect';
+import { layer as NodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem';
+import { layer as NodePathLayer } from '@effect/platform-node/NodePath';
+import { layer as NodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner';
+
+const testLayer = Layer.provideMerge(NodeChildProcessSpawnerLayer, Layer.mergeAll(NodeFileSystemLayer, NodePathLayer));
 import { existsSync, mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -69,7 +75,7 @@ describe('GET /api/admin/tldr/:issueId', () => {
     // running:false, healthy:false — this is the happy path for "venv exists
     // but daemon hasn't been started yet".
     const service = getTldrDaemonService(ws, venv);
-    const status = await service.getStatus();
+    const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(testLayer)));
 
     expect(status.running).toBe(false);
     expect(status.healthy).toBe(false);

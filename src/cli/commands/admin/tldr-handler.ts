@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { getTldrDaemonService, listTldrDaemonServices } from '../../../lib/tldr-daemon.js';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, basename } from 'path';
@@ -32,6 +33,7 @@ export async function tldrCommand(action: string, workspace?: string, options: T
 }
 
 async function statusCommand(options: TldrOptions): Promise<void> {
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
   const projectRoot = process.cwd();
   const venvPath = join(projectRoot, '.venv');
 
@@ -47,7 +49,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
   // Check main daemon
   if (existsSync(venvPath)) {
     const service = getTldrDaemonService(projectRoot, venvPath);
-    const status = await service.getStatus();
+    const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
     const tldrPath = join(projectRoot, '.tldr');
 
     let indexAge = 'N/A';
@@ -113,7 +115,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 
       if (existsSync(wsVenvPath)) {
         const service = getTldrDaemonService(wsPath, wsVenvPath);
-        const status = await service.getStatus();
+        const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
         const tldrPath = join(wsPath, '.tldr');
 
         let indexAge = 'N/A';
@@ -201,6 +203,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 }
 
 async function startCommand(workspace: string | undefined, options: TldrOptions): Promise<void> {
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
   const projectRoot = process.cwd();
 
   if (workspace) {
@@ -220,7 +223,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
     }
 
     const service = getTldrDaemonService(wsPath, venvPath);
-    await service.start();
+    await Effect.runPromise(service.start().pipe(Effect.provide(NodeServicesLayer)));
 
     if (!options.json) {
       console.log(chalk.green(`✓ Started TLDR daemon for ${workspace}`));
@@ -236,7 +239,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
     }
 
     const service = getTldrDaemonService(projectRoot, venvPath);
-    await service.start();
+    await Effect.runPromise(service.start().pipe(Effect.provide(NodeServicesLayer)));
 
     if (!options.json) {
       console.log(chalk.green('✓ Started TLDR daemon for main'));
@@ -245,6 +248,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
 }
 
 async function stopCommand(workspace: string | undefined, options: TldrOptions): Promise<void> {
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
   const projectRoot = process.cwd();
 
   if (workspace) {
@@ -263,7 +267,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
     }
 
     const service = getTldrDaemonService(wsPath, venvPath);
-    await service.stop();
+    await Effect.runPromise(service.stop().pipe(Effect.provide(NodeServicesLayer)));
 
     if (!options.json) {
       console.log(chalk.green(`✓ Stopped TLDR daemon for ${workspace}`));
@@ -278,7 +282,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
     }
 
     const service = getTldrDaemonService(projectRoot, venvPath);
-    await service.stop();
+    await Effect.runPromise(service.stop().pipe(Effect.provide(NodeServicesLayer)));
 
     if (!options.json) {
       console.log(chalk.green('✓ Stopped TLDR daemon for main'));
@@ -287,6 +291,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
 }
 
 async function warmCommand(workspace: string | undefined, options: TldrOptions): Promise<void> {
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
   const projectRoot = process.cwd();
 
   if (workspace) {
@@ -311,7 +316,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
       console.log(chalk.dim('This may take a few minutes for large codebases'));
     }
 
-    await service.warm(false);  // foreground mode for warming
+    await Effect.runPromise(service.warm(false).pipe(Effect.provide(NodeServicesLayer)));  // foreground mode for warming
 
     if (!options.json) {
       console.log(chalk.green(`✓ Index warming complete for ${workspace}`));
@@ -333,7 +338,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
       console.log(chalk.dim('This may take a few minutes for large codebases'));
     }
 
-    await service.warm(false);  // foreground mode for warming
+    await Effect.runPromise(service.warm(false).pipe(Effect.provide(NodeServicesLayer)));  // foreground mode for warming
 
     if (!options.json) {
       console.log(chalk.green('✓ Index warming complete for main'));

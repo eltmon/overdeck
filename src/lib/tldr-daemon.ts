@@ -5,10 +5,27 @@
  * Provides code analysis and summarization for token-efficient agent work.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { existsSync, writeFileSync, readFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
+import { ChildProcess } from 'effect/unstable/process';
+import { ChildProcessSpawner } from 'effect/unstable/process/ChildProcessSpawner';
+
+// ============================================================================
+// Typed errors
+// ============================================================================
+
+/** tldr binary not found in the venv. */
+export class TldrNotInstalledError extends Data.TaggedError('TldrNotInstalledError')<{
+  readonly venvPath: string;
+  readonly tldrBin: string;
+}> {}
+
+/** Daemon failed to write its pidfile within the startup deadline. */
+export class TldrStartError extends Data.TaggedError('TldrStartError')<{
+  readonly workspacePath: string;
+  readonly message?: string;
+}> {}
 
 // ============================================================================
 // TLDR Session Metrics (PAN-236)
@@ -23,11 +40,11 @@ import { join } from 'path';
  *   metrics-checkpoint.json — tracks byte offsets for delta (per-cost-event) reporting
  */
 export interface TldrSessionMetrics {
-  interceptions: number;                   // TLDR summaries served since last checkpoint
-  bypasses: number;                        // TLDR bypasses since last checkpoint
-  estimatedTokensSaved: number;            // Rough token savings (fullTokens - ~1000 per interception)
-  filesAnalyzed: string[];                 // Unique files summarized in this window
-  bypassReasons: Record<string, number>;   // e.g. { "offset-limit": 3, "recently-edited": 1 }
+  interceptions: number;
+  bypasses: number;
+  estimatedTokensSaved: number;
+  filesAnalyzed: string[];
+  bypassReasons: Record<string, number>;
 }
 
 /** Checkpoint persisted to .tldr/metrics-checkpoint.json */
@@ -39,25 +56,35 @@ interface TldrMetricsCheckpoint {
   capturedAt: string;
 }
 
-function readMetricsCheckpoint(checkpointFile: string): TldrMetricsCheckpoint | null {
-  if (!existsSync(checkpointFile)) return null;
-  try {
-    return JSON.parse(readFileSync(checkpointFile, 'utf-8')) as TldrMetricsCheckpoint;
-  } catch {
-    return null;
-  }
+// ─── Internal helpers (sync FS wrapped in Effect.try) ─────────────────────────
+
+function readMetricsCheckpointEffect(checkpointFile: string): Effect.Effect<TldrMetricsCheckpoint | null> {
+  if (!existsSync(checkpointFile)) return Effect.succeed(null);
+  return Effect.try({
+    try: () => JSON.parse(readFileSync(checkpointFile, 'utf-8')) as TldrMetricsCheckpoint,
+    catch: () => null as TldrMetricsCheckpoint | null,
+  }).pipe(Effect.catch(() => Effect.succeed<TldrMetricsCheckpoint | null>(null)));
 }
 
-function readLogLines(logFile: string, startByte?: number, startLine = 0): { lines: string[]; size: number } {
-  if (!existsSync(logFile)) return { lines: [], size: 0 };
-  const size = statSync(logFile).size;
-  if (startByte !== undefined) {
-    const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
-    const content = readFileSync(logFile).subarray(safeStart).toString('utf-8');
-    return { lines: content.split('\n').filter(l => l.trim()), size };
-  }
-  const content = readFileSync(logFile, 'utf-8');
-  return { lines: content.split('\n').filter(l => l.trim()).slice(startLine), size };
+function readLogLinesEffect(
+  logFile: string,
+  startByte?: number,
+  startLine = 0,
+): Effect.Effect<{ lines: string[]; size: number }> {
+  if (!existsSync(logFile)) return Effect.succeed({ lines: [], size: 0 });
+  return Effect.try({
+    try: () => {
+      const size = statSync(logFile).size;
+      if (startByte !== undefined) {
+        const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
+        const content = readFileSync(logFile).subarray(safeStart).toString('utf-8');
+        return { lines: content.split('\n').filter(l => l.trim()), size };
+      }
+      const content = readFileSync(logFile, 'utf-8');
+      return { lines: content.split('\n').filter(l => l.trim()).slice(startLine), size };
+    },
+    catch: () => ({ lines: [], size: 0 }),
+  }).pipe(Effect.catch(() => Effect.succeed({ lines: [], size: 0 })));
 }
 
 /**
@@ -66,65 +93,64 @@ function readLogLines(logFile: string, startByte?: number, startLine = 0): { lin
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
  */
-export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
-  const tldrDir = join(workspacePath, '.tldr');
-  const interceptionsLog = join(tldrDir, 'interceptions.log');
-  const bypassesLog = join(tldrDir, 'bypasses.log');
-  const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
+export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): Effect.Effect<TldrSessionMetrics> {
+  return Effect.gen(function* () {
+    const tldrDir = join(workspacePath, '.tldr');
+    const interceptionsLog = join(tldrDir, 'interceptions.log');
+    const bypassesLog = join(tldrDir, 'bypasses.log');
+    const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
 
-  const checkpoint = sinceCheckpoint ? readMetricsCheckpoint(checkpointFile) : null;
-  const interceptionsStartByte = checkpoint?.interceptionsByte;
-  const bypassesStartByte = checkpoint?.bypassesByte;
-  const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
-  const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
+    const checkpoint = sinceCheckpoint ? yield* readMetricsCheckpointEffect(checkpointFile) : null;
+    const interceptionsStartByte = checkpoint?.interceptionsByte;
+    const bypassesStartByte = checkpoint?.bypassesByte;
+    const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
+    const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
 
-  // Parse interceptions log: each line is "timestamp file_size rel_path"
-  const newInterceptions = readLogLines(
-    interceptionsLog,
-    sinceCheckpoint ? interceptionsStartByte : undefined,
-    sinceCheckpoint && interceptionsStartByte === undefined ? interceptionsStartLine : 0,
-  ).lines;
+    const { lines: newInterceptions } = yield* readLogLinesEffect(
+      interceptionsLog,
+      sinceCheckpoint ? interceptionsStartByte : undefined,
+      sinceCheckpoint && interceptionsStartByte === undefined ? interceptionsStartLine : 0,
+    );
 
-  let estimatedTokensSaved = 0;
-  const filesAnalyzed: string[] = [];
+    let estimatedTokensSaved = 0;
+    const filesAnalyzed: string[] = [];
 
-  for (const line of newInterceptions) {
-    const parts = line.trim().split(' ');
-    if (parts.length >= 3) {
-      const fileSizeBytes = parseInt(parts[1], 10) || 0;
-      const relPath = parts.slice(2).join(' ');
-      // Rough estimate: ~1 token per 4 bytes for code; TLDR summary is ~1000 tokens
-      const fullTokens = Math.round(fileSizeBytes / 4);
-      estimatedTokensSaved += Math.max(0, fullTokens - 1000);
-      if (relPath && !filesAnalyzed.includes(relPath)) {
-        filesAnalyzed.push(relPath);
+    for (const line of newInterceptions) {
+      const parts = line.trim().split(' ');
+      if (parts.length >= 3) {
+        const fileSizeBytes = parseInt(parts[1], 10) || 0;
+        const relPath = parts.slice(2).join(' ');
+        const fullTokens = Math.round(fileSizeBytes / 4);
+        estimatedTokensSaved += Math.max(0, fullTokens - 1000);
+        if (relPath && !filesAnalyzed.includes(relPath)) {
+          filesAnalyzed.push(relPath);
+        }
       }
     }
-  }
 
-  // Parse bypasses log: each line is "timestamp reason [rel_path]"
-  const newBypasses = readLogLines(
-    bypassesLog,
-    sinceCheckpoint ? bypassesStartByte : undefined,
-    sinceCheckpoint && bypassesStartByte === undefined ? bypassesStartLine : 0,
-  ).lines;
-  const bypassReasons: Record<string, number> = {};
+    const { lines: newBypasses } = yield* readLogLinesEffect(
+      bypassesLog,
+      sinceCheckpoint ? bypassesStartByte : undefined,
+      sinceCheckpoint && bypassesStartByte === undefined ? bypassesStartLine : 0,
+    );
+    const bypassReasons: Record<string, number> = {};
 
-  for (const line of newBypasses) {
-    const parts = line.trim().split(' ');
-    if (parts.length >= 2) {
-      const reason = parts[1];
-      bypassReasons[reason] = (bypassReasons[reason] || 0) + 1;
+    for (const line of newBypasses) {
+      const parts = line.trim().split(' ');
+      if (parts.length >= 2) {
+        const reason = parts[1];
+        bypassReasons[reason] = (bypassReasons[reason] || 0) + 1;
+      }
     }
-  }
 
-  return {
-    interceptions: newInterceptions.length,
-    bypasses: newBypasses.length,
-    estimatedTokensSaved,
-    filesAnalyzed,
-    bypassReasons,
-  };
+    return {
+      interceptions: newInterceptions.length,
+      bypasses: newBypasses.length,
+      estimatedTokensSaved,
+      filesAnalyzed,
+      bypassReasons,
+    };
+  });
 }
 
 /**
@@ -136,44 +162,59 @@ export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): 
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
  */
-export function captureTldrMetrics(workspacePath: string): TldrSessionMetrics | null {
+export function captureTldrMetrics(workspacePath: string): Effect.Effect<TldrSessionMetrics | null> {
   const tldrDir = join(workspacePath, '.tldr');
   if (!existsSync(tldrDir)) {
-    return null;
+    return Effect.succeed(null);
   }
 
-  const metrics = getTldrMetrics(workspacePath, true);
+  return Effect.gen(function* () {
+    const metrics = yield* getTldrMetrics(workspacePath, true);
 
-  // Advance checkpoint to current byte offsets without rescanning historical logs.
-  const interceptionsLog = join(tldrDir, 'interceptions.log');
-  const bypassesLog = join(tldrDir, 'bypasses.log');
-  const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
-  const previous = readMetricsCheckpoint(checkpointFile);
-  const interceptionsByte = existsSync(interceptionsLog) ? statSync(interceptionsLog).size : 0;
-  const bypassesByte = existsSync(bypassesLog) ? statSync(bypassesLog).size : 0;
-  const previousInterceptionsLine = previous?.interceptionsByte !== undefined && previous.interceptionsByte > interceptionsByte
-    ? 0
-    : previous?.interceptionsLine ?? 0;
-  const previousBypassesLine = previous?.bypassesByte !== undefined && previous.bypassesByte > bypassesByte
-    ? 0
-    : previous?.bypassesLine ?? 0;
+    const interceptionsLog = join(tldrDir, 'interceptions.log');
+    const bypassesLog = join(tldrDir, 'bypasses.log');
+    const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
 
-  const checkpoint: TldrMetricsCheckpoint = {
-    interceptionsLine: previousInterceptionsLine + metrics.interceptions,
-    bypassesLine: previousBypassesLine + metrics.bypasses,
-    interceptionsByte,
-    bypassesByte,
-    capturedAt: new Date().toISOString(),
-  };
+    const previous = yield* readMetricsCheckpointEffect(checkpointFile);
 
-  try {
-    writeFileSync(checkpointFile, JSON.stringify(checkpoint, null, 2), 'utf-8');
-  } catch { /* non-fatal — metrics still returned */ }
+    const interceptionsByte = existsSync(interceptionsLog)
+      ? yield* Effect.try({ try: () => statSync(interceptionsLog).size, catch: () => 0 })
+          .pipe(Effect.catch(n => Effect.succeed(n)))
+      : 0;
+    const bypassesByte = existsSync(bypassesLog)
+      ? yield* Effect.try({ try: () => statSync(bypassesLog).size, catch: () => 0 })
+          .pipe(Effect.catch(n => Effect.succeed(n)))
+      : 0;
 
-  return metrics;
+    const previousInterceptionsLine =
+      previous?.interceptionsByte !== undefined && previous.interceptionsByte > interceptionsByte
+        ? 0
+        : previous?.interceptionsLine ?? 0;
+    const previousBypassesLine =
+      previous?.bypassesByte !== undefined && previous.bypassesByte > bypassesByte
+        ? 0
+        : previous?.bypassesLine ?? 0;
+
+    const checkpoint: TldrMetricsCheckpoint = {
+      interceptionsLine: previousInterceptionsLine + metrics.interceptions,
+      bypassesLine: previousBypassesLine + metrics.bypasses,
+      interceptionsByte,
+      bypassesByte,
+      capturedAt: new Date().toISOString(),
+    };
+
+    yield* Effect.try({
+      try: () => writeFileSync(checkpointFile, JSON.stringify(checkpoint, null, 2), 'utf-8'),
+      catch: () => undefined,
+    }).pipe(Effect.catch(() => Effect.void));
+
+    return metrics;
+  });
 }
 
-const execAsync = promisify(exec);
+// ============================================================================
+// Daemon status / pidfile
+// ============================================================================
 
 /**
  * TLDR daemon status
@@ -192,9 +233,7 @@ export interface TldrDaemonStatus {
  *
  * The `tldr` binary writes its PID to <workspace>/.tldr/daemon.pid on start
  * and removes it on stop. That file is the single source of truth — Panopticon
- * does not maintain its own state file (PAN-1132: writing our own state with a
- * fallback to the CLI's process.pid caused the file to be reaped the moment the
- * CLI exited, making running daemons report as stopped).
+ * does not maintain its own state file (PAN-1132).
  */
 interface LiveDaemonState {
   pid: number;
@@ -211,37 +250,37 @@ function getPidFilePath(workspacePath: string): string {
  *
  * Returns null when no pidfile exists or the process is gone.
  */
-function readDaemonState(workspacePath: string): LiveDaemonState | null {
+function readDaemonStateEffect(workspacePath: string): Effect.Effect<LiveDaemonState | null> {
   const pidFile = getPidFilePath(workspacePath);
-  if (!existsSync(pidFile)) {
-    return null;
-  }
+  if (!existsSync(pidFile)) return Effect.succeed(null);
 
-  let raw: string;
-  try {
-    raw = readFileSync(pidFile, 'utf-8').trim();
-  } catch {
-    return null;
-  }
+  return Effect.gen(function* () {
+    const raw = yield* Effect.try({
+      try: () => readFileSync(pidFile, 'utf-8').trim(),
+      catch: () => '',
+    }).pipe(Effect.catch(e => Effect.succeed(e)));
 
-  const pid = parseInt(raw, 10);
-  if (!Number.isFinite(pid) || pid <= 0) {
-    return null;
-  }
+    const pid = parseInt(raw, 10);
+    if (!Number.isFinite(pid) || pid <= 0) return null as LiveDaemonState | null;
 
-  try {
-    process.kill(pid, 0);
-  } catch {
-    return null;
-  }
+    const alive = yield* Effect.try({
+      try: () => { process.kill(pid, 0); return true; },
+      catch: () => false,
+    }).pipe(Effect.catch(e => Effect.succeed(e)));
+    if (!alive) return null as LiveDaemonState | null;
 
-  let startedAt: Date | undefined;
-  try {
-    startedAt = statSync(pidFile).mtime;
-  } catch { /* informational only */ }
+    const startedAt = yield* Effect.try({
+      try: () => statSync(pidFile).mtime,
+      catch: () => undefined as Date | undefined,
+    }).pipe(Effect.catch(e => Effect.succeed(e)));
 
-  return { pid, startedAt };
+    return { pid, startedAt } as LiveDaemonState;
+  });
 }
+
+// ============================================================================
+// TldrDaemonService
+// ============================================================================
 
 /**
  * TLDR Daemon Service
@@ -252,235 +291,240 @@ export class TldrDaemonService {
   private workspacePath: string;
   private venvPath: string;
 
-  /**
-   * Create a new TLDR daemon service for a workspace
-   *
-   * @param workspacePath - Path to the workspace (project root or workspace directory)
-   * @param venvPath - Path to the Python venv containing llm-tldr
-   */
   constructor(workspacePath: string, venvPath: string) {
     this.workspacePath = workspacePath;
     this.venvPath = venvPath;
   }
 
   /**
-   * Start the TLDR daemon
+   * Start the TLDR daemon.
    *
    * @param background - Run daemon in background (default: true)
    */
-  async start(background = true): Promise<void> {
-    const currentState = readDaemonState(this.workspacePath);
-    if (currentState) {
-      console.warn(`TLDR daemon already running for ${this.workspacePath} (PID: ${currentState.pid})`);
-      return;
-    }
+  start(background = true): Effect.Effect<void, TldrNotInstalledError | TldrStartError, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    return Effect.gen(function* () {
+      const currentState = yield* readDaemonStateEffect(workspacePath);
+      if (currentState !== null) {
+        return; // already running
+      }
 
-    const tldrBin = join(this.venvPath, 'bin', 'tldr');
-    if (!existsSync(tldrBin)) {
-      throw new Error(`tldr binary not found at ${tldrBin}. Ensure llm-tldr is installed in the venv.`);
-    }
+      const tldrBin = join(venvPath, 'bin', 'tldr');
+      if (!existsSync(tldrBin)) {
+        return yield* Effect.fail(new TldrNotInstalledError({ venvPath, tldrBin }));
+      }
 
-    console.log(`Starting TLDR daemon for ${this.workspacePath}...`);
-
-    try {
       const cmd = background
-        ? `cd "${this.workspacePath}" && "${tldrBin}" daemon start --project "${this.workspacePath}" >/dev/null 2>&1 &`
-        : `cd "${this.workspacePath}" && "${tldrBin}" daemon start --project "${this.workspacePath}"`;
+        ? `"${tldrBin}" daemon start --project "${workspacePath}" >/dev/null 2>&1 &`
+        : `"${tldrBin}" daemon start --project "${workspacePath}"`;
 
-      const { stderr } = await execAsync(cmd);
+      const spawner = yield* ChildProcessSpawner;
+      yield* spawner.exitCode(
+        ChildProcess.make('sh', ['-c', cmd], { cwd: workspacePath }),
+      ).pipe(
+        Effect.mapError(
+          (e) => new TldrStartError({ workspacePath, message: String(e) }),
+        ),
+      );
 
-      if (stderr && !stderr.includes('started')) {
-        console.warn(`TLDR daemon start warning: ${stderr}`);
-      }
-
-      // Poll for the tldr-owned pidfile to appear with a live process.
-      const deadline = Date.now() + 5000;
+      // Poll for the tldr-owned pidfile (both background and foreground paths).
       let state: LiveDaemonState | null = null;
-      while (Date.now() < deadline) {
-        state = readDaemonState(this.workspacePath);
-        if (state) break;
-        await new Promise(r => setTimeout(r, 100));
+      for (let i = 0; i < 50; i++) {
+        state = yield* readDaemonStateEffect(workspacePath);
+        if (state !== null) break;
+        yield* Effect.sleep('100 millis');
       }
 
-      if (!state) {
-        throw new Error(`TLDR daemon failed to write pidfile at ${getPidFilePath(this.workspacePath)} within 5s`);
+      if (state === null) {
+        return yield* Effect.fail(
+          new TldrStartError({
+            workspacePath,
+            message: `pidfile not written within 5s at ${getPidFilePath(workspacePath)}`,
+          }),
+        );
       }
-
-      console.log(`✓ TLDR daemon started for ${this.workspacePath} (PID: ${state.pid})`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to start TLDR daemon: ${errorMessage}`);
-    }
+    });
   }
 
   /**
-   * Stop the TLDR daemon
+   * Stop the TLDR daemon.
    */
-  async stop(): Promise<void> {
-    const currentState = readDaemonState(this.workspacePath);
-    if (!currentState) {
-      console.warn(`TLDR daemon not running for ${this.workspacePath}`);
-      return;
-    }
-
-    const tldrBin = join(this.venvPath, 'bin', 'tldr');
-    if (!existsSync(tldrBin)) {
-      console.warn(`tldr binary not found at ${tldrBin}, killing daemon directly`);
-      try { process.kill(currentState.pid, 'SIGTERM'); } catch { /* already gone */ }
-      return;
-    }
-
-    console.log(`Stopping TLDR daemon for ${this.workspacePath}...`);
-
-    try {
-      await execAsync(`cd "${this.workspacePath}" && "${tldrBin}" daemon stop`);
-      console.log(`✓ TLDR daemon stopped for ${this.workspacePath}`);
-    } catch (error) {
-      try {
-        process.kill(currentState.pid, 'SIGTERM');
-        console.log(`✓ Forcefully stopped TLDR daemon (PID: ${currentState.pid})`);
-      } catch (killError) {
-        console.warn(`Failed to kill TLDR daemon process: ${killError}`);
+  stop(): Effect.Effect<void, never, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    return Effect.gen(function* () {
+      const currentState = yield* readDaemonStateEffect(workspacePath);
+      if (currentState === null) {
+        return; // not running
       }
-    }
+
+      const tldrBin = join(venvPath, 'bin', 'tldr');
+      if (!existsSync(tldrBin)) {
+        yield* Effect.try({
+          try: () => { process.kill(currentState.pid, 'SIGTERM'); },
+          catch: () => undefined,
+        }).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
+
+      const spawner = yield* ChildProcessSpawner;
+      const stopped = yield* spawner.exitCode(
+        ChildProcess.make(tldrBin, ['daemon', 'stop'], { cwd: workspacePath }),
+      ).pipe(
+        Effect.map(code => Number(code) === 0),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+
+      if (!stopped) {
+        yield* Effect.try({
+          try: () => { process.kill(currentState.pid, 'SIGTERM'); },
+          catch: () => undefined,
+        }).pipe(Effect.catch(() => Effect.void));
+      }
+    });
   }
 
   /**
-   * Get daemon status
+   * Get daemon status.
    */
-  async getStatus(): Promise<TldrDaemonStatus> {
-    const state = readDaemonState(this.workspacePath);
+  getStatus(): Effect.Effect<TldrDaemonStatus, never, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    return Effect.gen(function* () {
+      const state = yield* readDaemonStateEffect(workspacePath);
 
-    if (!state) {
+      if (state === null) {
+        return { running: false, workspacePath, venvPath, healthy: false };
+      }
+
+      const svc = new TldrDaemonService(workspacePath, venvPath);
+      const healthy = yield* svc.checkHealth();
+
       return {
-        running: false,
-        workspacePath: this.workspacePath,
-        venvPath: this.venvPath,
-        healthy: false,
+        running: true,
+        pid: state.pid,
+        startedAt: state.startedAt,
+        workspacePath,
+        venvPath,
+        healthy,
       };
-    }
-
-    const healthy = await this.checkHealth();
-
-    return {
-      running: true,
-      pid: state.pid,
-      startedAt: state.startedAt,
-      workspacePath: this.workspacePath,
-      venvPath: this.venvPath,
-      healthy,
-    };
+    });
   }
 
   /**
-   * Check if daemon is healthy (can respond to status queries)
+   * Check if daemon is healthy (can respond to status queries).
    */
-  async checkHealth(): Promise<boolean> {
-    const tldrBin = join(this.venvPath, 'bin', 'tldr');
-    if (!existsSync(tldrBin)) {
-      return false;
-    }
+  checkHealth(): Effect.Effect<boolean, never, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    return Effect.gen(function* () {
+      const tldrBin = join(venvPath, 'bin', 'tldr');
+      if (!existsSync(tldrBin)) return false;
 
-    try {
-      // Try to get daemon status
-      await execAsync(`cd "${this.workspacePath}" && "${tldrBin}" daemon status`, { timeout: 3000 });
-      return true;
-    } catch {
-      return false;
-    }
+      const spawner = yield* ChildProcessSpawner;
+      return yield* spawner.exitCode(
+        ChildProcess.make(tldrBin, ['daemon', 'status'], { cwd: workspacePath }),
+      ).pipe(
+        Effect.map(code => Number(code) === 0),
+        Effect.timeout('3 seconds'),
+        Effect.catchTag('TimeoutError', () => Effect.succeed(false)),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+    });
   }
 
   /**
-   * Restart the daemon
+   * Restart the daemon.
    */
-  async restart(): Promise<void> {
-    console.log(`Restarting TLDR daemon for ${this.workspacePath}...`);
-    await this.stop();
-    await new Promise(r => setTimeout(r, 1000)); // Wait for cleanup
-    await this.start();
+  restart(): Effect.Effect<void, TldrNotInstalledError | TldrStartError, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    const svc = new TldrDaemonService(workspacePath, venvPath);
+    return Effect.gen(function* () {
+      yield* svc.stop();
+      yield* Effect.sleep('1 second');
+      yield* svc.start();
+    });
   }
 
   /**
-   * Warm the index (trigger initial analysis)
+   * Warm the index (trigger initial analysis).
    *
    * @param background - Run in background (default: true)
    */
-  async warm(background = true): Promise<void> {
-    const tldrBin = join(this.venvPath, 'bin', 'tldr');
-    if (!existsSync(tldrBin)) {
-      throw new Error(`tldr binary not found at ${tldrBin}`);
-    }
+  warm(background = true): Effect.Effect<void, TldrNotInstalledError, ChildProcessSpawner> {
+    const workspacePath = this.workspacePath;
+    const venvPath = this.venvPath;
+    return Effect.gen(function* () {
+      const tldrBin = join(venvPath, 'bin', 'tldr');
+      if (!existsSync(tldrBin)) {
+        return yield* Effect.fail(new TldrNotInstalledError({ venvPath, tldrBin }));
+      }
 
-    console.log(`Warming TLDR index for ${this.workspacePath}...`);
-
-    try {
       const cmd = background
-        ? `cd "${this.workspacePath}" && "${tldrBin}" warm . >/dev/null 2>&1 &`
-        : `cd "${this.workspacePath}" && "${tldrBin}" warm .`;
+        ? `"${tldrBin}" warm . >/dev/null 2>&1 &`
+        : `"${tldrBin}" warm .`;
 
-      await execAsync(cmd);
-      console.log(`✓ TLDR index warming initiated for ${this.workspacePath}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to warm TLDR index: ${errorMessage}`);
-    }
+      const spawner = yield* ChildProcessSpawner;
+      yield* spawner.exitCode(
+        ChildProcess.make('sh', ['-c', cmd], { cwd: workspacePath }),
+      ).pipe(
+        Effect.mapError(() => new TldrNotInstalledError({ venvPath, tldrBin })),
+        Effect.flatMap(code =>
+          !background && Number(code) !== 0
+            ? Effect.fail(new TldrNotInstalledError({ venvPath, tldrBin }))
+            : Effect.void,
+        ),
+      );
+    });
   }
 
   /**
-   * Check if daemon is running
+   * Check if daemon is running (sync pidfile check).
    */
-  isRunning(): boolean {
-    return readDaemonState(this.workspacePath) !== null;
+  isRunning(): Effect.Effect<boolean> {
+    return readDaemonStateEffect(this.workspacePath).pipe(
+      Effect.map(state => state !== null),
+    );
   }
 
-  /**
-   * Get workspace path
-   */
   getWorkspacePath(): string {
     return this.workspacePath;
   }
 
-  /**
-   * Get venv path
-   */
   getVenvPath(): string {
     return this.venvPath;
   }
 }
 
-/**
- * Global registry of TLDR daemon services by workspace path
- */
+// ============================================================================
+// Registry
+// ============================================================================
+
+/** Global registry of TLDR daemon services by workspace path */
 const daemonRegistry = new Map<string, TldrDaemonService>();
 
 /**
- * Get or create a TLDR daemon service for a workspace
- *
- * @param workspacePath - Path to the workspace
- * @param venvPath - Path to the Python venv
+ * Get or create a TLDR daemon service for a workspace.
  */
 export function getTldrDaemonService(workspacePath: string, venvPath: string): TldrDaemonService {
   const existing = daemonRegistry.get(workspacePath);
-  if (existing) {
-    return existing;
-  }
-
+  if (existing) return existing;
   const service = new TldrDaemonService(workspacePath, venvPath);
   daemonRegistry.set(workspacePath, service);
   return service;
 }
 
 /**
- * Remove a daemon service from the registry
- *
- * @param workspacePath - Path to the workspace
+ * Remove a daemon service from the registry.
  */
 export function removeTldrDaemonService(workspacePath: string): void {
   daemonRegistry.delete(workspacePath);
 }
 
 /**
- * List all registered daemon services
+ * List all registered daemon services.
  */
 export function listTldrDaemonServices(): TldrDaemonService[] {
   return Array.from(daemonRegistry.values());

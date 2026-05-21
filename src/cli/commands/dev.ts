@@ -146,13 +146,15 @@ async function startSidecars(): Promise<void> {
 
   // TLDR
   try {
+    const { Effect } = await import('effect');
+    const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
     const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
     const projectRoot = process.cwd();
     const venvPath = join(projectRoot, '.venv');
     if (existsSync(venvPath)) {
       console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
       const tldrService = getTldrDaemonService(projectRoot, venvPath);
-      await tldrService.start(true);
+      await Effect.runPromise(tldrService.start(true).pipe(Effect.provide(NodeServicesLayer)));
       console.log(chalk.green('✓ TLDR daemon started'));
     } else {
       console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));

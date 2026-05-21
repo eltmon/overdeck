@@ -5815,8 +5815,9 @@ const getWorkspaceTldrRoute = HttpRouter.add(
           });
         }
 
+        const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
         const service = getTldrDaemonService(workspacePath, venvPath);
-        const status = await service.getStatus();
+        const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
         const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
 
         return jsonResponse({

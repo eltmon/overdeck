@@ -2559,11 +2559,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   try {
     const venvPath = join(options.workspace, '.venv');
     if (existsSync(venvPath)) {
+      const { Effect } = await import('effect');
+      const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
       const { getTldrDaemonService } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonService(options.workspace, venvPath);
-      const status = await tldrService.getStatus();
+      const status = await Effect.runPromise(tldrService.getStatus().pipe(Effect.provide(NodeServicesLayer)));
       if (!status.running) {
-        await tldrService.start(true);
+        await Effect.runPromise(tldrService.start(true).pipe(Effect.provide(NodeServicesLayer)));
         console.log(`[${agentId}] Started TLDR daemon for workspace`);
       }
     }

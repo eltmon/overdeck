@@ -105,9 +105,11 @@ async function stopTldrDaemon(workspacePath: string): Promise<StepResult> {
     return stepSkipped(step, ['No .venv found']);
   }
   try {
+    const { Effect } = await import('effect');
+    const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
     const { getTldrDaemonService } = await import('../tldr-daemon.js');
     const tldrService = getTldrDaemonService(workspacePath, venvPath);
-    await tldrService.stop();
+    await Effect.runPromise(tldrService.stop().pipe(Effect.provide(NodeServicesLayer)));
     return stepOk(step, ['Stopped TLDR daemon']);
   } catch {
     return stepSkipped(step, ['TLDR daemon not running or failed to stop (non-fatal)']);

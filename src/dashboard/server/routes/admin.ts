@@ -38,16 +38,14 @@ const getAdminTldrRoute = HttpRouter.add(
       return jsonResponse({ available: false, reason: 'No .venv found in workspace' });
     }
 
-    return yield* Effect.promise(async () => {
-      const service = getTldrDaemonService(workspacePath, venvPath);
-      const status = await service.getStatus();
-      return jsonResponse({
-        available: true,
-        running: status.running,
-        pid: status.pid,
-        healthy: status.healthy,
-        workspacePath,
-      });
+    const service = getTldrDaemonService(workspacePath, venvPath);
+    const status = yield* service.getStatus();
+    return jsonResponse({
+      available: true,
+      running: status.running,
+      pid: status.pid,
+      healthy: status.healthy,
+      workspacePath,
     });
   }))
 );

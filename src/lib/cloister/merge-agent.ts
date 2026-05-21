@@ -116,11 +116,13 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
     console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
 
     // Get TLDR daemon service
+    const { Effect } = await import('effect');
+    const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
     const { getTldrDaemonService } = await import('../tldr-daemon.js');
     const tldrService = getTldrDaemonService(projectPath, venvPath);
 
     // Check if daemon is running
-    const status = await tldrService.getStatus();
+    const status = await Effect.runPromise(tldrService.getStatus().pipe(Effect.provide(NodeServicesLayer)));
     if (!status.running) {
       console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
       return;
@@ -128,7 +130,7 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
 
     // Trigger warm to reindex (this will update the index incrementally)
     console.log(`[merge-agent] Triggering TLDR index warm...`);
-    await tldrService.warm(true);  // background mode
+    await Effect.runPromise(tldrService.warm(true).pipe(Effect.provide(NodeServicesLayer)));
 
     console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
     logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);

@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgents, getAgentDir, type AgentState } from '../../lib/agents.js';
@@ -200,7 +201,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Show TLDR session metrics if a .tldr/ dir exists in the workspace
     try {
-      const tldr = getTldrMetrics(agent.workspace);
+      const tldr = Effect.runSync(getTldrMetrics(agent.workspace));
       if (tldr.interceptions > 0 || tldr.bypasses > 0) {
         const savedK = Math.round(tldr.estimatedTokensSaved / 1000);
         const bypassStr = tldr.bypasses > 0 ? ` (${tldr.bypasses} bypassed)` : '';
@@ -309,10 +310,11 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
   const mainEntries: TldrIndexEntry[] = [];
   const workspaceEntries: TldrIndexEntry[] = [];
 
+  const { layer: NodeServicesLayer } = await import('@effect/platform-node/NodeServices');
   const mainVenvPath = join(projectRoot, '.venv');
   if (existsSync(mainVenvPath)) {
     const service = getTldrDaemonService(projectRoot, mainVenvPath);
-    const status = await service.getStatus();
+    const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
     const { fileCount, edgeCount, ageMs } = readTldrIndexData(projectRoot);
     mainEntries.push({ label: `Main (${projectName})`, running: status.running, fileCount, edgeCount, ageMs });
   }
@@ -326,7 +328,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
       const wsVenvPath = join(wsPath, '.venv');
       if (existsSync(wsVenvPath)) {
         const service = getTldrDaemonService(wsPath, wsVenvPath);
-        const status = await service.getStatus();
+        const status = await Effect.runPromise(service.getStatus().pipe(Effect.provide(NodeServicesLayer)));
         const { fileCount, edgeCount, ageMs } = readTldrIndexData(wsPath);
         workspaceEntries.push({ label: ws.name, running: status.running, fileCount, edgeCount, ageMs });
       }
