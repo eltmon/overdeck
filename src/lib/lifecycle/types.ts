@@ -133,6 +133,10 @@ export function stepFailed(step: string, error: string, details?: string[]): Ste
 /**
  * Get LINEAR_API_KEY from environment or .panopticon.env.
  * Shared across lifecycle modules.
+ *
+ * Kept as a sync function (not Effect-wrapped) because external callers
+ * outside the lifecycle/ batch (src/lib/close-out.ts) consume it synchronously.
+ * Those callers will migrate in their own batches.
  */
 export function getLinearApiKey(): string | null {
   if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;

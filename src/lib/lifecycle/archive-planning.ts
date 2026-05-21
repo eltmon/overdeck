@@ -11,10 +11,11 @@
  */
 
 import { existsSync } from 'fs';
-import { mkdir, cp, rm, rename } from 'fs/promises';
+import { mkdir, cp, rename } from 'fs/promises';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import {
   ARCHIVES_DIR,
   PROJECT_DOCS_SUBDIR,
@@ -69,9 +70,23 @@ export function findWorkspacePath(projectPath: string, issueLower: string): stri
  * Move PRD from active/ to completed/ directory.
  * Uses git mv with fallback to plain copy. Idempotent — skips if already completed.
  */
-export async function movePrd(
+export function movePrd(
   ctx: LifecycleContext,
   opts: ArchiveOptions = {},
+): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => movePrdImpl(ctx, opts),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('archive-planning:move-prd', `Failed to preserve PRD: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function movePrdImpl(
+  ctx: LifecycleContext,
+  opts: ArchiveOptions,
 ): Promise<StepResult> {
   const { pushToRemote = true } = opts;
   const step = 'archive-planning:move-prd';
@@ -160,7 +175,20 @@ export async function movePrd(
  * Returns a hard failure if archiving fails — callers must NOT proceed with
  * workspace deletion after an archive failure.
  */
-export async function archiveWorkspaceArtifacts(
+export function archiveWorkspaceArtifacts(
+  ctx: LifecycleContext,
+): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => archiveWorkspaceArtifactsImpl(ctx),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('archive-planning:archive-artifacts', `Failed to archive: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function archiveWorkspaceArtifactsImpl(
   ctx: LifecycleContext,
 ): Promise<StepResult> {
   const issueLower = ctx.issueId.toLowerCase();
@@ -171,92 +199,85 @@ export async function archiveWorkspaceArtifacts(
     return stepSkipped(step, ['No workspace found to archive']);
   }
 
-  try {
-    let archiveDir = join(ARCHIVES_DIR, issueLower);
+  let archiveDir = join(ARCHIVES_DIR, issueLower);
 
-    // Rotate previous archive if it exists
-    if (existsSync(archiveDir)) {
-      let version = 1;
-      while (existsSync(`${archiveDir}.${version}`)) {
-        version++;
-      }
-      const rotatedDir = `${archiveDir}.${version}`;
-      // Rename is O(1) metadata vs. copy+delete which is O(archive size). Both
-      // paths live under ARCHIVES_DIR so they're on the same filesystem.
-      await rename(archiveDir, rotatedDir);
+  // Rotate previous archive if it exists
+  if (existsSync(archiveDir)) {
+    let version = 1;
+    while (existsSync(`${archiveDir}.${version}`)) {
+      version++;
     }
-
-    await mkdir(archiveDir, { recursive: true });
-    const details: string[] = [];
-
-    const panDir = join(workspacePath, PAN_DIRNAME)
-
-    const feedbackDir = join(panDir, PAN_FEEDBACK_DIRNAME)
-    if (existsSync(feedbackDir)) {
-      await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true })
-      details.push('Archived feedback/')
-    }
-
-    const continueFile = join(panDir, PAN_CONTINUE_FILENAME)
-    if (existsSync(continueFile)) {
-      await cp(continueFile, join(archiveDir, PAN_CONTINUE_FILENAME))
-      details.push(`Archived ${PAN_CONTINUE_FILENAME}`)
-    }
-
-    const specFile = join(panDir, PAN_SPEC_FILENAME)
-    if (existsSync(specFile)) {
-      await cp(specFile, join(archiveDir, PAN_SPEC_FILENAME))
-      details.push(`Archived ${PAN_SPEC_FILENAME}`)
-    }
-
-    const sessionsFile = join(panDir, PAN_SESSIONS_FILENAME)
-    if (existsSync(sessionsFile)) {
-      await cp(sessionsFile, join(archiveDir, PAN_SESSIONS_FILENAME))
-      details.push(`Archived ${PAN_SESSIONS_FILENAME}`)
-    }
-
-    const contextFile = join(panDir, PAN_CONTEXT_FILENAME)
-    if (existsSync(contextFile)) {
-      await cp(contextFile, join(archiveDir, PAN_CONTEXT_FILENAME))
-      details.push(`Archived ${PAN_CONTEXT_FILENAME}`)
-    }
-
-    const prdFile = join(panDir, 'prd.md')
-    if (existsSync(prdFile)) {
-      await cp(prdFile, join(archiveDir, 'prd.md'))
-      details.push('Archived workspace prd.md')
-    }
-
-    const beadsDir = join(workspacePath, '.beads')
-    if (existsSync(beadsDir)) {
-      await cp(beadsDir, join(archiveDir, '.beads'), { recursive: true })
-      details.push('Archived .beads/')
-    }
-
-    details.push(`Archived to ${archiveDir}`);
-    return stepOk(step, details);
-  } catch (err) {
-    return stepFailed(step, `Failed to archive: ${(err as Error).message}`);
+    const rotatedDir = `${archiveDir}.${version}`;
+    // Rename is O(1) metadata vs. copy+delete which is O(archive size). Both
+    // paths live under ARCHIVES_DIR so they're on the same filesystem.
+    await rename(archiveDir, rotatedDir);
   }
+
+  await mkdir(archiveDir, { recursive: true });
+  const details: string[] = [];
+
+  const panDir = join(workspacePath, PAN_DIRNAME)
+
+  const feedbackDir = join(panDir, PAN_FEEDBACK_DIRNAME)
+  if (existsSync(feedbackDir)) {
+    await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true })
+    details.push('Archived feedback/')
+  }
+
+  const continueFile = join(panDir, PAN_CONTINUE_FILENAME)
+  if (existsSync(continueFile)) {
+    await cp(continueFile, join(archiveDir, PAN_CONTINUE_FILENAME))
+    details.push(`Archived ${PAN_CONTINUE_FILENAME}`)
+  }
+
+  const specFile = join(panDir, PAN_SPEC_FILENAME)
+  if (existsSync(specFile)) {
+    await cp(specFile, join(archiveDir, PAN_SPEC_FILENAME))
+    details.push(`Archived ${PAN_SPEC_FILENAME}`)
+  }
+
+  const sessionsFile = join(panDir, PAN_SESSIONS_FILENAME)
+  if (existsSync(sessionsFile)) {
+    await cp(sessionsFile, join(archiveDir, PAN_SESSIONS_FILENAME))
+    details.push(`Archived ${PAN_SESSIONS_FILENAME}`)
+  }
+
+  const contextFile = join(panDir, PAN_CONTEXT_FILENAME)
+  if (existsSync(contextFile)) {
+    await cp(contextFile, join(archiveDir, PAN_CONTEXT_FILENAME))
+    details.push(`Archived ${PAN_CONTEXT_FILENAME}`)
+  }
+
+  const prdFile = join(panDir, 'prd.md')
+  if (existsSync(prdFile)) {
+    await cp(prdFile, join(archiveDir, 'prd.md'))
+    details.push('Archived workspace prd.md')
+  }
+
+  const beadsDir = join(workspacePath, '.beads')
+  if (existsSync(beadsDir)) {
+    await cp(beadsDir, join(archiveDir, '.beads'), { recursive: true })
+    details.push('Archived .beads/')
+  }
+
+  details.push(`Archived to ${archiveDir}`);
+  return stepOk(step, details);
 }
 
 /**
  * Full archive-planning operation: move PRD + archive workspace artifacts.
  * Archive failure is a hard fail — do not proceed with workspace deletion.
  */
-export async function archivePlanning(
+export function archivePlanning(
   ctx: LifecycleContext,
   opts: ArchiveOptions = {},
-): Promise<StepResult[]> {
-  const results: StepResult[] = [];
-
-  // Step 1: Move PRD
-  const prdResult = await movePrd(ctx, opts);
-  results.push(prdResult);
-
-  // Step 2: Archive workspace artifacts
-  const archiveResult = await archiveWorkspaceArtifacts(ctx);
-  results.push(archiveResult);
-
-  return results;
+): Effect.Effect<StepResult[]> {
+  return Effect.gen(function* () {
+    const results: StepResult[] = [];
+    const prdResult = yield* movePrd(ctx, opts);
+    results.push(prdResult);
+    const archiveResult = yield* archiveWorkspaceArtifacts(ctx);
+    results.push(archiveResult);
+    return results;
+  });
 }
