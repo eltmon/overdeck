@@ -34,6 +34,28 @@ function verbBadgeForAgent(agent: Agent): VerbBadgeProps {
   return { variant: 'WORK RUNNING', className: 'text-[9px]' };
 }
 
+export type StreamLineKind = 'verb-line' | 'ok' | 'warn' | 'err' | 'neutral';
+
+const STREAM_LINE_COLOR_CLASS: Record<StreamLineKind, string> = {
+  'verb-line': 'text-signal-review-foreground',
+  ok: 'text-success-foreground',
+  warn: 'text-warning-foreground',
+  err: 'text-destructive-foreground',
+  neutral: 'text-foreground',
+};
+
+/**
+ * Classify a stream line for color routing per PRD §4.7 stream excerpt rules.
+ * Priority: err > warn > ok > verb-line > neutral.
+ */
+export function classifyStreamLine(line: string): StreamLineKind {
+  if (/^[✗❌]|\bERR\b|\bERROR\b|\bFAIL\b/i.test(line)) return 'err';
+  if (/^!|\bWARN\b|\bWARNING\b/i.test(line)) return 'warn';
+  if (/^✓|\bOK\b|\bPASS\b|\bdone\b/i.test(line)) return 'ok';
+  if (/^[→▸✱]/.test(line)) return 'verb-line';
+  return 'neutral';
+}
+
 function formatSpend(cost: number | undefined) {
   if (cost === undefined) return 'loading';
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -104,8 +126,10 @@ export default function DrawerActiveAgent() {
         <div className="shrink-0 text-right font-mono text-[10px] leading-none text-muted-foreground">{meta}</div>
       </div>
 
-      <div data-testid="drawer-active-agent-stream" className="mt-[12px] max-h-[180px] overflow-auto rounded-[10px] border border-border bg-[rgb(0_0_0_/_32%)] px-[12px] py-[10px] font-mono text-[11px] leading-[16px] text-muted-foreground">
-        {streamLines.length > 0 ? streamLines.map((line, index) => <div key={`${line}-${index}`} className="truncate">{line}</div>) : <div className="italic">No recent stream output</div>}
+      <div data-testid="drawer-active-agent-stream" className="mt-[12px] max-h-[180px] overflow-auto rounded-[10px] border border-border bg-[rgb(0_0_0_/_32%)] px-[12px] py-[10px] font-mono text-[11px] leading-[16px]">
+        {streamLines.length > 0 ? streamLines.map((line, index) => (
+          <div key={`${line}-${index}`} className={`truncate ${STREAM_LINE_COLOR_CLASS[classifyStreamLine(line)]}`}>{line}</div>
+        )) : <div className="italic text-muted-foreground">No recent stream output</div>}
       </div>
 
       <form className="mt-[12px] flex gap-[8px]" onSubmit={onSubmit}>
