@@ -2090,7 +2090,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
+  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
   if (health.healthy) return;
 
   const normalizedIssue = issueId.toUpperCase();

@@ -417,7 +417,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Kill existing planning session if any
     await killSessionAsync(sessionName).catch(() => {});
 
-    const workspacePanPaths = ensureWorkspacePanDir(workspacePath);
+    const workspacePanPaths = await Effect.runPromise(ensureWorkspacePanDir(workspacePath));
     await Promise.all(
       ['transcripts', 'discussions', 'notes'].map((subdir) =>
         mkdir(join(workspacePanPaths.panDir, subdir), { recursive: true }),

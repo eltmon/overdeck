@@ -35,7 +35,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   let pendingFeedbackStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
-    const planningContent = readPlanningContext(ctx.workspacePath);
+    const planningContent = await readPlanningContext(ctx.workspacePath);
     const featureContext = await readFeatureContext(ctx.workspacePath, ctx.issueId);
 
     const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
@@ -56,7 +56,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
-    pendingFeedbackStr = readPendingFeedback(ctx.workspacePath);
+    pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
   }
 
   return Effect.runSync(renderPrompt({
@@ -88,7 +88,7 @@ async function readWorkspacePlanAsync(workspacePath: string): Promise<ReturnType
     return null;
   }
   const doc = JSON.parse(raw) as NonNullable<ReturnType<typeof readWorkspacePlan>>;
-  const continueState = await readWorkspaceContinueAsync(workspacePath);
+  const continueState = await Effect.runPromise(readWorkspaceContinueAsync(workspacePath));
   if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
     return applyStatusOverrides(doc, continueState.statusOverrides);
   }
@@ -132,14 +132,14 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
  * Read pending specialist feedback.
  * Primary source: workspace `.pan/continue.json` feedback[] plus `.pan/feedback/`.
  */
-function readPendingFeedback(workspacePath: string): string {
+async function readPendingFeedback(workspacePath: string): Promise<string> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
   const projectRoot = join(workspacePath, '..', '..');
 
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {
-      const cont = readWorkspaceContinue(workspacePath)
+      const cont = await Effect.runPromise(readWorkspaceContinue(workspacePath))
       if (cont?.feedback?.length) {
         continueEntries.push(...cont.feedback)
       }
@@ -150,7 +150,8 @@ function readPendingFeedback(workspacePath: string): string {
   const seqsInContinue = new Set(continueEntries.map(e => e.seq));
   const legacyFilePaths: string[] = [];
   try {
-    for (const file of readFeedback(workspacePath)) {
+    const feedbackFiles = await Effect.runPromise(readFeedback(workspacePath));
+    for (const file of feedbackFiles) {
       const match = file.filename.match(/^(\d{3})-/);
       const seq = match ? parseInt(match[1], 10) : -1;
       if (!seqsInContinue.has(seq)) {
@@ -247,8 +248,8 @@ export async function getTrackerContext(
 
       // Fetch issue and comments in parallel
       const [issue, allComments] = await Promise.all([
-        tracker.getIssue(issueId),
-        tracker.getComments(issueId).catch((err: unknown) => {
+        Effect.runPromise(tracker.getIssue(issueId)),
+        Effect.runPromise(tracker.getComments(issueId)).catch((err: unknown) => {
           // GitLab throws NotImplementedError; treat as no comments
           if (err instanceof NotImplementedError) return [];
           throw err;
@@ -353,12 +354,12 @@ export async function getTrackerContext(
 /**
  * Read planning artifacts for an issue from workspace `.pan/continue.json`.
  */
-export function readPlanningContext(workspacePath: string): string | null {
+export async function readPlanningContext(workspacePath: string): Promise<string | null> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
   if (!issueId) return null;
 
   try {
-    const workspaceContinue = readWorkspaceContinue(workspacePath)
+    const workspaceContinue = await Effect.runPromise(readWorkspaceContinue(workspacePath))
     if (workspaceContinue) {
       return JSON.stringify(workspaceContinue, null, 2)
     }
@@ -379,7 +380,7 @@ function inferIssueIdFromWorkspace(workspacePath: string): string | null {
  * Falls back to a deterministic tracker-based parent workspace lookup.
  */
 export async function readFeatureContext(workspacePath: string, issueId: string): Promise<string | null> {
-  const panContext = readWorkspaceContext(workspacePath)
+  const panContext = await Effect.runPromise(readWorkspaceContext(workspacePath))
   if (panContext) {
     return panContext
   }
@@ -396,11 +397,11 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
     for (const trackerType of trackerTypes) {
       try {
         const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-        const issue = await tracker.getIssue(issueId);
+        const issue = await Effect.runPromise(tracker.getIssue(issueId));
         if (issue.parentRef) {
           const projectRoot = dirname(dirname(workspacePath));
           const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
-          const parentPanContext = readWorkspaceContext(parentWorkspace)
+          const parentPanContext = await Effect.runPromise(readWorkspaceContext(parentWorkspace))
           if (parentPanContext) {
             return parentPanContext
           }
@@ -423,7 +424,7 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
  * context so the story agent has deterministic O(1) access.
  */
 export async function writeStoryFeatureContext(workspacePath: string, issueId: string): Promise<void> {
-  if (readWorkspaceContext(workspacePath)) return;
+  if (await Effect.runPromise(readWorkspaceContext(workspacePath))) return;
 
   try {
     const config = loadConfig();
@@ -436,13 +437,13 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
     for (const trackerType of trackerTypes) {
       try {
         const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-        const issue = await tracker.getIssue(issueId);
+        const issue = await Effect.runPromise(tracker.getIssue(issueId));
         if (!issue.parentRef) return;
 
         // Load parent feature title for richer context
         let parentTitle = issue.parentRef;
         try {
-          const parentIssue = await tracker.getIssue(issue.parentRef);
+          const parentIssue = await Effect.runPromise(tracker.getIssue(issue.parentRef));
           if (parentIssue.title) parentTitle = parentIssue.title;
         } catch {
           // fallback to ref
@@ -491,13 +492,13 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
           }
         }
 
-        const parentPanContext = readWorkspaceContext(parentWorkspace)
+        const parentPanContext = await Effect.runPromise(readWorkspaceContext(parentWorkspace))
         if (parentPanContext && !contextContent) {
           contextContent = parentPanContext
         }
 
         if (contextContent) {
-          writeWorkspaceContext(workspacePath, contextContent)
+          await Effect.runPromise(writeWorkspaceContext(workspacePath, contextContent))
         }
 
         return;
