@@ -271,19 +271,17 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     const normalizedIssueId = issueId.toUpperCase();
     console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
 
-    // Resolve any pending specialist completion Promises (PAN-632: event-driven completion).
+    // Resolve any pending specialist completion waiters (PAN-632: event-driven completion).
     // This replaces polling loops in spawnMergeAgentForBranches / syncMainIntoWorkspace.
     if (specialist === 'merge') {
-      yield* Effect.promise(async () => {
-        const { reportSpecialistCompletion } = await import('../../../lib/cloister/specialist-completion.js');
-        const resolved = reportSpecialistCompletion(normalizedIssueId, {
-          status: status as 'passed' | 'failed',
-          notes,
-        });
-        if (resolved) {
-          console.log(`[specialists/done] Resolved pending completion waiter for ${normalizedIssueId}`);
-        }
+      const { reportSpecialistCompletion } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-completion.js'));
+      const resolved = yield* reportSpecialistCompletion(normalizedIssueId, {
+        status: status as 'passed' | 'failed',
+        notes,
       });
+      if (resolved) {
+        console.log(`[specialists/done] Resolved pending completion waiter for ${normalizedIssueId}`);
+      }
     }
 
     // GUARD: If this issue is in a server-managed merge (polyrepo), the server handles
