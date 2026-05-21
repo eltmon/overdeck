@@ -5,6 +5,9 @@
  * (Linear, GitHub Issues, GitLab Issues, etc.)
  */
 
+import { Data, Effect } from 'effect';
+import type { TrackerError } from '../errors.js';
+
 // Supported tracker types
 export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 
@@ -132,77 +135,95 @@ export interface IssueTracker {
   /**
    * List issues matching filters
    */
-  listIssues(filters?: IssueFilters): Promise<Issue[]>;
+  listIssues(
+    filters?: IssueFilters,
+  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError>;
 
   /**
    * Get a single issue by ID or ref
    * @param id - Issue ID or human-readable ref (e.g., "MIN-630", "#42")
    */
-  getIssue(id: string): Promise<Issue>;
+  getIssue(
+    id: string,
+  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError>;
 
   /**
    * Update an existing issue
    */
-  updateIssue(id: string, update: IssueUpdate): Promise<Issue>;
+  updateIssue(
+    id: string,
+    update: IssueUpdate,
+  ): Effect.Effect<Issue, IssueNotFoundError | TrackerError | TrackerAuthError>;
 
   /**
    * Create a new issue
    */
-  createIssue(issue: NewIssue): Promise<Issue>;
+  createIssue(
+    issue: NewIssue,
+  ): Effect.Effect<Issue, TrackerError | TrackerAuthError>;
 
   /**
    * Get comments on an issue
    */
-  getComments(issueId: string): Promise<Comment[]>;
+  getComments(
+    issueId: string,
+  ): Effect.Effect<Comment[], TrackerError | TrackerAuthError>;
 
   /**
    * Add a comment to an issue
    */
-  addComment(issueId: string, body: string): Promise<Comment>;
+  addComment(
+    issueId: string,
+    body: string,
+  ): Effect.Effect<Comment, TrackerError | TrackerAuthError>;
 
   /**
    * Transition issue to a new state
    */
-  transitionIssue(id: string, state: IssueState): Promise<void>;
+  transitionIssue(
+    id: string,
+    state: IssueState,
+  ): Effect.Effect<
+    void,
+    IssueNotFoundError | TrackerError | TrackerAuthError | NotImplementedError
+  >;
 
   /**
    * Link a PR/MR to an issue
    */
-  linkPR(issueId: string, prUrl: string): Promise<void>;
+  linkPR(
+    issueId: string,
+    prUrl: string,
+  ): Effect.Effect<void, TrackerError | TrackerAuthError | NotImplementedError>;
 
   /**
    * Get child issues for a parent issue (hierarchy support).
    * Returns empty array for trackers that don't support hierarchy.
    */
-  getChildIssues(parentId: string): Promise<Issue[]>;
+  getChildIssues(
+    parentId: string,
+  ): Effect.Effect<Issue[], TrackerError | TrackerAuthError>;
 }
 
 /**
- * Error thrown when a tracker feature is not implemented
+ * Error surfaced when a tracker feature is not implemented by a given adapter.
  */
-export class NotImplementedError extends Error {
-  constructor(feature: string) {
-    super(`Not implemented: ${feature}`);
-    this.name = 'NotImplementedError';
-  }
-}
+export class NotImplementedError extends Data.TaggedError('NotImplementedError')<{
+  readonly feature: string;
+}> {}
 
 /**
- * Error thrown when an issue is not found
+ * Error surfaced when a requested issue does not exist in the tracker.
  */
-export class IssueNotFoundError extends Error {
-  constructor(id: string, tracker: TrackerType) {
-    super(`Issue not found: ${id} (tracker: ${tracker})`);
-    this.name = 'IssueNotFoundError';
-  }
-}
+export class IssueNotFoundError extends Data.TaggedError('IssueNotFoundError')<{
+  readonly id: string;
+  readonly tracker: TrackerType;
+}> {}
 
 /**
- * Error thrown when tracker authentication fails
+ * Error surfaced when tracker authentication fails (missing or invalid credentials).
  */
-export class TrackerAuthError extends Error {
-  constructor(tracker: TrackerType, message: string) {
-    super(`Authentication failed for ${tracker}: ${message}`);
-    this.name = 'TrackerAuthError';
-  }
-}
+export class TrackerAuthError extends Data.TaggedError('TrackerAuthError')<{
+  readonly tracker: TrackerType;
+  readonly message: string;
+}> {}
