@@ -4,17 +4,17 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-19T05:43:42.243Z"
+    "updated": "2026-05-21T01:13:42.328Z"
   },
   "plan": {
     "id": "pan-1194",
     "title": "Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "status": "proposed",
+    "status": "completed",
     "uid": "8452620e-f664-41c0-b8b4-4fb39fe2205f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 121,
+    "sequence": 122,
     "created": "2026-05-18T22:40:00.000Z",
-    "updated": "2026-05-19T05:43:42.243Z",
+    "updated": "2026-05-21T01:13:42.328Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
@@ -682,5 +682,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
