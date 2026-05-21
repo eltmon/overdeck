@@ -276,7 +276,7 @@ describe('AgentSpawner Effect service', () => {
 
   describe('deepWipe', () => {
     it('calls deepWipe with confirmed:true', async () => {
-      mockDeepWipe.mockResolvedValue({ success: true, steps: [] });
+      mockDeepWipe.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
@@ -293,7 +293,7 @@ describe('AgentSpawner Effect service', () => {
     });
 
     it('respects custom deleteWorkspace/deleteBranches/resetIssue options', async () => {
-      mockDeepWipe.mockResolvedValue({ success: true, steps: [] });
+      mockDeepWipe.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
@@ -315,7 +315,7 @@ describe('AgentSpawner Effect service', () => {
     });
 
     it('wraps deepWipe errors as AgentStartError', async () => {
-      mockDeepWipe.mockRejectedValue(new Error('branch deletion failed'));
+      mockDeepWipe.mockReturnValue(Effect.fail(new Error('branch deletion failed')));
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 

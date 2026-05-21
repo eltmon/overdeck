@@ -5,28 +5,33 @@ import {
   TrackerAuthError,
 } from '../../../src/lib/tracker/interface.js';
 
+// PAN-1249: tracker errors migrated to Data.TaggedError. Constructors take
+// structured objects instead of positional strings, and surface tag/payload
+// via `_tag` + the typed fields rather than a templated `message`.
 describe('Tracker Errors', () => {
   describe('NotImplementedError', () => {
-    it('should create error with feature message', () => {
-      const error = new NotImplementedError('GitLab tracker');
-      expect(error.message).toBe('Not implemented: GitLab tracker');
-      expect(error.name).toBe('NotImplementedError');
+    it('should create error with feature payload', () => {
+      const error = new NotImplementedError({ feature: 'GitLab tracker' });
+      expect(error._tag).toBe('NotImplementedError');
+      expect(error.feature).toBe('GitLab tracker');
     });
   });
 
   describe('IssueNotFoundError', () => {
     it('should create error with issue id and tracker', () => {
-      const error = new IssueNotFoundError('MIN-123', 'linear');
-      expect(error.message).toBe('Issue not found: MIN-123 (tracker: linear)');
-      expect(error.name).toBe('IssueNotFoundError');
+      const error = new IssueNotFoundError({ id: 'MIN-123', tracker: 'linear' });
+      expect(error._tag).toBe('IssueNotFoundError');
+      expect(error.id).toBe('MIN-123');
+      expect(error.tracker).toBe('linear');
     });
   });
 
   describe('TrackerAuthError', () => {
     it('should create error with tracker and message', () => {
-      const error = new TrackerAuthError('github', 'Token expired');
-      expect(error.message).toBe('Authentication failed for github: Token expired');
-      expect(error.name).toBe('TrackerAuthError');
+      const error = new TrackerAuthError({ tracker: 'github', message: 'Token expired' });
+      expect(error._tag).toBe('TrackerAuthError');
+      expect(error.tracker).toBe('github');
+      expect(error.message).toBe('Token expired');
     });
   });
 });

@@ -16,7 +16,11 @@ vi.mock('util', async (importOriginal) => {
   };
 });
 
-import { compactBeads } from '../../../../src/lib/lifecycle/compact-beads.js';
+import { Effect } from 'effect';
+import { compactBeads as compactBeadsEffect } from '../../../../src/lib/lifecycle/compact-beads.js';
+
+const compactBeads = (...args: Parameters<typeof compactBeadsEffect>) =>
+  Effect.runPromise(compactBeadsEffect(...args));
 
 describe('compact-beads', () => {
   beforeEach(() => {

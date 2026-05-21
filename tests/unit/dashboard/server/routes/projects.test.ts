@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -198,9 +199,9 @@ describe('fetchProjectSessionTree', () => {
       { name: 'feature-pan-123', isDirectory: () => true },
     ]);
 
-    // Mock findSpecByIssue to return a spec entry with a path
+    // Mock findSpecByIssue to return a spec entry — Effect-returning post-PAN-1249.
     const specPath = '/tmp/panopticon-cli/.pan/specs/2026-01-01-PAN-123-implement-command-deck.vbrief.json';
-    mockFindSpecByIssue.mockReturnValue({ path: specPath });
+    mockFindSpecByIssue.mockReturnValue(Effect.succeed({ path: specPath }));
 
     // Mock readFile to return spec content when the spec path is read (by readOptional)
     (readFile as any).mockImplementation((p: string) => {

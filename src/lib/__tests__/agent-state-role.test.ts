@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
 
 let tempHome: string;
@@ -233,7 +234,7 @@ describe('AgentState role persistence', () => {
     const createSessionAsync = vi.fn();
     const emitActivityEntry = vi.fn();
     vi.doMock('../workspace/stack-health.js', () => ({
-      getWorkspaceStackHealth: vi.fn(async () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
         healthy: false,
         reasons: ['panopticon-feature-pan-1140-init init exited non-zero (1)'],
         lastObserved: '2026-05-16T00:00:00.000Z',
@@ -278,7 +279,7 @@ describe('AgentState role persistence', () => {
       isClaudeCodeChannelsEnabled: () => false,
     }));
     vi.doMock('../workspace/stack-health.js', () => ({
-      getWorkspaceStackHealth: vi.fn(async () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
         healthy: false,
         reasons: ['panopticon-feature-pan-1140-server stuck Created for 180s'],
         lastObserved: '2026-05-16T00:00:00.000Z',
@@ -325,7 +326,7 @@ describe('AgentState role persistence', () => {
 
   it('does not block when workspace stack health is healthy', async () => {
     vi.doMock('../workspace/stack-health.js', () => ({
-      getWorkspaceStackHealth: vi.fn(async () => ({ healthy: true, reasons: [], lastObserved: '2026-05-16T00:00:00.000Z' })),
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-05-16T00:00:00.000Z' })),
     }));
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 

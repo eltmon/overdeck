@@ -8,7 +8,7 @@
  */
 
 import { exec, spawn } from 'child_process';
-import { basename, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { promisify } from 'util';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { Effect } from 'effect';
@@ -448,6 +448,7 @@ export function promoteVBriefToProposed(
   let destContinue: string | null = null;
   if (existsSync(sourceContinue)) {
     destContinue = getContinueFilePath(projectRoot, upperIssueId);
+    mkdirSync(dirname(destContinue), { recursive: true });
     copyFileSync(sourceContinue, destContinue);
   }
 

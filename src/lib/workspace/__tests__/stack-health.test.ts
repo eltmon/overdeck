@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
 
 import {
   recordDockerContainerLifecycleSnapshot,
@@ -11,12 +12,18 @@ import {
 import type { ProjectConfig } from '../../projects.js';
 import {
   evaluateWorkspaceStackHealth,
-  getWorkspaceStackHealth,
+  getWorkspaceStackHealth as getWorkspaceStackHealthEffect,
   inferIssueIdFromStackContainerName,
   recordWorkspaceStackHealthTransition,
   resetWorkspaceStackHealthTransitionsForTests,
   type DockerContainerLifecycle,
 } from '../stack-health.js';
+
+// Wrap the Effect-returning getWorkspaceStackHealth for legacy await-style tests.
+const getWorkspaceStackHealth: typeof getWorkspaceStackHealthEffect extends (...a: infer A) => infer R
+  ? R extends Effect.Effect<infer V, infer E> ? (...a: A) => Promise<V> : never : never =
+  ((...args: Parameters<typeof getWorkspaceStackHealthEffect>) =>
+    Effect.runPromise(getWorkspaceStackHealthEffect(...args))) as any;
 
 const dockerProject: ProjectConfig = {
   name: 'Panopticon',

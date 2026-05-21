@@ -58,7 +58,22 @@ vi.mock('@linear/sdk', () => ({
   }; }),
 }));
 
-import { approve, closeOut, deepWipe, close, resetToTodo, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
+import { Effect } from 'effect';
+import {
+  approve as approveEffect,
+  closeOut as closeOutEffect,
+  deepWipe as deepWipeEffect,
+  close as closeEffect,
+  resetToTodo as resetToTodoEffect,
+  __testInternals,
+} from '../../../../src/lib/lifecycle/workflows.js';
+
+// Workflows now return Effects; wrap to keep legacy await-style tests working.
+const approve = (...args: Parameters<typeof approveEffect>) => Effect.runPromise(approveEffect(...args));
+const closeOut = (...args: Parameters<typeof closeOutEffect>) => Effect.runPromise(closeOutEffect(...args));
+const deepWipe = (...args: Parameters<typeof deepWipeEffect>) => Effect.runPromise(deepWipeEffect(...args));
+const close = (...args: Parameters<typeof closeEffect>) => Effect.runPromise(closeEffect(...args));
+const resetToTodo = (...args: Parameters<typeof resetToTodoEffect>) => Effect.runPromise(resetToTodoEffect(...args));
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
 
 describe('workflows', () => {
@@ -159,7 +174,7 @@ describe('workflows', () => {
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const verifyStep = await __testInternals.verifyBranchMerged(ctx);
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
 
       expect(verifyStep.step).toBe('close-out:verify-merged');
       expect(verifyStep.success).toBe(true);

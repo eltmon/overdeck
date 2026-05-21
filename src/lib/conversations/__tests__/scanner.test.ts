@@ -239,8 +239,10 @@ describe('scanner', () => {
     writeFileSync(target, SESSION_JSONL, 'utf8');
     writeFileSync(outside, SESSION_JSONL, 'utf8');
 
-    const parser = vi.fn(async (filePath: string) => {
-      if (filePath === outside) throw new Error('outside file should not be parsed');
+    // Production wraps opts.parseJsonl via Effect.runPromise, so the mock must
+    // return an Effect, not a Promise (PAN-1249 jsonl-async migration).
+    const parser = vi.fn((filePath: string) => {
+      if (filePath === outside) return Effect.fail(new Error('outside file should not be parsed') as any);
       return parseSessionJsonl(filePath);
     });
 
@@ -248,7 +250,7 @@ describe('scanner', () => {
       mode: 'targeted',
       dirs: ['/home/user/Projects/myapp'],
       watchDirs: [],
-      parseJsonl: parser,
+      parseJsonl: parser as any,
     });
 
     expect(result.inserted + result.updated).toBe(1);

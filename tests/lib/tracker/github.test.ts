@@ -1,6 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import { GitHubTracker } from '../../../src/lib/tracker/github.js';
 import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/interface.js';
+
+/**
+ * Wraps a tracker so each Effect-returning method becomes Promise-returning
+ * (auto-runs the Effect, unwraps FiberFailure cause for `.rejects.toThrow`).
+ * Keeps legacy `await tracker.X(...)` test shape working post-migration.
+ */
+function isEffect(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  for (const key of Object.getOwnPropertyNames(v)) {
+    if (key.startsWith('~effect/Effect/')) return true;
+  }
+  return false;
+}
+function wrap<T extends object>(t: T): any {
+  return new Proxy(t, {
+    get(target, prop) {
+      const value = (target as any)[prop];
+      if (typeof value !== 'function') return value;
+      return (...args: any[]) => {
+        const result = value.apply(target, args);
+        if (isEffect(result)) {
+          return Effect.runPromise(result as any).catch((err) => {
+            if (err && typeof err === 'object' && 'cause' in err && err.cause) {
+              const cause = (err as any).cause;
+              if (cause && typeof cause === 'object' && '_tag' in cause) throw cause;
+            }
+            throw err;
+          });
+        }
+        return result;
+      };
+    },
+  });
+}
 
 // Mock Octokit
 vi.mock('@octokit/rest', () => ({
@@ -36,7 +71,7 @@ describe('GitHubTracker', () => {
     });
 
     it('should create tracker with valid parameters', () => {
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       expect(tracker.name).toBe('github');
     });
   });
@@ -76,7 +111,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listForRepo as any).mockResolvedValue({ data: mockIssues });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issues = await tracker.listIssues();
@@ -101,7 +136,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listForRepo as any).mockResolvedValue({ data: [] });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.listIssues({
@@ -127,7 +162,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listForRepo as any).mockResolvedValue({ data: [] });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.listIssues({ includeClosed: true });
@@ -158,7 +193,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listForRepo as any).mockResolvedValue({ data: mockIssues });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issues = await tracker.listIssues();
@@ -187,7 +222,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issue = await tracker.getIssue('99');
@@ -219,7 +254,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issue = await tracker.getIssue('#42');
@@ -232,7 +267,7 @@ describe('GitHubTracker', () => {
     });
 
     it('should throw IssueNotFoundError for invalid ref', async () => {
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
 
       await expect(tracker.getIssue('invalid')).rejects.toThrow(IssueNotFoundError);
     });
@@ -245,7 +280,7 @@ describe('GitHubTracker', () => {
       (error as any).status = 404;
       (mockOctokit.issues.get as any).mockRejectedValue(error);
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await expect(tracker.getIssue('999')).rejects.toThrow(IssueNotFoundError);
@@ -273,7 +308,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issue = await tracker.updateIssue('#42', {
@@ -311,7 +346,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.updateIssue('42', { state: 'closed' });
@@ -341,7 +376,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.updateIssue('42', { labels: ['bug', 'priority'] });
@@ -371,7 +406,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.updateIssue('42', { assignee: 'newuser' });
@@ -401,7 +436,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.updateIssue('42', { assignee: '' });
@@ -432,7 +467,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.create as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issue = await tracker.createIssue({
@@ -472,7 +507,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.create as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const issue = await tracker.createIssue({ title: 'Minimal Issue' });
@@ -513,7 +548,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listComments as any).mockResolvedValue({ data: mockComments });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const comments = await tracker.getComments('42');
@@ -547,7 +582,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.listComments as any).mockResolvedValue({ data: mockComments });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const comments = await tracker.getComments('#42');
@@ -571,7 +606,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.createComment as any).mockResolvedValue({ data: mockComment });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       const comment = await tracker.addComment('42', 'New comment');
@@ -608,7 +643,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.transitionIssue('42', 'closed');
@@ -638,7 +673,7 @@ describe('GitHubTracker', () => {
       (mockOctokit.issues.update as any).mockResolvedValue({});
       (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.transitionIssue('42', 'open');
@@ -664,7 +699,7 @@ describe('GitHubTracker', () => {
 
       (mockOctokit.issues.createComment as any).mockResolvedValue({ data: mockComment });
 
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       (tracker as any).octokit = mockOctokit;
 
       await tracker.linkPR('42', 'https://github.com/owner/repo/pull/50');
@@ -704,7 +739,7 @@ describe('GitHubTracker', () => {
 
         (mockOctokit.issues.get as any).mockResolvedValue({ data: mockIssue });
 
-        const tracker = new GitHubTracker('token', 'owner', 'repo');
+        const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
         (tracker as any).octokit = mockOctokit;
 
         const issue = await tracker.getIssue('1');
@@ -715,7 +750,7 @@ describe('GitHubTracker', () => {
 
   describe('getChildIssues', () => {
     it('returns empty array (GitHub does not support parent-child hierarchy)', async () => {
-      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
       const result = await tracker.getChildIssues('some-parent-id');
       expect(result).toEqual([]);
     });

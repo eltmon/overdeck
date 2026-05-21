@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -19,10 +20,11 @@ vi.mock('../../tracker/factory.js', () => ({
 }));
 
 function mockTrackerResponse(storyRef: string, parentRef: string, parentTitle?: string) {
+  // Tracker.getIssue is Effect-returning post-PAN-1249.
   mockGetIssue.mockImplementation((id: string) => {
-    if (id.toUpperCase() === storyRef.toUpperCase()) return Promise.resolve({ parentRef });
-    if (id.toUpperCase() === parentRef.toUpperCase()) return Promise.resolve({ title: parentTitle || parentRef });
-    return Promise.resolve({});
+    if (id.toUpperCase() === storyRef.toUpperCase()) return Effect.succeed({ parentRef });
+    if (id.toUpperCase() === parentRef.toUpperCase()) return Effect.succeed({ title: parentTitle || parentRef });
+    return Effect.succeed({});
   });
 }
 
@@ -71,7 +73,7 @@ describe('readFeatureContext', () => {
   });
 
   it('returns null when no local file and no parent ref', async () => {
-    mockGetIssue.mockResolvedValue({ parentRef: undefined });
+    mockGetIssue.mockReturnValue(Effect.succeed({ parentRef: undefined }));
     const result = await readFeatureContext(workspacePath, 'US-123');
     expect(result).toBeNull();
   });
@@ -155,7 +157,7 @@ describe('writeStoryFeatureContext', () => {
   });
 
   it('no-ops when issue has no parentRef', async () => {
-    mockGetIssue.mockResolvedValue({ parentRef: undefined });
+    mockGetIssue.mockReturnValue(Effect.succeed({ parentRef: undefined }));
     await writeStoryFeatureContext(storyWorkspace, 'US-123');
     expect(existsSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME))).toBe(false);
   });

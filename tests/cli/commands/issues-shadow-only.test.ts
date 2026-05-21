@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 
 const { loadConfigMock, isShadowedMock, getPendingSyncCountMock, createTrackerMock, loadProjectsConfigMock } =
   vi.hoisted(() => ({
@@ -58,7 +59,8 @@ describe('listCommand --shadow-only', () => {
     ];
 
     createTrackerMock.mockReturnValue({
-      listIssues: vi.fn().mockResolvedValue(mockIssues),
+      // listIssues is Effect-returning post-PAN-1249.
+      listIssues: vi.fn().mockReturnValue(Effect.succeed(mockIssues)),
     });
 
     // PAN-2 is shadowed, PAN-1 is not

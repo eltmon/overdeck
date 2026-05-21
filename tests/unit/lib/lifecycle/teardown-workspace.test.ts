@@ -36,9 +36,13 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
   removeShadowState: vi.fn().mockReturnValue({ success: true }),
 }));
 
-import { teardownWorkspace } from '../../../../src/lib/lifecycle/teardown-workspace.js';
+import { Effect } from 'effect';
+import { teardownWorkspace as teardownWorkspaceEffect } from '../../../../src/lib/lifecycle/teardown-workspace.js';
 import { sessionExists } from '../../../../src/lib/tmux.js';
 import { AGENTS_DIR } from '../../../../src/lib/paths.js';
+
+const teardownWorkspace = (...args: Parameters<typeof teardownWorkspaceEffect>) =>
+  Effect.runPromise(teardownWorkspaceEffect(...args));
 
 describe('teardown-workspace', () => {
   let testDir: string;

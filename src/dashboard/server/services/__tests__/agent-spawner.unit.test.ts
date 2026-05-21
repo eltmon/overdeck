@@ -82,7 +82,8 @@ describe('AgentSpawner — integration', () => {
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);
     mockSpawnPlanningSession.mockResolvedValue({ success: true });
-    mockDeepWipe.mockResolvedValue({ success: true, steps: [] });
+    // deepWipe returns an Effect, not a Promise (PAN-1249).
+    mockDeepWipe.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
   });
 
   describe('startWork', () => {
