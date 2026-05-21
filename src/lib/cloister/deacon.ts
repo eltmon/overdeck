@@ -4797,6 +4797,21 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         } else {
           continue; // truly still running
         }
+      } else if (state.status === 'starting') {
+        // PAN-1256: work agents in `starting` status need a startup grace
+        // window before being declared orphaned. The harness launch (especially
+        // kimi-k2.6 via pi, or large model warmup) can take 30-60+ seconds to
+        // create the tmux session on a loaded system. Without this gate, the
+        // 60s patrol races the spawn flow's 30s ready-poll and kills slow
+        // spawns. Mirror the reviewer pattern (REVIEWER_LAUNCHER_GRACE_MS above)
+        // with a generous window: patrol-interval (60s) + ready-poll (30s) +
+        // headroom for tmux/launcher cold start.
+        const startedMs = Date.parse(state.startedAt ?? '');
+        const WORK_LAUNCHER_GRACE_MS = 120_000;
+        if (Number.isFinite(startedMs) && Date.now() - startedMs < WORK_LAUNCHER_GRACE_MS) {
+          continue;
+        }
+        // Past the grace window with no tmux session — true orphan, fall through.
       }
       // Orphaned — crashed agent with no tmux session
       const oldStatus = state.status;
