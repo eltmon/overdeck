@@ -6,6 +6,9 @@ import { promisify } from 'node:util';
 
 import type { DashboardSnapshot } from '@panctl/contracts';
 
+import { Effect } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
+
 import { listRunningAgentsAsync, getAgentRuntimeStateAsync, type AgentState } from '../../../lib/agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { listPaneValuesAsync } from '../../../lib/tmux.js';
@@ -147,9 +150,9 @@ let resourceConfigInflight: Promise<void> | null = null;
 function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
     dockerStatsCollector = new DockerStatsCollector();
-    dockerStatsCollector.start().catch((err: unknown) => {
-      console.error('[system-health] DockerStatsCollector.start() failed:', err);
-    });
+    Effect.runFork(
+      dockerStatsCollector.start().pipe(Effect.provide(nodeServicesLayer)),
+    );
   }
   return dockerStatsCollector;
 }

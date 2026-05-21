@@ -7,17 +7,7 @@
  * exec mocked.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Mock child_process before importing the module
-vi.mock('child_process', () => ({
-  exec: vi.fn(),
-}));
-
-import { promisify } from 'util';
-vi.mock('util', () => ({
-  promisify: vi.fn((fn) => fn),
-}));
+import { describe, it, expect } from 'vitest';
 
 describe('DockerStatsCollector', () => {
   // Test parsing logic by testing the exported class through mock exec calls
