@@ -20,7 +20,7 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
   stepOk: (step: string, details?: string[]) => ({ step, success: true, skipped: false, details }),
   stepSkipped: (step: string, details?: string[]) => ({ step, success: true, skipped: true, details }),
   stepFailed: (step: string, error: string) => ({ step, success: false, skipped: false, error }),
-  getLinearApiKey: vi.fn().mockReturnValue(null),
+  getLinearApiKey: vi.fn().mockResolvedValue(null),
 }));
 
 import { Effect } from 'effect';

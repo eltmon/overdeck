@@ -3866,7 +3866,8 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
 
     try {
       const { closeOut } = await import('../lifecycle/workflows.js');
-      const result = await closeOut(ctx);
+      // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+      const result = await Effect.runPromise(closeOut(ctx));
       if (!result.success) {
         const failed = result.steps.find(step => !step.success && !step.skipped);
         throw new Error(failed?.error ?? 'closeOut workflow failed');

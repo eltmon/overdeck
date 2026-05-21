@@ -138,12 +138,13 @@ function closeViaDirect(
   }
 
   // Try Linear
-  const linearApiKey = await getLinearApiKey();
-  if (linearApiKey) {
-    return closeLinearDirect(ctx, linearApiKey);
-  }
-
-  return Effect.succeed(stepFailed(step, 'No tracker available and cannot determine issue type'));
+  return Effect.gen(function* () {
+    const linearApiKey = yield* Effect.promise(() => getLinearApiKey());
+    if (linearApiKey) {
+      return yield* closeLinearDirect(ctx, linearApiKey);
+    }
+    return stepFailed(step, 'No tracker available and cannot determine issue type');
+  });
 }
 
 /**
@@ -402,12 +403,13 @@ function applyClosedOutLabel(
     return applyLabelGitHub(ctx);
   }
 
-  const linearApiKey = await getLinearApiKey();
-  if (linearApiKey) {
-    return applyLabelLinear(ctx, linearApiKey);
-  }
-
-  return Effect.succeed(stepSkipped(step, ['No tracker available for label management']));
+  return Effect.gen(function* () {
+    const linearApiKey = yield* Effect.promise(() => getLinearApiKey());
+    if (linearApiKey) {
+      return yield* applyLabelLinear(ctx, linearApiKey);
+    }
+    return stepSkipped(step, ['No tracker available for label management']);
+  });
 }
 
 function applyLabelViaTracker(

@@ -145,7 +145,8 @@ describe('POST /api/issues/:id/close-out', () => {
       },
     ]);
     issueDataServiceMock.invalidateTracker.mockResolvedValue(undefined);
-    closeOutMock.mockResolvedValue({
+    // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
+    closeOutMock.mockReturnValue(Effect.succeed({
       workflow: 'close-out',
       issueId: 'PAN-1190',
       success: true,
@@ -155,7 +156,7 @@ describe('POST /api/issues/:id/close-out', () => {
         { step: 'close-issue:github', success: true },
       ],
       duration: 12,
-    });
+    }));
   });
 
   it('returns a successful WorkflowResult and marks a verifying-on-main issue done', async () => {

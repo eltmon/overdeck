@@ -81,7 +81,13 @@ const deepWipe = (...args: Parameters<typeof deepWipeEffect>) => Effect.runPromi
 const close = (...args: Parameters<typeof closeEffect>) => Effect.runPromise(closeEffect(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoEffect>) => Effect.runPromise(resetToTodoEffect(...args));
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
-import { findSpecByIssue, writeSpecForIssue } from '../../../../src/lib/pan-dir/specs.js';
+import { findSpecByIssue as findSpecByIssueEffect, writeSpecForIssue as writeSpecForIssueEffect } from '../../../../src/lib/pan-dir/specs.js';
+
+// PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
+const findSpecByIssue = (projectRoot: string, issueId: string) =>
+  Effect.runPromise(findSpecByIssueEffect(projectRoot, issueId) as Effect.Effect<any, any, never>);
+const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
+  Effect.runPromise(writeSpecForIssueEffect(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 
 function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
@@ -100,12 +106,13 @@ function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
 }
 
 function successfulTracker() {
+  // PAN-1249: IssueTracker methods return Effect now, not Promise.
   return {
     name: 'github',
-    transitionIssue: vi.fn().mockResolvedValue(undefined),
-    addComment: vi.fn().mockResolvedValue(undefined),
-    updateIssue: vi.fn().mockResolvedValue(undefined),
-    getIssue: vi.fn().mockResolvedValue(null),
+    transitionIssue: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    addComment: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    updateIssue: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    getIssue: vi.fn().mockReturnValue(Effect.succeed({ labels: [] })),
   } as any;
 }
 
@@ -253,7 +260,7 @@ describe('workflows', () => {
       );
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
-      writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
@@ -270,8 +277,8 @@ describe('workflows', () => {
 
       expect(result.success).toBe(true);
       expect(existsSync(wsPath)).toBe(false);
-      expect(findSpecByIssue(testDir, 'PAN-100')?.status).toBe('completed');
-      expect(findSpecByIssue(testDir, 'PAN-100')?.document.plan.status).toBe('completed');
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.status).toBe('completed');
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.document.plan.status).toBe('completed');
 
       const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
       expect(commands.some(command => command.includes('gh issue close 100'))).toBe(true);
@@ -281,7 +288,7 @@ describe('workflows', () => {
     });
 
     it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
-      writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
@@ -299,7 +306,7 @@ describe('workflows', () => {
       expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/agent-pan-100/'))).toBe(true);
       expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/planning-pan-100/'))).toBe(true);
 
-      const spec = findSpecByIssue(testDir, 'PAN-100');
+      const spec = await findSpecByIssue(testDir, 'PAN-100');
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
@@ -328,7 +335,8 @@ describe('workflows', () => {
 
     it('should preserve review status when tracker close fails', async () => {
       const tracker = successfulTracker();
-      tracker.transitionIssue.mockRejectedValueOnce(new Error('tracker unavailable'));
+      // PAN-1249: tracker methods return Effect; failure surfaces as Effect.fail.
+      tracker.transitionIssue.mockReturnValueOnce(Effect.fail(new Error('tracker unavailable')));
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker });
 

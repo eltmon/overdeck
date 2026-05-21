@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
 const execFileMock = vi.hoisted(() => vi.fn());
 
@@ -73,7 +74,11 @@ vi.mock('../../activity-logger.js', () => ({
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
-vi.mock('../../lifecycle/workflows.js', () => ({ closeOut: vi.fn(async () => ({ success: true, steps: [] })) }));
+vi.mock('../../lifecycle/workflows.js', async () => {
+  // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
+  const { Effect } = await import('effect');
+  return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
+});
 vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({
@@ -138,7 +143,8 @@ describe('autoCloseOut', () => {
     mockLoadReviewStatuses.mockReturnValue({});
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 } as any);
-    mockCloseOut.mockResolvedValue({ success: true, steps: [] } as any);
+    // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
+    mockCloseOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }) as any);
     installIssueView(['verifying-on-main']);
   });
 
@@ -191,10 +197,11 @@ describe('autoCloseOut', () => {
 
   it('records failure through review status and activity so retry backs off via updatedAt', async () => {
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
-    mockCloseOut.mockResolvedValue({
+    // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
+    mockCloseOut.mockReturnValue(Effect.succeed({
       success: false,
       steps: [{ step: 'close-out:archive', success: false, skipped: false, error: 'archive failed' }],
-    } as any);
+    }) as any);
 
     const actions = await autoCloseOut(now);
 

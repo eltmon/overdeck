@@ -88,12 +88,13 @@ describe('findPlan', () => {
     expect(existsSync(result!)).toBe(true);
   });
 
-  it('prefers the workspace worktree spec over the parent project spec', () => {
-    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+  it('resolves the parent project spec (PAN-1124: single spec on main, workspace-first lookup removed)', () => {
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    // Workspace spec is no longer preferred — verify the canonical project spec wins.
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlan(WORKSPACE_PATH)).toBe(workspaceSpec);
-    expect(readWorkspacePlan(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
+    expect(findPlan(WORKSPACE_PATH)).toBe(projectSpec);
+    expect(readWorkspacePlan(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {

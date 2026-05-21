@@ -89,20 +89,20 @@ vi.mock('../../projects.js', () => ({
   getProject: vi.fn(),
 }));
 
-const postMergeLifecycleMock = vi.fn(async () => {});
+const postMergeLifecycleMock = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('../merge-agent.js', async (importOriginal) => {
   // Keep the real `parseSlotBranch` (a pure regex) — only stub the loopback.
   const actual = await importOriginal<typeof import('../merge-agent.js')>();
   return { ...actual, postMergeLifecycle: postMergeLifecycleMock };
 });
 
-const resolveGitHubIssueMock = vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli' }));
+const resolveGitHubIssueMock = vi.hoisted(() => vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli' })));
 vi.mock('../../tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../tracker-utils.js')>();
   return { ...actual, resolveGitHubIssue: resolveGitHubIssueMock };
 });
 
-const readContinueStateAsyncMock = vi.fn();
+const readContinueStateAsyncMock = vi.hoisted(() => vi.fn());
 vi.mock('../../vbrief/continue-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../vbrief/continue-state.js')>();
   return { ...actual, readContinueStateAsync: readContinueStateAsyncMock };

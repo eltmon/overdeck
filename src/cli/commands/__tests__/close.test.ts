@@ -1,14 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
-const mocks = vi.hoisted(() => ({
-  closeOut: vi.fn(async () => ({ success: true, steps: [] })),
-  execFile: vi.fn(),
-  findProjectByTeam: vi.fn(() => null),
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
-  createInterface: vi.fn(),
-  existsSync: vi.fn(() => true),
-  readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/panopticon-cli:PAN\n'),
-}));
+const mocks = vi.hoisted(() => {
+  // Hoisted requires inline import — synchronously resolved at top.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Effect: EffectHoisted } = require('effect') as typeof import('effect');
+  return {
+    // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
+    closeOut: vi.fn(() => EffectHoisted.succeed({ success: true, steps: [] })),
+    execFile: vi.fn(),
+    findProjectByTeam: vi.fn(() => null),
+    resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+    createInterface: vi.fn(),
+    existsSync: vi.fn(() => true),
+    readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/panopticon-cli:PAN\n'),
+  };
+});
 
 vi.mock('child_process', async (importActual) => ({
   ...(await importActual<typeof import('child_process')>()),

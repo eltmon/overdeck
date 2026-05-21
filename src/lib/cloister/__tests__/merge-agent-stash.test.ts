@@ -89,7 +89,14 @@ import { postMergeLifecycle, resetPostMergeState, spawnMergeAgentForBranches } f
 import { dropStash, listStashes } from '../../stashes.js';
 import { spawnRun } from '../../agents.js';
 import { AGENTS_DIR } from '../../paths.js';
-import { findSpecByIssue, writeSpecForIssue } from '../../pan-dir/specs.js';
+import { findSpecByIssue as findSpecByIssueEffect, writeSpecForIssue as writeSpecForIssueEffect } from '../../pan-dir/specs.js';
+import { Effect } from 'effect';
+
+// PAN-1249: pan-dir/specs functions return Effect; bridge to Promise for tests.
+const findSpecByIssue = (projectRoot: string, issueId: string) =>
+  Effect.runPromise(findSpecByIssueEffect(projectRoot, issueId) as Effect.Effect<any, any, never>);
+const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
+  Effect.runPromise(writeSpecForIssueEffect(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
 
 describe('merge-agent ship role and stash lifecycle', () => {
   let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
@@ -228,7 +235,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
       mkdirSync(workspacePath, { recursive: true });
       mkdirSync(agentStateDir, { recursive: true });
       mkdirSync(planningStateDir, { recursive: true });
-      writeSpecForIssue(projectPath, {
+      await writeSpecForIssue(projectPath, {
         vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
         plan: {
           id: 'PAN-1',
@@ -281,8 +288,8 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(commands.some(command => command.includes('--add-label') && command.includes('needs-close-out'))).toBe(false);
       expect(existsSync(workspacePath)).toBe(true);
       expect(existsSync(agentStateDir)).toBe(true);
-      expect(findSpecByIssue(projectPath, 'PAN-1')?.status).toBe('active');
-      expect(findSpecByIssue(projectPath, 'PAN-1')?.document.plan.status).toBe('active');
+      expect((await findSpecByIssue(projectPath, 'PAN-1'))?.status).toBe('active');
+      expect((await findSpecByIssue(projectPath, 'PAN-1'))?.document.plan.status).toBe('active');
       expect(closeIssueMock).not.toHaveBeenCalled();
       expect(transitionVBriefOnMainMock).not.toHaveBeenCalled();
       expect(teardownWorkspaceMock).not.toHaveBeenCalled();
