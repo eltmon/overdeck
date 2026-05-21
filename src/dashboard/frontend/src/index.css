@@ -247,8 +247,8 @@ body::after {
   .drawer-gate-border-fail {
     border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
   }
-  .verb-badge-pulse {
-    animation: verb-badge-pulse 1.6s ease-out infinite;
+  .pulse {
+    animation: pulse 1.6s ease-out infinite;
   }
   .drawer-bead-current-ping {
     animation: drawer-bead-current-ping 1.6s ease-out infinite;
@@ -266,7 +266,7 @@ body::after {
   }
 }
 
-@keyframes verb-badge-pulse {
+@keyframes pulse {
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;

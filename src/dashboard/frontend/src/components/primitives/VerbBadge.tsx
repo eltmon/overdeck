@@ -105,7 +105,7 @@ export default function VerbBadge(props: VerbBadgeProps) {
       {config.pulse && (
         <span
           aria-hidden="true"
-          className="h-[6px] w-[6px] rounded-full bg-current verb-badge-pulse"
+          className="h-[6px] w-[6px] rounded-full bg-current pulse"
         />
       )}
       <span>{config.label}</span>
