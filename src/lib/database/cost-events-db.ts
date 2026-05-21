@@ -21,6 +21,43 @@ class DatabaseError extends Data.TaggedError('DatabaseError')<{
   readonly cause?: unknown;
 }> {}
 
+// ============== Daily spend cache (avoids sync SQLite on event loop) ==============
+
+const DAILY_SPEND_CACHE_TTL_MS = 30_000;
+const dailySpendCache = new Map<string, { total: number; updatedAt: number }>();
+
+function dailySpendCacheKey(issueId: string, startTs: string): string {
+  return `${issueId}:${startTs}`;
+}
+
+function startOfLocalDayIso(ts: string): string {
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+}
+
+export function recordMemoryExtractionSpend(issueId: string, startTs: string, cost: number): void {
+  const key = dailySpendCacheKey(issueId, startTs);
+  const existing = dailySpendCache.get(key);
+  if (existing) {
+    existing.total += cost;
+    existing.updatedAt = Date.now();
+  } else {
+    dailySpendCache.set(key, { total: cost, updatedAt: Date.now() });
+  }
+}
+
+export function invalidateMemorySpendCache(issueId: string, startTs: string): void {
+  dailySpendCache.delete(dailySpendCacheKey(issueId, startTs));
+}
+
+export function getCachedMemoryExtractionCostUsd(opts: { issueId: string; startTs: string }): number | null {
+  const cached = dailySpendCache.get(dailySpendCacheKey(opts.issueId, opts.startTs));
+  if (cached && Date.now() - cached.updatedAt < DAILY_SPEND_CACHE_TTL_MS) {
+    return cached.total;
+  }
+  return null;
+}
+
 // ============== Write operations ==============
 
 /**
@@ -58,10 +95,16 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
           event.tldrBypasses ?? null,
           event.tldrTokensSaved ?? null,
           event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
-          sourceFile ?? null,
+          event.source ?? sourceFile ?? null,
           event.cavemanVariant ?? null,
         );
         if (result.changes === 0) return null; // Duplicate
+
+        // Keep the daily spend cache warm for memory-extraction events
+        if (event.source === 'memory-extraction' || sourceFile === 'memory-extraction') {
+          recordMemoryExtractionSpend(event.issueId, startOfLocalDayIso(event.ts), event.cost);
+        }
+
         return result.lastInsertRowid as number;
       },
       catch: (cause) => new DatabaseError({ operation: 'insertCostEvent', cause }),
@@ -117,7 +160,7 @@ export function insertCostEvents(
         ev.tldrBypasses ?? null,
         ev.tldrTokensSaved ?? null,
         ev.tldrBypassReasons ? JSON.stringify(ev.tldrBypassReasons) : null,
-        sourceFile ?? null,
+        ev.source ?? sourceFile ?? null,
         ev.cavemanVariant ?? null,
       );
       if (result.changes > 0) {
@@ -137,6 +180,43 @@ export function insertCostEvents(
 /**
  * Get all cost events, optionally filtered.
  */
+export function queryMemoryExtractionCostUsd(opts: {
+  issueId: string;
+  startTs: string;
+  endTs?: string;
+}): number {
+  // Fast-path: cached daily total avoids sync SQLite on the event loop
+  if (!opts.endTs) {
+    const cached = getCachedMemoryExtractionCostUsd(opts);
+    if (cached !== null) return cached;
+  }
+
+  const db = getDatabase();
+  const conditions = [
+    'UPPER(issue_id) = UPPER(?)',
+    "source_file = 'memory-extraction'",
+    'ts >= ?',
+  ];
+  const params: string[] = [opts.issueId, opts.startTs];
+  if (opts.endTs) {
+    conditions.push('ts <= ?');
+    params.push(opts.endTs);
+  }
+
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(cost), 0) AS total
+    FROM cost_events
+    WHERE ${conditions.join(' AND ')}
+  `).get(...params) as { total: number } | undefined;
+  const result = row?.total ?? 0;
+
+  if (!opts.endTs) {
+    dailySpendCache.set(dailySpendCacheKey(opts.issueId, opts.startTs), { total: result, updatedAt: Date.now() });
+  }
+
+  return result;
+}
+
 export function queryCostEvents(opts: {
   issueId?: string;
   agentId?: string;
@@ -182,7 +262,9 @@ export function queryCostEvents(opts: {
   const sql = `
     SELECT ts, agent_id, issue_id, session_type, provider, model,
            input, output, cache_read, cache_write, cost, request_id,
-           tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons
+           session_id,
+           tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+           source_file
     FROM cost_events
     ${where}
     ORDER BY ts ASC
@@ -469,10 +551,12 @@ interface DbCostRow {
   cache_write: number;
   cost: number;
   request_id: string | null;
+  session_id: string | null;
   tldr_interceptions: number | null;
   tldr_bypasses: number | null;
   tldr_tokens_saved: number | null;
   tldr_bypass_reasons: string | null;
+  source_file: string | null;
   caveman_variant: string | null;
 }
 
@@ -501,6 +585,8 @@ function rowToCostEvent(row: DbCostRow): CostEvent {
     cacheWrite: row.cache_write,
     cost: row.cost,
     requestId: row.request_id ?? undefined,
+    sessionId: row.session_id ?? undefined,
+    source: row.source_file ?? undefined,
     tldrInterceptions: row.tldr_interceptions ?? undefined,
     tldrBypasses: row.tldr_bypasses ?? undefined,
     tldrTokensSaved: row.tldr_tokens_saved ?? undefined,

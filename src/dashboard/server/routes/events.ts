@@ -14,7 +14,7 @@
  *   - Optional bearer token auth via PANOPTICON_EVENTS_TOKEN env var.
  *
  * Stability: only the event types in PUBLIC_CATALOG are part of the public
- * contract. All other events stream through but may change shape without notice.
+ * contract. Internal events are not exposed on this route.
  */
 
 import { Effect, Layer, Option, Stream } from 'effect';
@@ -31,6 +31,7 @@ const PUBLIC_CATALOG = [
   'activity.updated',
   'agent.started',
   'agent.stopped',
+  'agent.heartbeat_dead',
   'agent.output_received',
   'workspace.created',
   'workspace.destroyed',
@@ -63,6 +64,7 @@ function parseCsv(value: string | null): Set<string> | null {
 }
 
 function matchesFilter(event: StoredEvent, filters: StreamFilters): boolean {
+  if (!isPublicEventType(event.type)) return false;
   if (filters.types && !filters.types.has(event.type)) return false;
   const payload = (event.payload ?? {}) as Record<string, unknown>;
   if (filters.sources) {
@@ -73,6 +75,10 @@ function matchesFilter(event: StoredEvent, filters: StreamFilters): boolean {
     if (payload['issueId'] !== filters.issueId) return false;
   }
   return true;
+}
+
+function isPublicEventType(type: string): boolean {
+  return (PUBLIC_CATALOG as readonly string[]).includes(type);
 }
 
 function formatFrame(event: StoredEvent): string {

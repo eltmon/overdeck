@@ -14,6 +14,7 @@ optional:
   - IS_POLYREPO
   - POLYREPO_DIRS
   - PR_URL
+  - MEMORY_CONTEXT
 ---
 # Merge Task — {{ISSUE_ID}}
 
@@ -27,6 +28,12 @@ optional:
 **POLYREPO project** — git repos in subdirectories: {{POLYREPO_DIRS}}.
 The workspace root is NOT a git repo. You must `cd` into each subdirectory to run git commands, and you MUST complete the merge for ALL repos.
 {{/IS_POLYREPO}}
+
+{{#MEMORY_CONTEXT}}
+## Memory Context
+
+{{MEMORY_CONTEXT}}
+{{/MEMORY_CONTEXT}}
 
 ## PHASE 1 — SYNC & BASELINE (before merge)
 

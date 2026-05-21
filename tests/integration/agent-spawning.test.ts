@@ -81,6 +81,15 @@ vi.mock('../../src/lib/cv.js', () => ({
   getAgentCV: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock('../../src/lib/memory/injection.js', () => ({
+  injectPromptTimeMemory: vi.fn().mockResolvedValue({
+    status: 'injected',
+    reason: null,
+    context: '',
+    decision: {},
+  }),
+}));
+
 vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/cliproxy.js')>();
   return {

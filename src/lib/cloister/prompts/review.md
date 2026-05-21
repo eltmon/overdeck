@@ -14,6 +14,7 @@ optional:
   - PR_URL
   - POLYREPO_DIRS
   - ACCEPTANCE_CRITERIA
+  - MEMORY_CONTEXT
 ---
 # Code Review — {{ISSUE_ID}}
 
@@ -34,6 +35,12 @@ You are a demanding code review specialist. Your job is to ensure code is produc
 {{/PR_URL}}
 {{#IS_POLYREPO}}- **Polyrepo:** git repos in subdirectories: {{POLYREPO_DIRS}}
 {{/IS_POLYREPO}}
+
+{{#MEMORY_CONTEXT}}
+## Memory Context
+
+{{MEMORY_CONTEXT}}
+{{/MEMORY_CONTEXT}}
 
 **IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the test-agent runs tests in the next step.
 

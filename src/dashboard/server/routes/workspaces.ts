@@ -16,6 +16,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  *   POST   /api/workspaces/:issueId/clean
  *   POST   /api/workspaces/:issueId/containerize
  *   POST   /api/workspaces/:issueId/containers/:containerName/:action
+ *   POST   /api/workspaces/:issueId/memory-summary
  *   POST   /api/workspaces/:issueId/refresh-db
  *   GET    /api/workspaces/:issueId/stashes
  *   POST   /api/workspaces/:issueId/stashes/:stashRef/recover
@@ -116,6 +117,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { generateDailySummary } from '../../../lib/memory/cli.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -2892,6 +2894,32 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         { status: 500 }
       );
     }
+  }))
+);
+
+// ─── Route: POST /api/workspaces/:issueId/memory-summary ─────────────────────
+
+const postWorkspaceMemorySummaryRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/memory-summary',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const result = yield* Effect.promise(() => generateDailySummary({
+      projectId: basename(projectPath),
+      issueId,
+    }));
+    return jsonResponse(result);
   }))
 );
 
@@ -6056,6 +6084,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceContainerizeRoute,
   postWorkspaceStartRoute,
   postWorkspaceContainerActionRoute,
+  postWorkspaceMemorySummaryRoute,
   postWorkspaceRefreshDbRoute,
   getWorkspaceReviewStatusRoute,
   postWorkspaceReviewStatusRoute,

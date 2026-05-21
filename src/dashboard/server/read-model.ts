@@ -180,6 +180,8 @@ export interface ReadModelServiceShape {
   ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
   /** Return in-memory turn diff summaries for a single agent. */
   readonly getTurnDiffSummaries: (agentId: string) => Effect.Effect<TurnDiffSummary[]>;
+  /** Return the agentId for a given sessionId (from agent snapshot or runtime claudeSessionId). */
+  readonly getAgentIdBySessionId: (sessionId: string) => Effect.Effect<string | null>;
   /** Apply a domain event to the read model (called by event store on append). */
   readonly applyEvent: (event: DomainEvent) => void;
   /** Bootstrap the read model from existing lib module state. */
@@ -234,6 +236,13 @@ export const ReadModelServiceLive = Layer.effect(
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
+        memory: {
+          observationsByIssueId: state.observationsByIssueId,
+          statusByIssueId: state.statusByIssueId,
+          rollupsByIssueId: state.rollupsByIssueId,
+          resetMarkersByScopeId: state.resetMarkersByScopeId,
+          healthByIssueId: state.healthByIssueId,
+        },
         scanProgress: state.scanProgress,
         enrichStats: state.enrichStats,
         enrichProgressBySessionId: state.enrichProgressBySessionId,
@@ -280,6 +289,9 @@ export const ReadModelServiceLive = Layer.effect(
 
     const getTurnDiffSummaries = (agentId: string): Effect.Effect<TurnDiffSummary[]> =>
       Effect.sync(() => cloneTurnDiffSummaries(state.turnDiffSummariesByAgentId[agentId]));
+
+    const getAgentIdBySessionId = (sessionId: string): Effect.Effect<string | null> =>
+      Effect.sync(() => state.agentIdBySessionId[sessionId] ?? null);
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -404,6 +416,7 @@ export const ReadModelServiceLive = Layer.effect(
           }
 
           const statusMap = loadReviewStatuses();
+          const cachedMemory = cached.memory as Partial<ReadModelState> | undefined;
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
@@ -415,6 +428,11 @@ export const ReadModelServiceLive = Layer.effect(
             ),
             issuesRaw: cached.issues ? [...cached.issues] : [],
             resources: cached.resources as ReadModelState['resources'],
+            observationsByIssueId: cachedMemory?.observationsByIssueId ?? INITIAL_READ_MODEL_STATE.observationsByIssueId,
+            statusByIssueId: cachedMemory?.statusByIssueId ?? INITIAL_READ_MODEL_STATE.statusByIssueId,
+            rollupsByIssueId: cachedMemory?.rollupsByIssueId ?? INITIAL_READ_MODEL_STATE.rollupsByIssueId,
+            resetMarkersByScopeId: cachedMemory?.resetMarkersByScopeId ?? INITIAL_READ_MODEL_STATE.resetMarkersByScopeId,
+            healthByIssueId: cachedMemory?.healthByIssueId ?? INITIAL_READ_MODEL_STATE.healthByIssueId,
           };
           usedProjectionCache = true;
           console.log(
@@ -709,6 +727,7 @@ export const ReadModelServiceLive = Layer.effect(
       getChannelPermissionRequest,
       getResolvedChannelPermissionDecision,
       getTurnDiffSummaries,
+      getAgentIdBySessionId,
       applyEvent,
       bootstrap: Effect.void,
     };

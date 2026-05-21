@@ -19,6 +19,9 @@ import { WS_METHODS } from '@panctl/contracts'
 import { Stream } from 'effect'
 import { loadSnapshotFromCache } from '../lib/snapshotCache'
 
+const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
+const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
+
 // ─── EventRouter component ────────────────────────────────────────────────────
 
 export function EventRouter() {
@@ -32,6 +35,29 @@ export function EventRouter() {
     const transport = getTransport()
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
+    let bootstrapInFlight = false
+    let bootstrapComplete = false
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null
+    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
+
+    function stopFallbackPoller() {
+      if (fallbackInterval) clearInterval(fallbackInterval)
+      if (fallbackTimeout) clearTimeout(fallbackTimeout)
+      fallbackInterval = null
+      fallbackTimeout = null
+    }
+
+    function startFallbackPoller() {
+      stopFallbackPoller()
+      fallbackInterval = setInterval(() => {
+        if (bootstrapComplete) {
+          stopFallbackPoller()
+          return
+        }
+        bootstrap().catch(console.error)
+      }, SNAPSHOT_FALLBACK_INTERVAL_MS)
+      fallbackTimeout = setTimeout(stopFallbackPoller, SNAPSHOT_FALLBACK_WINDOW_MS)
+    }
 
     // ── Instant render: load from localStorage cache ─────────────────────────
     const cached = loadSnapshotFromCache()
@@ -41,12 +67,16 @@ export function EventRouter() {
 
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
     async function bootstrap() {
+      if (bootstrapInFlight) return
+      bootstrapInFlight = true
       coordinator.beginSnapshotRecovery('bootstrap')
       try {
         const snapshot = await transport.request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
         ) as DashboardSnapshot
         syncSnapshot(snapshot)
+        bootstrapComplete = true
+        stopFallbackPoller()
         const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
         if (needsReplay) {
           await replay(snapshot.sequence)
@@ -54,8 +84,8 @@ export function EventRouter() {
       } catch (err) {
         console.error('[EventRouter] bootstrap failed:', err)
         coordinator.failRecovery()
-        // Retry after delay
-        setTimeout(bootstrap, 2000)
+      } finally {
+        bootstrapInFlight = false
       }
     }
 
@@ -71,11 +101,36 @@ export function EventRouter() {
           applyEvents(typed)
           coordinator.markEventBatchApplied(typed[typed.length - 1]!.sequence)
         }
-        coordinator.completeReplayRecovery()
+        const needsAnotherReplay = coordinator.completeReplayRecovery()
+        if (needsAnotherReplay) {
+          await replay(coordinator.getState().latestSequence)
+          return
+        }
+        drainDeferredEvents()
       } catch (err) {
         console.error('[EventRouter] replay failed:', err)
         coordinator.failRecovery()
       }
+    }
+
+    function drainDeferredEvents() {
+      const deferred = pendingBatch.current.splice(0).sort((a, b) => a.sequence - b.sequence)
+      const applyBatch: DomainEvent[] = []
+      for (const event of deferred) {
+        const classification = coordinator.classifyDomainEvent(event.sequence)
+        if (classification === 'ignore') continue
+        if (classification === 'apply') {
+          applyBatch.push(event)
+          coordinator.markEventBatchApplied(event.sequence)
+          continue
+        }
+        pendingBatch.current.push(event)
+        if (classification === 'recover') {
+          replay(coordinator.getState().latestSequence).catch(console.error)
+          break
+        }
+      }
+      if (applyBatch.length > 0) applyEvents(applyBatch)
     }
 
     // ── Event coalescing ──────────────────────────────────────────────────────
@@ -88,11 +143,7 @@ export function EventRouter() {
       flushScheduled.current = true
       setTimeout(() => {
         flushScheduled.current = false
-        const batch = pendingBatch.current.splice(0)
-        if (batch.length === 0) return
-        applyEvents(batch)
-        const lastSeq = batch[batch.length - 1]!.sequence
-        coordinator.markEventBatchApplied(lastSeq)
+        drainDeferredEvents()
       }, 16)
     }
 
@@ -136,8 +187,10 @@ export function EventRouter() {
     )
 
     bootstrap()
+    startFallbackPoller()
 
     return () => {
+      stopFallbackPoller()
       unsubscribe()
     }
   }, [syncSnapshot, applyEvents])

@@ -23,7 +23,7 @@ import { ensureInternalToken } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
-import { getEventStore } from './event-store.js';
+import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
@@ -36,6 +36,10 @@ import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
+import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
+import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
+import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../lib/memory/reconciliation.js';
+import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 
 declare const Bun: unknown;
 
@@ -259,6 +263,11 @@ setAgentStoppedNotifier((agentId) => {
       const state = await getAgentStateAsync(agentId);
       if (state) {
         es.append({
+          type: 'agent.heartbeat_dead',
+          timestamp: new Date().toISOString(),
+          payload: { agentId, issueId: state.issueId, sessionId: state.sessionId },
+        } as any);
+        es.append({
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
           payload: buildAgentStatusChangedPayload(state),
@@ -266,7 +275,7 @@ setAgentStoppedNotifier((agentId) => {
         return;
       }
       es.append({
-        type: 'agent.stopped',
+        type: 'agent.heartbeat_dead',
         timestamp: new Date().toISOString(),
         payload: { agentId },
       } as any);
@@ -326,6 +335,33 @@ await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 
+void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
+void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })
+  .catch(err => console.warn('[memory-reconciliation] startup sweep failed:', err?.message ?? err));
+startTranscriptPoller();
+console.log('[panopticon] Memory transcript poller started');
+
+void (async () => {
+  const store = await initEventStore();
+  store.subscribe((event) => {
+    if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
+      const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
+        ? (event.payload as { agentId: string }).agentId
+        : null;
+      if (agentId) {
+        void reconcileAgentMemory(agentId).catch(err => console.warn('[memory-reconciliation] agent sweep failed:', err?.message ?? err));
+      }
+      const sessionId = typeof (event.payload as { sessionId?: unknown }).sessionId === 'string'
+        ? (event.payload as { sessionId: string }).sessionId
+        : null;
+      if (sessionId) clearQueryExpansionCache(sessionId);
+    }
+    if (event.type === 'agent.started' || event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
+      void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] lifecycle registry sync failed:', err?.message ?? err));
+    }
+  });
+})().catch(err => console.warn('[memory-poller] lifecycle subscription failed:', err?.message ?? err));
+
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
@@ -355,6 +391,8 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
+  stopTranscriptPoller();
+  closeMemoryFtsDatabases();
   process.exit(0);
 };
 process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));

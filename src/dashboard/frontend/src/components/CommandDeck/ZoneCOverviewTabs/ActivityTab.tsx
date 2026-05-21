@@ -1,4 +1,4 @@
-import { ActivityFeed } from '../../GodView/ActivityFeed';
+import { ActivityFeedSidebar } from '../ActivityFeedSidebar';
 
 interface ActivityTabProps {
   issueId: string;
@@ -7,7 +7,7 @@ interface ActivityTabProps {
 export function ActivityTab({ issueId }: ActivityTabProps) {
   return (
     <div data-testid="activity-tab" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <ActivityFeed issueId={issueId} />
+      <ActivityFeedSidebar issueId={issueId} />
     </div>
   );
 }

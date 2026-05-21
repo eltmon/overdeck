@@ -5,6 +5,7 @@ import { Info, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import type { DashboardState } from '../../lib/store';
 import { selectGodViewActivityFeed, type GodViewActivityEvent } from '../../hooks/useGodViewSocket';
 import { useDashboardStore } from '../../lib/store';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 
 async function fetchActivityREST(): Promise<GodViewActivityEvent[]> {
   const res = await fetch('/api/activity');
@@ -25,13 +26,6 @@ const EVENT_COLORS: Record<GodViewActivityEvent['level'], string> = {
   error: 'var(--gv-pink)',
   warn: 'var(--gv-amber)',
 };
-
-function timeAgo(ts: string) {
-  const ms = Date.now() - new Date(ts).getTime();
-  if (ms < 60000) return `${Math.floor(ms / 1000)}s`;
-  if (ms < 3600000) return `${Math.floor(ms / 60000)}m`;
-  return `${Math.floor(ms / 3600000)}h`;
-}
 
 function isActivityForIssue(event: GodViewActivityEvent, issueId: string): boolean {
   if (event.issueId) {
@@ -112,7 +106,7 @@ export function ActivityFeed({ issueId }: ActivityFeedProps = {}) {
                         {event.source}
                       </span>
                       <span className="text-[9px] shrink-0" style={{ color: 'var(--gv-text-dim)' }}>
-                        {timeAgo(event.timestamp)}
+                        {formatRelativeTime(event.timestamp, new Date())}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 min-w-0">

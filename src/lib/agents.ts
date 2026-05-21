@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
-import { join, resolve, dirname } from 'path';
+import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -41,6 +41,7 @@ import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
+import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
 
@@ -2064,6 +2065,52 @@ function defaultRunWorkspace(issueId: string): string {
   return join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
 }
 
+export async function retrieveSpawnTimeMemoryContext(input: {
+  prompt: string;
+  issueId: string;
+  workspace: string;
+  agentId: string;
+  role: Role;
+  harness: 'claude-code' | 'pi';
+}): Promise<string> {
+  if (!input.prompt.trim()) return '';
+
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(input.workspace),
+      workspaceId: basename(input.workspace),
+      issueId: input.issueId,
+      runId: input.agentId,
+      sessionId: input.agentId,
+      agentRole: input.role,
+      agentHarness: input.harness,
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    return (await injectPromptTimeMemory({ prompt: input.prompt, identity, surface: 'spawn' })).context;
+  } catch (error) {
+    console.warn(`[agents] Spawn-time memory context unavailable for ${input.agentId}:`, error instanceof Error ? error.message : String(error));
+    return '';
+  }
+}
+
+async function withSpawnTimeMemoryContext(input: {
+  prompt: string;
+  issueId: string;
+  workspace: string;
+  agentId: string;
+  role: Role;
+  harness: 'claude-code' | 'pi';
+}): Promise<string> {
+  const context = await retrieveSpawnTimeMemoryContext(input);
+  return context ? `${context}\n\n---\n\n${input.prompt}` : input.prompt;
+}
+
+function inferMemoryProjectId(workspacePath: string): string {
+  const workspaceName = basename(workspacePath);
+  if (workspaceName.startsWith('feature-')) return basename(dirname(dirname(workspacePath)));
+  return workspaceName;
+}
+
 function runAgentId(issueId: string, role: Role, subRole?: string): string {
   const base = role === 'work'
     ? `agent-${issueId.toLowerCase()}`
@@ -2198,11 +2245,21 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
+  const prompt = options.prompt
+    ? await withSpawnTimeMemoryContext({
+        prompt: options.prompt,
+        issueId,
+        workspace,
+        agentId,
+        role,
+        harness: resolvedHarness,
+      })
+    : '';
 
   let promptFile: string | undefined;
-  if (options.prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
+  if (prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
-    await writeFileAsync(promptFile, options.prompt);
+    await writeFileAsync(promptFile, prompt);
   }
 
   checkAndSetupHooks();
@@ -2348,10 +2405,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await setOptionAsync(agentId, 'destroy-unattached', 'off');
   await setOptionAsync(agentId, 'remain-on-exit', 'on');
 
-  if (options.prompt) {
+if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
-        await writePiAgentPrompt(agentId, options.prompt);
+        await writePiAgentPrompt(agentId, prompt);
       } catch (err) {
         console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
@@ -2373,7 +2430,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       }
       if (ready) {
         await new Promise<void>((resolve) => setTimeout(resolve, 500));
-        await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+        await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
       } else {
         console.error(`[${agentId}] Claude did not become ready within 30s`);
       }
@@ -2547,10 +2604,21 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
+  if (prompt) {
+    prompt = await withSpawnTimeMemoryContext({
+      prompt,
+      issueId: options.issueId,
+      workspace: options.workspace,
+      agentId,
+      role,
+      harness: resolvedHarness,
+    });
+  }
+
   // Write prompt to file for complex prompts (avoids shell escaping issues)
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   if (prompt) {
-    writeFileSync(promptFile, prompt);
+    await writeFileAsync(promptFile, prompt);
   }
 
   // Auto-setup hooks if not configured

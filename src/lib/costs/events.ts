@@ -20,6 +20,7 @@ export interface CostEvent {
   agentId: string;         // Agent identifier
   issueId: string;         // Issue identifier (e.g., "PAN-81")
   sessionType: string;     // Session type (e.g., "implementation", "planning")
+  source?: string;         // Cost source tag (e.g., "memory-extraction")
   provider: string;        // AI provider (e.g., "anthropic", "openai", "google")
   model: string;           // Model name (e.g., "claude-sonnet-4")
   input: number;           // Input tokens

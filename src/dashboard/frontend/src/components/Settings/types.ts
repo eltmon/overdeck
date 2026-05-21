@@ -80,11 +80,26 @@ export interface TtsConfig {
   mutedIssues?: string[];
 }
 
+export interface MemorySettingsConfig {
+  provider?: 'anthropic' | 'cliproxy';
+  model?: string;
+  per_day_cost_cap_usd?: number;
+  fallback_provider?: 'anthropic' | 'cliproxy' | '';
+  fallback_model?: string;
+  fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+  observations_enabled?: boolean;
+  prompt_time_injection_enabled?: boolean;
+  rollup_pending_threshold?: number;
+  sidebar_refresh_interval_ms?: number;
+  worker_concurrency?: number;
+}
+
 export interface SettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
+  memory?: MemorySettingsConfig;
   openrouter?: {
     favorites?: string[];
   };

@@ -23,10 +23,30 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 pan_resolve_agent_id || exit 0
 
+INPUT=$(cat 2>/dev/null || echo '{}')
 TS=$(date -Iseconds)
 
 pan_emit_event "$AGENT_ID" "{\"kind\":\"waiting_clear\",\"clearedBy\":\"user_response\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "{\"kind\":\"message_received\",\"direction\":\"to_agent\",\"source\":\"user\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "{\"kind\":\"thinking_start\",\"lastToolAt\":\"$TS\",\"timestamp\":\"$TS\"}"
+
+INTERNAL_TOKEN="${PANOPTICON_INTERNAL_TOKEN:-}"
+if [ -z "$INTERNAL_TOKEN" ]; then
+  TOKEN_PATH="${PANOPTICON_HOME:-$HOME/.panopticon}/internal-token"
+  if [ -f "$TOKEN_PATH" ]; then
+    INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
+  fi
+fi
+
+if command -v jq >/dev/null 2>&1; then
+  INJECT_BODY=$(printf '%s' "$INPUT" | jq -c --arg agentId "$AGENT_ID" '{prompt: (.prompt // .message // .input // ""), sessionId: (.session_id // ""), agentId: $agentId}' 2>/dev/null)
+  if [ -n "$INJECT_BODY" ]; then
+    INJECT_RESPONSE=$(curl -s -m 1 -X POST -H 'Content-Type: application/json' -H "x-panopticon-internal-token: $INTERNAL_TOKEN" --data "$INJECT_BODY" "$PAN_DASHBOARD_URL/api/memory/inject" 2>/dev/null || true)
+    INJECT_CONTEXT=$(printf '%s' "$INJECT_RESPONSE" | jq -r 'if .ok == true and (.context // "") != "" then .context else empty end' 2>/dev/null)
+    if [ -n "$INJECT_CONTEXT" ]; then
+      printf '%s\n' "$INJECT_CONTEXT"
+    fi
+  fi
+fi
 
 exit 0

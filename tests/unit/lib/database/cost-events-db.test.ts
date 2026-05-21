@@ -50,13 +50,14 @@ function insertEvent(overrides: {
   output?: number;
   ts?: string;
   requestId?: string;
+  sessionId?: string;
 }) {
   const id = ++seq;
   testDb.prepare(`
     INSERT INTO cost_events
       (ts, agent_id, issue_id, session_type, provider, model, input, output,
-       cache_read, cache_write, cost, request_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       cache_read, cache_write, cost, request_id, session_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     overrides.ts ?? new Date().toISOString(),
     overrides.agentId ?? 'agent-x',
@@ -70,6 +71,7 @@ function insertEvent(overrides: {
     0,
     overrides.cost ?? 0.001,
     overrides.requestId ?? `req-${id}`,
+    overrides.sessionId ?? null,
   );
 }
 
@@ -135,11 +137,19 @@ describe('queryCostEvents', () => {
 
   it('maps row fields to CostEvent correctly', () => {
     const ts = new Date().toISOString();
-    insertEvent({ ts, issueId: 'PAN-MAP', agentId: 'mapped-agent', model: 'test-model', cost: 0.0042 });
+    insertEvent({
+      ts,
+      issueId: 'PAN-MAP',
+      agentId: 'mapped-agent',
+      model: 'test-model',
+      cost: 0.0042,
+      sessionId: 'session-map',
+    });
     const results = queryCostEvents({ issueId: 'PAN-MAP' });
     expect(results[0].ts).toBe(ts);
     expect(results[0].issueId).toBe('PAN-MAP');
     expect(results[0].agentId).toBe('mapped-agent');
+    expect(results[0].sessionId).toBe('session-map');
     expect(results[0].model).toBe('test-model');
     expect(results[0].cost).toBeCloseTo(0.0042);
     expect(results[0].type).toBe('cost');

@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 40;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -302,6 +302,26 @@ export function initSchema(db: Database.Database): void {
       processed_at   TEXT NOT NULL,
       event_count    INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS transcript_checkpoints (
+      session_id                     TEXT PRIMARY KEY,
+      project_id                     TEXT NOT NULL,
+      workspace_id                   TEXT NOT NULL,
+      issue_id                       TEXT NOT NULL,
+      transcript_path                TEXT NOT NULL,
+      last_offset                    INTEGER NOT NULL DEFAULT 0,
+      last_observation_at            TEXT,
+      last_mid_turn_at               TEXT,
+      mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
+      updated_at                     TEXT NOT NULL,
+      claim_owner                    TEXT,
+      claim_from                     INTEGER,
+      claim_to                       INTEGER,
+      claim_expires_at               TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
+      ON transcript_checkpoints(project_id, issue_id, workspace_id);
 
     -- ===== API Cache =====
     CREATE TABLE IF NOT EXISTS api_cache (
@@ -1129,6 +1149,35 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 38) {
     initDiscoveredSessionsSchema(db);
     backfillDiscoveredSessionArrayIndexes(db);
+  }
+
+  // v38 → v39: add transcript checkpoints for memory extraction claim ranges
+  if (currentVersion < 39) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS transcript_checkpoints (
+        session_id                     TEXT PRIMARY KEY,
+        project_id                     TEXT NOT NULL,
+        workspace_id                   TEXT NOT NULL,
+        issue_id                       TEXT NOT NULL,
+        transcript_path                TEXT NOT NULL,
+        last_offset                    INTEGER NOT NULL DEFAULT 0,
+        last_observation_at            TEXT,
+        last_mid_turn_at               TEXT,
+        mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
+        updated_at                     TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
+        ON transcript_checkpoints(project_id, issue_id, workspace_id);
+    `);
+  }
+
+  // v39 → v40: add in-flight claim fields to transcript_checkpoints for atomic range reservation
+  if (currentVersion < 40) {
+    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_owner TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

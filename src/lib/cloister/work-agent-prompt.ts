@@ -25,6 +25,7 @@ export interface WorkAgentPromptContext {
   skipDynamicContext?: boolean;
   /** Pre-fetched tracker context (new comments, status). Injected by callers. */
   trackerContext?: string;
+  memoryContext?: string;
 }
 
 export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise<string> {
@@ -75,6 +76,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
       TLDR_AVAILABLE: existsSync(join(ctx.workspacePath, '.venv')),
+      MEMORY_CONTEXT: ctx.memoryContext || '',
     },
   }));
 }

@@ -16,10 +16,17 @@ optional:
   - PENDING_FEEDBACK
   - NEW_TRACKER_CONTEXT
   - TLDR_AVAILABLE
+  - MEMORY_CONTEXT
 ---
 # Working on Issue: {{ISSUE_ID}}
 
 **Workspace:** {{WORKSPACE_PATH}}
+
+{{#MEMORY_CONTEXT}}
+## Memory Context
+
+{{MEMORY_CONTEXT}}
+{{/MEMORY_CONTEXT}}
 
 ## CRITICAL: Stay In Your Workspace
 

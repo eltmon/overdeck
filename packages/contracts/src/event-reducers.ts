@@ -15,6 +15,11 @@ import type {
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
+  MemoryObservation,
+  MemoryStatus,
+  PendingTurn,
+  RagDecision,
+  ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
   TurnDiffSummary,
@@ -27,6 +32,33 @@ export interface ResolvedChannelPermissionDecision {
   agentId: string
   issueId?: string
   behavior: 'allow' | 'deny'
+}
+
+export interface MemoryHealthSnapshot {
+  projectId: string
+  issueId: string
+  status: 'healthy' | 'degraded' | 'failing'
+  reason: string | null
+  ragDecision?: RagDecision
+  updatedAt: string
+}
+
+export interface MemoryRollupTriggerSnapshot {
+  projectId: string
+  workspaceId: string
+  issueId: string
+  pendingTurns: PendingTurn[]
+  pendingCount: number
+  threshold: number
+  triggeredAt: string
+}
+
+export interface MemoryReadModelState {
+  observationsByIssueId: Record<string, MemoryObservation[]>
+  statusByIssueId: Record<string, MemoryStatus>
+  rollupsByIssueId: Record<string, MemoryRollupTriggerSnapshot[]>
+  resetMarkersByScopeId: Record<string, ResetMarker[]>
+  healthByIssueId: Record<string, MemoryHealthSnapshot>
 }
 
 export interface ReadModelState {
@@ -59,6 +91,11 @@ export interface ReadModelState {
   /** Bumped whenever a conversation is created, so the sidebar list can refresh
    * immediately instead of waiting for its poll tick. */
   conversationsListRevision: number
+  observationsByIssueId: Record<string, MemoryObservation[]>
+  statusByIssueId: Record<string, MemoryStatus>
+  rollupsByIssueId: Record<string, MemoryRollupTriggerSnapshot[]>
+  resetMarkersByScopeId: Record<string, ResetMarker[]>
+  healthByIssueId: Record<string, MemoryHealthSnapshot>
   /** PAN-457 — active scan progress snapshot */
   scanProgress: ScanProgressSnapshot | null
   /** PAN-457 — latest enrichment stats */
@@ -67,6 +104,8 @@ export interface ReadModelState {
   enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
   /** PAN-457 — latest per-session embedding progress */
   embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
+  /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
+  agentIdBySessionId: Record<string, string>
 }
 
 export interface ScanProgressSnapshot {
@@ -140,10 +179,16 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   conversationsListRevision: 0,
+  observationsByIssueId: {},
+  statusByIssueId: {},
+  rollupsByIssueId: {},
+  resetMarkersByScopeId: {},
+  healthByIssueId: {},
   scanProgress: null,
   enrichStats: null,
   enrichProgressBySessionId: {},
   embedProgressBySessionId: {},
+  agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -164,6 +209,18 @@ const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
 const MAX_SESSION_PROGRESS_ENTRIES = 100
 export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
+export const DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE = 50
+
+export function getMaxMemoryObservationsPerIssue(): number {
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_MEMORY_OBSERVATION_LIMIT
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE
+}
+
+export function trimMemoryObservations(observations: MemoryObservation[]): MemoryObservation[] {
+  const max = getMaxMemoryObservationsPerIssue()
+  return observations.length > max ? observations.slice(-max) : observations
+}
 
 export function getMaxTurnDiffSummariesPerAgent(): number {
   const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_TURN_DIFF_SUMMARY_LIMIT
@@ -203,6 +260,18 @@ export function omitTurnDiffSummariesForAgent(
 ): ReadModelState['turnDiffSummariesByAgentId'] {
   const { [agentId]: _removed, ...rest } = turnDiffSummariesByAgentId ?? {}
   return rest
+}
+
+/** Remove all entries in agentIdBySessionId that point to the given agentId. */
+function removeAgentFromSessionIndex(
+  agentIdBySessionId: ReadModelState['agentIdBySessionId'],
+  agentId: string,
+): ReadModelState['agentIdBySessionId'] {
+  const next: Record<string, string> = {}
+  for (const [sessionId, id] of Object.entries(agentIdBySessionId)) {
+    if (id !== agentId) next[sessionId] = id
+  }
+  return next
 }
 
 // ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
@@ -253,6 +322,17 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     channelPermissionRequestIdsByAgentId[request.agentId] = [...existing, request.requestId]
   }
 
+  const memory = snapshot.memory as Partial<MemoryReadModelState> | undefined
+
+  // Rebuild sessionId → agentId index from snapshot
+  const agentIdBySessionId: Record<string, string> = {}
+  for (const agent of snapshot.agents) {
+    if (agent.sessionId) agentIdBySessionId[agent.sessionId] = agent.id
+  }
+  for (const [agentId, runtime] of Object.entries(snapshot.agentRuntimeById ?? {})) {
+    if (runtime.claudeSessionId) agentIdBySessionId[runtime.claudeSessionId] = agentId
+  }
+
   return {
     ...state,
     sequence: snapshot.sequence,
@@ -265,10 +345,16 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
+    observationsByIssueId: memory?.observationsByIssueId ?? state.observationsByIssueId,
+    statusByIssueId: memory?.statusByIssueId ?? state.statusByIssueId,
+    rollupsByIssueId: memory?.rollupsByIssueId ?? state.rollupsByIssueId,
+    resetMarkersByScopeId: memory?.resetMarkersByScopeId ?? state.resetMarkersByScopeId,
+    healthByIssueId: memory?.healthByIssueId ?? state.healthByIssueId,
     scanProgress: snapshot.scanProgress ?? null,
     enrichStats: snapshot.enrichStats ?? null,
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
+    agentIdBySessionId,
   }
 }
 
@@ -278,27 +364,38 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
   switch (event.type) {
     case 'agent.created': {
       const existing = state.agentsById[event.payload.agentId]
+      const agent = event.payload.agent
+      const nextAgentIdBySessionId = agent.sessionId
+        ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
+        : state.agentIdBySessionId
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: {
           ...state.agentsById,
           [event.payload.agentId]: existing
-            ? { ...existing, ...event.payload.agent }
-            : event.payload.agent,
+            ? { ...existing, ...agent }
+            : agent,
         },
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 
-    case 'agent.started':
+    case 'agent.started': {
+      const agent = event.payload.agent
+      const nextAgentIdBySessionId = agent.sessionId
+        ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
+        : state.agentIdBySessionId
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: {
           ...state.agentsById,
-          [event.payload.agentId]: event.payload.agent,
+          [event.payload.agentId]: agent,
         },
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
+    }
 
     case 'agent.enrichment_changed': {
       const agent = state.agentsById[event.payload.agentId]
@@ -373,6 +470,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
         resolvedChannelPermissionDecisionIdsByAgentId: restResolvedIds,
         turnDiffSummariesByAgentId: omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId),
+        agentIdBySessionId: removeAgentFromSessionIndex(state.agentIdBySessionId, event.payload.agentId),
       }
     }
 
@@ -633,8 +731,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
       )
       let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
+      let nextAgentIdBySessionId = state.agentIdBySessionId
       for (const agentId of removedAgentIds) {
         nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+        nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, agentId)
       }
       const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
         if (issue['identifier'] === issueId || issue['id'] === issueId) {
@@ -647,6 +747,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+        agentIdBySessionId: nextAgentIdBySessionId,
         issuesRaw: updatedIssues,
       }
     }
@@ -655,10 +756,12 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const { issueId, sessionName } = event.payload
       let updatedAgents: typeof state.agentsById
       let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
+      let nextAgentIdBySessionId = state.agentIdBySessionId
       if (sessionName) {
         const { [sessionName]: _removed, ...rest } = state.agentsById
         updatedAgents = rest
         nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, sessionName)
+        nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, sessionName)
       } else {
         const removedAgentIds = Object.entries(state.agentsById)
           .filter(([, agent]) => agent.issueId === issueId)
@@ -668,6 +771,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         )
         for (const agentId of removedAgentIds) {
           nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+          nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, agentId)
         }
       }
       return {
@@ -675,6 +779,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 
@@ -685,6 +790,94 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.items_unblocked':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'memory.observation_created': {
+      const observation = event.payload.observation
+      const existing = state.observationsByIssueId[observation.issueId] ?? []
+      const index = existing.findIndex(entry => entry.id === observation.id)
+      const updated = trimMemoryObservations(index === -1
+        ? [...existing, observation]
+        : existing.map((entry, entryIndex) => entryIndex === index ? observation : entry))
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        observationsByIssueId: {
+          ...state.observationsByIssueId,
+          [observation.issueId]: updated,
+        },
+      }
+    }
+
+    case 'memory.status_updated': {
+      const { identity, status } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        statusByIssueId: {
+          ...state.statusByIssueId,
+          [identity.issueId]: status,
+        },
+      }
+    }
+
+    case 'memory.rollup_triggered': {
+      const trigger: MemoryRollupTriggerSnapshot = {
+        projectId: event.payload.projectId,
+        workspaceId: event.payload.workspaceId,
+        issueId: event.payload.issueId,
+        pendingTurns: [],
+        pendingCount: event.payload.pendingCount,
+        threshold: event.payload.threshold,
+        triggeredAt: event.timestamp,
+      }
+      const existing = state.rollupsByIssueId[event.payload.issueId] ?? []
+      const updated = [...existing, trigger].slice(-10)
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        rollupsByIssueId: {
+          ...state.rollupsByIssueId,
+          [event.payload.issueId]: updated,
+        },
+      }
+    }
+
+    case 'memory.reset_marker_created': {
+      const { marker } = event.payload
+      const key = `${marker.scope}:${marker.scopeId}`
+      const existing = state.resetMarkersByScopeId[key] ?? []
+      const index = existing.findIndex(entry => entry.id === marker.id)
+      const updated = index === -1
+        ? [...existing, marker]
+        : existing.map((entry, entryIndex) => entryIndex === index ? marker : entry)
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        resetMarkersByScopeId: {
+          ...state.resetMarkersByScopeId,
+          [key]: updated,
+        },
+      }
+    }
+
+    case 'memory.health_changed': {
+      const health: MemoryHealthSnapshot = {
+        projectId: event.payload.projectId,
+        issueId: event.payload.issueId,
+        status: event.payload.status,
+        reason: event.payload.reason,
+        ragDecision: event.payload.ragDecision,
+        updatedAt: event.timestamp,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        healthByIssueId: {
+          ...state.healthByIssueId,
+          [event.payload.issueId]: health,
+        },
+      }
+    }
 
     // ─── PAN-800 Agent Runtime Events ──────────────────────────────────────
     case 'agent.activity_changed': {
@@ -929,11 +1122,20 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
+      let nextAgentIdBySessionId = state.agentIdBySessionId
+      if (claudeSessionId && claudeSessionId !== prev.claudeSessionId) {
+        nextAgentIdBySessionId = { ...state.agentIdBySessionId, [claudeSessionId]: agentId }
+        if (prev.claudeSessionId && state.agentIdBySessionId[prev.claudeSessionId] === agentId) {
+          const { [prev.claudeSessionId]: _removed, ...rest } = state.agentIdBySessionId
+          nextAgentIdBySessionId = { ...rest, [claudeSessionId]: agentId }
+        }
+      }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
         agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 

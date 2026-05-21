@@ -61,6 +61,22 @@ export interface TmuxConfig {
   config_mode?: TmuxConfigMode;
 }
 
+export interface MemoryConfig {
+  extraction?: {
+    provider?: 'anthropic' | 'cliproxy';
+    model?: string;
+    per_day_cost_cap_usd?: number;
+    fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+  };
+  features?: {
+    observations?: boolean;
+    prompt_time_injection?: boolean;
+  };
+  rollup_pending_threshold?: number;
+  sidebar_refresh_interval_ms?: number;
+  worker_concurrency?: number;
+}
+
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
 
 export interface ConversationsConfig {
@@ -295,6 +311,9 @@ export interface YamlConfig {
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
 
+  /** Durable memory extraction and retrieval configuration */
+  memory?: MemoryConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -491,6 +510,21 @@ export interface NormalizedConfig {
     };
   };
 
+  /** Durable memory extraction and retrieval configuration */
+  memory: {
+    extraction: {
+      provider?: 'anthropic' | 'cliproxy';
+      model?: string;
+      perDayCostCapUsd?: number;
+      fallbackChain: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+    };
+    observationsEnabled: boolean;
+    promptTimeInjectionEnabled: boolean;
+    rollupPendingThreshold: number;
+    sidebarRefreshIntervalMs: number;
+    workerConcurrency: number;
+  };
+
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
 
@@ -670,6 +704,16 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       maxParallel: 4,
       costConfirmThreshold: 1.00,
     },
+  },
+  memory: {
+    extraction: {
+      fallbackChain: [],
+    },
+    observationsEnabled: true,
+    promptTimeInjectionEnabled: true,
+    rollupPendingThreshold: 4,
+    sidebarRefreshIntervalMs: 10_000,
+    workerConcurrency: 4,
   },
   shadow: {
     enabled: false,
@@ -1142,6 +1186,17 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
+    memory: {
+      extraction: {
+        ...DEFAULT_CONFIG.memory.extraction,
+        fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain],
+      },
+      observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
+      promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+      rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
+      sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
+      workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
+    },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -1351,6 +1406,33 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.conversations?.enrichment?.cost_confirm_threshold !== undefined) {
       result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
+    }
+
+    if (config.memory) {
+      if (config.memory.extraction) {
+        result.memory.extraction = {
+          ...result.memory.extraction,
+          ...(config.memory.extraction.provider !== undefined ? { provider: config.memory.extraction.provider } : {}),
+          ...(config.memory.extraction.model !== undefined ? { model: config.memory.extraction.model } : {}),
+          ...(config.memory.extraction.per_day_cost_cap_usd !== undefined ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {}),
+          ...(config.memory.extraction.fallback_chain !== undefined ? { fallbackChain: config.memory.extraction.fallback_chain } : {}),
+        };
+      }
+      if (config.memory.features?.observations !== undefined) {
+        result.memory.observationsEnabled = config.memory.features.observations;
+      }
+      if (config.memory.features?.prompt_time_injection !== undefined) {
+        result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+      }
+      if (config.memory.rollup_pending_threshold !== undefined) {
+        result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
+      }
+      if (config.memory.sidebar_refresh_interval_ms !== undefined) {
+        result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
+      }
+      if (config.memory.worker_concurrency !== undefined) {
+        result.memory.workerConcurrency = config.memory.worker_concurrency;
+      }
     }
 
     // Merge OpenRouter favorites

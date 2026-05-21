@@ -148,6 +148,19 @@ export interface ApiSettingsConfig {
       cost_confirm_threshold?: number;
     };
   };
+  memory?: {
+    provider?: 'anthropic' | 'cliproxy';
+    model?: string;
+    per_day_cost_cap_usd?: number;
+    fallback_provider?: 'anthropic' | 'cliproxy' | '';
+    fallback_model?: string;
+    fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+    observations_enabled?: boolean;
+    prompt_time_injection_enabled?: boolean;
+    rollup_pending_threshold?: number;
+    sidebar_refresh_interval_ms?: number;
+    worker_concurrency?: number;
+  };
   api_keys: {
     openai?: string;
     voyage?: string;
@@ -472,6 +485,15 @@ export function loadSettingsApi(): ApiSettingsConfig {
     }) : undefined,
   });
 
+  const memory = config.memory ?? {
+    extraction: { fallbackChain: [] },
+    observationsEnabled: true,
+    promptTimeInjectionEnabled: true,
+    rollupPendingThreshold: 4,
+    sidebarRefreshIntervalMs: 10_000,
+    workerConcurrency: 4,
+  };
+
   return {
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
@@ -499,6 +521,19 @@ export function loadSettingsApi(): ApiSettingsConfig {
       config_mode: config.tmux.configMode,
     },
     conversations: conversationSettings,
+    memory: {
+      provider: memory.extraction.provider,
+      model: memory.extraction.model,
+      per_day_cost_cap_usd: memory.extraction.perDayCostCapUsd,
+      fallback_provider: memory.extraction.fallbackChain[0]?.provider ?? '',
+      fallback_model: memory.extraction.fallbackChain[0]?.model,
+      fallback_chain: memory.extraction.fallbackChain,
+      observations_enabled: memory.observationsEnabled,
+      prompt_time_injection_enabled: memory.promptTimeInjectionEnabled,
+      rollup_pending_threshold: memory.rollupPendingThreshold,
+      sidebar_refresh_interval_ms: memory.sidebarRefreshIntervalMs,
+      worker_concurrency: memory.workerConcurrency,
+    },
     tracker_keys: config.trackerKeys,
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
@@ -552,6 +587,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
     ['conversations', config.conversations],
+    ['memory', config.memory],
     ['tracker_keys', config.tracker_keys],
     ['experimental', config.experimental],
     ['claude', config.claude],
@@ -628,6 +664,25 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
+    memory: settings.memory
+      ? {
+          extraction: {
+            provider: settings.memory.provider || undefined,
+            model: settings.memory.model || undefined,
+            per_day_cost_cap_usd: settings.memory.per_day_cost_cap_usd,
+            fallback_chain: settings.memory.fallback_chain ?? (settings.memory.fallback_provider && settings.memory.fallback_model
+              ? [{ provider: settings.memory.fallback_provider, model: settings.memory.fallback_model }]
+              : undefined),
+          },
+          features: {
+            observations: settings.memory.observations_enabled,
+            prompt_time_injection: settings.memory.prompt_time_injection_enabled,
+          },
+          rollup_pending_threshold: settings.memory.rollup_pending_threshold,
+          sidebar_refresh_interval_ms: settings.memory.sidebar_refresh_interval_ms,
+          worker_concurrency: settings.memory.worker_concurrency,
+        }
+      : undefined,
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
       ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
@@ -685,6 +740,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     conversations: {
       ...current.conversations,
       ...updates.conversations,
+    },
+    memory: {
+      ...current.memory,
+      ...updates.memory,
     },
     tracker_keys: {
       ...current.tracker_keys,
@@ -779,6 +838,21 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     const level = settings.models.gemini_thinking_level;
     if (level < 1 || level > 4) {
       errors.push('Gemini thinking level must be between 1 and 4');
+    }
+  }
+
+  if (settings.memory !== undefined) {
+    if (settings.memory.per_day_cost_cap_usd !== undefined && settings.memory.per_day_cost_cap_usd < 0) {
+      errors.push('memory.per_day_cost_cap_usd must be greater than or equal to 0');
+    }
+    if (settings.memory.rollup_pending_threshold !== undefined && (!Number.isInteger(settings.memory.rollup_pending_threshold) || settings.memory.rollup_pending_threshold < 1)) {
+      errors.push('memory.rollup_pending_threshold must be a positive integer');
+    }
+    if (settings.memory.sidebar_refresh_interval_ms !== undefined && (!Number.isInteger(settings.memory.sidebar_refresh_interval_ms) || settings.memory.sidebar_refresh_interval_ms < 1)) {
+      errors.push('memory.sidebar_refresh_interval_ms must be a positive integer');
+    }
+    if (settings.memory.worker_concurrency !== undefined && (!Number.isInteger(settings.memory.worker_concurrency) || settings.memory.worker_concurrency < 1)) {
+      errors.push('memory.worker_concurrency must be a positive integer');
     }
   }
 

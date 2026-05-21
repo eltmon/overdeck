@@ -81,6 +81,7 @@ import { restartCommand } from './commands/restart.js';
 import { reloadCommand } from './commands/reload.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
+import { createMemoryCommand } from './commands/memory.js';
 import { planCommand } from './commands/plan.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
@@ -453,6 +454,8 @@ registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)
 registerReleaseCommands(program);
+
+program.addCommand(createMemoryCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);

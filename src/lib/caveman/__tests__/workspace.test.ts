@@ -13,6 +13,7 @@ import { getCavemanHooksDir } from '../setup.js';
 import {
   determineCavemanVariant,
   injectCavemanSettings,
+  injectMemoryHookSettings,
   readCavemanVariant,
   type CavemanVariant,
 } from '../workspace.js';
@@ -22,17 +23,22 @@ const mockGetHooksDir = vi.mocked(getCavemanHooksDir);
 let testBase: string;
 let workspaceDir: string;
 let hooksDir: string;
+let originalPanopticonHome: string | undefined;
 
 beforeEach(() => {
   testBase = join(tmpdir(), `caveman-ws-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   workspaceDir = join(testBase, 'workspace');
   hooksDir = join(testBase, 'hooks');
+  originalPanopticonHome = process.env.PANOPTICON_HOME;
+  process.env.PANOPTICON_HOME = join(testBase, 'pan-home');
   mkdirSync(workspaceDir, { recursive: true });
   mkdirSync(hooksDir, { recursive: true });
   mockGetHooksDir.mockReturnValue(hooksDir);
 });
 
 afterEach(() => {
+  if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
+  else process.env.PANOPTICON_HOME = originalPanopticonHome;
   rmSync(testBase, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
@@ -81,6 +87,61 @@ describe('readCavemanVariant', () => {
     mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
     writeFileSync(join(workspaceDir, '.claude', '.caveman-variant'), 'garbage-value\n');
     expect(await readCavemanVariant(workspaceDir)).toBe('off');
+  });
+});
+
+describe('injectMemoryHookSettings', () => {
+  it('installs Stop, SessionStart, and UserPromptSubmit memory hooks into fresh settings', async () => {
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop[0].hooks[0]).toMatchObject({ type: 'command', timeout: 1 });
+    expect(settings.hooks.Stop[0].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('panopticon-memory-hook.js" session-start');
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0]).toMatchObject({ type: 'command', timeout: 2 });
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('panopticon-memory-hook.js" prompt-inject');
+
+    const scriptPath = settings.hooks.Stop[0].hooks[0].command.match(/node "([^"]+)" turn/)?.[1];
+    expect(scriptPath).toContain(join(process.env.PANOPTICON_HOME!, 'hooks', 'memory', 'panopticon-memory-hook.js'));
+    expect(scriptPath).not.toContain(workspaceDir);
+    const script = readFileSync(scriptPath, 'utf-8');
+    expect(script).toContain('/api/memory/turn');
+    expect(script).toContain('/api/memory/session/start');
+    expect(script).toContain('/api/memory/inject');
+  });
+
+  it('preserves existing hooks and does not duplicate memory hooks on repeated setup', async () => {
+    mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
+    writeFileSync(
+      join(workspaceDir, '.claude', 'settings.json'),
+      JSON.stringify({ hooks: { Stop: [{ matcher: '.*', hooks: [{ type: 'command', command: 'echo existing' }] }] } })
+    );
+
+    await injectMemoryHookSettings(workspaceDir);
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop).toHaveLength(2);
+    expect(settings.hooks.Stop[0].hooks[0].command).toBe('echo existing');
+    expect(settings.hooks.Stop[1].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
+  });
+
+  it('reinstalls all memory hooks after workspace settings are recreated', async () => {
+    await injectMemoryHookSettings(workspaceDir);
+    rmSync(join(workspaceDir, '.claude'), { recursive: true, force: true });
+    mkdirSync(workspaceDir, { recursive: true });
+
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
+    const scriptPath = settings.hooks.UserPromptSubmit[0].hooks[0].command.match(/node "([^"]+)" prompt-inject/)?.[1];
+    expect(scriptPath).not.toContain(workspaceDir);
+    expect(readFileSync(scriptPath, 'utf-8')).toContain('x-panopticon-internal-token');
   });
 });
 

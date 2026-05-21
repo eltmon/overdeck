@@ -17,6 +17,8 @@
 import { useMemo, useState } from 'react';
 import { getHarness } from '@panctl/contracts';
 import type { Issue, Agent } from '../../../types';
+import { selectMemoryObservations, selectMemoryStatus, useDashboardStore } from '../../../lib/store';
+import { WorkspaceStatusCard } from '../WorkspaceStatusCard';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
 import { RoundCard, type RoundData, type RoundVerdict } from '../RoundCard';
@@ -229,6 +231,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const [isSpawnPending, setIsSpawnPending] = useState(false);
   const [containerMenu, setContainerMenu] = useState<ContainerMenuState | null>(null);
   const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const [memorySummaryMessage, setMemorySummaryMessage] = useState<string | null>(null);
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const containerControlMutation = useMutation({
@@ -262,6 +265,32 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
+  });
+
+  const memorySummaryMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/memory-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate memory summary');
+      }
+      return res.json() as Promise<{ status: string; path: string; observationCount: number; previousObservationCount: number | null }>;
+    },
+    onSuccess: (result) => {
+      if (result.status === 'insufficient-data') {
+        setMemorySummaryMessage(`Insufficient data: ${result.observationCount} observations found; 3 required.`);
+      } else if (result.status === 'up-to-date') {
+        setMemorySummaryMessage(`Summary already up to date; ${result.observationCount - (result.previousObservationCount ?? 0)} new observations found, 20 required.`);
+      } else {
+        setMemorySummaryMessage(`Generated daily memory summary at ${result.path}.`);
+      }
+    },
+    onError: (error) => {
+      setMemorySummaryMessage(error instanceof Error ? error.message : 'Failed to generate memory summary');
+    },
   });
 
   const planning = usePlanningSummaryQuery(issueId);
@@ -307,6 +336,19 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
   const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
+  const memoryStatus = useDashboardStore(selectMemoryStatus(issueId));
+  const memoryObservations = useDashboardStore(selectMemoryObservations(issueId));
+  const workspaceStatusIssue = issue ?? {
+    identifier: issueId,
+    title: issueId,
+    description: undefined,
+  };
+  const workspaceStatusStats = {
+    additions: pr.data?.pr?.additions ?? 0,
+    deletions: pr.data?.pr?.deletions ?? 0,
+    commits: workspace.data?.git?.ahead ?? 0,
+    prs: pr.data?.pr ? 1 : 0,
+  };
 
   const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
     e.preventDefault();
@@ -325,6 +367,29 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         lineHeight: 1.5,
       }}
     >
+      <WorkspaceStatusCard
+        issue={workspaceStatusIssue}
+        status={memoryStatus}
+        observations={memoryObservations}
+        stats={workspaceStatusStats}
+        onOpenWorkspaceHome={() => onSwitchTab?.('overview')}
+      />
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 text-xs">
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground hover:border-primary/60 hover:bg-popover disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={memorySummaryMutation.isPending}
+          onClick={() => {
+            setMemorySummaryMessage(null);
+            memorySummaryMutation.mutate();
+          }}
+        >
+          {memorySummaryMutation.isPending ? 'Generating memory summary…' : 'Generate memory summary'}
+        </button>
+        {memorySummaryMessage && <span className="text-muted-foreground">{memorySummaryMessage}</span>}
+      </div>
+
       {/* 1. Status billboard */}
       <section
         data-testid="overview-billboard"
