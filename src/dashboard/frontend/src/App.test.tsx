@@ -79,6 +79,7 @@ vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { c
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
 vi.mock('./components/skeletons/AgentsSkeleton', () => ({ AgentsSkeleton: () => null }));
 vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () => null }));
+vi.mock('./components/skeletons/PipelineSkeleton', () => ({ PipelineSkeleton: () => null }));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
