@@ -24,6 +24,7 @@ import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionN
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
+import { Effect } from 'effect';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 
 // Worst-case respawn window for switch-model / resume / restart-all is
@@ -477,11 +478,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
           cols: hub.cols,
           rows: hub.rows,
           cwd: homedir(),
-          env: buildChildEnvWithoutTmux(process.env, {
+          env: Effect.runSync(buildChildEnvWithoutTmux(process.env, {
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',
             LANG: 'en_US.UTF-8',
-          }) as { [key: string]: string },
+          })) as { [key: string]: string },
         });
 
         hub.pty = ptyProcess;

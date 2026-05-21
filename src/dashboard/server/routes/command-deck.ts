@@ -1056,7 +1056,7 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
-    const env = buildChildEnv(process.env, providerEnv);
+    const env = Effect.runSync(buildChildEnv(process.env, providerEnv));
     const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
       `${cliCmd} -p${modelFlag} --no-session-persistence`,

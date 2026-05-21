@@ -2263,9 +2263,10 @@ const postAgentsRoute = HttpRouter.add(
     if (!existsSync(workspacePath)) {
       try {
         const nodeDir = dirname(process.execPath);
+        const wsCreateEnv = yield* buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` });
         yield* Effect.promise(() => execAsync(
           `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: wsCreateEnv }
         ));
       } catch (wsErr) {
         return jsonResponse({
@@ -2997,7 +2998,7 @@ const postAgentsRoute = HttpRouter.add(
                   const containerChild = spawn('./dev', ['all'], {
                     cwd: workspacePath,
                     stdio: 'ignore',
-                    env: buildChildEnvWithoutTmux(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` }),
+                    env: Effect.runSync(buildChildEnvWithoutTmux(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` })),
                     detached: true,
                   });
                   containerChild.unref();

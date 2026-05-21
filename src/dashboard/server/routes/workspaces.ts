@@ -2331,7 +2331,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           cwd: workspaceDir,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
+          env: Effect.runSync(buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` })),
         });
 
         devUp.stdout?.on('data', (data) => {

@@ -1072,7 +1072,7 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
 
   // Build provider-env for the title model (same routing as conversation sessions)
   const providerEnv = await getProviderEnvForModel(titleModel);
-  const childEnv = { ...buildChildEnv(), ...providerEnv };
+  const childEnv = { ...Effect.runSync(buildChildEnv()), ...providerEnv };
 
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(

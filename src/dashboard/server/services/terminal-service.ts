@@ -128,11 +128,11 @@ async function getNodePty() {
 
 /** Spawn PTY immediately — caller must ensure tmux session exists. */
 function spawnPtyImmediate(sessionName: string, cols: number, rows: number): PtyProcess {
-  const env = buildChildEnvWithoutTmux(process.env, {
+  const env = Effect.runSync(buildChildEnvWithoutTmux(process.env, {
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     LANG: 'en_US.UTF-8',
-  });
+  }));
   const cwd = homedir();
 
   if (isBun()) {
