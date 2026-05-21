@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { LinearClient } from '@linear/sdk';
 import { reopenWorkspaceState } from '../../lib/reopen.js';
+import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
@@ -408,7 +409,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
   const spinner = ora(`Fetching issue ${id}...`).start();
 
   try {
-    const apiKey = getLinearApiKey();
+    const apiKey = Effect.runSync(getLinearApiKey());
     if (!apiKey) {
       spinner.fail('LINEAR_API_KEY not found');
       console.log('');

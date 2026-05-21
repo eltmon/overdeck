@@ -14,6 +14,7 @@ import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { findPlan } from '../../lib/vbrief/io.js';
@@ -254,7 +255,7 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   }
 
   if (isLinearIssue(issueId)) {
-    const apiKey = getLinearApiKey();
+    const apiKey = Effect.runSync(getLinearApiKey());
     if (apiKey) {
       try {
         const { LinearClient } = await import('@linear/sdk');
@@ -413,7 +414,7 @@ async function handleRemoteWorkspace(
         }
       }
     } else if (isLinearIssue(issueId)) {
-      const apiKey = getLinearApiKey();
+      const apiKey = Effect.runSync(getLinearApiKey());
       if (apiKey) {
         const updated = await updateLinearToInProgress(apiKey, issueId);
         if (updated) {
