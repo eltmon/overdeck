@@ -19,6 +19,7 @@ import { embed } from './providers.js';
 import { getConversationsConfig } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
+import { Effect } from 'effect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,12 +161,12 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
     }
 
     try {
-      const embedResult = await embedFn(provider, {
+      const embedResult = await Effect.runPromise(embedFn(provider, {
         text,
         model,
         baseUrl: opts.ollamaBaseUrl,
         apiKey: provider === 'ollama' ? undefined : config.apiKeys?.[provider],
-      });
+      }));
 
       insertEmbedding(session.id, model, embedResult.embedding);
       result.embedded++;

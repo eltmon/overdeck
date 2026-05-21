@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { Effect } from 'effect';
 
 import { normalizeEmbedding } from '../embeddings/providers.js';
 import { buildEmbeddingText, embedSessions } from '../embeddings/index.js';
@@ -168,14 +169,13 @@ describe('buildEmbeddingText', () => {
 
 // ─── embedSessions ────────────────────────────────────────────────────────────
 
-const mockEmbedFn = async (_provider: unknown, opts: { text: string }): Promise<EmbeddingResult> => {
-  // Return a deterministic fake embedding based on text length
+const mockEmbedFn = (_provider: unknown, opts: { text: string }): Effect.Effect<EmbeddingResult> => {
   const dim = 8;
   const values = Array.from({ length: dim }, (_, i) => (opts.text.length + i) / 1000);
-  return {
+  return Effect.succeed({
     embedding: new Float32Array(values),
     model: 'text-embedding-3-small',
-  };
+  });
 };
 
 describe('embedSessions', () => {
@@ -225,10 +225,9 @@ describe('embedSessions', () => {
 
   it('stores OpenAI text-embedding-3-small embeddings as 1536 dimensions', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
-      embedding: new Float32Array(1536).fill(0.1),
-      model: opts.model,
-    }));
+    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+      Effect.succeed({ embedding: new Float32Array(1536).fill(0.1), model: opts.model }),
+    );
 
     const result = await embedSessions({
       model: 'text-embedding-3-small',
@@ -244,10 +243,9 @@ describe('embedSessions', () => {
 
   it('uses nomic-embed-text as the Ollama provider default', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
-      embedding: new Float32Array(768).fill(0.1),
-      model: opts.model,
-    }));
+    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+      Effect.succeed({ embedding: new Float32Array(768).fill(0.1), model: opts.model }),
+    );
 
     const result = await embedSessions({
       provider: 'ollama',
@@ -275,10 +273,9 @@ describe('embedSessions', () => {
 
   it('stores Voyage voyage-code-3 embeddings as 1024 dimensions', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
-      embedding: new Float32Array(1024).fill(0.1),
-      model: opts.model,
-    }));
+    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+      Effect.succeed({ embedding: new Float32Array(1024).fill(0.1), model: opts.model }),
+    );
 
     const result = await embedSessions({
       provider: 'voyage',
