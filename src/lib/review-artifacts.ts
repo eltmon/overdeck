@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { Data, Effect } from 'effect';
 import { findPlan } from './vbrief/io.js';
 import { promisify } from 'node:util';
 import { queryBeadsForIssue } from './beads-query.js';
@@ -186,3 +187,46 @@ export async function createReviewArtifactsForIssue(
 
   return { mergeSet, artifacts };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for review-artifacts Effect variants. */
+export class ReviewArtifactError extends Data.TaggedError('ReviewArtifactError')<{
+  readonly issueId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `buildRichReviewArtifactBody`. */
+export const buildRichReviewArtifactBodyEffect = (
+  issueId: string,
+  workspacePath: string,
+): Effect.Effect<string, ReviewArtifactError> =>
+  Effect.tryPromise({
+    try: () => buildRichReviewArtifactBody(issueId, workspacePath),
+    catch: (cause) =>
+      new ReviewArtifactError({
+        issueId,
+        stage: 'buildRichReviewArtifactBody',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `createReviewArtifactsForIssue`. */
+export const createReviewArtifactsForIssueEffect = (
+  issueId: string,
+  workspacePath: string,
+): Effect.Effect<ReviewArtifactCreationResult, ReviewArtifactError> =>
+  Effect.tryPromise({
+    try: () => createReviewArtifactsForIssue(issueId, workspacePath),
+    catch: (cause) =>
+      new ReviewArtifactError({
+        issueId,
+        stage: 'createReviewArtifactsForIssue',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

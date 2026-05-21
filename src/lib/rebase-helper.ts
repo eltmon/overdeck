@@ -17,6 +17,7 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { Data, Effect } from 'effect';
 import { MergeSet } from './merge-set.js';
 
 const execAsync = promisify(exec);
@@ -205,3 +206,35 @@ async function tryResolvePlanningConflicts(
     return { resolved: false, remainingConflicts: ['(error checking rebase status)'] };
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variant of the rebase helper. The Promise-returning
+// API is preserved for existing callers; new Effect-based callers can compose
+// `rebaseAndPushReposEffect` directly without round-tripping through
+// `Effect.runPromise`.
+
+/** Tagged error for rebase-helper Effect variants. */
+export class RebaseError extends Data.TaggedError('RebaseError')<{
+  readonly workspacePath: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `rebaseAndPushRepos`. Failure shape never throws — the
+ *  result's `success: false` carries the failed-repo details. The Effect
+ *  channel surfaces unexpected exceptions only. */
+export const rebaseAndPushReposEffect = (
+  workspacePath: string,
+  mergeSet: MergeSet,
+): Effect.Effect<RebaseAllResult, RebaseError> =>
+  Effect.tryPromise({
+    try: () => rebaseAndPushRepos(workspacePath, mergeSet),
+    catch: (cause) =>
+      new RebaseError({
+        workspacePath,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

@@ -7,6 +7,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
+import { Data, Effect } from 'effect';
 import {
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
@@ -967,3 +968,88 @@ export function getOpenRouterFavorites(): string[] {
   const settings = loadSettingsApi();
   return settings.openrouter?.favorites ?? [];
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants for the genuinely-async settings-api
+// surfaces. Sync helpers (`loadSettingsApi`, `getRoleConfig`, validation,
+// defaults) remain unwrapped — they're pure reads of an in-memory parsed
+// config. Only the disk-writing helpers receive Effect variants.
+
+/** Tagged error for settings-api Effect variants. */
+export class SettingsApiError extends Data.TaggedError('SettingsApiError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `saveSettingsApi`. */
+export const saveSettingsApiEffect = (
+  settings: ApiSettingsConfig,
+): Effect.Effect<void, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => saveSettingsApi(settings),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'saveSettingsApi',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `updateSettingsApi`. */
+export const updateSettingsApiEffect = (
+  updates: Partial<ApiSettingsConfig>,
+): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => updateSettingsApi(updates),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'updateSettingsApi',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `setRoleConfig`. */
+export const setRoleConfigEffect = (
+  role: Role,
+  roleConfig: RoleConfig,
+): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => setRoleConfig(role, roleConfig),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'setRoleConfig',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `updateProviderApiKey`. */
+export const updateProviderApiKeyEffect = (
+  ...args: Parameters<typeof updateProviderApiKey>
+): Effect.Effect<Awaited<ReturnType<typeof updateProviderApiKey>>, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => updateProviderApiKey(...args),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'updateProviderApiKey',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `saveOpenRouterFavorites`. */
+export const saveOpenRouterFavoritesEffect = (
+  favorites: string[],
+): Effect.Effect<void, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => saveOpenRouterFavorites(favorites),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'saveOpenRouterFavorites',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

@@ -28,6 +28,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { Data, Effect } from 'effect';
 
 import type { RuntimeName } from './runtimes/types.js';
 import { sessionFilePath } from './paths.js';
@@ -224,3 +225,31 @@ export async function convertConversationTranscript(opts: ConvertOptions): Promi
   await writeFile(targetSessionFile, `${lines.join('\n')}\n`, 'utf-8');
   return { sessionId, targetSessionFile };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for session-format-converter Effect variants. */
+export class SessionConvertError extends Data.TaggedError('SessionConvertError')<{
+  readonly fromHarness: RuntimeName;
+  readonly toHarness: RuntimeName;
+  readonly sourceSessionFile: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `convertConversationTranscript`. */
+export const convertConversationTranscriptEffect = (
+  opts: ConvertOptions,
+): Effect.Effect<ConvertResult, SessionConvertError> =>
+  Effect.tryPromise({
+    try: () => convertConversationTranscript(opts),
+    catch: (cause) =>
+      new SessionConvertError({
+        fromHarness: opts.fromHarness,
+        toHarness: opts.toHarness,
+        sourceSessionFile: opts.sourceSessionFile,
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

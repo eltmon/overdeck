@@ -10,6 +10,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Data, Effect } from 'effect';
 import { loadConfig } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
 import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
@@ -192,3 +193,30 @@ EOF`);
 
   return metadata;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for remote-workspace Effect variants. */
+export class RemoteWorkspaceError extends Data.TaggedError('RemoteWorkspaceError')<{
+  readonly issueId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `createRemoteWorkspace`. */
+export const createRemoteWorkspaceEffect = (
+  issueId: string,
+  options: CreateRemoteWorkspaceOptions = {},
+): Effect.Effect<RemoteWorkspaceMetadata, RemoteWorkspaceError> =>
+  Effect.tryPromise({
+    try: () => createRemoteWorkspace(issueId, options),
+    catch: (cause) =>
+      new RemoteWorkspaceError({
+        issueId,
+        stage: 'createRemoteWorkspace',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+

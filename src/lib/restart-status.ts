@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { Data, Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
 
 export type RestartTrigger = 'pan reload' | 'pan restart' | 'watchdog';
@@ -60,3 +61,39 @@ export async function readRestartStatus(): Promise<RestartStatus | null> {
     return null;
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Tagged error for restart-status Effect variants. */
+export class RestartStatusError extends Data.TaggedError('RestartStatusError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `writeRestartStatus`. */
+export const writeRestartStatusEffect = (
+  entry: RestartStatus,
+): Effect.Effect<void, RestartStatusError> =>
+  Effect.tryPromise({
+    try: () => writeRestartStatus(entry),
+    catch: (cause) =>
+      new RestartStatusError({
+        operation: 'writeRestartStatus',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `readRestartStatus`. */
+export const readRestartStatusEffect = (): Effect.Effect<RestartStatus | null, RestartStatusError> =>
+  Effect.tryPromise({
+    try: () => readRestartStatus(),
+    catch: (cause) =>
+      new RestartStatusError({
+        operation: 'readRestartStatus',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
