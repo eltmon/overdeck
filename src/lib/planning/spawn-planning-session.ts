@@ -310,7 +310,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
         `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
       ).join('\n\n')
     : '_No child stories found._';
-  writeWorkspaceContext(
+  await Effect.runPromise(writeWorkspaceContext(
     workspacePath,
     `# Feature Context: ${issue.identifier}\n\n` +
       `**Title:** ${issue.title}\n\n` +
@@ -319,7 +319,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
       `## Child Stories\n${childStoriesSection}\n\n` +
       `---\n` +
       `*This file is auto-generated for story-level workspaces to reference.*\n`,
-  );
+  ));
 }
 
 // ─── Main spawn function ─────────────────────────────────────────────────────
@@ -492,7 +492,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
 
     // Capture planning prompt in workspace .pan/continue.json.
-    writeWorkspaceContinue(workspacePath, {
+    await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
       version: '1',
       issueId: issue.identifier,
       created: new Date().toISOString(),
@@ -511,7 +511,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         },
       ],
       feedback: [],
-    });
+    }));
 
     await writeFeatureContext(workspacePath, issue);
 

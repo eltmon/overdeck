@@ -1413,11 +1413,11 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
           return [request.normalizedIssueId, request.response] as const;
         }
 
-        const stackHealth = await getWorkspaceStackHealth(request.normalizedIssueId, {
+        const stackHealth = await Effect.runPromise(getWorkspaceStackHealth(request.normalizedIssueId, {
           projectConfig: { ...request.projectConfig, path: request.projectPath },
           workspacePath: request.workspacePath,
           containers,
-        });
+        }));
 
         return [request.normalizedIssueId, {
           exists: true,
@@ -1580,7 +1580,7 @@ const getWorkspaceRoute = HttpRouter.add(
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
-          getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true }),
+          Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
           listSessionNamesAsync(),
           capturePaneAsync(agentSession, 50).catch(() => ''),

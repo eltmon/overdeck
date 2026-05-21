@@ -270,7 +270,7 @@ export const AgentSpawnerLive = Layer.effect(
           const project = resolveProjectFromIssue(issueId);
           const projectPath = project?.projectPath ?? process.cwd();
 
-          await deepWipe(
+          await Effect.runPromise(deepWipe(
             {
               issueId,
               projectPath,
@@ -281,7 +281,7 @@ export const AgentSpawnerLive = Layer.effect(
               deleteBranches: opts.deleteBranches ?? true,
               resetIssue: opts.resetIssue ?? true,
             },
-          );
+          ));
         },
         catch: (err) =>
           new AgentStartError({

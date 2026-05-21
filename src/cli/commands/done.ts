@@ -437,7 +437,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
       if (continueState) {
         const now = new Date().toISOString();
-        writeWorkspaceContinue(workspacePath, {
+        await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
           ...continueState,
           sessionHistory: [
             ...continueState.sessionHistory,
@@ -447,7 +447,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               note: options.comment || 'Agent signaled work complete',
             },
           ],
-        });
+        }));
       }
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
