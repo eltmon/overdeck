@@ -40,6 +40,7 @@ export {
   WORKSPACES_DIR,
 } from './workspace-metadata.js';
 
+import { Effect } from 'effect';
 import { FlyProvider, createFlyProvider } from './fly-provider.js';
 import type { RemoteProvider, RemoteProviderConfig } from './interface.js';
 
@@ -67,7 +68,7 @@ export async function isRemoteAvailable(): Promise<{ available: boolean; reason?
   const fly = createFlyProvider();
 
   try {
-    const isAuth = await fly.isAuthenticated();
+    const isAuth = await Effect.runPromise(fly.isAuthenticated());
     if (!isAuth) {
       return {
         available: false,
