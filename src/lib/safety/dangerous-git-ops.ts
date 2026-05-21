@@ -24,6 +24,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Data, Effect } from 'effect';
 import { GIT_CLEAN_EXCLUDES, gitCleanExcludeFlags } from './protected-paths.js';
 
 const execAsync = promisify(exec);
@@ -198,3 +199,93 @@ function pathLeaf(p: string): string {
 
 /** Re-export for convenience so callers don't need a second import. */
 export { GIT_CLEAN_EXCLUDES };
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants. The sync/promise variants above are
+// preserved so existing CLI and route callers keep working; new Effect-based
+// callers can compose without `Effect.runPromise` round-tripping.
+
+/** Tagged error for dangerous-git-ops Effect variants. */
+export class DangerousGitOpError extends Data.TaggedError('DangerousGitOpError')<{
+  readonly operation: DangerousOp;
+  readonly reason: string;
+  readonly recovery?: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `runGitClean`. Fails with DangerousGitOpError on block or shell failure. */
+export const runGitCleanEffect = (opts: {
+  workspacePath: string;
+  userInvoked: boolean;
+  reason: string;
+  extraExcludes?: readonly string[];
+  timeoutMs?: number;
+}): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
+  Effect.tryPromise({
+    try: () => runGitClean(opts),
+    catch: (cause) => {
+      if (cause instanceof DangerousOpBlockedError) {
+        return new DangerousGitOpError({
+          operation: cause.operation,
+          reason: cause.reason,
+          recovery: cause.recovery,
+          cause,
+        });
+      }
+      return new DangerousGitOpError({
+        operation: 'git_clean',
+        reason: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      });
+    },
+  });
+
+/** Effect variant of `dryRunGitClean`. */
+export const dryRunGitCleanEffect = (opts: {
+  workspacePath: string;
+  extraExcludes?: readonly string[];
+}): Effect.Effect<string[], DangerousGitOpError> =>
+  Effect.tryPromise({
+    try: () => dryRunGitClean(opts),
+    catch: (cause) =>
+      new DangerousGitOpError({
+        operation: 'git_clean',
+        reason: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `runGitResetHard`. */
+export const runGitResetHardEffect = (opts: {
+  workspacePath: string;
+  ref: string;
+  reason: string;
+  timeoutMs?: number;
+}): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
+  Effect.tryPromise({
+    try: () => runGitResetHard(opts),
+    catch: (cause) =>
+      new DangerousGitOpError({
+        operation: 'git_reset_hard',
+        reason: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `runGitCheckoutOverwrite`. */
+export const runGitCheckoutOverwriteEffect = (opts: {
+  workspacePath: string;
+  ref: string;
+  reason: string;
+  timeoutMs?: number;
+}): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
+  Effect.tryPromise({
+    try: () => runGitCheckoutOverwrite(opts),
+    catch: (cause) =>
+      new DangerousGitOpError({
+        operation: 'git_checkout_overwrite',
+        reason: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

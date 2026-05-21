@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
@@ -347,3 +347,33 @@ export function buildHandoffPrompt(
     },
   }));
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants. The async variants above stay so existing
+// callers keep working; Effect-based callers can compose without runPromise.
+
+/** Tagged error for handoff-context Effect variants. */
+export class HandoffContextError extends Data.TaggedError('HandoffContextError')<{
+  readonly issueId: string;
+  readonly stage: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+/** Effect variant of `captureHandoffContext`. */
+export const captureHandoffContextEffect = (
+  agentState: AgentState,
+  targetModel: string,
+  reason: string,
+): Effect.Effect<HandoffContext, HandoffContextError> =>
+  Effect.tryPromise({
+    try: () => captureHandoffContext(agentState, targetModel, reason),
+    catch: (cause) =>
+      new HandoffContextError({
+        issueId: agentState.issueId,
+        stage: 'captureHandoffContext',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

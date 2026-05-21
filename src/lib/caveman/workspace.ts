@@ -14,7 +14,9 @@
 import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
 import type { NormalizedCavemanConfig } from '../config-yaml.js';
+import { FsError } from '../errors.js';
 import { getCavemanHooksDir } from './setup.js';
 
 /** Caveman variant for A/B testing and cost tracking */
@@ -127,3 +129,37 @@ export async function readCavemanVariant(workspacePath: string): Promise<Caveman
   }
   return 'off';
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect-channel variants. Sync callers keep working; new Effect-based
+// composers can chain without round-tripping through `Effect.tryPromise`.
+
+/** Effect variant of `injectCavemanSettings`. */
+export const injectCavemanSettingsEffect = (
+  workspacePath: string,
+  variant: CavemanVariant,
+): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: () => injectCavemanSettings(workspacePath, variant),
+    catch: (cause) =>
+      new FsError({
+        path: workspacePath,
+        operation: 'injectCavemanSettings',
+        cause,
+      }),
+  });
+
+/** Effect variant of `readCavemanVariant`. */
+export const readCavemanVariantEffect = (
+  workspacePath: string,
+): Effect.Effect<CavemanVariant, FsError> =>
+  Effect.tryPromise({
+    try: () => readCavemanVariant(workspacePath),
+    catch: (cause) =>
+      new FsError({
+        path: workspacePath,
+        operation: 'readCavemanVariant',
+        cause,
+      }),
+  });

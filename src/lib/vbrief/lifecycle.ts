@@ -16,7 +16,10 @@
  */
 
 import { mkdirSync } from 'fs';
+import { mkdir } from 'fs/promises';
 import { join } from 'path';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 
 export const VBRIEF_ROOT_DIRNAME = 'vbrief';
 
@@ -122,3 +125,30 @@ export function ensureVBriefDirs(projectRoot: string, vbriefDirname?: string): s
   }
   return root;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of `ensureVBriefDirs`. Uses fs/promises so dashboard server
+ * routes can create the vBRIEF lifecycle directories without blocking the
+ * Node.js event loop. Idempotent.
+ */
+export const ensureVBriefDirsEffect = (
+  projectRoot: string,
+  vbriefDirname?: string,
+): Effect.Effect<string, FsError> =>
+  Effect.gen(function* () {
+    const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
+    yield* Effect.tryPromise({
+      try: () => mkdir(root, { recursive: true }),
+      catch: (cause) => new FsError({ path: root, operation: 'mkdir', cause }),
+    });
+    for (const dir of VBRIEF_LIFECYCLE_DIRS) {
+      const lifecycleDir = join(root, dir);
+      yield* Effect.tryPromise({
+        try: () => mkdir(lifecycleDir, { recursive: true }),
+        catch: (cause) => new FsError({ path: lifecycleDir, operation: 'mkdir', cause }),
+      });
+    }
+    return root;
+  });
