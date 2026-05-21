@@ -179,9 +179,10 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
 
 type PipelineViewProps = {
   onSearchOpen?: () => void;
+  onTabChange?: (tab: string) => void;
 };
 
-export function PipelineView({ onSearchOpen }: PipelineViewProps = {}) {
+export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
@@ -344,6 +345,32 @@ export function PipelineView({ onSearchOpen }: PipelineViewProps = {}) {
             >
               Search issues, agents, branches…
             </button>
+          ) : undefined
+        }
+        segmentedControl={
+          onTabChange ? (
+            <div
+              data-component="pipeline-segmented-control"
+              className="flex items-center gap-[2px] rounded-[var(--radius-lg)] border border-border bg-card p-[2px]"
+            >
+              {(['List', 'Board', 'Analytics'] as const).map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={label === 'List'}
+                  onClick={() => {
+                    if (label === 'Board') onTabChange('kanban');
+                    else if (label === 'Analytics') onTabChange('metrics');
+                  }}
+                  className={cn(
+                    'rounded-[calc(var(--radius-lg)-2px)] px-[10px] py-[5px] text-[12px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground',
+                    label === 'List' && 'bg-accent text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ) : undefined
         }
       />
