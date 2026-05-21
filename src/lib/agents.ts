@@ -170,7 +170,7 @@ async function resolveEffectiveHarness(harness: unknown, model: string): Promise
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') {
-    const authStatus = await getClaudeAuthStatus();
+    const authStatus = await Effect.runPromise(getClaudeAuthStatus());
     if (authStatus.hasAnthropicApiKey) return 'api-key';
     return authStatus.loggedIn ? 'subscription' : undefined;
   }
