@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "29d41cbb-7a62-4e17-873d-4ffb4db4ad35",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-15T05:40:00.000Z",
-    "updated": "2026-05-15T05:38:59.140Z",
+    "updated": "2026-05-21T01:02:47.479Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1122",
@@ -65,7 +65,10 @@
           "difficulty": "simple",
           "issueLabel": "pan-1122",
           "requiresInspection": true,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts"
+          ]
         },
         "narrative": {
           "Action": "Edit src/lib/settings.ts: replace the OpenAIModel union with exactly 'gpt-5.4-nano' | 'gpt-5.4-mini' | 'gpt-5.4' | 'gpt-5.5' | 'gpt-5.5-pro'. Also update the OpenAI default-models array at settings.ts:223 to the same five IDs. This is the type foundation other beads encode against."
@@ -106,7 +109,10 @@
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1122",
-          "requiresInspection": false
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/model-capabilities.ts"
+          ]
         },
         "narrative": {
           "Action": "Extend LEGACY_MODEL_REDIRECTS in src/lib/model-capabilities.ts so every dropped OpenAI ID (gpt-5.5-mini, gpt-5.5-nano, gpt-5.4-pro, o3, o4-mini, gpt-4o, gpt-4o-mini, o3-deep-research, gpt-5.3-codex, gpt-5.2) maps to 'gpt-5.4'. The redirect emits the existing warning when a saved config references a dropped ID."
@@ -139,7 +145,11 @@
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1122",
-          "requiresInspection": false
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/router-config.ts",
+            "src/lib/providers.ts"
+          ]
         },
         "narrative": {
           "Action": "Update the OpenAI `models` arrays at src/lib/router-config.ts:67 and :134, and src/lib/providers.ts:81 and :180, to exactly ['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-5.4', 'gpt-5.5', 'gpt-5.5-pro']. Also update the OpenAI include-check at providers.ts:180 so that any model ID outside the supported set falls through to the unknown-provider error path."
@@ -172,7 +182,10 @@
         "metadata": {
           "difficulty": "trivial",
           "issueLabel": "pan-1122",
-          "requiresInspection": false
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ]
         },
         "narrative": {
           "Action": "Edit src/dashboard/frontend/src/components/Settings/modelCatalog.ts: remove gpt-5.5-mini, gpt-5.5-nano, gpt-5.4-pro, o3, o4-mini, gpt-4o, gpt-4o-mini from MODELS_BY_PROVIDER.openai. The remaining five entries (gpt-5.5-pro, gpt-5.5, gpt-5.4, gpt-5.4-mini, gpt-5.4-nano) keep their existing tier/cost/capability metadata."
@@ -205,7 +218,16 @@
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1122",
-          "requiresInspection": false
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/settings-api.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "src/dashboard/frontend/src/components/inspector/utils.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/agents.ts"
+          ]
         },
         "narrative": {
           "Action": "Remove dropped-ID entries from: src/lib/cost.ts (gpt-5.4-pro pricing row); src/lib/settings-api.ts (priority map at :718 and :722 — drop gpt-5.4-pro, gpt-4o, gpt-4o-mini); src/dashboard/server/routes/settings.ts (apiModel alias map — drop gpt-5.4-pro, o3-deep-research, gpt-4o, gpt-4o-mini, o1); src/dashboard/frontend/src/components/inspector/utils.ts (backing-model labels at :121, :129); src/lib/model-fallback.ts (dropped-ID entries in PROVIDER_HINTS, CROSS_PROVIDER_FALLBACK, MODEL_PRIORITY); src/lib/model-capabilities.ts (dedicated gpt-5.4-pro capabilities entry at :328). The CLIProxy registry alias in src/lib/agents.ts (gpt-5.4-pro → gpt-5.4) can be removed since the redirect layer now covers it. Add a gpt-5.4-nano capabilities entry if missing for parity with the other four supported IDs."
