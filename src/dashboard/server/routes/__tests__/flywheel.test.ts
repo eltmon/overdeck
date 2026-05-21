@@ -99,7 +99,7 @@ describe('flywheel status POST payload helper', () => {
 
   it('accepts a valid status, persists latest.json, and notifies subscribers', async () => {
     const status = makeStatus('RUN-7', '2026-05-18T13:00:00.000Z');
-    const received: FlywheelStatus[] = [];
+    const received: (FlywheelStatus | null)[] = [];
     const unsubscribe = subscribeLatestFlywheelStatus((next) => received.push(next));
 
     const result = await postFlywheelStatusPayload(status, { panopticonHome });

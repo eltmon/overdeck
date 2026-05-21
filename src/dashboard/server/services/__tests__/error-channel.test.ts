@@ -111,7 +111,9 @@ describe('Typed errors — Effect channel propagation', () => {
   });
 
   it('Effect.catchTag lets non-matching errors pass through', async () => {
-    const program = Effect.fail(new IssueNotFound({ id: 'MIN-1' })).pipe(
+    const failed: Effect.Effect<never, IssueNotFound | TrackerNotConfigured> =
+      Effect.fail(new IssueNotFound({ id: 'MIN-1' }));
+    const program = failed.pipe(
       Effect.catchTag('TrackerNotConfigured', () => Effect.succeed('should not match')),
     );
 
@@ -120,7 +122,9 @@ describe('Typed errors — Effect channel propagation', () => {
   });
 
   it('Effect.catchTags catches multiple typed errors', async () => {
-    const program = Effect.fail(new RateLimited({ retryAfter: 30 })).pipe(
+    const failed: Effect.Effect<never, RateLimited | TrackerApiError> =
+      Effect.fail(new RateLimited({ retryAfter: 30 }));
+    const program = failed.pipe(
       Effect.catchTags({
         RateLimited: (err) => Effect.succeed(`rate limited: ${err.retryAfter}s`),
         TrackerApiError: () => Effect.succeed('api error'),

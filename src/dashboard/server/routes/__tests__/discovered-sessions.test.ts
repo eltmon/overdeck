@@ -17,6 +17,7 @@ import {
   getDiscoveredStats,
   getDiscoveredSessionById,
   findDiscoveredSessions,
+  type UpsertDiscoveredSessionOpts,
 } from '../../../../lib/database/discovered-sessions-db.js';
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
@@ -421,7 +422,7 @@ describe('scan targeted mode with dirs', () => {
 
 // ─── GET /api/discovered-sessions/stats ──────────────────────────────────────
 
-const SEED_SESSION = {
+const SEED_SESSION: UpsertDiscoveredSessionOpts = {
   jsonlPath: '/stats/1.jsonl',
   workspacePath: '/home/user/Projects/alpha',
   workspaceHash: 'hash-stats',
@@ -441,7 +442,7 @@ const SEED_SESSION = {
   panAgentId: null,
   fileSize: 512,
   fileMtime: '2025-01-01T00:00:00Z',
-} as const;
+};
 
 describe('getDiscoveredStats (GET /api/discovered-sessions/stats logic)', () => {
   it('returns zero counts on empty database', () => {

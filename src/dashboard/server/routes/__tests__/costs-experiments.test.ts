@@ -5,9 +5,11 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { HttpServerResponse } from 'effect/unstable/http';
+import { HttpServerResponse as HttpServerResponseModule } from 'effect/unstable/http';
 import { httpHandler } from '../http-handler.js';
 import { jsonResponse } from '../../http-helpers.js';
+
+type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 
 // Mock getCavemanExperimentData so tests don't require a real DB
 vi.mock('../../../../lib/database/cost-events-db.js', async (importOriginal) => {
@@ -21,7 +23,7 @@ const mockGetExperimentData = vi.mocked(getCavemanExperimentData);
 
 /** Run an Effect route handler and extract status + JSON body */
 async function runRoute(
-  effect: Effect.Effect<typeof HttpServerResponse.Type, unknown, never>
+  effect: Effect.Effect<HttpServerResponse, unknown, never>
 ): Promise<{ status: number; body: unknown }> {
   const response = await Effect.runPromise(httpHandler(effect));
   const rawBody = response.body as { body: Uint8Array } | null;

@@ -4,7 +4,7 @@ import type { EditorId } from '@panctl/contracts';
 
 // ─── Mock child_process ──────────────────────────────────────────────────────
 
-const mockSpawn = vi.fn(() => ({ unref: vi.fn() }));
+const mockSpawn = vi.fn((..._args: unknown[]) => ({ unref: vi.fn() }));
 const mockExecAsync = vi.fn();
 
 vi.mock('node:child_process', () => ({

@@ -6,7 +6,15 @@ import type { SystemHealthSnapshot } from '../../services/system-health-service.
 
 const GIB = 1024 ** 3;
 
-function createHealthSnapshot(overrides: Partial<SystemHealthSnapshot> = {}): SystemHealthSnapshot {
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends Array<infer _U>
+    ? T[K]
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : T[K];
+};
+
+function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {}): SystemHealthSnapshot {
   const base: SystemHealthSnapshot = {
     severity: 'normal',
     updatedAt: '2026-04-27T00:00:00.000Z',
@@ -29,6 +37,8 @@ function createHealthSnapshot(overrides: Partial<SystemHealthSnapshot> = {}): Sy
       leakedSpecialistCount: 0,
       containerCount: 1,
       containerMemoryBytes: 2 * GIB,
+      panopticonMemoryBytes: 4 * GIB,
+      panopticonMemoryPercent: 6.25,
     },
     thresholds: {
       memoryAvailableWarningBytes: 4 * GIB,

@@ -9,7 +9,9 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { Effect, Layer } from 'effect';
-import { HttpServerResponse } from 'effect/unstable/http';
+import { HttpServerResponse as HttpServerResponseModule } from 'effect/unstable/http';
+
+type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,7 +22,7 @@ import { jsonResponse } from '../../http-helpers.js';
 
 /** Run a route effect and return the response status and parsed JSON body. */
 async function runRoute(
-  effect: Effect.Effect<typeof HttpServerResponse.Type, unknown, never>
+  effect: Effect.Effect<HttpServerResponse, unknown, never>
 ): Promise<{ status: number; body: unknown }> {
   const response = await Effect.runPromise(httpHandler(effect));
   const body = response.body as { body: Uint8Array } | null;
@@ -46,7 +48,7 @@ describe('Effect.promise async FS pattern', () => {
     const effect = httpHandler(
       Effect.promise(async () => {
         throw new Error('async FS failure');
-      }) as Effect.Effect<typeof HttpServerResponse.Type, never, never>
+      }) as Effect.Effect<HttpServerResponse, never, never>
     );
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
