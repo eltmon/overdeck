@@ -1,4 +1,6 @@
+import { Effect } from 'effect'
 import { capturePaneAsync } from './tmux.js'
+import { TmuxError } from './errors.js'
 
 export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'other'
 
@@ -221,3 +223,34 @@ export async function detectAwaitingInputForAgent(
     paneDetectionInFlight.delete(cacheKey)
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native variant of detectAwaitingInputForAgent. Fails with TmuxError if
+ * the pane capture fails outside the in-cache fast path.
+ */
+export const detectAwaitingInputForAgentEffect = (
+  agentId: string,
+  options: { isPlanning?: boolean; lines?: number; cache?: boolean } = {},
+): Effect.Effect<AwaitingInputDetection | null, TmuxError> =>
+  Effect.tryPromise({
+    try: () => detectAwaitingInputForAgent(agentId, options),
+    catch: (cause) =>
+      new TmuxError({
+        command: 'capture-pane',
+        message: `failed to detect awaiting input for ${agentId}`,
+        cause,
+      }),
+  })
+
+/**
+ * Capture the pane and return the detection synchronously. This is a pure
+ * function over a captured string — exported for symmetry, useful when the
+ * caller already has the pane text in hand.
+ */
+export const detectAwaitingInputFromPaneEffect = (
+  pane: string,
+  options: { isPlanning?: boolean } = {},
+): Effect.Effect<AwaitingInputDetection | null> =>
+  Effect.sync(() => detectAwaitingInputFromPane(pane, options))

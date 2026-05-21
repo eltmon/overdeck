@@ -11,6 +11,8 @@
  * Use it anywhere you would otherwise write `{ ...process.env, ...overrides }`.
  */
 
+import { Effect } from 'effect';
+
 /** Env vars that leak from a parent shell / tmux / screen and must not reach children. */
 const LEAKED_ENV_KEYS = new Set([
   'TMUX',
@@ -93,3 +95,19 @@ export function buildChildEnvWithoutTmux(
   }
   return out;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect-native variant of buildChildEnv. Pure — never fails. */
+export const buildChildEnvEffect = (
+  baseEnv: NodeJS.ProcessEnv = process.env,
+  overrides?: Record<string, string>,
+): Effect.Effect<Record<string, string>> =>
+  Effect.sync(() => buildChildEnv(baseEnv, overrides));
+
+/** Effect-native variant of buildChildEnvWithoutTmux. Pure — never fails. */
+export const buildChildEnvWithoutTmuxEffect = (
+  baseEnv: NodeJS.ProcessEnv = process.env,
+  overrides?: Record<string, string>,
+): Effect.Effect<Record<string, string>> =>
+  Effect.sync(() => buildChildEnvWithoutTmux(baseEnv, overrides));

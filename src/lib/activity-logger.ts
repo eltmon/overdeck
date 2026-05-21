@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { Effect } from 'effect';
 import { getEventStore } from '../dashboard/server/event-store.js';
 import type { DomainEvent } from '@panctl/contracts';
 import type { Role } from './agents.js';
@@ -195,3 +196,36 @@ export function emitDashboardLifecycle(
     // Non-fatal
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native emit of an activity.entry domain event. Non-failing — the
+ * underlying append is fire-and-forget and silently swallows any event-store
+ * errors to match the Promise contract.
+ */
+export const emitActivityEntryEffect = (
+  options: EmitActivityOptions,
+): Effect.Effect<void> => Effect.sync(() => emitActivityEntry(options));
+
+/** Effect-native variant of emitActivityDetailed. */
+export const emitActivityDetailedEffect = (
+  options: EmitDetailedOptions,
+): Effect.Effect<void> => Effect.sync(() => emitActivityDetailed(options));
+
+/** Effect-native variant of emitActivityTts. */
+export const emitActivityTtsEffect = (
+  options: EmitTtsOptions,
+): Effect.Effect<void> => Effect.sync(() => emitActivityTts(options));
+
+/** Effect-native variant of emitDashboardLifecycle. */
+export const emitDashboardLifecycleEffect = (
+  status: 'started' | 'completed' | 'failed',
+  options: {
+    reason: string;
+    issueId?: string;
+    trigger?: string;
+    durationMs?: number;
+    error?: string;
+  },
+): Effect.Effect<void> => Effect.sync(() => emitDashboardLifecycle(status, options));

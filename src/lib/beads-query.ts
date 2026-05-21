@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'path';
+import { Data, Effect } from 'effect';
 
 const execFileAsync = promisify(execFile);
 
@@ -15,6 +16,12 @@ export interface BeadEntry {
   priority?: number;
   [key: string]: unknown;
 }
+
+/** Thrown when an issue has no beads — the typed signal that work-agent gating fails. */
+export class BeadsMissingError extends Data.TaggedError('BeadsMissingError')<{
+  readonly issueId: string;
+  readonly workspacePath: string;
+}> {}
 
 async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
   try {
@@ -99,3 +106,40 @@ export async function queryBeadById(
     return null;
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Query beads for an issue. Effect-native. Never fails — returns [] on any error
+ * (matches the existing Promise contract where bd-down or missing-JSONL is benign).
+ */
+export const queryBeadsForIssueEffect = (
+  workspacePath: string,
+  issueId: string,
+): Effect.Effect<readonly BeadEntry[]> =>
+  Effect.promise(() => queryBeadsForIssue(workspacePath, issueId));
+
+/**
+ * Assert the issue has beads. Effect-native. Fails with BeadsMissingError if
+ * no beads are found.
+ */
+export const assertIssueHasBeadsEffect = (
+  workspacePath: string,
+  issueId: string,
+): Effect.Effect<void, BeadsMissingError> =>
+  Effect.gen(function* () {
+    const beads = yield* queryBeadsForIssueEffect(workspacePath, issueId);
+    if (beads.length === 0) {
+      return yield* Effect.fail(new BeadsMissingError({ issueId, workspacePath }));
+    }
+  });
+
+/**
+ * Look up a single bead by ID. Effect-native. Never fails — returns null on any
+ * error.
+ */
+export const queryBeadByIdEffect = (
+  workspacePath: string,
+  beadId: string,
+): Effect.Effect<BeadEntry | null> =>
+  Effect.promise(() => queryBeadById(workspacePath, beadId));

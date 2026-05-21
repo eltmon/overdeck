@@ -16,9 +16,11 @@
 
 import { existsSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { listSessionNamesAsync } from './tmux.js';
 import { parseIssueId } from './issue-id.js';
+import { FsError } from './errors.js';
 
 /**
  * Valid agent directory naming patterns.
@@ -217,3 +219,40 @@ export async function cleanupAgentDirectories(options: {
 
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native variant of findOrphanedAgentDirs. Fails with FsError if the
+ * agents directory listing fails. The tmux listing is wrapped so listing
+ * failures bubble up as FsError too (treats tmux as part of the filesystem
+ * for purposes of this check).
+ */
+export const findOrphanedAgentDirsEffect = (
+  agentsDir: string = AGENTS_DIR,
+): Effect.Effect<readonly OrphanedAgentDir[], FsError> =>
+  Effect.tryPromise({
+    try: () => findOrphanedAgentDirs(agentsDir),
+    catch: (cause) =>
+      new FsError({ path: agentsDir, operation: 'findOrphanedAgentDirs', cause }),
+  });
+
+/**
+ * Effect-native variant of cleanupAgentDirectories. Fails with FsError if the
+ * orphan scan fails. Individual rm failures are still swallowed internally so
+ * a partial cleanup is the worst case (matches the Promise contract).
+ */
+export const cleanupAgentDirectoriesEffect = (options: {
+  dryRun?: boolean;
+  force?: boolean;
+  agentsDir?: string;
+} = {}): Effect.Effect<CleanupResult, FsError> =>
+  Effect.tryPromise({
+    try: () => cleanupAgentDirectories(options),
+    catch: (cause) =>
+      new FsError({
+        path: options.agentsDir ?? AGENTS_DIR,
+        operation: 'cleanupAgentDirectories',
+        cause,
+      }),
+  });

@@ -18,6 +18,8 @@ import { join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
+import { Effect } from 'effect'
+import { FsError } from './errors.js'
 import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
 import {
   detectAwaitingInputForAgent,
@@ -318,3 +320,55 @@ export async function computeAgentEnrichment(
     resolutionCount: runtimeState?.resolutionCount || 0,
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native variant of computeAgentEnrichment. Fails with FsError if any
+ * underlying filesystem read fails outside the swallowed branches.
+ */
+export const computeAgentEnrichmentEffect = (
+  agentId: string,
+  startedAt?: string,
+  hasActiveSpecialist?: boolean,
+  skipJsonlScan?: boolean,
+): Effect.Effect<AgentEnrichment, FsError> =>
+  Effect.tryPromise({
+    try: () => computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, skipJsonlScan),
+    catch: (cause) =>
+      new FsError({
+        path: getAgentDir(agentId),
+        operation: 'computeAgentEnrichment',
+        cause,
+      }),
+  })
+
+/** Effect-native: resolve the workspace path for an agent (null on failure). */
+export const getAgentWorkspaceEffect = (
+  agentId: string,
+): Effect.Effect<string | null> =>
+  Effect.promise(() => getAgentWorkspace(agentId))
+
+/** Effect-native: resolve the active JSONL session path for an agent (null on failure). */
+export const getAgentJsonlPathEffect = (
+  agentId: string,
+): Effect.Effect<string | null> =>
+  Effect.promise(() => getAgentJsonlPath(agentId))
+
+/** Effect-native: get the mtime of the agent's active JSONL session file. */
+export const getAgentJsonlMtimeEffect = (
+  agentId: string,
+): Effect.Effect<number | null> =>
+  Effect.promise(() => getAgentJsonlMtime(agentId))
+
+/** Effect-native: parse pending questions from a JSONL file. */
+export const getPendingQuestionsEffect = (
+  jsonlPath: string,
+): Effect.Effect<readonly PendingQuestion[]> =>
+  Effect.promise(() => getPendingQuestions(jsonlPath))
+
+/** Effect-native: get pending questions for an agent by id. */
+export const getAgentPendingQuestionsEffect = (
+  agentId: string,
+): Effect.Effect<readonly PendingQuestion[]> =>
+  Effect.promise(() => getAgentPendingQuestions(agentId))
