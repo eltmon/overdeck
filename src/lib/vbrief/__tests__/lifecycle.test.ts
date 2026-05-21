@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from '@effect/vitest';
 import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { Effect } from 'effect';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirs,
@@ -85,15 +87,20 @@ describe('resolveVBriefDir', () => {
 });
 
 describe('ensureVBriefDirs', () => {
-  it('creates ./vbrief/{proposed,active,completed,cancelled}/ and returns root', () => {
-    const root = ensureVBriefDirs(TEST_DIR);
-    expect(root).toBe(join(TEST_DIR, 'vbrief'));
-    for (const dir of VBRIEF_LIFECYCLE_DIRS) {
-      expect(existsSync(join(root, dir))).toBe(true);
-    }
-  });
-  it('is idempotent', () => {
-    ensureVBriefDirs(TEST_DIR);
-    expect(() => ensureVBriefDirs(TEST_DIR)).not.toThrow();
-  });
+  it.effect('creates ./vbrief/{proposed,active,completed,cancelled}/ and returns root', () =>
+    Effect.gen(function* () {
+      const root = yield* ensureVBriefDirs(TEST_DIR);
+      expect(root).toBe(join(TEST_DIR, 'vbrief'));
+      for (const dir of VBRIEF_LIFECYCLE_DIRS) {
+        expect(existsSync(join(root, dir))).toBe(true);
+      }
+    }).pipe(Effect.provide(NodeFileSystem.layer)),
+  );
+
+  it.effect('is idempotent', () =>
+    Effect.gen(function* () {
+      yield* ensureVBriefDirs(TEST_DIR);
+      yield* ensureVBriefDirs(TEST_DIR);
+    }).pipe(Effect.provide(NodeFileSystem.layer)),
+  );
 });

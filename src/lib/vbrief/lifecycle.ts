@@ -15,8 +15,9 @@
  * (one vBRIEF per issue) and slug gives human readability.
  */
 
-import { mkdirSync } from 'fs';
 import { join } from 'path';
+import { Effect, FileSystem } from 'effect';
+import { FsError } from '../errors.js';
 
 export const VBRIEF_ROOT_DIRNAME = 'vbrief';
 
@@ -114,11 +115,22 @@ export function resolveVBriefRoot(projectRoot: string, vbriefDirname?: string): 
  *
  * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureVBriefDirs(projectRoot: string, vbriefDirname?: string): string {
-  const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
-  mkdirSync(root, { recursive: true });
-  for (const dir of VBRIEF_LIFECYCLE_DIRS) {
-    mkdirSync(join(root, dir), { recursive: true });
-  }
-  return root;
+export function ensureVBriefDirs(
+  projectRoot: string,
+  vbriefDirname?: string,
+): Effect.Effect<string, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const root = join(projectRoot, vbriefDirname ?? VBRIEF_ROOT_DIRNAME);
+    yield* fs.makeDirectory(root, { recursive: true }).pipe(
+      Effect.mapError((cause) => new FsError({ path: root, operation: 'makeDirectory', cause })),
+    );
+    for (const dir of VBRIEF_LIFECYCLE_DIRS) {
+      const dirPath = join(root, dir);
+      yield* fs.makeDirectory(dirPath, { recursive: true }).pipe(
+        Effect.mapError((cause) => new FsError({ path: dirPath, operation: 'makeDirectory', cause })),
+      );
+    }
+    return root;
+  });
 }
