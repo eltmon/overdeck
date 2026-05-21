@@ -10,6 +10,7 @@
 
 import { findDiscoveredSessionIds, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
 import type { ConversationFilter } from '../../database/discovered-sessions-db.js';
+import { Effect } from 'effect';
 import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
@@ -217,7 +218,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
     }
   });
 
-  const taskResults = await runWithPool(tasks, maxParallel);
+  const taskResults = await Effect.runPromise(runWithPool(tasks, maxParallel));
   for (let i = 0; i < taskResults.length; i++) {
     const taskResult = taskResults[i];
     if (!(taskResult instanceof Error)) continue;

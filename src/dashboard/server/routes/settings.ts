@@ -793,7 +793,7 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 
       try {
         const providerEnv = await getProviderEnvForModel(model);
-        const conflicts = await detectProviderEnvConflicts(providerEnv);
+        const conflicts = await Effect.runPromise(detectProviderEnvConflicts(providerEnv));
         return jsonResponse({ conflicts });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
