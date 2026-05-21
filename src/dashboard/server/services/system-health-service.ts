@@ -163,10 +163,23 @@ function toPercent(part: number, total: number): number {
   return Math.round((part / total) * 1000) / 10;
 }
 
-function classifyAgentKind(agentId: string): HealthAgentProcess['kind'] {
-  if (agentId.startsWith('agent-')) return 'work';
+function classifyAgentKind(
+  agentId: string,
+  role?: string,
+): HealthAgentProcess['kind'] {
+  // Legacy prefixes (older agents may still exist on disk)
   if (agentId.startsWith('planning-')) return 'planning';
-  if (agentId.startsWith('specialist-') || agentId.endsWith('-agent')) return 'specialist';
+  if (agentId.startsWith('specialist-')) return 'specialist';
+  // Modern naming — every agent starts with `agent-`. Disambiguate by role:
+  // role='work' (or unset for legacy state files) → work agent or swarm slot
+  // role='review'/'review-*'/'test'/'ship' → specialist
+  // PAN-1257: without this, every specialist gets misclassified as work and
+  // inflates workAgentCount, hitting agentBlockCount cap and blocking swarms.
+  if (agentId.startsWith('agent-')) {
+    if (role === 'work' || role === undefined) return 'work';
+    return 'specialist';
+  }
+  if (agentId.endsWith('-agent')) return 'specialist';
   return 'other';
 }
 
@@ -498,7 +511,7 @@ async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
       return {
         id: agent.id,
         issueId: agent.issueId,
-        kind: classifyAgentKind(agent.id),
+        kind: classifyAgentKind(agent.id, agent.role),
         status: agent.status,
         tmuxActive: agent.tmuxActive,
         memoryBytes,
