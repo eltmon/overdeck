@@ -4,6 +4,8 @@ import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
+import { Effect } from 'effect';
+import { ProcessSpawnError } from '../errors.js';
 import { getVBriefACStatus, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 
 const execAsync = promisify(exec);
@@ -243,3 +245,58 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
 
   return failures;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Additive Effect wrappers around the public preflight checks. Each variant
+// preserves the existing "soft-failure" semantics — the original functions
+// already swallow errors and return failure-line arrays, so the Effect
+// channel for these is effectively `never` for the bead / git checks. The
+// `runPreflightChecks` wrapper surfaces a `ProcessSpawnError` only if its
+// underlying `bd` invocation throws something the inner catch missed (which
+// today it does not, but we keep the typed channel for future hardening).
+
+const toPreflightProcessError = (
+  op: string,
+  cause: unknown,
+): ProcessSpawnError =>
+  new ProcessSpawnError({
+    command: 'done-preflight',
+    args: [op],
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Check for open beads scoped to an issue (Effect variant). */
+export const checkOpenBeadsEffect = (
+  workspacePath: string,
+  issueId: string,
+): Effect.Effect<string[], ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => checkOpenBeads(workspacePath, issueId),
+    catch: (cause) => toPreflightProcessError('checkOpenBeads', cause),
+  });
+
+/** Check for uncommitted changes in a workspace (Effect variant). */
+export const checkUncommittedChangesEffect = (
+  workspacePath: string,
+): Effect.Effect<string[], ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => checkUncommittedChanges(workspacePath),
+    catch: (cause) => toPreflightProcessError('checkUncommittedChanges', cause),
+  });
+
+/** Check vBRIEF acceptance-criteria status (Effect variant — pure, never fails). */
+export const checkVBriefACStatusEffect = (
+  workspacePath: string,
+): Effect.Effect<string[]> =>
+  Effect.sync(() => checkVBriefACStatus(workspacePath));
+
+/** Run all `pan done` pre-flight checks (Effect variant). */
+export const runPreflightChecksEffect = (
+  workspacePath: string,
+  issueId: string,
+): Effect.Effect<string[], ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => runPreflightChecks(workspacePath, issueId),
+    catch: (cause) => toPreflightProcessError('runPreflightChecks', cause),
+  });

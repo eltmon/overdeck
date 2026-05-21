@@ -9,6 +9,8 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 
 import { join } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from 'yaml';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 import type { RemoteWorkspaceMetadata } from './interface.js';
 
 // Path for workspace metadata
@@ -95,3 +97,49 @@ export function deleteWorkspaceMetadata(issueId: string): boolean {
     return false;
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Additive Effect-typed wrappers over the metadata sync helpers above. The
+// originals stay because they are called from many places (workspace.ts,
+// work/issue.ts); the Effect variants surface FS failures as `FsError` so
+// callers in Effect graphs can compose this with the broader migration.
+
+const toMetadataFsError = (op: string, path: string, cause: unknown): FsError =>
+  new FsError({ path, operation: op, cause });
+
+/** Save workspace metadata (Effect variant). */
+export const saveWorkspaceMetadataEffect = (
+  metadata: RemoteWorkspaceMetadata,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveWorkspaceMetadata(metadata),
+    catch: (cause) =>
+      toMetadataFsError(
+        'saveWorkspaceMetadata',
+        join(WORKSPACES_DIR, `${metadata.id}.yaml`),
+        cause,
+      ),
+  });
+
+/** Load workspace metadata (Effect variant — pure, never fails). */
+export const loadWorkspaceMetadataEffect = (
+  issueId: string,
+): Effect.Effect<RemoteWorkspaceMetadata | null> =>
+  Effect.sync(() => loadWorkspaceMetadata(issueId));
+
+/** List all workspace metadata files (Effect variant — pure, never fails). */
+export const listWorkspaceMetadataEffect = (): Effect.Effect<
+  RemoteWorkspaceMetadata[]
+> => Effect.sync(() => listWorkspaceMetadata());
+
+/** Find a remote workspace by id (Effect variant — pure, never fails). */
+export const findRemoteWorkspaceMetadataEffect = (
+  issueId: string,
+): Effect.Effect<RemoteWorkspaceMetadata | null> =>
+  Effect.sync(() => findRemoteWorkspaceMetadata(issueId));
+
+/** Delete workspace metadata (Effect variant — returns whether a file was removed). */
+export const deleteWorkspaceMetadataEffect = (
+  issueId: string,
+): Effect.Effect<boolean> =>
+  Effect.sync(() => deleteWorkspaceMetadata(issueId));

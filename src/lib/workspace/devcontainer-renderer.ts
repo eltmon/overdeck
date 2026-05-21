@@ -32,6 +32,8 @@ import {
 } from 'fs';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 import {
   replacePlaceholders,
   type ProjectConfig,
@@ -261,3 +263,53 @@ export function renderDevcontainer(
 
   return result;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Additive Effect wrappers around the sync rendering helpers. The originals
+// throw on missing templates / projects; the Effect wrappers map those into
+// `FsError` so callers in Effect graphs can `Effect.catchTag` them.
+
+const toRenderFsError = (op: string, path: string, cause: unknown): FsError =>
+  new FsError({ path, operation: op, cause });
+
+/** Build the canonical placeholder set (Effect variant — pure, never fails). */
+export const createWorkspacePlaceholdersEffect = (
+  projectConfig: ProjectConfig,
+  featureName: string,
+  workspacePath: string,
+  extra: Partial<TemplatePlaceholders> = {},
+): Effect.Effect<TemplatePlaceholders> =>
+  Effect.sync(() =>
+    createWorkspacePlaceholders(projectConfig, featureName, workspacePath, extra),
+  );
+
+/** Sanitize hardcoded $HOME paths in a compose file (Effect variant). */
+export const sanitizeComposeFileEffect = (
+  filePath: string,
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => sanitizeComposeFile(filePath),
+    catch: (cause) => toRenderFsError('sanitizeComposeFile', filePath, cause),
+  });
+
+/** Render every `*.template` from `templateDir` (Effect variant). */
+export const processTemplatesEffect = (
+  templateDir: string,
+  targetDir: string,
+  placeholders: TemplatePlaceholders,
+  mappings?: { source: string; target: string }[],
+): Effect.Effect<string[], FsError> =>
+  Effect.try({
+    try: () => processTemplates(templateDir, targetDir, placeholders, mappings),
+    catch: (cause) => toRenderFsError('processTemplates', templateDir, cause),
+  });
+
+/** Render `<workspace>/.devcontainer/` (Effect variant). */
+export const renderDevcontainerEffect = (
+  opts: DevcontainerRenderOptions,
+): Effect.Effect<DevcontainerRenderResult, FsError> =>
+  Effect.try({
+    try: () => renderDevcontainer(opts),
+    catch: (cause) =>
+      toRenderFsError('renderDevcontainer', opts.workspacePath, cause),
+  });
