@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Compass, Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
-import { IssueWorkbench } from './IssueWorkbench';
+import { ZoneA } from './ZoneA';
+import type { OverviewTab as ZoneCOverviewTab } from './ZoneCOverview';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
 import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
@@ -230,8 +231,15 @@ function ProjectRightPaneTabs({
   issueCostDetails,
   conversations,
   selectedConversation,
+  activeIssueId: controlledActiveIssueId,
+  conversationViewMode,
+  onConversationViewModeChange,
+  onArchivedConversation,
+  conversationAgentId,
+  zoneA,
   onOpenIssue,
   onSelectConversation,
+  onActiveIssueIdChange,
 }: {
   projectName: string;
   features: ProjectFeature[];
@@ -239,23 +247,76 @@ function ProjectRightPaneTabs({
   issueCostDetails: Record<string, IssueCostBreakdown>;
   conversations: Conversation[];
   selectedConversation: string | null;
+  activeIssueId?: string | null;
+  conversationViewMode?: ViewMode;
+  onConversationViewModeChange?: (mode: ViewMode) => void;
+  onArchivedConversation?: () => void;
+  conversationAgentId?: string;
+  zoneA?: {
+    issueId: string;
+    title: string;
+    source?: string;
+    url?: string;
+    onOpenBeads?: () => void;
+    agent?: Agent;
+    issue?: Issue;
+  };
   onOpenIssue: (issueId: string) => void;
-  onSelectConversation: (name: string) => void;
+  onSelectConversation: (name: string | null) => void;
+  onActiveIssueIdChange?: (issueId: string | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ProjectRightTab>(() => readProjectTab(projectName));
   const [activeIssueId, setActiveIssueId] = useState<string | null>(() => features[0]?.issueId ?? null);
+  const hasExplicitTabChoiceRef = useRef(false);
+
+  // Resolve effective activeIssueId: controlled prop takes precedence
+  const effectiveActiveIssueId = controlledActiveIssueId ?? activeIssueId;
 
   useEffect(() => {
     setActiveTab(readProjectTab(projectName));
+    hasExplicitTabChoiceRef.current = localStorage.getItem(projectTabStorageKey(projectName)) !== null;
+  }, [projectName]);
+
+  useEffect(() => {
     setActiveIssueId((current) => {
       if (current && features.some((feature) => feature.issueId === current)) return current;
       return features[0]?.issueId ?? null;
     });
-  }, [features, projectName]);
+  }, [features]);
+
+  useEffect(() => {
+    if (controlledActiveIssueId && !hasExplicitTabChoiceRef.current) {
+      setActiveTab('pipeline');
+    }
+  }, [controlledActiveIssueId]);
+
+  useEffect(() => {
+    if (selectedConversation && conversations.some(c => c.name === selectedConversation)) {
+      setActiveTab('conversations');
+    }
+  }, [selectedConversation, conversations]);
 
   const selectTab = (tab: ProjectRightTab) => {
+    hasExplicitTabChoiceRef.current = true;
     setActiveTab(tab);
     try { localStorage.setItem(projectTabStorageKey(projectName), tab); } catch { /* ignore */ }
+  };
+
+  const handleZoneASwitchTab = (tab: ZoneCOverviewTab) => {
+    const mapping: Record<string, ProjectRightTab> = {
+      overview: 'settings',
+      activity: 'activity',
+      costs: 'activity',
+      prd: 'plans',
+      state: 'settings',
+      inference: 'activity',
+      vbrief: 'plans',
+      beads: 'beads',
+      prdiff: 'activity',
+      discussions: 'conversations',
+    };
+    const mapped = mapping[tab];
+    if (mapped) selectTab(mapped);
   };
 
   const openPipelineFeature = (feature: ProjectFeature) => {
@@ -266,8 +327,20 @@ function ProjectRightPaneTabs({
   const tabLabel = PROJECT_RIGHT_TABS.find((tab) => tab.id === activeTab)?.label ?? activeTab;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background" data-component="command-deck-right-pane-tabs">
-      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-2" role="tablist" aria-label={`${projectName} right pane tabs`}>
+    <div className="flex h-full min-h-0 flex-col bg-background" data-component="command-deck-right-pane-tabs" data-testid="command-deck-right-pane-tabs">
+      {zoneA && (
+        <ZoneA
+          issueId={zoneA.issueId}
+          title={zoneA.title}
+          source={zoneA.source}
+          url={zoneA.url}
+          onOpenBeads={zoneA.onOpenBeads}
+          agent={zoneA.agent}
+          issue={zoneA.issue}
+          onSwitchTab={handleZoneASwitchTab}
+        />
+      )}
+      <div className="flex h-[48px] shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-0" role="tablist" aria-label={`${projectName} right pane tabs`}>
         {PROJECT_RIGHT_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -285,8 +358,16 @@ function ProjectRightPaneTabs({
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">Issue</span>
           <select
-            value={activeIssueId ?? ''}
-            onChange={(event) => setActiveIssueId(event.target.value || null)}
+            value={effectiveActiveIssueId ?? ''}
+            onChange={(event) => {
+              const value = event.target.value || null;
+              if (controlledActiveIssueId == null) {
+                setActiveIssueId(value);
+              } else {
+                onActiveIssueIdChange?.(value);
+              }
+              onOpenIssue(value ?? '');
+            }}
             className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
             aria-label={`${tabLabel} issue`}
           >
@@ -306,32 +387,66 @@ function ProjectRightPaneTabs({
             onSelectFeature={openPipelineFeature}
           />
         )}
-        {activeTab !== 'pipeline' && !activeIssueId && (
+        {activeTab !== 'pipeline' && !effectiveActiveIssueId && (
           <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
             No project issue is available for {tabLabel}.
           </div>
         )}
-        {activeTab === 'plans' && activeIssueId && <VBriefTab issueId={activeIssueId} />}
-        {activeTab === 'beads' && activeIssueId && <BeadsTab issueId={activeIssueId} />}
-        {activeTab === 'conversations' && activeIssueId && (
+        {activeTab === 'plans' && effectiveActiveIssueId && <VBriefTab issueId={effectiveActiveIssueId} />}
+        {activeTab === 'beads' && effectiveActiveIssueId && <BeadsTab issueId={effectiveActiveIssueId} />}
+        {activeTab === 'conversations' && effectiveActiveIssueId && (
           <div className="flex min-h-full flex-col gap-4 p-4">
-            <DiscussionsTab issueId={activeIssueId} />
-            <div className="flex flex-col gap-2">
-              {conversations.length > 0 ? conversations.map((conversation) => (
-                <button
-                  key={conversation.name}
-                  type="button"
-                  className={`rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors ${selectedConversation === conversation.name ? 'bg-accent text-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => onSelectConversation(conversation.name)}
-                >
-                  {conversation.title ?? conversation.name}
-                </button>
-              )) : <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No project conversations.</div>}
-            </div>
+            {selectedConversation ? (
+              (() => {
+                const conv = conversations.find(c => c.name === selectedConversation);
+                return conv ? (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <button
+                      type="button"
+                      onClick={() => onSelectConversation(null)}
+                      className="mb-2 flex items-center gap-1 self-start rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ChevronLeft size={14} />
+                      Back to conversations
+                    </button>
+                    <div className="min-h-0 flex-1">
+                      <ConversationPanel
+                        key={conv.name}
+                        conversation={conv}
+                        viewMode={conversationViewMode ?? 'conversation'}
+                        onViewModeChange={onConversationViewModeChange}
+                        agentId={conversationAgentId}
+                        onArchived={onArchivedConversation}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
+                    Conversation not found.
+                  </div>
+                );
+              })()
+            ) : (
+              <>
+                <DiscussionsTab issueId={effectiveActiveIssueId} />
+                <div className="flex flex-col gap-2">
+                  {conversations.length > 0 ? conversations.map((conversation) => (
+                    <button
+                      key={conversation.name}
+                      type="button"
+                      className={`rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors ${selectedConversation === conversation.name ? 'bg-accent text-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => onSelectConversation(conversation.name)}
+                    >
+                      {conversation.title ?? conversation.name}
+                    </button>
+                  )) : <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No project conversations.</div>}
+                </div>
+              </>
+            )}
           </div>
         )}
-        {activeTab === 'activity' && activeIssueId && <ActivityTab issueId={activeIssueId} />}
-        {activeTab === 'settings' && activeIssueId && <OverviewTab issueId={activeIssueId} />}
+        {activeTab === 'activity' && effectiveActiveIssueId && <ActivityTab issueId={effectiveActiveIssueId} />}
+        {activeTab === 'settings' && effectiveActiveIssueId && <OverviewTab issueId={effectiveActiveIssueId} />}
       </div>
     </div>
   );
@@ -929,10 +1044,6 @@ export function CommandDeck({
     if (selectedFeature) {
       selectSession(selectedFeature, null);
     }
-    if (name !== null) {
-      setSelectedProject(null);
-      setSelectedFeature(null);
-    }
   }, [selectSession, selectedFeature]);
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
@@ -1065,20 +1176,32 @@ export function CommandDeck({
     return () => window.removeEventListener('panopticon:reconnected', handler);
   }, [queryClient]);
 
-  // Find selected feature data (memoized to avoid O(P×F) scan per render)
-  const selectedFeatureData = useMemo(() => {
-    if (!selectedFeature) return null;
-    for (const p of projectsWithSessions) {
-      const f = p.features.find(f => f.issueId === selectedFeature);
-      if (f) return f;
-    }
-    return null;
-  }, [projectsWithSessions, selectedFeature]);
-
   const selectedProjectData = useMemo(() => {
     if (!selectedProject) return null;
     return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
   }, [projectsWithSessions, selectedProject]);
+
+  const resolvedProjectForFeature = useMemo(() => {
+    if (!selectedFeature) return null;
+    for (const p of projectsWithSessions) {
+      if (p.features.some(f => f.issueId === selectedFeature)) return p;
+    }
+    return null;
+  }, [projectsWithSessions, selectedFeature]);
+
+  const resolvedProjectForConversation = useMemo(() => {
+    if (!selectedConversation) return null;
+    const conv = conversations.find(c => c.name === selectedConversation);
+    if (!conv || !conv.cwd) return null;
+    const matched = registeredProjects.find(rp =>
+      conv.cwd === rp.path || conv.cwd.startsWith(rp.path + '/'),
+    );
+    if (!matched) return null;
+    const name = matched.name ?? matched.key;
+    return projectsWithSessions.find(p => p.name === name) ?? null;
+  }, [conversations, selectedConversation, registeredProjects, projectsWithSessions]);
+
+  const rightPaneProject = selectedProjectData ?? resolvedProjectForFeature ?? resolvedProjectForConversation;
 
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
@@ -1307,56 +1430,42 @@ export function CommandDeck({
 
         {/* Content Area */}
         <div className={styles.content}>
-          {selectedConversation ? (
-            (() => {
-              const conv = conversations.find(c => c.name === selectedConversation);
-              return conv ? (
-                <ConversationPanel
-                  key={conv.name}
-                  conversation={conv}
-                  viewMode={conversationViewMode}
-                  onViewModeChange={onConversationViewModeChange}
-                  agentId={selectedAgent?.id}
-                  onArchived={() => {
-                    setSelectedConversation(null);
-                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
-                  }}
-                />
-              ) : (
-                <div className={styles.contentEmpty}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p>Loading session…</p>
-                  </div>
-                </div>
-              );
-            })()
-          ) : selectedFeature ? (
-            <IssueWorkbench
-              issueId={selectedFeature}
-              title={selectedIssueTitle}
-              sessions={selectedFeatureData?.sessions ?? []}
-              source={selectedIssue?.source}
-              url={selectedIssue?.url}
-              onOpenBeads={() => setShowBeads(true)}
-              agent={selectedAgent}
-              issue={selectedIssue ?? undefined}
-            />
-          ) : selectedProject ? (
+          {rightPaneProject ? (
             <ProjectRightPaneTabs
-              projectName={selectedProject}
-              features={selectedProjectData?.features ?? []}
+              projectName={rightPaneProject.name}
+              features={rightPaneProject.features}
               issueCosts={issueCosts}
               issueCostDetails={issueCostDetails}
-              conversations={projectConversations[selectedProject] ?? []}
+              conversations={projectConversations[rightPaneProject.name] ?? []}
               selectedConversation={selectedConversation}
+              activeIssueId={selectedFeature || null}
+              conversationViewMode={conversationViewMode}
+              onConversationViewModeChange={onConversationViewModeChange}
+              onArchivedConversation={() => {
+                setSelectedConversation(null);
+                queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              }}
+              conversationAgentId={selectedAgent?.id}
+              zoneA={selectedFeature ? {
+                issueId: selectedFeature,
+                title: selectedIssueTitle,
+                source: selectedIssue?.source,
+                url: selectedIssue?.url,
+                onOpenBeads: () => setShowBeads(true),
+                agent: selectedAgent,
+                issue: selectedIssue ?? undefined,
+              } : undefined}
               onOpenIssue={(issueId) => openIssue(issueId)}
               onSelectConversation={handleSelectConversation}
+              onActiveIssueIdChange={(issueId) => {
+                if (issueId) handleSelectFeature(issueId);
+              }}
             />
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
                 <Compass size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-                <p>Select a feature to view activity</p>
+                <p>Select a project to view activity</p>
               </div>
             </div>
           )}

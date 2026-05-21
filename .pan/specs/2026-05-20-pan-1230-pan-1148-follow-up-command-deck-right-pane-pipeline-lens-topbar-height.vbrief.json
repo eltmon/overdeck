@@ -93,7 +93,7 @@
       {
         "id": "b1-lens-as-default-rightpane",
         "title": "Make ProjectRightPaneTabs the unconditional right pane when a project is selected",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-20T03:00:00.000Z",
         "metadata": {
@@ -114,7 +114,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac1",
             "title": "When a project is selected in the tree (with or without a feature/conversation also selected), the right pane DOM contains `data-component=\"command-deck-right-pane-tabs\"` as the top-level right-pane container.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -122,7 +122,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac2",
             "title": "When a feature is selected in the project tree, the top-level right pane does NOT mount `data-testid=\"issue-workbench\"` (the legacy IssueWorkbench shell). The lens remains mounted instead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -130,7 +130,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac3",
             "title": "ProjectRightPaneTabs accepts a new controlled `activeIssueId?: string | null` prop. When set, tabs 2–6 (Plans / Beads / Conversations / Activity / Settings) drill into that issue id. When null, the existing first-feature default applies.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -138,7 +138,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac4",
             "title": "Selecting a feature in the tree sets the lens's `activeTab` to `'pipeline'` (so the user sees the project-filtered Pipeline with that issue) unless the user has explicitly chosen another tab during this session; tab choice still persists per-project to localStorage `mc-project-right-tab:<projectName>`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -146,7 +146,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac5",
             "title": "No regressions: existing tab keyboard navigation, tab persistence per-project, and Pipeline-tab ProjectOverview rendering all continue to work as in the current code.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -154,7 +154,7 @@
           {
             "id": "b1-lens-as-default-rightpane.ac6",
             "title": "Typecheck + lint + existing CommandDeck unit tests pass (some tests will be updated in b5; this bead does not break any tests that aren't touched in b5).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +164,7 @@
       {
         "id": "b2-conversation-rendering-in-tab",
         "title": "Render ConversationPanel inside the Conversations tab instead of as the top-level right pane",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-20T03:00:00.000Z",
         "metadata": {
@@ -180,7 +180,7 @@
           {
             "id": "b2-conversation-rendering-in-tab.ac1",
             "title": "Selecting a conversation (e.g. clicking a conversation row in the project tree) auto-switches the lens to the Conversations tab.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -188,7 +188,7 @@
           {
             "id": "b2-conversation-rendering-in-tab.ac2",
             "title": "When a conversation is selected, the Conversations tab body renders ConversationPanel with the same props (viewMode, onViewModeChange, agentId, onArchived) it received from the legacy top-level branch.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -196,7 +196,7 @@
           {
             "id": "b2-conversation-rendering-in-tab.ac3",
             "title": "A 'Back' (or equivalent) control inside the Conversations tab clears selectedConversation and restores the DiscussionsTab + conversation list view inside the tab.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -204,7 +204,7 @@
           {
             "id": "b2-conversation-rendering-in-tab.ac4",
             "title": "The top-level `selectedConversation ? ConversationPanel : ...` branch is fully removed from the right-pane render block in CommandDeck/index.tsx; ConversationPanel is imported only by the Conversations-tab code path.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -212,7 +212,7 @@
           {
             "id": "b2-conversation-rendering-in-tab.ac5",
             "title": "Archiving a conversation (onArchived) still clears selectedConversation and invalidates the conversations query — behavior identical to today.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -222,7 +222,7 @@
       {
         "id": "b3-preserve-issue-actions",
         "title": "Surface per-issue actions (start/stop/fork/plan/open-beads) within the lens shell so removing IssueWorkbench doesn't regress UX",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-20T03:00:00.000Z",
         "metadata": {
@@ -238,7 +238,7 @@
           {
             "id": "b3-preserve-issue-actions.ac1",
             "title": "When an issue is highlighted in the lens (activeIssueId non-null), a compact actions row is visible above or beside the tab strip exposing the same actions previously surfaced by ZoneA's ZoneActionStrip (start, stop, fork, plan, open-beads, view-source, view-url, cost display).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -246,7 +246,7 @@
           {
             "id": "b3-preserve-issue-actions.ac2",
             "title": "Every existing data-testid that ZoneA / ZoneActionStrip exposed (including but not limited to `zone-a-cost`) is preserved verbatim in the new actions row OR aliased into the lens with the same id, so existing tests and tools can find them.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -254,7 +254,7 @@
           {
             "id": "b3-preserve-issue-actions.ac3",
             "title": "Action handler wiring is unchanged: e.g. clicking 'Open beads' still triggers the BeadsDialog opener, clicking 'Plan' still triggers the PlanDialog opener, etc. No behavior regressions versus the legacy IssueWorkbench surface.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -262,7 +262,7 @@
           {
             "id": "b3-preserve-issue-actions.ac4",
             "title": "When no issue is highlighted (activeIssueId null — e.g. user clicked the project header), the actions row is hidden (or shows a project-level placeholder). The lens does not render dead/disabled action buttons.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -272,7 +272,7 @@
       {
         "id": "b4-tab-strip-48px",
         "title": "Right-pane tab strip height is exactly 48px per PRD §4.7.12",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-20T03:00:00.000Z",
         "metadata": {
@@ -288,7 +288,7 @@
           {
             "id": "b4-tab-strip-48px.ac1",
             "title": "The right-pane tab strip element (`data-component=\"command-deck-right-pane-tabs\"` → first child role=\"tablist\") has class `h-[48px]` and renders at exactly 48px tall (measured via `getBoundingClientRect().height`).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -296,7 +296,7 @@
           {
             "id": "b4-tab-strip-48px.ac2",
             "title": "Tab button vertical alignment is unchanged visually — buttons remain centered within the strip after the height change.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -304,7 +304,7 @@
           {
             "id": "b4-tab-strip-48px.ac3",
             "title": "Pipeline route TopBar primitive remains at 52px (the Pipeline test PipelineView.test.tsx:120 asserting `h-[52px]` still passes — Pipeline = 52px per PRD §4.7.12 row 1, Command Deck = 48px per row 3, they are different surfaces).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -314,7 +314,7 @@
       {
         "id": "b5-tests",
         "title": "Update + add tests covering the right-pane lens default and 48px tab strip",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-20T03:00:00.000Z",
         "metadata": {
@@ -330,7 +330,7 @@
           {
             "id": "b5-tests.ac1",
             "title": "Vitest assertion: with selectedProject set and no selectedFeature, the right pane DOM contains `data-component=\"command-deck-right-pane-tabs\"`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -338,7 +338,7 @@
           {
             "id": "b5-tests.ac2",
             "title": "Vitest assertion: with selectedFeature set, the right pane DOM does NOT contain `data-testid=\"issue-workbench\"` at the top level; the lens is rendered instead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -346,7 +346,7 @@
           {
             "id": "b5-tests.ac3",
             "title": "Vitest assertion: when selectedConversation transitions from null to some-id, the lens's active tab becomes `'conversations'` and ConversationPanel is rendered inside the tab body.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -354,7 +354,7 @@
           {
             "id": "b5-tests.ac4",
             "title": "Vitest assertion: when an issue is highlighted, the actions row containing the preserved data-testids (e.g. `zone-a-cost`) is mounted above the tab strip.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -362,7 +362,7 @@
           {
             "id": "b5-tests.ac5",
             "title": "Vitest assertion: the tab strip element's `getBoundingClientRect().height` equals 48 (within ±1px tolerance for sub-pixel rounding) in the test render.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -370,7 +370,7 @@
           {
             "id": "b5-tests.ac6",
             "title": "Playwright UAT in an isolated browser context performs the full flow above and asserts the same conditions in a real browser. The Playwright test does NOT share localStorage/cookies with any other agent's session; localStorage keys (e.g. `mc-project-right-tab:*`) are seeded inside the test fixture if needed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -378,7 +378,7 @@
           {
             "id": "b5-tests.ac7",
             "title": "Full test suite (`npm test` from workspace root and frontend) and `npm run typecheck` + `npm run lint` pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -485,5 +485,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

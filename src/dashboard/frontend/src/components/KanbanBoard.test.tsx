@@ -5,9 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard, DroppableColumn } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
+import IssueCardPrimitive from './primitives/IssueCard';
+
+const mockUseDroppable = vi.fn(() => ({ isOver: false, setNodeRef: vi.fn() }));
+
+vi.mock('@dnd-kit/core', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core');
+  return {
+    ...actual,
+    useDroppable: (...args: Parameters<typeof import('@dnd-kit/core')['useDroppable']>) => mockUseDroppable(...args),
+  };
+});
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -731,6 +742,75 @@ describe('IssueCard', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onPlan).not.toHaveBeenCalled();
   });
+
+  it('renders Beads N/M progress row when beadCounts is present', () => {
+    renderIssueCard({
+      issue: createMockIssue({ beadCounts: { completed: 7, total: 12 } }),
+    });
+
+    expect(screen.getByText('Beads 7/12')).toBeInTheDocument();
+    const beadProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="bead-progress"]');
+    expect(beadProgress).toBeInTheDocument();
+    expect(beadProgress).toHaveAttribute('data-progress', '7');
+  });
+
+  it('hides bead progress row when beadCounts is null', () => {
+    renderIssueCard({
+      issue: createMockIssue({ beadCounts: null }),
+    });
+
+    expect(screen.queryByText(/Beads \d+\/\d+/)).not.toBeInTheDocument();
+  });
+
+  it('renders agent foot with name, sub, runtime and avatar for active agent', () => {
+    renderIssueCard({
+      workAgent: createMockAgent({ id: 'agent-test-123', model: 'claude-sonnet-4-6' }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    expect(card).toHaveTextContent('agent-test-123');
+    expect(card).toHaveTextContent('Sonnet 4.6');
+    expect(card.querySelector('[class*="rounded-full"][class*="grid"]')).toBeInTheDocument();
+  });
+
+  it('renders empty agent foot with no agent and tracker ref when no agent is active', () => {
+    renderIssueCard({
+      issue: createMockIssue({ source: 'github' }),
+      workAgent: undefined,
+    });
+
+    expect(screen.getByText('no agent')).toBeInTheDocument();
+    expect(screen.getByText('GitHub TEST-123')).toBeInTheDocument();
+  });
+
+  it('renders cost overlay when totalCost is greater than 0', () => {
+    renderIssueCard({
+      cost: { issueId: 'TEST-123', totalCost: 5.5, tokenCount: 1000, sessionCount: 1 },
+    });
+
+    expect(screen.getByTestId('card-cost-TEST-123')).toBeInTheDocument();
+  });
+
+  it('uses success tokens for merge-ready cards', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Review' }),
+      // Simulate merge-ready state via review status injection would require
+      // more setup; instead test the primitive directly through the board card
+      // by leveraging the fact that KanbanBoard computes mergeReadyCard from
+      // reviewStatus. We render the primitive directly for a focused assertion.
+    });
+
+    // Render the primitive directly for a focused styling test
+    const { container } = render(
+      <IssueCardPrimitive issueId="TEST-123" priority={3} mergeReadyCard={true}>
+        <div>content</div>
+      </IssueCardPrimitive>,
+    );
+
+    const card = container.querySelector('[data-merge-ready-card="true"]');
+    expect(card).toHaveClass('border-success/60', 'bg-success/10');
+    expect(card).not.toHaveClass('border-warning/60', 'bg-warning/10');
+  });
 });
 
 describe('groupByCanceledType', () => {
@@ -1303,5 +1383,54 @@ describe('CompactChildCard', () => {
     }];
     render(<CompactChildCard issue={child} agents={agents} />);
     expect(screen.getByTitle('Agent running')).toBeDefined();
+  });
+});
+
+describe('DroppableColumn', () => {
+  beforeEach(() => {
+    mockUseDroppable.mockReturnValue({ isOver: false, setNodeRef: vi.fn() });
+  });
+
+  afterEach(() => {
+    mockUseDroppable.mockClear();
+  });
+
+  it('applies blocked styles when dragging over a different column', () => {
+    mockUseDroppable.mockReturnValue({ isOver: true, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="done">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).toContain('cursor-not-allowed');
+    expect(el.className).toContain('opacity-60');
+    expect(el.className).not.toContain('scale-[1.02]');
+  });
+
+  it('applies scale when dragging over the same column', () => {
+    mockUseDroppable.mockReturnValue({ isOver: true, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="in_progress">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).toContain('scale-[1.02]');
+    expect(el.className).not.toContain('cursor-not-allowed');
+    expect(el.className).not.toContain('opacity-60');
+  });
+
+  it('applies no hover styles when not dragging over', () => {
+    mockUseDroppable.mockReturnValue({ isOver: false, setNodeRef: vi.fn() });
+    const { container } = render(
+      <DroppableColumn status="in_progress" activeDragStatus="done">
+        <div>content</div>
+      </DroppableColumn>,
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.className).not.toContain('scale-[1.02]');
+    expect(el.className).not.toContain('cursor-not-allowed');
+    expect(el.className).not.toContain('opacity-60');
   });
 });
