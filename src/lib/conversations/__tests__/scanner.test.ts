@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -77,7 +78,7 @@ describe('work-pool', () => {
       inFlight--;
     });
 
-    await runWithPool(tasks, MAX);
+    await Effect.runPromise(runWithPool(tasks, MAX));
     expect(maxInFlight).toBeLessThanOrEqual(MAX);
   });
 });

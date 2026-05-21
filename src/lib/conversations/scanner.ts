@@ -24,6 +24,7 @@ import {
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
+import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
 import { buildCorrelationMap } from './correlator.js';
 import { getModelCapability } from '../model-capabilities.js';
@@ -335,11 +336,11 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   });
 
   // 8. Run with bounded parallelism
-  await runWithPool(tasks, maxParallel, (taskResult) => {
+  await Effect.runPromise(runWithPool(tasks, maxParallel, (taskResult) => {
     if (taskResult instanceof Error) {
       result.errors++;
     }
-  });
+  }));
 
   result.durationMs = Date.now() - startTs;
   if (result.warnings?.length === 0) delete result.warnings;

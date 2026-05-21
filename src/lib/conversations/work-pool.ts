@@ -2,8 +2,10 @@
  * Bounded parallelism work pool (PAN-457).
  *
  * Limits concurrent async tasks to maxParallel. Tasks are started as soon as a
- * slot is free — no batching. Uses promise chaining to avoid setTimeout polling.
+ * slot is free — no batching. Uses Effect.all concurrency for back-pressure.
  */
+
+import { Effect } from 'effect';
 
 export interface WorkPoolStats {
   total: number;
@@ -19,34 +21,33 @@ export interface WorkPoolStats {
  * @param maxParallel  Maximum concurrent executions
  * @param onDone    Optional callback called after each task completes (success or failure)
  */
-export async function runWithPool<T>(
+export function runWithPool<T>(
   tasks: Array<() => Promise<T>>,
   maxParallel: number,
   onDone?: (result: T | Error, index: number) => void,
-): Promise<Array<T | Error>> {
-  if (tasks.length === 0) return [];
+): Effect.Effect<Array<T | Error>> {
+  if (tasks.length === 0) return Effect.succeed([]);
   const limit = Math.max(1, maxParallel);
 
-  const results: Array<T | Error> = new Array(tasks.length);
-  let nextIdx = 0;
+  const effects = tasks.map((task, idx) =>
+    Effect.tryPromise({
+      try: () => task(),
+      catch: (e) => (e instanceof Error ? e : new Error(String(e))),
+    }).pipe(
+      Effect.matchEffect({
+        onFailure: (err) =>
+          Effect.sync(() => {
+            onDone?.(err, idx);
+            return err as T | Error;
+          }),
+        onSuccess: (val) =>
+          Effect.sync(() => {
+            onDone?.(val, idx);
+            return val as T | Error;
+          }),
+      }),
+    ),
+  );
 
-  async function worker(): Promise<void> {
-    while (nextIdx < tasks.length) {
-      const idx = nextIdx++;
-      const task = tasks[idx];
-      try {
-        const result = await task();
-        results[idx] = result;
-        onDone?.(result, idx);
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        results[idx] = error;
-        onDone?.(error, idx);
-      }
-    }
-  }
-
-  // Spawn `limit` workers and wait for all to drain
-  await Promise.all(Array.from({ length: limit }, () => worker()));
-  return results;
+  return Effect.all(effects, { concurrency: limit });
 }

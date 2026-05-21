@@ -14,6 +14,7 @@ import {
   insertEmbedding,
 } from '../../database/discovered-sessions-db.js';
 import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
+import { Effect } from 'effect';
 import { runWithPool } from '../work-pool.js';
 import { embed } from './providers.js';
 import { getConversationsConfig } from '../../config-yaml.js';
@@ -180,7 +181,7 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
     }
   });
 
-  await runWithPool(tasks, maxParallel);
+  await Effect.runPromise(runWithPool(tasks, maxParallel));
   result.durationMs = Date.now() - startTs;
   return result;
 }
