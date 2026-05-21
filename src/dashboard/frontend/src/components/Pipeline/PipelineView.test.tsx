@@ -294,4 +294,29 @@ describe('PipelineView', () => {
     expect(ledger).toHaveClass('opacity-55');
     expect(within(ledger).getAllByText('—')).toHaveLength(2);
   });
+
+  it('renders empty-state card when no issues match the active phase filter', () => {
+    const { container } = renderPipelineView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
+    // After filtering to 'ship', PAN-1 is in ship, so not empty — flip to a phase with nothing
+    fireEvent.click(screen.getByRole('button', { name: 'plan' }));
+    // PAN-3 is in plan, so still not empty — use a combination that yields empty
+    // Apply a project filter that has no planned issues in 'plan' phase
+    fireEvent.click(screen.getByRole('button', { name: 'all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Panopticon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
+
+    // Panopticon project has PAN-1 in ship, so not empty. Filter to a phase with no Panopticon issues
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    // PAN-1 is Panopticon in ship; PAN-2, PAN-6, PAN-7 are Operations (not Panopticon) in work
+    const emptyState = container.querySelector('[data-component="pipeline-empty-state"]');
+    expect(emptyState).toBeInTheDocument();
+    expect(emptyState).toHaveTextContent('No issues match the selected filters.');
+
+    // TopBar, MetricStrip, and filter row are still visible
+    expect(container.querySelector('[data-component="top-bar"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="metric-strip"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="pipeline-filter-row"]')).toBeInTheDocument();
+  });
 });

@@ -452,7 +452,14 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
         </div>
       </div>
       <div className="flex-1 overflow-auto">
-        {visiblePhases.map((phase) => (
+        {visiblePhases.every((phase) => groupedIssues[phase].length === 0) ? (
+          <div
+            data-component="pipeline-empty-state"
+            className="mx-[22px] mt-[24px] rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground"
+          >
+            No issues match the selected filters.
+          </div>
+        ) : visiblePhases.map((phase) => (
           <section
             key={phase}
             ref={(element) => {
