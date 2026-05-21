@@ -19,12 +19,18 @@
  * sync-state-via-commit shape this helper produces is the substrate for that.
  */
 
-import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { dirname, join, sep } from 'path';
-import { promisify } from 'util';
+import { Effect, Layer, Stream } from 'effect';
+import { ChildProcess } from 'effect/unstable/process';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
+import { GitError } from '../errors.js';
 
-const execAsync = promisify(exec);
+const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
+);
 
 const DEBOUNCE_MS = 2_000;
 
@@ -34,7 +40,7 @@ interface QueuedCommit {
   timer: NodeJS.Timeout;
 }
 
-interface FlushResult {
+export interface FlushResult {
   committed: boolean;
   reason?: string;
 }
@@ -42,15 +48,64 @@ interface FlushResult {
 const pending = new Map<string, QueuedCommit>();
 let serializer: Promise<unknown> = Promise.resolve();
 
+interface GitResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+/** Run a git subcommand. Fails with GitError on non-zero exit. */
+function runGit(
+  args: readonly string[],
+  cwd: string,
+): Effect.Effect<GitResult, GitError> {
+  return Effect.gen(function* () {
+    const handle = yield* ChildProcess.make('git', [...args], { cwd });
+    const stdoutBuf = yield* Stream.runFold(
+      handle.stdout,
+      () => Buffer.alloc(0),
+      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
+    );
+    const stderrBuf = yield* Stream.runFold(
+      handle.stderr,
+      () => Buffer.alloc(0),
+      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
+    );
+    const exitCode = yield* handle.exitCode;
+    if (exitCode !== 0) {
+      return yield* Effect.fail(
+        new GitError({
+          command: ['git', ...args],
+          stderr: stderrBuf.toString('utf-8'),
+          exitCode,
+        }),
+      );
+    }
+    return {
+      stdout: stdoutBuf.toString('utf-8'),
+      stderr: stderrBuf.toString('utf-8'),
+      exitCode,
+    };
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(spawnerLayer),
+    Effect.catchCause((cause) =>
+      Effect.fail(
+        new GitError({
+          command: ['git', ...args],
+          stderr: String(cause),
+          exitCode: -1,
+          cause,
+        }),
+      ),
+    ),
+  );
+}
+
 /**
  * Queue an auto-commit for one or more files. Returns immediately; the actual
  * git commit happens after the debounce window. Multiple calls for the same
  * project root inside the window coalesce.
- *
- * `paths` are absolute or project-relative paths. `subject` is the conventional
- * commit subject used when this call is the only one in the window — when
- * multiple subjects pile up, they batch under a generic "update N files"
- * message.
  */
 export function queueAutoCommit(opts: {
   projectRoot: string;
@@ -62,89 +117,136 @@ export function queueAutoCommit(opts: {
 
   const existing = pending.get(projectRoot);
   if (existing) {
-    paths.forEach(p => existing.paths.add(p));
+    paths.forEach((p) => existing.paths.add(p));
     existing.subjects.push(subject);
     clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => void flush(projectRoot), DEBOUNCE_MS);
+    existing.timer = setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS);
     return;
   }
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flush(projectRoot), DEBOUNCE_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS),
   });
 }
 
 /**
- * Force a flush of any pending commits for `projectRoot`. Useful for tests and
- * for shutdown paths that want to ensure operational state is persisted before
- * the process exits. Resolves after the commit attempt (success or no-op).
+ * Force a flush of any pending commits for `projectRoot`. Returns an Effect that
+ * resolves after the commit attempt (success or no-op).
  */
-export async function flushAutoCommits(projectRoot: string): Promise<FlushResult> {
-  const batch = pending.get(projectRoot);
-  if (!batch) return { committed: false, reason: 'no pending' };
-  clearTimeout(batch.timer);
-  return flush(projectRoot);
+export function flushAutoCommits(
+  projectRoot: string,
+): Effect.Effect<FlushResult, never> {
+  return Effect.promise(() => flushPromise(projectRoot));
 }
 
-async function flush(projectRoot: string): Promise<FlushResult> {
+function flushPromise(projectRoot: string): Promise<FlushResult> {
   const batch = pending.get(projectRoot);
-  if (!batch) return { committed: false, reason: 'no pending' };
+  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
+  clearTimeout(batch.timer);
+  return flushInner(projectRoot);
+}
+
+function flushInner(projectRoot: string): Promise<FlushResult> {
+  const batch = pending.get(projectRoot);
+  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
   pending.delete(projectRoot);
 
-  // Serialize across all projectRoots within this process so two concurrent
-  // flushes don't trample git's index.
-  const task = serializer.then(() => doCommit(projectRoot, batch));
+  const task = serializer.then(() => Effect.runPromise(doCommit(projectRoot, batch)));
   serializer = task.catch(() => undefined);
   return task;
 }
 
-async function doCommit(projectRoot: string, batch: QueuedCommit): Promise<FlushResult> {
-  if (!existsSync(join(projectRoot, '.git'))) {
-    return { committed: false, reason: 'not a git repo' };
-  }
-
-  // Only auto-commit on `main`. Feature/workspace branches have their own
-  // commit cadence driven by work agents.
-  let branch: string;
-  try {
-    const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot });
-    branch = stdout.trim();
-  } catch (err: any) {
-    return { committed: false, reason: `branch check failed: ${err?.message ?? err}` };
-  }
-  if (branch !== 'main') {
-    return { committed: false, reason: `not on main (${branch})` };
-  }
-
-  const paths = Array.from(batch.paths);
-  const relativePaths = paths.map(p => relativizeToRoot(p, projectRoot));
-  const quotedPaths = relativePaths.map(shellQuote).join(' ');
-
-  try {
-    await execAsync(`git add -- ${quotedPaths}`, { cwd: projectRoot });
-    try {
-      await execAsync(`git diff --cached --quiet -- ${quotedPaths}`, { cwd: projectRoot });
-      // No diff staged for these paths.
-      return { committed: false, reason: 'no diff' };
-    } catch {
-      // Diff present — proceed to commit.
+function doCommit(
+  projectRoot: string,
+  batch: QueuedCommit,
+): Effect.Effect<FlushResult, never> {
+  return Effect.gen(function* () {
+    if (!existsSync(join(projectRoot, '.git'))) {
+      return { committed: false, reason: 'not a git repo' };
     }
 
-    const subject = batch.subjects.length === 1
-      ? batch.subjects[0]
-      : `chore(state): batch update ${relativePaths.length} pan/beads file(s)`;
-
-    await execAsync(
-      `git commit -m ${shellQuote(subject)} -- ${quotedPaths}`,
-      { cwd: projectRoot },
+    // Check current branch.
+    const branchResult: FlushResult | string = yield* runGit(
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      projectRoot,
+    ).pipe(
+      Effect.matchEffect({
+        onSuccess: (r) => Effect.succeed(r.stdout.trim()),
+        onFailure: (err) =>
+          Effect.succeed({
+            committed: false as const,
+            reason: `branch check failed: ${err.stderr || err._tag}`,
+          } satisfies FlushResult),
+      }),
     );
+    if (typeof branchResult !== 'string') return branchResult;
+
+    if (branchResult !== 'main') {
+      return { committed: false, reason: `not on main (${branchResult})` };
+    }
+
+    const branch = branchResult;
+    const paths = Array.from(batch.paths);
+    const relativePaths = paths.map((p) => relativizeToRoot(p, projectRoot));
+
+    // git add
+    const addOk: boolean | FlushResult = yield* runGit(
+      ['add', '--', ...relativePaths],
+      projectRoot,
+    ).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true as const),
+        onFailure: (err) => {
+          console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+          return Effect.succeed({
+            committed: false as const,
+            reason: err.stderr || err._tag,
+          } satisfies FlushResult);
+        },
+      }),
+    );
+    if (typeof addOk !== 'boolean') return addOk;
+
+    // git diff --cached --quiet exits 0 if NO diff, 1 if diff present.
+    // So a successful run means "no diff" — bail out.
+    const noDiff: boolean = yield* runGit(
+      ['diff', '--cached', '--quiet', '--', ...relativePaths],
+      projectRoot,
+    ).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true),
+        onFailure: () => Effect.succeed(false),
+      }),
+    );
+    if (noDiff) {
+      return { committed: false, reason: 'no diff' };
+    }
+
+    const subject =
+      batch.subjects.length === 1
+        ? batch.subjects[0]
+        : `chore(state): batch update ${relativePaths.length} pan/beads file(s)`;
+
+    const commitOk: boolean | FlushResult = yield* runGit(
+      ['commit', '-m', subject, '--', ...relativePaths],
+      projectRoot,
+    ).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true as const),
+        onFailure: (err) => {
+          console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+          return Effect.succeed({
+            committed: false as const,
+            reason: err.stderr || err._tag,
+          } satisfies FlushResult);
+        },
+      }),
+    );
+    if (typeof commitOk !== 'boolean') return commitOk;
+
     return { committed: true };
-  } catch (err: any) {
-    // Best-effort: never break the calling write path because of a git hiccup.
-    console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err?.message ?? err}`);
-    return { committed: false, reason: err?.message ?? String(err) };
-  }
+  });
 }
 
 /**
@@ -168,9 +270,4 @@ function relativizeToRoot(absOrRel: string, projectRoot: string): string {
   const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;
   if (absOrRel.startsWith(rootPrefix)) return absOrRel.slice(rootPrefix.length);
   return absOrRel;
-}
-
-function shellQuote(s: string): string {
-  // POSIX-safe single-quote escape: end quote, escape the literal quote, re-open.
-  return `'${s.replace(/'/g, `'\\''`)}'`;
 }
