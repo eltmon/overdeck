@@ -4,17 +4,17 @@
     "created": "2026-05-20T07:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1235: Frontend test failures on clean main (Sidebar / App route helpers / IssueDrawer)",
-    "updated": "2026-05-20T13:25:19.897Z"
+    "updated": "2026-05-21T18:13:57.178Z"
   },
   "plan": {
     "id": "pan-1235",
     "title": "Frontend test failures on clean main (Sidebar / App route helpers / IssueDrawer)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "a5bc0c52-30dc-4b16-adc1-f5472cb71682",
     "author": "agent:claude-opus-4-7",
-    "sequence": 30,
+    "sequence": 36,
     "created": "2026-05-20T07:05:00.000Z",
-    "updated": "2026-05-20T13:25:19.897Z",
+    "updated": "2026-05-21T18:13:57.178Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1235",
@@ -131,69 +131,67 @@
     "metadata": {
       "canonicalFilename": "2026-05-20-PAN-1235-frontend-test-failures-on-clean-main-sidebar-app-route-helpers-issuedrawer.vbrief.json",
       "pipeline": {
-        "phase": "merge",
+        "phase": "done",
         "issueId": "PAN-1235",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T13:25:19.895Z",
+        "updatedAt": "2026-05-21T18:13:50.247Z",
         "work": {
-          "updatedAt": "2026-05-20T13:25:19.895Z",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-20T13:25:19.895Z",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T13:25:19.895Z",
+              "at": "2026-05-21T18:13:50.247Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-05-20T13:25:19.895Z",
-          "notes": "All 7 ACs verified; 996/996 tests green; zero blockers across all four reviewers",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T13:25:19.895Z",
-              "notes": "All 7 ACs verified; 996/996 tests green; zero blockers across all four reviewers"
+              "at": "2026-05-21T18:13:50.247Z"
             }
           ],
           "approval": "approved"
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-05-20T13:25:19.895Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-20T13:25:19.895Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "at": "2026-05-21T18:13:50.247Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T13:25:19.895Z",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T13:25:19.895Z",
+          "status": "merged",
+          "updatedAt": "2026-05-21T18:13:50.247Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T13:25:19.895Z"
+              "status": "merged",
+              "at": "2026-05-21T18:13:50.247Z"
             }
           ],
-          "readyForMerge": true,
+          "readyForMerge": false,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1236"
         }
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
