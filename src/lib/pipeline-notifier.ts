@@ -14,6 +14,7 @@
  * pick up the latest DB state via `enrichReviewStatusFromSessions()`.
  */
 
+import { Effect } from 'effect';
 import type { ReviewStatus } from './review-status.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
@@ -83,3 +84,14 @@ export function notifyPipeline(event: PipelineEvent): void {
     })
     .finally(() => clearTimeout(timer));
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of {@link setPipelineHandler}. */
+export const setPipelineHandlerEffect = (fn: Handler): Effect.Effect<void, never> =>
+  Effect.sync(() => setPipelineHandler(fn));
+
+/** Effect variant of {@link notifyPipeline}. Fire-and-forget; never fails. */
+export const notifyPipelineEffect = (event: PipelineEvent): Effect.Effect<void, never> =>
+  Effect.sync(() => notifyPipeline(event));
+

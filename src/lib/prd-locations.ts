@@ -14,6 +14,7 @@
 
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -105,3 +106,38 @@ export function findPrdAnywhere(
   }
   return findDraftPrd(projectPath, issueId)
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// All helpers in this module are pure path computation + existsSync stat — no
+// real I/O failure modes. Effect.sync wrappers preserve the synchronous nature.
+
+/** Effect variant of {@link canonicalPrdSubdir}. */
+export const canonicalPrdSubdirEffect = (
+  projectPath: string,
+  issueId: string,
+  status: Exclude<PrdStatus, 'draft'>,
+): Effect.Effect<string, never> =>
+  Effect.sync(() => canonicalPrdSubdir(projectPath, issueId, status));
+
+/** Effect variant of {@link findPrdAtStatus}. */
+export const findPrdAtStatusEffect = (
+  projectPath: string,
+  issueId: string,
+  status: Exclude<PrdStatus, 'draft'>,
+): Effect.Effect<PrdLocation | null, never> =>
+  Effect.sync(() => findPrdAtStatus(projectPath, issueId, status));
+
+/** Effect variant of {@link findDraftPrd}. */
+export const findDraftPrdEffect = (
+  projectPath: string,
+  issueId: string,
+): Effect.Effect<PrdLocation | null, never> =>
+  Effect.sync(() => findDraftPrd(projectPath, issueId));
+
+/** Effect variant of {@link findPrdAnywhere}. */
+export const findPrdAnywhereEffect = (
+  projectPath: string,
+  issueId: string,
+): Effect.Effect<PrdLocation | null, never> =>
+  Effect.sync(() => findPrdAnywhere(projectPath, issueId));

@@ -6,6 +6,7 @@
  * network issues BEFORE the agent enters Claude Code's opaque retry loop.
  */
 
+import { Effect } from 'effect';
 import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
@@ -272,3 +273,41 @@ export class ProviderHealthError extends Error {
     this.probeResult = result;
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link probeProvider}. Never fails — probe results
+ * (including error classifications) are carried in the success channel as
+ * `ProbeResult`.
+ */
+export const probeProviderEffect = (
+  provider: ProviderConfig,
+  apiKey: string,
+  model: string,
+): Effect.Effect<ProbeResult, never> =>
+  Effect.promise(() => probeProvider(provider, apiKey, model));
+
+/** Effect variant of {@link validateProviderHealth}. */
+export const validateProviderHealthEffect = (
+  model: string,
+  apiKey?: string,
+): Effect.Effect<void, ProviderHealthError> =>
+  Effect.tryPromise({
+    try: () => validateProviderHealth(model, apiKey),
+    catch: (cause) => {
+      if (cause instanceof ProviderHealthError) return cause;
+      // Should never happen — validateProviderHealth only throws ProviderHealthError.
+      // Re-wrap defensively so the typed error channel stays narrow.
+      const provider = getProviderForModel(model as ModelId);
+      return new ProviderHealthError(provider, model, {
+        ok: false,
+        kind: 'unknown',
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
+    },
+  });
+
+/** Effect variant of {@link invalidateProbeCache}. Pure cache mutation; cannot fail. */
+export const invalidateProbeCacheEffect = (provider?: string): Effect.Effect<void, never> =>
+  Effect.sync(() => invalidateProbeCache(provider));

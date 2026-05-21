@@ -20,6 +20,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
+import { Effect } from 'effect';
+import { FsError } from './errors.js';
 import { PANOPTICON_HOME } from './paths.js';
 
 export type AlsoSyncTool = 'cursor' | 'codex' | 'windsurf' | 'cline' | 'copilot' | 'aider';
@@ -263,3 +265,28 @@ export function runMultiToolSync(projectPath: string): MultiToolSyncResult[] {
 
   return allResults;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of {@link resolveAlsoSyncTools}. Pure config read; cannot fail. */
+export const resolveAlsoSyncToolsEffect = (projectPath?: string): Effect.Effect<AlsoSyncTool[], never> =>
+  Effect.sync(() => resolveAlsoSyncTools(projectPath));
+
+/** Effect variant of {@link syncSkillsToTools}. */
+export const syncSkillsToToolsEffect = (
+  skillsDir: string,
+  projectPath: string,
+  tools: AlsoSyncTool[],
+): Effect.Effect<MultiToolSyncResult[], FsError> =>
+  Effect.try({
+    try: () => syncSkillsToTools(skillsDir, projectPath, tools),
+    catch: (cause) => new FsError({ path: skillsDir, operation: 'syncSkillsToTools', cause }),
+  });
+
+/** Effect variant of {@link runMultiToolSync}. */
+export const runMultiToolSyncEffect = (projectPath: string): Effect.Effect<MultiToolSyncResult[], FsError> =>
+  Effect.try({
+    try: () => runMultiToolSync(projectPath),
+    catch: (cause) => new FsError({ path: projectPath, operation: 'runMultiToolSync', cause }),
+  });
+

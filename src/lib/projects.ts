@@ -5,8 +5,11 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
+import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { Effect } from 'effect';
+import { ConfigError, ConfigParseError, FsError } from './errors.js';
 import { PANOPTICON_HOME } from './paths.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import type { QualityGateConfig, RepoConfig } from './workspace-config.js';
@@ -533,3 +536,176 @@ export function getSpecialistPromptOverride(
   const config = getSpecialistConfig(projectKey);
   return (config.prompts as Record<string, string | undefined>)[specialistType] || null;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of {@link loadProjectsConfig}.
+ *
+ * Reuses the mtime-cache from the sync implementation but reads the YAML
+ * asynchronously when a cache miss occurs. Parse failures surface as
+ * `ConfigParseError` instead of being swallowed.
+ */
+export const loadProjectsConfigEffect = (): Effect.Effect<ProjectsConfig, ConfigParseError | FsError> =>
+  Effect.gen(function* () {
+    const exists = yield* Effect.sync(() => existsSync(PROJECTS_CONFIG_FILE));
+    if (!exists) return { projects: {} } as ProjectsConfig;
+
+    const mtime = yield* Effect.tryPromise({
+      try: async () => (await stat(PROJECTS_CONFIG_FILE)).mtimeMs,
+      catch: (cause) =>
+        new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'stat', cause }),
+    });
+    if (_projectsCache && _projectsCache.mtime === mtime) {
+      return _projectsCache.config;
+    }
+    const content = yield* Effect.tryPromise({
+      try: () => readFile(PROJECTS_CONFIG_FILE, 'utf-8'),
+      catch: (cause) =>
+        new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'readFile', cause }),
+    });
+    const config = yield* Effect.try({
+      try: () => (parseYaml(content) as ProjectsConfig) || { projects: {} },
+      catch: (cause) =>
+        new ConfigParseError({
+          path: PROJECTS_CONFIG_FILE,
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
+    _projectsCache = { mtime, config };
+    return config;
+  });
+
+/** Effect variant of {@link saveProjectsConfig}. */
+export const saveProjectsConfigEffect = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const dir = PANOPTICON_HOME;
+      if (!existsSync(dir)) {
+        await mkdir(dir, { recursive: true });
+      }
+      const out = stringifyYaml(config, { indent: 2 });
+      await writeFile(PROJECTS_CONFIG_FILE, out, 'utf-8');
+      _projectsCache = null;
+    },
+    catch: (cause) =>
+      new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'saveProjectsConfig', cause }),
+  });
+
+/** Effect variant of {@link listProjects}. */
+export const listProjectsEffect = (): Effect.Effect<Array<{ key: string; config: ProjectConfig }>, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.map((config) =>
+      Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig })),
+    ),
+  );
+
+/** Effect variant of {@link registerProject}. */
+export const registerProjectEffect = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.flatMap((config) => {
+      config.projects[key] = projectConfig;
+      return saveProjectsConfigEffect(config);
+    }),
+  );
+
+/** Effect variant of {@link unregisterProject}. */
+export const unregisterProjectEffect = (key: string): Effect.Effect<boolean, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.flatMap((config) => {
+      if (!config.projects[key]) return Effect.succeed(false);
+      delete config.projects[key];
+      return saveProjectsConfigEffect(config).pipe(Effect.as(true));
+    }),
+  );
+
+/** Effect variant of {@link findProjectByTeam}. */
+export const findProjectByTeamEffect = (teamPrefix: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.map((config) => {
+      for (const [, projectConfig] of Object.entries(config.projects)) {
+        if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix.toUpperCase()) {
+          return projectConfig;
+        }
+      }
+      return null;
+    }),
+  );
+
+/** Effect variant of {@link findProjectByPath}. */
+export const findProjectByPathEffect = (workspacePath: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.map((config) => {
+      const normalizedTarget = resolve(workspacePath);
+      for (const [, projectConfig] of Object.entries(config.projects)) {
+        const normalizedProject = resolve(projectConfig.path);
+        if (
+          normalizedTarget === normalizedProject ||
+          normalizedTarget.startsWith(normalizedProject + '/')
+        ) {
+          return projectConfig;
+        }
+      }
+      return null;
+    }),
+  );
+
+/** Effect variant of {@link resolveProjectFromIssue}. */
+export const resolveProjectFromIssueEffect = (
+  issueId: string,
+  labels: string[] = [],
+): Effect.Effect<ResolvedProject | null, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(
+    Effect.map((config) => {
+      const parsed = parseIssueId(issueId);
+      if (!parsed) return null;
+      for (const [key, projectConfig] of Object.entries(config.projects)) {
+        const singlePrefix = getIssuePrefix(projectConfig);
+        if (singlePrefix?.toUpperCase() === parsed.prefix) {
+          return {
+            projectKey: key,
+            projectName: projectConfig.name,
+            projectPath: resolveProjectPath(projectConfig, labels),
+            linearTeam: singlePrefix,
+          } satisfies ResolvedProject;
+        }
+        if (projectConfig.issue_prefixes?.some((p) => p.toUpperCase() === parsed.prefix)) {
+          return {
+            projectKey: key,
+            projectName: projectConfig.name,
+            projectPath: resolveProjectPath(projectConfig, labels),
+            linearTeam: projectConfig.issue_prefixes?.find((p) => p.toUpperCase() === parsed.prefix),
+          } satisfies ResolvedProject;
+        }
+        if (!singlePrefix && !projectConfig.issue_prefixes) {
+          const derivedPrefix = key.toUpperCase().replace(/-/g, '');
+          if (derivedPrefix === parsed.prefix) {
+            return {
+              projectKey: key,
+              projectName: projectConfig.name,
+              projectPath: resolveProjectPath(projectConfig, labels),
+              linearTeam: undefined,
+            } satisfies ResolvedProject;
+          }
+        }
+      }
+      return null;
+    }),
+  );
+
+/** Effect variant of {@link getProject}. */
+export const getProjectEffect = (key: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(Effect.map((config) => config.projects[key] || null));
+
+/** Effect variant of {@link hasProjects}. */
+export const hasProjectsEffect = (): Effect.Effect<boolean, ConfigParseError | FsError> =>
+  loadProjectsConfigEffect().pipe(Effect.map((config) => Object.keys(config.projects).length > 0));
+
+/** Effect variant of {@link initializeProjectsConfig}. */
+export const initializeProjectsConfigEffect = (): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => initializeProjectsConfig(),
+    catch: (cause) => new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'initializeProjectsConfig', cause }),
+  });
+
