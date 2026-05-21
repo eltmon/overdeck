@@ -1,5 +1,6 @@
 import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
-import { Effect, Either } from 'effect';
+import { Effect } from 'effect';
+import * as Either from 'effect/Either';
 
 import {
   normalizeChannelPermissionRequestFields,
