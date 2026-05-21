@@ -1456,6 +1456,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // every field access in one PR would have been mechanical noise.
 
 import type { AgentRuntimeSnapshot } from '@panctl/contracts';
+import { Effect } from 'effect';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
@@ -1529,7 +1530,7 @@ export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentR
     return getAgentRuntimeState(agentId);
   }
   // Cross-process (CLI, external lib callers): sync mirror is empty, hit HTTP.
-  const snap = await fetchAgentRuntimeSnapshot(agentId);
+  const snap = await Effect.runPromise(fetchAgentRuntimeSnapshot(agentId));
   return snapshotToRuntimeState(snap);
 }
 
@@ -1539,47 +1540,47 @@ export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentR
  */
 export async function saveAgentRuntimeState(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
   if (patch.currentIssue !== undefined) {
-    await emitAgentEvent(agentId, {
+    await Effect.runPromise(emitAgentEvent(agentId, {
       kind: 'current_issue_set',
       currentIssue: patch.currentIssue || undefined,
-    });
+    }));
   }
 
   if (patch.resolution !== undefined && patch.resolutionCount !== undefined) {
-    await emitAgentEvent(agentId, {
+    await Effect.runPromise(emitAgentEvent(agentId, {
       kind: 'resolution_set',
       resolution: patch.resolution,
       resolutionCount: patch.resolutionCount,
-    });
+    }));
   }
 
   if (patch.state !== undefined) {
     if (patch.state === 'waiting-on-human') {
-      await emitAgentEvent(agentId, {
+      await Effect.runPromise(emitAgentEvent(agentId, {
         kind: 'waiting_start',
         reason: (patch.waitingReason as 'tool_permission' | 'user_question' | 'disambiguation' | 'other') || 'other',
         message: patch.waitingNotification,
-      });
+      }));
     } else if (patch.state === 'active') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
     } else if (patch.state === 'idle') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' }));
     } else if (patch.state === 'stopped') {
-      await emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' });
+      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' }));
     }
   } else if (patch.currentTool !== undefined) {
-    await emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool });
+    await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
   }
 
   if (patch.claudeSessionId) {
     // model_set requires a model — use existing snapshot's model if present.
     const snap = getAgentRuntimeState(agentId);
     if (snap || patch.claudeSessionId) {
-      await emitAgentEvent(agentId, {
+      await Effect.runPromise(emitAgentEvent(agentId, {
         kind: 'model_set',
         model: 'unknown',
         claudeSessionId: patch.claudeSessionId,
-      });
+      }));
     }
   }
 }
