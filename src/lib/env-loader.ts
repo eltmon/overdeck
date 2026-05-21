@@ -5,9 +5,11 @@
  * This allows the settings system to access API keys configured in the .env file.
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Effect, FileSystem } from 'effect';
+import { FsError, FsNotFoundError } from './errors.js';
 
 /**
  * Path to the Panopticon environment file
@@ -41,32 +43,39 @@ function parseEnvFile(content: string): Record<string, string> {
 }
 
 /**
- * Load environment variables from ~/.panopticon.env
+ * Load environment variables from ~/.panopticon.env.
  * Does not override existing environment variables.
  *
- * @returns Object with loaded variables and any errors
+ * Fails with `FsNotFoundError` if the env file does not exist.
+ * Fails with `FsError` if the file cannot be read.
  */
-export function loadPanopticonEnv(): {
-  loaded: string[];
-  skipped: string[];
-  error?: string;
-} {
-  const result = {
-    loaded: [] as string[],
-    skipped: [] as string[],
-  };
+export function loadPanopticonEnv(): Effect.Effect<
+  { loaded: string[]; skipped: string[] },
+  FsError | FsNotFoundError,
+  FileSystem.FileSystem
+> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
 
-  if (!existsSync(ENV_FILE_PATH)) {
-    return { ...result, error: `Env file not found: ${ENV_FILE_PATH}` };
-  }
+    const fileExists = yield* fs.exists(ENV_FILE_PATH).pipe(
+      Effect.mapError((cause) => new FsError({ path: ENV_FILE_PATH, operation: 'exists', cause })),
+    );
 
-  try {
-    const content = readFileSync(ENV_FILE_PATH, 'utf-8');
+    if (!fileExists) {
+      return yield* Effect.fail(new FsNotFoundError({ path: ENV_FILE_PATH }));
+    }
+
+    const content = yield* fs.readFileString(ENV_FILE_PATH, 'utf8').pipe(
+      Effect.mapError((cause) =>
+        new FsError({ path: ENV_FILE_PATH, operation: 'readFileString', cause }),
+      ),
+    );
+
     const envVars = parseEnvFile(content);
+    const result: { loaded: string[]; skipped: string[] } = { loaded: [], skipped: [] };
 
     for (const [key, value] of Object.entries(envVars)) {
       if (process.env[key]) {
-        // Don't override existing env vars
         result.skipped.push(key);
       } else {
         process.env[key] = value;
@@ -75,9 +84,7 @@ export function loadPanopticonEnv(): {
     }
 
     return result;
-  } catch (error: any) {
-    return { ...result, error: `Failed to load env file: ${error.message}` };
-  }
+  });
 }
 
 /**

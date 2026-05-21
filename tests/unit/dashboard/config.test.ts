@@ -11,9 +11,12 @@ import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src
 
 // Prevent loadPanopticonEnv from loading ~/.panopticon.env during tests
 // so env var presence/absence is fully controlled by the test.
-vi.mock('../../../src/lib/env-loader.js', () => ({
-  loadPanopticonEnv: () => ({ loaded: [], skipped: [] }),
-}));
+vi.mock('../../../src/lib/env-loader.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    loadPanopticonEnv: () => Effect.succeed({ loaded: [] as string[], skipped: [] as string[] }),
+  };
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

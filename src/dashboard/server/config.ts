@@ -58,9 +58,9 @@ export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShap
  */
 export const ServerConfigLayer = Layer.effect(
   ServerConfig,
-  Effect.sync((): ServerConfigShape => {
-    // Load .panopticon.env (idempotent)
-    loadPanopticonEnv();
+  Effect.gen(function* () {
+    // Load .panopticon.env (idempotent — file missing or unreadable is non-fatal)
+    yield* loadPanopticonEnv().pipe(Effect.ignore);
 
     const portStr = process.env['API_PORT'] ?? process.env['PORT'] ?? '3011';
     const port = parseInt(portStr, 10);
