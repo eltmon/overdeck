@@ -187,6 +187,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const [filter, setFilter] = useState(readFilterState);
   const { eventsByIssue } = useCostStream({ limit: 500 });
   const now = useSharedTick(30000);
@@ -197,6 +198,19 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
     plan: null,
     todo: null,
   });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollTop = useRef<number>(0);
+
+  useEffect(() => {
+    if (drawerIssueId === null && savedScrollTop.current > 0) {
+      const el = scrollContainerRef.current;
+      if (el) {
+        window.requestAnimationFrame(() => {
+          el.scrollTop = savedScrollTop.current;
+        });
+      }
+    }
+  }, [drawerIssueId]);
 
   useEffect(() => {
     const handlePopState = () => setFilter(readFilterState());
@@ -451,7 +465,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         {visiblePhases.every((phase) => groupedIssues[phase].length === 0) ? (
           <div
             data-component="pipeline-empty-state"
@@ -492,7 +506,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
                   agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
                   ledger={ledger}
                   assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
-                  onOpen={openIssue}
+                  onOpen={(id) => { savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0; openIssue(id); }}
                 />
               );
             })}
