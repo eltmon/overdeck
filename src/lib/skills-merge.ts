@@ -8,8 +8,10 @@ import {
   statSync,
 } from 'fs';
 import { join, relative, dirname } from 'path';
+import { Effect } from 'effect';
 import { SKILLS_DIR, CACHE_AGENTS_DIR, CACHE_RULES_DIR } from './paths.js';
 import {
+  createEmptyManifest,
   readManifest,
   writeManifest,
   collectSourceFiles,
@@ -67,7 +69,9 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
 export function mergeSkillsIntoWorkspace(workspacePath: string): MergeResult {
   const claudeDir = join(workspacePath, '.claude');
   const manifestPath = join(claudeDir, '.panopticon-manifest.json');
-  const manifest = readManifest(manifestPath);
+  const manifest = Effect.runSync(
+    readManifest(manifestPath).pipe(Effect.orElseSucceed(createEmptyManifest)),
+  );
 
   const result: MergeResult = {
     added: [],
@@ -91,15 +95,15 @@ export function mergeSkillsIntoWorkspace(workspacePath: string): MergeResult {
     if (!existsSync(sourceDir)) continue;
 
     const prefix = targetSubdir ? `${targetSubdir}/` : '';
-    const files = collectSourceFiles(sourceDir, '');
+    const files = Effect.runSync(collectSourceFiles(sourceDir, ''));
 
     for (const file of files) {
       const relativePath = `${prefix}${file.relativePath}`;
       const targetPath = join(claudeDir, relativePath);
-      const sourceHash = hashFile(file.absolutePath);
+      const sourceHash = Effect.runSync(hashFile(file.absolutePath));
 
       // Check status against manifest
-      const status = compareFileToManifest(targetPath, relativePath, manifest);
+      const status = Effect.runSync(compareFileToManifest(targetPath, relativePath, manifest));
 
       switch (status.action) {
         case 'new':
@@ -131,7 +135,7 @@ export function mergeSkillsIntoWorkspace(workspacePath: string): MergeResult {
   }
 
   // Write updated manifest
-  writeManifest(manifestPath, manifest);
+  Effect.runSync(writeManifest(manifestPath, manifest));
 
   return result;
 }
@@ -154,7 +158,9 @@ export function applyProjectTemplateOverlay(
 ): string[] {
   const claudeDir = join(workspacePath, '.claude');
   const manifestPath = join(claudeDir, '.panopticon-manifest.json');
-  const manifest = readManifest(manifestPath);
+  const manifest = Effect.runSync(
+    readManifest(manifestPath).pipe(Effect.orElseSucceed(createEmptyManifest)),
+  );
   const overlayed: string[] = [];
 
   if (!existsSync(templateDir)) return overlayed;
@@ -180,7 +186,7 @@ export function applyProjectTemplateOverlay(
       // Track in manifest if it's under .claude/
       if (target.startsWith('.claude/')) {
         const relativePath = target.slice('.claude/'.length);
-        const hash = hashFile(targetPath);
+        const hash = Effect.runSync(hashFile(targetPath));
         setManifestEntry(manifest, relativePath, hash, 'project-template');
         overlayed.push(relativePath);
       }
@@ -192,7 +198,7 @@ export function applyProjectTemplateOverlay(
       const copied = copyTree(claudeInTemplate, claudeDir);
       for (const rel of copied) {
         const targetPath = join(claudeDir, rel);
-        const hash = hashFile(targetPath);
+        const hash = Effect.runSync(hashFile(targetPath));
         setManifestEntry(manifest, rel, hash, 'project-template');
         overlayed.push(rel);
       }
@@ -200,7 +206,7 @@ export function applyProjectTemplateOverlay(
   }
 
   // Write updated manifest
-  writeManifest(manifestPath, manifest);
+  Effect.runSync(writeManifest(manifestPath, manifest));
 
   return overlayed;
 }
@@ -296,7 +302,9 @@ export function mergePanSkillsIntoWorkspace(projectPath: string, workspacePath: 
 
   const claudeSkillsDir = join(workspacePath, '.claude', 'skills');
   const manifestPath = join(workspacePath, '.claude', '.panopticon-manifest.json');
-  const manifest = readManifest(manifestPath);
+  const manifest = Effect.runSync(
+    readManifest(manifestPath).pipe(Effect.orElseSucceed(createEmptyManifest)),
+  );
 
   const skillDirs = readdirSync(panSkillsDir, { withFileTypes: true })
     .filter(e => e.isDirectory())
@@ -313,14 +321,14 @@ export function mergePanSkillsIntoWorkspace(projectPath: string, workspacePath: 
     }
 
     // Rule #2: copy from .pan/skills/<name>/ to workspace .claude/skills/<name>/
-    const files = collectSourceFiles(sourceSkillDir, '');
+    const files = Effect.runSync(collectSourceFiles(sourceSkillDir, ''));
     mkdirSync(targetSkillDir, { recursive: true });
     let anyAdded = false;
     for (const file of files) {
       const targetPath = join(targetSkillDir, file.relativePath);
       mkdirSync(dirname(targetPath), { recursive: true });
       copyFileSync(file.absolutePath, targetPath);
-      const hash = hashFile(targetPath);
+      const hash = Effect.runSync(hashFile(targetPath));
       setManifestEntry(manifest, `skills/${skillName}/${file.relativePath}`, hash, 'pan-skills');
       result.added.push(`skills/${skillName}/${file.relativePath}`);
       anyAdded = true;
@@ -330,6 +338,6 @@ export function mergePanSkillsIntoWorkspace(projectPath: string, workspacePath: 
     }
   }
 
-  writeManifest(manifestPath, manifest);
+  Effect.runSync(writeManifest(manifestPath, manifest));
   return result;
 }

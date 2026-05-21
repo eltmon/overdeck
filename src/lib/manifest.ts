@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
+import { Effect } from 'effect';
+import { ConfigParseError, FsError } from './errors.js';
 
 /**
  * Manifest entry for a single distributed file.
@@ -33,10 +35,15 @@ export type FileStatus =
 /**
  * Compute SHA-256 hash of a file, prefixed with "sha256:".
  */
-export function hashFile(filePath: string): string {
-  const content = readFileSync(filePath);
-  const hex = createHash('sha256').update(content).digest('hex');
-  return `sha256:${hex}`;
+export function hashFile(filePath: string): Effect.Effect<string, FsError> {
+  return Effect.try({
+    try: () => {
+      const content = readFileSync(filePath);
+      const hex = createHash('sha256').update(content).digest('hex');
+      return `sha256:${hex}`;
+    },
+    catch: (cause) => new FsError({ path: filePath, operation: 'read', cause }),
+  });
 }
 
 /**
@@ -51,30 +58,39 @@ export function createEmptyManifest(): Manifest {
 }
 
 /**
- * Read a manifest from disk. Returns empty manifest if file doesn't exist or is invalid.
+ * Read a manifest from disk. Returns empty manifest if file doesn't exist or has wrong schema.
+ * Surfaces a ConfigParseError if the file exists but contains invalid JSON.
  */
-export function readManifest(manifestPath: string): Manifest {
-  if (!existsSync(manifestPath)) {
-    return createEmptyManifest();
-  }
+export function readManifest(manifestPath: string): Effect.Effect<Manifest, ConfigParseError> {
+  return Effect.gen(function* () {
+    if (!existsSync(manifestPath)) {
+      return createEmptyManifest();
+    }
 
-  try {
-    const raw = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const raw = yield* Effect.try({
+      try: () => JSON.parse(readFileSync(manifestPath, 'utf-8')),
+      catch: (cause) =>
+        new ConfigParseError({ path: manifestPath, message: 'Invalid JSON', cause }),
+    });
+
     if (raw.version === 1 && raw.managed_by === 'panopticon' && typeof raw.installed === 'object') {
       return raw as Manifest;
     }
     return createEmptyManifest();
-  } catch {
-    return createEmptyManifest();
-  }
+  });
 }
 
 /**
  * Write a manifest to disk (creates parent directories if needed).
  */
-export function writeManifest(manifestPath: string, manifest: Manifest): void {
-  mkdirSync(join(manifestPath, '..'), { recursive: true });
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+export function writeManifest(manifestPath: string, manifest: Manifest): Effect.Effect<void, FsError> {
+  return Effect.try({
+    try: () => {
+      mkdirSync(join(manifestPath, '..'), { recursive: true });
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+    },
+    catch: (cause) => new FsError({ path: manifestPath, operation: 'write', cause }),
+  });
 }
 
 /**
@@ -111,22 +127,24 @@ export function compareFileToManifest(
   targetFile: string,
   relativePath: string,
   manifest: Manifest,
-): FileStatus {
-  if (!existsSync(targetFile)) {
-    return { action: 'new' };
-  }
+): Effect.Effect<FileStatus, FsError> {
+  return Effect.gen(function* () {
+    if (!existsSync(targetFile)) {
+      return { action: 'new' } as FileStatus;
+    }
 
-  const entry = manifest.installed[relativePath];
-  if (!entry) {
-    return { action: 'user-owned' };
-  }
+    const entry = manifest.installed[relativePath];
+    if (!entry) {
+      return { action: 'user-owned' } as FileStatus;
+    }
 
-  const currentHash = hashFile(targetFile);
-  if (currentHash === entry.hash) {
-    return { action: 'update', currentHash };
-  }
+    const currentHash = yield* hashFile(targetFile);
+    if (currentHash === entry.hash) {
+      return { action: 'update', currentHash } as FileStatus;
+    }
 
-  return { action: 'modified', currentHash, manifestHash: entry.hash };
+    return { action: 'modified', currentHash, manifestHash: entry.hash } as FileStatus;
+  });
 }
 
 /**
@@ -140,31 +158,36 @@ export function compareFileToManifest(
 export function collectSourceFiles(
   sourceDir: string,
   prefix: string,
-): Array<{ absolutePath: string; relativePath: string }> {
-  const results: Array<{ absolutePath: string; relativePath: string }> = [];
-
+): Effect.Effect<Array<{ absolutePath: string; relativePath: string }>, FsError> {
   if (!existsSync(sourceDir)) {
-    return results;
+    return Effect.succeed([]);
   }
 
-  function walk(dir: string): void {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (entry.isFile()) {
-        const rel = relative(sourceDir, fullPath);
-        results.push({
-          absolutePath: fullPath,
-          relativePath: `${prefix}${rel}`,
-        });
+  return Effect.try({
+    try: () => {
+      const results: Array<{ absolutePath: string; relativePath: string }> = [];
+
+      function walk(dir: string): void {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(fullPath);
+          } else if (entry.isFile()) {
+            const rel = relative(sourceDir, fullPath);
+            results.push({
+              absolutePath: fullPath,
+              relativePath: `${prefix}${rel}`,
+            });
+          }
+        }
       }
-    }
-  }
 
-  walk(sourceDir);
-  return results;
+      walk(sourceDir);
+      return results;
+    },
+    catch: (cause) => new FsError({ path: sourceDir, operation: 'readdir', cause }),
+  });
 }
 
 /**
@@ -179,17 +202,19 @@ export function buildManifestFromDirectory(
   baseDir: string,
   categories: string[],
   source: string,
-): Manifest {
-  const manifest = createEmptyManifest();
+): Effect.Effect<Manifest, FsError> {
+  return Effect.gen(function* () {
+    const manifest = createEmptyManifest();
 
-  for (const category of categories) {
-    const categoryDir = join(baseDir, category);
-    const files = collectSourceFiles(categoryDir, `${category}/`);
-    for (const file of files) {
-      const hash = hashFile(file.absolutePath);
-      setManifestEntry(manifest, file.relativePath, hash, source);
+    for (const category of categories) {
+      const categoryDir = join(baseDir, category);
+      const files = yield* collectSourceFiles(categoryDir, `${category}/`);
+      for (const file of files) {
+        const hash = yield* hashFile(file.absolutePath);
+        setManifestEntry(manifest, file.relativePath, hash, source);
+      }
     }
-  }
 
-  return manifest;
+    return manifest;
+  });
 }

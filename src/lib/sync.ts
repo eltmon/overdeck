@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync,
 import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import {
   SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
   SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SOURCE_SKILLS_DIR, SOURCE_AGENTS_DIR, SOURCE_RULES_DIR,
@@ -9,6 +10,7 @@ import {
   SYNC_TARGET, isDevMode,
 } from './paths.js';
 import {
+  createEmptyManifest,
   buildManifestFromDirectory, writeManifest, readManifest, hashFile,
   setManifestEntry, collectSourceFiles,
   type Manifest, type FileStatus,
@@ -309,12 +311,14 @@ export function refreshCache(): RefreshCacheResult {
   }
 
   // Generate cache manifest
-  const manifest = buildManifestFromDirectory(
-    join(SKILLS_DIR, '..'),  // ~/.panopticon/
-    ['skills', 'agent-definitions', 'rules'],
-    'panopticon',
+  const manifest = Effect.runSync(
+    buildManifestFromDirectory(
+      join(SKILLS_DIR, '..'),  // ~/.panopticon/
+      ['skills', 'agent-definitions', 'rules'],
+      'panopticon',
+    ),
   );
-  writeManifest(CACHE_MANIFEST, manifest);
+  Effect.runSync(writeManifest(CACHE_MANIFEST, manifest));
 
   return result;
 }
@@ -351,13 +355,15 @@ export function planSync(): SyncPlan {
 
   const targetBase = join(devrootPath, '.claude');
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
-  const manifest = readManifest(manifestPath);
+  const manifest = Effect.runSync(
+    readManifest(manifestPath).pipe(Effect.orElseSucceed(createEmptyManifest)),
+  );
 
   // Plan skills
-  const skillFiles = collectSourceFiles(SKILLS_DIR, 'skills/');
+  const skillFiles = Effect.runSync(collectSourceFiles(SKILLS_DIR, 'skills/'));
   for (const file of skillFiles) {
     const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+    const status = Effect.runSync(compareFileToManifest(targetFile, file.relativePath, manifest));
     const skillName = file.relativePath.split('/')[1] || file.relativePath;
 
     let syncStatus: SyncItem['status'] = 'new';
@@ -374,10 +380,10 @@ export function planSync(): SyncPlan {
   }
 
   // Plan agents
-  const agentFiles = collectSourceFiles(CACHE_AGENTS_DIR, 'agents/');
+  const agentFiles = Effect.runSync(collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'));
   for (const file of agentFiles) {
     const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+    const status = Effect.runSync(compareFileToManifest(targetFile, file.relativePath, manifest));
 
     let syncStatus: SyncItem['status'] = 'new';
     if (status.action === 'update') syncStatus = 'symlink';
@@ -393,10 +399,10 @@ export function planSync(): SyncPlan {
   }
 
   // Plan rules
-  const ruleFiles = collectSourceFiles(CACHE_RULES_DIR, 'rules/');
+  const ruleFiles = Effect.runSync(collectSourceFiles(CACHE_RULES_DIR, 'rules/'));
   for (const file of ruleFiles) {
     const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+    const status = Effect.runSync(compareFileToManifest(targetFile, file.relativePath, manifest));
 
     let syncStatus: SyncItem['status'] = 'new';
     if (status.action === 'update') syncStatus = 'symlink';
@@ -448,25 +454,27 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
 
   const targetBase = join(devrootPath, '.claude');
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
-  const manifest = readManifest(manifestPath);
+  const manifest = Effect.runSync(
+    readManifest(manifestPath).pipe(Effect.orElseSucceed(createEmptyManifest)),
+  );
 
   // Collect all source files from cache
   const allFiles = [
-    ...collectSourceFiles(SKILLS_DIR, 'skills/'),
-    ...collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'),
-    ...collectSourceFiles(CACHE_RULES_DIR, 'rules/'),
+    ...Effect.runSync(collectSourceFiles(SKILLS_DIR, 'skills/')),
+    ...Effect.runSync(collectSourceFiles(CACHE_AGENTS_DIR, 'agents/')),
+    ...Effect.runSync(collectSourceFiles(CACHE_RULES_DIR, 'rules/')),
   ];
 
   for (const file of allFiles) {
     const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+    const status = Effect.runSync(compareFileToManifest(targetFile, file.relativePath, manifest));
 
     switch (status.action) {
       case 'new': {
         // File doesn't exist at target — copy it
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
-        const hash = hashFile(targetFile);
+        const hash = Effect.runSync(hashFile(targetFile));
         setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
         result.created.push(file.relativePath);
         break;
@@ -476,7 +484,7 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
         // File exists, hash matches manifest — safe to overwrite (user didn't modify)
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
-        const hash = hashFile(targetFile);
+        const hash = Effect.runSync(hashFile(targetFile));
         setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
         result.updated.push(file.relativePath);
         break;
@@ -495,7 +503,7 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
         if (options.force) {
           mkdirSync(dirname(targetFile), { recursive: true });
           copyFileSync(file.absolutePath, targetFile);
-          const hash = hashFile(targetFile);
+          const hash = Effect.runSync(hashFile(targetFile));
           setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
           result.updated.push(file.relativePath);
         } else {
@@ -513,7 +521,7 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
   }
 
   // Write updated manifest
-  writeManifest(manifestPath, manifest);
+  Effect.runSync(writeManifest(manifestPath, manifest));
 
   return result;
 }
