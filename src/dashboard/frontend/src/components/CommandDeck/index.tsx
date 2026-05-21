@@ -1203,6 +1203,18 @@ export function CommandDeck({
 
   const rightPaneProject = selectedProjectData ?? resolvedProjectForFeature ?? resolvedProjectForConversation;
 
+  // A conversation that is not scoped to any registered project — e.g. created
+  // without a projectKey, so its cwd defaults to ~/Projects (see the POST
+  // /api/conversations handler). These are exactly the conversations listed in
+  // the sidebar's dedicated "Conversations" section. PAN-1230 made
+  // ProjectRightPaneTabs the right-pane shell, but that lens requires a
+  // project, so selecting an unscoped conversation produced no rightPaneProject
+  // and fell through to the "Select a project" empty state. Render it directly.
+  const unscopedConversation = useMemo(() => {
+    if (rightPaneProject || !selectedConversation) return null;
+    return conversations.find(c => c.name === selectedConversation) ?? null;
+  }, [rightPaneProject, selectedConversation, conversations]);
+
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
     : '';
@@ -1461,6 +1473,20 @@ export function CommandDeck({
                 if (issueId) handleSelectFeature(issueId);
               }}
             />
+          ) : unscopedConversation ? (
+            <div className="flex h-full min-h-0 flex-col">
+              <ConversationPanel
+                key={unscopedConversation.name}
+                conversation={unscopedConversation}
+                viewMode={conversationViewMode ?? 'conversation'}
+                onViewModeChange={onConversationViewModeChange}
+                agentId={selectedAgent?.id}
+                onArchived={() => {
+                  setSelectedConversation(null);
+                  queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                }}
+              />
+            </div>
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
