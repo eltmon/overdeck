@@ -3,7 +3,8 @@ import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
 import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
@@ -550,7 +551,9 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     }
 
     const runNumber = runNumberFromRunId(status.runId);
-    const mergeQueue = await computeMergeQueue(status.activePipeline, cwd).catch(() => []);
+    const mergeQueue = await Effect.runPromise(
+      computeMergeQueue(status.activePipeline, cwd).pipe(Effect.provide(nodeServicesLayer)),
+    );
     const runReport = formatFlywheelStateReport(status, mergeQueue);
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 
