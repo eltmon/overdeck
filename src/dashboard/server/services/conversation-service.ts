@@ -44,11 +44,17 @@ export interface ParseResult {
   /** Active proposed plan (ExitPlanMode with no matching tool_result yet). */
   proposedPlan?: ProposedPlan;
   /** ExitPlanMode tool_use IDs (persist across incremental calls). */
-  planToolUseIds: Set<string>;
+  planToolUseIds?: Set<string>;
   /** Compact boundary markers detected in the JSONL. */
-  compactBoundaries: CompactBoundary[];
+  compactBoundaries?: CompactBoundary[];
   /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
   permissionMode?: string;
+  /** Map assistant message ID → file paths touched by file-modifying tool_use calls. */
+  fileEditsByAssistantId?: Map<string, Array<{ tool: string; filePath: string }>>;
+  /** ID of the current pendingAssistant message (carried across incremental parses for file-edit tracking). */
+  pendingAssistantId?: string;
+  /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
+  orphanToolUseIds?: Set<string>;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -56,12 +62,12 @@ export interface ParseState {
   pendingToolUse: Map<string, WorkLogEntry>;
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   lastSequence: number;
-  planToolUseIds: Set<string>;
+  planToolUseIds?: Set<string>;
   proposedPlan?: ProposedPlan;
   /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
   permissionMode?: string;
   /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
-  fileEditsByAssistantId: Map<string, Array<{ tool: string; filePath: string }>>;
+  fileEditsByAssistantId?: Map<string, Array<{ tool: string; filePath: string }>>;
   /** ID of the current pendingAssistant message (carried across incremental parses for file-edit tracking). */
   pendingAssistantId?: string;
   /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
@@ -382,11 +388,9 @@ export async function parseConversationMessages(
               if (proposedPlan && proposedPlan.id === block.tool_use_id) {
                 const text = resultText ?? '';
                 if (text.includes('approved')) {
-                  proposedPlan.status = 'approved';
-                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                  proposedPlan = { ...proposedPlan, status: 'approved', resolvedAt: entry.timestamp ?? new Date().toISOString() };
                 } else if (text.includes("doesn't want to proceed") || text.includes('does not want')) {
-                  proposedPlan.status = 'rejected';
-                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                  proposedPlan = { ...proposedPlan, status: 'rejected', resolvedAt: entry.timestamp ?? new Date().toISOString() };
                 }
               }
             } else {
@@ -481,11 +485,9 @@ export async function parseConversationMessages(
               unresolvedResults.delete(block.id);
               const resultText = unresolved.resultText ?? '';
               if (resultText.includes('approved')) {
-                proposedPlan.status = 'approved';
-                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                proposedPlan = { ...proposedPlan, status: 'approved', resolvedAt: entry.timestamp ?? new Date().toISOString() };
               } else if (resultText.includes("doesn't want to proceed") || resultText.includes('does not want')) {
-                proposedPlan.status = 'rejected';
-                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                proposedPlan = { ...proposedPlan, status: 'rejected', resolvedAt: entry.timestamp ?? new Date().toISOString() };
               }
             }
           } else if (block.name === 'EnterPlanMode') {
@@ -607,8 +609,7 @@ export async function parseConversationMessages(
       const newMode = (entry as Record<string, unknown>).permissionMode as string | undefined;
       if (newMode && permissionMode === 'plan' && newMode !== 'plan') {
         if (proposedPlan && proposedPlan.status === 'pending') {
-          proposedPlan.status = 'approved';
-          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+          proposedPlan = { ...proposedPlan, status: 'approved', resolvedAt: entry.timestamp ?? new Date().toISOString() };
         }
       }
       permissionMode = newMode;
@@ -637,8 +638,7 @@ export async function parseConversationMessages(
         }
       } else if (attachment?.type === 'plan_mode_exit') {
         if (proposedPlan && proposedPlan.status === 'pending') {
-          proposedPlan.status = 'approved';
-          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+          proposedPlan = { ...proposedPlan, status: 'approved', resolvedAt: entry.timestamp ?? new Date().toISOString() };
         }
       } else if (attachment?.type === 'plan_mode') {
         // Claude Code plan_mode attachment: agent called EnterPlanMode, plan written
@@ -1108,7 +1108,7 @@ export function watchConversation(
 
   async function startWatch(): Promise<void> {
     try {
-      const watcher = watch(sessionFile, { signal: abortController.signal });
+      const watcher = watch(sessionFile, { signal: abortController!.signal });
       for await (const _event of watcher) {
         await handleChange();
       }

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import {
@@ -351,7 +352,9 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     : new Set<string>();
   const issueMatch = workspaceName.match(/^feature-([a-z]+-\d+)$/i);
   const issueId = issueMatch ? issueMatch[1].toUpperCase() : null;
-  const specEntry = issueId ? findSpecByIssue(projectRoot, issueId) : null;
+  const specEntry = issueId
+    ? await Effect.runPromise(findSpecByIssue(projectRoot, issueId)).catch(() => null)
+    : null;
   const vbriefPath = specEntry ? specEntry.path : null;
 
   return {

@@ -39,6 +39,8 @@ export interface GitHubComment {
 
 // ─── Service interface ────────────────────────────────────────────────────────
 
+export type GitHubClientError = TrackerApiError | RateLimited | TrackerNotConfigured;
+
 export interface GitHubClientShape {
   /**
    * Get a GitHub issue by owner/repo/number.
@@ -47,7 +49,7 @@ export interface GitHubClientShape {
     owner: string,
     repo: string,
     number: number,
-  ) => Effect.Effect<GitHubIssue, IssueNotFound | TrackerApiError>;
+  ) => Effect.Effect<GitHubIssue, IssueNotFound | GitHubClientError>;
 
   /**
    * Close a GitHub issue.
@@ -56,7 +58,7 @@ export interface GitHubClientShape {
     owner: string,
     repo: string,
     number: number,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, GitHubClientError>;
 
   /**
    * Reopen a GitHub issue.
@@ -65,7 +67,7 @@ export interface GitHubClientShape {
     owner: string,
     repo: string,
     number: number,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, GitHubClientError>;
 
   /**
    * Add a label to an issue. Creates the label in the repo if it does not exist.
@@ -75,7 +77,7 @@ export interface GitHubClientShape {
     repo: string,
     number: number,
     label: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, GitHubClientError>;
 
   /**
    * Remove a label from an issue. Non-fatal if label is not present.
@@ -85,7 +87,7 @@ export interface GitHubClientShape {
     repo: string,
     number: number,
     label: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, GitHubClientError>;
 
   /**
    * Ensure a label exists in the repo (create if absent).
@@ -96,7 +98,7 @@ export interface GitHubClientShape {
     name: string,
     color?: string,
     description?: string,
-  ) => Effect.Effect<GitHubLabel, TrackerApiError>;
+  ) => Effect.Effect<GitHubLabel, GitHubClientError>;
 
   /**
    * Add a comment to an issue.
@@ -106,7 +108,7 @@ export interface GitHubClientShape {
     repo: string,
     number: number,
     body: string,
-  ) => Effect.Effect<void, TrackerApiError>;
+  ) => Effect.Effect<void, GitHubClientError>;
 
   /**
    * Get comments on an issue.
@@ -116,7 +118,7 @@ export interface GitHubClientShape {
     repo: string,
     number: number,
     perPage?: number,
-  ) => Effect.Effect<ReadonlyArray<GitHubComment>, TrackerApiError>;
+  ) => Effect.Effect<ReadonlyArray<GitHubComment>, GitHubClientError>;
 }
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
@@ -331,8 +333,15 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
             createdAt: c.created_at as string,
           })) satisfies GitHubComment[];
         },
-        catch: (err) => {
-          if (err instanceof IssueNotFound || err instanceof RateLimited) return err;
+        catch: (err): GitHubClientError => {
+          if (err instanceof RateLimited) return err;
+          if (err instanceof IssueNotFound) {
+            return new TrackerApiError({
+              tracker: 'github',
+              message: `Issue not found: ${err.id}`,
+              cause: err,
+            });
+          }
           return wrapGitHubError(err);
         },
       }),
@@ -368,7 +377,7 @@ function getGitHubClient(): GitHubClientShape {
       getComments: () => fail,
     };
   }
-  if (_githubClientToken !== config.token) {
+  if (_githubClientToken !== config.token || !_githubClientImpl) {
     _githubClientToken = config.token;
     _githubClientImpl = makeGitHubClientImpl(config.token);
   }

@@ -268,13 +268,13 @@ export const AgentSpawnerLive = Layer.effect(
           const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
 
           const project = resolveProjectFromIssue(issueId);
-          const projectPath = project?.path ?? process.cwd();
+          const projectPath = project?.projectPath ?? process.cwd();
 
           await deepWipe(
             {
               issueId,
               projectPath,
-              projectName: project?.name,
+              projectName: project?.projectName,
             },
             {
               deleteWorkspace: opts.deleteWorkspace ?? true,

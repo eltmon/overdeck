@@ -46,11 +46,8 @@ interface PiContentBlock {
   [k: string]: unknown;
 }
 
-interface PiMessageEntry {
+interface PiMessageEntry extends PiEntry {
   type: 'message';
-  id: string;
-  parentId: string | null;
-  timestamp: string;
   message: {
     role: 'user' | 'assistant' | 'toolResult';
     content?: PiContentBlock[] | string;
@@ -152,7 +149,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
       if (text) {
         sequence += 1;
         workLog.push({
-          id: entry.id,
+          id: entry.id ?? `tool-result-${sequence}`,
           createdAt,
           label: 'Tool result',
           result: text,
@@ -185,7 +182,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
       }
       sequence += 1;
       messages.push({
-        id: entry.id,
+        id: entry.id ?? `message-${sequence}`,
         role,
         text,
         createdAt,

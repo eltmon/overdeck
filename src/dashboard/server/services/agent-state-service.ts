@@ -185,7 +185,7 @@ export const AgentStateServiceLive = Layer.effect(
       get: (id) =>
         SubscriptionRef.get(ref).pipe(Effect.map((m) => m[id])),
       getAll: SubscriptionRef.get(ref),
-      changes: ref.changes,
+      changes: SubscriptionRef.changes(ref),
       emit: (event) =>
         Effect.promise(() =>
           store.appendAsync(event as Omit<DomainEvent, 'sequence'>),

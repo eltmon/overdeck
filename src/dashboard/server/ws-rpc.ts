@@ -12,14 +12,14 @@ import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
 import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
-import { ReadModelService } from './read-model.js';
+import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
@@ -154,16 +154,16 @@ const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 500;
 
 type EnrichSessionsRpcInput = {
-  level?: number;
-  ids?: number[];
-  filter?: ConversationFilter;
-  limit?: number;
-  model?: string;
-  customPrompt?: string;
-  upgrade?: boolean;
-  confirmed?: boolean;
-  force?: boolean;
-  fullTranscript?: boolean;
+  readonly level?: number;
+  readonly ids?: readonly number[];
+  readonly filter?: Readonly<ConversationFilter>;
+  readonly limit?: number;
+  readonly model?: string;
+  readonly customPrompt?: string;
+  readonly upgrade?: boolean;
+  readonly confirmed?: boolean;
+  readonly force?: boolean;
+  readonly fullTranscript?: boolean;
 };
 
 export function buildEnrichSessionsJobPayload(input: EnrichSessionsRpcInput, config: RuntimeConversationsConfig) {
@@ -198,25 +198,25 @@ function normalizeConversationPagination(limit: number | undefined, offset: numb
 }
 
 function normalizeConversationFilter(input: {
-  workspacePath?: string;
-  primaryModel?: string;
-  managed?: boolean;
-  unmanaged?: boolean;
-  since?: string;
-  before?: string;
-  after?: string;
-  minCost?: number;
-  maxCost?: number;
-  minMessages?: number;
-  tags?: string[];
-  tools?: string[];
-  files?: string[];
-  issueId?: string;
-  enrichmentLevel?: number;
-  enriched?: boolean;
-  notEnriched?: boolean;
-  limit?: number;
-  offset?: number;
+  readonly workspacePath?: string;
+  readonly primaryModel?: string;
+  readonly managed?: boolean;
+  readonly unmanaged?: boolean;
+  readonly since?: string;
+  readonly before?: string;
+  readonly after?: string;
+  readonly minCost?: number;
+  readonly maxCost?: number;
+  readonly minMessages?: number;
+  readonly tags?: readonly string[];
+  readonly tools?: readonly string[];
+  readonly files?: readonly string[];
+  readonly issueId?: string;
+  readonly enrichmentLevel?: number;
+  readonly enriched?: boolean;
+  readonly notEnriched?: boolean;
+  readonly limit?: number;
+  readonly offset?: number;
 }): ConversationFilter {
   return {
     workspacePath: input.workspacePath,
@@ -229,9 +229,9 @@ function normalizeConversationFilter(input: {
     minCost: input.minCost,
     maxCost: input.maxCost,
     minMessages: input.minMessages,
-    tags: input.tags,
-    tools: input.tools,
-    files: input.files,
+    tags: input.tags ? [...input.tags] : undefined,
+    tools: input.tools ? [...input.tools] : undefined,
+    files: input.files ? [...input.files] : undefined,
     issueId: input.issueId,
     enrichmentLevel: input.enrichmentLevel,
     enriched: input.enriched,
@@ -589,11 +589,11 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
             const sessionFile = conv?.claudeSessionId
               ? sessionFilePath(conv.cwd, conv.claudeSessionId)
-              : conv?.sessionFile ?? null;
+              : null;
 
             if (!sessionFile) {
               // Session file not yet discovered — emit a single discovering event
-              return Stream.make<ConversationEvent>({ kind: 'discovering' });
+              return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
             }
 
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
@@ -607,7 +607,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     workLog: initial.workLog,
                     streaming: initial.streaming,
                     proposedPlan: initial.proposedPlan,
-                    compactBoundaries: initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
+                    compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
                   });
 
                   // Watch for new content and stream incremental updates
@@ -620,7 +620,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                       workLog: result.workLog,
                       streaming: result.streaming,
                       proposedPlan: result.proposedPlan,
-                      compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
+                      compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
                     });
                   });
 
@@ -767,7 +767,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           }
           return toDiscoveredSessionSnapshot(session);
         }).pipe(
-          Effect.mapError((cause) => cause instanceof PanRpcError
+          Effect.mapError((cause: unknown) => cause instanceof PanRpcError
             ? cause
             : new PanRpcError({ message: String(cause), code: 'GET_DISCOVERED_SESSION_FAILED' })),
         ),
@@ -782,7 +782,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               estimatedCost: number;
               actualCost: number | null;
               durationMs: number;
-            }>('enrichSessions', buildEnrichSessionsJobPayload(input, config), async (rawProgress) => {
+            }>('enrichSessions', buildEnrichSessionsJobPayload(input as EnrichSessionsRpcInput, config), async (rawProgress) => {
               const progress = rawProgress as {
                 session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
               };

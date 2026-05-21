@@ -25,7 +25,7 @@ import {
   markConversationEnded,
 } from '../../../lib/database/conversations-db.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -79,7 +79,8 @@ export async function pollConversations(): Promise<void> {
     // Batch attachment cleanup to avoid an unbounded fan-out when many
     // conversations end simultaneously (e.g., after server restart).
     await runInBatches(endedConversations, 5, async (conv) => {
-      await cleanupUnreferencedConversationAttachments(conv).catch((err: unknown) => {
+      const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
+      await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile }).catch((err: unknown) => {
         console.error(`[conversation-lifecycle] Cleanup failed for ${conv.name}:`, err);
       });
     });
