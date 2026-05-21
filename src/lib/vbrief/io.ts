@@ -18,10 +18,30 @@
 import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
+import { Data, Effect } from 'effect';
 import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
+import { FsError } from '../errors.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
+
+// ─── Effect-channel typed errors ─────────────────────────────────────────────
+
+/** vBRIEF document on disk had unresolved git merge conflict markers. */
+export class VBriefMergeConflictTaggedError extends Data.TaggedError('VBriefMergeConflictError')<{
+  readonly planPath: string;
+}> {}
+
+/** vBRIEF document on disk does not match the v0.5 spec shape. */
+export class VBriefInvalidFormatError extends Data.TaggedError('VBriefInvalidFormatError')<{
+  readonly planPath: string;
+  readonly reason: string;
+}> {}
+
+export type VBriefReadError =
+  | FsError
+  | VBriefMergeConflictTaggedError
+  | VBriefInvalidFormatError;
 
 /**
  * Extract issue ID from a workspace directory path.
@@ -371,3 +391,80 @@ export function updateSubItemStatus(
 
   writeWorkspaceContinue(workspacePath, continueState);
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// These wrap the existing async APIs in Effect with typed error channels so
+// callers can compose vBRIEF reads with other Effect-native code. They do NOT
+// replace the sync/Promise variants — CLI and legacy callers continue to use
+// those. Migrate callers individually as they move into Effect.
+
+/**
+ * Effect variant of readPlanAsync — failures surface as typed errors in the
+ * channel instead of thrown exceptions.
+ */
+export const readPlanEffect = (
+  planPath: string,
+): Effect.Effect<VBriefDocument, VBriefReadError> =>
+  Effect.gen(function* () {
+    const raw = yield* Effect.tryPromise({
+      try: () => readFile(planPath, 'utf-8'),
+      catch: (cause) => new FsError({ path: planPath, operation: 'readFile', cause }),
+    });
+    if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+      return yield* Effect.fail(new VBriefMergeConflictTaggedError({ planPath }));
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (cause) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
+      );
+    }
+    const obj = parsed as { vBRIEFInfo?: unknown; plan?: unknown };
+    if (!obj || !obj.vBRIEFInfo || !obj.plan) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({
+          planPath,
+          reason: `missing 'vBRIEFInfo' and/or 'plan' top-level keys`,
+        }),
+      );
+    }
+    return obj as VBriefDocument;
+  });
+
+/**
+ * Effect variant of findPlanAsync. Returns null when the workspace has no
+ * resolvable plan — only IO/decoding failures surface as errors.
+ */
+export const findPlanEffect = (
+  workspacePath: string,
+): Effect.Effect<string | null, FsError> =>
+  Effect.tryPromise({
+    try: () => findPlanAsync(workspacePath),
+    catch: (cause) => new FsError({ path: workspacePath, operation: 'findPlan', cause }),
+  });
+
+/**
+ * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
+ * for the workspace; otherwise returns the merged document with statusOverrides
+ * applied. IO/decoding failures surface as typed errors.
+ */
+export const readWorkspacePlanEffect = (
+  workspacePath: string,
+): Effect.Effect<VBriefDocument | null, VBriefReadError> =>
+  Effect.gen(function* () {
+    const planPath = yield* findPlanEffect(workspacePath);
+    if (!planPath) return null;
+    const doc = yield* readPlanEffect(planPath);
+
+    const continueState = yield* Effect.tryPromise({
+      try: () => readWorkspaceContinueAsync(workspacePath),
+      catch: (cause) => new FsError({ path: workspacePath, operation: 'readWorkspaceContinue', cause }),
+    });
+    if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+      return applyStatusOverrides(doc, continueState.statusOverrides);
+    }
+    return doc;
+  });

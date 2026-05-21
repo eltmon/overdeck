@@ -8,6 +8,7 @@
 import { readdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { Effect } from 'effect';
 
 import {
   VBRIEF_LIFECYCLE_DIRS,
@@ -16,7 +17,8 @@ import {
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import type { VBriefDocument } from './types.js';
-import { VBriefMergeConflictError } from './io.js';
+import { VBriefMergeConflictError, VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
+import { FsError } from '../errors.js';
 import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
 
 const CACHE_TTL_MS = 5_000;
@@ -172,3 +174,62 @@ export async function readVBriefDocumentAsync(path: string): Promise<VBriefDocum
     `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' and/or 'plan' top-level keys.`,
   );
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect variant of findVBriefByIssueAsync. Returns null when no vBRIEF maps
+ * to the issue; only IO failures surface as typed errors.
+ */
+export const findVBriefByIssueEffect = (
+  projectRoot: string,
+  issueId: string,
+): Effect.Effect<FoundVBriefAsync | null, FsError> =>
+  Effect.tryPromise({
+    try: () => findVBriefByIssueAsync(projectRoot, issueId),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'findVBriefByIssue', cause }),
+  });
+
+/** Effect variant of listVBriefsAsync. */
+export const listVBriefsEffect = (
+  projectRoot: string,
+): Effect.Effect<FoundVBriefAsync[], FsError> =>
+  Effect.tryPromise({
+    try: () => listVBriefsAsync(projectRoot),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'listVBriefs', cause }),
+  });
+
+/**
+ * Effect variant of readVBriefDocumentAsync. Returns typed errors for merge
+ * conflict markers and invalid spec shape.
+ */
+export const readVBriefDocumentEffect = (
+  path: string,
+): Effect.Effect<VBriefDocument, VBriefReadError> =>
+  Effect.gen(function* () {
+    const raw = yield* Effect.tryPromise({
+      try: () => readFile(path, 'utf-8'),
+      catch: (cause) => new FsError({ path, operation: 'readFile', cause }),
+    });
+    if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+      return yield* Effect.fail(new VBriefMergeConflictTaggedError({ planPath: path }));
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (cause) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({ planPath: path, reason: `invalid JSON: ${(cause as Error).message}` }),
+      );
+    }
+    const obj = parsed as { vBRIEFInfo?: unknown; plan?: unknown };
+    if (!obj || !obj.vBRIEFInfo || !obj.plan) {
+      return yield* Effect.fail(
+        new VBriefInvalidFormatError({
+          planPath: path,
+          reason: `missing 'vBRIEFInfo' and/or 'plan' top-level keys`,
+        }),
+      );
+    }
+    return obj as VBriefDocument;
+  });
