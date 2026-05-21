@@ -25,8 +25,7 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { findPlan, readWorkspacePlan } from './io.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { findPlan, readWorkspaceContinueSync, readWorkspacePlan, writeWorkspaceContinueSync } from './io.js';
 
 function assertSingleWriter(planPath: string, writerId: string): void {
   const owner = activePlanWriters.get(planPath);
@@ -108,7 +107,7 @@ function mirrorTaskOperationToContinueFile(
   status: VBriefItemStatus,
   subItemIds?: string[],
 ): void {
-  const continueState = readWorkspaceContinue(workspacePath) ?? {
+  const continueState = readWorkspaceContinueSync(workspacePath) ?? {
     version: '1' as const,
     issueId: '',
     created: new Date().toISOString(),
@@ -139,7 +138,7 @@ function mirrorTaskOperationToContinueFile(
   }
 
   continueState.statusOverrides = overrides;
-  writeWorkspaceContinue(workspacePath, continueState);
+  writeWorkspaceContinueSync(workspacePath, continueState);
 }
 
 /** Persist a task operation to workspace .pan/spec.vbrief.json with CAS + single-writer guard. */
