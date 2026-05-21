@@ -35,6 +35,7 @@
       "devDependencies": {
         "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^20.5.0",
+        "@effect/vitest": "4.0.0-beta.45",
         "@panctl/contracts": "workspace:*",
         "@types/better-sqlite3": "^7.6.13",
         "@types/inquirer": "^9.0.9",
