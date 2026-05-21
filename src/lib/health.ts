@@ -9,9 +9,18 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeState } from './agents.js';
 import { capturePaneAsync, listSessionNamesAsync, sessionExistsAsync } from './tmux.js';
+
+/** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
+export class HealthError extends Data.TaggedError('HealthError')<{
+  readonly agentId: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 // Deacon pattern defaults
 export const DEFAULT_PING_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -438,3 +447,60 @@ export function formatHealthStatus(health: AgentHealth): string {
 
   return lines.join('\n');
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const healthCatch = (agentId: string, operation: string) => (cause: unknown) =>
+  new HealthError({
+    agentId,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect-native isAgentAlive — tmux session liveness probe, never fails. */
+export const isAgentAliveEffect = (agentId: string): Effect.Effect<boolean, never> =>
+  Effect.promise(() => isAgentAlive(agentId));
+
+/**
+ * Effect-native pingAgent — full classify + persist cycle.
+ * Fails with HealthError if classification throws (e.g. tmux capture-pane fails
+ * outside the swallowed branches).
+ */
+export const pingAgentEffect = (
+  agentId: string,
+  config?: HealthConfig,
+): Effect.Effect<AgentHealth, HealthError> =>
+  Effect.tryPromise({
+    try: () => (config ? pingAgent(agentId, config) : pingAgent(agentId)),
+    catch: healthCatch(agentId, 'pingAgent'),
+  });
+
+/** Effect-native handleStuckAgent — stop + recover with cooldown gates. */
+export const handleStuckAgentEffect = (
+  agentId: string,
+  config?: HealthConfig,
+): Effect.Effect<{ action: 'recovered' | 'cooldown' | 'skipped'; reason: string }, HealthError> =>
+  Effect.tryPromise({
+    try: () => (config ? handleStuckAgent(agentId, config) : handleStuckAgent(agentId)),
+    catch: healthCatch(agentId, 'handleStuckAgent'),
+  });
+
+/** Effect-native runHealthCheck — single sweep of all agents. */
+export const runHealthCheckEffect = (
+  config?: HealthConfig,
+): Effect.Effect<
+  {
+    checked: number;
+    healthy: number;
+    warning: number;
+    stuck: number;
+    dead: number;
+    recovered: string[];
+  },
+  HealthError
+> =>
+  Effect.tryPromise({
+    try: () => (config ? runHealthCheck(config) : runHealthCheck()),
+    catch: healthCatch('*', 'runHealthCheck'),
+  });

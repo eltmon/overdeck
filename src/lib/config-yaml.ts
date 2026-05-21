@@ -10,6 +10,8 @@
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync } from 'fs/promises';
+import { Effect } from 'effect';
+import { ConfigError, ConfigParseError } from './errors.js';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -1908,3 +1910,55 @@ export function getProjectConfigPath(): string | null {
 export function isClaudeCodeChannelsEnabled(): boolean {
   return loadConfig().config.experimental.claudeCodeChannels;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native loadConfigAsyncNoMigration. Reads global + project config,
+ * merges with defaults, applies env fallbacks. Fails with ConfigParseError
+ * for malformed YAML or ConfigError for other I/O failures.
+ */
+export const loadConfigAsyncNoMigrationEffect = (): Effect.Effect<
+  ConfigLoadResult,
+  ConfigError | ConfigParseError
+> =>
+  Effect.tryPromise({
+    try: () => loadConfigAsyncNoMigration(),
+    catch: (cause) =>
+      new ConfigError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native loadConfig — sync read, wraps any failure (parse / fs) as
+ * ConfigError. Use this from Effect contexts that need merged config without
+ * forcing the codebase to migrate every loadConfig call site.
+ */
+export const loadConfigEffect = (): Effect.Effect<ConfigLoadResult, ConfigError> =>
+  Effect.try({
+    try: () => loadConfig(),
+    catch: (cause) =>
+      new ConfigError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native updateConversationsConfig. Persists the supplied
+ * ConversationsConfig overrides into config.yaml. Fails with ConfigError on
+ * write failure.
+ */
+export const updateConversationsConfigAsyncEffect = (
+  updates: ConversationsConfig,
+): Effect.Effect<void, ConfigError> =>
+  Effect.tryPromise({
+    try: () => updateConversationsConfigAsync(updates),
+    catch: (cause) =>
+      new ConfigError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });

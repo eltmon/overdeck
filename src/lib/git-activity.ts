@@ -9,7 +9,14 @@
  * NEVER use execSync/readFileSync here — this runs in the dashboard server.
  */
 
+import { Effect, Data } from 'effect';
 import { getDatabase } from './database/index.js';
+
+/** A database operation against the git_operations table failed. */
+export class GitActivityDbError extends Data.TaggedError('GitActivityDbError')<{
+  readonly operation: string;
+  readonly cause: unknown;
+}> {}
 
 /** Operation types that can be recorded */
 export type GitOperationType =
@@ -144,3 +151,29 @@ export function listGitOperations(filter: GitOperationFilter = {}): GitOperation
     ts: row.ts,
   }));
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/**
+ * Effect-native appendGitOperation — typed-error variant of the SQLite write.
+ * Fails with GitActivityDbError if the insert throws (e.g. DB locked).
+ */
+export const appendGitOperationEffect = (
+  op: Omit<GitOperation, 'id'>,
+): Effect.Effect<number, GitActivityDbError> =>
+  Effect.try({
+    try: () => appendGitOperation(op),
+    catch: (cause) => new GitActivityDbError({ operation: 'appendGitOperation', cause }),
+  });
+
+/**
+ * Effect-native listGitOperations — typed-error variant of the SQLite read.
+ * Fails with GitActivityDbError on query failure.
+ */
+export const listGitOperationsEffect = (
+  filter: GitOperationFilter = {},
+): Effect.Effect<readonly GitOperation[], GitActivityDbError> =>
+  Effect.try({
+    try: () => listGitOperations(filter),
+    catch: (cause) => new GitActivityDbError({ operation: 'listGitOperations', cause }),
+  });

@@ -28,9 +28,18 @@ import { join } from 'path';
 import { spawn, execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
+import { Effect, Data } from 'effect';
 import { PANOPTICON_HOME, BIN_DIR } from './paths.js';
+import { FsError, ProcessSpawnError } from './errors.js';
 
 const execAsync = promisify(exec);
+
+/** A cliproxy sidecar lifecycle operation (install/start/stop/probe) failed. */
+export class CliproxyError extends Data.TaggedError('CliproxyError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 export const CLIPROXY_HOST = '127.0.0.1';
 export const CLIPROXY_PORT = 8317;
@@ -699,3 +708,93 @@ export async function restartCliproxyAsync(): Promise<void> {
   await new Promise((r) => setTimeout(r, 500));
   await startCliproxyAsync();
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+const cliproxyCatch = (operation: string) => (cause: unknown) =>
+  new CliproxyError({
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/**
+ * Effect-native bridgeCodexAuthToCliproxy — copies ChatGPT subscription
+ * credentials into cliproxy's auth dir. Fails with FsError if a copy or
+ * mkdir throws.
+ */
+export const bridgeCodexAuthToCliproxyEffect = (): Effect.Effect<boolean, FsError> =>
+  Effect.tryPromise({
+    try: () => bridgeCodexAuthToCliproxyAsync(),
+    catch: (cause) =>
+      new FsError({
+        path: getCliproxyAuthDir(),
+        operation: 'bridgeCodexAuthToCliproxy',
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native bridgeGeminiAuthToCliproxy — writes the supplied API key
+ * to cliproxy's gemini credential file. Fails with FsError on write failure.
+ */
+export const bridgeGeminiAuthToCliproxyEffect = (
+  apiKey: string,
+): Effect.Effect<boolean, FsError> =>
+  Effect.tryPromise({
+    try: () => bridgeGeminiAuthToCliproxyAsync(apiKey),
+    catch: (cause) =>
+      new FsError({
+        path: getCliproxyAuthDir(),
+        operation: 'bridgeGeminiAuthToCliproxy',
+        cause,
+      }),
+  });
+
+/**
+ * Effect-native installCliproxy — downloads + unpacks the cliproxy binary
+ * from GitHub releases. Fails with CliproxyError on network or extraction
+ * failure.
+ */
+export const installCliproxyEffect = (
+  force = false,
+): Effect.Effect<void, CliproxyError> =>
+  Effect.tryPromise({
+    try: () => installCliproxyAsync(force),
+    catch: cliproxyCatch('installCliproxy'),
+  });
+
+/** Effect-native isCliproxyRunningAsync — port + pidfile probe, never fails. */
+export const isCliproxyRunningEffect = (): Effect.Effect<boolean, never> =>
+  Effect.promise(() => isCliproxyRunningAsync());
+
+/** Effect-native checkCliproxyPort — TCP probe of the local port, never fails. */
+export const checkCliproxyPortEffect = (): Effect.Effect<boolean, never> =>
+  Effect.promise(() => checkCliproxyPortAsync());
+
+/** Effect-native startCliproxy — spawns the sidecar. Fails with ProcessSpawnError. */
+export const startCliproxyEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => startCliproxyAsync(),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: getCliproxyBinary(),
+        args: ['-config', getCliproxyConfigPath()],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect-native stopCliproxy — best-effort SIGTERM via pidfile. */
+export const stopCliproxyEffect = (): Effect.Effect<void, CliproxyError> =>
+  Effect.tryPromise({
+    try: () => stopCliproxyAsync(),
+    catch: cliproxyCatch('stopCliproxy'),
+  });
+
+/** Effect-native restartCliproxy — stop + 500ms wait + start. */
+export const restartCliproxyEffect = (): Effect.Effect<void, ProcessSpawnError | CliproxyError> =>
+  Effect.tryPromise({
+    try: () => restartCliproxyAsync(),
+    catch: cliproxyCatch('restartCliproxy'),
+  });
