@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { mkdir, rename, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import { Data, Effect } from 'effect';
 
 import { getContinuesDir } from '../pan-dir/continues.js';
 
@@ -509,4 +510,90 @@ function validateSwarmRuntime(value: unknown, path: string): asserts value is Sw
     }
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Wraps the existing async continue-state APIs in typed Effect channels.
+// `*Async` variants own the real fs/promises I/O and the in-process writer
+// serialization, so the Effect wrappers simply lift their failures into a
+// tagged error. Sync APIs (`writeContinueState`, `readContinueState`,
+// `appendSessionEntry`, `appendFeedbackEntry`, `clearFeedback`) remain
+// available for CLI callers.
+
+/** Tagged error for continue-state Effect variants. */
+export class ContinueStateError extends Data.TaggedError('ContinueStateError')<{
+  readonly projectRoot: string;
+  readonly issueId: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+const liftContinueError = (
+  projectRoot: string,
+  issueId: string,
+  operation: string,
+  cause: unknown,
+): ContinueStateError =>
+  new ContinueStateError({
+    projectRoot,
+    issueId,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect variant of `writeContinueStateAsync`. */
+export const writeContinueStateEffect = (
+  projectRoot: string,
+  issueId: string,
+  stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
+): Effect.Effect<void, ContinueStateError> =>
+  Effect.tryPromise({
+    try: () => writeContinueStateAsync(projectRoot, issueId, stateOrUpdater),
+    catch: (cause) => liftContinueError(projectRoot, issueId, 'writeContinueState', cause),
+  });
+
+/** Effect variant of `readContinueStateAsync`. */
+export const readContinueStateEffect = (
+  projectRoot: string,
+  issueId: string,
+): Effect.Effect<ContinueState | null, ContinueStateError> =>
+  Effect.tryPromise({
+    try: () => readContinueStateAsync(projectRoot, issueId),
+    catch: (cause) => liftContinueError(projectRoot, issueId, 'readContinueState', cause),
+  });
+
+/** Effect variant of `appendSessionEntry`. Uses the sync API under the hood;
+ * the failure mode is a writer-conflict throw, not async I/O. */
+export const appendSessionEntryEffect = (
+  projectRoot: string,
+  issueId: string,
+  entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
+): Effect.Effect<ContinueState, ContinueStateError> =>
+  Effect.try({
+    try: () => appendSessionEntry(projectRoot, issueId, entry),
+    catch: (cause) => liftContinueError(projectRoot, issueId, 'appendSessionEntry', cause),
+  });
+
+/** Effect variant of `appendFeedbackEntry`. */
+export const appendFeedbackEntryEffect = (
+  projectRoot: string,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): Effect.Effect<ContinueState, ContinueStateError> =>
+  Effect.try({
+    try: () => appendFeedbackEntry(projectRoot, issueId, entry),
+    catch: (cause) => liftContinueError(projectRoot, issueId, 'appendFeedbackEntry', cause),
+  });
+
+/** Effect variant of `clearFeedback`. */
+export const clearFeedbackEffect = (
+  projectRoot: string,
+  issueId: string,
+): Effect.Effect<ContinueState | null, ContinueStateError> =>
+  Effect.try({
+    try: () => clearFeedback(projectRoot, issueId),
+    catch: (cause) => liftContinueError(projectRoot, issueId, 'clearFeedback', cause),
+  });
 

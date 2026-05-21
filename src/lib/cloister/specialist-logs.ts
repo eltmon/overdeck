@@ -10,6 +10,7 @@
 
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
+import { Data, Effect } from 'effect';
 import { getPanopticonHome } from '../paths.js';
 
 /** Get specialists directory (lazy to support test env overrides) */
@@ -538,3 +539,112 @@ export function cleanupAllLogs(): {
 
   return results;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Additive Effect wrappers around the existing sync APIs. The underlying file
+// I/O is sync (CLI-callable); these variants lift thrown exceptions into a
+// typed error channel so callers can compose specialist-log operations with
+// other Effect-native code. Migrate callers individually.
+
+/** Tagged error for specialist-log Effect variants. */
+export class SpecialistLogError extends Data.TaggedError('SpecialistLogError')<{
+  readonly projectKey: string;
+  readonly specialistType: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+const liftLogError = (
+  projectKey: string,
+  specialistType: string,
+  operation: string,
+  cause: unknown,
+): SpecialistLogError =>
+  new SpecialistLogError({
+    projectKey,
+    specialistType,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+
+/** Effect variant of `createRunLog`. */
+export const createRunLogEffect = (
+  projectKey: string,
+  specialistType: string,
+  issueId: string,
+  contextSeed?: string,
+): Effect.Effect<{ runId: string; filePath: string }, SpecialistLogError> =>
+  Effect.try({
+    try: () => createRunLog(projectKey, specialistType, issueId, contextSeed),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'createRunLog', cause),
+  });
+
+/** Effect variant of `appendToRunLog`. */
+export const appendToRunLogEffect = (
+  projectKey: string,
+  specialistType: string,
+  runId: string,
+  content: string,
+): Effect.Effect<void, SpecialistLogError> =>
+  Effect.try({
+    try: () => appendToRunLog(projectKey, specialistType, runId, content),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'appendToRunLog', cause),
+  });
+
+/** Effect variant of `finalizeRunLog`. */
+export const finalizeRunLogEffect = (
+  projectKey: string,
+  specialistType: string,
+  runId: string,
+  result: { status: 'passed' | 'failed' | 'blocked' | 'incomplete'; notes?: string },
+): Effect.Effect<void, SpecialistLogError> =>
+  Effect.try({
+    try: () => finalizeRunLog(projectKey, specialistType, runId, result),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'finalizeRunLog', cause),
+  });
+
+/** Effect variant of `getRunLog`. */
+export const getRunLogEffect = (
+  projectKey: string,
+  specialistType: string,
+  runId: string,
+): Effect.Effect<string | null, SpecialistLogError> =>
+  Effect.try({
+    try: () => getRunLog(projectKey, specialistType, runId),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'getRunLog', cause),
+  });
+
+/** Effect variant of `listRunLogs`. */
+export const listRunLogsEffect = (
+  projectKey: string,
+  specialistType: string,
+  options: { limit?: number; offset?: number } = {},
+): Effect.Effect<RunLogEntry[], SpecialistLogError> =>
+  Effect.try({
+    try: () => listRunLogs(projectKey, specialistType, options),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'listRunLogs', cause),
+  });
+
+/** Effect variant of `cleanupOldLogs`. */
+export const cleanupOldLogsEffect = (
+  projectKey: string,
+  specialistType: string,
+  retention: { maxDays: number; maxRuns: number },
+): Effect.Effect<number, SpecialistLogError> =>
+  Effect.try({
+    try: () => cleanupOldLogs(projectKey, specialistType, retention),
+    catch: (cause) => liftLogError(projectKey, specialistType, 'cleanupOldLogs', cause),
+  });
+
+/** Effect variant of `cleanupAllLogs`. */
+export const cleanupAllLogsEffect = (): Effect.Effect<
+  { totalDeleted: number; byProject: Record<string, Record<string, number>> },
+  SpecialistLogError
+> =>
+  Effect.try({
+    try: () => cleanupAllLogs(),
+    catch: (cause) => liftLogError('*', '*', 'cleanupAllLogs', cause),
+  });
