@@ -10,6 +10,7 @@
  * server code was emitting the events.
  */
 
+import { Effect } from 'effect'
 import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { capturePaneAsync } from '../../../lib/tmux.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
@@ -74,7 +75,7 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
   const eventStore = getEventStore()
   const activeAgents = runningAgents.filter((a) => a.tmuxActive)
 
-  await withConcurrencyLimit(
+  await Effect.runPromise(withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
       const { id: agentId } = agent
 
@@ -131,7 +132,7 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
       }
     }),
     4,
-  )
+  ))
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map((a) => a.id))

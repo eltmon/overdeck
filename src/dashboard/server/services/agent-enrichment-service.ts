@@ -12,6 +12,7 @@
  * restored here via the event-driven projection pipeline.
  */
 
+import { Effect } from 'effect'
 import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
@@ -64,7 +65,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // Stopped agents have no changing state — their enrichment is static.
   const activeAgents = runningAgents.filter(a => a.tmuxActive)
 
-  await withConcurrencyLimit(
+  await Effect.runPromise(withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
       const { id: agentId, issueId, startedAt } = agent
 
@@ -182,7 +183,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       }
     }),
     4,
-  )
+  ))
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map(a => a.id))

@@ -465,7 +465,7 @@ export async function fetchProjectSessionTree(
       }))
       .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
 
-    const results = await withConcurrencyLimit(
+    const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => async () => {
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
@@ -486,7 +486,7 @@ export async function fetchProjectSessionTree(
         }
       }),
       15,
-    );
+    ));
 
     features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }

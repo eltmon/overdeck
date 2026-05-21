@@ -37,7 +37,6 @@ import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
