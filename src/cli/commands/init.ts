@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import ora from 'ora';
+import { Effect } from 'effect';
 import { INIT_DIRS, CONFIG_FILE, PANOPTICON_HOME, SKILLS_DIR, AGENTS_DIR } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig } from '../../lib/config.js';
 import { detectShell, getShellRcFile, addAlias, getAliasInstructions } from '../../lib/shell.js';
@@ -110,11 +111,11 @@ export async function initCommand(): Promise<void> {
     const agentsCopied = copyBundledAgents();
 
     // Detect shell and add alias
-    const shell = detectShell();
-    const rcFile = getShellRcFile(shell);
+    const shell = Effect.runSync(detectShell());
+    const rcFile = Effect.runSync(getShellRcFile(shell));
 
     if (rcFile && existsSync(rcFile)) {
-      addAlias(rcFile);
+      Effect.runSync(addAlias(rcFile));
       spinner.succeed('Panopticon initialized!');
       console.log('');
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(PANOPTICON_HOME));
@@ -125,7 +126,7 @@ export async function initCommand(): Promise<void> {
       if (agentsCopied > 0) {
         console.log(chalk.green('✓') + ` Installed ${agentsCopied} bundled agents`);
       }
-      console.log(chalk.green('✓') + ' ' + getAliasInstructions(shell));
+      console.log(chalk.green('✓') + ' ' + Effect.runSync(getAliasInstructions(shell)));
     } else {
       spinner.succeed('Panopticon initialized!');
       console.log('');
