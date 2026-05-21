@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from '@effect/vitest';
 import { parseContainerServiceName, parseIssueIdFromText } from '../src/lib/resource-utils';
 
 describe('parseIssueIdFromText', () => {
