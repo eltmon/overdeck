@@ -228,12 +228,14 @@ describe('IssueDrawer', () => {
     const scrollArea = screen.getByTestId('drawer-activity-rail-scroll');
 
     expect(rail).toHaveClass('w-[320px]', 'border-l', 'bg-card/70');
-    expect(screen.getByText('Merged branch')).toBeInTheDocument();
-    expect(screen.getByText('Work started')).toBeInTheDocument();
-    expect(screen.queryByText('Other issue')).not.toBeInTheDocument();
-    expect(screen.getByText('Merged branch').compareDocumentPosition(screen.getByText('Work started'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(screen.getByTestId('drawer-activity-dot-done')).toHaveClass('bg-success');
-    expect(screen.getByTestId('drawer-activity-dot-work')).toHaveClass('bg-primary');
+    // Scope text + dot assertions to the rail; the Activity tab panel renders
+    // its own copy of these entries when drawer.tab === 'activity'.
+    expect(within(rail).getByText('Merged branch')).toBeInTheDocument();
+    expect(within(rail).getByText('Work started')).toBeInTheDocument();
+    expect(within(rail).queryByText('Other issue')).not.toBeInTheDocument();
+    expect(within(rail).getByText('Merged branch').compareDocumentPosition(within(rail).getByText('Work started'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(rail).getByTestId('drawer-activity-dot-done')).toHaveClass('bg-success');
+    expect(within(rail).getByTestId('drawer-activity-dot-work')).toHaveClass('bg-primary');
 
     scrollArea.scrollTop = 120;
     useDashboardStore.setState({
@@ -245,7 +247,7 @@ describe('IssueDrawer', () => {
     rerender(drawerUi(queryClient));
 
     await waitFor(() => expect(scrollArea.scrollTop).toBe(0));
-    expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
+    expect(within(rail).getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
   });
 
   it('matches activity rail agent events through store agent issue ownership', () => {
@@ -282,9 +284,12 @@ describe('IssueDrawer', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'activity');
 
     renderDrawer();
+    const rail = screen.getByTestId('drawer-activity-rail');
 
-    expect(screen.getByText('Security reviewer active')).toBeInTheDocument();
-    expect(screen.queryByText('Other reviewer active')).not.toBeInTheDocument();
+    // Scope to the rail; the Activity tab panel also renders these entries
+    // when drawer.tab === 'activity'.
+    expect(within(rail).getByText('Security reviewer active')).toBeInTheDocument();
+    expect(within(rail).queryByText('Other reviewer active')).not.toBeInTheDocument();
   });
 
   it('renders phase timeline from drawer data with done current and upcoming states', () => {
