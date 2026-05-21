@@ -29,6 +29,7 @@ import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
 import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentsSkeleton } from './components/skeletons/AgentsSkeleton';
+import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
@@ -863,9 +864,11 @@ export default function App() {
             </div>
           )}
         {activeTab === 'pipeline' && (
-          <div className="w-full h-full overflow-hidden">
-            <PipelineView />
-          </div>
+          <BootstrapGate fallback={<PipelineSkeleton />}>
+            <div className="w-full h-full overflow-hidden">
+              <PipelineView onSearchOpen={() => setIsSearchOpen(true)} onTabChange={(tab) => setActiveTab(tab as Parameters<typeof setActiveTab>[0])} />
+            </div>
+          </BootstrapGate>
         )}
         {activeTab === 'awaiting-merge' && (
           <div className="w-full h-full overflow-auto">

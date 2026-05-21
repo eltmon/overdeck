@@ -4,6 +4,7 @@ import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { getPipelineIssuePhase, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import MetricStrip from '../primitives/MetricStrip';
@@ -155,6 +156,15 @@ function formatCost(value: number) {
   return '$0';
 }
 
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const safeMs = Math.max(0, ms);
+  const hours = Math.floor(safeMs / 3_600_000);
+  const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function MetricIcon({ label }: { label: string }) {
   return <span aria-hidden="true">{label}</span>;
 }
@@ -167,13 +177,20 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
   return <VerbBadge variant="QUEUED FOR PLAN" />;
 }
 
-export function PipelineView() {
+type PipelineViewProps = {
+  onSearchOpen?: () => void;
+  onTabChange?: (tab: string) => void;
+};
+
+export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const [filter, setFilter] = useState(readFilterState);
   const { eventsByIssue } = useCostStream({ limit: 500 });
+  const now = useSharedTick(30000);
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
     review: null,
@@ -181,6 +198,19 @@ export function PipelineView() {
     plan: null,
     todo: null,
   });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollTop = useRef<number>(0);
+
+  useEffect(() => {
+    if (drawerIssueId === null && savedScrollTop.current > 0) {
+      const el = scrollContainerRef.current;
+      if (el) {
+        window.requestAnimationFrame(() => {
+          el.scrollTop = savedScrollTop.current;
+        });
+      }
+    }
+  }, [drawerIssueId]);
 
   useEffect(() => {
     const handlePopState = () => setFilter(readFilterState());
@@ -281,7 +311,7 @@ export function PipelineView() {
 
     return [
       { id: 'active', eyebrow: 'Active issues', value: activeIssues, sub: 'open pipeline', icon: <MetricIcon label="●" />, signal: 'info' as const },
-      { id: 'work', eyebrow: 'Work running', value: workRunning, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' as const },
+      { id: 'work', eyebrow: 'Work running', value: workRunning, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
       { id: 'review', eyebrow: 'Review running', value: reviewIssueIds.size, sub: 'review gates', icon: <MetricIcon label="◆" />, signal: 'review' as const },
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
@@ -316,7 +346,61 @@ export function PipelineView() {
 
   return (
     <section className="flex h-full w-full flex-col overflow-hidden bg-background" data-component="pipeline-view">
-      <TopBar title="Pipeline" breadcrumb="Unified operations" />
+      <TopBar
+        title="Pipeline"
+        breadcrumb="Unified operations"
+        search={
+          onSearchOpen ? (
+            <button
+              type="button"
+              data-component="pipeline-search-trigger"
+              onClick={onSearchOpen}
+              className="flex h-[32px] w-full min-w-[280px] items-center gap-[8px] rounded-[var(--radius-lg)] border border-border bg-card px-[10px] text-[12px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              Search issues, agents, branches…
+            </button>
+          ) : undefined
+        }
+        segmentedControl={
+          onTabChange ? (
+            <div
+              data-component="pipeline-segmented-control"
+              className="flex items-center gap-[2px] rounded-[var(--radius-lg)] border border-border bg-card p-[2px]"
+            >
+              {(['List', 'Board', 'Analytics'] as const).map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={label === 'List'}
+                  onClick={() => {
+                    if (label === 'Board') onTabChange('kanban');
+                    else if (label === 'Analytics') onTabChange('metrics');
+                  }}
+                  className={cn(
+                    'rounded-[calc(var(--radius-lg)-2px)] px-[10px] py-[5px] text-[12px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground',
+                    label === 'List' && 'bg-accent text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
+        actions={
+          onSearchOpen ? (
+            <button
+              type="button"
+              data-component="pipeline-start-agent"
+              onClick={onSearchOpen}
+              className="flex h-[32px] items-center gap-[6px] rounded-[var(--radius-lg)] bg-primary px-[14px] text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <span aria-hidden="true">▶</span>
+              Start agent
+            </button>
+          ) : undefined
+        }
+      />
       <MetricStrip columns={5} tiles={metricTiles} />
       <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-border bg-background px-[22px] py-[10px]" data-component="pipeline-filter-row">
         <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Pipeline phase filter">
@@ -381,8 +465,15 @@ export function PipelineView() {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
-        {visiblePhases.map((phase) => (
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+        {visiblePhases.every((phase) => groupedIssues[phase].length === 0) ? (
+          <div
+            data-component="pipeline-empty-state"
+            className="mx-[22px] mt-[24px] rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground"
+          >
+            No issues match the selected filters.
+          </div>
+        ) : visiblePhases.map((phase) => (
           <section
             key={phase}
             ref={(element) => {
@@ -394,6 +485,14 @@ export function PipelineView() {
             <PhaseHeader phase={phase} count={groupedIssues[phase].length} />
             {groupedIssues[phase].map((issue) => {
               const agent = agentByIssueId.get(issue.identifier.toLowerCase());
+              const costEvents = eventsByIssue[issue.identifier];
+              const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
+              const ledger = {
+                runtime: agent?.startedAt
+                  ? formatDuration(now.getTime() - new Date(agent.startedAt).getTime())
+                  : undefined,
+                cost: costSum > 0 ? formatCost(costSum) : undefined,
+              };
               return (
                 <IssueRow
                   key={issue.identifier}
@@ -405,8 +504,9 @@ export function PipelineView() {
                   labels={issue.labels.slice(0, 3)}
                   verbBadge={verbBadgeForPhase(phase)}
                   agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
+                  ledger={ledger}
                   assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
-                  onOpen={openIssue}
+                  onOpen={(id) => { savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0; openIssue(id); }}
                 />
               );
             })}

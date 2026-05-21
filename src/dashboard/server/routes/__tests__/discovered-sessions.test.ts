@@ -31,6 +31,7 @@ import {
   rejectUnauthorizedDashboardSessionMintRequest,
 } from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -66,6 +67,7 @@ beforeEach(() => {
   process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
 });
 
 afterEach(async () => {
@@ -76,6 +78,7 @@ afterEach(async () => {
   delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
@@ -203,6 +206,25 @@ describe('parseSearchParams', () => {
 // ─── Origin validation ────────────────────────────────────────────────────────
 
 describe('dashboard conversation route guards', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const ORIGIN_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL', 'PANOPTICON_TRUSTED_ORIGINS', 'PANOPTICON_TRAEFIK_ENABLED', 'PANOPTICON_TRAEFIK_DOMAIN', 'NODE_ENV'] as const;
+
+  beforeEach(() => {
+    for (const key of ORIGIN_ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+    _resetTrustedOriginsForTests();
+  });
+
+  afterEach(() => {
+    for (const key of ORIGIN_ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    _resetTrustedOriginsForTests();
+  });
+
   function request(headers: Record<string, string> = {}, method = 'GET') {
     return { headers, method } as never;
   }

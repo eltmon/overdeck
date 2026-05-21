@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Eye, LayoutGrid, Bot, Server,
@@ -11,7 +11,47 @@ import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { DeaconPauseToggle } from './DeaconPauseToggle';
 import { useTheme } from '../hooks/useTheme';
+import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
+import { getPipelineIssuePhase } from '../lib/pipeline-state';
+import type { Issue, Agent } from '../types';
 import type { Tab } from './Header';
+
+type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
+const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
+
+const PHASE_LABELS: Record<PipelineIssuePhase, string> = {
+  ship: 'Ship', review: 'Review', work: 'Work', plan: 'Plan', todo: 'Todo',
+};
+
+const PHASE_DOT_CLASSES: Record<PipelineIssuePhase, string> = {
+  ship: 'bg-success', review: 'bg-warning', work: 'bg-info',
+  plan: 'bg-signal-review', todo: 'bg-muted-foreground/30',
+};
+
+function isClosedIssue(issue: Issue) {
+  const state = issue.state ?? issue.status;
+  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Canceled' || state === 'Closed' || state === 'Completed';
+}
+
+function readPipelineFilterState() {
+  if (typeof window === 'undefined') return { phase: 'all' as const, projects: [] as string[] };
+  const params = new URLSearchParams(window.location.search);
+  const phaseParam = params.get('phase');
+  const phase = (PIPELINE_PHASES as string[]).includes(phaseParam ?? '') ? phaseParam as PipelineIssuePhase : 'all' as const;
+  const projects = params.get('projects')?.split(',').map((p) => p.trim()).filter(Boolean) ?? [];
+  return { phase, projects };
+}
+
+function setPipelineFilterUrl(key: 'phase' | 'projects', value: string | null) {
+  const url = new URL(window.location.href);
+  if (value === null || value === '') {
+    url.searchParams.delete(key);
+  } else {
+    url.searchParams.set(key, value);
+  }
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
 
 const SIDEBAR_STORAGE_KEY = 'panopticon.ui.sidebarCollapsed';
 
@@ -84,6 +124,51 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const issues = useDashboardStore(selectIssues) as Issue[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const [pipelineFilter, setPipelineFilter] = useState(readPipelineFilterState);
+
+  useEffect(() => {
+    const handlePopState = () => setPipelineFilter(readPipelineFilterState());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const pipelineData = useMemo(() => {
+    if (activeTab !== 'pipeline') return { phaseCounts: {} as Record<string, number>, projects: [] as Array<{ id: string; name: string; color: string; prefix: string }> };
+
+    const agentByIssueId = new Map<string, Agent>();
+    for (const agent of agents) {
+      const key = agent.issueId?.toLowerCase();
+      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
+    }
+
+    const phaseCounts: Record<string, number> = { ship: 0, review: 0, work: 0, plan: 0, todo: 0 };
+    const projectMap = new Map<string, { name: string; color: string; prefix: string }>();
+
+    for (const issue of issues) {
+      if (isClosedIssue(issue)) continue;
+      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
+      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
+      const phase = getPipelineIssuePhase(issue, reviewStatus, agent);
+      phaseCounts[phase] = (phaseCounts[phase] ?? 0) + 1;
+      if (issue.project) {
+        const id = issue.project.id || issue.project.name;
+        if (!projectMap.has(id)) {
+          const prefix = issue.identifier.includes('-') ? issue.identifier.split('-')[0].toUpperCase() : '';
+          projectMap.set(id, { name: issue.project.name, color: issue.project.color ?? '', prefix });
+        }
+      }
+    }
+
+    const projects = Array.from(projectMap.entries())
+      .map(([id, info]) => ({ id, ...info }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { phaseCounts, projects };
+  }, [activeTab, issues, agents, reviewStatusByIssueId]);
   const { data: versionData } = useQuery({
     queryKey: ['version'],
     queryFn: async () => {
@@ -244,6 +329,80 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
               })}
             </div>
           ))}
+
+          {/* ─── Pipeline filter groups ─── */}
+          {!collapsed && activeTab === 'pipeline' && (
+            <>
+              <div className="mb-1" data-testid="sidebar-pipeline-phases">
+                <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1">
+                  Filter phase
+                </p>
+                <button
+                  type="button"
+                  data-testid="sidebar-phase-all"
+                  onClick={() => { setPipelineFilterUrl('phase', null); setPipelineFilter(readPipelineFilterState); }}
+                  className={`w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 ${pipelineFilter.phase === 'all' ? 'bg-accent text-foreground border-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'}`}
+                >
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/30 shrink-0" />
+                  <span className="truncate">All phases</span>
+                  <span className="ml-auto text-[11px] text-muted-foreground">
+                    {Object.values(pipelineData.phaseCounts).reduce((s, n) => s + n, 0)}
+                  </span>
+                </button>
+                {PIPELINE_PHASES.map((phase) => (
+                  <button
+                    key={phase}
+                    type="button"
+                    data-testid={`sidebar-phase-${phase}`}
+                    onClick={() => { setPipelineFilterUrl('phase', phase); setPipelineFilter(readPipelineFilterState); }}
+                    className={`w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 ${pipelineFilter.phase === phase ? 'bg-accent text-foreground border-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'}`}
+                  >
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${PHASE_DOT_CLASSES[phase]}`} />
+                    <span className="truncate">{PHASE_LABELS[phase]}</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      {pipelineData.phaseCounts[phase] ?? 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {pipelineData.projects.length > 0 && (
+                <div className="mb-1" data-testid="sidebar-pipeline-projects">
+                  <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1">
+                    Projects
+                  </p>
+                  {pipelineData.projects.map((project) => {
+                    const isSelected = pipelineFilter.projects.includes(project.id);
+                    const toggle = () => {
+                      const next = isSelected
+                        ? pipelineFilter.projects.filter((p) => p !== project.id)
+                        : [...pipelineFilter.projects, project.id];
+                      setPipelineFilterUrl('projects', next.length > 0 ? next.join(',') : null);
+                      setPipelineFilter(readPipelineFilterState);
+                    };
+                    return (
+                      <button
+                        key={project.id}
+                        type="button"
+                        data-testid={`sidebar-project-${project.id}`}
+                        onClick={toggle}
+                        aria-pressed={isSelected}
+                        className={`w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 ${isSelected ? 'bg-accent text-foreground border-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'}`}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ background: project.color || 'currentColor' }}
+                        />
+                        <span className="truncate">{project.name}</span>
+                        {project.prefix && (
+                          <span className="ml-auto text-[11px] text-muted-foreground font-mono">{project.prefix}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </nav>
 
         {/* ─── Footer: Status + Search + Theme toggle ─── */}

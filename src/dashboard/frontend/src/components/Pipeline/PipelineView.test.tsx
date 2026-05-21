@@ -154,7 +154,7 @@ describe('PipelineView', () => {
     expect(await within(strip).findByText('$1.75')).toBeInTheDocument();
 
     const tiles = Array.from(strip.querySelectorAll('[data-component="metric-tile"]'));
-    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'warning', 'review', 'success', 'cost']);
+    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'info', 'review', 'success', 'cost']);
     expect(tiles.map((tile) => tile.querySelector('[data-component="metric-tile-value"]')?.textContent)).toEqual([
       '7',
       '1',
@@ -260,5 +260,63 @@ describe('PipelineView', () => {
     expect(new URLSearchParams(window.location.search).has('noPr')).toBe(true);
     expect(screen.getByText('Open PR')).toBeInTheDocument();
     expect(screen.queryByText('Ready to ship')).toBeNull();
+  });
+
+  it('renders ledger runtime for rows with an active agent', () => {
+    const { container } = renderPipelineView();
+    const pan2Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
+    const ledger = pan2Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    const runtime = within(ledger).getByText(/\d+h? \d+m/);
+    expect(runtime).toBeInTheDocument();
+    expect(ledger).not.toHaveClass('opacity-55');
+  });
+
+  it('renders ledger cost for rows with cost events in the byIssue stream', async () => {
+    const { container } = renderPipelineView();
+
+    // Wait for the async cost fetch to resolve and render
+    await screen.findByText('$1.25');
+
+    const pan1Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-1"]') as HTMLElement;
+    const pan1Ledger = pan1Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(within(pan1Ledger).getByText('$1.25')).toBeInTheDocument();
+    expect(pan1Ledger).not.toHaveClass('opacity-55');
+
+    const pan2Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
+    const pan2Ledger = pan2Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(within(pan2Ledger).getByText('$0.500')).toBeInTheDocument();
+  });
+
+  it('shows empty ledger styling for rows with no agent and no cost events', () => {
+    const { container } = renderPipelineView();
+    const pan6Row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-6"]') as HTMLElement;
+    const ledger = pan6Row.querySelector('[data-component="issue-row-ledger"]') as HTMLElement;
+    expect(ledger).toHaveClass('opacity-55');
+    expect(within(ledger).getAllByText('—')).toHaveLength(2);
+  });
+
+  it('renders empty-state card when no issues match the active phase filter', () => {
+    const { container } = renderPipelineView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
+    // After filtering to 'ship', PAN-1 is in ship, so not empty — flip to a phase with nothing
+    fireEvent.click(screen.getByRole('button', { name: 'plan' }));
+    // PAN-3 is in plan, so still not empty — use a combination that yields empty
+    // Apply a project filter that has no planned issues in 'plan' phase
+    fireEvent.click(screen.getByRole('button', { name: 'all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Panopticon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
+
+    // Panopticon project has PAN-1 in ship, so not empty. Filter to a phase with no Panopticon issues
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    // PAN-1 is Panopticon in ship; PAN-2, PAN-6, PAN-7 are Operations (not Panopticon) in work
+    const emptyState = container.querySelector('[data-component="pipeline-empty-state"]');
+    expect(emptyState).toBeInTheDocument();
+    expect(emptyState).toHaveTextContent('No issues match the selected filters.');
+
+    // TopBar, MetricStrip, and filter row are still visible
+    expect(container.querySelector('[data-component="top-bar"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="metric-strip"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="pipeline-filter-row"]')).toBeInTheDocument();
   });
 });
