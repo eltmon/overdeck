@@ -27,6 +27,7 @@ import {
   saveAgentState,
   saveSessionId,
 } from '../../../../../src/lib/agents.js';
+import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
 import { getWorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
 import type { WorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
@@ -46,7 +47,7 @@ function makeAgentId(prefix: string): string {
 }
 
 afterEach(() => {
-  setAgentRuntimeMirror({});
+  Effect.runSync(setAgentRuntimeMirror({}));
   for (const id of testAgentIds) {
     const dir = getAgentDir(id);
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
@@ -71,9 +72,9 @@ describe('resume route gate predicate', () => {
       status: 'running',
       startedAt: new Date().toISOString(),
     });
-    setAgentRuntimeMirror({
+    Effect.runSync(setAgentRuntimeMirror({
       [agentId]: { id: agentId, activity: 'working', lastActivity: new Date().toISOString(), updatedAtSequence: 1 },
-    });
+    }));
     saveSessionId(agentId, 'session-active');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
@@ -106,9 +107,9 @@ describe('resume route gate predicate', () => {
       status: 'running',
       startedAt: new Date().toISOString(),
     });
-    setAgentRuntimeMirror({
+    Effect.runSync(setAgentRuntimeMirror({
       [agentId]: { id: agentId, activity: 'idle', lastActivity: new Date().toISOString(), updatedAtSequence: 1 },
-    });
+    }));
     saveSessionId(agentId, 'session-stuck');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);

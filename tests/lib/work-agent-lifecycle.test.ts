@@ -8,6 +8,7 @@ import {
   saveAgentState,
   saveSessionId,
 } from '../../src/lib/agents.js';
+import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
 import { getWorkAgentLifecycleState } from '../../src/lib/work-agent-lifecycle.js';
 import * as tmux from '../../src/lib/tmux.js';
@@ -151,14 +152,14 @@ describe('work-agent-lifecycle', () => {
     // Populate the runtime mirror directly — saveAgentRuntimeState is async and
     // relies on the dashboard event system which is not running in unit tests.
     // activity:'idle' maps to runtimeState.state === 'idle' via snapshotToRuntimeState.
-    setAgentRuntimeMirror({
+    Effect.runSync(setAgentRuntimeMirror({
       [agentId]: {
         id: agentId,
         activity: 'idle',
         lastActivity: new Date().toISOString(),
         updatedAtSequence: 1,
       },
-    });
+    }));
     saveSessionId(agentId, 'session-stuck');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
@@ -175,7 +176,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.reason).toContain('runtime is idle');
 
     sessionExistsSpy.mockRestore();
-    setAgentRuntimeMirror({});
+    Effect.runSync(setAgentRuntimeMirror({}));
   });
 
   // 'suspended' is a legacy state retained for backward-compat — ensure it also
@@ -205,14 +206,14 @@ describe('work-agent-lifecycle', () => {
     // code paths that wrote state.json directly. New code uses activity:'idle'.
     // Since snapshotToRuntimeState has no 'suspended' Activity mapping, we use
     // 'idle' here as the closest real-world equivalent.
-    setAgentRuntimeMirror({
+    Effect.runSync(setAgentRuntimeMirror({
       [agentId]: {
         id: agentId,
         activity: 'idle',
         lastActivity: new Date().toISOString(),
         updatedAtSequence: 1,
       },
-    });
+    }));
     saveSessionId(agentId, 'session-suspended');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
@@ -224,7 +225,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
 
     sessionExistsSpy.mockRestore();
-    setAgentRuntimeMirror({});
+    Effect.runSync(setAgentRuntimeMirror({}));
   });
 
   it('allows fresh start when agent state is missing and no live session exists', () => {
