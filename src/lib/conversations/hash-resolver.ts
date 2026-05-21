@@ -15,8 +15,10 @@
 import { promises as fs } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { listProjects } from '../projects.js';
+import { FsError } from '../errors.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,4 +174,28 @@ async function addCandidateRoot(candidates: Set<string>, dir: string): Promise<v
   } catch {
     // Permission denied or non-existent directory — skip
   }
+}
+
+// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+//
+// Additive Effect surface — wraps the existing class method so Effect-native
+// callers can use HashResolver with a typed error channel. The Promise-based
+// `resolve()` method remains canonical.
+
+/**
+ * Resolve a JSONL path to a workspace via HashResolver.
+ * The underlying impl tolerates fs errors internally, so this Effect never
+ * fails in practice — FsError is declared for forward-compatibility if the
+ * impl ever begins propagating IO failures.
+ */
+export function resolveJsonlEffect(
+  resolver: HashResolver,
+  jsonlPath: string,
+  cwdFromFirstMessage: string | null,
+): Effect.Effect<ResolvedWorkspace, FsError> {
+  return Effect.tryPromise({
+    try: () => resolver.resolve(jsonlPath, cwdFromFirstMessage),
+    catch: (cause) =>
+      new FsError({ path: jsonlPath, operation: 'hash-resolve', cause }),
+  });
 }

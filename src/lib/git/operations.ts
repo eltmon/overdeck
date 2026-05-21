@@ -17,7 +17,9 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import { appendGitOperation } from '../git-activity.js';
+import { GitError, VcsError } from '../errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -261,4 +263,106 @@ export async function gitMerge(
     });
     throw err;
   }
+}
+
+// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+//
+// These wrap the existing Promise-based functions with typed Effect error
+// channels (GitError / VcsError). The underlying impl is unchanged; this is
+// an additive surface for callers that already speak Effect. MainDivergedError
+// is thrown by the underlying gitPush; the Effect variant surfaces it
+// preserved as the cause inside a VcsError tagged 'main-diverged'.
+
+/** Resolve a git ref to its SHA. Returns null if the ref does not exist. */
+export function gitRevParseEffect(
+  cwd: string,
+  ref: string,
+): Effect.Effect<string | null> {
+  return Effect.promise(() => gitRevParse(cwd, ref));
+}
+
+/** Fetch from a remote. */
+export function gitFetchEffect(
+  cwd: string,
+  remote = 'origin',
+  branch?: string,
+  opts: { issueId?: string } = {},
+): Effect.Effect<void, GitError> {
+  return Effect.tryPromise({
+    try: () => gitFetch(cwd, remote, branch, opts),
+    catch: (cause) =>
+      new GitError({
+        command: branch ? ['git', 'fetch', remote, branch] : ['git', 'fetch', remote],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
+}
+
+/**
+ * Push a branch to a remote with divergence guard.
+ * Fails with VcsError tagged 'main-diverged' when MainDivergedError is thrown.
+ */
+export function gitPushEffect(
+  cwd: string,
+  remote = 'origin',
+  branch = 'main',
+  opts: { issueId?: string } = {},
+): Effect.Effect<void, VcsError | GitError> {
+  return Effect.tryPromise({
+    try: () => gitPush(cwd, remote, branch, opts),
+    catch: (cause) => {
+      if (cause instanceof MainDivergedError) {
+        return new VcsError({
+          operation: 'main-diverged',
+          message: cause.message,
+          cause,
+        });
+      }
+      return new GitError({
+        command: ['git', 'push', remote, branch],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      });
+    },
+  });
+}
+
+/** Force-push a branch (--force-with-lease). */
+export function gitForcePushEffect(
+  cwd: string,
+  remote = 'origin',
+  branch = 'main',
+  opts: { issueId?: string; reason?: string } = {},
+): Effect.Effect<void, GitError> {
+  return Effect.tryPromise({
+    try: () => gitForcePush(cwd, remote, branch, opts),
+    catch: (cause) =>
+      new GitError({
+        command: ['git', 'push', '--force-with-lease', remote, branch],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
+}
+
+/** Merge a branch into the current branch. */
+export function gitMergeEffect(
+  cwd: string,
+  branch: string,
+  opts: { issueId?: string; noFf?: boolean } = {},
+): Effect.Effect<void, GitError> {
+  return Effect.tryPromise({
+    try: () => gitMerge(cwd, branch, opts),
+    catch: (cause) =>
+      new GitError({
+        command: opts.noFf ? ['git', 'merge', '--no-ff', branch] : ['git', 'merge', branch],
+        stderr: cause instanceof Error ? cause.message : String(cause),
+        exitCode: -1,
+        cause,
+      }),
+  });
 }

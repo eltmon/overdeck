@@ -13,9 +13,19 @@ import { promisify } from 'util'
 import { randomUUID } from 'crypto'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { mkdtemp, rm, writeFile } from 'fs/promises'
+import { mkdtemp, rm } from 'fs/promises'
+import { Effect, Layer, Stream } from 'effect'
+import { ChildProcess } from 'effect/unstable/process'
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner'
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
+import * as NodePath from '@effect/platform-node/NodePath'
+import { CheckpointError, GitError, InvalidAgentIdError, VcsError } from '../errors.js'
 
 const execFileAsync = promisify(execFile)
+
+const checkpointSpawnerLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+)
 
 const CHECKPOINT_REF_PREFIX = 'refs/pan/turn'
 
@@ -549,4 +559,309 @@ function parseNumstatWithStatus(numstat: string, nameStatus: string): TurnDiffFi
   }
 
   return files.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+//
+// These wrap the existing Promise-based functions so Effect-native callers can
+// use checkpoint operations with typed error channels. The underlying impl is
+// unchanged — failures are mapped to CheckpointError / InvalidAgentIdError /
+// VcsError / GitError so callers can narrow via Effect.catchTag.
+//
+// The existing Promise functions remain canonical; these are an additive
+// surface for the perf-driver migration (PAN-1249).
+
+function assertSafeAgentIdEffect(agentId: string): Effect.Effect<void, InvalidAgentIdError> {
+  return SAFE_AGENT_ID_RE.test(agentId)
+    ? Effect.void
+    : Effect.fail(new InvalidAgentIdError({ agentId }))
+}
+
+/** Capture a checkpoint at the current working tree state. */
+export function captureCheckpointEffect(
+  cwd: string,
+  agentId: string,
+  turnId: string,
+): Effect.Effect<void, CheckpointError | InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    yield* Effect.tryPromise({
+      try: () => captureCheckpoint(cwd, agentId, turnId),
+      catch: (cause) =>
+        new CheckpointError({ agentId, operation: 'capture', message: String(cause), cause }),
+    })
+  })
+}
+
+/** Check whether a checkpoint exists for the given turn. */
+export function hasCheckpointEffect(
+  cwd: string,
+  agentId: string,
+  turnId: string,
+): Effect.Effect<boolean, InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.promise(() => hasCheckpoint(cwd, agentId, turnId))
+  })
+}
+
+/** Delete a checkpoint ref. No-op if it doesn't exist. */
+export function deleteCheckpointEffect(
+  cwd: string,
+  agentId: string,
+  turnId: string,
+): Effect.Effect<void, InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    yield* Effect.promise(() => deleteCheckpoint(cwd, agentId, turnId))
+  })
+}
+
+/** Compute unified diff between two checkpoints. */
+export function diffCheckpointsEffect(
+  cwd: string,
+  agentId: string,
+  fromTurnId: string,
+  toTurnId: string,
+  filePath?: string,
+): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.tryPromise({
+      try: () => diffCheckpoints(cwd, agentId, fromTurnId, toTurnId, filePath),
+      catch: (cause) =>
+        new CheckpointError({ agentId, operation: 'diff', message: String(cause), cause }),
+    })
+  })
+}
+
+/** Compute diff between a checkpoint and the current HEAD. */
+export function diffCheckpointToHeadEffect(
+  cwd: string,
+  agentId: string,
+  turnId: string,
+): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.tryPromise({
+      try: () => diffCheckpointToHead(cwd, agentId, turnId),
+      catch: (cause) =>
+        new CheckpointError({ agentId, operation: 'diff-to-head', message: String(cause), cause }),
+    })
+  })
+}
+
+/** Get file change summary between two checkpoints. */
+export function diffCheckpointFilesEffect(
+  cwd: string,
+  agentId: string,
+  fromTurnId: string,
+  toTurnId: string,
+): Effect.Effect<TurnDiffFileChange[], CheckpointError | InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.tryPromise({
+      try: () => diffCheckpointFiles(cwd, agentId, fromTurnId, toTurnId),
+      catch: (cause) =>
+        new CheckpointError({ agentId, operation: 'diff-files', message: String(cause), cause }),
+    })
+  })
+}
+
+/** Get the committer date (ISO 8601) of a checkpoint commit. */
+export function getCheckpointTimestampEffect(
+  cwd: string,
+  agentId: string,
+  turnId: string,
+): Effect.Effect<string, InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.promise(() => getCheckpointTimestamp(cwd, agentId, turnId))
+  })
+}
+
+/** Get the list of checkpoint turn IDs for a workspace. */
+export function listCheckpointsEffect(
+  cwd: string,
+  agentId: string,
+): Effect.Effect<string[], InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    return yield* Effect.promise(() => listCheckpoints(cwd, agentId))
+  })
+}
+
+/** Delete all checkpoint refs for a workspace. */
+export function deleteAllCheckpointsEffect(
+  cwd: string,
+  agentId: string,
+): Effect.Effect<void, InvalidAgentIdError> {
+  return Effect.gen(function* () {
+    yield* assertSafeAgentIdEffect(agentId)
+    yield* Effect.promise(() => deleteAllCheckpoints(cwd, agentId))
+  })
+}
+
+/** Delete all checkpoint refs for a set of agent IDs. */
+export function pruneCheckpointRefsForAgentsEffect(
+  cwd: string,
+  agentIds: string[],
+): Effect.Effect<number> {
+  return Effect.promise(() => pruneCheckpointRefsForAgents(cwd, agentIds))
+}
+
+/** Delete all checkpoint refs older than olderThanDays days. */
+export function pruneStaleCheckpointRefsEffect(
+  cwd: string,
+  olderThanDays: number,
+): Effect.Effect<number> {
+  return Effect.promise(() => pruneStaleCheckpointRefs(cwd, olderThanDays))
+}
+
+/** One-time migration: delete legacy unscoped checkpoint refs. */
+export function deleteLegacyCheckpointRefsEffect(cwd: string): Effect.Effect<number> {
+  return Effect.promise(() => deleteLegacyCheckpointRefs(cwd))
+}
+
+/** Compute unified diff of the workspace against the main branch. */
+export function diffAgainstMainEffect(
+  cwd: string,
+  filePath?: string,
+): Effect.Effect<string, VcsError> {
+  return Effect.tryPromise({
+    try: () => diffAgainstMain(cwd, filePath),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-against-main', message: String(cause), cause }),
+  })
+}
+
+/** Get file change summary of the workspace against the main branch. */
+export function diffAgainstMainFilesEffect(
+  cwd: string,
+): Effect.Effect<TurnDiffFileChange[], VcsError> {
+  return Effect.tryPromise({
+    try: () => diffAgainstMainFiles(cwd),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-against-main-files', message: String(cause), cause }),
+  })
+}
+
+/** Find the commit SHA at the given timestamp (rev-list --before). */
+export function findCommitAtTimeEffect(
+  cwd: string,
+  isoTimestamp: string,
+): Effect.Effect<string | null> {
+  return Effect.promise(() => findCommitAtTime(cwd, isoTimestamp))
+}
+
+/** Diff since a given base commit. */
+export function diffSinceCommitEffect(
+  cwd: string,
+  baseCommit: string,
+): Effect.Effect<TurnDiffFileChange[], VcsError> {
+  return Effect.tryPromise({
+    try: () => diffSinceCommit(cwd, baseCommit),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-since-commit', message: String(cause), cause }),
+  })
+}
+
+/** Diff specific file paths against HEAD. */
+export function diffFilesAgainstHeadEffect(
+  cwd: string,
+  filePaths: string[],
+): Effect.Effect<TurnDiffFileChange[], VcsError> {
+  return Effect.tryPromise({
+    try: () => diffFilesAgainstHead(cwd, filePaths),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-files-against-head', message: String(cause), cause }),
+  })
+}
+
+/** Patch diff since a given base commit. */
+export function diffPatchSinceCommitEffect(
+  cwd: string,
+  baseCommit: string,
+  filePath?: string,
+): Effect.Effect<string, VcsError> {
+  return Effect.tryPromise({
+    try: () => diffPatchSinceCommit(cwd, baseCommit, filePath),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-patch-since-commit', message: String(cause), cause }),
+  })
+}
+
+/** Patch diff for specific file paths against HEAD. */
+export function diffPatchFilesAgainstHeadEffect(
+  cwd: string,
+  filePaths: string[],
+): Effect.Effect<string, VcsError> {
+  return Effect.tryPromise({
+    try: () => diffPatchFilesAgainstHead(cwd, filePaths),
+    catch: (cause) =>
+      new VcsError({ operation: 'diff-patch-files-against-head', message: String(cause), cause }),
+  })
+}
+
+// ─── Effect-native git runner (for callers that want typed GitError) ──────────
+//
+// Exposed for downstream perf-driver work. Internal use only for now —
+// existing call sites remain on execFileAsync until they migrate.
+
+interface CheckpointGitResult {
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number
+}
+
+/** Run a git subcommand under ChildProcessSpawner. */
+export function runCheckpointGit(
+  args: readonly string[],
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<CheckpointGitResult, GitError> {
+  return Effect.gen(function* () {
+    const handle = yield* ChildProcess.make('git', [...args], {
+      cwd,
+      ...(env ? { env } : {}),
+    })
+    const stdoutBuf = yield* Stream.runFold(
+      handle.stdout,
+      () => Buffer.alloc(0),
+      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
+    )
+    const stderrBuf = yield* Stream.runFold(
+      handle.stderr,
+      () => Buffer.alloc(0),
+      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
+    )
+    const exitCode = yield* handle.exitCode
+    if (exitCode !== 0) {
+      return yield* Effect.fail(
+        new GitError({
+          command: ['git', ...args],
+          stderr: stderrBuf.toString('utf-8'),
+          exitCode,
+        }),
+      )
+    }
+    return {
+      stdout: stdoutBuf.toString('utf-8'),
+      stderr: stderrBuf.toString('utf-8'),
+      exitCode,
+    }
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(checkpointSpawnerLayer),
+    Effect.catchCause((cause) =>
+      Effect.fail(
+        new GitError({
+          command: ['git', ...args],
+          stderr: String(cause),
+          exitCode: -1,
+          cause,
+        }),
+      ),
+    ),
+  )
 }

@@ -3,9 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Effect } from 'effect';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlags } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { FsError, ProcessSpawnError } from '../errors.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -997,4 +999,53 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
     readFiles,
     modifiedFiles,
   };
+}
+
+// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+//
+// Additive Effect surface for smart-compaction. The underlying Promise
+// functions remain canonical; these wrappers map failures to typed errors
+// (ProcessSpawnError for spawn / generation failures, FsError for IO).
+
+/** Effect variant of runModelSummary. */
+export function runModelSummaryEffect(
+  prompt: string,
+  model?: string,
+  timeoutMs?: number,
+  harness: RuntimeName = 'claude-code',
+): Effect.Effect<string, ProcessSpawnError> {
+  return Effect.tryPromise({
+    try: () => runModelSummary(prompt, model, timeoutMs, harness),
+    catch: (cause) =>
+      new ProcessSpawnError({
+        command: harness === 'pi' ? 'pi' : 'claude',
+        args: ['-p', model ?? 'default'],
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+}
+
+/** Effect variant of generateSmartSummary. */
+export function generateSmartSummaryEffect(
+  options: CompactionOptions,
+): Effect.Effect<CompactionResult, FsError | ProcessSpawnError> {
+  return Effect.tryPromise({
+    try: () => generateSmartSummary(options),
+    catch: (cause) => {
+      const msg = cause instanceof Error ? cause.message : String(cause);
+      // Distinguish between fs failures (read jsonl) and spawn failures (LLM).
+      // The underlying impl throws plain Error in both cases; we map to
+      // FsError when the message hints at file IO, otherwise spawn.
+      if (msg.toLowerCase().includes('enoent') || msg.toLowerCase().includes('no such file')) {
+        return new FsError({ path: options.jsonlPath, operation: 'smart-summary-read', cause });
+      }
+      return new ProcessSpawnError({
+        command: 'claude',
+        args: ['-p', options.model ?? 'default'],
+        message: msg,
+        cause,
+      });
+    },
+  });
 }
