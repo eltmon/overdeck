@@ -9,6 +9,7 @@
         "@effect/platform-bun": "4.0.0-beta.45",
         "@effect/platform-node": "4.0.0-beta.45",
         "@effect/platform-node-shared": "4.0.0-beta.45",
+        "@effect/vitest": "4.0.0-beta.45",
         "@google-cloud/speech": "^7.3.1",
         "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
         "@iarna/toml": "^2.2.5",
@@ -324,6 +325,8 @@
     "@effect/platform-node": ["@effect/platform-node@4.0.0-beta.45", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.45", "mime": "^4.1.0", "undici": "^7.24.0" }, "peerDependencies": { "effect": "^4.0.0-beta.45", "ioredis": "^5.7.0" } }, "sha512-P07NMG4eoy62iLX9szak0hkr7hrwgq5+XMkm7URVug/3zqfZVxEG2kxn9JzVK1lF5WbaVrEKwjt3IkEJxzSPtg=="],
 
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.45", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.19.0" }, "peerDependencies": { "effect": "^4.0.0-beta.45" } }, "sha512-0T4RG18o+aCVUSlmPxA7uAjHJkyE3MS/uRrR5kCNSZQNG3X71wdIbu82wE/MnV6+6YSSPDx/6TVdZWYkJF0JWw=="],
+
+    "@effect/vitest": ["@effect/vitest@4.0.0-beta.45", "", { "peerDependencies": { "effect": "^4.0.0-beta.45", "vitest": "^3.0.0 || ^4.0.0" } }, "sha512-38JA5Z6c2FoEhpVKbl7rjTrMU8Al5T30Kwtb6N3B9kOkyr2SsmvNsP9T65bh03IBh3ak9U//acrkmjS3hLQwKA=="],
 
     "@electron/asar": ["@electron/asar@3.4.1", "", { "dependencies": { "commander": "^5.0.0", "glob": "^7.1.6", "minimatch": "^3.0.4" }, "bin": { "asar": "bin/asar.js" } }, "sha512-i4/rNPRS84t0vSRa2HorerGRXWyF4vThfHesw0dmcWHp+cspK743UanA0suA5Q5y8kzY2y6YKrvbIUn69BCAiA=="],
 

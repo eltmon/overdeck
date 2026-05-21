@@ -16,6 +16,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import {
   sessionExistsAsync,
@@ -277,7 +278,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
-  return renderPrompt({
+  return Effect.runSync(renderPrompt({
     name: 'planning',
     vars: {
       ISSUE_ID: issue.identifier,
@@ -295,7 +296,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
     },
-  });
+  }));
 }
 
 /**

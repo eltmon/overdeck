@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
+import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { readContinueStateAsync, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
@@ -58,7 +59,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
     pendingFeedbackStr = readPendingFeedback(ctx.workspacePath);
   }
 
-  return renderPrompt({
+  return Effect.runSync(renderPrompt({
     name: 'work',
     vars: {
       ISSUE_ID: ctx.issueId,
@@ -75,7 +76,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
       TLDR_AVAILABLE: existsSync(join(ctx.workspacePath, '.venv')),
     },
-  });
+  }));
 }
 
 
