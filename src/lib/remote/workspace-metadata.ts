@@ -1,97 +1,109 @@
-/**
- * Workspace Metadata Management
- *
- * Shared module for loading, saving, and listing workspace metadata.
- * Used by both workspace.ts and work/issue.ts for remote workspace support.
- */
-
-import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'fs';
+import { Effect, FileSystem } from 'effect';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from 'yaml';
 import type { RemoteWorkspaceMetadata } from './interface.js';
+import { FsError } from '../errors.js';
 
-// Path for workspace metadata
 export const WORKSPACES_DIR = join(homedir(), '.panopticon', 'workspaces');
 
-/**
- * Save workspace metadata to ~/.panopticon/workspaces/{issueId}.yaml
- */
-export function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
-  if (!existsSync(WORKSPACES_DIR)) {
-    mkdirSync(WORKSPACES_DIR, { recursive: true });
-  }
+export function saveWorkspaceMetadata(
+  metadata: RemoteWorkspaceMetadata,
+): Effect.Effect<void, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
 
-  const filename = join(WORKSPACES_DIR, `${metadata.id}.yaml`);
-  writeFileSync(filename, stringify(metadata), 'utf-8');
+    yield* fs.makeDirectory(WORKSPACES_DIR, { recursive: true }).pipe(
+      Effect.mapError(cause => new FsError({ path: WORKSPACES_DIR, operation: 'makeDirectory', cause })),
+    );
+
+    const filename = join(WORKSPACES_DIR, `${metadata.id}.yaml`);
+    yield* fs.writeFileString(filename, stringify(metadata)).pipe(
+      Effect.mapError(cause => new FsError({ path: filename, operation: 'write', cause })),
+    );
+  });
 }
 
-/**
- * Load workspace metadata from ~/.panopticon/workspaces/{issueId}.yaml
- */
-export function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
-  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+export function loadWorkspaceMetadata(
+  issueId: string,
+): Effect.Effect<RemoteWorkspaceMetadata | null, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+    const fs = yield* FileSystem.FileSystem;
 
-  if (!existsSync(filename)) {
-    return null;
-  }
+    const exists = yield* fs.exists(filename).pipe(
+      Effect.mapError(cause => new FsError({ path: filename, operation: 'exists', cause })),
+    );
+    if (!exists) return null;
 
-  try {
-    const content = readFileSync(filename, 'utf-8');
-    return parse(content) as RemoteWorkspaceMetadata;
-  } catch {
-    return null;
-  }
+    const content = yield* fs.readFileString(filename).pipe(
+      Effect.mapError(cause => new FsError({ path: filename, operation: 'read', cause })),
+    );
+
+    return yield* Effect.try({
+      try: () => parse(content) as RemoteWorkspaceMetadata,
+      catch: cause => new FsError({ path: filename, operation: 'parse', cause }),
+    });
+  });
 }
 
-/**
- * List all workspace metadata files
- */
-export function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
-  if (!existsSync(WORKSPACES_DIR)) {
-    return [];
-  }
+export function listWorkspaceMetadata(): Effect.Effect<
+  RemoteWorkspaceMetadata[],
+  FsError,
+  FileSystem.FileSystem
+> {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
 
-  const files = readdirSync(WORKSPACES_DIR).filter(f => f.endsWith('.yaml'));
-  const workspaces: RemoteWorkspaceMetadata[] = [];
+    const exists = yield* fs.exists(WORKSPACES_DIR).pipe(
+      Effect.mapError(cause => new FsError({ path: WORKSPACES_DIR, operation: 'exists', cause })),
+    );
+    if (!exists) return [];
 
-  for (const file of files) {
-    try {
-      const content = readFileSync(join(WORKSPACES_DIR, file), 'utf-8');
-      workspaces.push(parse(content) as RemoteWorkspaceMetadata);
-    } catch {
-      // Skip invalid files
+    const files = yield* fs.readDirectory(WORKSPACES_DIR).pipe(
+      Effect.mapError(cause => new FsError({ path: WORKSPACES_DIR, operation: 'readDirectory', cause })),
+    );
+
+    const workspaces: RemoteWorkspaceMetadata[] = [];
+    for (const file of files.filter(f => f.endsWith('.yaml'))) {
+      const filePath = join(WORKSPACES_DIR, file);
+      const content = yield* fs.readFileString(filePath).pipe(
+        Effect.mapError(cause => new FsError({ path: filePath, operation: 'read', cause })),
+      );
+      const parsed = yield* Effect.try({
+        try: () => parse(content) as RemoteWorkspaceMetadata,
+        catch: cause => new FsError({ path: filePath, operation: 'parse', cause }),
+      });
+      workspaces.push(parsed);
     }
-  }
 
-  return workspaces;
+    return workspaces;
+  });
 }
 
-/**
- * Check if a workspace exists (local or remote)
- * Returns metadata if remote workspace exists, null otherwise
- */
-export function findRemoteWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
+export function findRemoteWorkspaceMetadata(
+  issueId: string,
+): Effect.Effect<RemoteWorkspaceMetadata | null, FsError, FileSystem.FileSystem> {
   return loadWorkspaceMetadata(issueId);
 }
 
-/**
- * Delete workspace metadata
- */
-export function deleteWorkspaceMetadata(issueId: string): boolean {
-  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+export function deleteWorkspaceMetadata(
+  issueId: string,
+): Effect.Effect<boolean, FsError, FileSystem.FileSystem> {
+  return Effect.gen(function* () {
+    const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+    const fs = yield* FileSystem.FileSystem;
 
-  if (!existsSync(filename)) {
-    return false;
-  }
+    const exists = yield* fs.exists(filename).pipe(
+      Effect.mapError(cause => new FsError({ path: filename, operation: 'exists', cause })),
+    );
+    if (!exists) return false;
 
-  try {
-    const { unlinkSync } = require('fs');
-    unlinkSync(filename);
+    yield* fs.remove(filename).pipe(
+      Effect.mapError(cause => new FsError({ path: filename, operation: 'remove', cause })),
+    );
     return true;
-  } catch {
-    return false;
-  }
+  });
 }
