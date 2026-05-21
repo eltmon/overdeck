@@ -9,7 +9,10 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
+import { Effect } from 'effect';
+import { FsError } from '../errors.js';
 import { checkHook } from '../hooks.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentHealth } from './health.js';
@@ -302,3 +305,76 @@ export function clearOldViolations(hoursOld: number = 24): void {
     saveViolations(activeViolations);
   }
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// Async persistence helpers around the in-memory `activeViolations` map. These
+// are additive: the sync variants stay in place because the module-level cache
+// is populated at import time and most callers happen on the orchestrator's
+// patrol thread where sync I/O is acceptable. Route handlers should prefer
+// the Effect variants.
+
+const saveViolationsAsync = (violations: Map<string, FPPViolation>): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    const dir = dirname(VIOLATIONS_DATA_FILE);
+    yield* Effect.tryPromise({
+      try: () => mkdir(dir, { recursive: true }),
+      catch: (cause) => new FsError({ path: dir, operation: 'mkdir', cause }),
+    });
+
+    const persisted: ViolationsDataPersisted = {
+      violations: Array.from(violations.entries()),
+    };
+
+    const tempFile = `${VIOLATIONS_DATA_FILE}.tmp`;
+    yield* Effect.tryPromise({
+      try: () => writeFile(tempFile, JSON.stringify(persisted, null, 2), 'utf-8'),
+      catch: (cause) => new FsError({ path: tempFile, operation: 'writeFile', cause }),
+    });
+    yield* Effect.tryPromise({
+      try: () => rename(tempFile, VIOLATIONS_DATA_FILE),
+      catch: (cause) => new FsError({ path: VIOLATIONS_DATA_FILE, operation: 'rename', cause }),
+    });
+
+    yield* Effect.tryPromise({
+      try: () => unlink(tempFile),
+      catch: (cause) => new FsError({ path: tempFile, operation: 'unlink', cause }),
+    }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+  });
+
+/** Effect variant of `resolveViolation`. */
+export const resolveViolationEffect = (
+  agentId: string,
+  type: FPPViolationType,
+): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    const key = `${agentId}-${type}`;
+    const violation = activeViolations.get(key);
+    if (!violation) return;
+
+    violation.resolved = true;
+    console.log(`🔔 FPP violation resolved for ${agentId}: ${type}`);
+    yield* saveViolationsAsync(activeViolations);
+  });
+
+/** Effect variant of `clearOldViolations`. */
+export const clearOldViolationsEffect = (hoursOld: number = 24): Effect.Effect<void, FsError> =>
+  Effect.gen(function* () {
+    const cutoff = Date.now() - hoursOld * 60 * 60 * 1000;
+    let changed = false;
+
+    for (const [key, violation] of activeViolations.entries()) {
+      if (violation.resolved && new Date(violation.detectedAt).getTime() < cutoff) {
+        activeViolations.delete(key);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      yield* saveViolationsAsync(activeViolations);
+    }
+  });
+
+// Silence "unused" warnings for fs/promises imports that may be picked up by
+// future expansions of the Effect variants above.
+void readFile;

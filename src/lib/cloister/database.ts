@@ -9,7 +9,19 @@ import type Database from 'better-sqlite3';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { Data, Effect } from 'effect';
 import { PANOPTICON_HOME } from '../paths.js';
+
+/**
+ * Local error class for the cloister health-history SQLite store. Distinct from
+ * `DatabaseError` in the application-settings store because this layer
+ * (better-sqlite3 / bun:sqlite, sync API) has different failure surfaces.
+ */
+export class CloisterDatabaseError extends Data.TaggedError('CloisterDatabaseError')<{
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 declare const Bun: unknown;
 const _require = createRequire(import.meta.url);
@@ -394,3 +406,159 @@ export function getDatabaseStats(): {
     newestEvent,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+//
+// `better-sqlite3` (and `bun:sqlite`) are intentionally synchronous APIs, so
+// these wrappers stay sync at the call site and lift failures into a typed
+// `CloisterDatabaseError` channel via `Effect.try`. They exist so callers in
+// the Effect world can compose health-history reads/writes without manually
+// wrapping every call.
+
+/** Effect variant of `writeHealthEvent`. */
+export const writeHealthEventEffect = (
+  event: Omit<HealthEvent, 'id'>,
+): Effect.Effect<number, CloisterDatabaseError> =>
+  Effect.try({
+    try: () => writeHealthEvent(event),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'writeHealthEvent',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `writeHealthEvents`. */
+export const writeHealthEventsEffect = (
+  events: Omit<HealthEvent, 'id'>[],
+): Effect.Effect<number, CloisterDatabaseError> =>
+  Effect.try({
+    try: () => writeHealthEvents(events),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'writeHealthEvents',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getHealthHistory`. */
+export const getHealthHistoryEffect = (
+  agentId: string,
+  startTime: string,
+  endTime: string,
+): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
+  Effect.try({
+    try: () => getHealthHistory(agentId, startTime, endTime),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getHealthHistory',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getRecentHealthHistory`. */
+export const getRecentHealthHistoryEffect = (
+  agentId: string,
+  limit?: number,
+): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
+  Effect.try({
+    try: () => getRecentHealthHistory(agentId, limit),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getRecentHealthHistory',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getAllHealthHistory`. */
+export const getAllHealthHistoryEffect = (
+  startTime: string,
+  endTime: string,
+): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
+  Effect.try({
+    try: () => getAllHealthHistory(startTime, endTime),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getAllHealthHistory',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getLatestHealthEvent`. */
+export const getLatestHealthEventEffect = (
+  agentId: string,
+): Effect.Effect<HealthEventWithMetadata | null, CloisterDatabaseError> =>
+  Effect.try({
+    try: () => getLatestHealthEvent(agentId),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getLatestHealthEvent',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getAgentsWithHistory`. */
+export const getAgentsWithHistoryEffect = (): Effect.Effect<string[], CloisterDatabaseError> =>
+  Effect.try({
+    try: () => getAgentsWithHistory(),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getAgentsWithHistory',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `cleanupOldEvents`. */
+export const cleanupOldEventsEffect = (
+  retentionDays?: number,
+): Effect.Effect<number, CloisterDatabaseError> =>
+  Effect.try({
+    try: () => cleanupOldEvents(getHealthDatabase(), retentionDays),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'cleanupOldEvents',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `deleteAgentHistory`. */
+export const deleteAgentHistoryEffect = (
+  agentId: string,
+): Effect.Effect<number, CloisterDatabaseError> =>
+  Effect.try({
+    try: () => deleteAgentHistory(agentId),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'deleteAgentHistory',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `getDatabaseStats`. */
+export const getDatabaseStatsEffect = (): Effect.Effect<
+  {
+    totalEvents: number;
+    uniqueAgents: number;
+    oldestEvent: string | null;
+    newestEvent: string | null;
+  },
+  CloisterDatabaseError
+> =>
+  Effect.try({
+    try: () => getDatabaseStats(),
+    catch: (cause) =>
+      new CloisterDatabaseError({
+        operation: 'getDatabaseStats',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
