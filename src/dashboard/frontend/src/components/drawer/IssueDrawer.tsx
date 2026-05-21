@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useDashboardStore } from '../../lib/store';
@@ -11,6 +12,32 @@ import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
 import PhaseTimeline from './PhaseTimeline';
 import { useDrawerData } from './useDrawerData';
+import { VBriefViewer } from '../vbrief/VBriefViewer';
+import type { VBriefDocument } from '../vbrief/types';
+
+function DrawerPlanPanel({ issueId }: { issueId: string }) {
+  const { data, isLoading, isError } = useQuery<VBriefDocument | null>({
+    queryKey: ['drawer-vbrief-plan', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan`);
+      if (!res.ok) return null;
+      return res.json() as Promise<VBriefDocument>;
+    },
+    retry: false,
+  });
+
+  return (
+    <div data-testid="drawer-tab-panel-plan">
+      {isLoading ? (
+        <div className="text-[12px] text-muted-foreground">Loading plan…</div>
+      ) : isError ? (
+        <div className="text-[12px] text-muted-foreground">Failed to load plan</div>
+      ) : (
+        <VBriefViewer doc={data ?? null} />
+      )}
+    </div>
+  );
+}
 
 void COMMAND_DECK_SURFACE_REGISTRY;
 
@@ -138,6 +165,8 @@ export function IssueDrawer() {
               <div data-testid="drawer-tab-panel-beads">
                 <DrawerBeadsList />
               </div>
+            ) : drawer.tab === 'plan' && drawer.issueId ? (
+              <DrawerPlanPanel issueId={drawer.issueId} />
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
