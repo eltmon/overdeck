@@ -4,7 +4,7 @@
     "created": "2026-05-20T02:34:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1228: PAN-1148 follow-up — Pipeline view gaps (ledger / TopBar / sidebar / skeleton / empty state / scroll-restore)",
-    "updated": "2026-05-21T00:48:50.384Z"
+    "updated": "2026-05-21T00:57:27.514Z"
   },
   "plan": {
     "id": "pan-1228",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7c3d8e9-f2a1-4e7b-9d6c-8a5b4f3e2d1c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 41,
+    "sequence": 47,
     "created": "2026-05-20T02:34:00.000Z",
-    "updated": "2026-05-21T00:48:50.384Z",
+    "updated": "2026-05-21T00:57:27.514Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1228",
@@ -496,55 +496,57 @@
         "phase": "review",
         "issueId": "PAN-1228",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-21T00:48:50.381Z",
+        "updatedAt": "2026-05-21T00:57:27.513Z",
         "work": {
-          "updatedAt": "2026-05-21T00:48:50.381Z",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-21T00:48:50.381Z",
+          "status": "failed",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
+          "notes": "Verification FAILED at test (12040ms):\n\n init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/discovered-sessions.test.ts > dashboard conversation route guards > allows semantic GET requests from trusted origins\nAssertionError: expected { _id: 'HttpServerResponse', …(5) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"body\": Uint8Array {\n    \"_tag\": \"Uint8Array\",\n    \"body\": Uint8Array [\n      123,\n      34,\n      101,\n      114,\n      114,\n      111,\n      114,\n      34,\n      58,\n      34,\n      73,\n      110,\n      118,\n      97,\n      108,\n      105,\n      100,\n      32,\n      111,\n      114,\n      105,\n      103,\n      105,\n      110,\n      34,\n      125,\n    ],\n    \"contentLength\": 26,\n    \"contentType\": \"application/json\",\n    \"~effect/http/HttpBody\": \"~effect/http/HttpBody\",\n  },\n  \"cookies\": {\n    \"cookies\": {},\n  },\n  \"headers\": {\n    \"content-length\": \"26\",\n    \"content-type\": \"application/json\",\n  },\n  \"status\": 403,\n  \"statusText\": undefined,\n}\n\n ❯ src/dashboard/server/routes/__tests__/discovered-sessions.test.ts:274:22\n    272|       { requireOriginHeader: true },\n    273|     );\n    274|     expect(response).toBeNull();\n       |                      ^\n    275|   });\n    276|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-21T00:48:50.381Z"
+              "status": "failed",
+              "at": "2026-05-21T00:57:27.513Z",
+              "notes": "Verification FAILED at test (12040ms):\n\n init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/discovered-sessions.test.ts > dashboard conversation route guards > allows semantic GET requests from trusted origins\nAssertionError: expected { _id: 'HttpServerResponse', …(5) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"body\": Uint8Array {\n    \"_tag\": \"Uint8Array\",\n    \"body\": Uint8Array [\n      123,\n      34,\n      101,\n      114,\n      114,\n      111,\n      114,\n      34,\n      58,\n      34,\n      73,\n      110,\n      118,\n      97,\n      108,\n      105,\n      100,\n      32,\n      111,\n      114,\n      105,\n      103,\n      105,\n      110,\n      34,\n      125,\n    ],\n    \"contentLength\": 26,\n    \"contentType\": \"application/json\",\n    \"~effect/http/HttpBody\": \"~effect/http/HttpBody\",\n  },\n  \"cookies\": {\n    \"cookies\": {},\n  },\n  \"headers\": {\n    \"content-length\": \"26\",\n    \"content-type\": \"application/json\",\n  },\n  \"status\": 403,\n  \"statusText\": undefined,\n}\n\n ❯ src/dashboard/server/routes/__tests__/discovered-sessions.test.ts:274:22\n    272|       { requireOriginHeader: true },\n    273|     );\n    274|     expect(response).toBeNull();\n       |                      ^\n    275|   });\n    276|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-21T00:48:50.381Z",
-          "notes": "Verification failed at vbrief-ac",
+          "status": "failed",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
+          "notes": "Verification failed at test",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-21T00:48:50.381Z",
-              "notes": "Verification failed at vbrief-ac"
+              "status": "failed",
+              "at": "2026-05-21T00:57:27.513Z",
+              "notes": "Verification failed at test"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-21T00:48:50.381Z",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-21T00:48:50.381Z"
+              "at": "2026-05-21T00:57:27.513Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-21T00:48:50.381Z",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-21T00:48:50.381Z",
+          "updatedAt": "2026-05-21T00:57:27.513Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-21T00:48:50.381Z"
+              "at": "2026-05-21T00:57:27.513Z"
             }
           ],
           "readyForMerge": false,
