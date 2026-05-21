@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useDashboardStore } from '../../lib/store';
+import { cn } from '../../lib/utils';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import DrawerActivityRail from './DrawerActivityRail';
@@ -11,9 +12,52 @@ import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
 import PhaseTimeline from './PhaseTimeline';
-import { useDrawerData } from './useDrawerData';
+import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
+
+const ACTIVITY_PHASE_DOT_CLASSES = {
+  work: 'bg-primary',
+  review: 'bg-signal-review',
+  ship: 'bg-warning',
+  done: 'bg-success',
+  info: 'bg-info',
+} satisfies Record<DrawerActivityPhase, string>;
+
+function formatActivityWhen(value: string) {
+  if (!value) return 'just now';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function DrawerActivityPanel() {
+  const { activityFull } = useDrawerData();
+  return (
+    <div data-testid="drawer-tab-panel-activity">
+      {activityFull.length === 0 ? (
+        <div className="rounded-[12px] border border-dashed border-border px-[12px] py-[18px] text-center text-[12px] text-muted-foreground">
+          No activity yet.
+        </div>
+      ) : (
+        <div className="space-y-[12px]">
+          {activityFull.map((item) => (
+            <div key={item.id} className="grid grid-cols-[14px_1fr] gap-[10px]" data-phase={item.phase}>
+              <span
+                aria-hidden="true"
+                className={cn('mt-[4px] h-[8px] w-[8px] rounded-full', ACTIVITY_PHASE_DOT_CLASSES[item.phase])}
+              />
+              <div className="min-w-0">
+                <div className="text-[12px] leading-[18px] text-foreground">{item.message}</div>
+                <div className="mt-[2px] font-mono text-[10px] leading-none text-muted-foreground">{formatActivityWhen(item.when)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DrawerPlanPanel({ issueId }: { issueId: string }) {
   const { data, isLoading, isError } = useQuery<VBriefDocument | null>({
@@ -167,6 +211,8 @@ export function IssueDrawer() {
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <DrawerPlanPanel issueId={drawer.issueId} />
+            ) : drawer.tab === 'activity' ? (
+              <DrawerActivityPanel />
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
