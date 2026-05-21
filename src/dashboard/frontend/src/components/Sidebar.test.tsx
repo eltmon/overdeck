@@ -196,4 +196,14 @@ describe('Sidebar pipeline filter groups', () => {
     const workButton = screen.getByTestId('sidebar-phase-work');
     expect(workButton.className).toContain('border-primary');
   });
+
+  it('project items render color mark and issue-prefix tag', () => {
+    renderSidebar({ activeTab: 'pipeline' });
+
+    const panButton = screen.getByTestId('sidebar-project-pan');
+    const dot = panButton.querySelector('span[style]');
+    expect(dot).toBeInTheDocument();
+    expect(dot).toHaveStyle('background: #fff');
+    expect(panButton).toHaveTextContent('PAN');
+  });
 });

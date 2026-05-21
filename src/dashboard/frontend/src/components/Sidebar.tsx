@@ -137,7 +137,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
   }, []);
 
   const pipelineData = useMemo(() => {
-    if (activeTab !== 'pipeline') return { phaseCounts: {} as Record<string, number>, projects: [] as Array<{ id: string; name: string }> };
+    if (activeTab !== 'pipeline') return { phaseCounts: {} as Record<string, number>, projects: [] as Array<{ id: string; name: string; color: string; prefix: string }> };
 
     const agentByIssueId = new Map<string, Agent>();
     for (const agent of agents) {
@@ -146,7 +146,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     }
 
     const phaseCounts: Record<string, number> = { ship: 0, review: 0, work: 0, plan: 0, todo: 0 };
-    const projectMap = new Map<string, string>();
+    const projectMap = new Map<string, { name: string; color: string; prefix: string }>();
 
     for (const issue of issues) {
       if (isClosedIssue(issue)) continue;
@@ -156,12 +156,15 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
       phaseCounts[phase] = (phaseCounts[phase] ?? 0) + 1;
       if (issue.project) {
         const id = issue.project.id || issue.project.name;
-        if (!projectMap.has(id)) projectMap.set(id, issue.project.name);
+        if (!projectMap.has(id)) {
+          const prefix = issue.identifier.includes('-') ? issue.identifier.split('-')[0].toUpperCase() : '';
+          projectMap.set(id, { name: issue.project.name, color: issue.project.color ?? '', prefix });
+        }
       }
     }
 
     const projects = Array.from(projectMap.entries())
-      .map(([id, name]) => ({ id, name }))
+      .map(([id, info]) => ({ id, ...info }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { phaseCounts, projects };
@@ -385,7 +388,14 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                         aria-pressed={isSelected}
                         className={`w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 ${isSelected ? 'bg-accent text-foreground border-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'}`}
                       >
+                        <span
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ background: project.color || 'currentColor' }}
+                        />
                         <span className="truncate">{project.name}</span>
+                        {project.prefix && (
+                          <span className="ml-auto text-[11px] text-muted-foreground font-mono">{project.prefix}</span>
+                        )}
                       </button>
                     );
                   })}
