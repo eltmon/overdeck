@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { Effect } from 'effect';
 import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
@@ -335,7 +336,7 @@ export function buildHandoffPrompt(
   context: HandoffContext,
   additionalInstructions?: string
 ): string {
-  return renderPrompt({
+  return Effect.runSync(renderPrompt({
     name: 'handoff-to-work',
     vars: {
       ISSUE_ID: context.issueId,
@@ -344,5 +345,5 @@ export function buildHandoffPrompt(
       HANDOFF_CONTEXT: serializeHandoffContext(context),
       ADDITIONAL_INSTRUCTIONS_BLOCK: additionalInstructions || '',
     },
-  });
+  }));
 }

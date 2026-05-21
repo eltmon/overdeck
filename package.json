@@ -107,6 +107,7 @@
     "@effect/platform-bun": "4.0.0-beta.45",
     "@effect/platform-node": "4.0.0-beta.45",
     "@effect/platform-node-shared": "4.0.0-beta.45",
+    "@effect/vitest": "4.0.0-beta.45",
     "@google-cloud/speech": "^7.3.1",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",

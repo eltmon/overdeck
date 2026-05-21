@@ -27,7 +27,6 @@ import { getSpecialistHarness } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
-import { renderPrompt } from './prompts.js';
 
 const execAsync = promisify(exec);
 
