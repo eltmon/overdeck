@@ -9,18 +9,28 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import chalk from 'chalk';
+import { Effect } from 'effect';
+import { FsError } from './errors.js';
 
 /**
- * Get Linear API key from environment or config file
+ * Get Linear API key from environment or config file.
+ * Falls back to process.env.LINEAR_API_KEY if the config file is absent or unreadable.
  */
-export function getLinearApiKey(): string | null {
+export function getLinearApiKey(): Effect.Effect<string | null> {
   const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
+  if (!existsSync(envFile)) {
+    return Effect.succeed(process.env.LINEAR_API_KEY ?? null);
   }
-  return process.env.LINEAR_API_KEY || null;
+  return Effect.try({
+    try: () => {
+      const content = readFileSync(envFile, 'utf-8');
+      const match = content.match(/LINEAR_API_KEY=(.+)/);
+      return match ? match[1].trim() : (process.env.LINEAR_API_KEY ?? null);
+    },
+    catch: (cause) => new FsError({ path: envFile, operation: 'read', cause }),
+  }).pipe(
+    Effect.catchTag('FsError', () => Effect.succeed(process.env.LINEAR_API_KEY ?? null)),
+  );
 }
 
 /**

@@ -12,6 +12,7 @@ import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
+import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
@@ -204,7 +205,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         process.exit(1);
       }
     } else {
-      const linearApiKey = getLinearApiKey();
+      const linearApiKey = Effect.runSync(getLinearApiKey());
       if (linearApiKey) {
         try {
           const { LinearClient } = await import('@linear/sdk');
@@ -361,7 +362,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
       }
     } else {
-      const apiKey = getLinearApiKey();
+      const apiKey = Effect.runSync(getLinearApiKey());
       if (apiKey) {
         spinner.text = 'Updating Linear to In Review...';
         trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
