@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
-    "updated": "2026-05-20T22:32:42.365Z"
+    "updated": "2026-05-20T23:49:39.081Z"
   },
   "plan": {
     "id": "pan-1190",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f5e8a1c2-9b3d-4e7f-a8b1-c2d3e4f5a6b7",
     "author": "agent:claude-opus-4-7",
-    "sequence": 1895,
+    "sequence": 1964,
     "created": "2026-05-18T13:25:00.000Z",
-    "updated": "2026-05-20T22:32:42.365Z",
+    "updated": "2026-05-20T23:49:39.081Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1190",
@@ -1082,54 +1082,44 @@
         "phase": "test",
         "issueId": "PAN-1190",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T22:32:42.350Z",
+        "updatedAt": "2026-05-20T23:49:39.075Z",
         "work": {
-          "updatedAt": "2026-05-20T22:32:42.350Z",
+          "updatedAt": "2026-05-20T23:49:39.075Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-20T22:32:42.350Z",
-          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-          "history": [
-            {
-              "status": "passed",
-              "at": "2026-05-20T22:32:42.350Z",
-              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
-            }
-          ]
+          "updatedAt": "2026-05-20T23:49:39.075Z",
+          "history": []
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-05-20T22:32:42.350Z",
-          "notes": "All four sub-reviews pass; 0 blockers, 4 non-blocking advisories (shellQuote injection hardening, findPlan workspace-first shadowing, autoCloseOut GitHub-only scope, lib→server import inversion)",
+          "status": "pending",
+          "updatedAt": "2026-05-20T23:49:39.075Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-20T22:32:42.350Z",
-              "notes": "All four sub-reviews pass; 0 blockers, 4 non-blocking advisories (shellQuote injection hardening, findPlan workspace-first shadowing, autoCloseOut GitHub-only scope, lib→server import inversion)"
+              "status": "pending",
+              "at": "2026-05-20T23:49:39.075Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "dispatch_failed",
-          "updatedAt": "2026-05-20T22:32:42.350Z",
-          "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0); panopticon-feature-pan-1190-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1190' or retry with --host to override.",
+          "status": "failed",
+          "updatedAt": "2026-05-20T23:49:39.075Z",
+          "notes": "Automated gates passed (bun install --frozen-lockfile; npm run typecheck; npm run lint; npm test), but browser UAT did not meet verifying-state acceptance. On https://pan.localhost, live PAN-1190 is still in Review, so the real post-merge verifying path is not observable. A browser-only fixture setting PAN-1190 to status=Verifying/state=verifying_on_main/mergeStatus=merged still rendered PAN-1190 under Ship/Done with COMPLETED/MERGED on Board/Pipeline and no VERIFYING badge; Close Out only appeared as bulk-selection action text, not as the issue verifying close-out action. Unmet criteria: verifying_on_main issue visible on Command Deck/Pipeline/Board with VERIFYING badge and Close Out action while merge action is hidden.",
           "history": [
             {
-              "status": "dispatch_failed",
-              "at": "2026-05-20T22:32:42.350Z",
-              "notes": "Workspace docker stack for PAN-1190 is not healthy: panopticon-feature-pan-1190-server-1 service exited (0); panopticon-feature-pan-1190-dev-1 service exited (255). Run 'pan workspace rebuild PAN-1190' or retry with --host to override."
+              "status": "failed",
+              "at": "2026-05-20T23:49:39.075Z",
+              "notes": "Automated gates passed (bun install --frozen-lockfile; npm run typecheck; npm run lint; npm test), but browser UAT did not meet verifying-state acceptance. On https://pan.localhost, live PAN-1190 is still in Review, so the real post-merge verifying path is not observable. A browser-only fixture setting PAN-1190 to status=Verifying/state=verifying_on_main/mergeStatus=merged still rendered PAN-1190 under Ship/Done with COMPLETED/MERGED on Board/Pipeline and no VERIFYING badge; Close Out only appeared as bulk-selection action text, not as the issue verifying close-out action. Unmet criteria: verifying_on_main issue visible on Command Deck/Pipeline/Board with VERIFYING badge and Close Out action while merge action is hidden."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T22:32:42.350Z",
+          "updatedAt": "2026-05-20T23:49:39.075Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-20T22:32:42.350Z",
+          "updatedAt": "2026-05-20T23:49:39.075Z",
           "history": [],
           "readyForMerge": false
         }

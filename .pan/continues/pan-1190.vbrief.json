@@ -2,13 +2,21 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-05-20T08:45:59.543Z",
+  "updated": "2026-05-20T23:49:39.047Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
   "beadsMapping": {},
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-05-20T23:49:39Z",
+      "markdownBody": "TESTS FAILED for PAN-1190:\n\nAutomated gates passed (bun install --frozen-lockfile; npm run typecheck; npm run lint; npm test), but browser UAT did not meet verifying-state acceptance. On https://pan.localhost, live PAN-1190 is still in Review, so the real post-merge verifying path is not observable. A browser-only fixture setting PAN-1190 to status=Verifying/state=verifying_on_main/mergeStatus=merged still rendered PAN-1190 under Ship/Done with COMPLETED/MERGED on Board/Pipeline and no VERIFYING badge; Close Out only appeared as bulk-selection action text, not as the issue verifying close-out action. Unmet criteria: verifying_on_main issue visible on Command Deck/Pipeline/Board with VERIFYING badge and Close Out action while merge action is hidden.\n\n## REQUIRED: Fix ALL test failures, then invoke the /rebase-and-submit skill\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite locally to verify your fixes pass\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1190 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully."
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "feedback",
@@ -204,6 +212,11 @@
       "reason": "feedback",
       "note": "[2026-05-20T08:42Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-20T08:42:43.226Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T23:49Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-05-20T23:49:39.047Z"
     }
   ]
 }

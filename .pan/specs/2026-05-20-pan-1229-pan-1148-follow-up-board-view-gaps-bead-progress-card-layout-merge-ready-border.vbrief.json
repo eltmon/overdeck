@@ -4,7 +4,7 @@
     "created": "2026-05-20T02:32:51.033Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1229: PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
-    "updated": "2026-05-20T08:34:28.010Z"
+    "updated": "2026-05-20T22:40:30.298Z"
   },
   "plan": {
     "id": "pan-1229",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7c9f4e2a-3b1d-4f8e-9a5c-2e8b1d3f7a9e",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 7,
     "created": "2026-05-20T02:32:51.033Z",
-    "updated": "2026-05-20T08:34:28.010Z",
+    "updated": "2026-05-20T22:40:30.298Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1229",
@@ -479,47 +479,68 @@
     "metadata": {
       "canonicalFilename": "2026-05-20-PAN-1229-pan-1148-follow-up-board-view-gaps-bead-progress-card-layout-merge-ready-border.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "merge",
         "issueId": "PAN-1229",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-20T08:34:28.010Z",
+        "updatedAt": "2026-05-20T22:40:30.298Z",
         "work": {
-          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-05-20T08:34:28.010Z",
-          "history": []
+          "status": "passed",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-20T22:40:30.298Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "status": "passed",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
+          "notes": "Approved: all convoy reviewers completed with no blocking findings.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T08:34:28.010Z"
+              "status": "passed",
+              "at": "2026-05-20T22:40:30.298Z",
+              "notes": "Approved: all convoy reviewers completed with no blocking findings."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "status": "passed",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-20T08:34:28.010Z"
+              "status": "passed",
+              "at": "2026-05-20T22:40:30.298Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-20T08:34:28.010Z",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-20T08:34:28.010Z",
-          "history": [],
-          "readyForMerge": false
+          "status": "pending",
+          "updatedAt": "2026-05-20T22:40:30.298Z",
+          "notes": "Post-rebase verification failed at typecheck",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-20T22:40:30.298Z",
+              "notes": "Post-rebase verification failed at typecheck"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1241"
         }
       }
     }
