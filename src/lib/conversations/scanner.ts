@@ -139,7 +139,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const startTs = Date.now();
   const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0, warnings: [] };
 
-  const parseJsonl = opts.parseJsonl ?? parseSessionJsonl;
+  const parseJsonlEff = opts.parseJsonl ?? parseSessionJsonl;
+  const parseJsonl = (path: string) => Effect.runPromise(parseJsonlEff(path));
 
   // 1. Discover JSONL candidates
   const discoveryEncodings = targetEncodingsForMode(opts);
@@ -189,7 +190,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const correlationMap = buildCorrelationMap(allPaths);
 
   // 4. Determine parallelism from system-probe
-  const caps = await getSystemCapabilities(opts.maxParallel);
+  const caps = await Effect.runPromise(getSystemCapabilities(opts.maxParallel));
   const maxParallel = caps.recommendedParallelism;
 
   // 5. Track progress

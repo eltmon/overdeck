@@ -1,8 +1,16 @@
 /**
  * Async streaming JSONL parser for the scanner service (PAN-457).
  *
- * Uses fs/promises + readline to parse a Claude Code session JSONL file
- * without loading the entire file into memory. Zero sync FS calls.
+ * Streams a Claude Code session JSONL file line-by-line via readline so
+ * the file is never loaded fully into memory. PAN-1249: returns an Effect.
+ *
+ * The implementation still uses Node's `fs.createReadStream` + `readline`
+ * because the Effect `FileSystem.stream` API yields raw byte chunks rather
+ * than crlf-delimited lines and we'd have to re-implement line-splitting
+ * around partial UTF-8 boundaries — readline already handles that.
+ *
+ * Errors are intentionally swallowed (partial metadata is preferable to a
+ * scan-wide failure), so the public Effect's error channel is `never`.
  *
  * Do NOT modify the existing sync parsers in cost-parsers/jsonl-parser.ts —
  * they remain valid for CLI cost commands.
@@ -10,6 +18,8 @@
 
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
+import { Effect } from 'effect';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /**
@@ -90,44 +100,70 @@ function extractFilePath(toolName: string, input: Record<string, unknown>): stri
  * Asynchronously parse a Claude Code JSONL session file.
  *
  * Streams the file line-by-line using readline — never loads the full file.
- * On corrupt/empty/partial input, returns best-effort partial metadata.
+ * On corrupt/empty/partial input, returns best-effort partial metadata. The
+ * Effect cannot fail (error channel = `never`); IO errors yield whatever
+ * was parsed up to the failure point.
  */
-export async function parseSessionJsonl(filePath: string): Promise<SessionMetadata> {
-  const result: SessionMetadata = {
-    messageCount: 0,
-    firstTs: null,
-    lastTs: null,
-    modelsUsed: [],
-    primaryModel: null,
-    tokenInput: 0,
-    tokenOutput: 0,
-    toolsUsed: [],
-    filesTouched: [],
-    sessionId: null,
-    cwdFromFirstMessage: null,
-  };
+export function parseSessionJsonl(filePath: string): Effect.Effect<SessionMetadata, never> {
+  return Effect.callback<SessionMetadata, never>((resume) => {
+    const result: SessionMetadata = {
+      messageCount: 0,
+      firstTs: null,
+      lastTs: null,
+      modelsUsed: [],
+      primaryModel: null,
+      tokenInput: 0,
+      tokenOutput: 0,
+      toolsUsed: [],
+      filesTouched: [],
+      sessionId: null,
+      cwdFromFirstMessage: null,
+    };
 
-  const modelCounts: Record<string, number> = {};
-  const toolsSet = new Set<string>();
-  const filesSet = new Set<string>();
-  let isFirstMessage = true;
+    const modelCounts: Record<string, number> = {};
+    const toolsSet = new Set<string>();
+    const filesSet = new Set<string>();
+    let isFirstMessage = true;
+    let finalized = false;
 
-  let readStream: ReturnType<typeof createReadStream> | null = null;
-
-  try {
-    readStream = createReadStream(filePath, { encoding: 'utf8' });
+    const readStream = createReadStream(filePath, { encoding: 'utf8' });
     const rl = createInterface({ input: readStream, crlfDelay: Infinity });
 
-    for await (const rawLine of rl) {
+    const finalize = () => {
+      if (finalized) return;
+      finalized = true;
+      try {
+        rl.close();
+      } catch {
+        // ignore
+      }
+      try {
+        readStream.destroy();
+      } catch {
+        // ignore
+      }
+
+      result.modelsUsed = Object.keys(modelCounts);
+      if (result.modelsUsed.length > 0) {
+        result.primaryModel = result.modelsUsed.reduce((a, b) =>
+          (modelCounts[a] ?? 0) >= (modelCounts[b] ?? 0) ? a : b,
+        );
+      }
+      result.toolsUsed = [...toolsSet];
+      result.filesTouched = [...filesSet];
+      resume(Effect.succeed(result));
+    };
+
+    rl.on('line', (rawLine) => {
       const line = rawLine.trim();
-      if (!line) continue;
+      if (!line) return;
 
       let msg: ClaudeMessageWithCwd;
       try {
         msg = JSON.parse(line) as ClaudeMessageWithCwd;
       } catch {
         // Skip corrupt lines
-        continue;
+        return;
       }
 
       result.messageCount++;
@@ -179,23 +215,10 @@ export async function parseSessionJsonl(filePath: string): Promise<SessionMetada
           }
         }
       }
-    }
-  } catch {
-    // File read or stream error — return partial metadata
-  } finally {
-    readStream?.destroy();
-  }
+    });
 
-  // Build modelsUsed list and pick primaryModel (most frequent)
-  result.modelsUsed = Object.keys(modelCounts);
-  if (result.modelsUsed.length > 0) {
-    result.primaryModel = result.modelsUsed.reduce((a, b) =>
-      (modelCounts[a] ?? 0) >= (modelCounts[b] ?? 0) ? a : b,
-    );
-  }
-
-  result.toolsUsed = [...toolsSet];
-  result.filesTouched = [...filesSet];
-
-  return result;
+    rl.on('close', finalize);
+    rl.on('error', finalize);
+    readStream.on('error', finalize);
+  });
 }

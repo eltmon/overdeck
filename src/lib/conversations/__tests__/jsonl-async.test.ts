@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseSessionJsonl } from '../jsonl-async.js';
+import { Effect } from 'effect';
+import { parseSessionJsonl as parseSessionJsonlEff } from '../jsonl-async.js';
+
+// Promise-returning shim so the existing async/await assertions keep working
+// after the Effect migration (PAN-1249).
+const parseSessionJsonl = (path: string) => Effect.runPromise(parseSessionJsonlEff(path));
 
 let fixtureDir: string;
 

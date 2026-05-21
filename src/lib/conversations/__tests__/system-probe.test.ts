@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetSystemCapabilitiesCache, getSystemCapabilities } from '../system-probe.js';
+import { Effect } from 'effect';
+import { resetSystemCapabilitiesCache, getSystemCapabilities as getSystemCapabilitiesEff } from '../system-probe.js';
+
+// Promise-returning shim so the existing async/await assertions keep working
+// after the Effect migration (PAN-1249).
+const getSystemCapabilities = (override?: number | null) =>
+  Effect.runPromise(getSystemCapabilitiesEff(override));
 
 beforeEach(() => {
   resetSystemCapabilitiesCache();
