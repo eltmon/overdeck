@@ -236,4 +236,20 @@ strongest model (Opus or Sonnet) and may warrant manual oversight.
   wave-0 shared errors + strict per-slot prompt mitigation.
 - **2026-05-20** — Step 2 (analyzer) complete. `scripts/analyze-effect-migration.ts`
   generated `.pan/swarm-migration-plan.vbrief.json` — 227 items, 774 edges,
-  13 waves. Awaiting step 3 (smoke test) before step 4 (consolidate issues).
+  13 waves.
+- **2026-05-20** — Step 3 (smoke test) **DISPATCHED**. PAN-1122 chosen as
+  smoke target; files_scope added to all 5 items (commit 95437f082).
+  Dispatch with default kimi-k2.6 model exposed THREE Panopticon bugs:
+  - **PAN-1256** (fixed): deacon orphan-recovery races work-agent spawn —
+    no startup grace window. Added 120s grace for status:starting work agents.
+  - **PAN-1257** (fixed): `classifyAgentKind` returned 'work' for every
+    `agent-` prefixed agent, including review/test/ship specialists.
+    `workAgentCount` inflated to total-agent-count, hitting cap. Fix uses
+    role field to disambiguate.
+  - **PAN-1258** (open): kimi-k2.6 swarm slot spawn hangs silently between
+    `checkAndSetupHooks` and `writeLauncherScriptAtomic`. Workaround:
+    `--model sonnet`. Workaroundable for the migration; ties up PAN-1192.
+  Smoke test re-dispatched at 21:22Z with `--model sonnet` and succeeded:
+  4 tmux sessions live, all slots in proper running state. Now waiting on
+  slot work → review → test → merge cycle. Auto-advance enabled to
+  validate PAN-1178's new deacon detector.
