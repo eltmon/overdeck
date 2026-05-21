@@ -434,7 +434,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     // Append 'end' session entry to workspace continue state.
     try {
-      const continueState = readWorkspaceContinue(workspacePath);
+      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
       if (continueState) {
         const now = new Date().toISOString();
         writeWorkspaceContinue(workspacePath, {

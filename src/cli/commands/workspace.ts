@@ -1033,7 +1033,7 @@ async function createRemoteWorkspace(
   try {
     // Step 1: Create VM
     spinner.text = 'Creating VM (this may take 1-2 minutes)...';
-    const vmInfo = await fly.createVm(vmName);
+    const vmInfo = await Effect.runPromise(fly.createVm(vmName));
 
     // Get git remote URL
     let repoUrl = '';
@@ -1119,7 +1119,7 @@ async function createRemoteWorkspace(
         }
 
         // Clone this repo on the remote VM
-        const cloneResult = await fly.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
+        const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`));
         if (cloneResult.exitCode !== 0) {
           throw new Error(`Failed to clone ${repo.name}: ${cloneResult.stderr}`);
         }
@@ -1127,10 +1127,10 @@ async function createRemoteWorkspace(
         // Create feature branch for this repo
         const repoBranchPrefix = repo.branch_prefix || 'feature/';
         const repoBranchName = `${repoBranchPrefix}${normalizedId}`;
-        const branchResult = await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
+        const branchResult = await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`));
         if (branchResult.exitCode !== 0) {
           // Branch might already exist remotely
-          await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
+          await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`));
         }
       }
 
@@ -1141,17 +1141,17 @@ async function createRemoteWorkspace(
       // Remote VMs use SSH keys, not interactive HTTPS credentials
       const sshRepoUrl = convertToSshUrl(repoUrl);
 
-      const cloneResult = await fly.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
+      const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`));
       if (cloneResult.exitCode !== 0) {
         throw new Error(`Failed to clone: ${cloneResult.stderr}`);
       }
 
       // Step 4: Create feature branch
       spinner.text = 'Creating feature branch...';
-      const branchResult = await fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+      const branchResult = await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`));
       if (branchResult.exitCode !== 0) {
         // Branch might already exist remotely
-        await fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+        await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`));
       }
     }
 

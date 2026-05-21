@@ -6,6 +6,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -125,7 +126,7 @@ export async function closeOutCommand(issueId: string, options: CloseOutOptions)
       : {}),
   };
 
-  const result = await closeOut(ctx);
+  const result = await Effect.runPromise(closeOut(ctx));
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));

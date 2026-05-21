@@ -6,11 +6,12 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { loadConfig } from '../../../lib/config.js';
-import { createFlyProvider } from '../../../lib/remote/index.js';
+import { createFlyProvider, type VmInfo } from '../../../lib/remote/index.js';
 
 const execAsync = promisify(exec);
 
@@ -44,7 +45,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
     });
 
     // Check authentication
-    const isAuth = await fly.isAuthenticated();
+    const isAuth = await Effect.runPromise(fly.isAuthenticated());
     if (!isAuth) {
       spinner.fail('Not authenticated with Fly.io');
       console.log('');
@@ -54,9 +55,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
     // List machines to verify app access (ensureApp is called in createVm)
     spinner.text = `Checking app '${appName}'...`;
-    let machines: Awaited<ReturnType<typeof fly.listVms>> = [];
+    let machines: VmInfo[] = [];
     try {
-      machines = await fly.listVms();
+      machines = await Effect.runPromise(fly.listVms());
       spinner.succeed(`App '${appName}' exists with ${machines.length} machine(s)`);
     } catch (err: any) {
       if (err.statusCode === 404 || err.message?.includes('404')) {

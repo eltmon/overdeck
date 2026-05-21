@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { homedir } from 'os';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
@@ -83,7 +84,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
   }
 
   const { resetToTodo } = await import('../../lib/lifecycle/index.js');
-  const result = await resetToTodo({
+  const result = await Effect.runPromise(resetToTodo({
     issueId,
     projectPath,
     projectName,
@@ -92,7 +93,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     deleteWorkspace: options.workspace !== false,
     deleteBranches: options.workspace !== false,
     resetIssue: true,
-  });
+  }));
 
   for (const step of result.steps) {
     if (step.details) {

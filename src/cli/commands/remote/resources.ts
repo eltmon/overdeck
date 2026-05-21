@@ -5,6 +5,7 @@
  */
 
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import ora from 'ora';
 import { loadConfig } from '../../../lib/config.js';
 import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
@@ -37,7 +38,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
     const fly = createFlyProviderFromConfig(config.remote);
 
     // Check authentication
-    const isAuth = await fly.isAuthenticated();
+    const isAuth = await Effect.runPromise(fly.isAuthenticated());
     if (!isAuth) {
       spinner.fail('Not authenticated with Fly.io');
       console.log('');
@@ -46,7 +47,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
     }
 
     // Get VM list
-    const vms = await fly.listVms();
+    const vms = await Effect.runPromise(fly.listVms());
 
     // Collect resource usage for running VMs
     const resources: VmResources[] = [];
@@ -69,11 +70,11 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
 
       try {
         // Get memory usage via SSH
-        const memResult = await fly.ssh(vm.name, "free -m | awk '/^Mem:/ {print $3}'");
+        const memResult = await Effect.runPromise(fly.ssh(vm.name, "free -m | awk '/^Mem:/ {print $3}'"));
         const memMB = parseInt(memResult.stdout.trim(), 10) || 0;
 
         // Get disk usage
-        const diskResult = await fly.ssh(vm.name, "df -m / | awk 'NR==2 {print $3}'");
+        const diskResult = await Effect.runPromise(fly.ssh(vm.name, "df -m / | awk 'NR==2 {print $3}'"));
         const diskMB = parseInt(diskResult.stdout.trim(), 10) || 0;
 
         resources.push({
