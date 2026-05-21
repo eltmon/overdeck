@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { type ReviewStatusSnapshot } from '@panctl/contracts';
+import { type ReviewStatusSnapshot, type DomainEvent, WS_METHODS } from '@panctl/contracts';
+import { Stream } from 'effect';
 
+import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore, selectIssues, selectAgents, selectReviewStatus } from '../../lib/store';
 import type { Agent, Issue } from '../../types';
 
@@ -89,8 +91,7 @@ type DrawerIssueSubscription = {
 
 let drawerIssueSubscription: DrawerIssueSubscription | null = null;
 
-function stopDrawerIssueSubscription() {
-  if (drawerIssueSubscription?.releaseTimer) {
+function stopDrawerIssueSubscription() { if (drawerIssueSubscription?.releaseTimer) {
     window.clearTimeout(drawerIssueSubscription.releaseTimer);
   }
   drawerIssueSubscription?.unsubscribe();
@@ -336,6 +337,43 @@ export function useDrawerData(): DrawerData {
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
+
+  useEffect(() => {
+    if (!drawerIssueId) return;
+
+    if (drawerIssueSubscription?.issueId === drawerIssueId) {
+      if (drawerIssueSubscription.releaseTimer !== null) {
+        window.clearTimeout(drawerIssueSubscription.releaseTimer);
+        drawerIssueSubscription.releaseTimer = null;
+      }
+      drawerIssueSubscription.refCount += 1;
+    } else {
+      if (drawerIssueSubscription) {
+        stopDrawerIssueSubscription();
+      }
+
+      const unsubscribe = getTransport().subscribe(
+        (client) => (client as PanRpcProtocolClient)[WS_METHODS.subscribeIssueEvents]({ issueId: drawerIssueId }) as unknown as Stream.Stream<DomainEvent, Error, never>,
+        (event) => useDashboardStore.getState().applyEvent(event as DomainEvent),
+      );
+
+      drawerIssueSubscription = {
+        issueId: drawerIssueId,
+        refCount: 1,
+        unsubscribe,
+        releaseTimer: null,
+      };
+    }
+
+    return () => {
+      if (drawerIssueSubscription?.issueId === drawerIssueId) {
+        drawerIssueSubscription.refCount -= 1;
+        if (drawerIssueSubscription.refCount === 0) {
+          drawerIssueSubscription.releaseTimer = window.setTimeout(stopDrawerIssueSubscription, 1000);
+        }
+      }
+    };
+  }, [drawerIssueId]);
 
   return useMemo(() => {
     if (!drawerIssueId) {
