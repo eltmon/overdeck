@@ -1457,7 +1457,6 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // every field access in one PR would have been mechanical noise.
 
 import type { AgentRuntimeSnapshot } from '@panctl/contracts';
-import { Effect } from 'effect';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
