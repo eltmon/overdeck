@@ -1264,13 +1264,17 @@ program
     // Open browser after server has had a moment to start
     setTimeout(async () => {
       console.log(`  ${chalk.cyan(url)}`);
-      try {
-        const { openBrowser } = await import('../lib/browser.js');
-        await openBrowser(browserUrl);
-      } catch {
+      const [{ openBrowser }, { Effect }, { layer: nodeServicesLayer }] = await Promise.all([
+        import('../lib/browser.js'),
+        import('effect'),
+        import('@effect/platform-node/NodeServices'),
+      ]);
+      await Effect.runPromise(
+        openBrowser(browserUrl).pipe(Effect.provide(nodeServicesLayer)),
+      ).catch(() => {
         // If openBrowser fails, show URL for manual opening
         console.log(chalk.dim(`  Open your browser to: ${browserUrl}`));
-      }
+      });
     }, 1_500);
   });
 
