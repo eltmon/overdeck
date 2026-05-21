@@ -20,7 +20,6 @@ import { embed } from './providers.js';
 import { getConversationsConfig } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
-import { Effect } from 'effect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
