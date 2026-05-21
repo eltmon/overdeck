@@ -1949,7 +1949,7 @@ export async function buildAgentLaunchConfig(opts: {
   // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
   try {
     const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
-    await injectPanopticonInfraDeny(opts.workspace);
+    await Effect.runPromise(injectPanopticonInfraDeny(opts.workspace));
   } catch (err) {
     console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
   }

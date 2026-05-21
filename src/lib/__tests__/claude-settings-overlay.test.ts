@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
 
 import { injectPanopticonInfraDeny } from '../claude-settings-overlay.js';
 
@@ -32,8 +33,8 @@ describe('injectPanopticonInfraDeny', () => {
       JSON.stringify({ permissions: { deny: ['Bash(existing:*)'] }, other: true }, null, 2),
     );
 
-    await injectPanopticonInfraDeny(workspace);
-    await injectPanopticonInfraDeny(workspace);
+    await Effect.runPromise(injectPanopticonInfraDeny(workspace));
+    await Effect.runPromise(injectPanopticonInfraDeny(workspace));
 
     const settings = await readSettings(workspace);
     expect(settings.other).toBe(true);
