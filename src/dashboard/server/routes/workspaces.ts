@@ -1049,9 +1049,10 @@ async function ensurePRExists(
     if (options?.cwd) execOptions.cwd = options.cwd;
 
     // Check for existing PR
-    let existingOut = '';
+    let existingOut: string = '';
     try {
-      ({ stdout: existingOut } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions));
+      const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions);
+      existingOut = String(stdout);
     } catch { /* no existing PR */ }
     const existing = existingOut.trim();
     if (existing) return { created: false, prUrl: existing };
@@ -1067,7 +1068,8 @@ async function ensurePRExists(
     await writeFileAsync(bodyFile, prBody, 'utf-8');
 
     try {
-      const { stdout: createOut } = await execFileAsync('gh', ['pr', 'create', '--head', branchName, '--base', targetBranch, '--title', issueId, '--body-file', bodyFile], execOptions);
+      const { stdout: rawOut } = await execFileAsync('gh', ['pr', 'create', '--head', branchName, '--base', targetBranch, '--title', issueId, '--body-file', bodyFile], execOptions);
+      const createOut = String(rawOut);
       // gh pr create prints the PR URL as the last line of stdout
       const prUrl = createOut.trim().split('\n').pop()?.trim() || createOut.trim();
       return { created: true, prUrl };
@@ -3627,7 +3629,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           ? wsInfoRerun.remotePath!
           : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
         if (!wsInfoRerun.isRemote) {
-          yield* Effect.promise(() => restoreTrackedBeadsExport(workspacePathRerun));
+          yield* restoreTrackedBeadsExport(workspacePathRerun);
         }
         const dirtyError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePathRerun, wsInfoRerun));
         if (dirtyError) {
@@ -3818,7 +3820,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     if (!workspaceInfo.isRemote) {
-      yield* Effect.promise(() => restoreTrackedBeadsExport(workspacePath));
+      yield* restoreTrackedBeadsExport(workspacePath);
     }
 
     const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));
@@ -5742,7 +5744,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
             : {}),
         };
 
-        const lifecycleResult = await lifecycleApprove(lifecycleCtx);
+        const lifecycleResult = await Effect.runPromise(lifecycleApprove(lifecycleCtx));
         console.log(
           `[approve] Lifecycle completed for ${issueId}: ${lifecycleResult.steps
             .filter((s: any) => s.success && !s.skipped)

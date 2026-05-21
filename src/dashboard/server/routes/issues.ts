@@ -112,14 +112,14 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const existingSpec = findSpecByIssue(projectPath, upperIssueId);
+  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
   const proposed = existingSpec
-    ? (() => {
+    ? await (async () => {
         const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-        writeSpec(existingSpec.path, nextDoc);
+        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
         return { path: existingSpec.path, filename: existingSpec.filename };
       })()
-    : writeSpecForIssue(projectPath, workspaceDoc, 'proposed');
+    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
@@ -326,14 +326,14 @@ async function runDestructiveIssueLifecycle(
 
   const { resetToTodo, cancelIssueWorkflow } = await import('../../../lib/lifecycle/index.js');
   const workflow = mode === 'cancel' ? cancelIssueWorkflow : resetToTodo;
-  const result = await workflow(ctx, {
+  const result = await Effect.runPromise(workflow(ctx, {
     deleteWorkspace,
     deleteBranches: deleteWorkspace,
     resetIssue: true,
     workspaceConfig: projectConfig?.workspace,
     projectName: projectConfig?.name || '',
     onProgress: opts.onProgress ? (event) => opts.onProgress?.({ type: 'progress', ...event }) : undefined,
-  });
+  }));
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
@@ -561,7 +561,7 @@ const postIssueCloseRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* Effect.promise(() => closeWorkflow(ctx, { reason }));
+    const result = yield* closeWorkflow(ctx, { reason });
 
     if (githubCheck.isGitHub) {
       execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 }).catch(() => {});
@@ -2173,7 +2173,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* Effect.promise(() => closeOut(ctx));
+    const result = yield* closeOut(ctx);
 
     if (result.success) {
       // Patch cached labels immediately so the board hides the issue right away
@@ -2365,21 +2365,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
         }
       }
 
-      const closeResult = yield* Effect.tryPromise({
-        try: () => closeOut(ctx),
-        catch: (error) => ({
-          workflow: 'close-out' as const,
-          issueId: id,
-          success: false,
-          steps: [{
-            step: 'close-out',
+      const closeResult = yield* closeOut(ctx).pipe(
+        Effect.catch((error: unknown) =>
+          Effect.succeed({
+            workflow: 'close-out' as const,
+            issueId: id,
             success: false,
-            skipped: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          }],
-          duration: 0,
-        }),
-      });
+            steps: [{
+              step: 'close-out',
+              success: false,
+              skipped: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }],
+            duration: 0,
+          }),
+        ),
+      );
 
       if (closeResult.success) {
         let newLabels: string[] = ['closed-out'];
@@ -2626,7 +2627,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     if (!projectPath) {
-      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, 404);
+      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, { status: 404 });
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2634,7 +2635,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
         { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },
-        409,
+        { status: 409 },
       );
     }
 
@@ -2643,7 +2644,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
-      return jsonResponse({ success: false, created: result.created, errors }, 500);
+      return jsonResponse({ success: false, created: result.created, errors }, { status: 500 });
     }
 
     return jsonResponse({

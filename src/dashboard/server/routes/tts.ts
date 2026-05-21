@@ -405,7 +405,8 @@ const deleteTtsVoiceRoute = HttpRouter.add(
     if (originError) return originError;
 
     const params = yield* HttpRouter.params;
-    const deleted = yield* Effect.promise(() => removeTtsVoice(params.id));
+    if (!params.id) return jsonResponse({ error: 'id required' }, { status: 400 });
+    const deleted = yield* Effect.promise(() => removeTtsVoice(params.id!));
     if (!deleted) return jsonResponse({ error: 'voice not found' }, { status: 404 });
     return jsonResponse({ deleted: true });
   }),

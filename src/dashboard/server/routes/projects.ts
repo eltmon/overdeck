@@ -357,7 +357,7 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const entry = findSpecByIssue(projectPath, issueId);
+      const entry = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
       if (entry) {
         const specContent = await readOptional(entry.path);
         if (specContent) {

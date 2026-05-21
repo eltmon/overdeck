@@ -107,10 +107,9 @@ const getRemoteStatusRoute = HttpRouter.add(
     }
 
     const fly = createFlyProviderFromConfig(remoteConfig);
-    const vms = yield* Effect.tryPromise({
-      try: () => fly.listVms(),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
+    const vms = yield* fly.listVms().pipe(
+      Effect.catch((err: unknown) => Effect.fail(new Error(err instanceof Error ? err.message : String(err)))),
+    );
 
     return jsonResponse({
       enabled: true,
@@ -133,7 +132,9 @@ const listRemoteWorkspacesRoute = HttpRouter.add(
     const fly = createFlyProviderFromConfig(config.remote);
 
     // Best-effort: if listing VMs fails, return workspaces without status
-    const vms = yield* Effect.promise(() => fly.listVms().catch(() => [] as Array<{ name: string; status: string }>));
+    const vms = yield* fly.listVms().pipe(
+      Effect.catch(() => Effect.succeed([] as Array<{ name: string; status: string }>)),
+    );
 
     const enriched = (workspaces as Array<{ vmName?: string } & Record<string, unknown>>).map(ws => ({
       ...ws,
@@ -163,8 +164,8 @@ const getRemoteWorkspaceRoute = HttpRouter.add(
     const fly = createFlyProviderFromConfig(config.remote);
 
     // Best-effort: ignore errors when getting VM status
-    const vmStatus = yield* Effect.promise(() =>
-      fly.getStatus(metadata.vmName!).catch(() => 'unknown')
+    const vmStatus = yield* fly.getStatus(metadata.vmName!).pipe(
+      Effect.catch(() => Effect.succeed('unknown' as const)),
     );
 
     let agentStatus = null;

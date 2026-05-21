@@ -88,6 +88,7 @@ import {
   determineModel,
   getProviderAuthMode,
   setAgentDeliveryMethod,
+  normalizeAgentId,
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
@@ -2478,7 +2479,7 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!isRemote) {
-      const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+      const stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
           issueId,
@@ -3143,7 +3144,7 @@ const postAgentsRoute = HttpRouter.add(
     } catch (error: any) {
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
-        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+        const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
         emitActivityEntry({
           source: 'dashboard',
           level: 'error',

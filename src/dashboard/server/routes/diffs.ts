@@ -44,6 +44,9 @@ const getDiffsRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params
     const agentId = params.agentId
+    if (!agentId) {
+      return jsonResponse({ error: 'agentId required' }, { status: 400 })
+    }
     const readModel = yield* ReadModelService
 
     return yield* Effect.promise(async () => {
@@ -91,6 +94,9 @@ const getTurnDiffRoute = HttpRouter.add(
     const params = yield* HttpRouter.params
     const agentId = params.agentId
     const turnId = params.turnId
+    if (!agentId || !turnId) {
+      return jsonResponse({ error: 'agentId and turnId required' }, { status: 400 })
+    }
     const readModel = yield* ReadModelService
 
     return yield* Effect.promise(async () => {
@@ -141,6 +147,9 @@ const getFullDiffRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params
     const agentId = params.agentId
+    if (!agentId) {
+      return jsonResponse({ error: 'agentId required' }, { status: 400 })
+    }
     const readModel = yield* ReadModelService
 
     return yield* Effect.promise(async () => {
@@ -161,8 +170,8 @@ const getFullDiffRoute = HttpRouter.add(
           return jsonResponse({ agentId, diff: '', files: [], turnCount: checkpoints.length })
         }
 
-        const firstTurn = checkpoints[0]
-        const lastTurn = checkpoints[checkpoints.length - 1]
+        const firstTurn = checkpoints[0]!
+        const lastTurn = checkpoints[checkpoints.length - 1]!
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
         const files = await diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn)
@@ -245,6 +254,9 @@ const postTestCheckpointRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params
     const agentId = params.agentId
+    if (!agentId) {
+      return jsonResponse({ error: 'agentId required' }, { status: 400 })
+    }
     const readModel = yield* ReadModelService
 
     return yield* Effect.promise(async () => {
@@ -267,7 +279,7 @@ const postTestCheckpointRoute = HttpRouter.add(
 
         // Get file changes from previous checkpoint (if any)
         const checkpoints = await listCheckpoints(workspace, agentId)
-        const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null
+        const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2]! : null
         let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = []
         if (prevCheckpoint) {
           files = await diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId)

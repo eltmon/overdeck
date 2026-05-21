@@ -175,14 +175,14 @@ const ConfigResponseSchema = Schema.Struct({
 const OkResponseSchema = Schema.Struct({ ok: Schema.Boolean });
 const TestConnectionResponseSchema = Schema.Struct({ ok: Schema.Boolean, latencyMs: Schema.optional(Schema.Number), error: Schema.optional(Schema.String) });
 
-function validatedJsonResponse<A>(schema: Schema.Schema<A, unknown, never>, data: unknown): ReturnType<typeof jsonResponse> {
+function validatedJsonResponse<A>(schema: Schema.Codec<A>, data: unknown): ReturnType<typeof jsonResponse> {
   Schema.decodeUnknownSync(schema)(data);
   return jsonResponse(data);
 }
 
-function parseRequestBody<A>(schema: Schema.Schema<A, unknown, never>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
+function parseRequestBody<A>(schema: Schema.Codec<A>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
   try {
-    return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) };
+    return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) as A };
   } catch (err) {
     return {
       ok: false,
@@ -429,7 +429,7 @@ const postEnrichByIdRoute = HttpRouter.add(
       const config = yield* Effect.promise(() => getConversationsConfigAsync());
       const eventStore = yield* EventStoreService;
       const result = yield* Effect.promise(() =>
-        runDashboardDbJob('enrichSessions', {
+        runDashboardDbJob<{ enriched: number; errors: number; estimatedCost: number; actualCost: number | null; durationMs: number }>('enrichSessions', {
           tier,
           sessionIds: [id],
           config,
@@ -515,7 +515,7 @@ const postScanRoute = HttpRouter.add(
     yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(startedEvent as ScanStartedEvent)));
 
     const result = yield* Effect.promise(() =>
-      runDashboardDbJob('scanConversations', {
+      runDashboardDbJob<{ inserted: number; updated: number; skipped: number; errors: number; durationMs: number }>('scanConversations', {
         mode,
         watchDirs,
         dirs: body.dirs,
@@ -591,7 +591,7 @@ const postEnrichRoute = HttpRouter.add(
 
     try {
       const result = yield* Effect.promise(() =>
-        runDashboardDbJob('enrichSessions', {
+        runDashboardDbJob<{ enriched: number; errors: number; estimatedCost: number; actualCost: number | null; durationMs: number }>('enrichSessions', {
           tier,
           sessionIds: enrichSessionIds,
           maxParallel: enrichMaxParallel,
