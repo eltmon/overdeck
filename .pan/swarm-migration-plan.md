@@ -249,7 +249,14 @@ strongest model (Opus or Sonnet) and may warrant manual oversight.
   - **PAN-1258** (open): kimi-k2.6 swarm slot spawn hangs silently between
     `checkAndSetupHooks` and `writeLauncherScriptAtomic`. Workaround:
     `--model sonnet`. Workaroundable for the migration; ties up PAN-1192.
-  Smoke test re-dispatched at 21:22Z with `--model sonnet` and succeeded:
-  4 tmux sessions live, all slots in proper running state. Now waiting on
-  slot work → review → test → merge cycle. Auto-advance enabled to
-  validate PAN-1178's new deacon detector.
+  - **PAN-1263** (open): swarm UX — pipeline rows show identical "Work
+    (sonnet)" labels, IssueDrawer shows only slot 1, no multi-slot
+    navigation. Cosmetic; doesn't block dispatch.
+- **2026-05-20** — Step 3 **VALIDATED**. All four wave-0 slot PRs (#1259-1262)
+  merged into `feature/pan-1122`. Deacon log confirmed PAN-1178 working:
+  `[deacon] Detected merged swarm slot PR #1260 — firing postMergeLifecycle`
+  for all 4. Auto-advance immediately spawned `agent-pan-1122-5`
+  (cleanup-stale-refs, wave 1) — that's the full validation we needed.
+- **2026-05-20** — Step 4 (consolidate issues) complete. PAN-1250/1251/1252
+  closed as superseded. PAN-1249 recast as the single swarm-dispatch issue
+  with pre-flight artifacts and dispatch parameters.
