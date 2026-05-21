@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
+
 import { emitActivityEntry } from '../activity-logger.js';
 import {
   getCachedDockerContainerLifecycleObservedAt,
@@ -176,75 +178,79 @@ export function evaluateWorkspaceStackHealth(
   return { healthy: reasons.length === 0, reasons, lastObserved };
 }
 
-export async function collectDockerContainerLifecycleSnapshot(): Promise<DockerContainerLifecycle[]> {
-  try {
-    const { stdout } = await execFileAsync('docker', ['ps', '-a', '--format', '{{json .}}'], {
-      encoding: 'utf-8',
-      timeout: 5_000,
-    });
-    const containers: DockerContainerLifecycle[] = [];
-    for (const line of stdout.trim().split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const raw = JSON.parse(line) as DockerPsJson;
-        const name = raw.Names ?? raw.Name;
-        if (!raw.ID || !name) continue;
-        containers.push({
-          id: raw.ID,
-          name,
-          status: raw.Status ?? '',
-          state: raw.State,
-          createdAt: raw.CreatedAt,
-        });
-      } catch {
-        // Ignore malformed docker rows.
+export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<DockerContainerLifecycle[]> =>
+  Effect.tryPromise({
+    try: () =>
+      execFileAsync('docker', ['ps', '-a', '--format', '{{json .}}'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      }),
+    catch: (err) => err,
+  }).pipe(
+    Effect.map(({ stdout }) => {
+      const containers: DockerContainerLifecycle[] = [];
+      for (const line of stdout.trim().split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const raw = JSON.parse(line) as DockerPsJson;
+          const name = raw.Names ?? raw.Name;
+          if (!raw.ID || !name) continue;
+          containers.push({
+            id: raw.ID,
+            name,
+            status: raw.Status ?? '',
+            state: raw.State,
+            createdAt: raw.CreatedAt,
+          });
+        } catch {
+          // Ignore malformed docker rows.
+        }
       }
-    }
-    return containers;
-  } catch {
-    return [];
-  }
-}
+      return containers;
+    }),
+    Effect.orElseSucceed(() => [] as DockerContainerLifecycle[]),
+  );
 
-export async function getWorkspaceStackHealth(
+export const getWorkspaceStackHealth = (
   issueId: string,
   options: WorkspaceStackHealthOptions = {},
-): Promise<WorkspaceStackHealth> {
-  const projectConfig = options.projectConfig ?? resolveStackProject(issueId);
-  if (!hasDockerWorkspace(projectConfig)) {
-    return { healthy: true, reasons: [], lastObserved: (options.now ?? new Date()).toISOString() };
-  }
+): Effect.Effect<WorkspaceStackHealth> =>
+  Effect.gen(function* () {
+    const projectConfig = options.projectConfig ?? resolveStackProject(issueId);
+    if (!hasDockerWorkspace(projectConfig)) {
+      return { healthy: true, reasons: [], lastObserved: (options.now ?? new Date()).toISOString() };
+    }
 
-  let observedAt: string | null = null;
-  let containers = options.containers;
+    let observedAt: string | null = null;
+    let containers = options.containers;
 
-  if (!containers) {
-    observedAt = getCachedDockerContainerLifecycleObservedAt();
-    containers = observedAt ? getCachedDockerContainerLifecycleSnapshot() : undefined;
-  }
+    if (!containers) {
+      observedAt = getCachedDockerContainerLifecycleObservedAt();
+      containers = observedAt ? getCachedDockerContainerLifecycleSnapshot() : undefined;
+    }
 
-  if (!containers) {
-    const observed = options.now ?? new Date();
-    containers = await collectDockerContainerLifecycleSnapshot();
-    observedAt = observed.toISOString();
-    recordDockerContainerLifecycleSnapshot(containers, observedAt);
-  }
+    if (!containers) {
+      const observed = options.now ?? new Date();
+      containers = yield* collectDockerContainerLifecycleSnapshot();
+      observedAt = observed.toISOString();
+      recordDockerContainerLifecycleSnapshot(containers, observedAt);
+    }
 
-  const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
-    now: options.now,
-    stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
-    stackExpected: options.stackExpected ?? isWorkspaceStackExpected(issueId, projectConfig, options.workspacePath),
+    const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
+      now: options.now,
+      stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
+      stackExpected: options.stackExpected ?? isWorkspaceStackExpected(issueId, projectConfig, options.workspacePath),
+    });
+    const observedHealth = observedAt && !options.now
+      ? { ...health, lastObserved: observedAt }
+      : health;
+
+    if (options.emitTransitionActivity) {
+      recordWorkspaceStackHealthTransition(issueId, observedHealth);
+    }
+
+    return observedHealth;
   });
-  const observedHealth = observedAt && !options.now
-    ? { ...health, lastObserved: observedAt }
-    : health;
-
-  if (options.emitTransitionActivity) {
-    recordWorkspaceStackHealthTransition(issueId, observedHealth);
-  }
-
-  return observedHealth;
-}
 
 export function recordWorkspaceStackHealthTransition(issueId: string, health: WorkspaceStackHealth): boolean {
   const key = normalizeIssue(issueId);
