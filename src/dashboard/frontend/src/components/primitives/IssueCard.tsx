@@ -76,7 +76,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
           : unhealthyCard || stuckCard
             ? 'border-destructive/60 bg-destructive/10 shadow-md'
             : mergeReadyCard
-              ? 'border-success/60 bg-success/10 shadow-md'
+              ? 'badge-border-success bg-success/10 shadow-md'
               : bulkSelected
                 ? 'border-primary/50 bg-primary/10 shadow-sm'
                 : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-md',

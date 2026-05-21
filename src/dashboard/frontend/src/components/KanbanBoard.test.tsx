@@ -808,7 +808,7 @@ describe('IssueCard', () => {
     );
 
     const card = container.querySelector('[data-merge-ready-card="true"]');
-    expect(card).toHaveClass('border-success/60', 'bg-success/10');
+    expect(card).toHaveClass('badge-border-success', 'bg-success/10');
     expect(card).not.toHaveClass('border-warning/60', 'bg-warning/10');
   });
 });
