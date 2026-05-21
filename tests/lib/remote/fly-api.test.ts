@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from '@effect/vitest';
+import { Effect } from 'effect';
+import { ConfigError } from '../../../src/lib/errors.js';
 import { FlyApiClient, FlyApiError, createFlyApiClient } from '../../../src/lib/remote/fly-api.js';
 
 // Mock global fetch
@@ -29,151 +31,183 @@ describe('FlyApiClient', () => {
     client = new FlyApiClient('test-token');
   });
 
-  it('sets Authorization header on all requests', async () => {
-    mockOk([]);
-    await client.listMachines('my-app');
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/apps/my-app/machines'),
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-token' }) })
+  it.effect('sets Authorization header on all requests', () =>
+    Effect.gen(function* () {
+      mockOk([]);
+      yield* client.listMachines('my-app');
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/apps/my-app/machines'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+        })
+      );
+    })
+  );
+
+  describe('createMachine', () => {
+    it.effect('POSTs to /apps/{app}/machines with name and config', () =>
+      Effect.gen(function* () {
+        const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+        mockOk(machine);
+        const result = yield* client.createMachine('my-app', 'ws-123', {
+          image: 'registry.fly.io/pan-workspace:latest',
+        });
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines',
+          expect.objectContaining({ method: 'POST' })
+        );
+        expect(result.id).toBe('m1');
+      })
     );
   });
 
-  describe('createMachine', () => {
-    it('POSTs to /apps/{app}/machines with name and config', async () => {
-      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
-      mockOk(machine);
-      const result = await client.createMachine('my-app', 'ws-123', { image: 'registry.fly.io/pan-workspace:latest' });
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines',
-        expect.objectContaining({ method: 'POST' })
-      );
-      expect(result.id).toBe('m1');
-    });
-  });
-
   describe('destroyMachine', () => {
-    it('DELETEs with force=true', async () => {
-      mockOk('');
-      await client.destroyMachine('my-app', 'm1');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines/m1?force=true',
-        expect.objectContaining({ method: 'DELETE' })
-      );
-    });
+    it.effect('DELETEs with force=true', () =>
+      Effect.gen(function* () {
+        mockOk('');
+        yield* client.destroyMachine('my-app', 'm1');
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines/m1?force=true',
+          expect.objectContaining({ method: 'DELETE' })
+        );
+      })
+    );
   });
 
   describe('startMachine', () => {
-    it('POSTs to /start', async () => {
-      mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
-      await client.startMachine('my-app', 'm1');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines/m1/start',
-        expect.objectContaining({ method: 'POST' })
-      );
-    });
+    it.effect('POSTs to /start', () =>
+      Effect.gen(function* () {
+        mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+        yield* client.startMachine('my-app', 'm1');
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines/m1/start',
+          expect.objectContaining({ method: 'POST' })
+        );
+      })
+    );
   });
 
   describe('stopMachine', () => {
-    it('POSTs to /stop', async () => {
-      mockOk({ id: 'm1', name: 'ws-123', state: 'stopped', region: 'iad' });
-      await client.stopMachine('my-app', 'm1');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines/m1/stop',
-        expect.objectContaining({ method: 'POST' })
-      );
-    });
+    it.effect('POSTs to /stop', () =>
+      Effect.gen(function* () {
+        mockOk({ id: 'm1', name: 'ws-123', state: 'stopped', region: 'iad' });
+        yield* client.stopMachine('my-app', 'm1');
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines/m1/stop',
+          expect.objectContaining({ method: 'POST' })
+        );
+      })
+    );
   });
 
   describe('getMachine', () => {
-    it('makes GET and returns machine', async () => {
-      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
-      mockOk(machine);
-      const result = await client.getMachine('my-app', 'm1');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines/m1',
-        expect.objectContaining({ method: 'GET' })
-      );
-      expect(result.id).toBe('m1');
-    });
+    it.effect('makes GET and returns machine', () =>
+      Effect.gen(function* () {
+        const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+        mockOk(machine);
+        const result = yield* client.getMachine('my-app', 'm1');
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines/m1',
+          expect.objectContaining({ method: 'GET' })
+        );
+        expect(result.id).toBe('m1');
+      })
+    );
   });
 
   describe('listMachines', () => {
-    it('returns empty array when API returns null', async () => {
-      mockOk(null);
-      const result = await client.listMachines('my-app');
-      expect(result).toEqual([]);
-    });
+    it.effect('returns empty array when API returns null', () =>
+      Effect.gen(function* () {
+        mockOk(null);
+        const result = yield* client.listMachines('my-app');
+        expect(result).toEqual([]);
+      })
+    );
 
-    it('returns machines array', async () => {
-      const machines = [{ id: 'm1', name: 'ws-1', state: 'started', region: 'iad' }];
-      mockOk(machines);
-      const result = await client.listMachines('my-app');
-      expect(result).toHaveLength(1);
-    });
+    it.effect('returns machines array', () =>
+      Effect.gen(function* () {
+        const machines = [{ id: 'm1', name: 'ws-1', state: 'started', region: 'iad' }];
+        mockOk(machines);
+        const result = yield* client.listMachines('my-app');
+        expect(result).toHaveLength(1);
+      })
+    );
   });
 
   describe('execCommand', () => {
-    it('POSTs command array to exec endpoint', async () => {
-      mockOk({ stdout: 'hello', stderr: '', exit_code: 0 });
-      await client.execCommand('my-app', 'm1', ['/bin/sh', '-c', 'echo hello']);
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://api.machines.dev/v1/apps/my-app/machines/m1/exec',
-        expect.objectContaining({
-          method: 'POST',
-          body: expect.stringContaining('"command"'),
-        })
-      );
-    });
+    it.effect('POSTs command array to exec endpoint', () =>
+      Effect.gen(function* () {
+        mockOk({ stdout: 'hello', stderr: '', exit_code: 0 });
+        yield* client.execCommand('my-app', 'm1', ['/bin/sh', '-c', 'echo hello']);
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.machines.dev/v1/apps/my-app/machines/m1/exec',
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.stringContaining('"command"'),
+          })
+        );
+      })
+    );
   });
 
   describe('waitForState', () => {
-    it('makes GET with state and timeout params', async () => {
-      mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
-      await client.waitForState('my-app', 'm1', 'started', 30);
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/apps/my-app/machines/m1/wait'),
-        expect.objectContaining({ method: 'GET' })
-      );
-      const url: string = fetchMock.mock.calls[0][0];
-      expect(url).toContain('state=started');
-      expect(url).toContain('timeout=30');
-    });
+    it.effect('makes GET with state and timeout params', () =>
+      Effect.gen(function* () {
+        mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+        yield* client.waitForState('my-app', 'm1', 'started', 30);
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/apps/my-app/machines/m1/wait'),
+          expect.objectContaining({ method: 'GET' })
+        );
+        const url: string = fetchMock.mock.calls[0][0];
+        expect(url).toContain('state=started');
+        expect(url).toContain('timeout=30');
+      })
+    );
   });
 
   describe('ensureApp', () => {
-    it('does nothing if app already exists', async () => {
-      mockOk({ name: 'my-app' });
-      await client.ensureApp('my-app', 'personal');
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
+    it.effect('does nothing if app already exists', () =>
+      Effect.gen(function* () {
+        mockOk({ name: 'my-app' });
+        yield* client.ensureApp('my-app', 'personal');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      })
+    );
 
-    it('creates app if 404', async () => {
-      mockError(404);
-      mockOk({ name: 'my-app' });
-      await client.ensureApp('my-app', 'personal');
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(fetchMock).toHaveBeenLastCalledWith(
-        'https://api.machines.dev/v1/apps',
-        expect.objectContaining({ method: 'POST' })
-      );
-    });
+    it.effect('creates app if 404', () =>
+      Effect.gen(function* () {
+        mockError(404);
+        mockOk({ name: 'my-app' });
+        yield* client.ensureApp('my-app', 'personal');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenLastCalledWith(
+          'https://api.machines.dev/v1/apps',
+          expect.objectContaining({ method: 'POST' })
+        );
+      })
+    );
 
-    it('rethrows non-404 errors', async () => {
-      mockError(500, 'internal error');
-      await expect(client.ensureApp('my-app', 'personal')).rejects.toThrow(FlyApiError);
-    });
+    it.effect('rethrows non-404 errors', () =>
+      Effect.gen(function* () {
+        mockError(500, 'internal error');
+        const err = yield* Effect.flip(client.ensureApp('my-app', 'personal'));
+        expect(err._tag).toBe('FlyApiError');
+        expect((err as FlyApiError).statusCode).toBe(500);
+      })
+    );
   });
 
   describe('error handling', () => {
-    it('throws FlyApiError with statusCode and body on non-ok response', async () => {
-      mockError(403, 'forbidden');
-      await expect(client.listMachines('my-app')).rejects.toThrow(FlyApiError);
-      mockError(403, 'forbidden');
-      await expect(client.listMachines('my-app').catch(e => e)).resolves.toMatchObject({
-        statusCode: 403,
-        body: 'forbidden',
-      });
-    });
+    it.effect('surfaces FlyApiError with statusCode and body on non-ok response', () =>
+      Effect.gen(function* () {
+        mockError(403, 'forbidden');
+        const err = yield* Effect.flip(client.listMachines('my-app'));
+        expect(err._tag).toBe('FlyApiError');
+        expect((err as FlyApiError).statusCode).toBe(403);
+        expect((err as FlyApiError).body).toBe('forbidden');
+      })
+    );
   });
 });
 
@@ -188,20 +222,28 @@ describe('createFlyApiClient', () => {
     }
   });
 
-  it('reads token from FLY_API_TOKEN env var', () => {
-    process.env.FLY_API_TOKEN = 'env-token';
-    const client = createFlyApiClient();
-    expect(client).toBeInstanceOf(FlyApiClient);
-  });
+  it.effect('reads token from FLY_API_TOKEN env var', () =>
+    Effect.gen(function* () {
+      process.env.FLY_API_TOKEN = 'env-token';
+      const client = yield* createFlyApiClient();
+      expect(client).toBeInstanceOf(FlyApiClient);
+    })
+  );
 
-  it('uses explicit token over env var', () => {
-    process.env.FLY_API_TOKEN = 'env-token';
-    const client = createFlyApiClient('explicit-token');
-    expect(client).toBeInstanceOf(FlyApiClient);
-  });
+  it.effect('uses explicit token over env var', () =>
+    Effect.gen(function* () {
+      process.env.FLY_API_TOKEN = 'env-token';
+      const client = yield* createFlyApiClient('explicit-token');
+      expect(client).toBeInstanceOf(FlyApiClient);
+    })
+  );
 
-  it('throws if no token available', () => {
-    delete process.env.FLY_API_TOKEN;
-    expect(() => createFlyApiClient()).toThrow('Fly API token not found');
-  });
+  it.effect('fails with ConfigError if no token available', () =>
+    Effect.gen(function* () {
+      delete process.env.FLY_API_TOKEN;
+      const err = yield* Effect.flip(createFlyApiClient());
+      expect(err._tag).toBe('ConfigError');
+      expect((err as ConfigError).message).toContain('Fly API token not found');
+    })
+  );
 });

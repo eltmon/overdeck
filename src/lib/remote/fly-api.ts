@@ -6,6 +6,9 @@
  * Auth: FLY_API_TOKEN environment variable
  */
 
+import { Data, Effect } from 'effect';
+import { ConfigError } from '../errors.js';
+
 export interface FlyMachineConfig {
   image: string;
   env?: Record<string, string>;
@@ -39,16 +42,12 @@ export interface FlyExecResult {
   exit_code: number;
 }
 
-export class FlyApiError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode: number,
-    public readonly body: string
-  ) {
-    super(message);
-    this.name = 'FlyApiError';
-  }
-}
+export class FlyApiError extends Data.TaggedError('FlyApiError')<{
+  readonly operation: string;
+  readonly statusCode: number;
+  readonly body: string;
+  readonly message: string;
+}> {}
 
 const BASE_URL = 'https://api.machines.dev/v1';
 
@@ -59,48 +58,72 @@ export class FlyApiClient {
     this.token = token;
   }
 
-  private async request<T>(
+  private request<T>(
     method: string,
     path: string,
     body?: unknown
-  ): Promise<T> {
+  ): Effect.Effect<T, FlyApiError> {
     const url = `${BASE_URL}${path}`;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    const text = await response.text();
-
-    if (!response.ok) {
-      throw new FlyApiError(
-        `Fly API error ${response.status} for ${method} ${path}: ${text}`,
-        response.status,
-        text
-      );
-    }
-
-    if (!text) return undefined as T;
-
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return text as unknown as T;
-    }
+    return Effect.tryPromise({
+      try: () =>
+        fetch(url, {
+          method,
+          headers,
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        }),
+      catch: (cause) =>
+        new FlyApiError({
+          operation: `${method} ${path}`,
+          statusCode: 0,
+          body: '',
+          message: `Network error: ${String(cause)}`,
+        }),
+    }).pipe(
+      Effect.flatMap((response) =>
+        Effect.tryPromise({
+          try: () => response.text(),
+          catch: (cause) =>
+            new FlyApiError({
+              operation: `${method} ${path}`,
+              statusCode: 0,
+              body: '',
+              message: `Failed to read response: ${String(cause)}`,
+            }),
+        }).pipe(
+          Effect.flatMap((text) => {
+            if (!response.ok) {
+              return Effect.fail(
+                new FlyApiError({
+                  operation: `${method} ${path}`,
+                  statusCode: response.status,
+                  body: text,
+                  message: `Fly API error ${response.status} for ${method} ${path}: ${text}`,
+                })
+              );
+            }
+            if (!text) return Effect.succeed(undefined as T);
+            try {
+              return Effect.succeed(JSON.parse(text) as T);
+            } catch {
+              return Effect.succeed(text as unknown as T);
+            }
+          })
+        )
+      )
+    );
   }
 
   /** Create a machine in an app */
-  async createMachine(
+  createMachine(
     appName: string,
     name: string,
     config: FlyMachineConfig
-  ): Promise<FlyMachine> {
+  ): Effect.Effect<FlyMachine, FlyApiError> {
     return this.request<FlyMachine>('POST', `/apps/${appName}/machines`, {
       name,
       config: {
@@ -118,29 +141,29 @@ export class FlyApiClient {
   }
 
   /** Destroy a machine (force=true for immediate) */
-  async destroyMachine(appName: string, machineId: string): Promise<void> {
-    await this.request<void>(
+  destroyMachine(appName: string, machineId: string): Effect.Effect<void, FlyApiError> {
+    return this.request<void>(
       'DELETE',
       `/apps/${appName}/machines/${machineId}?force=true`
     );
   }
 
   /** Start a stopped machine */
-  async startMachine(appName: string, machineId: string): Promise<void> {
-    await this.request<void>(
+  startMachine(appName: string, machineId: string): Effect.Effect<void, FlyApiError> {
+    return this.request<void>(
       'POST',
       `/apps/${appName}/machines/${machineId}/start`
     );
   }
 
   /** Stop a running machine */
-  async stopMachine(
+  stopMachine(
     appName: string,
     machineId: string,
     signal?: string,
     timeout?: number
-  ): Promise<void> {
-    await this.request<void>(
+  ): Effect.Effect<void, FlyApiError> {
+    return this.request<void>(
       'POST',
       `/apps/${appName}/machines/${machineId}/stop`,
       signal || timeout ? { signal, timeout } : undefined
@@ -148,7 +171,7 @@ export class FlyApiClient {
   }
 
   /** Get a machine by ID */
-  async getMachine(appName: string, machineId: string): Promise<FlyMachine> {
+  getMachine(appName: string, machineId: string): Effect.Effect<FlyMachine, FlyApiError> {
     return this.request<FlyMachine>(
       'GET',
       `/apps/${appName}/machines/${machineId}`
@@ -156,21 +179,20 @@ export class FlyApiClient {
   }
 
   /** List all machines in an app */
-  async listMachines(appName: string): Promise<FlyMachine[]> {
-    const result = await this.request<FlyMachine[] | null>(
+  listMachines(appName: string): Effect.Effect<FlyMachine[], FlyApiError> {
+    return this.request<FlyMachine[] | null>(
       'GET',
       `/apps/${appName}/machines`
-    );
-    return result ?? [];
+    ).pipe(Effect.map((result) => result ?? []));
   }
 
   /** Execute a command inside a running machine */
-  async execCommand(
+  execCommand(
     appName: string,
     machineId: string,
     command: string[],
     timeout: number = 30
-  ): Promise<FlyExecResult> {
+  ): Effect.Effect<FlyExecResult, FlyApiError> {
     return this.request<FlyExecResult>(
       'POST',
       `/apps/${appName}/machines/${machineId}/exec`,
@@ -179,43 +201,45 @@ export class FlyApiClient {
   }
 
   /** Wait for a machine to reach a target state */
-  async waitForState(
+  waitForState(
     appName: string,
     machineId: string,
     state: string,
     timeout: number = 60
-  ): Promise<void> {
-    await this.request<void>(
+  ): Effect.Effect<void, FlyApiError> {
+    return this.request<void>(
       'GET',
       `/apps/${appName}/machines/${machineId}/wait?state=${state}&timeout=${timeout}`
     );
   }
 
   /** Create a Fly app if it doesn't exist */
-  async ensureApp(appName: string, orgSlug: string): Promise<void> {
-    try {
-      await this.request<unknown>('GET', `/apps/${appName}`);
-    } catch (err) {
-      if (err instanceof FlyApiError && err.statusCode === 404) {
-        await this.request<unknown>('POST', '/apps', {
-          app_name: appName,
-          org_slug: orgSlug,
-          network: 'default',
-        });
-      } else {
-        throw err;
-      }
-    }
+  ensureApp(appName: string, orgSlug: string): Effect.Effect<void, FlyApiError> {
+    return this.request<unknown>('GET', `/apps/${appName}`).pipe(
+      Effect.catchTag('FlyApiError', (err) =>
+        err.statusCode === 404
+          ? this.request<unknown>('POST', '/apps', {
+              app_name: appName,
+              org_slug: orgSlug,
+              network: 'default',
+            })
+          : Effect.fail(err)
+      ),
+      Effect.asVoid
+    );
   }
 }
 
 /** Create a FlyApiClient from env or explicit token */
-export function createFlyApiClient(token?: string): FlyApiClient {
+export function createFlyApiClient(token?: string): Effect.Effect<FlyApiClient, ConfigError> {
   const tok = token ?? process.env.FLY_API_TOKEN;
   if (!tok) {
-    throw new Error(
-      'Fly API token not found. Set FLY_API_TOKEN environment variable or run: fly auth login'
+    return Effect.fail(
+      new ConfigError({
+        message:
+          'Fly API token not found. Set FLY_API_TOKEN environment variable or run: fly auth login',
+      })
     );
   }
-  return new FlyApiClient(tok);
+  return Effect.succeed(new FlyApiClient(tok));
 }
