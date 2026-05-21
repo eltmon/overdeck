@@ -1583,7 +1583,7 @@ export async function syncMainIntoWorkspace(
   // auto-commit below would then propagate that deletion onto the feature
   // branch. Restore the tracked export first so the auto-commit only sees
   // intentional changes.
-  await restoreTrackedBeadsExport(projectPath);
+  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
 
   // Pre-flight: auto-commit uncommitted changes before merge
   try {

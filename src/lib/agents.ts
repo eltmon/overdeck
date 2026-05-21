@@ -1862,7 +1862,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   if (projectConfig.github_repo) {
     const [owner, repo] = projectConfig.github_repo.split('/');
     const tracker = createTracker({ type: 'github', owner, repo });
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via GitHub (${projectConfig.github_repo})`);
     return;
   }
@@ -1875,7 +1875,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
       throw new Error(`Project ${projectConfig.name} uses Rally (project: ${projectConfig.rally_project}) but no Rally tracker is configured in config.yaml`);
     }
     const tracker = createTrackerFromConfig(trackersConfig, 'rally');
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via Rally (project: ${projectConfig.rally_project})`);
     return;
   }
@@ -1889,7 +1889,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
       throw new Error(`Project ${projectConfig.name} uses Linear (team: ${getIssuePrefix(projectConfig)}) but no Linear tracker is configured in config.yaml`);
     }
     const tracker = createTrackerFromConfig(trackersConfig, 'linear');
-    await tracker.transitionIssue(issueId, state);
+    await Effect.runPromise(tracker.transitionIssue(issueId, state));
     console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${getIssuePrefix(projectConfig)})`);
     return;
   }

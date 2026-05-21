@@ -7,6 +7,7 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
+import { Effect } from 'effect';
 import { loadConfig } from '../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';

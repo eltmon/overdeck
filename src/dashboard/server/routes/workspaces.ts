@@ -595,7 +595,7 @@ async function getDirtyWorkspaceErrorForReviewRequest(
 ): Promise<string | null> {
   try {
     if (!workspaceInfo.isRemote) {
-      await restoreTrackedBeadsExport(workspacePath);
+      await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     }
 
     const statusCmd = 'git status --porcelain -uno';
@@ -1386,7 +1386,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       const containers = workspaceRequests.some((request) =>
         request.kind === 'local' && Boolean(request.projectConfig.workspace?.docker?.compose_template)
       )
-        ? await collectDockerContainerLifecycleSnapshot()
+        ? await Effect.runPromise(collectDockerContainerLifecycleSnapshot())
         : undefined;
 
       return Promise.all(workspaceRequests.map(async (request) => {

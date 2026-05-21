@@ -10,6 +10,7 @@ import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { loadConfig } from '../../lib/config.js';
 import type { Issue, TrackerType } from '../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';

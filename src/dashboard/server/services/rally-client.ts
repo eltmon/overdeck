@@ -113,7 +113,7 @@ export const RallyClientLive = Layer.effect(
       getIssue: (id) =>
         Effect.tryPromise({
           try: async () => {
-            const raw = await tracker.getIssue(id);
+            const raw = await Effect.runPromise(tracker.getIssue(id));
             return {
               id: raw.id,
               ref: raw.ref,
@@ -131,7 +131,7 @@ export const RallyClientLive = Layer.effect(
       getChildIssues: (id) =>
         Effect.tryPromise({
           try: async () => {
-            const children = await tracker.getChildIssues(id);
+            const children = await Effect.runPromise(tracker.getChildIssues(id));
             return children.map((raw) => ({
               id: raw.id,
               ref: raw.ref,
@@ -145,14 +145,14 @@ export const RallyClientLive = Layer.effect(
 
       updateState: (id, state) =>
         Effect.tryPromise({
-          try: () => tracker.transitionIssue(id, state),
+          try: () => Effect.runPromise(tracker.transitionIssue(id, state)),
           catch: (err) => wrapRallyError(err),
         }),
 
       addComment: (id, body) =>
         Effect.tryPromise({
           try: async () => {
-            await tracker.addComment(id, body);
+            await Effect.runPromise(tracker.addComment(id, body));
           },
           catch: (err) => {
             if (err instanceof RateLimited) {

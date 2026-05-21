@@ -502,7 +502,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       autoRequeueCount: 0,
     });
 
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');
@@ -606,9 +606,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await restoreTrackedBeadsExport(workspacePath);
+    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
   } catch (error: any) {
     spinner.fail(error.message);

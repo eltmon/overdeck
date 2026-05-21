@@ -3620,7 +3620,7 @@ async function reconcileAndCheckIfMerged(
     }
 
     const tracker = createTracker(trackerConfig);
-    await tracker.getIssue(issueId);
+    await Effect.runPromise(tracker.getIssue(issueId));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);
