@@ -8,8 +8,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
+import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { TokenUsage, calculateCost, getPricing, AIProvider, logCost, CostEntry } from '../cost.js';
+import { FsError } from '../errors.js';
 
 // Claude Code JSONL message format
 export interface ClaudeMessage {
@@ -483,3 +485,64 @@ export function importSessionToCostLog(
     },
   });
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of getProjectDirs. */
+export const getProjectDirsEffect = (): Effect.Effect<string[], FsError> =>
+  Effect.try({
+    try: () => getProjectDirs(),
+    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getProjectDirs', cause }),
+  });
+
+/** Effect variant of getSessionFiles. */
+export const getSessionFilesEffect = (
+  projectDir: string,
+): Effect.Effect<string[], FsError> =>
+  Effect.try({
+    try: () => getSessionFiles(projectDir),
+    catch: (cause) => new FsError({ path: projectDir, operation: 'getSessionFiles', cause }),
+  });
+
+/** Effect variant of getAllSessionFiles. */
+export const getAllSessionFilesEffect = (): Effect.Effect<string[], FsError> =>
+  Effect.try({
+    try: () => getAllSessionFiles(),
+    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getAllSessionFiles', cause }),
+  });
+
+/** Effect variant of parseClaudeSession. */
+export const parseClaudeSessionEffect = (
+  sessionFile: string,
+): Effect.Effect<SessionUsage | null, FsError> =>
+  Effect.try({
+    try: () => parseClaudeSession(sessionFile),
+    catch: (cause) => new FsError({ path: sessionFile, operation: 'parseClaudeSession', cause }),
+  });
+
+/** Effect variant of parseAllSessions. */
+export const parseAllSessionsEffect = (
+  maxAge?: number,
+): Effect.Effect<SessionUsage[], FsError> =>
+  Effect.try({
+    try: () => parseAllSessions(maxAge),
+    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'parseAllSessions', cause }),
+  });
+
+/** Effect variant of getRecentSessions. */
+export const getRecentSessionsEffect = (
+  days: number = 7,
+): Effect.Effect<SessionUsage[], FsError> =>
+  Effect.try({
+    try: () => getRecentSessions(days),
+    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getRecentSessions', cause }),
+  });
+
+/** Effect variant of getActiveSessionModel. */
+export const getActiveSessionModelEffect = (
+  workspacePath: string,
+): Effect.Effect<string | null, FsError> =>
+  Effect.try({
+    try: () => getActiveSessionModel(workspacePath),
+    catch: (cause) => new FsError({ path: workspacePath, operation: 'getActiveSessionModel', cause }),
+  });

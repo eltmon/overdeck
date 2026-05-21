@@ -21,8 +21,10 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
+import { Effect } from 'effect';
 import type { SessionUsage } from './jsonl-parser.js';
 import type { TokenUsage } from '../cost.js';
+import { FsError } from '../errors.js';
 
 // Minimal entry shape we care about. Anything else is ignored.
 interface PiSessionRoot {
@@ -327,3 +329,14 @@ function emptyUsage(filePath: string, root: PiSessionRoot): SessionUsage {
     modelBreakdown: {},
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of parsePiSession. */
+export const parsePiSessionEffect = (
+  filePath: string,
+): Effect.Effect<SessionUsage | null, FsError> =>
+  Effect.try({
+    try: () => parsePiSession(filePath),
+    catch: (cause) => new FsError({ path: filePath, operation: 'parsePiSession', cause }),
+  });

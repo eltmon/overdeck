@@ -4,8 +4,10 @@
  * Manages the rolling 90-day retention window for cost events.
  */
 
+import { Effect } from 'effect';
 import { readEvents, replaceEventsFile, getLastEventMetadata, CostEvent } from './events.js';
 import { rebuildCache } from './aggregator.js';
+import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -131,3 +133,41 @@ export function getRetentionStatus(retentionDays: number = 90): {
     eventsToRemove,
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+
+/** Effect variant of pruneOldEvents. */
+export const pruneOldEventsEffect = (
+  retentionDays: number = 90,
+): Effect.Effect<RetentionStats, FsError> =>
+  Effect.try({
+    try: () => pruneOldEvents(retentionDays),
+    catch: (cause) => new FsError({ path: '<events>', operation: 'pruneOldEvents', cause }),
+  });
+
+/** Effect variant of needsPruning. */
+export const needsPruningEffect = (
+  retentionDays: number = 90,
+): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => needsPruning(retentionDays),
+    catch: (cause) => new FsError({ path: '<events>', operation: 'needsPruning', cause }),
+  });
+
+/** Effect variant of getRetentionStatus. */
+export const getRetentionStatusEffect = (
+  retentionDays: number = 90,
+): Effect.Effect<
+  {
+    totalEvents: number;
+    oldestEventTs: string | null;
+    oldestEventAge: number;
+    needsPruning: boolean;
+    eventsToRemove: number;
+  },
+  FsError
+> =>
+  Effect.try({
+    try: () => getRetentionStatus(retentionDays),
+    catch: (cause) => new FsError({ path: '<events>', operation: 'getRetentionStatus', cause }),
+  });
