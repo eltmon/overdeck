@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Effect, Layer, Option, Schema } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
@@ -465,7 +466,11 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
       const status = await readCurrentFlywheelStatusForDashboard();
       if (!status) return jsonResponse([]);
       const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
-      const queue = await computeMergeQueue(status.activePipeline, process.cwd());
+      const queue = await Effect.runPromise(
+        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
+          Effect.provide(nodeServicesLayer),
+        ),
+      );
       return jsonResponse(queue);
     });
   })),
