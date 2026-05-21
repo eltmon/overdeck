@@ -177,7 +177,11 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
   return <VerbBadge variant="QUEUED FOR PLAN" />;
 }
 
-export function PipelineView() {
+type PipelineViewProps = {
+  onSearchOpen?: () => void;
+};
+
+export function PipelineView({ onSearchOpen }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
@@ -327,7 +331,22 @@ export function PipelineView() {
 
   return (
     <section className="flex h-full w-full flex-col overflow-hidden bg-background" data-component="pipeline-view">
-      <TopBar title="Pipeline" breadcrumb="Unified operations" />
+      <TopBar
+        title="Pipeline"
+        breadcrumb="Unified operations"
+        search={
+          onSearchOpen ? (
+            <button
+              type="button"
+              data-component="pipeline-search-trigger"
+              onClick={onSearchOpen}
+              className="flex h-[32px] w-full min-w-[280px] items-center gap-[8px] rounded-[var(--radius-lg)] border border-border bg-card px-[10px] text-[12px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              Search issues, agents, branches…
+            </button>
+          ) : undefined
+        }
+      />
       <MetricStrip columns={5} tiles={metricTiles} />
       <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-border bg-background px-[22px] py-[10px]" data-component="pipeline-filter-row">
         <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Pipeline phase filter">

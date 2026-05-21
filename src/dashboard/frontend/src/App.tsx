@@ -864,7 +864,7 @@ export default function App() {
           )}
         {activeTab === 'pipeline' && (
           <div className="w-full h-full overflow-hidden">
-            <PipelineView />
+            <PipelineView onSearchOpen={() => setIsSearchOpen(true)} />
           </div>
         )}
         {activeTab === 'awaiting-merge' && (
