@@ -17,6 +17,7 @@
  * `auto` flag or when you need fully unmoderated execution.
  */
 
+import { Effect } from 'effect';
 import type { ClaudePermissionMode } from './config.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 
@@ -129,3 +130,33 @@ export function buildClaudeUserSettings(mode?: ClaudePermissionMode): ClaudeUser
     },
   };
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// All helpers are pure-sync — additive Effect.sync wrappers keep Effect-graph
+// callers from needing inline Effect.sync().
+
+/** Resolve the effective permission mode. Pure. */
+export const resolvePermissionModeEffect = (
+  explicit?: ClaudePermissionMode,
+): Effect.Effect<ClaudePermissionMode> =>
+  Effect.sync(() => resolvePermissionMode(explicit));
+
+/** Permission CLI flags as an argv-friendly array. Pure. */
+export const getClaudePermissionFlagsEffect = (
+  mode?: ClaudePermissionMode,
+): Effect.Effect<string[]> => Effect.sync(() => getClaudePermissionFlags(mode));
+
+/** Permission CLI flags as a single shell-friendly string. Pure. */
+export const getClaudePermissionFlagsStringEffect = (
+  mode?: ClaudePermissionMode,
+): Effect.Effect<string> => Effect.sync(() => getClaudePermissionFlagsString(mode));
+
+/** Bypass prefix for the `--agent` flag form. Pure. */
+export const bypassPrefixForAgentFlagEffect = (
+  mode?: ClaudePermissionMode,
+): Effect.Effect<string> => Effect.sync(() => bypassPrefixForAgentFlag(mode));
+
+/** Build the `~/.claude/settings.json` payload. Pure. */
+export const buildClaudeUserSettingsEffect = (
+  mode?: ClaudePermissionMode,
+): Effect.Effect<ClaudeUserSettings> => Effect.sync(() => buildClaudeUserSettings(mode));

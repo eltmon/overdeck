@@ -5,9 +5,11 @@
  * Supports multiple AI providers with configurable pricing.
  */
 
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
+import { FsError } from './errors.js';
 
 // ============== Types ==============
 
@@ -595,3 +597,110 @@ export function formatCost(cost: number, currency: string = 'USD'): string {
   }
   return `${cost.toFixed(4)} ${currency}`;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Cost-tracking helpers — sync FS by design (CLI / cron scripts). Read paths
+// are Effect.sync; write paths surface FsError via Effect.try.
+
+/** Compute the cost of one token-usage record at given pricing. Pure. */
+export const calculateCostEffect = (
+  usage: TokenUsage,
+  pricing: ModelPricing,
+): Effect.Effect<number> => Effect.sync(() => calculateCost(usage, pricing));
+
+/** Look up pricing for a (provider, model) pair. Pure. */
+export const getPricingEffect = (
+  provider: AIProvider,
+  model: string,
+): Effect.Effect<ModelPricing | null> => Effect.sync(() => getPricing(provider, model));
+
+/** Append a single cost entry to the cost log. */
+export const logCostEffect = (
+  entry: Omit<CostEntry, 'id' | 'timestamp'>,
+): Effect.Effect<CostEntry, FsError> =>
+  Effect.try({
+    try: () => logCost(entry),
+    catch: (cause) => new FsError({ path: COSTS_DIR, operation: 'log-cost', cause }),
+  });
+
+/** Convenience wrapper: compute cost then log. */
+export const logUsageEffect = (
+  ...args: Parameters<typeof logUsage>
+): Effect.Effect<ReturnType<typeof logUsage>, FsError> =>
+  Effect.try({
+    try: () => logUsage(...args),
+    catch: (cause) => new FsError({ path: COSTS_DIR, operation: 'log-usage', cause }),
+  });
+
+/** Read entries across an inclusive date range. Pure-ish. */
+export const readCostsEffect = (
+  startDate: string,
+  endDate: string,
+): Effect.Effect<CostEntry[]> => Effect.sync(() => readCosts(startDate, endDate));
+
+/** Read today's cost entries. Pure-ish. */
+export const readTodayCostsEffect = (): Effect.Effect<CostEntry[]> =>
+  Effect.sync(() => readTodayCosts());
+
+/** Read recent cost entries scoped to an issue. Pure-ish. */
+export const readIssueCostsEffect = (
+  issueId: string,
+  days: number = 30,
+): Effect.Effect<CostEntry[]> => Effect.sync(() => readIssueCosts(issueId, days));
+
+/** Summarize a flat list of cost entries. Pure. */
+export const summarizeCostsEffect = (
+  entries: CostEntry[],
+): Effect.Effect<CostSummary> => Effect.sync(() => summarizeCosts(entries));
+
+/** Daily / weekly / monthly rollups. Pure-ish. */
+export const getDailySummaryEffect = (date?: string): Effect.Effect<CostSummary> =>
+  Effect.sync(() => getDailySummary(date));
+export const getWeeklySummaryEffect = (): Effect.Effect<CostSummary> =>
+  Effect.sync(() => getWeeklySummary());
+export const getMonthlySummaryEffect = (): Effect.Effect<CostSummary> =>
+  Effect.sync(() => getMonthlySummary());
+
+/** Budget CRUD. */
+export const createBudgetEffect = (
+  budget: Omit<CostBudget, 'id' | 'spent'>,
+): Effect.Effect<CostBudget, FsError> =>
+  Effect.try({
+    try: () => createBudget(budget),
+    catch: (cause) =>
+      new FsError({ path: COSTS_DIR, operation: 'create-budget', cause }),
+  });
+export const getBudgetEffect = (id: string): Effect.Effect<CostBudget | null> =>
+  Effect.sync(() => getBudget(id));
+export const getAllBudgetsEffect = (): Effect.Effect<CostBudget[]> =>
+  Effect.sync(() => getAllBudgets());
+export const updateBudgetSpentEffect = (
+  id: string,
+  spent: number,
+): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => updateBudgetSpent(id, spent),
+    catch: (cause) =>
+      new FsError({ path: COSTS_DIR, operation: 'update-budget-spent', cause }),
+  });
+export const checkBudgetEffect = (
+  id: string,
+): Effect.Effect<ReturnType<typeof checkBudget>> => Effect.sync(() => checkBudget(id));
+export const deleteBudgetEffect = (id: string): Effect.Effect<boolean, FsError> =>
+  Effect.try({
+    try: () => deleteBudget(id),
+    catch: (cause) =>
+      new FsError({ path: COSTS_DIR, operation: 'delete-budget', cause }),
+  });
+
+/** Render a human-readable cost report. Pure-ish. */
+export const generateReportEffect = (
+  startDate: string,
+  endDate: string,
+): Effect.Effect<string> => Effect.sync(() => generateReport(startDate, endDate));
+
+/** Format a cost number for display. Pure. */
+export const formatCostEffect = (
+  cost: number,
+  currency: string = 'USD',
+): Effect.Effect<string> => Effect.sync(() => formatCost(cost, currency));

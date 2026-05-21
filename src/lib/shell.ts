@@ -1,6 +1,8 @@
+import { Effect } from 'effect';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { FsError } from './errors.js';
 
 export type Shell = 'bash' | 'zsh' | 'fish' | 'unknown';
 
@@ -62,3 +64,28 @@ export function getAliasInstructions(shell: Shell): string {
 
   return `Alias added to ${rcFile}. Run:\n  source ${rcFile}`;
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Shell-detection helpers — pure-sync wrappers and FsError-typed append.
+
+/** Detect the current user's shell from $SHELL. Pure. */
+export const detectShellEffect = (): Effect.Effect<Shell> => Effect.sync(() => detectShell());
+
+/** Resolve the shell rc file path for a detected shell. Pure-ish (existsSync). */
+export const getShellRcFileEffect = (shell: Shell): Effect.Effect<string | null> =>
+  Effect.sync(() => getShellRcFile(shell));
+
+/** True if the rc file already contains the panopticon alias. Pure-ish (readFile). */
+export const hasAliasEffect = (rcFile: string): Effect.Effect<boolean> =>
+  Effect.sync(() => hasAlias(rcFile));
+
+/** Append the panopticon alias to an rc file; surfaces FsError on failure. */
+export const addAliasEffect = (rcFile: string): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => addAlias(rcFile),
+    catch: (cause) => new FsError({ path: rcFile, operation: 'append-alias', cause }),
+  });
+
+/** Human-readable alias install instructions for a shell. Pure. */
+export const getAliasInstructionsEffect = (shell: Shell): Effect.Effect<string> =>
+  Effect.sync(() => getAliasInstructions(shell));

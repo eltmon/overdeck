@@ -6,6 +6,7 @@
  * Panopticon always works even without configuring external providers.
  */
 
+import { Effect } from 'effect';
 import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
 import { resolveModelId } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
@@ -469,3 +470,60 @@ export function getAvailableModels(enabledProviders: Set<ModelProvider>): ModelI
     return isProviderEnabled(provider, enabledProviders);
   }) as ModelId[];
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// Pure-sync provider/fallback resolution — additive Effect.sync wrappers.
+
+/** True if the model id is an OpenRouter id. Pure. */
+export const isOpenRouterModelEffect = (modelId: string): Effect.Effect<boolean> =>
+  Effect.sync(() => isOpenRouterModel(modelId));
+
+/** Resolve the provider for a model id. Pure. */
+export const getModelProviderEffect = (
+  modelId: ModelId | string,
+): Effect.Effect<ModelProvider> => Effect.sync(() => getModelProvider(modelId));
+
+/** Whether the model requires an external (non-Anthropic) API key. Pure. */
+export const requiresExternalKeyEffect = (
+  modelId: ModelId | string,
+): Effect.Effect<boolean> => Effect.sync(() => requiresExternalKey(modelId));
+
+/** Models for a specific provider. Pure. */
+export const getModelsByProviderEffect = (
+  provider: ModelProvider,
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsByProvider(provider));
+
+/** Tier-aware fallback resolution. Pure. */
+export const applyTierAwareFallbackEffect = (
+  modelId: ModelId,
+  enabledProviders: Set<ModelProvider>,
+  userTier?: SubscriptionPlan,
+): Effect.Effect<ModelId> =>
+  Effect.sync(() => applyTierAwareFallback(modelId, enabledProviders, userTier));
+
+/** Provider-disabled fallback resolution. Pure. */
+export const applyFallbackEffect = (
+  modelId: ModelId,
+  enabledProviders: Set<ModelProvider>,
+): Effect.Effect<ModelId> => Effect.sync(() => applyFallback(modelId, enabledProviders));
+
+/** Map a non-Anthropic model to its Anthropic equivalent. Pure. */
+export const getFallbackModelEffect = (modelId: ModelId): Effect.Effect<AnthropicModel> =>
+  Effect.sync(() => getFallbackModel(modelId));
+
+/** Detect enabled providers from configured API keys. Pure. */
+export const detectEnabledProvidersEffect = (
+  apiKeys: Parameters<typeof detectEnabledProviders>[0],
+): Effect.Effect<Set<ModelProvider>> => Effect.sync(() => detectEnabledProviders(apiKeys));
+
+/** Filter a model list to the ones whose providers are enabled. Pure. */
+export const filterAvailableModelsEffect = (
+  models: ModelId[],
+  enabledProviders: Set<ModelProvider>,
+): Effect.Effect<ModelId[]> =>
+  Effect.sync(() => filterAvailableModels(models, enabledProviders));
+
+/** All available models across enabled providers. Pure. */
+export const getAvailableModelsEffect = (
+  enabledProviders: Set<ModelProvider>,
+): Effect.Effect<ModelId[]> => Effect.sync(() => getAvailableModels(enabledProviders));

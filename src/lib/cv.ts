@@ -4,9 +4,11 @@
  * Tracks agent performance over time to enable capability-based routing.
  */
 
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
+import { FsError } from './errors.js';
 
 export interface WorkEntry {
   issueId: string;
@@ -271,3 +273,50 @@ export function formatCV(cv: AgentCV): string {
 
   return lines.join('\n');
 }
+
+// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// CV file IO is sync by design. Read paths return Effect.sync; write paths
+// surface FsError.
+
+/** Load (or create) the CV for an agent. Pure-ish. */
+export const getAgentCVEffect = (agentId: string): Effect.Effect<AgentCV> =>
+  Effect.sync(() => getAgentCV(agentId));
+
+/** Persist a CV to disk. */
+export const saveAgentCVEffect = (cv: AgentCV): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => saveAgentCV(cv),
+    catch: (cause) =>
+      new FsError({ path: cv.agentId, operation: 'save-agent-cv', cause }),
+  });
+
+/** Mark the start of a work item on an agent's CV. */
+export const startWorkEffect = (
+  agentId: string,
+  issueId: string,
+  skills?: string[],
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => startWork(agentId, issueId, skills),
+    catch: (cause) =>
+      new FsError({ path: agentId, operation: 'cv-start-work', cause }),
+  });
+
+/** Mark completion (success / failure / abandoned). */
+export const completeWorkEffect = (
+  ...args: Parameters<typeof completeWork>
+): Effect.Effect<void, FsError> =>
+  Effect.try({
+    try: () => completeWork(...args),
+    catch: (cause) =>
+      new FsError({ path: args[0], operation: 'cv-complete-work', cause }),
+  });
+
+/** Aggregate rankings across all agents. Pure-ish. */
+export const getAgentRankingsEffect = (): Effect.Effect<
+  ReturnType<typeof getAgentRankings>
+> => Effect.sync(() => getAgentRankings());
+
+/** Render a CV as text. Pure. */
+export const formatCVEffect = (cv: AgentCV): Effect.Effect<string> =>
+  Effect.sync(() => formatCV(cv));
