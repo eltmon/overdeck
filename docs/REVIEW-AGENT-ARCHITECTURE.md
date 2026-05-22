@@ -156,7 +156,7 @@ Machine-readable status uses the existing review-status fields and lifecycle eve
 
 ## Model and harness configuration
 
-Model selection is role-based and resolved through `resolveModel(role, subRole, config)`:
+Model selection is role-based and resolved through `resolveModel(role, subRole, config)`. A sub-role can set `model: parent` to inherit the parent role's effective model:
 
 ```yaml
 workhorses:
@@ -169,7 +169,7 @@ roles:
     model: workhorse:expensive
     sub:
       security:
-        model: workhorse:mid
+        model: parent          # inherits roles.review.model
       correctness:
         model: workhorse:mid
       performance:
@@ -177,6 +177,8 @@ roles:
       requirements:
         model: workhorse:mid
 ```
+
+`parent` is valid only for sub-role models (`roles.<role>.sub.<subRole>.model`). It is rejected for role-level models (`roles.<role>.model`) and workhorse slots (`workhorses.<slot>`), because those fields have no parent role to inherit from.
 
 Harness selection follows the same role/sub-role shape. Because the convoy prompts are inlined, the choice between Claude Code, Pi, or another harness does not change the reviewer's instructions — only the runtime. See [`HARNESSES.md`](./HARNESSES.md) for Pi vs Claude Code behavior and ToS rules.
 
