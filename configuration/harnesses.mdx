@@ -36,8 +36,8 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 - Vendored extension at `packages/pi-extension/` reports lifecycle events:
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
   heartbeat, and a `/pan-done` slash command writes a completion marker.
-- Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax through
-  Pi's own provider routing.
+- Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
+  DashScope through Pi's own provider routing.
 
 ## Installing Pi
 
@@ -105,7 +105,7 @@ OAuth subscription. Everything else is allowed:
 | Harness | Model provider | Anthropic auth mode | Allowed? |
 | --- | --- | --- | --- |
 | claude-code | any | any | ✅ |
-| pi | non-Anthropic (OpenAI/Google/OpenRouter/Minimax/...) | any | ✅ |
+| pi | non-Anthropic (OpenAI/Google/OpenRouter/Minimax/DashScope/...) | any | ✅ |
 | pi | Anthropic | API key | ✅ |
 | pi | Anthropic | subscription | 🚫 |
 | pi | Anthropic | unset (no Anthropic auth) | ✅ |

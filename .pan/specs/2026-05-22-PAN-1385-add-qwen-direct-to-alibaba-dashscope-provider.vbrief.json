@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:39:53.607Z"
+    "updated": "2026-05-22T23:42:27.576Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:39:53.607Z",
+    "updated": "2026-05-22T23:42:27.576Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -555,7 +555,7 @@
       {
         "id": "docs-providers-list",
         "title": "Mention DashScope in provider lists in the Mintlify docs",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -571,7 +571,7 @@
           {
             "id": "docs-providers-list.ac1",
             "title": "Both .mdx files mention DashScope (or Alibaba DashScope) wherever they enumerate the provider list.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -579,7 +579,7 @@
           {
             "id": "docs-providers-list.ac2",
             "title": "No broken Mintlify links or syntax errors — `npm run lint` (or whatever doc linter is in place) passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
