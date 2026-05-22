@@ -2,6 +2,7 @@
  * Tests for review-monitor.ts (PAN-1059)
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { join } from 'path';
 
 // ── fs/promises mock ───────────────────────────────────────────────────────
@@ -17,11 +18,11 @@ vi.mock('fs', () => ({
 }));
 
 // ── tmux mocks ─────────────────────────────────────────────────────────────
-const mockSessionExistsAsync = vi.fn(async () => false);
-const mockIsPaneDeadAsync = vi.fn(async () => true);
+const mockSessionExistsAsyncEffect = vi.fn();
+const mockIsPaneDeadAsyncEffect = vi.fn();
 vi.mock('../../tmux.js', () => ({
-  sessionExistsAsync: (...args: unknown[]) => mockSessionExistsAsync(...args),
-  isPaneDeadAsync: (...args: unknown[]) => mockIsPaneDeadAsync(...args),
+  sessionExistsAsyncEffect: (...args: unknown[]) => mockSessionExistsAsyncEffect(...args),
+  isPaneDeadAsyncEffect: (...args: unknown[]) => mockIsPaneDeadAsyncEffect(...args),
 }));
 
 import { waitForReviewerOutputs, reviewerOutputPath, REVIEW_SUB_ROLES } from '../review-monitor.js';
@@ -51,8 +52,8 @@ describe('waitForReviewerOutputs', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockExistsSync.mockReturnValue(false);
-    mockSessionExistsAsync.mockResolvedValue(false);
-    mockIsPaneDeadAsync.mockResolvedValue(true);
+    mockSessionExistsAsyncEffect.mockReturnValue(Effect.succeed(false));
+    mockIsPaneDeadAsyncEffect.mockReturnValue(Effect.succeed(true));
   });
 
   afterEach(() => {
@@ -82,7 +83,7 @@ describe('waitForReviewerOutputs', () => {
 
   it('returns missing when session is dead and output file was never written', async () => {
     mockExistsSync.mockReturnValue(false);
-    mockIsPaneDeadAsync.mockResolvedValue(true);
+    mockIsPaneDeadAsyncEffect.mockReturnValue(Effect.succeed(true));
 
     const resultPromise = waitForReviewerOutputs({
       issueId: 'PAN-1059',
@@ -105,7 +106,7 @@ describe('waitForReviewerOutputs', () => {
     mockExistsSync.mockReturnValue(true);
     const oldMtime = Date.now() - 1000;
     mockStat.mockResolvedValue({ mtimeMs: oldMtime });
-    mockIsPaneDeadAsync.mockResolvedValue(true);
+    mockIsPaneDeadAsyncEffect.mockReturnValue(Effect.succeed(true));
 
     const resultPromise = waitForReviewerOutputs({
       issueId: 'PAN-1059',
@@ -136,7 +137,7 @@ describe('waitForReviewerOutputs', () => {
       // Return very old mtime on all calls so staleAfterMs is immediately exceeded
       return { mtimeMs: now - 20 * 60 * 1000 };
     });
-    mockIsPaneDeadAsync.mockResolvedValue(false); // sessions still alive
+    mockIsPaneDeadAsyncEffect.mockReturnValue(Effect.succeed(false)); // sessions still alive
 
     const resultPromise = waitForReviewerOutputs({
       issueId: 'PAN-1059',
@@ -167,7 +168,7 @@ describe('waitForReviewerOutputs', () => {
       if (path.endsWith('/performance.md')) return { mtimeMs: now - 1_000 };
       return { mtimeMs: now - 10 * 60 * 1000 };
     });
-    mockIsPaneDeadAsync.mockResolvedValue(true);
+    mockIsPaneDeadAsyncEffect.mockReturnValue(Effect.succeed(true));
 
     const resultPromise = waitForReviewerOutputs({
       issueId: 'PAN-1059',
