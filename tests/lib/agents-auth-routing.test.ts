@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -37,7 +38,7 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
-  bridgeGeminiAuthToCliproxyAsync: mockBridgeGeminiAuth,
+  bridgeGeminiAuthToCliproxyEffect: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',

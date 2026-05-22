@@ -18,7 +18,7 @@ import { existsSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
-import { listSessionNamesAsync } from './tmux.js';
+import { listSessionNamesAsyncEffect } from './tmux.js';
 import { parseIssueId } from './issue-id.js';
 import { FsError } from './errors.js';
 
@@ -125,7 +125,7 @@ export async function findOrphanedAgentDirs(
   const entries = readdirSync(agentsDir, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
-  const sessionNames = await listSessionNamesAsync();
+  const sessionNames = await Effect.runPromise(listSessionNamesAsyncEffect());
   const sessionSet = new Set(sessionNames);
 
   const orphaned: OrphanedAgentDir[] = [];

@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Data, Effect } from 'effect';
-import { getAgentState, getAgentStateAsync, getAgentRuntimeState, getAgentRuntimeStateAsync, getLatestSessionId, getLatestSessionIdAsync, normalizeAgentId } from './agents.js';
-import { sessionExists, sessionExistsAsync } from './tmux.js';
+import { getAgentState, getAgentStateEffect, getAgentRuntimeState, getAgentRuntimeStateEffect, getLatestSessionId, getLatestSessionIdEffect, normalizeAgentId } from './agents.js';
+import { sessionExists, sessionExistsAsyncEffect } from './tmux.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
 export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
@@ -130,11 +130,11 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
 
 export async function getWorkAgentLifecycleStateAsync(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = await getAgentStateAsync(agentId);
-  const runtimeState = await getAgentRuntimeStateAsync(agentId);
+  const agentState = await Effect.runPromise(getAgentStateEffect(agentId));
+  const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId));
   const hasAgentState = !!agentState;
-  const hasSavedSession = !!(await getLatestSessionIdAsync(agentId));
-  const hasLiveTmuxSession = await sessionExistsAsync(agentId);
+  const hasSavedSession = !!(await Effect.runPromise(getLatestSessionIdEffect(agentId)));
+  const hasLiveTmuxSession = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
   const hasWorkspace = !!agentState?.workspace && await pathExistsAsync(agentState.workspace);
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';

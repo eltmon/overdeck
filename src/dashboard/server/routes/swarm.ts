@@ -25,16 +25,16 @@ import { evaluateSpawnGuardrails } from './agents.js';
 import { validateOrigin } from './origin-validation.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
-import { findPlanAsync, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
-import { readWorkspaceContinueAsync } from '../../../lib/pan-dir/continue.js';
-import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
-import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
+import { findPlanEffect, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
+import { readWorkspaceContinue } from '../../../lib/pan-dir/continue.js';
+import { readContinueStateEffect, writeContinueStateEffect, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
+import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileEffect, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { normalizeModelOverride } from '../../../lib/model-validation.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../../../lib/config-yaml.js';
-import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
+import { listSessionNamesAsyncEffect, isPaneDeadAsyncEffect, killSessionAsyncEffect, listPaneValuesAsyncEffect } from '../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -135,7 +135,7 @@ function assertPathInside(parent: string, child: string): void {
 }
 
 async function readWorkspacePlanAsync(workspacePath: string, resolvedPlanPath?: string): Promise<VBriefDocument | null> {
-  const planPath = resolvedPlanPath ?? (await findPlanAsync(workspacePath));
+  const planPath = resolvedPlanPath ?? (await Effect.runPromise(findPlanEffect(workspacePath)));
   if (!planPath) return null;
   try {
     const raw = await readFile(planPath, 'utf-8');
@@ -144,7 +144,7 @@ async function readWorkspacePlanAsync(workspacePath: string, resolvedPlanPath?: 
     }
     const parsed = JSON.parse(raw);
     if (parsed.vBRIEFInfo && parsed.plan) {
-      const continueState = await Effect.runPromise(readWorkspaceContinueAsync(workspacePath));
+      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
       if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
         return applyStatusOverrides(parsed as VBriefDocument, continueState.statusOverrides);
       }
@@ -199,7 +199,7 @@ function getSwarmStatePath(issueId: string): string {
   return join(getSwarmDir(), `${issueId.toLowerCase()}.json`);
 }
 
-// PAN-977 review-round-18 blocker: `readContinueStateAsync` / `writeContinueStateAsync`
+// PAN-977 review-round-18 blocker: continue-state readers and writers
 // internally call `getContinuesDir(projectRoot)` which appends `.pan/continues/`, so
 // callers must pass the **workspace root** (or project root), NOT the workspace's
 // `.pan/` directory. Returning `join(workspacePath, '.pan')` made every swarm-side
@@ -228,14 +228,14 @@ function emptyContinueState(issueId: string, now: string): ContinueState {
 
 async function loadWorkspaceContinue(workspacePath: string, issueId: string): Promise<ContinueState> {
   const now = new Date().toISOString();
-  return await readContinueStateAsync(continueDirForWorkspace(workspacePath), issueId) ?? emptyContinueState(issueId, now);
+  return (await Effect.runPromise(readContinueStateEffect(continueDirForWorkspace(workspacePath), issueId))) ?? emptyContinueState(issueId, now);
 }
 
 async function saveRuntimeToContinue(workspacePath: string, issueId: string, runtime: SwarmRuntime): Promise<void> {
   const continueDir = continueDirForWorkspace(workspacePath);
   await mkdir(continueDir, { recursive: true });
   const now = new Date().toISOString();
-  await writeContinueStateAsync(continueDir, issueId, (cont) => ({ ...(cont ?? emptyContinueState(issueId, now)), swarmRuntime: runtime }));
+  await Effect.runPromise(writeContinueStateEffect(continueDir, issueId, (cont) => ({ ...(cont ?? emptyContinueState(issueId, now)), swarmRuntime: runtime })));
 }
 
 function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
@@ -357,7 +357,7 @@ async function persistSynthesisOutput(
     'Resolved upstream context:',
     ...parents.map(parent => `- ${parent.id}: ${parent.title} [${parent.status}]${parent.narrative?.Action ? ` — ${parent.narrative.Action}` : ''}`),
   ].join('\n');
-  await writeContinueStateAsync(continueDirForWorkspace(workspacePath), issueId, (cont) => {
+  await Effect.runPromise(writeContinueStateEffect(continueDirForWorkspace(workspacePath), issueId, (cont) => {
     const existingRuntime = cont?.swarmRuntime ?? {
       model: defaultSwarmModel(),
       slots: [],
@@ -381,7 +381,7 @@ async function persistSynthesisOutput(
         { timestamp: now, reason: 'manual', note: `swarm synthesis prepared for ${item.id}` },
       ],
     };
-  });
+  }));
 }
 
 async function loadLegacySwarmState(issueId: string): Promise<SwarmState | null> {
@@ -488,7 +488,7 @@ async function runWithConcurrencyLimit<T, R>(
 
 async function getPaneExitStatusAsync(sessionName: string): Promise<number | null> {
   try {
-    const value = (await listPaneValuesAsync(sessionName, '#{pane_dead_status}'))[0]?.trim();
+    const value = (await Effect.runPromise(listPaneValuesAsyncEffect(sessionName, '#{pane_dead_status}')))[0]?.trim();
     if (!value) return null;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
@@ -594,7 +594,7 @@ function emitFailedMergeTransitions(before: SwarmState, after: SwarmState): void
 
 async function refreshSwarmRuntimeState(
   state: SwarmState,
-  sessions?: string[],
+  sessions?: readonly string[],
   projectPath?: string,
 ): Promise<{ state: SwarmState; changed: boolean; failedMergeTransitions: SlotAssignment[] }> {
   const statusRefresh = await refreshSwarmSlotStatuses(state, sessions);
@@ -613,7 +613,7 @@ async function refreshSwarmIssue(issueId: string): Promise<{ status: number; bod
   const state = await loadSwarmState(issueUpper);
   if (!state) return { status: 404, body: { error: `No swarm state for ${issueUpper}` } };
 
-  const sessions = await listSessionNamesAsync();
+  const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
   const project = resolveProjectFromIssue(issueUpper);
   const refreshed = await refreshSwarmRuntimeState(state, sessions, project?.projectPath);
   if (refreshed.changed) await saveSwarmState(refreshed.state);
@@ -623,9 +623,9 @@ async function refreshSwarmIssue(issueId: string): Promise<{ status: number; bod
 
 async function refreshSwarmSlotStatuses(
   state: SwarmState,
-  sessions?: string[],
+  sessions?: readonly string[],
 ): Promise<{ state: SwarmState; changed: boolean }> {
-  const liveSessions = sessions ?? await listSessionNamesAsync();
+  const liveSessions = sessions ?? await Effect.runPromise(listSessionNamesAsyncEffect());
   const runningSlots = state.slots.filter((slot) => slot.status === 'running');
   if (runningSlots.length === 0) {
     return { state, changed: false };
@@ -636,7 +636,7 @@ async function refreshSwarmSlotStatuses(
     SWARM_PANE_CHECK_CONCURRENCY,
     async (slot) => {
       const sessionPresent = liveSessions.includes(slot.sessionName);
-      const paneDead = sessionPresent ? await isPaneDeadAsync(slot.sessionName).catch(() => false) : false;
+      const paneDead = sessionPresent ? await Effect.runPromise(isPaneDeadAsyncEffect(slot.sessionName).pipe(Effect.catch(() => Effect.succeed(false)))) : false;
       const exitStatus = sessionPresent && paneDead ? await getPaneExitStatusAsync(slot.sessionName) : null;
       return {
         sessionName: slot.sessionName,
@@ -865,7 +865,7 @@ async function dispatchSwarmWave(
   // and onSlotMergeComplete (which read model from persisted state). Re-validate here so a
   // tampered state file cannot inject shell metacharacters into runtime launcher commands.
   const modelGuard = validateModelId(requestedModel);
-  if (!modelGuard.ok) {
+  if (modelGuard.ok === false) {
     return { status: 400, body: { error: modelGuard.error } };
   }
   const issueLower = issueUpper.toLowerCase();
@@ -891,7 +891,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
+  const canonicalPlanPath = await Effect.runPromise(findPlanEffect(mainWorkspace));
   if (!canonicalPlanPath) {
     return {
       status: 422,
@@ -1093,7 +1093,7 @@ async function dispatchSwarmWave(
     })),
   ];
 
-  const existingSessions = await listSessionNamesAsync();
+  const existingSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
   const existingSwarmSessions = existingSessions.filter(
     s => s.startsWith(`agent-${issueLower}-`) && /agent-[a-z0-9-]+-\d+$/.test(s),
   );
@@ -1103,9 +1103,9 @@ async function dispatchSwarmWave(
     existingSwarmSessions,
     SWARM_PANE_CHECK_CONCURRENCY,
     async (sessionName) => {
-      const paneDead = await isPaneDeadAsync(sessionName).catch(() => false);
+      const paneDead = await Effect.runPromise(isPaneDeadAsyncEffect(sessionName).pipe(Effect.catch(() => Effect.succeed(false))));
       if (paneDead) {
-        await killSessionAsync(sessionName).catch(() => {});
+        await Effect.runPromise(killSessionAsyncEffect(sessionName).pipe(Effect.catch(() => Effect.void)));
         return { sessionName, alive: false };
       }
       return { sessionName, alive: true };
@@ -1275,14 +1275,14 @@ async function dispatchSwarmWave(
       // a successful claim, release the claim (`unblock`) so the next dispatch
       // can retry — never leave an orphan claim with no live agent.
       try {
-        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+        await Effect.runPromise(applyTaskOperationToPlanFileEffect(canonicalPlanPath, {
           type: 'claim',
           itemId: item.id,
           reason: dispatchSynthesisFirst
             ? `Swarm slot ${slotNum} dispatched (synthesis phase)`
             : `Swarm slot ${slotNum} dispatched`,
           writerId: `swarm-dispatch-${process.pid}`,
-        }, mainWorkspace);
+        }, mainWorkspace));
       } catch (claimErr: any) {
         return `Slot ${slotNum} (${item.id}): canonical vBRIEF claim failed — ${claimErr.message}`;
       }
@@ -1322,12 +1322,12 @@ async function dispatchSwarmWave(
         // Spawn failed after the claim landed — release the item so the next
         // dispatch cycle can retry. If the release itself fails, the next poll
         // can repair it; record the original spawn error either way.
-        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+        await Effect.runPromise(applyTaskOperationToPlanFileEffect(canonicalPlanPath, {
           type: 'unblock',
           itemId: item.id,
           reason: `Spawn failed for slot ${slotNum}; releasing claim for retry`,
           writerId: `swarm-dispatch-${process.pid}`,
-        }, mainWorkspace).catch((releaseErr: any) => {
+        }, mainWorkspace)).catch((releaseErr: any) => {
           console.warn(`[swarm] Failed to release claim after spawn error for ${item.id}: ${releaseErr.message}`);
         });
         return `Slot ${slotNum} (${item.id}): ${err.message}`;
@@ -1429,7 +1429,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   const project = resolveProjectFromIssue(issueUpper);
   if (!project) return { ok: false, status: 404, error: `no project resolved for ${issueUpper}` };
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
-  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
+  const canonicalPlanPath = await Effect.runPromise(findPlanEffect(mainWorkspace));
   if (!canonicalPlanPath) {
     return { ok: false, status: 422, error: `No canonical vBRIEF plan found for ${issueUpper}` };
   }
@@ -1504,19 +1504,19 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   if (resolvedItemId) {
     try {
       if (isSynthesisCompletion) {
-        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+        await Effect.runPromise(applyTaskOperationToPlanFileEffect(canonicalPlanPath, {
           type: 'unblock',
           itemId: resolvedItemId,
           reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
           writerId: `swarm-synth-${process.pid}`,
-        }, mainWorkspace);
+        }, mainWorkspace));
       } else {
-        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+        await Effect.runPromise(applyTaskOperationToPlanFileEffect(canonicalPlanPath, {
           type: 'done',
           itemId: resolvedItemId,
           reason: `Swarm slot ${slotId} merged into feature branch`,
           writerId: `swarm-merge-${process.pid}`,
-        }, mainWorkspace);
+        }, mainWorkspace));
       }
     } catch (mutationErr: any) {
       // Persist a retry-needed marker on the slot so the next reconciliation
@@ -1571,7 +1571,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       };
     }
     if (synthesisOutput && resolvedItemId) {
-      await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
+      await Effect.runPromise(writeContinueStateEffect(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
         const runtime = cont?.swarmRuntime ?? runtimeFromState(nextState);
         return {
           ...(cont ?? emptyContinueState(issueUpper, now)),
@@ -1584,7 +1584,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
             updatedAt: now,
           },
         };
-      });
+      }));
     }
 
     let dispatched = false;
@@ -1619,7 +1619,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       }
     }
   } else if (synthesisOutput && resolvedItemId) {
-    await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
+    await Effect.runPromise(writeContinueStateEffect(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
       const runtime = cont?.swarmRuntime ?? {
         model: defaultSwarmModel(),
         slots: [],
@@ -1638,7 +1638,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
           updatedAt: now,
         },
       };
-    });
+    }));
   }
   return { ok: true };
 }
@@ -1687,20 +1687,20 @@ async function recoverSwarmSlot(
   const project = resolveProjectFromIssue(issueUpper);
   if (!project) return { status: 404, body: { error: `Could not resolve project for ${issueUpper}` } };
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
-  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
+  const canonicalPlanPath = await Effect.runPromise(findPlanEffect(mainWorkspace));
   const writerId = `swarm-recover-${action}-${process.pid}`;
 
   if (action === 'retry' || action === 'drop') {
     if (!canonicalPlanPath) return { status: 422, body: { error: `No canonical vBRIEF plan found for ${issueUpper}` } };
     try {
-      await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+      await Effect.runPromise(applyTaskOperationToPlanFileEffect(canonicalPlanPath, {
         type: action === 'drop' ? 'done' : 'unblock',
         itemId: slot.itemId,
         reason: action === 'drop'
           ? 'Operator dropped slot via failed-merge recovery'
           : 'Operator retried slot via failed-merge recovery',
         writerId,
-      }, mainWorkspace);
+      }, mainWorkspace));
     } catch (err: any) {
       return { status: 500, body: { error: err?.message ?? String(err) } };
     }
@@ -1807,7 +1807,7 @@ async function drainPendingSlotMerges(): Promise<void> {
         continue;
       }
       const result = await onSlotMergeComplete(parsed.issueId, parsed.itemId ?? '', parsed.slotId as number);
-      if (result.ok) {
+      if (result.ok === true) {
         await unlink(file).catch(() => undefined);
         console.log(`[swarm] Drained pending slot-merge marker ${entry}`);
       } else {
@@ -1835,7 +1835,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
   }
   const issueIds = Array.from(activeSwarmIssueIds);
 
-  const sessions = await listSessionNamesAsync().catch(() => [] as string[]);
+  const sessions = await Effect.runPromise(listSessionNamesAsyncEffect().pipe(Effect.catch(() => Effect.succeed([] as string[]))));
 
   for (const issueId of issueIds) {
     const loadedState = await loadSwarmState(issueId);
@@ -2159,7 +2159,7 @@ const postSwarmRoute = HttpRouter.add(
       return jsonResponse({ error: 'maxSlots must be a positive integer.' }, { status: 400 });
     }
     const modelCheck = validateModelId(model);
-    if (!modelCheck.ok) {
+    if (modelCheck.ok === false) {
       return jsonResponse({ error: modelCheck.error }, { status: 400 });
     }
     const requestedHostOverride = rawBody.host === true || rawBody.allowHost === true;
@@ -2485,7 +2485,7 @@ const postSwarmSlotMergedRoute = HttpRouter.add(
     }
 
     const result = yield* Effect.promise(() => onSlotMergeComplete(issueId, itemId, slotId as number, synthesisOutput as string | undefined));
-    if (!result.ok) {
+    if (result.ok === false) {
       return jsonResponse({ error: result.error }, { status: result.status });
     }
     return jsonResponse({ success: true });

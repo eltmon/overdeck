@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { setReviewStatusAsync, getReviewStatusAsync, type BlockerReason, type ReviewStatus } from './review-status.js';
+import { setReviewStatusAsyncEffect, getReviewStatusAsyncEffect, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 
@@ -86,7 +86,7 @@ async function loadAndValidateStatus(
   prNumber?: number,
   headSha?: string,
 ): Promise<ReviewStatus | null> {
-  const status = await getReviewStatusAsync(issueId);
+  const status = await Effect.runPromise(getReviewStatusAsyncEffect(issueId));
   if (!status) return null;
 
   // If no PR identity is stored yet, allow the event (identity will be populated lazily).
@@ -203,7 +203,7 @@ async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumb
       { encoding: 'utf-8', timeout: 15000 },
     );
     const [mergeable, mergeableState, draft] = JSON.parse(stdout) as [boolean | null, string | null, boolean];
-    const status = await getReviewStatusAsync(issueId);
+    const status = await Effect.runPromise(getReviewStatusAsyncEffect(issueId));
     if (!status) return;
 
     const update: Partial<ReviewStatus> = {};
@@ -249,7 +249,7 @@ async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumb
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await setReviewStatusAsync(issueId, update, status);
+      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
     }
   } catch (err) {
     console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
@@ -287,7 +287,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await setReviewStatusAsync(issueId, update, status);
+      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
     }
   }
 }
@@ -321,7 +321,7 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await setReviewStatusAsync(issueId, update, status);
+      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
     }
   }
 }
@@ -401,7 +401,7 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await setReviewStatusAsync(issueId, update, status);
+    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
   }
 }
 
@@ -439,7 +439,7 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await setReviewStatusAsync(issueId, update, status);
+    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
   }
 }
 
@@ -507,7 +507,7 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await setReviewStatusAsync(issueId, update, status);
+    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
   }
 }
 
@@ -545,7 +545,7 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
       // to construct a prUrl, and the SHA alone isn't enough to bind identity.
 
       if (Object.keys(update).length > 0) {
-        await setReviewStatusAsync(issueId, update, status);
+        await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
       }
 
       // Keep scanning in case the payload includes multiple feature branches.

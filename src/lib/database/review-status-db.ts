@@ -16,7 +16,7 @@ import { normalizeReviewStatus } from '../review-status-normalize.js';
  * Used by the *Async wrappers; sync functions still throw at the boundary.
  * Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
  */
-class DatabaseError extends Data.TaggedError('DatabaseError')<{
+export class DatabaseError extends Data.TaggedError('DatabaseError')<{
   readonly operation: string;
   readonly cause?: unknown;
 }> {}
@@ -161,6 +161,41 @@ export function deleteReviewStatus(issueId: string): void {
 // PAN-1249: internally implemented with Effect.async/Effect.try so the
 // failure mode is typed (DatabaseError). The Promise return type is kept
 // to satisfy existing callers in src/lib/review-status.ts.
+
+export const upsertReviewStatusEffect = (
+  status: ReviewStatus,
+): Effect.Effect<void, DatabaseError> =>
+  Effect.tryPromise({
+    try: () =>
+      new Promise<void>((resolve, reject) => {
+        setImmediate(() => {
+          try {
+            upsertReviewStatus(status);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }),
+    catch: (cause) => new DatabaseError({ operation: 'upsertReviewStatusEffect', cause }),
+  });
+
+export const getReviewStatusFromDbEffect = (
+  issueId: string,
+): Effect.Effect<ReviewStatus | null, DatabaseError> =>
+  Effect.tryPromise({
+    try: () =>
+      new Promise<ReviewStatus | null>((resolve, reject) => {
+        setImmediate(() => {
+          try {
+            resolve(getReviewStatusFromDb(issueId));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }),
+    catch: (cause) => new DatabaseError({ operation: 'getReviewStatusFromDbEffect', cause }),
+  });
 
 export function upsertReviewStatusAsync(status: ReviewStatus): Promise<void> {
   const program = Effect.tryPromise({

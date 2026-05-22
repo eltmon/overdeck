@@ -1,14 +1,15 @@
 /**
  * Tests for PAN-977 swarm runtime fields on ContinueState.
  */
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import {
   readContinueState,
   writeContinueState,
-  readContinueStateAsync,
-  writeContinueStateAsync,
+  readContinueStateEffect,
+  writeContinueStateEffect,
   continueFilePath,
   type ContinueState,
   type SwarmRuntime,
@@ -62,8 +63,8 @@ describe('swarmRuntime in ContinueState', () => {
 
   it('round-trips swarmRuntime through async write/read', async () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
-    await writeContinueStateAsync(TEST_DIR, 'PAN-977', state);
-    const read = await readContinueStateAsync(TEST_DIR, 'PAN-977');
+    await Effect.runPromise(writeContinueStateEffect(TEST_DIR, 'PAN-977', state));
+    const read = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'PAN-977'));
     expect(read?.swarmRuntime?.model).toBe('test-model');
   });
 
@@ -138,15 +139,15 @@ describe('swarmRuntime in ContinueState', () => {
 
   it('canonicalizes lowercase and uppercase issue IDs to the same async file', async () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
-    await writeContinueStateAsync(TEST_DIR, 'PAN-977', state);
+    await Effect.runPromise(writeContinueStateEffect(TEST_DIR, 'PAN-977', state));
 
-    const read = await readContinueStateAsync(TEST_DIR, 'pan-977');
+    const read = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'pan-977'));
     expect(read?.issueId).toBe('PAN-977');
     expect(read?.swarmRuntime?.model).toBe('test-model');
   });
 
   it('async read returns null for missing file', async () => {
-    const result = await readContinueStateAsync(TEST_DIR, 'PAN-NOT-EXIST');
+    const result = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'PAN-NOT-EXIST'));
     expect(result).toBeNull();
   });
 });

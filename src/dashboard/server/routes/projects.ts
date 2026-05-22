@@ -16,14 +16,14 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { httpHandler } from './http-handler.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { listSessionNamesAsync } from '../../../lib/tmux.js';
+import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
@@ -190,7 +190,7 @@ async function collectSessionTreeNodes(
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
-      const rtState = await getAgentRuntimeStateAsync(checkId);
+      const rtState = await Effect.runPromise(getAgentRuntimeStateEffect(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
@@ -440,7 +440,7 @@ export async function fetchProjectSessionTree(
 
   // Reuse shared request-scoped data when provided; otherwise fetch lazily.
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
-    ?? new Set((await listSessionNamesAsync().catch(() => [] as string[])).filter(s => s.trim()));
+    ?? new Set((await Effect.runPromise(listSessionNamesAsyncEffect()).catch(() => [] as string[])).filter(s => s.trim()));
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
@@ -517,7 +517,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
     const results = yield* Effect.tryPromise({
       try: async () => {
-        const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
+        const allSessionsArr = await Effect.runPromise(listSessionNamesAsyncEffect()).catch(() => [] as string[]);
         const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
 
         const issueTitles = await buildIssueTitleMap();

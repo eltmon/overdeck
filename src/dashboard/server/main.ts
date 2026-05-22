@@ -28,7 +28,7 @@ import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
-import { getAgentStateAsync, type AgentState } from '../../lib/agents.js';
+import { getAgentStateEffect, type AgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
@@ -260,7 +260,7 @@ setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
       const es = getEventStore();
-      const state = await getAgentStateAsync(agentId);
+      const state = await Effect.runPromise(getAgentStateEffect(agentId));
       if (state) {
         es.append({
           type: 'agent.heartbeat_dead',

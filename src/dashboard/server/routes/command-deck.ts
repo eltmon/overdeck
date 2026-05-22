@@ -33,10 +33,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
-import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateEffect, listRunningAgentsEffect } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
-import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { capturePaneAsyncEffect, listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
@@ -61,7 +61,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
+import { readWorkspacePlanEffect } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -239,7 +239,7 @@ export async function fetchActivityDataWithContext(
   const tmuxSessionNames = context.tmuxSessionNames ?? new Set<string>();
   if (!context.tmuxSessionNames) {
     try {
-      const allSessions = await listSessionNamesAsync();
+      const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
       for (const s of allSessions) {
         if (s.trim()) tmuxSessionNames.add(s.trim());
       }
@@ -292,7 +292,7 @@ export async function fetchActivityDataWithContext(
       let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
-          transcript = (await capturePaneAsync(checkId, 500)).trim();
+          transcript = (await Effect.runPromise(capturePaneAsyncEffect(checkId, 500))).trim();
           transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
@@ -311,7 +311,7 @@ export async function fetchActivityDataWithContext(
         }
       }
 
-      const rtState = await getAgentRuntimeStateAsync(checkId);
+      const rtState = await Effect.runPromise(getAgentRuntimeStateEffect(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
@@ -569,7 +569,7 @@ export async function fetchActivityDataWithContext(
 
       if (includeTranscripts && ss.status === 'running') {
         try {
-          const output = (await capturePaneAsync(specialistSessionId, 100)).trim();
+          const output = (await Effect.runPromise(capturePaneAsyncEffect(specialistSessionId, 100))).trim();
           if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
             transcriptParts.push(`\n--- Live Output ---\n${output}`);
           } else if (output) {
@@ -629,7 +629,7 @@ export async function fetchActivityDataWithContext(
       costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
 
-    const agents = includeTranscripts ? await listRunningAgentsAsync() : await getCachedRunningAgents();
+    const agents = includeTranscripts ? await Effect.runPromise(listRunningAgentsEffect()) : await getCachedRunningAgents();
     const resolvedCost = resolveIssueHeadlineCost({
       issueId,
       aggregateCost,
@@ -725,7 +725,7 @@ async function fetchPlanningData(
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   // Pipeline mirror corroboration (PAN-977)
   try {
-    const doc = await readWorkspacePlanAsync(workspacePath);
+    const doc = await Effect.runPromise(readWorkspacePlanEffect(workspacePath));
     if (doc) {
       const items = doc.plan.items;
       if (items.length > 0) {

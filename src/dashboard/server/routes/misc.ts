@@ -52,7 +52,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
-import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { createSessionAsyncEffect, killSessionAsyncEffect, listSessionNamesAsyncEffect, resizeWindowAsyncEffect, sendKeysEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
@@ -64,10 +64,10 @@ import {
 } from '../services/tracker-config.js';
 import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { loadConfig as loadPanConfig } from '../../../lib/config.js';
-import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
+import { checkAgentHealthEffect, determineHealthStatusEffect } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { findPlanAsync, isPlanningCompleteAsync, isPlanningProposedAsync } from '../../../lib/vbrief/io.js';
+import { findPlanEffect, readPlanEffect } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
@@ -207,6 +207,21 @@ interface ConfirmationRequest {
 }
 
 const pendingConfirmations = new Map<string, ConfirmationRequest>();
+
+const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+
+const checkPlanStatusEffect = (
+  workspacePath: string,
+  matchStatus: (status: string) => boolean,
+): Effect.Effect<boolean, unknown> => Effect.gen(function* () {
+  const planPath = yield* findPlanEffect(workspacePath);
+  if (!planPath) return false;
+  const status = yield* readPlanEffect(planPath).pipe(
+    Effect.map(doc => doc.plan?.status),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+  return Boolean(status && matchStatus(status));
+});
 
 // ─── Runtime metrics helpers ──────────────────────────────────────────────────
 
@@ -442,17 +457,16 @@ const getHealthAgentsRoute = HttpRouter.add(
           name.startsWith('specialist-'),
       );
 
-      // Fetch the live tmux session set ONCE for the whole request — without
-      // this, determineHealthStatusAsync would spawn a tmux subprocess per
-      // agent dir (~150 forks per /api/health poll, every 5s).
-      const liveSessions = new Set(await listSessionNamesAsync());
+      // Fetch the live tmux session set ONCE for the whole request — per-agent
+      // liveness checks used to fork once per agent dir (~150 forks per poll).
+      const liveSessions = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
 
       const agents = await Promise.all(
         agentNames.map(async name => {
           const stateFile = join(agentsDir, name, 'state.json');
           const healthFile = join(agentsDir, name, 'health.json');
 
-          const healthStatus = await determineHealthStatusAsync(name, stateFile, liveSessions);
+          const healthStatus = await Effect.runPromise(determineHealthStatusEffect(name, stateFile, liveSessions));
           if (!healthStatus) return null;
 
           // Only read health.json for agents that survive the status filter —
@@ -505,7 +519,7 @@ const postHealthAgentPingRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
     try {
-        const health = await checkAgentHealthAsync(id);
+        const health = await Effect.runPromise(checkAgentHealthEffect(id));
 
         if (!health.alive) {
           return jsonResponse({ success: false, status: 'dead' });
@@ -876,7 +890,7 @@ const postConfirmationRespondRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
     try {
         const response = confirmed ? 'y' : 'n';
-        await sendKeysAsync(confirmationRequest.sessionName, response);
+        await Effect.runPromise(sendKeysEffect(confirmationRequest.sessionName, response));
         pendingConfirmations.delete(id);
         return jsonResponse({ success: true, confirmed });
       }    catch (error: unknown) {
@@ -986,24 +1000,24 @@ const getPlanningStatusRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            sessionExists = await sessionExistsAsync(sessionName);
+            sessionExists = await Effect.runPromise(sessionExistsAsyncEffect(sessionName));
           } catch {}
         }
 
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
         const hasContinueFile = existsSync(panContinueFile);
-        const hasPlanningState = hasContinueFile || await findPlanAsync(workspacePath) !== null;
+        const hasPlanningState = hasContinueFile || await Effect.runPromise(findPlanEffect(workspacePath)) !== null;
         const hasPromptFile = hasPlanningState;
         // hasCompletionMarker means `plan.status === 'proposed'` (gates the
         // dashboard Done button which should hide once the user has approved).
         // planningCompleted means `plan.status` indicates planning has finished
         // (any of proposed/approved/pending/running/completed/blocked).
         const hasCompletionMarker = existsSync(panDir)
-          ? await isPlanningProposedAsync(workspacePath, panDir)
+          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => status === 'proposed'))
           : false;
         const planningCompleted = existsSync(panDir)
-          ? await isPlanningCompleteAsync(workspacePath, panDir)
+          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => PLANNING_FINISHED_STATUSES.has(status)))
           : false;
 
         return jsonResponse({
@@ -1102,12 +1116,12 @@ const postPlanningMessageRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            sessionExists = await sessionExistsAsync(sessionName);
+            sessionExists = await Effect.runPromise(sessionExistsAsyncEffect(sessionName));
           } catch {}
         }
 
         if (sessionExists) {
-          await sendKeysAsync(sessionName, message, 'planning user message');
+          await Effect.runPromise(sendKeysEffect(sessionName, message, 'planning user message'));
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
@@ -1214,10 +1228,10 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
-        await createSessionAsync(sessionName, agentCwd, `bash '${launcherScript}'`);
+        await Effect.runPromise(createSessionAsyncEffect(sessionName, agentCwd, `bash '${launcherScript}'`));
 
         try {
-          await resizeWindowAsync(sessionName, 200, 50);
+          await Effect.runPromise(resizeWindowAsyncEffect(sessionName, 200, 50));
         } catch {}
 
         await Effect.runPromise(eventStore.append({
@@ -1258,7 +1272,7 @@ const deletePlanningSessionRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        await killSessionAsync(sessionName);
+        await Effect.runPromise(killSessionAsyncEffect(sessionName));
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

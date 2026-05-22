@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -30,9 +31,9 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
-  capturePaneAsync: vi.fn(),
-  listSessionNamesAsync: vi.fn(),
-  sessionExistsAsync: sessionExistsAsyncMock,
+  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+  listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+  sessionExistsAsyncEffect: (name: string) => Effect.promise(() => sessionExistsAsyncMock(name)),
 }));
 
 vi.mock('../../src/lib/agents.js', () => ({

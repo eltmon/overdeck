@@ -25,19 +25,40 @@ vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatus: vi.fn(),
 }));
 
-vi.mock('../../../lib/tmux.js', () => ({
+vi.mock('../../../lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsync: vi.fn(async () => ''),
-  createSessionAsync: vi.fn(async () => {}),
+  capturePaneAsyncEffect: effectMock(''),
+  createSessionAsyncEffect: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsync: vi.fn(async () => {}),
+  killSessionAsyncEffect: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsync: vi.fn(async () => []),
-  listSessionNamesAsync: vi.fn(async () => []),
+  listPaneValuesAsyncEffect: effectMock([]),
+  listSessionNamesAsyncEffect: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsync: vi.fn(async () => false),
-  sendKeysAsync: vi.fn(async () => {}),
-}));
+  sessionExistsAsyncEffect: effectMock(false),
+  sendKeysEffect: effectMock(undefined),
+  };
+});
 
 vi.mock('../specialists.js', () => ({
   getTmuxSessionName: vi.fn((t: string) => `specialist-${t}`),

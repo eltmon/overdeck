@@ -5,7 +5,7 @@
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { WorkspaceContinueState } from '../pan-dir/types.js';
@@ -690,6 +690,22 @@ export interface PersistedTaskOperation extends TaskOperation {
 
 export const activePlanWriters = new Map<string, string>();
 
+export class VBriefDagError extends Data.TaggedError('VBriefDagError')<{
+  readonly planPath: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+function liftDagError(planPath: string, operation: string, cause: unknown): VBriefDagError {
+  return new VBriefDagError({
+    planPath,
+    operation,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+}
+
 export function lockPathForPlan(planPath: string): string {
   return `${planPath}.writer.lock`;
 }
@@ -735,6 +751,12 @@ export async function removeStaleLockAsync(planPath: string): Promise<void> {
     }
   } catch { /* best effort */ }
 }
+
+export const removeStaleLockEffect = (planPath: string): Effect.Effect<void, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => removeStaleLockAsync(planPath),
+    catch: (cause) => liftDagError(planPath, 'removeStaleLock', cause),
+  });
 
 // PAN-977 round-16 blocker #2: bounded retry/wait around the writer lock so
 // concurrent same-cycle dispatch claims (parallel slot spawns mutating the
@@ -799,10 +821,22 @@ async function assertSingleWriterAsync(planPath: string, writerId: string): Prom
   throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
 }
 
+export const assertSingleWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => assertSingleWriterAsync(planPath, writerId),
+    catch: (cause) => liftDagError(planPath, 'assertSingleWriter', cause),
+  });
+
 async function releasePlanWriterAsync(planPath: string, writerId: string): Promise<void> {
   if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
   await rm(lockPathForPlan(planPath), { recursive: true, force: true });
 }
+
+export const releasePlanWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => releasePlanWriterAsync(planPath, writerId),
+    catch: (cause) => liftDagError(planPath, 'releasePlanWriter', cause),
+  });
 
 export function workspacePlanPath(workspacePath: string): string {
   return join(workspacePath, '.pan', 'spec.vbrief.json');
@@ -822,6 +856,12 @@ async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): 
   await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
   await rename(tmp, planPath);
 }
+
+export const writePlanFileAtomicEffect = (planPath: string, doc: VBriefDocument): Effect.Effect<void, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => writePlanFileAtomicAsync(planPath, doc),
+    catch: (cause) => liftDagError(planPath, 'writePlanFileAtomic', cause),
+  });
 
 /** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
 async function mirrorTaskOperationToContinueFileAsync(
@@ -887,6 +927,16 @@ export async function applyTaskOperationToPlanFileAsync(
     await releasePlanWriterAsync(planPath, operation.writerId);
   }
 }
+
+export const applyTaskOperationToPlanFileEffect = (
+  planPath: string,
+  operation: PersistedTaskOperation,
+  workspacePath?: string,
+): Effect.Effect<TaskOperationResult, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => applyTaskOperationToPlanFileAsync(planPath, operation, workspacePath),
+    catch: (cause) => liftDagError(planPath, 'applyTaskOperationToPlanFile', cause),
+  });
 
 export type TaskCommand = 'next' | 'show' | TaskOperationType;
 
@@ -1011,6 +1061,12 @@ async function readPlanFileAsync(planPath: string): Promise<VBriefDocument> {
   return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
 }
 
+export const readPlanFileEffect = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => readPlanFileAsync(planPath),
+    catch: (cause) => liftDagError(planPath, 'readPlanFile', cause),
+  });
+
 export async function writePipelineMirrorToPlanFileAsync(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): Promise<VBriefDocument | null> {
   if (!existsSync(planPath)) return null;
   await assertSingleWriterAsync(planPath, writerId);
@@ -1027,6 +1083,16 @@ export async function writePipelineMirrorToPlanFileAsync(planPath: string, mirro
     await releasePlanWriterAsync(planPath, writerId);
   }
 }
+
+export const writePipelineMirrorToPlanFileEffect = (
+  planPath: string,
+  mirror: NestedPlanPipelineMirror,
+  writerId = `pipeline-${process.pid}`,
+): Effect.Effect<VBriefDocument | null, VBriefDagError> =>
+  Effect.tryPromise({
+    try: () => writePipelineMirrorToPlanFileAsync(planPath, mirror, writerId),
+    catch: (cause) => liftDagError(planPath, 'writePipelineMirrorToPlanFile', cause),
+  });
 
 export interface PromptSizeVerification {
   fullPlanBytes: number;
