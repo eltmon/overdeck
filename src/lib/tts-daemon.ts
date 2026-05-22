@@ -5,7 +5,7 @@ import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { LOGS_DIR, PANOPTICON_HOME, packageRoot } from './paths.js';
+import { LOGS_DIR, PANOPTICON_HOME, SYNC_SOURCES, packageRoot } from './paths.js';
 import { loadConfig, type NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { ProcessSpawnError, FsError } from './errors.js';
 
@@ -109,7 +109,7 @@ export async function resolveQwenTtsPackageDir(): Promise<string> {
 }
 
 export async function resolveTtsDaemonScript(): Promise<string> {
-  const script = join(packageRoot, 'skills', 'pan-tts', 'scripts', 'tts_daemon.py');
+  const script = join(SYNC_SOURCES.skills, 'pan-tts', 'scripts', 'tts_daemon.py');
   if (await pathExists(script)) return script;
   throw new Error(`Qwen TTS daemon script not found at ${script}`);
 }

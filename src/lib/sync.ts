@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import {
   SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
-  SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SOURCE_SKILLS_DIR, SOURCE_AGENTS_DIR, SOURCE_RULES_DIR,
+  SYNC_SOURCES,
   CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
   SYNC_TARGET, isDevMode,
 } from './paths.js';
@@ -220,13 +220,13 @@ export function refreshCache(): RefreshCacheResult {
   };
 
   // Copy skills from repo to cache (always overwrite)
-  if (existsSync(SOURCE_SKILLS_DIR)) {
-    const skillDirs = readdirSync(SOURCE_SKILLS_DIR, { withFileTypes: true })
+  if (existsSync(SYNC_SOURCES.skills)) {
+    const skillDirs = readdirSync(SYNC_SOURCES.skills, { withFileTypes: true })
       .filter((d) => d.isDirectory());
 
     result.skills.total = skillDirs.length;
     for (const skillDir of skillDirs) {
-      const src = join(SOURCE_SKILLS_DIR, skillDir.name);
+      const src = join(SYNC_SOURCES.skills, skillDir.name);
       const dst = join(SKILLS_DIR, skillDir.name);
       copyDirectoryRecursive(src, dst);
       result.skills.copied++;
@@ -234,12 +234,12 @@ export function refreshCache(): RefreshCacheResult {
   }
 
   // Copy dev-skills to cache too (in dev mode only)
-  if (isDevMode() && existsSync(SOURCE_DEV_SKILLS_DIR)) {
-    const devSkillDirs = readdirSync(SOURCE_DEV_SKILLS_DIR, { withFileTypes: true })
+  if (isDevMode() && existsSync(SYNC_SOURCES.devSkills)) {
+    const devSkillDirs = readdirSync(SYNC_SOURCES.devSkills, { withFileTypes: true })
       .filter((d) => d.isDirectory());
 
     for (const skillDir of devSkillDirs) {
-      const src = join(SOURCE_DEV_SKILLS_DIR, skillDir.name);
+      const src = join(SYNC_SOURCES.devSkills, skillDir.name);
       const dst = join(SKILLS_DIR, skillDir.name);
       copyDirectoryRecursive(src, dst);
       result.skills.copied++;
@@ -262,14 +262,14 @@ export function refreshCache(): RefreshCacheResult {
   // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
   // never deletes existing files in the target, so non-Panopticon agent
   // definitions a project may have authored stay intact.
-  if (existsSync(SOURCE_AGENTS_DIR)) {
+  if (existsSync(SYNC_SOURCES.agents)) {
     mkdirSync(CACHE_AGENTS_DIR, { recursive: true });
-    const agents = readdirSync(SOURCE_AGENTS_DIR, { withFileTypes: true })
+    const agents = readdirSync(SYNC_SOURCES.agents, { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
 
     result.agents.total = agents.length;
     for (const agent of agents) {
-      copyFileSync(join(SOURCE_AGENTS_DIR, agent.name), join(CACHE_AGENTS_DIR, agent.name));
+      copyFileSync(join(SYNC_SOURCES.agents, agent.name), join(CACHE_AGENTS_DIR, agent.name));
       result.agents.copied++;
     }
 
@@ -298,14 +298,14 @@ export function refreshCache(): RefreshCacheResult {
   }
 
   // Copy rules from repo to cache (directory may not exist yet)
-  if (existsSync(SOURCE_RULES_DIR)) {
-    const ruleFiles = readdirSync(SOURCE_RULES_DIR, { withFileTypes: true })
+  if (existsSync(SYNC_SOURCES.rules)) {
+    const ruleFiles = readdirSync(SYNC_SOURCES.rules, { withFileTypes: true })
       .filter((entry) => entry.isFile());
 
     result.rules.total = ruleFiles.length;
     for (const rule of ruleFiles) {
       mkdirSync(CACHE_RULES_DIR, { recursive: true });
-      copyFileSync(join(SOURCE_RULES_DIR, rule.name), join(CACHE_RULES_DIR, rule.name));
+      copyFileSync(join(SYNC_SOURCES.rules, rule.name), join(CACHE_RULES_DIR, rule.name));
       result.rules.copied++;
     }
   }
@@ -536,18 +536,18 @@ export interface HookItem {
 export function planHooksSync(): HookItem[] {
   const hooks: HookItem[] = [];
 
-  if (!existsSync(SOURCE_SCRIPTS_DIR)) {
+  if (!existsSync(SYNC_SOURCES.hooks)) {
     return hooks;
   }
 
   // Sync hook scripts (no extension) and bundled JS scripts (.js)
   // Skip source files (.ts), shell helpers (.sh), and other non-hook files (.mjs)
-  const scripts = readdirSync(SOURCE_SCRIPTS_DIR, { withFileTypes: true })
+  const scripts = readdirSync(SYNC_SOURCES.hooks, { withFileTypes: true })
     .filter((entry) => entry.isFile() && !entry.name.startsWith('.')
       && (!entry.name.includes('.') || entry.name.endsWith('.js')));
 
   for (const script of scripts) {
-    const sourcePath = join(SOURCE_SCRIPTS_DIR, script.name);
+    const sourcePath = join(SYNC_SOURCES.hooks, script.name);
     const targetPath = join(BIN_DIR, script.name);
 
     let status: HookItem['status'] = 'new';
@@ -609,7 +609,7 @@ const STATUSLINE_TARGETS: Record<string, { configDir: string; scriptName: string
 export function syncStatusline(): { synced: string[]; errors: string[] } {
   const result = { synced: [] as string[], errors: [] as string[] };
 
-  const sourceScript = join(SOURCE_SCRIPTS_DIR, 'statusline.sh');
+  const sourceScript = join(SYNC_SOURCES.hooks, 'statusline.sh');
   if (!existsSync(sourceScript)) {
     return result;
   }

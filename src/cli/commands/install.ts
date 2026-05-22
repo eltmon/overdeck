@@ -14,8 +14,7 @@ import {
   TRAEFIK_DYNAMIC_DIR,
   TRAEFIK_CERTS_DIR,
   SKILLS_DIR,
-  SOURCE_TRAEFIK_TEMPLATES,
-  SOURCE_SKILLS_DIR
+  SYNC_SOURCES,
 } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
 import { Effect } from 'effect';
@@ -522,7 +521,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
       // Copy static Traefik files (docker-compose.yml, traefik.yml, certs)
       // Only copy if files don't already exist
       if (!existsSync(join(TRAEFIK_DIR, 'docker-compose.yml'))) {
-        copyDirectoryRecursive(SOURCE_TRAEFIK_TEMPLATES, TRAEFIK_DIR);
+        copyDirectoryRecursive(SYNC_SOURCES.traefikTemplates, TRAEFIK_DIR);
         // Remove .template files from runtime dir (they stay in source only)
         cleanupTemplateFiles();
         spinner.succeed('Traefik configuration created from templates');

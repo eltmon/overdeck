@@ -4,7 +4,7 @@
     "created": "2026-05-22T03:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1312: Finish the Effect migration — migrate all callers to *Effect siblings, then delete the Promise variants from src/lib/",
-    "updated": "2026-05-22T03:19:57.802Z"
+    "updated": "2026-05-22T10:57:32.753Z"
   },
   "plan": {
     "id": "pan-1312",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7a4c1e92-3b6d-4f81-a0e5-2c9d8b1f64a3",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 126,
     "created": "2026-05-22T03:25:00.000Z",
-    "updated": "2026-05-22T03:19:57.802Z",
+    "updated": "2026-05-22T10:57:32.753Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1312",
@@ -348,7 +348,9 @@
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Spawn failed for slot 8; releasing claim for retry",
+          "statusUpdatedAt": "2026-05-22T10:48:43.126Z"
         },
         "narrative": {
           "Action": "routes/agents.ts imports findPlanAsync/readPlanAsync (vbrief/io), getWorkAgentLifecycleStateAsync (work-agent-lifecycle) and several tmux *Async (capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync). The handlers are already Effect.gen — replace each *Async call with its Effect sibling (yield* the sibling directly) and remove the surrounding Effect.tryPromise wrapper. Migrate the colocated test routes/__tests__/agents-lifecycle-event.test.ts (update *Async mocks)."
@@ -409,14 +411,16 @@
       {
         "id": "w1c-route-swarm",
         "title": "Wave 1c — migrate routes/swarm.ts and its test off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 8 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:04:09.648Z"
         },
         "narrative": {
           "Action": "routes/swarm.ts imports *Async from vbrief/io, pan-dir/continue (readWorkspaceContinueAsync), vbrief/continue-state (readContinueStateAsync, writeContinueStateAsync), vbrief/dag and lib/tmux. Replace each with its Effect sibling in the Effect.gen handlers. Migrate routes/__tests__/swarm.test.ts (update *Async mocks). Preserve dag writer-lock behavior."
@@ -425,32 +429,37 @@
           {
             "id": "w1c-route-swarm.ac1",
             "title": "routes/swarm.ts and routes/__tests__/swarm.test.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:09.648Z"
           },
           {
             "id": "w1c-route-swarm.ac2",
             "title": "swarm endpoints behave identically; swarm.test.ts passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:09.648Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:04:09.648Z"
       },
       {
         "id": "w1c-route-session",
         "title": "Wave 1c — migrate routes/misc.ts, command-deck.ts and reviewer-tree.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 9 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:04:09.690Z"
         },
         "narrative": {
           "Action": "routes/misc.ts imports tmux *Async (createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync), vbrief/io *Async and the dashboard health-filtering *Async wrappers; command-deck.ts imports lib/agents and lib/tmux *Async; reviewer-tree.ts imports capturePaneAsync. Replace each with its Effect sibling. reviewer-tree.ts is plain-async — run the Effect via Effect.runPromise at the function boundary. NOTE H6: misc.ts keeps tmux send-keys delivery (sendKeysEffect) — do NOT switch it to the channels bridge."
@@ -459,20 +468,23 @@
           {
             "id": "w1c-route-session.ac1",
             "title": "routes/misc.ts, command-deck.ts and reviewer-tree.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:09.690Z"
           },
           {
             "id": "w1c-route-session.ac2",
             "title": "endpoints behave identically; tmux send-keys delivery is unchanged (not switched to the channels bridge)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:09.690Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:04:09.690Z"
       },
       {
         "id": "w1c-route-runtime",
@@ -484,7 +496,9 @@
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Spawn failed for slot 9; releasing claim for retry",
+          "statusUpdatedAt": "2026-05-22T10:48:43.210Z"
         },
         "narrative": {
           "Action": "These routes import lib/agents *Async (getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync) and lib/tmux listSessionNamesAsync. Replace with the Effect siblings. hooks/metrics/projects are Effect.gen — yield* the siblings; jsonl-resolver.ts is plain-async — run via Effect.runPromise at the function boundary."
@@ -511,14 +525,16 @@
       {
         "id": "w1c-route-infra",
         "title": "Wave 1c — migrate routes/cliproxy.ts, codex-auth.ts, flywheel.ts, specialists.ts and discovered-sessions.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 10 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:54:31.986Z"
         },
         "narrative": {
           "Action": "These routes import lib/cliproxy *Async (bridgeCodexAuthToCliproxyAsync, etc.), lib/tmux *Async (createSessionAsync, killSessionAsync, sessionExistsAsync, listSessionNamesAsync) and lib/config-yaml (getConversationsConfigAsync, updateConversationsConfigAsync). Replace each with its Effect sibling in the Effect.gen handlers; resolve dynamic *Async imports (e.g. specialists.ts dynamically imports sessionExistsAsync)."
@@ -527,32 +543,37 @@
           {
             "id": "w1c-route-infra.ac1",
             "title": "routes/cliproxy.ts, codex-auth.ts, flywheel.ts, specialists.ts and discovered-sessions.ts import no *Async variant from src/lib/ (including dynamic imports)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:54:31.986Z"
           },
           {
             "id": "w1c-route-infra.ac2",
             "title": "the affected endpoints behave identically",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:54:31.986Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:54:31.986Z"
       },
       {
         "id": "w1c-svc-polling",
         "title": "Wave 1c — migrate agent polling services off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 8 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:55:15.745Z"
         },
         "narrative": {
           "Action": "services/agent-enrichment-service.ts, agent-output-service.ts and running-agents-cache.ts are plain-async poller loops importing listRunningAgentsAsync (agents) and capturePaneAsync (tmux). Replace each *Async with its Effect sibling and run the Effect via Effect.runPromise inside the existing async poll loop — non-blocking, no *Sync FS. Migrate the colocated tests (agent-output-service.test.ts, running-agents-cache.test.ts), updating *Async mocks."
@@ -561,32 +582,37 @@
           {
             "id": "w1c-svc-polling.ac1",
             "title": "agent-enrichment-service.ts, agent-output-service.ts, running-agents-cache.ts and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:55:15.745Z"
           },
           {
             "id": "w1c-svc-polling.ac2",
             "title": "poller behavior is unchanged; the colocated tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:55:15.745Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:55:15.745Z"
       },
       {
         "id": "w1c-svc-health",
         "title": "Wave 1c — migrate system-health, resource-discovery and issue-data services off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:04:38.703Z"
         },
         "narrative": {
           "Action": "services/system-health-service.ts, resource-discovery.ts and issue-data-service.ts import lib/agents *Async (listRunningAgentsAsync, getAgentRuntimeStateAsync, getAgentStateAsync), lib/tmux listPaneValuesAsync, and vbrief/io findPlanAsync/readWorkspacePlanAsync. Replace each with its Effect sibling; run via Effect.runPromise at the async-service boundary."
@@ -595,32 +621,37 @@
           {
             "id": "w1c-svc-health.ac1",
             "title": "system-health-service.ts, resource-discovery.ts and issue-data-service.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:38.703Z"
           },
           {
             "id": "w1c-svc-health.ac2",
             "title": "service behavior is unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:04:38.703Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:04:38.703Z"
       },
       {
         "id": "w1c-svc-lifecycle",
         "title": "Wave 1c — migrate conversation-lifecycle, pending-respawn and agent-spawner services off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:34:48.413Z"
         },
         "narrative": {
           "Action": "services/conversation-lifecycle.ts, pending-respawn.ts and agent-spawner.ts import lib/tmux *Async (listSessionNamesAsync, sessionExistsAsync) and lib/agents stopAgentAsync (a dynamic import in agent-spawner). Replace each with its Effect sibling; run via Effect.runPromise at the async boundary. Migrate the colocated tests (conversation-lifecycle.test.ts, pending-respawn.test.ts, agent-spawner.test.ts, agent-spawner.unit.test.ts), updating *Async mocks."
@@ -629,32 +660,37 @@
           {
             "id": "w1c-svc-lifecycle.ac1",
             "title": "conversation-lifecycle.ts, pending-respawn.ts, agent-spawner.ts and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:34:48.413Z"
           },
           {
             "id": "w1c-svc-lifecycle.ac2",
             "title": "service behavior is unchanged; the colocated tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:34:48.413Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:34:48.413Z"
       },
       {
         "id": "w1c-svc-flywheel-terminal",
         "title": "Wave 1c — migrate flywheel-actions and terminal services off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 10 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:34:48.464Z"
         },
         "narrative": {
           "Action": "services/flywheel-actions.ts imports lib/config-yaml loadConfigAsyncNoMigration, lib/tmux sessionExistsAsync and lib/agents stopAgentAsync (static + dynamic import); services/terminal-service.ts is Effect.gen and imports lib/tmux resizeWindowAsync and sessionExistsAsync. Replace each *Async with its Effect sibling."
@@ -663,32 +699,37 @@
           {
             "id": "w1c-svc-flywheel-terminal.ac1",
             "title": "flywheel-actions.ts and terminal-service.ts import no *Async variant from src/lib/ (including dynamic imports)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:34:48.464Z"
           },
           {
             "id": "w1c-svc-flywheel-terminal.ac2",
             "title": "flywheel-actions and terminal-service behavior is unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:34:48.464Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:34:48.464Z"
       },
       {
         "id": "w1c-toplevel-bootstrap",
         "title": "Wave 1c — migrate main.ts, pending-feedback.ts and read-model.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:38:54.176Z"
         },
         "narrative": {
           "Action": "src/dashboard/server/main.ts and pending-feedback.ts import lib/agents *Async (getAgentStateAsync, messageAgent); read-model.ts imports *Async variants used during read-model bootstrap. Replace each with its Effect sibling, run via Effect.runPromise at the async/bootstrap boundary. Migrate the colocated __tests__/read-model-diff-summaries.test.ts."
@@ -697,32 +738,37 @@
           {
             "id": "w1c-toplevel-bootstrap.ac1",
             "title": "main.ts, pending-feedback.ts, read-model.ts and read-model-diff-summaries.test.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:38:54.176Z"
           },
           {
             "id": "w1c-toplevel-bootstrap.ac2",
             "title": "server bootstrap and read-model behavior is unchanged; the test passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:38:54.176Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:38:54.176Z"
       },
       {
         "id": "w1c-toplevel-ws",
         "title": "Wave 1c — migrate ws-rpc.ts and ws-terminal.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:39:11.773Z"
         },
         "narrative": {
           "Action": "ws-rpc.ts (Effect.gen RPC handlers) imports lib/tmux listSessionNamesAsync and lib/config-yaml getConversationsConfigAsync; ws-terminal.ts (raw WebSocket, plain-async) imports lib/tmux *Async (capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync). Replace each with its Effect sibling; ws-rpc yields directly, ws-terminal runs via Effect.runPromise inside its async IIFEs. Do not change PTY/terminal lifecycle behavior."
@@ -731,32 +777,37 @@
           {
             "id": "w1c-toplevel-ws.ac1",
             "title": "ws-rpc.ts and ws-terminal.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:11.773Z"
           },
           {
             "id": "w1c-toplevel-ws.ac2",
             "title": "WebSocket RPC and terminal streaming behavior is unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:11.773Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:39:11.773Z"
       },
       {
         "id": "w1c-health-filtering",
         "title": "Wave 1c — migrate src/dashboard/lib/health-filtering.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:47:20.419Z"
         },
         "narrative": {
           "Action": "src/dashboard/lib/health-filtering.ts is a shared dashboard helper (consumed by routes/misc.ts) that imports lib/agents *Async variants. Replace them with the Effect siblings. Acceptance criterion 2 of the issue greps all of src/dashboard, so this file outside src/dashboard/server/ is still in scope."
@@ -765,32 +816,37 @@
           {
             "id": "w1c-health-filtering.ac1",
             "title": "src/dashboard/lib/health-filtering.ts imports no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:47:20.419Z"
           },
           {
             "id": "w1c-health-filtering.ac2",
             "title": "health-filtering behavior is unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:47:20.419Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:47:20.419Z"
       },
       {
         "id": "w1d-cloister-orchestration",
         "title": "Wave 1d — migrate cloister orchestration files (deacon, service, session-rotation, specialists) off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 5 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:39:31.045Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/deacon.ts, service.ts, session-rotation.ts and specialists.ts (and their __tests__) onto the Effect siblings. These are orchestration helpers — replace *Async calls with Effect siblings run via Effect.runPromise where the surrounding code stays imperative. Update test mocks/spies for the Effect siblings."
@@ -799,32 +855,37 @@
           {
             "id": "w1d-cloister-orchestration.ac1",
             "title": "cloister deacon.ts, service.ts, session-rotation.ts, specialists.ts and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:31.045Z"
           },
           {
             "id": "w1d-cloister-orchestration.ac2",
             "title": "orchestration behavior is unchanged; the affected cloister tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:31.045Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:39:31.045Z"
       },
       {
         "id": "w1d-cloister-review",
         "title": "Wave 1d — migrate cloister review files (review-agent, review-context, review-monitor, inspect-agent) off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:44:49.939Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/review-agent.ts, review-context.ts, review-monitor.ts and inspect-agent.ts (and their __tests__) onto the Effect siblings. Update test mocks for the Effect siblings."
@@ -833,32 +894,37 @@
           {
             "id": "w1d-cloister-review.ac1",
             "title": "cloister review-agent.ts, review-context.ts, review-monitor.ts, inspect-agent.ts and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:44:49.939Z"
           },
           {
             "id": "w1d-cloister-review.ac2",
             "title": "review-pipeline behavior is unchanged; the affected tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:44:49.939Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:44:49.939Z"
       },
       {
         "id": "w1d-cloister-merge-flywheel",
         "title": "Wave 1d — migrate cloister merge/flywheel files (merge-agent, flywheel, work-agent-prompt) off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 10 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T08:39:49.006Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/merge-agent.ts, flywheel.ts and work-agent-prompt.ts (and their __tests__) onto the Effect siblings. work-agent-prompt.ts already uses Effect.runPromise for some calls — consume the Effect siblings directly there. Update test mocks."
@@ -867,32 +933,37 @@
           {
             "id": "w1d-cloister-merge-flywheel.ac1",
             "title": "cloister merge-agent.ts, flywheel.ts, work-agent-prompt.ts and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:49.006Z"
           },
           {
             "id": "w1d-cloister-merge-flywheel.ac2",
             "title": "merge/flywheel behavior is unchanged; the affected tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T08:39:49.006Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T08:39:49.006Z"
       },
       {
         "id": "w1d-memory",
         "title": "Wave 1d — migrate src/lib/memory/ caller files off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 dispatched",
+          "statusUpdatedAt": "2026-05-22T10:47:10.850Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/memory/pipeline.ts, poller.ts, reconciliation.ts and transcript-source.ts (and memory __tests__) onto the Effect siblings. NOTE: memory/checkpoint-client.ts itself is OUT OF SCOPE (its own *Async functions have no Effect sibling) — only migrate memory files' usage of OTHER modules' *Async variants; calls to checkpoint-client's own *Async functions stay."
@@ -919,14 +990,16 @@
       {
         "id": "w1d-lifecycle",
         "title": "Wave 1d — migrate src/lib/lifecycle/ caller files off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 dispatched",
+          "statusUpdatedAt": "2026-05-22T10:47:11.633Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/lifecycle/close-issue.ts, teardown-workspace.ts and workflows.ts onto the Effect siblings."
@@ -953,14 +1026,16 @@
       {
         "id": "w1d-agent-modules",
         "title": "Wave 1d — migrate agent-* lib modules off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 dispatched",
+          "statusUpdatedAt": "2026-05-22T10:47:10.910Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/agent-directory-cleanup.ts, agent-enrichment.ts and agent-input-detection.ts (and their __tests__) onto the Effect siblings. Update test mocks."
@@ -987,14 +1062,16 @@
       {
         "id": "w1d-runtimes",
         "title": "Wave 1d — migrate src/lib/runtimes/ files off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:57:32.753Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/runtimes/claude-code.ts and pi.ts (and runtimes __tests__) onto the Effect siblings. Update test mocks."
@@ -1003,32 +1080,37 @@
           {
             "id": "w1d-runtimes.ac1",
             "title": "src/lib/runtimes/ files and their tests import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:57:32.753Z"
           },
           {
             "id": "w1d-runtimes.ac2",
             "title": "runtime behavior is unchanged; the affected tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:57:32.753Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:57:32.753Z"
       },
       {
         "id": "w1d-vbrief-internal",
         "title": "Wave 1d — migrate cross-module *Async usage within src/lib/vbrief/",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 5 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:48:19.022Z"
         },
         "narrative": {
           "Action": "The vbrief modules call each other's *Async variants (io, dag, continue-state, vbrief-index). Migrate every cross-module *Async import within src/lib/vbrief/io.ts, dag.ts, continue-state.ts and vbrief-index.ts (and vbrief __tests__) onto the Effect siblings. This bead migrates CALLER usage only — a module's own *Async exports are deleted later in Wave 2a. Preserve dag writer-lock semantics."
@@ -1037,32 +1119,37 @@
           {
             "id": "w1d-vbrief-internal.ac1",
             "title": "no src/lib/vbrief/ file imports another vbrief module's *Async variant",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:19.022Z"
           },
           {
             "id": "w1d-vbrief-internal.ac2",
             "title": "vbrief behavior is unchanged; vbrief tests pass (including dag-writer-lock tests)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:19.022Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:48:19.022Z"
       },
       {
         "id": "w1d-config-internal",
         "title": "Wave 1d — migrate cross-module *Async usage within config / review-status lib modules",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 6 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:48:30.729Z"
         },
         "narrative": {
           "Action": "Migrate every cross-module *Async import within src/lib/config.ts, config-yaml.ts, cloister/config.ts, review-status.ts, review-status-enrichment.ts and database/review-status-db.ts onto the Effect siblings — caller usage only; own *Async exports are deleted in Wave 2a. NOTE: review-status.ts setReviewStatus is a sync function that internally fire-and-forgets dbUpsert work — preserve that fire-and-forget shape; convert the inner call to the Effect sibling run via Effect.runPromise."
@@ -1071,32 +1158,37 @@
           {
             "id": "w1d-config-internal.ac1",
             "title": "config.ts, config-yaml.ts, cloister/config.ts, review-status.ts, review-status-enrichment.ts and review-status-db.ts import no other module's *Async variant",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:30.729Z"
           },
           {
             "id": "w1d-config-internal.ac2",
             "title": "config loading and review-status behavior is unchanged; the affected tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:30.729Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:48:30.729Z"
       },
       {
         "id": "w1d-misc",
         "title": "Wave 1d — migrate remaining src/lib/ caller files off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T10:48:51.865Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in the remaining lib caller files — close-out.ts, health.ts, webhook-handlers.ts, planning/spawn-planning-session.ts, pan-dir/index.ts, pan-dir/specs.ts, pan-dir/continue.ts, work-agent-lifecycle.ts (cross-module usage) and any remaining src/lib/__tests__ — onto the Effect siblings. After this bead, no src/lib/ file imports another module's *Async variant. Update test mocks."
@@ -1105,20 +1197,23 @@
           {
             "id": "w1d-misc.ac1",
             "title": "the remaining src/lib/ caller files and tests import no *Async variant from another src/lib/ module",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:51.865Z"
           },
           {
             "id": "w1d-misc.ac2",
             "title": "behavior is unchanged; the affected tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T10:48:51.865Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T10:48:51.865Z"
       },
       {
         "id": "w1e-gate",

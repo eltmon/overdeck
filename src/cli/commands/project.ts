@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, symlinkSync, mkdirSync, readdirSync, statSync } from 'fs';
-import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join, resolve } from 'path';
 import {
   listProjects,
   registerProject,
@@ -13,12 +12,10 @@ import {
   IssueRoutingRule,
   getIssuePrefix,
 } from '../../lib/projects.js';
+import { SYNC_SOURCES } from '../../lib/paths.js';
 
-// Get path to bundled git hooks
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// After build: dist/cli/commands/project.js -> dist -> package root -> scripts/git-hooks
-const BUNDLED_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
+// Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
+const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
 
 /**
  * Install Panopticon git hooks in a directory

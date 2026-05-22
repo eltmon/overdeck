@@ -3,14 +3,13 @@ import ora from 'ora';
 import { execSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlinkSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { loadConfig } from '../../lib/config.js';
 import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
 import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills, syncPiSettings } from '../../lib/sync.js';
-import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
+import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
@@ -19,10 +18,8 @@ import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
 import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolation, ensureExcalidrawMcp } from '../../lib/claude-mcp.js';
 
-// Get path to bundled git hooks
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const BUNDLED_GIT_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
+// Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
+const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
 
 // Helper to check if a command exists
 function checkCommand(cmd: string): boolean {

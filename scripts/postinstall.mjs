@@ -15,7 +15,8 @@ import { spawnSync } from 'child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = dirname(__dirname);
 const BIN_DIR = join(homedir(), '.panopticon', 'bin');
-const SCRIPTS_DIR = __dirname;
+// PAN-1201: hook scripts live under sync-sources/hooks/, not scripts/.
+const HOOKS_SOURCE_DIR = join(PACKAGE_ROOT, 'sync-sources', 'hooks');
 const NATIVE_MODULES = ['better-sqlite3'];
 
 function syncHooksIfInitialized() {
@@ -27,14 +28,20 @@ function syncHooksIfInitialized() {
   // Ensure bin directory exists
   mkdirSync(BIN_DIR, { recursive: true });
 
-  // Copy all scripts from scripts/ to ~/.panopticon/bin/
-  const scripts = readdirSync(SCRIPTS_DIR)
-    .filter(f => !f.startsWith('.') && !f.endsWith('.mjs') && !f.endsWith('.js'));
+  // Copy hook scripts (extensionless executables + .sh helpers) to
+  // ~/.panopticon/bin/. Built artifacts (record-cost-event.js), build config
+  // (tsdown.config.ts, *.ts), and the git-hooks/ subdir are skipped — those
+  // are not Claude Code hooks. `pan sync` handles record-cost-event.js.
+  if (!existsSync(HOOKS_SOURCE_DIR)) return;
+  const scripts = readdirSync(HOOKS_SOURCE_DIR, { withFileTypes: true })
+    .filter(d => d.isFile() && !d.name.startsWith('.'))
+    .filter(d => !d.name.includes('.') || d.name.endsWith('.sh'))
+    .map(d => d.name);
 
   let synced = 0;
   for (const script of scripts) {
     try {
-      const source = join(SCRIPTS_DIR, script);
+      const source = join(HOOKS_SOURCE_DIR, script);
       const target = join(BIN_DIR, script);
       copyFileSync(source, target);
       chmodSync(target, 0o755);
