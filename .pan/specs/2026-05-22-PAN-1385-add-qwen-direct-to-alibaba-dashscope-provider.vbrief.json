@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:37:01.305Z"
+    "updated": "2026-05-22T23:39:53.607Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:37:01.305Z",
+    "updated": "2026-05-22T23:39:53.607Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -379,7 +379,7 @@
       {
         "id": "frontend-settings-ui",
         "title": "Expose DashScope as a Settings provider tile + catalog entry",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -395,7 +395,7 @@
           {
             "id": "frontend-settings-ui.ac1",
             "title": "Settings page shows an 'Alibaba DashScope' provider tile with an API-key input.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -403,7 +403,7 @@
           {
             "id": "frontend-settings-ui.ac2",
             "title": "modelCatalog.ts includes qwen3-max (premium), qwen3-coder-plus (premium, coding tag emphasized), qwen3-plus (balanced), and qwen3.7 or canonical equivalent (premium, flagship — sits alongside qwen3-max).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -411,7 +411,7 @@
           {
             "id": "frontend-settings-ui.ac3",
             "title": "ProviderPanel.tsx `providerList` array includes `'dashscope'` (place it adjacent to `'nous'` for visual grouping).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
