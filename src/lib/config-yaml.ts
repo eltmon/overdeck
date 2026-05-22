@@ -2013,6 +2013,19 @@ export const loadConfigAsyncNoMigrationEffect = (): Effect.Effect<
       }),
   });
 
+export const getConversationsConfigAsyncEffect = (): Effect.Effect<
+  RuntimeConversationsConfig,
+  ConfigError
+> =>
+  Effect.tryPromise({
+    try: () => getConversationsConfigAsync(),
+    catch: (cause) =>
+      new ConfigError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
 /**
  * Effect-native loadConfig — sync read, wraps any failure (parse / fs) as
  * ConfigError. Use this from Effect contexts that need merged config without
