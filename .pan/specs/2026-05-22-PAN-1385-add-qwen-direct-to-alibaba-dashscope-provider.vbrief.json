@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:42:27.576Z"
+    "updated": "2026-05-22T23:45:07.537Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:42:27.576Z",
+    "updated": "2026-05-22T23:45:07.537Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -290,7 +290,7 @@
       {
         "id": "dashboard-settings-route",
         "title": "Wire `dashscope` into dashboard /test-api-key and /validate-api-key routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -306,7 +306,7 @@
           {
             "id": "dashboard-settings-route.ac1",
             "title": "Provider allow-list in /api/settings/validate-api-key includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -314,7 +314,7 @@
           {
             "id": "dashboard-settings-route.ac2",
             "title": "Both /test-api-key and /validate-api-key handle `provider: 'dashscope'` and call `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/...` URLs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -322,7 +322,7 @@
           {
             "id": "dashboard-settings-route.ac3",
             "title": "401 / 404 / generic-HTTP error paths in the new `case 'dashscope'` blocks match the nous block's error-message shape (so the UI surfaces identical messages across providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
