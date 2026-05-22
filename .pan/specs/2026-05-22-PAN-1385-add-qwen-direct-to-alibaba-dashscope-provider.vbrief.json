@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:17:02.771Z"
+    "updated": "2026-05-22T23:22:39.266Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:17:02.771Z",
+    "updated": "2026-05-22T23:22:39.266Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -240,7 +240,7 @@
       {
         "id": "add-qwen3-capabilities",
         "title": "Add MODEL_CAPABILITIES entries for qwen3-max, qwen3-coder-plus, qwen3-plus",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -256,7 +256,7 @@
           {
             "id": "add-qwen3-capabilities.ac1",
             "title": "`ModelCapability.provider` union includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -264,7 +264,7 @@
           {
             "id": "add-qwen3-capabilities.ac2",
             "title": "MODEL_CAPABILITIES contains entries for `qwen3-max`, `qwen3-coder-plus`, `qwen3-plus`, and `qwen3.7` (or its verified canonical equivalent), each with `provider: 'dashscope'` and a `notes` field mentioning 'Singapore intl / ap-southeast-1'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -272,7 +272,7 @@
           {
             "id": "add-qwen3-capabilities.ac3",
             "title": "`getModelsForProvider('dashscope')` returns exactly the four new model IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7 or canonical equivalent).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -280,7 +280,7 @@
           {
             "id": "add-qwen3-capabilities.ac4",
             "title": "Each new entry has all 11 SkillDimension scores populated (no missing keys).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

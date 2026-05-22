@@ -18,7 +18,7 @@
  */
 
 import { Effect } from 'effect';
-import { DashScopeModel, ModelId } from './settings.js';
+import { ModelId } from './settings.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
@@ -86,13 +86,13 @@ export type SkillDimension =
 /**
  * Capability profile for a single model
  */
-type CapabilityModelId = Exclude<ModelId, DashScopeModel>;
+type CapabilityModelId = ModelId;
 
 export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -783,6 +783,98 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 100,
     },
     notes: 'Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DASHSCOPE (ALIBABA) MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'qwen3-max': {
+    model: 'qwen3-max',
+    provider: 'dashscope',
+    displayName: 'Qwen3 Max (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 95,
+      'code-review': 93,
+      debugging: 93,
+      planning: 94,
+      documentation: 91,
+      testing: 91,
+      security: 89,
+      performance: 89,
+      synthesis: 94,
+      speed: 72,
+      'context-length': 98,
+    },
+    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+  },
+
+  'qwen3-coder-plus': {
+    model: 'qwen3-coder-plus',
+    provider: 'dashscope',
+    displayName: 'Qwen3 Coder Plus (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 96,
+      'code-review': 94,
+      debugging: 94,
+      planning: 91,
+      documentation: 90,
+      testing: 92,
+      security: 89,
+      performance: 90,
+      synthesis: 92,
+      speed: 74,
+      'context-length': 98,
+    },
+    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+  },
+
+  'qwen3-plus': {
+    model: 'qwen3-plus',
+    provider: 'dashscope',
+    displayName: 'Qwen3 Plus (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 131072,
+    skills: {
+      'code-generation': 88,
+      'code-review': 86,
+      debugging: 86,
+      planning: 84,
+      documentation: 84,
+      testing: 84,
+      security: 80,
+      performance: 82,
+      synthesis: 88,
+      speed: 82,
+      'context-length': 96,
+    },
+    notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+  },
+
+  'qwen3.7': {
+    model: 'qwen3.7',
+    provider: 'dashscope',
+    displayName: 'Qwen3.7 (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 96,
+      'code-review': 94,
+      debugging: 94,
+      planning: 95,
+      documentation: 92,
+      testing: 92,
+      security: 90,
+      performance: 90,
+      synthesis: 95,
+      speed: 70,
+      'context-length': 98,
+    },
+    notes: 'Canonical DashScope ID pending smoke-test verification; substitute everywhere if upstream renames. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
   },
 };
 
