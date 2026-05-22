@@ -737,7 +737,7 @@ export function isPidDead(pid: number | undefined | null): boolean {
  * Remove a stale writer lock directory and any sibling `.tmp` transaction
  * files for the same plan path. Idempotent and best-effort.
  */
-export async function removeStaleLockAsync(planPath: string): Promise<void> {
+async function removeStaleLockFiles(planPath: string): Promise<void> {
   await rm(lockPathForPlan(planPath), { recursive: true, force: true });
   // Sweep .tmp transaction files that share the plan-path prefix
   try {
@@ -754,7 +754,7 @@ export async function removeStaleLockAsync(planPath: string): Promise<void> {
 
 export const removeStaleLockEffect = (planPath: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
-    try: () => removeStaleLockAsync(planPath),
+    try: () => removeStaleLockFiles(planPath),
     catch: (cause) => liftDagError(planPath, 'removeStaleLock', cause),
   });
 
@@ -766,75 +766,70 @@ export const removeStaleLockEffect = (planPath: string): Effect.Effect<void, VBr
 // stuck lock surfaces quickly.
 const WRITER_LOCK_RETRY_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320, 360];
 
-async function assertSingleWriterAsync(planPath: string, writerId: string): Promise<void> {
-  const lockPath = lockPathForPlan(planPath);
-  let lastOwnerDescription = 'unknown writer';
-  for (let attempt = 0; attempt <= WRITER_LOCK_RETRY_DELAYS_MS.length; attempt += 1) {
-    const owner = activePlanWriters.get(planPath);
-    if (!owner || owner === writerId) {
-      try {
-        await mkdir(lockPath, { mode: 0o700 });
-        // PAN-977 review-round-17 blocker: once mkdir succeeds we own the
-        // lock directory. If the owner.json write throws a non-EEXIST error
-        // (ENOSPC, EPERM, ENAMETOOLONG, …), we must remove the directory
-        // before re-throwing — otherwise the orphan lock wedges every
-        // subsequent assertSingleWriterAsync call (mkdir → EEXIST →
-        // owner.json read → ENOENT → "unknown writer" → permanent
-        // writer-conflict), and `activePlanWriters.set` never ran so
-        // `releasePlanWriterAsync` won't free it either.
-        try {
-          await writeFile(
-            lockOwnerPath(planPath),
-            JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
-            'utf-8',
-          );
-        } catch (writeErr) {
-          try { await rm(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
-          throw writeErr;
-        }
-        activePlanWriters.set(planPath, writerId);
-        return;
-      } catch (err: any) {
-        if (err?.code !== 'EEXIST') throw err;
-        // On-disk lock exists but in-memory map says owner-or-empty — record
-        // the on-disk owner for diagnostics. If the owner PID is dead, the
-        // lock is orphaned (writer crashed); reclaim it on the next attempt.
-        let ownerPid: number | undefined;
-        try {
-          const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
-          ownerPid = ownerData.pid;
-          lastOwnerDescription = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
-        } catch { /* ignore malformed owner file */ }
-        if (isPidDead(ownerPid)) {
-          console.warn(`[vbrief] Reclaiming orphan writer lock for ${planPath} (dead ${lastOwnerDescription})`);
-          await removeStaleLockAsync(planPath);
-          continue;
-        }
-      }
-    } else {
-      lastOwnerDescription = owner;
-    }
-    const delay = WRITER_LOCK_RETRY_DELAYS_MS[attempt];
-    if (delay === undefined) break;
-    await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
-  }
-  throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
-}
-
 export const assertSingleWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
-    try: () => assertSingleWriterAsync(planPath, writerId),
+    try: async () => {
+      const lockPath = lockPathForPlan(planPath);
+      let lastOwnerDescription = 'unknown writer';
+      for (let attempt = 0; attempt <= WRITER_LOCK_RETRY_DELAYS_MS.length; attempt += 1) {
+        const owner = activePlanWriters.get(planPath);
+        if (!owner || owner === writerId) {
+          try {
+            await mkdir(lockPath, { mode: 0o700 });
+            // PAN-977 review-round-17 blocker: once mkdir succeeds we own the
+            // lock directory. If the owner.json write throws a non-EEXIST error
+            // (ENOSPC, EPERM, ENAMETOOLONG, …), we must remove the directory
+            // before re-throwing — otherwise the orphan lock wedges every
+            // subsequent writer acquisition (mkdir → EEXIST → owner.json read
+            // → ENOENT → "unknown writer" → permanent writer-conflict), and
+            // `activePlanWriters.set` never ran so release cannot free it.
+            try {
+              await writeFile(
+                lockOwnerPath(planPath),
+                JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
+                'utf-8',
+              );
+            } catch (writeErr) {
+              try { await rm(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
+              throw writeErr;
+            }
+            activePlanWriters.set(planPath, writerId);
+            return;
+          } catch (err: any) {
+            if (err?.code !== 'EEXIST') throw err;
+            // On-disk lock exists but in-memory map says owner-or-empty — record
+            // the on-disk owner for diagnostics. If the owner PID is dead, the
+            // lock is orphaned (writer crashed); reclaim it on the next attempt.
+            let ownerPid: number | undefined;
+            try {
+              const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
+              ownerPid = ownerData.pid;
+              lastOwnerDescription = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
+            } catch { /* ignore malformed owner file */ }
+            if (isPidDead(ownerPid)) {
+              console.warn(`[vbrief] Reclaiming orphan writer lock for ${planPath} (dead ${lastOwnerDescription})`);
+              await removeStaleLockFiles(planPath);
+              continue;
+            }
+          }
+        } else {
+          lastOwnerDescription = owner;
+        }
+        const delay = WRITER_LOCK_RETRY_DELAYS_MS[attempt];
+        if (delay === undefined) break;
+        await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
+      }
+      throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
+    },
     catch: (cause) => liftDagError(planPath, 'assertSingleWriter', cause),
   });
 
-async function releasePlanWriterAsync(planPath: string, writerId: string): Promise<void> {
-  if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
-  await rm(lockPathForPlan(planPath), { recursive: true, force: true });
-}
-
 export const releasePlanWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
-    try: () => releasePlanWriterAsync(planPath, writerId),
+    try: async () => {
+      if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
+      await rm(lockPathForPlan(planPath), { recursive: true, force: true });
+    },
     catch: (cause) => liftDagError(planPath, 'releasePlanWriter', cause),
   });
 
@@ -850,92 +845,85 @@ export function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
   }
 }
 
-async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): Promise<void> {
-  await mkdir(dirname(planPath), { recursive: true });
-  const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
-  await rename(tmp, planPath);
-}
-
 export const writePlanFileAtomicEffect = (planPath: string, doc: VBriefDocument): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
-    try: () => writePlanFileAtomicAsync(planPath, doc),
+    try: async () => {
+      await mkdir(dirname(planPath), { recursive: true });
+      const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
+      await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+      await rename(tmp, planPath);
+    },
     catch: (cause) => liftDagError(planPath, 'writePlanFileAtomic', cause),
   });
 
 /** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
-async function mirrorTaskOperationToContinueFileAsync(
+const mirrorTaskOperationToContinueFileEffect = (
   workspacePath: string,
   itemId: string,
   status: VBriefItemStatus,
   doc: VBriefDocument,
   subItemIds?: string[],
-): Promise<void> {
-  // PAN-1249: readWorkspaceContinue/writeWorkspaceContinue are now Effect-based.
-  // Wrap with Effect.runPromise at the async-public boundary to preserve the
-  // existing Promise<void> signature without cascading Effect through every
-  // caller (the additive-variant strategy used elsewhere in this directory).
-  const continueState: WorkspaceContinueState = (await Effect.runPromise(
-    readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null as WorkspaceContinueState | null))),
-  )) ?? {
-    version: '1' as const,
-    issueId: '',
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    gitState: {},
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-  };
-  const overrides = { ...(continueState.statusOverrides ?? {}) };
-  overrides[itemId] = status;
+): Effect.Effect<void, VBriefDagError> =>
+  Effect.gen(function* () {
+    const continueState: WorkspaceContinueState = (yield* readWorkspaceContinue(workspacePath).pipe(
+      Effect.catch(() => Effect.succeed(null as WorkspaceContinueState | null)),
+    )) ?? {
+      version: '1' as const,
+      issueId: '',
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+    };
+    const overrides = { ...(continueState.statusOverrides ?? {}) };
+    overrides[itemId] = status;
 
-  // Derive affected subItems from the already-mutated plan document
-  const item = doc.plan.items.find(i => i.id === itemId);
-  if (item?.subItems) {
-    const allSubIds = item.subItems.map(s => s.id);
-    const affectedSubIds = subItemIds?.length
-      ? subItemIds.filter(id => allSubIds.includes(id))
-      : (status === 'completed' ? allSubIds : []);
-    for (const subId of affectedSubIds) {
-      overrides[`${itemId}.${subId}`] = status;
+    // Derive affected subItems from the already-mutated plan document
+    const item = doc.plan.items.find(i => i.id === itemId);
+    if (item?.subItems) {
+      const allSubIds = item.subItems.map(s => s.id);
+      const affectedSubIds = subItemIds?.length
+        ? subItemIds.filter(id => allSubIds.includes(id))
+        : (status === 'completed' ? allSubIds : []);
+      for (const subId of affectedSubIds) {
+        overrides[`${itemId}.${subId}`] = status;
+      }
     }
-  }
 
-  continueState.statusOverrides = overrides;
-  await Effect.runPromise(writeWorkspaceContinue(workspacePath, continueState));
-}
-
-export async function applyTaskOperationToPlanFileAsync(
-  planPath: string,
-  operation: PersistedTaskOperation,
-  workspacePath?: string,
-): Promise<TaskOperationResult> {
-  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
-  await assertSingleWriterAsync(planPath, operation.writerId);
-  try {
-    const current = await readPlanFileAsync(planPath);
-    const result = applyTaskOperation(current, operation);
-    await writePlanFileAtomicAsync(planPath, result.doc);
-    // PAN-977: also update canonical continue-state overlay
-    const wsPath = workspacePath ?? dirname(dirname(planPath));
-    await mirrorTaskOperationToContinueFileAsync(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
-    return result;
-  } finally {
-    await releasePlanWriterAsync(planPath, operation.writerId);
-  }
-}
+    continueState.statusOverrides = overrides;
+    yield* writeWorkspaceContinue(workspacePath, continueState);
+  }).pipe(Effect.mapError((cause) => liftDagError(workspacePath, 'mirrorTaskOperationToContinueFile', cause)));
 
 export const applyTaskOperationToPlanFileEffect = (
   planPath: string,
   operation: PersistedTaskOperation,
   workspacePath?: string,
 ): Effect.Effect<TaskOperationResult, VBriefDagError> =>
-  Effect.tryPromise({
-    try: () => applyTaskOperationToPlanFileAsync(planPath, operation, workspacePath),
-    catch: (cause) => liftDagError(planPath, 'applyTaskOperationToPlanFile', cause),
+  Effect.gen(function* () {
+    if (!existsSync(planPath)) {
+      return yield* Effect.fail(liftDagError(planPath, 'applyTaskOperationToPlanFile', new Error(`vBRIEF plan not found: ${planPath}`)));
+    }
+
+    return yield* Effect.acquireUseRelease(
+      assertSingleWriterEffect(planPath, operation.writerId),
+      () => Effect.gen(function* () {
+        const current = yield* readPlanFileEffect(planPath);
+        const result = yield* Effect.try({
+          try: () => applyTaskOperation(current, operation),
+          catch: (cause) => liftDagError(planPath, 'applyTaskOperationToPlanFile', cause),
+        });
+        yield* writePlanFileAtomicEffect(planPath, result.doc);
+        // PAN-977: also update canonical continue-state overlay
+        const wsPath = workspacePath ?? dirname(dirname(planPath));
+        yield* mirrorTaskOperationToContinueFileEffect(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
+        return result;
+      }),
+      () => releasePlanWriterEffect(planPath, operation.writerId),
+    );
   });
 
 export type TaskCommand = 'next' | 'show' | TaskOperationType;
@@ -1057,41 +1045,34 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
   };
 }
 
-async function readPlanFileAsync(planPath: string): Promise<VBriefDocument> {
-  return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
-}
-
 export const readPlanFileEffect = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>
   Effect.tryPromise({
-    try: () => readPlanFileAsync(planPath),
+    try: async () => JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument,
     catch: (cause) => liftDagError(planPath, 'readPlanFile', cause),
   });
-
-export async function writePipelineMirrorToPlanFileAsync(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): Promise<VBriefDocument | null> {
-  if (!existsSync(planPath)) return null;
-  await assertSingleWriterAsync(planPath, writerId);
-  try {
-    const doc = await readPlanFileAsync(planPath);
-    setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
-    const now = new Date().toISOString();
-    doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
-    doc.plan.updated = now;
-    doc.vBRIEFInfo.updated = now;
-    await writePlanFileAtomicAsync(planPath, doc);
-    return doc;
-  } finally {
-    await releasePlanWriterAsync(planPath, writerId);
-  }
-}
 
 export const writePipelineMirrorToPlanFileEffect = (
   planPath: string,
   mirror: NestedPlanPipelineMirror,
   writerId = `pipeline-${process.pid}`,
 ): Effect.Effect<VBriefDocument | null, VBriefDagError> =>
-  Effect.tryPromise({
-    try: () => writePipelineMirrorToPlanFileAsync(planPath, mirror, writerId),
-    catch: (cause) => liftDagError(planPath, 'writePipelineMirrorToPlanFile', cause),
+  Effect.gen(function* () {
+    if (!existsSync(planPath)) return null;
+
+    return yield* Effect.acquireUseRelease(
+      assertSingleWriterEffect(planPath, writerId),
+      () => Effect.gen(function* () {
+        const doc = yield* readPlanFileEffect(planPath);
+        setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
+        const now = new Date().toISOString();
+        doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+        doc.plan.updated = now;
+        doc.vBRIEFInfo.updated = now;
+        yield* writePlanFileAtomicEffect(planPath, doc);
+        return doc;
+      }),
+      () => releasePlanWriterEffect(planPath, writerId),
+    );
   });
 
 export interface PromptSizeVerification {
