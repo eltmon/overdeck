@@ -27,6 +27,7 @@ vi.mock('../config-yaml.js', () => ({
     mid: 'claude-sonnet-4-6',
     cheap: 'claude-haiku-4-5',
   },
+  PARENT_MODEL_REF: 'parent',
   DEFAULT_ROLES: {
     plan: { model: 'workhorse:expensive' },
     work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } },
@@ -358,6 +359,41 @@ describe('saveSettingsApi', () => {
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
   });
 
+  it('round-trips parent sub-role model refs through saved and loaded settings', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      roles: {
+        ...settings.roles,
+        review: {
+          ...settings.roles?.review,
+          model: 'workhorse:expensive',
+          sub: {
+            ...settings.roles?.review?.sub,
+            security: { model: 'parent' },
+          },
+        },
+      },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('security:');
+    expect(written).toContain('model: parent');
+
+    mockLoadConfig.mockReturnValue(baseConfig({
+      roles: {
+        review: {
+          model: 'workhorse:expensive',
+          sub: { security: { model: 'parent' } },
+        },
+      },
+    }));
+
+    expect(loadSettingsApi().roles?.review?.sub?.security?.model).toBe('parent');
+  });
+
   it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -462,6 +498,40 @@ describe('validateSettingsApi', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Unknown role "banana"');
     expect(result.errors).toContain('Unknown sub-role "banana" for role "work"');
+  });
+
+  it('accepts parent only for sub-role model refs', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    expect(validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        review: {
+          ...validSettings.roles.review,
+          sub: {
+            ...validSettings.roles.review.sub,
+            security: { model: 'parent' },
+          },
+        },
+      },
+    }).errors).toEqual([]);
+
+    expect(validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        review: { ...validSettings.roles.review, model: 'parent' },
+      },
+    }).errors).toContain('roles.review.model cannot be parent; parent is valid only for sub-role models');
+
+    expect(validateSettingsApi({
+      ...validSettings,
+      workhorses: {
+        ...validSettings.workhorses,
+        mid: 'parent',
+      },
+    }).errors).toContain('workhorses.mid cannot be parent; parent is valid only for sub-role models');
   });
 
   it('rejects invalid, chained, and unresolved model references', async () => {

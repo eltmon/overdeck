@@ -1740,8 +1740,8 @@
     "hash": "3adc0add80cbe95c852b8162ef35b614"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/lib/settings-api.ts": {
-    "mtime": 1779481493.0157838,
-    "hash": "75f66c4cc3f713847fd16c15770be7fb"
+    "mtime": 1779484569.860245,
+    "hash": "8830a79923693c72799994ec76205411"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/lib/runtimes/pi-fifo.ts": {
     "mtime": 1779481493.01548,
@@ -2460,8 +2460,8 @@
     "hash": "724842fe1816e1031316202885dd5430"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/lib/__tests__/settings-api.test.ts": {
-    "mtime": 1779481493.0011811,
-    "hash": "17bbe11affff33b01f45d51a510c28b8"
+    "mtime": 1779484621.5110202,
+    "hash": "bba2109925399f2075faed9b9350259a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/lib/__tests__/pan-871-agent-id-normalization.test.ts": {
     "mtime": 1779481493.0011811,
