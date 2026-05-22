@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { reorderHookItems, getHook, pushToHook, clearHook } from '../../src/lib/hooks.js';
+import { reorderHookItemsSync, getHookSync, pushToHookSync, clearHookSync } from '../../src/lib/hooks.js';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from '../../src/lib/paths.js';
@@ -28,26 +28,26 @@ describe('reorderHookItems', () => {
 
   it('should reorder items successfully', () => {
     // Create test items
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 1' },
     });
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 2' },
     });
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 3' },
     });
 
-    const hook = getHook(TEST_AGENT_ID);
+    const hook = getHookSync(TEST_AGENT_ID);
     expect(hook).toBeDefined();
     expect(hook!.items).toHaveLength(3);
 
@@ -55,12 +55,12 @@ describe('reorderHookItems', () => {
 
     // Reorder: move last item to first
     const newOrder = [originalOrder[2], originalOrder[0], originalOrder[1]];
-    const success = reorderHookItems(TEST_AGENT_ID, newOrder);
+    const success = reorderHookItemsSync(TEST_AGENT_ID, newOrder);
 
     expect(success).toBe(true);
 
     // Verify new order
-    const reorderedHook = getHook(TEST_AGENT_ID);
+    const reorderedHook = getHookSync(TEST_AGENT_ID);
     expect(reorderedHook!.items).toHaveLength(3);
     expect(reorderedHook!.items[0].id).toBe(originalOrder[2]);
     expect(reorderedHook!.items[1].id).toBe(originalOrder[0]);
@@ -68,74 +68,74 @@ describe('reorderHookItems', () => {
   });
 
   it('should return false if hook does not exist', () => {
-    const success = reorderHookItems('non-existent-agent', ['id1', 'id2']);
+    const success = reorderHookItemsSync('non-existent-agent', ['id1', 'id2']);
     expect(success).toBe(false);
   });
 
   it('should return false if item ID not found', () => {
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 1' },
     });
 
-    const hook = getHook(TEST_AGENT_ID);
+    const hook = getHookSync(TEST_AGENT_ID);
     const validId = hook!.items[0].id;
 
     // Try to reorder with an invalid ID
-    const success = reorderHookItems(TEST_AGENT_ID, [validId, 'invalid-id']);
+    const success = reorderHookItemsSync(TEST_AGENT_ID, [validId, 'invalid-id']);
     expect(success).toBe(false);
   });
 
   it('should return false if item count mismatch', () => {
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 1' },
     });
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'normal',
       source: 'test',
       payload: { message: 'Item 2' },
     });
 
-    const hook = getHook(TEST_AGENT_ID);
+    const hook = getHookSync(TEST_AGENT_ID);
     const firstId = hook!.items[0].id;
 
     // Try to reorder with only one ID when there are two items
-    const success = reorderHookItems(TEST_AGENT_ID, [firstId]);
+    const success = reorderHookItemsSync(TEST_AGENT_ID, [firstId]);
     expect(success).toBe(false);
   });
 
   it('should preserve all item fields when reordering', () => {
     // Ensure clean state
-    clearHook(TEST_AGENT_ID);
+    clearHookSync(TEST_AGENT_ID);
 
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'task',
       priority: 'urgent',
       source: 'handoff',
       payload: { issueId: 'PAN-123', message: 'Urgent task' },
     });
-    pushToHook(TEST_AGENT_ID, {
+    pushToHookSync(TEST_AGENT_ID, {
       type: 'message',
       priority: 'normal',
       source: 'user',
       payload: { message: 'Normal message' },
     });
 
-    const hook = getHook(TEST_AGENT_ID);
+    const hook = getHookSync(TEST_AGENT_ID);
     expect(hook!.items).toHaveLength(2); // Verify we only have 2 items
     const originalOrder = hook!.items.map(item => item.id);
 
     // Reverse order
     const newOrder = [originalOrder[1], originalOrder[0]];
-    reorderHookItems(TEST_AGENT_ID, newOrder);
+    reorderHookItemsSync(TEST_AGENT_ID, newOrder);
 
-    const reorderedHook = getHook(TEST_AGENT_ID);
+    const reorderedHook = getHookSync(TEST_AGENT_ID);
     expect(reorderedHook!.items).toHaveLength(2); // Still only 2 items
 
     // Verify first item (was second) kept all fields
@@ -153,9 +153,9 @@ describe('reorderHookItems', () => {
 
   it('should handle empty queue', () => {
     // Create empty hook
-    clearHook(TEST_AGENT_ID);
+    clearHookSync(TEST_AGENT_ID);
 
-    const success = reorderHookItems(TEST_AGENT_ID, []);
+    const success = reorderHookItemsSync(TEST_AGENT_ID, []);
     expect(success).toBe(true); // Empty reorder of empty queue should succeed
   });
 });

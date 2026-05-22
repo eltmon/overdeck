@@ -29,32 +29,32 @@ export { PlanBuilder, planBuilder } from './builder.js';
 
 // I/O (from PAN-388 agent's implementation)
 export {
-  findPlan,
-  readPlan,
-  readWorkspacePlan,
+  findPlanSync,
+  readPlanSync,
+  readWorkspacePlanSync,
   updateItemStatus,
   updateSubItemStatus,
 } from './io.js';
 
 // Effect-typed IO variants (PAN-1249)
 export {
-  readPlanEffect,
-  findPlanEffect,
-  readWorkspacePlanEffect,
+  readPlan,
+  findPlan,
+  readWorkspacePlan,
   VBriefMergeConflictTaggedError,
   VBriefInvalidFormatError,
 } from './io.js';
 export type { VBriefReadError } from './io.js';
 
 // Beads integration
-export { createBeadsFromVBrief, syncBeadStatusToVBrief, getVBriefACStatus } from './beads.js';
+export { createBeadsFromVBrief, syncBeadStatusToVBrief, getVBriefACStatusSync } from './beads.js';
 export type { CreateBeadsResult, VBriefACStatus, ItemACStatus } from './beads.js';
 
 // Acceptance Criteria
 export {
-  extractAcceptanceCriteria,
+  extractAcceptanceCriteriaSync,
   extractACFromDocument,
   formatAcceptanceCriteria,
-  checkAllCriteriaCompleted,
+  checkAllCriteriaCompletedSync,
 } from './acceptance-criteria.js';
 export type { AcceptanceCriterion, ACCompletionResult } from './acceptance-criteria.js';

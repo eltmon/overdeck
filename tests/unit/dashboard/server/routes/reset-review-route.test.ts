@@ -81,7 +81,7 @@ afterEach(() => {
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
 import { processResetReviewPipeline } from '../../../../../src/dashboard/server/routes/workspaces.js';
-import { setReviewStatus, getReviewStatus } from '../../../../../src/lib/review-status.js';
+import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
   });
 
   it('200: resets review/test/merge/verification status to pending', () => {
-    setReviewStatus('PAN-1', {
+    setReviewStatusSync('PAN-1', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       mergeStatus: 'failed',
@@ -115,7 +115,7 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
     expect(result.httpStatus).toBe(200);
     expect(result.body.success).toBe(true);
 
-    const after = getReviewStatus('PAN-1');
+    const after = getReviewStatusSync('PAN-1');
     expect(after?.reviewStatus).toBe('pending');
     expect(after?.testStatus).toBe('pending');
     expect(after?.mergeStatus).toBe('pending');
@@ -129,7 +129,7 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
     // A human-initiated reset is an explicit circuit-breaker override. If the
     // stuck marker / retry budgets survive, the deacon immediately re-skips the
     // workspace and the "override" is a no-op (root cause of the PAN-977 jam).
-    setReviewStatus('PAN-2', {
+    setReviewStatusSync('PAN-2', {
       reviewStatus: 'passed',
       testStatus: 'pending',
       stuck: true,
@@ -145,7 +145,7 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
     const result = processResetReviewPipeline('PAN-2', true);
     expect(result.httpStatus).toBe(200);
 
-    const after = getReviewStatus('PAN-2');
+    const after = getReviewStatusSync('PAN-2');
     expect(after?.stuck).toBeFalsy();
     expect(after?.stuckReason).toBeUndefined();
     expect(after?.stuckAt).toBeUndefined();

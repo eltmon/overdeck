@@ -21,8 +21,8 @@ import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlanEffect, readWorkspacePlanEffect } from '../../../lib/vbrief/io.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 
 /**
@@ -168,7 +168,7 @@ function getCachedPlanningState(identifier: string): {
   beadCounts: { completed: number; total: number } | null;
 } {
   try {
-    const resolved = resolveProjectFromIssue(identifier);
+    const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) {
       return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
@@ -186,7 +186,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
   if (planningStateRefreshInFlight.has(identifier)) return false;
   planningStateRefreshInFlight.add(identifier);
   try {
-    const resolved = resolveProjectFromIssue(identifier);
+    const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) return updatePlanningStateCache(identifier, {
       result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
@@ -204,7 +204,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       });
     }
 
-    const planPath = await Effect.runPromise(findPlanEffect(workspacePath));
+    const planPath = await Effect.runPromise(findPlan(workspacePath));
     let planMtimeMs = -1;
     if (planPath) {
       try {
@@ -227,7 +227,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       return false;
     }
 
-    const doc = planPath ? await Effect.runPromise(readWorkspacePlanEffect(workspacePath)) : null;
+    const doc = planPath ? await Effect.runPromise(readWorkspacePlan(workspacePath)) : null;
     const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
     const beadCounts = computeBeadCounts(doc);
     return updatePlanningStateCache(identifier, {

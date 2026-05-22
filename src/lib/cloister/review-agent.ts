@@ -44,11 +44,11 @@ import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { killSessionAsyncEffect, listSessionNamesAsyncEffect, isPaneDeadAsyncEffect } from '../tmux.js';
-import { emitActivityEntry } from '../activity-logger.js';
+import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
-import { getReviewStatus, setReviewStatus } from '../review-status.js';
-import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
@@ -88,10 +88,10 @@ async function ensureReviewTempStash(issueId: string, workspace: string): Promis
   // drops the *current* ref but `setReviewStatus` overwrites the ref before
   // cleanup runs, so the prior round's ref gets orphaned. Drop-then-create is
   // the only ordering that guarantees no orphans.
-  const priorStatus = getReviewStatus(issueId);
+  const priorStatus = getReviewStatusSync(issueId);
   if (priorStatus?.reviewTempStashRef) {
     try {
-      await dropStash(workspace, priorStatus.reviewTempStashRef);
+      await Effect.runPromise(dropStash(workspace, priorStatus.reviewTempStashRef));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!/not found|does not exist/i.test(message)) {
@@ -106,24 +106,22 @@ async function ensureReviewTempStash(issueId: string, workspace: string): Promis
   });
   if (!stdout.trim()) return null;
 
-  const existingEntries = await listStashes(workspace);
-  const sequence = getNextReviewTempSequence(existingEntries, issueId);
+  const existingEntries = await Effect.runPromise(listStashes(workspace));
+  const sequence = getNextReviewTempSequence([...existingEntries], issueId);
   const message = buildStashMessage('review-temp', issueId, sequence);
   // We read porcelain status immediately before stashing and rely on review orchestration being
   // single-threaded per workspace; if another actor clears the dirtiness window before stash push,
   // createNamedStash can legitimately return null and the review should just continue without one.
-  const ref = await createNamedStash(workspace, message, true);
+  const ref = await Effect.runPromise(createNamedStash(workspace, message, true));
   if (!ref) return null;
 
   return { ref, message, sequence };
-}
-
-export async function cleanupReviewTempStash(issueId: string, workspace: string): Promise<void> {
-  const status = getReviewStatus(issueId);
+}async function cleanupReviewTempStashPromise(issueId: string, workspace: string): Promise<void> {
+  const status = getReviewStatusSync(issueId);
   if (!status?.reviewTempStashRef) return;
 
   try {
-    await dropStash(workspace, status.reviewTempStashRef);
+    await Effect.runPromise(dropStash(workspace, status.reviewTempStashRef));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/not found|does not exist/i.test(message)) {
@@ -131,27 +129,12 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
     }
   }
 
-  setReviewStatus(issueId, {
+  setReviewStatusSync(issueId, {
     reviewTempStashRef: undefined,
     reviewTempStashMessage: undefined,
     reviewTempStashSequence: undefined,
   });
-}
-
-/**
- * Build the spawn message for one convoy sub-role reviewer.
- *
- * The body of `roles/review-<subRole>.md` is the harness-agnostic prompt
- * template Panopticon owns. The orchestrator reads it and inlines it here
- * so every harness (Claude Code, Pi, Codex) receives the same instructions
- * as the first user message. No `--agent` flag, no workspace file lookup,
- * no auto-discovered subagent — the prompt arrives through the workflow.
- *
- * The wrapper around the body supplies the per-run identifiers the template
- * references abstractly: the assigned output file path and the shared
- * context manifest path.
- */
-export async function buildConvoyPrompt(opts: {
+}async function buildConvoyPromptPromise(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
@@ -281,20 +264,7 @@ function buildReviewRolePrompt(opts: {
   const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
   console.log(`[review-agent] Synthesis prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
-}
-
-/**
- * Spawn the `review` role for an issue using the unified role primitive
- * (spawnRun). The review role launches the four review sub-role sessions,
- * synthesizes their findings, and signals the verdict through
- * `pan specialists done review`. This wrapper carries the lifecycle concerns
- * the deleted dispatchParallelReview owned (idempotency check, feedback
- * archive, review-temp stash, reviewing-status flip, pipeline event).
- *
- * On failure: cleanup review-temp stash, flip status to failed with the
- * spawn error in reviewNotes so the dashboard surfaces the breakage.
- */
-export async function spawnReviewSubRoleForIssue(opts: {
+}async function spawnReviewSubRoleForIssuePromise(opts: {
   issueId: string;
   workspace: string;
   subRole: ReviewSubRole;
@@ -306,7 +276,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentStateEffect, spawnRun } = await import('../agents.js');
+    const { saveAgentState, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -330,14 +300,14 @@ export async function spawnReviewSubRoleForIssue(opts: {
       }
     }
 
-    const prompt = await buildConvoyPrompt({
+    const prompt = await Effect.runPromise(buildConvoyPrompt({
       issueId: opts.issueId,
       subRole: opts.subRole,
       outputPath,
       synthesisAgentId,
       contextManifestPath: opts.contextManifestPath,
       tier1Summary,
-    });
+    }));
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       subRole: opts.subRole,
@@ -354,10 +324,10 @@ export async function spawnReviewSubRoleForIssue(opts: {
     run.reviewOutputPath = outputPath;
     run.reviewSynthesisAgentId = synthesisAgentId;
     run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
-    await Effect.runPromise(saveAgentStateEffect(run));
+    await Effect.runPromise(saveAgentState(run));
     try {
-      const { notifyPipeline } = await import('../pipeline-notifier.js');
-      notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
+      const { notifyPipelineSync } = await import('../pipeline-notifier.js');
+      notifyPipelineSync({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
     } catch {
       // Non-fatal
     }
@@ -369,9 +339,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
       error: err instanceof Error ? err.message : String(err),
     };
   }
-}
-
-export async function spawnReviewRoleForIssue(
+}async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -384,9 +352,9 @@ export async function spawnReviewRoleForIssue(
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
   try {
-    const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+    const sessions = await Effect.runPromise(listSessionNames());
     if (sessions.includes(reviewSessionName)) {
-      const paneDead = await Effect.runPromise(isPaneDeadAsyncEffect(reviewSessionName));
+      const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
 
       // A synthesis agent that has finished its verdict does NOT terminate:
       // its role prompt tells it to "exit", but it runs `Bash(exit)` which
@@ -436,7 +404,11 @@ export async function spawnReviewRoleForIssue(
       // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
       const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      await killAllReviewerSessions(undefined, opts.issueId).catch(() => ({ killed: [], failed: [] }));
+      await Effect.runPromise(
+        killAllReviewerSessions(undefined, opts.issueId).pipe(
+          Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
+        ),
+      );
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -446,7 +418,7 @@ export async function spawnReviewRoleForIssue(
   // sees current-cycle feedback when it reads .pan/feedback/.
   try {
     const { archiveFeedbackFiles } = await import('./feedback-writer.js');
-    await archiveFeedbackFiles(opts.workspace);
+    await Effect.runPromise(archiveFeedbackFiles(opts.workspace));
   } catch {
     // Non-fatal: archiving is best-effort
   }
@@ -468,7 +440,7 @@ export async function spawnReviewRoleForIssue(
   // transitions reviewStatus to passed/blocked/failed and fires the review.approved
   // lifecycle event for reactive Cloister.
   try {
-    setReviewStatus(opts.issueId, {
+    setReviewStatusSync(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
       reviewTempStashRef: reviewTempStash?.ref,
@@ -478,7 +450,7 @@ export async function spawnReviewRoleForIssue(
   } catch (err) {
     console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
     if (reviewTempStash) {
-      try { await dropStash(opts.workspace, reviewTempStash.ref); } catch {}
+      try { await Effect.runPromise(dropStash(opts.workspace, reviewTempStash.ref)); } catch {}
     }
     return {
       success: false,
@@ -488,15 +460,15 @@ export async function spawnReviewRoleForIssue(
   }
 
   try {
-    const { notifyPipeline } = await import('../pipeline-notifier.js');
-    notifyPipeline({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
+    notifyPipelineSync({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
   } catch {
     // Non-fatal
   }
 
   try {
-    const { spawnRun, saveAgentStateEffect, getAgentStateEffect } = await import('../agents.js');
-    const workAgentState = await Effect.runPromise(getAgentStateEffect(`agent-${opts.issueId.toLowerCase()}`));
+    const { spawnRun, saveAgentState, getAgentState } = await import('../agents.js');
+    const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers
@@ -517,12 +489,12 @@ export async function spawnReviewRoleForIssue(
     let contextManifestPath: string | undefined;
     let tier1Summary: string | undefined;
     try {
-      const manifest = await buildReviewContext({
+      const manifest = await Effect.runPromise(buildReviewContext({
         runId,
         issueId: opts.issueId,
         workspace: opts.workspace,
         branch: opts.branch,
-      });
+      }));
       contextManifestPath = manifest.manifestPath;
       tier1Summary = formatTier1Summary(manifest);
       console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
@@ -543,16 +515,16 @@ export async function spawnReviewRoleForIssue(
     // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
     run.reviewRunId = runId;
     try {
-      await Effect.runPromise(saveAgentStateEffect(run));
+      await Effect.runPromise(saveAgentState(run));
     } catch (saveErr) {
       console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
     }
     console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
-    emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    emitActivityEntrySync({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
     const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
       const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
-      const result = await spawnReviewSubRoleForIssue({
+      const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
         issueId: opts.issueId,
         workspace: opts.workspace,
         subRole,
@@ -561,7 +533,7 @@ export async function spawnReviewRoleForIssue(
         contextManifestPath,
         synthesisAgentId: run.id,
         allowHost,
-      });
+      }));
       if (!result.success) {
         try {
           const { messageAgent } = await import('../agents.js');
@@ -585,11 +557,11 @@ export async function spawnReviewRoleForIssue(
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
     try {
-      await cleanupReviewTempStash(opts.issueId, opts.workspace);
+      await Effect.runPromise(cleanupReviewTempStash(opts.issueId, opts.workspace));
     } catch (cleanupError) {
       console.error(`[review-agent] Failed to clean review-temp stash for ${opts.issueId}:`, cleanupError);
     }
-    setReviewStatus(opts.issueId, {
+    setReviewStatusSync(opts.issueId, {
       reviewStatus: 'failed',
       reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,
       reviewTempStashRef: undefined,
@@ -632,9 +604,7 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
   if (!project) return false;
   if (session === `specialist-${project}-${issue}-review-agent`) return true;
   return session.startsWith(`specialist-${project}-${issue}-review-`);
-}
-
-export async function killAllReviewerSessions(
+}async function killAllReviewerSessionsPromise(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; failed: string[] }> {
@@ -643,7 +613,7 @@ export async function killAllReviewerSessions(
   let allSessions: readonly string[];
 
   try {
-    allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+    allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
     return { killed, failed };
@@ -653,7 +623,7 @@ export async function killAllReviewerSessions(
   await Promise.all(
     sessionsToKill.map(async (sessionName) => {
       try {
-        await Effect.runPromise(killSessionAsyncEffect(sessionName));
+        await Effect.runPromise(killSession(sessionName));
         console.log(`[review-agent] Killed reviewer session ${sessionName}`);
         killed.push(sessionName);
       } catch (err) {
@@ -663,31 +633,13 @@ export async function killAllReviewerSessions(
     }),
   );
   return { killed, failed };
-}
-
-/**
- * Kill ALL review-related tmux sessions on the panopticon socket.
- *
- * Called by `pan down` to prevent stale coordinator/reviewer sessions from
- * surviving a dashboard restart and blocking new review dispatch (PAN-931).
- *
- * Targets:
- *   - agent-<issueId>-review and agent-<issueId>-review-<role> (current role primitive)
- *   - review-coordinator-<issueId>-<timestamp> (legacy coordinator naming
- *     from the deleted dispatchParallelReview path; pattern kept so we
- *     reap leftover sessions from systems running pre-R6 builds)
- *   - specialist-<projectKey>-<issueId>-review-<role> (canonical PAN-830)
- *   - review-<issueId>-<timestamp>-<role> (legacy PAN-821)
- *
- * Returns the list of sessions killed and any that failed to kill.
- */
-export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
+}async function killAllReviewSessionsPromise(): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
 
   let allSessions: readonly string[];
   try {
-    allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+    allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during review cleanup:', err instanceof Error ? err.message : String(err));
     return { killed, failed };
@@ -710,7 +662,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   await Promise.all(
     sessionsToKill.map(async (sessionName) => {
       try {
-        await Effect.runPromise(killSessionAsyncEffect(sessionName));
+        await Effect.runPromise(killSession(sessionName));
         console.log(`[review-agent] Killed review session ${sessionName}`);
         killed.push(sessionName);
       } catch (err) {
@@ -730,32 +682,32 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
  * its own errors (stash listing / drop failures), so the Effect form mirrors
  * that contract.
  */
-export const cleanupReviewTempStashEffect = (
+export const cleanupReviewTempStash = (
   issueId: string,
   workspace: string,
 ): Effect.Effect<void> =>
-  Effect.promise(() => cleanupReviewTempStash(issueId, workspace));
+  Effect.promise(() => cleanupReviewTempStashPromise(issueId, workspace));
 
 /**
  * Effect variant of {@link buildConvoyPrompt}. Template reads are the only
  * fallible step; any failure here is fatal and propagates via Effect's defect
  * channel through `Effect.promise`.
  */
-export const buildConvoyPromptEffect = (opts: {
+export const buildConvoyPrompt = (opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
   synthesisAgentId: string;
   contextManifestPath?: string;
   tier1Summary?: string;
-}): Effect.Effect<string> => Effect.promise(() => buildConvoyPrompt(opts));
+}): Effect.Effect<string> => Effect.promise(() => buildConvoyPromptPromise(opts));
 
 /**
  * Effect variant of {@link spawnReviewSubRoleForIssue}. The Promise version
  * already aggregates errors into the structured result shape, so the Effect
  * form lifts via `Effect.promise`.
  */
-export const spawnReviewSubRoleForIssueEffect = (opts: {
+export const spawnReviewSubRoleForIssue = (opts: {
   issueId: string;
   workspace: string;
   subRole: ReviewSubRole;
@@ -766,32 +718,32 @@ export const spawnReviewSubRoleForIssueEffect = (opts: {
   model?: string;
   allowHost?: boolean;
 }): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
-  Effect.promise(() => spawnReviewSubRoleForIssue(opts));
+  Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
 
 /**
  * Effect variant of {@link spawnReviewRoleForIssue}. The Promise version
  * returns a structured result instead of throwing, so the Effect form lifts
  * via `Effect.promise`.
  */
-export const spawnReviewRoleForIssueEffect = (
+export const spawnReviewRoleForIssue = (
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string }> =>
-  Effect.promise(() => spawnReviewRoleForIssue(opts));
+  Effect.promise(() => spawnReviewRoleForIssuePromise(opts));
 
 /**
  * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
  * already aggregated into the `failed` array — this wrapper preserves that
  * contract.
  */
-export const killAllReviewerSessionsEffect = (
+export const killAllReviewerSessions = (
   projectKey: string | undefined,
   issueId: string,
 ): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewerSessions(projectKey, issueId));
+  Effect.promise(() => killAllReviewerSessionsPromise(projectKey, issueId));
 
 /**
  * Effect variant of {@link killAllReviewSessions}. Same aggregation semantics
  * as the Promise version.
  */
-export const killAllReviewSessionsEffect = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewSessions());
+export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
+  Effect.promise(() => killAllReviewSessionsPromise());

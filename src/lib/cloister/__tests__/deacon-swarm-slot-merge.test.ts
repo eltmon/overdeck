@@ -100,16 +100,16 @@ vi.mock('../../tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
-  isPaneDeadAsyncEffect: effectMock(false),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
+  isPaneDead: effectMock(false),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   };
 });

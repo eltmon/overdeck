@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ApiSettingsConfig } from '../settings-api.js';
 
@@ -215,13 +216,13 @@ describe('loadSettingsApi', () => {
       scope: 'pan-only',
     });
 
-    await setRoleConfig('flywheel', {
+    await Effect.runPromise(setRoleConfig('flywheel', {
       harness: 'pi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
       maxAgents: 4,
       scope: 'all-tracked-projects',
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('flywheel:');
@@ -317,7 +318,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       workhorses: { ...settings.workhorses, mid: 'gpt-5.5-mini' },
       roles: {
@@ -339,7 +340,7 @@ describe('saveSettingsApi', () => {
         rollup_pending_threshold: 6,
         sidebar_refresh_interval_ms: 15000,
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('# user comment');
@@ -362,13 +363,14 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await expect(saveSettingsApi({
+    await (await Effect.runPromise(expect(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
         daemonHost: '169.254.169.254',
       } as typeof settings.tts,
-    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
+    }))))eof settings.tts,
+    })))).rejects.toThrow('Unknown tts setting(s): daemonHost');
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
@@ -378,7 +380,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
@@ -393,7 +395,7 @@ describe('saveSettingsApi', () => {
         utteranceTemplates: { readyForMerge: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('summarizer:');

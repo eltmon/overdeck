@@ -29,12 +29,12 @@ vi.mock('../../../src/lib/projects.js', () => ({
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
-import { resolveTrackerType } from '../../../src/lib/tracker-utils.js';
-import { loadProjectsConfig, resolveProjectFromIssue } from '../../../src/lib/projects.js';
+import { resolveTrackerTypeSync } from '../../../src/lib/tracker-utils.js';
+import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../../../src/lib/projects.js';
 
-const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssueSync);
 
-const mockLoadProjectsConfig = vi.mocked(loadProjectsConfig);
+const mockLoadProjectsConfig = vi.mocked(loadProjectsConfigSync);
 
 describe('pan reopen tracker routing parity with pan start', () => {
   beforeEach(() => {
@@ -67,9 +67,9 @@ describe('pan reopen tracker routing parity with pan start', () => {
     });
 
     // PAN-457 should resolve to GitHub (same as pan start)
-    expect(resolveTrackerType('PAN-457')).toBe('github');
+    expect(resolveTrackerTypeSync('PAN-457')).toBe('github');
     // MIN-848 should still resolve to Linear
-    expect(resolveTrackerType('MIN-848')).toBe('linear');
+    expect(resolveTrackerTypeSync('MIN-848')).toBe('linear');
   });
 
   /**
@@ -87,8 +87,8 @@ describe('pan reopen tracker routing parity with pan start', () => {
       },
     });
 
-    expect(resolveTrackerType('MIN-123')).toBe('linear');
-    expect(resolveTrackerType('MIN-848')).toBe('linear');
+    expect(resolveTrackerTypeSync('MIN-123')).toBe('linear');
+    expect(resolveTrackerTypeSync('MIN-848')).toBe('linear');
   });
 
   /**
@@ -106,7 +106,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
       },
     });
 
-    expect(resolveTrackerType('UNKNOWN-99')).toBe('linear');
+    expect(resolveTrackerTypeSync('UNKNOWN-99')).toBe('linear');
   });
 
   /**
@@ -126,8 +126,8 @@ describe('pan reopen tracker routing parity with pan start', () => {
     });
 
     // PAN prefix matches the github_repo project → github
-    expect(resolveTrackerType('PAN-1')).toBe('github');
-    expect(resolveTrackerType('PAN-999')).toBe('github');
+    expect(resolveTrackerTypeSync('PAN-1')).toBe('github');
+    expect(resolveTrackerTypeSync('PAN-999')).toBe('github');
   });
 
   /**
@@ -150,17 +150,17 @@ describe('pan reopen tracker routing parity with pan start', () => {
     });
 
     // PAN prefix → both resolvers must agree on GitHub
-    expect(resolveTrackerType('PAN-457')).toBe('github');
+    expect(resolveTrackerTypeSync('PAN-457')).toBe('github');
     expect(mockResolveProjectFromIssue('PAN-457', [])?.projectKey).toBe('panopticon');
 
     // MIN prefix → both resolvers must agree on Linear
-    expect(resolveTrackerType('MIN-848')).toBe('linear');
+    expect(resolveTrackerTypeSync('MIN-848')).toBe('linear');
     expect(mockResolveProjectFromIssue('MIN-848', [])?.projectKey).toBe('myn');
 
     // Both functions agree for mixed prefixes
     for (const issue of ['PAN-1', 'PAN-999', 'MIN-123', 'MIN-456']) {
-      const trackerType = resolveTrackerType(issue);
-      const project = resolveProjectFromIssue(issue, []);
+      const trackerType = resolveTrackerTypeSync(issue);
+      const project = resolveProjectFromIssueSync(issue, []);
       if (project?.projectKey === 'panopticon') {
         expect(trackerType).toBe('github');
       } else if (project?.projectKey === 'myn') {

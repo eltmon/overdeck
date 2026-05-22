@@ -108,7 +108,7 @@ vi.mock('../../../../../src/lib/review-status.js', () => ({
   setDeaconIgnored: vi.fn(),
 }));
 
-import { clearReviewStatus, getReviewStatus, setReviewStatus } from '../../../../../src/lib/review-status.js';
+import { clearReviewStatus, getReviewStatusSync, setReviewStatusSync } from '../../../../../src/lib/review-status.js';
 import { reconcileGitHubMergeStatus } from '../../../../../src/dashboard/server/routes/workspaces.js';
 
 describe('reconcileGitHubMergeStatus', () => {
@@ -125,19 +125,19 @@ describe('reconcileGitHubMergeStatus', () => {
   });
 
   it('returns false when prUrl is missing', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
       mergeStatus: 'verifying',
     });
 
-    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'))).resolves.toBe(false);
     expect(mockGetPullRequestState).not.toHaveBeenCalled();
   });
 
   it('returns false when prUrl is not a GitHub PR URL', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -145,12 +145,12 @@ describe('reconcileGitHubMergeStatus', () => {
       prUrl: 'https://example.com/not-a-pr',
     });
 
-    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'))).resolves.toBe(false);
     expect(mockGetPullRequestState).not.toHaveBeenCalled();
   });
 
   it('returns false when the GitHub app is not configured', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -159,12 +159,12 @@ describe('reconcileGitHubMergeStatus', () => {
     });
     mockIsGitHubAppConfigured.mockReturnValue(false);
 
-    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'))).resolves.toBe(false);
     expect(mockGetPullRequestState).not.toHaveBeenCalled();
   });
 
   it('marks the issue merged when GitHub says the PR already merged', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -173,17 +173,17 @@ describe('reconcileGitHubMergeStatus', () => {
     });
     mockGetPullRequestState.mockResolvedValue({ merged: true });
 
-    const reconciled = await reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'));
+    const reconciled = await reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'));
 
     expect(reconciled).toBe(true);
-    const status = getReviewStatus('PAN-349');
+    const status = getReviewStatusSync('PAN-349');
     expect(status?.mergeStatus).toBe('merged');
     expect(status?.readyForMerge).toBe(false);
     expect(status?.mergeNotes).toBeUndefined();
   });
 
   it('returns false when the PR is still open', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -193,17 +193,17 @@ describe('reconcileGitHubMergeStatus', () => {
     });
     mockGetPullRequestState.mockResolvedValue({ merged: false, state: 'OPEN' });
 
-    const reconciled = await reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'));
+    const reconciled = await reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'));
 
     expect(reconciled).toBe(false);
-    const status = getReviewStatus('PAN-349');
+    const status = getReviewStatusSync('PAN-349');
     expect(status?.mergeStatus).toBe('verifying');
     expect(status?.readyForMerge).toBe(true);
     expect(status?.mergeNotes).toContain('Timed out');
   });
 
   it('returns false when GitHub state lookup throws', async () => {
-    setReviewStatus('PAN-349', {
+    setReviewStatusSync('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -212,8 +212,8 @@ describe('reconcileGitHubMergeStatus', () => {
     });
     mockGetPullRequestState.mockRejectedValue(new Error('boom'));
 
-    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
-    const status = getReviewStatus('PAN-349');
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatusSync('PAN-349'))).resolves.toBe(false);
+    const status = getReviewStatusSync('PAN-349');
     expect(status?.mergeStatus).toBe('verifying');
     expect(status?.readyForMerge).toBe(true);
   });

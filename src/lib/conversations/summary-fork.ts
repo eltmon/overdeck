@@ -29,7 +29,7 @@ import { Effect } from 'effect';
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
-import { loadConfig } from '../config-yaml.js';
+import { loadConfigSync } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
@@ -53,13 +53,7 @@ export interface SummaryForkResult {
   summaryModel: string | null;
 }
 
-const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
-
-/**
- * Generate a heuristic fallback summary without calling an LLM.
- * Used only when smart summary fails and we need a last-resort fallback.
- */
-export async function generateFallbackSummary(jsonlPath: string): Promise<string> {
+const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
   const { readFile } = await import('node:fs/promises');
   const lines = (await readFile(jsonlPath, 'utf-8'))
     .split('\n')
@@ -145,20 +139,18 @@ export async function generateSummaryForFork(jsonlPath: string, summaryModel?: s
 
   console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | harness=${summaryHarness} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
 
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   const richMode = config.conversations.richCompaction;
 
   try {
-    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary, harness: summaryHarness });
+    const result = await Effect.runPromise(generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary, harness: summaryHarness }));
     console.log(`[claude-invoke] SUCCESS purpose=summary-fork | model=${summaryModel} | outputChars=${result.summary.length}`);
     return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
   } catch (err: any) {
     console.error(`[claude-invoke] FAILED purpose=summary-fork | model=${summaryModel} | error="${err.message}"`);
     throw err;
   }
-}
-
-export async function reserveSummaryForkSession(
+}async function reserveSummaryForkSessionPromise(
   cwd: string,
 ): Promise<{ sessionId: string; sessionFile: string }> {
   const sessionId = randomUUID();
@@ -226,14 +218,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
       content: sanitizedContent,
     },
   };
-}
-
-/**
- * Copy JSONL content from the last compact_boundary (or from the start)
- * into a new session file. Thinking blocks are sanitized to prevent
- * signature validation errors on cross-model forks.
- */
-export async function copySessionFromCompactBoundary(
+}async function copySessionFromCompactBoundaryPromise(
   sourcePath: string,
   destPath: string,
 ): Promise<void> {
@@ -256,9 +241,7 @@ export async function copySessionFromCompactBoundary(
   });
 
   await writeFile(destPath, sanitizedLines.join('\n'), 'utf-8');
-}
-
-export async function createSummaryFork(
+}async function createSummaryForkPromise(
   conv: Conversation,
   options: SummaryForkOptions = {},
 ): Promise<SummaryForkResult> {
@@ -274,7 +257,7 @@ export async function createSummaryFork(
   const summaryModel = options.model || conv.model;
   console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false} plain=${options.plain || false}`);
 
-  const { sessionId, sessionFile } = await reserveSummaryForkSession(cwd);
+  const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(cwd));
 
   let summary: string;
   let usedSummaryModel: string | null;
@@ -282,11 +265,11 @@ export async function createSummaryFork(
   if (options.plain) {
     // Plain fork: copy raw JSONL from last compact boundary (or full history)
     // into the new session file so Claude Code can --resume it directly.
-    await copySessionFromCompactBoundary(sourceSessionFile, sessionFile);
+    await Effect.runPromise(copySessionFromCompactBoundary(sourceSessionFile, sessionFile));
     summary = '';
     usedSummaryModel = null;
   } else if (options.localSummaryOnly) {
-    summary = await generateFallbackSummary(sourceSessionFile);
+    summary = await Effect.runPromise(generateFallbackSummary(sourceSessionFile));
     usedSummaryModel = null;
   } else {
     const result = await generateSummaryForFork(sourceSessionFile, summaryModel ?? undefined, options.includeThinkingInSummary);
@@ -336,46 +319,46 @@ export { runModelSummary };
 // canonical; these are wrappers for Effect-native callers.
 
 /** Effect variant of generateFallbackSummary. */
-export function generateFallbackSummaryEffect(
+export function generateFallbackSummary(
   jsonlPath: string,
 ): Effect.Effect<string, FsError> {
   return Effect.tryPromise({
-    try: () => generateFallbackSummary(jsonlPath),
+    try: () => generateFallbackSummaryPromise(jsonlPath),
     catch: (cause) =>
       new FsError({ path: jsonlPath, operation: 'fallback-summary', cause }),
   });
 }
 
 /** Effect variant of reserveSummaryForkSession. */
-export function reserveSummaryForkSessionEffect(
+export function reserveSummaryForkSession(
   cwd: string,
 ): Effect.Effect<{ sessionId: string; sessionFile: string }, FsError> {
   return Effect.tryPromise({
-    try: () => reserveSummaryForkSession(cwd),
+    try: () => reserveSummaryForkSessionPromise(cwd),
     catch: (cause) =>
       new FsError({ path: cwd, operation: 'reserve-session', cause }),
   });
 }
 
 /** Effect variant of copySessionFromCompactBoundary. */
-export function copySessionFromCompactBoundaryEffect(
+export function copySessionFromCompactBoundary(
   sourcePath: string,
   destPath: string,
 ): Effect.Effect<void, FsError> {
   return Effect.tryPromise({
-    try: () => copySessionFromCompactBoundary(sourcePath, destPath),
+    try: () => copySessionFromCompactBoundaryPromise(sourcePath, destPath),
     catch: (cause) =>
       new FsError({ path: sourcePath, operation: 'copy-session', cause }),
   });
 }
 
 /** Effect variant of createSummaryFork. */
-export function createSummaryForkEffect(
+export function createSummaryFork(
   conv: Conversation,
   options: SummaryForkOptions = {},
 ): Effect.Effect<SummaryForkResult, FsError> {
   return Effect.tryPromise({
-    try: () => createSummaryFork(conv, options),
+    try: () => createSummaryForkPromise(conv, options),
     catch: (cause) =>
       new FsError({ path: conv.name, operation: 'create-summary-fork', cause }),
   });

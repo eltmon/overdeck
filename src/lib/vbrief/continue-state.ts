@@ -239,7 +239,7 @@ export function continueFilePath(projectRoot: string, issueId: string): string {
  * Atomically write the continue state to `<projectRoot>/.pan/continues/<issueId-lowercase>.vbrief.json`
  * using temp-file + rename. Sets `updated` to "now" and `created` if absent.
  */
-export function writeContinueState(projectRoot: string, issueId: string, state: ContinueState): void {
+export function writeContinueStateSync(projectRoot: string, issueId: string, state: ContinueState): void {
   const canonicalIssueId = issueId.toUpperCase();
   const path = continueFilePath(projectRoot, canonicalIssueId);
   const writerId = `continue-sync-${process.pid}`;
@@ -268,7 +268,7 @@ export function writeContinueState(projectRoot: string, issueId: string, state: 
  * wrong shape) — callers should handle this rather than silently producing
  * a fresh state.
  */
-export function readContinueState(projectRoot: string, issueId: string): ContinueState | null {
+export function readContinueStateSync(projectRoot: string, issueId: string): ContinueState | null {
   const path = continueFilePath(projectRoot, issueId);
   if (!existsSync(path)) return null;
   const raw = readFileSync(path, 'utf-8');
@@ -286,12 +286,12 @@ export function readContinueState(projectRoot: string, issueId: string): Continu
  * Append a session entry to the continue file's `sessionHistory`. Creates a
  * fresh continue state if the file doesn't yet exist. Persists atomically.
  */
-export function appendSessionEntry(
+export function appendSessionEntrySync(
   projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): ContinueState {
-  const existing = readContinueState(projectRoot, issueId);
+  const existing = readContinueStateSync(projectRoot, issueId);
   const now = new Date().toISOString();
   const fullEntry: ContinueSessionEntry = {
     ...entry,
@@ -312,7 +312,7 @@ export function appendSessionEntry(
         agentModel: entry.agentModel,
         sessionHistory: [fullEntry],
       };
-  writeContinueState(projectRoot, issueId, next);
+  writeContinueStateSync(projectRoot, issueId, next);
   return next;
 }
 
@@ -320,12 +320,12 @@ export function appendSessionEntry(
  * Append a feedback entry to the continue file's `feedback[]`. Creates a fresh
  * continue state if the file doesn't yet exist. Persists atomically.
  */
-export function appendFeedbackEntry(
+export function appendFeedbackEntrySync(
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): ContinueState {
-  const existing = readContinueState(projectRoot, issueId);
+  const existing = readContinueStateSync(projectRoot, issueId);
   const now = new Date().toISOString();
   const next: ContinueState = existing
     ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
@@ -342,7 +342,7 @@ export function appendFeedbackEntry(
         feedback: [entry],
         sessionHistory: [],
       };
-  writeContinueState(projectRoot, issueId, next);
+  writeContinueStateSync(projectRoot, issueId, next);
   return next;
 }
 
@@ -350,11 +350,11 @@ export function appendFeedbackEntry(
  * Clear all feedback entries from the continue file. Returns null if the file
  * doesn't exist. Persists atomically.
  */
-export function clearFeedback(projectRoot: string, issueId: string): ContinueState | null {
-  const existing = readContinueState(projectRoot, issueId);
+export function clearFeedbackSync(projectRoot: string, issueId: string): ContinueState | null {
+  const existing = readContinueStateSync(projectRoot, issueId);
   if (!existing) return null;
   const next: ContinueState = { ...existing, feedback: [] };
-  writeContinueState(projectRoot, issueId, next);
+  writeContinueStateSync(projectRoot, issueId, next);
   return next;
 }
 
@@ -544,7 +544,7 @@ const liftContinueError = (
   });
 
 /** Effect variant of `writeContinueStateAsync`. */
-export const writeContinueStateEffect = (
+export const writeContinueState = (
   projectRoot: string,
   issueId: string,
   stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
@@ -555,7 +555,7 @@ export const writeContinueStateEffect = (
   });
 
 /** Effect variant of `readContinueStateAsync`. */
-export const readContinueStateEffect = (
+export const readContinueState = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<ContinueState | null, ContinueStateError> =>
@@ -566,34 +566,34 @@ export const readContinueStateEffect = (
 
 /** Effect variant of `appendSessionEntry`. Uses the sync API under the hood;
  * the failure mode is a writer-conflict throw, not async I/O. */
-export const appendSessionEntryEffect = (
+export const appendSessionEntry = (
   projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): Effect.Effect<ContinueState, ContinueStateError> =>
   Effect.try({
-    try: () => appendSessionEntry(projectRoot, issueId, entry),
+    try: () => appendSessionEntrySync(projectRoot, issueId, entry),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'appendSessionEntry', cause),
   });
 
 /** Effect variant of `appendFeedbackEntry`. */
-export const appendFeedbackEntryEffect = (
+export const appendFeedbackEntry = (
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): Effect.Effect<ContinueState, ContinueStateError> =>
   Effect.try({
-    try: () => appendFeedbackEntry(projectRoot, issueId, entry),
+    try: () => appendFeedbackEntrySync(projectRoot, issueId, entry),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'appendFeedbackEntry', cause),
   });
 
 /** Effect variant of `clearFeedback`. */
-export const clearFeedbackEffect = (
+export const clearFeedback = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<ContinueState | null, ContinueStateError> =>
   Effect.try({
-    try: () => clearFeedback(projectRoot, issueId),
+    try: () => clearFeedbackSync(projectRoot, issueId),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'clearFeedback', cause),
   });
 

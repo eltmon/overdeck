@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
-import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
+import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import type { VBriefDocument, VBriefInspectionPolicy, VBriefItem, VBriefItemStatus } from './types.js';
@@ -51,15 +51,7 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
     : false;
   const inspectionDepth = item.metadata?.inspectionDepth === 'deep' ? 'deep' : 'fast';
   return { requiresInspection, inspectionDepth };
-}
-
-/**
- * Converts a vBRIEF plan.vbrief.json into beads tasks with dependencies.
- *
- * @param workspacePath - Path to the workspace root (contains .planning/plan.vbrief.json)
- * @returns Result with created bead IDs and any errors
- */
-export async function createBeadsFromVBrief(workspacePath: string): Promise<CreateBeadsResult> {
+}async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -104,7 +96,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   }
 
   // Read the vBRIEF plan — must be spec-compliant format
-  const doc = readWorkspacePlan(workspacePath);
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) {
     return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
   }
@@ -352,16 +344,14 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
   } catch {
     return null;
   }
-}
-
-export async function syncBeadStatusToVBrief(
+}async function syncBeadStatusToVBriefPromise(
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed',
   knownTitle?: string
 ): Promise<string | null> {
   try {
-    const doc = readWorkspacePlan(workspacePath);
+    const doc = readWorkspacePlanSync(workspacePath);
     if (!doc) return null;
 
     let beadTitle: string | null = knownTitle ?? null;
@@ -437,8 +427,8 @@ export interface VBriefACStatus {
  *
  * Used by: verification gate, pan done, merge agent, prompt injection.
  */
-export function getVBriefACStatus(workspacePath: string): VBriefACStatus | null {
-  const doc = readWorkspacePlan(workspacePath);
+export function getVBriefACStatusSync(workspacePath: string): VBriefACStatus | null {
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return null;
 
   const allCriteria = extractACFromDocument(doc);
@@ -491,11 +481,11 @@ export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')
 }> {}
 
 /** Effect variant of `createBeadsFromVBrief`. */
-export const createBeadsFromVBriefEffect = (
+export const createBeadsFromVBrief = (
   workspacePath: string,
 ): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>
   Effect.tryPromise({
-    try: () => createBeadsFromVBrief(workspacePath),
+    try: () => createBeadsFromVBriefPromise(workspacePath),
     catch: (cause) =>
       new BeadsOperationError({
         operation: 'createBeadsFromVBrief',
@@ -506,14 +496,14 @@ export const createBeadsFromVBriefEffect = (
   });
 
 /** Effect variant of `syncBeadStatusToVBrief`. */
-export const syncBeadStatusToVBriefEffect = (
+export const syncBeadStatusToVBrief = (
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed',
   knownTitle?: string,
 ): Effect.Effect<string | null, BeadsOperationError> =>
   Effect.tryPromise({
-    try: () => syncBeadStatusToVBrief(beadId, workspacePath, status, knownTitle),
+    try: () => syncBeadStatusToVBriefPromise(beadId, workspacePath, status, knownTitle),
     catch: (cause) =>
       new BeadsOperationError({
         operation: 'syncBeadStatusToVBrief',
@@ -524,11 +514,11 @@ export const syncBeadStatusToVBriefEffect = (
   });
 
 /** Effect variant of `getVBriefACStatus`. */
-export const getVBriefACStatusEffect = (
+export const getVBriefACStatus = (
   workspacePath: string,
 ): Effect.Effect<VBriefACStatus | null, BeadsOperationError> =>
   Effect.try({
-    try: () => getVBriefACStatus(workspacePath),
+    try: () => getVBriefACStatusSync(workspacePath),
     catch: (cause) =>
       new BeadsOperationError({
         operation: 'getVBriefACStatus',

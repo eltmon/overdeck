@@ -78,9 +78,7 @@ export async function injectMemoryHookSettings(workspacePath: string): Promise<v
   upsertHook(hooks, 'UserPromptSubmit', `node "${scriptPath}" prompt-inject`, 2);
 
   await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-}
-
-export async function injectCavemanSettings(workspacePath: string, variant: CavemanVariant): Promise<void> {
+}async function injectCavemanSettingsPromise(workspacePath: string, variant: CavemanVariant): Promise<void> {
   const claudeDir = join(workspacePath, '.claude');
   await mkdir(claudeDir, { recursive: true });
 
@@ -224,13 +222,7 @@ function internalToken() {
   return readFileSync(path, 'utf8').trim();
 }
 `;
-}
-
-/**
- * Read the caveman variant stored in a workspace's .claude/.caveman-variant file.
- * Returns 'off' if the file doesn't exist (caveman was disabled at workspace creation).
- */
-export async function readCavemanVariant(workspacePath: string): Promise<CavemanVariant> {
+}async function readCavemanVariantPromise(workspacePath: string): Promise<CavemanVariant> {
   const variantFile = join(workspacePath, '.claude', CAVEMAN_VARIANT_FILE);
   if (!existsSync(variantFile)) return 'off';
   const content = (await readFile(variantFile, 'utf-8')).trim();
@@ -246,12 +238,12 @@ export async function readCavemanVariant(workspacePath: string): Promise<Caveman
 // composers can chain without round-tripping through `Effect.tryPromise`.
 
 /** Effect variant of `injectCavemanSettings`. */
-export const injectCavemanSettingsEffect = (
+export const injectCavemanSettings = (
   workspacePath: string,
   variant: CavemanVariant,
 ): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
-    try: () => injectCavemanSettings(workspacePath, variant),
+    try: () => injectCavemanSettingsPromise(workspacePath, variant),
     catch: (cause) =>
       new FsError({
         path: workspacePath,
@@ -261,11 +253,11 @@ export const injectCavemanSettingsEffect = (
   });
 
 /** Effect variant of `readCavemanVariant`. */
-export const readCavemanVariantEffect = (
+export const readCavemanVariant = (
   workspacePath: string,
 ): Effect.Effect<CavemanVariant, FsError> =>
   Effect.tryPromise({
-    try: () => readCavemanVariant(workspacePath),
+    try: () => readCavemanVariantPromise(workspacePath),
     catch: (cause) =>
       new FsError({
         path: workspacePath,

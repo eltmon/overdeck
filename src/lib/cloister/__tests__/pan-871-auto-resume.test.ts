@@ -98,15 +98,15 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   };
 });
@@ -134,14 +134,14 @@ vi.mock('fs', () => ({
 }));
 
 import { autoResumeStoppedWorkAgents } from '../deacon.js';
-import { getAgentState, getAgentStateEffect, resumeAgent } from '../../../lib/agents.js';
-import { getReviewStatus } from '../../../lib/review-status.js';
+import { getAgentStateSync, getAgentState, resumeAgent } from '../../../lib/agents.js';
+import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
 
-const mockGetAgentState = getAgentState as any;
-const mockGetAgentStateAsync = getAgentStateEffect as any;
+const mockGetAgentState = getAgentStateSync as any;
+const mockGetAgentStateAsync = getAgentState as any;
 const mockResumeAgent = resumeAgent as any;
-const mockGetReviewStatus = getReviewStatus as any;
+const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
 
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {

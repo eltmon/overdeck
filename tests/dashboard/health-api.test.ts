@@ -20,8 +20,8 @@ const { activeSessions } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
-  sessionExistsAsyncEffect: (name: string) => Effect.succeed(activeSessions.has(name)),
-  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+  sessionExists: (name: string) => Effect.succeed(activeSessions.has(name)),
+  capturePane: vi.fn(() => Effect.succeed('')),
   getTmuxConfigMode: vi.fn(() => 'inherit-user'),
   getManagedTmuxSocketName: vi.fn(() => 'panopticon'),
   getManagedTmuxConfigPath: vi.fn(() => '/tmp/panopticon.tmux.conf'),

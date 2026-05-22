@@ -208,8 +208,8 @@ describe('spawnMergeAgentForBranches — isRunning called correctly', () => {
   });
 
   it('isRunning receives mergeProjectKey from resolveProjectFromIssue', async () => {
-    const { resolveProjectFromIssue } = await import('../../../../src/lib/projects.js');
-    const mockResolve = vi.mocked(resolveProjectFromIssue);
+    const { resolveProjectFromIssueSync } = await import('../../../../src/lib/projects.js');
+    const mockResolve = vi.mocked(resolveProjectFromIssueSync);
 
     // When resolveProjectFromIssue returns a project, mergeProjectKey should be passed
     mockResolve.mockReturnValueOnce({ projectKey: 'myproject', path: PROJECT_PATH } as any);

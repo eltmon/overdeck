@@ -15,7 +15,7 @@ import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
-import { getConversationsConfig } from '../../config-yaml.js';
+import { getConversationsConfigSync } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
 
@@ -123,7 +123,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0, estimatedCost: 0, actualCost: null, embedded: 0 };
 
   const tier = opts.tier ?? 1;
-  const config = opts.config ?? getConversationsConfig();
+  const config = opts.config ?? getConversationsConfigSync();
   const tierConfig = {
     quickModel: config.enrichment.quickModel,
     deepModel: config.enrichment.deepModel,
@@ -173,7 +173,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       });
       return;
     }
-    const sessionResult = await enrichSession({
+    const sessionResult = await Effect.runPromise(enrichSession({
       sessionId: session.id,
       jsonlPath: session.jsonlPath,
       tier,
@@ -183,7 +183,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       config: tierConfig,
       callApi,
       resolveModel,
-    });
+    }));
 
     processed++;
     state.accounted = true;

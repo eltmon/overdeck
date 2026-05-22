@@ -1,15 +1,16 @@
 /**
  * PAN-977 review-round-17 regression test.
  *
- * If `mkdir(lockPath)` succeeds inside `assertSingleWriterAsync` but the
+ * If `mkdir(lockPath)` succeeds during writer-lock acquisition but the
  * subsequent `writeFile(owner.json)` throws a non-EEXIST error (ENOSPC,
  * EPERM, ENAMETOOLONG, …), the orphan lock directory must be removed
  * before re-throwing. Otherwise every subsequent
- * `applyTaskOperationToPlanFileAsync` for that plan path wedges
+ * task operation for that plan path wedges
  * permanently — mkdir → EEXIST → owner.json read → ENOENT → "unknown
  * writer" → permanent writer-conflict, and `activePlanWriters.set` never
  * ran so the in-memory release path can't free it either.
  */
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -84,7 +85,7 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
   it('removes the lock directory when owner.json write fails so the next call can recover', async () => {
     const lockPath = `${planPath}.writer.lock`;
     // Re-import the module under test AFTER vi.mock takes effect.
-    const { applyTaskOperationToPlanFileAsync } = await import('../dag.js');
+    const { applyTaskOperationToPlanFile } = await import('../dag.js');
 
     // Force the next owner.json write to fail with a non-EEXIST error. This
     // mirrors a transient ENOSPC/EPERM at the worst possible moment: after
@@ -92,12 +93,12 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
     fsHooks.failNextWrite = 'owner.json';
 
     await expect(
-      applyTaskOperationToPlanFileAsync(planPath, {
+      Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
         type: 'claim',
         itemId: 'PAN-977-recover',
         expectedSequence: 1,
         writerId: 'writer-orphan',
-      }),
+      })),
     ).rejects.toThrow(/ENOSPC/);
 
     // Critical assertion: the lock directory must not survive the failed
@@ -106,12 +107,12 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
     expect(existsSync(lockPath)).toBe(false);
 
     // Subsequent claim must succeed (writeFile is now passthrough).
-    const result = await applyTaskOperationToPlanFileAsync(planPath, {
+    const result = await Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
       type: 'claim',
       itemId: 'PAN-977-recover',
       expectedSequence: 1,
       writerId: 'writer-recovered',
-    });
+    }));
     expect(result.item.status).toBe('running');
 
     // And the lock directory should be cleaned up by the surrounding finally

@@ -25,7 +25,7 @@ import {
   listActiveConversations,
   markConversationEnded,
 } from '../../../lib/database/conversations-db.js';
-import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
+import { listSessionNames } from '../../../lib/tmux.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
@@ -64,7 +64,7 @@ export async function pollConversations(): Promise<void> {
     const conversations = listActiveConversations();
     if (conversations.length === 0) return;
 
-    const aliveSessions = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
+    const aliveSessions = new Set(await Effect.runPromise(listSessionNames()));
 
     const endedConversations: typeof conversations = [];
     const now = Date.now();

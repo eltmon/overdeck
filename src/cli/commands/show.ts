@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * pan show <id> — unified observation command
  *
@@ -18,9 +19,9 @@ import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { getShadowState } from '../../lib/shadow-state.js';
 import { pingAgent } from '../../lib/health.js';
-import { getAgentCV } from '../../lib/cv.js';
-import { getAgentRuntimeState } from '../../lib/agents.js';
-import { resolveBareNumericId } from '../../lib/issue-id.js';
+import { getAgentCVSync } from '../../lib/cv.js';
+import { getAgentRuntimeStateSync } from '../../lib/agents.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -51,7 +52,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   // and prefixed agent IDs (agent-pan-1148). Bare numbers are resolved by probing
   // ~/.panopticon/agents/ for a unique state dir, since the CLI doesn't otherwise
   // know which project a bare number belongs to.
-  const resolved = resolveBareNumericId(id);
+  const resolved = resolveBareNumericIdSync(id);
   if (!resolved) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
@@ -69,12 +70,12 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   if (context) return contextCommand('state', agentId, undefined, { json });
   if (health) return healthCommand('ping', issueId, { json });
 
-  const shadowState = await getShadowState(issueId);
-  const healthData = await (async () => {
-    try { return await pingAgent(agentId); } catch { return null; }
-  })();
-  const runtimeState = getAgentRuntimeState(agentId);
-  const cvData = getAgentCV(agentId);
+  const shadowState = await Effect.runPromise(getShadowState(issueId));
+  const healthData = await Effect.runPromise(
+    pingAgent(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
+  );
+  const runtimeState = getAgentRuntimeStateSync(agentId);
+  const cvData = getAgentCVSync(agentId);
 
   if (json) {
     console.log(JSON.stringify({

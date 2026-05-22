@@ -32,31 +32,31 @@ async function runRoute(
 
 describe('Effect.promise async FS pattern', () => {
   it('returns 200 when async operation succeeds', async () => {
-    const effect = httpHandler(
+    const effect = (await Effect.runPromise(httpHandler(
       Effect.promise(async () => {
         // Simulate async FS read
         const data = await Promise.resolve({ value: 42 });
         return jsonResponse(data);
       })
-    );
+    )));
     const { status, body } = await runRoute(effect);
     expect(status).toBe(200);
     expect((body as { value: number }).value).toBe(42);
   });
 
   it('maps async rejection to 500 via httpHandler catchCause', async () => {
-    const effect = httpHandler(
+    const effect = (await Effect.runPromise(httpHandler(
       Effect.promise(async () => {
         throw new Error('async FS failure');
       }) as Effect.Effect<HttpServerResponse, never, never>
-    );
+    )));
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
     expect((body as { error: string }).error).toContain('async FS failure');
   });
 
   it('inline try/catch returns error response without failing Effect', async () => {
-    const effect = httpHandler(
+    const effect = (await Effect.runPromise(httpHandler(
       Effect.promise(async () => {
         try {
           throw new Error('handled error');
@@ -65,7 +65,7 @@ describe('Effect.promise async FS pattern', () => {
           return jsonResponse({ error: msg }, { status: 500 });
         }
       })
-    );
+    )));
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
     expect((body as { error: string }).error).toBe('handled error');
@@ -127,7 +127,7 @@ describe('EventStoreService.append via yield*', () => {
     });
 
     const response = await Effect.runPromise(
-      Effect.provide(httpHandler(routeEffect), testLayer)
+      Effect.provide((await Effect.runPromise(httpHandler(routeEffect))), testLayer)
     );
     const body = response.body as { body: Uint8Array } | null;
     const text = body?.body ? new TextDecoder().decode(body.body) : '{}';

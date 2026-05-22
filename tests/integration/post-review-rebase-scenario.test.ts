@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * PAN-1215 Integration Test: Full post-review-rebase scenario end-to-end
  *
@@ -142,7 +143,7 @@ vi.mock('../../src/lib/cloister/review-verdict-feedback.js', () => ({
 
 // ─── Imports after mocks ──────────────────────────────────────────────────────
 
-import { setReviewStatus, getReviewStatus, verificationSatisfied } from '../../src/lib/review-status.js';
+import { setReviewStatusSync, getReviewStatusSync, verificationSatisfied } from '../../src/lib/review-status.js';
 import { checkPostReviewCommits } from '../../src/lib/cloister/deacon.js';
 import { doneCommand } from '../../src/cli/commands/specialists/done.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
@@ -195,7 +196,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
   // ─── Gap A: Deacon redispatches review convoy after post-review reset ───────
 
   it('resets review and redispatches convoy after tree-changing rebase', async () => {
-    setReviewStatus('PAN-1215-A', {
+    setReviewStatusSync('PAN-1215-A', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -213,7 +214,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     ).toBe(true);
 
     // AC2: review status reset to pending, readyForMerge cleared
-    const after = getReviewStatus('PAN-1215-A');
+    const after = getReviewStatusSync('PAN-1215-A');
     expect(after?.reviewStatus).toBe('pending');
     expect(after?.testStatus).toBe('pending');
     expect(after?.readyForMerge).toBe(false);
@@ -231,7 +232,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
   });
 
   it('does NOT redispatch on tree-identical rebases (PAN-1213 short-circuit)', async () => {
-    setReviewStatus('PAN-1215-A2', {
+    setReviewStatusSync('PAN-1215-A2', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -247,7 +248,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     expect(actions.filter((a) => a.includes('PAN-1215-A2'))).toHaveLength(0);
     expect(mockSpawnReviewRoleForIssue).not.toHaveBeenCalled();
 
-    const after = getReviewStatus('PAN-1215-A2');
+    const after = getReviewStatusSync('PAN-1215-A2');
     expect(after?.reviewStatus).toBe('passed');
     expect(after?.reviewedAtCommit).toBe('newsha99');
   });
@@ -256,7 +257,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
   it('clears stale verificationStatus when review override signals passed', async () => {
     // Pre-seed a status with failed verification (e.g. from a prior cycle)
-    setReviewStatus('PAN-1215-C', {
+    setReviewStatusSync('PAN-1215-C', {
       reviewStatus: 'pending',
       testStatus: 'pending',
       verificationStatus: 'failed',
@@ -274,7 +275,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
     await doneCommand('review', 'pan-1215-c', { status: 'passed' });
 
-    const after = getReviewStatus('PAN-1215-C');
+    const after = getReviewStatusSync('PAN-1215-C');
     expect(after?.reviewStatus).toBe('passed');
     expect(after?.verificationStatus).toBe('passed');
     expect(after?.verificationNotes).toContain('PAN-1215');
@@ -290,10 +291,10 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     writeFileSync(join(testRepoDir, '.pan', 'spec.vbrief.json'), '{"plan":{"updated":true}}');
 
     // Capture a checkpoint
-    await captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1');
+    await Effect.runPromise(captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1'));
 
     // Verify the checkpoint ref was created
-    expect(await hasCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1')).toBe(true);
+    (await Effect.runPromise(expect(await hasCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1'))))-1215', 'turn-1'))).toBe(true);
 
     // List files in the checkpoint tree
     const ref = 'refs/pan/turn/agent-pan-1215/turn-1';
@@ -327,7 +328,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     const tracked = execSync('git ls-files .pan/continue.json', { cwd: testRepoDir, encoding: 'utf-8' }).trim();
     expect(tracked).toBe('');
 
-    await captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-untracked');
+    await Effect.runPromise(captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-untracked'));
 
     const ref = 'refs/pan/turn/agent-pan-1215/turn-untracked';
     const commit = execSync(`git rev-parse ${ref}`, { cwd: testRepoDir, encoding: 'utf-8' }).trim();
@@ -353,7 +354,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     writeFileSync(join(testRepoDir, '.pan', 'continue.json'), '{"version":"4"}');
 
     // Capture checkpoint — file should be excluded because it is no longer tracked
-    await captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-post-cleanup');
+    await Effect.runPromise(captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-post-cleanup'));
 
     const ref = 'refs/pan/turn/agent-pan-1215/turn-post-cleanup';
     const commit = execSync(`git rev-parse ${ref}`, { cwd: testRepoDir, encoding: 'utf-8' }).trim();

@@ -25,7 +25,7 @@
 import { Effect } from 'effect'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
-import { getProviderForModel } from './providers.js'
+import { getProviderForModelSync } from './providers.js'
 
 export type HarnessPolicyDecision = {
   allowed: boolean
@@ -55,24 +55,24 @@ const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5'])
  * Check whether a (model, authMode) pair is allowed, independent of harness.
  * Use this in pickers to lock model options that the current auth setup can't reach.
  */
-export function canUseModelWithAuth(
+export function canUseModelWithAuthSync(
   model: string,
   authMode: AuthMode | undefined,
 ): HarnessPolicyDecision {
-  const provider = getProviderForModel(model)
+  const provider = getProviderForModelSync(model)
   if (provider.name === 'openai' && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === 'api-key') {
     return GPT_5_5_API_KEY_BLOCK
   }
   return ALLOWED
 }
 
-export function canUseHarness(
+export function canUseHarnessSync(
   harness: RuntimeName,
   model: string,
   authMode: AuthMode | undefined,
 ): HarnessPolicyDecision {
   // Model-level auth restrictions apply to every harness.
-  const modelAuth = canUseModelWithAuth(model, authMode)
+  const modelAuth = canUseModelWithAuthSync(model, authMode)
   if (!modelAuth.allowed) return modelAuth
 
   if (harness === 'claude-code') {
@@ -80,7 +80,7 @@ export function canUseHarness(
   }
 
   // harness === 'pi'
-  const provider = getProviderForModel(model)
+  const provider = getProviderForModelSync(model)
   if (provider.name !== 'anthropic') {
     return ALLOWED
   }
@@ -96,16 +96,16 @@ export function canUseHarness(
 // Pure-sync policy checks — additive Effect.sync wrappers for callers in Effect graphs.
 
 /** Check whether a (model, authMode) pair is allowed. Pure. */
-export const canUseModelWithAuthEffect = (
+export const canUseModelWithAuth = (
   model: string,
   authMode: AuthMode | undefined,
 ): Effect.Effect<HarnessPolicyDecision> =>
-  Effect.sync(() => canUseModelWithAuth(model, authMode))
+  Effect.sync(() => canUseModelWithAuthSync(model, authMode))
 
 /** Check whether a (harness, model, authMode) triple is allowed. Pure. */
-export const canUseHarnessEffect = (
+export const canUseHarness = (
   harness: RuntimeName,
   model: string,
   authMode: AuthMode | undefined,
 ): Effect.Effect<HarnessPolicyDecision> =>
-  Effect.sync(() => canUseHarness(harness, model, authMode))
+  Effect.sync(() => canUseHarnessSync(harness, model, authMode))

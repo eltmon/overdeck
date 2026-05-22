@@ -13,7 +13,7 @@ import { Effect, Layer, Queue, Context, Stream } from 'effect';
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
-import { emitActivityDetailed } from '../../../lib/activity-logger.js';
+import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
 import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
 import { randomUUID } from 'crypto';
 
@@ -163,7 +163,7 @@ export const EventStoreServiceLive = Layer.effect(
     store.subscribe((event) => {
       if (event.type.startsWith('activity.')) return;
       const detailed = mapDomainEventToDetailed(event);
-      if (detailed) emitActivityDetailed(detailed);
+      if (detailed) emitActivityDetailedSync(detailed);
     });
 
     // Capture checkpoints when agent activity changes.
@@ -195,14 +195,14 @@ export const EventStoreServiceLive = Layer.effect(
           const turnId = `turn-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           // Capture checkpoint (git tag at current working tree state)
-          await captureCheckpoint(workspace, agentId, turnId);
+          await Effect.runPromise(captureCheckpoint(workspace, agentId, turnId));
 
           // Compute file changes from previous checkpoint
-          const checkpoints = await listCheckpoints(workspace, agentId);
+          const checkpoints = await Effect.runPromise(listCheckpoints(workspace, agentId));
           const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null;
           let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
           if (prevCheckpoint) {
-            files = await diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId);
+            files = await Effect.runPromise(diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId));
           }
 
           // Only emit if there are actual changes

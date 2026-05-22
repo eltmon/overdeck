@@ -265,9 +265,9 @@ export const AgentSpawnerLive = Layer.effect(
       Effect.tryPromise({
         try: async () => {
           const { deepWipe } = await import('../../../lib/lifecycle/workflows.js');
-          const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+          const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
 
-          const project = resolveProjectFromIssue(issueId);
+          const project = resolveProjectFromIssueSync(issueId);
           const projectPath = project?.projectPath ?? process.cwd();
 
           await Effect.runPromise(deepWipe(

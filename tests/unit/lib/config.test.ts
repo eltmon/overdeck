@@ -10,7 +10,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
 }));
 
 // Import after mocking
-import { loadConfig, saveConfig, getDefaultConfig } from '../../../src/lib/config.js';
+import { loadConfigSync, saveConfigSync, getDefaultConfigSync } from '../../../src/lib/config.js';
 
 // TODO(PAN-49): Test pollution with TEMP_DIR when run with full suite - passes in isolation
 describe.skip('config', () => {
@@ -25,7 +25,7 @@ describe.skip('config', () => {
 
   describe('getDefaultConfig', () => {
     it('should return default config structure', () => {
-      const config = getDefaultConfig();
+      const config = getDefaultConfigSync();
 
       expect(config).toHaveProperty('panopticon');
       expect(config).toHaveProperty('sync');
@@ -34,7 +34,7 @@ describe.skip('config', () => {
     });
 
     it('should have correct default values', () => {
-      const config = getDefaultConfig();
+      const config = getDefaultConfigSync();
 
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.trackers.primary).toBe('linear');
@@ -43,8 +43,8 @@ describe.skip('config', () => {
     });
 
     it('should return a copy, not the original', () => {
-      const config1 = getDefaultConfig();
-      const config2 = getDefaultConfig();
+      const config1 = getDefaultConfigSync();
+      const config2 = getDefaultConfigSync();
 
       config1.dashboard.port = 9999;
 
@@ -54,9 +54,9 @@ describe.skip('config', () => {
 
   describe('loadConfig', () => {
     it('should return default config when file does not exist', () => {
-      const config = loadConfig();
+      const config = loadConfigSync();
 
-      expect(config).toEqual(getDefaultConfig());
+      expect(config).toEqual(getDefaultConfigSync());
     });
 
     it('should parse TOML config file', () => {
@@ -76,7 +76,7 @@ api_port = 4001
 `;
       writeFileSync(join(testConfigDir, 'config.toml'), configContent);
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.panopticon.version).toBe('2.0.0');
       expect(config.sync.backup_before_sync).toBe(false);
@@ -91,7 +91,7 @@ port = 5000
 `;
       writeFileSync(join(testConfigDir, 'config.toml'), configContent);
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.dashboard.port).toBe(5000);
       // Default values should still be present
@@ -102,9 +102,9 @@ port = 5000
       writeFileSync(join(testConfigDir, 'config.toml'), 'invalid {{{{ toml');
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const config = loadConfig();
+      const config = loadConfigSync();
 
-      expect(config).toEqual(getDefaultConfig());
+      expect(config).toEqual(getDefaultConfigSync());
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -112,24 +112,24 @@ port = 5000
 
   describe('saveConfig', () => {
     it('should save config as TOML', () => {
-      const config = getDefaultConfig();
+      const config = getDefaultConfigSync();
       config.dashboard.port = 9000;
 
-      saveConfig(config);
+      saveConfigSync(config);
 
       const content = readFileSync(join(testConfigDir, 'config.toml'), 'utf8');
       expect(content).toContain('port = 9_000'); // TOML formats numbers with underscores
     });
 
     it('should preserve all config sections', () => {
-      const config = getDefaultConfig();
+      const config = getDefaultConfigSync();
       config.trackers.github = {
         type: 'github',
         owner: 'test',
         repo: 'repo',
       };
 
-      saveConfig(config);
+      saveConfigSync(config);
 
       const content = readFileSync(join(testConfigDir, 'config.toml'), 'utf8');
       expect(content).toContain('[trackers.github]');

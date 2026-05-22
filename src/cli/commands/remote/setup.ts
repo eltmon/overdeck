@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * pan remote setup
  *
@@ -11,7 +12,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { loadConfig, saveConfig } from '../../../lib/config.js';
+import { loadConfigSync, saveConfigSync } from '../../../lib/config.js';
 import { createFlyProvider } from '../../../lib/remote/index.js';
 
 const execAsync = promisify(exec);
@@ -47,7 +48,7 @@ export async function setupCommand(): Promise<void> {
   console.log('');
 
   const fly = createFlyProvider();
-  const isAuth = await fly.isAuthenticated();
+  const isAuth = await Effect.runPromise(fly.isAuthenticated());
 
   if (isAuth) {
     console.log(`  ${chalk.green('✓')} Authenticated with Fly.io`);
@@ -83,7 +84,7 @@ export async function setupCommand(): Promise<void> {
   console.log(chalk.bold('  Step 3: Configure Panopticon'));
   console.log('');
 
-  const config = loadConfig();
+  const config = loadConfigSync();
 
   if (!config.remote?.enabled) {
     config.remote = {
@@ -103,7 +104,7 @@ export async function setupCommand(): Promise<void> {
       },
     };
 
-    saveConfig(config);
+    saveConfigSync(config);
     console.log(`  ${chalk.green('✓')} Remote configuration added to config.toml`);
     console.log('');
     console.log(chalk.dim('  Edit ~/.panopticon/config.toml to customize:'));

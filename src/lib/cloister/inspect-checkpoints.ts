@@ -96,17 +96,7 @@ export function saveCheckpoint(
   writeFileSync(getCheckpointPath(projectKey, issueId), JSON.stringify(data, null, 2));
 
   return checkpoint;
-}
-
-/**
- * Get the diff base for an inspection.
- *
- * - If a previous checkpoint exists, diff from that commit
- * - Otherwise, diff from the merge-base with main (full branch diff)
- *
- * Returns the commit SHA or ref to diff from.
- */
-export async function getDiffBase(projectKey: string, issueId: string, workspacePath: string): Promise<string> {
+}async function getDiffBasePromise(projectKey: string, issueId: string, workspacePath: string): Promise<string> {
   const lastCheckpoint = getLastCheckpoint(projectKey, issueId);
 
   if (lastCheckpoint) {
@@ -124,12 +114,7 @@ export async function getDiffBase(projectKey: string, issueId: string, workspace
     // Fallback to 'main' if merge-base fails
     return 'main';
   }
-}
-
-/**
- * Get the diff stats (files changed, insertions, deletions) for the inspection scope.
- */
-export async function getDiffStats(workspacePath: string, diffBase: string): Promise<string> {
+}async function getDiffStatsPromise(workspacePath: string, diffBase: string): Promise<string> {
   try {
     const { stdout } = await execAsync(`git diff --stat ${diffBase}...HEAD`, {
       cwd: workspacePath,
@@ -139,12 +124,7 @@ export async function getDiffStats(workspacePath: string, diffBase: string): Pro
   } catch {
     return 'Unable to compute diff stats';
   }
-}
-
-/**
- * Get the current HEAD commit SHA.
- */
-export async function getCurrentHead(workspacePath: string): Promise<string> {
+}async function getCurrentHeadPromise(workspacePath: string): Promise<string> {
   try {
     const { stdout } = await execAsync('git rev-parse HEAD', {
       cwd: workspacePath,
@@ -162,7 +142,7 @@ export async function getCurrentHead(workspacePath: string): Promise<string> {
  * Effect-typed variant of {@link getDiffBase}. Always succeeds — falls back to
  * `'main'` if `git merge-base` fails, matching the Promise version's behavior.
  */
-export function getDiffBaseEffect(
+export function getDiffBase(
   projectKey: string,
   issueId: string,
   workspacePath: string,
@@ -182,7 +162,7 @@ export function getDiffBaseEffect(
  * Effect-typed variant of {@link getDiffStats}. Always succeeds — returns a
  * human-readable fallback string when the diff command fails.
  */
-export function getDiffStatsEffect(
+export function getDiffStats(
   workspacePath: string,
   diffBase: string,
 ): Effect.Effect<string> {
@@ -199,7 +179,7 @@ export function getDiffStatsEffect(
  * Effect-typed variant of {@link getCurrentHead}. Always succeeds — returns
  * `'unknown'` on failure to preserve the Promise version's contract.
  */
-export function getCurrentHeadEffect(workspacePath: string): Effect.Effect<string> {
+export function getCurrentHead(workspacePath: string): Effect.Effect<string> {
   return Effect.tryPromise({
     try: () => execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8' }),
     catch: (cause) => new GitError({ command: ['git', 'rev-parse', 'HEAD'], stderr: String(cause), exitCode: -1, cause }),

@@ -149,14 +149,7 @@ export function readSpecialistHandoffs(limit?: number): SpecialistHandoff[] {
 export function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[] {
   const allEvents = readSpecialistHandoffs();
   return allEvents.filter(e => e.issueId === issueId);
-}
-
-/**
- * Get specialist handoff statistics
- *
- * @returns Specialist handoff statistics
- */
-export async function getSpecialistHandoffStats(options?: { agentsDir?: string }): Promise<{
+}async function getSpecialistHandoffStatsPromise(options?: { agentsDir?: string }): Promise<{
   totalHandoffs: number;
   todayCount: number;
   bySpecialist: Record<string, { sent: number; received: number }>;
@@ -228,24 +221,7 @@ export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
   const events = readSpecialistHandoffs();
   const today = new Date().toISOString().split('T')[0];
   return events.filter(e => e.timestamp.startsWith(today));
-}
-
-/**
- * Update the status of a specialist handoff record in the JSONL log.
- *
- * Finds the most recent queued/processing entry for the given issueId +
- * toSpecialist pair and rewrites it in-place. Called by /api/specialists/done
- * so that success-rate calculations reflect actual outcomes rather than always
- * reading 0% (because the log is append-only and entries never change status
- * without this function).
- *
- * @param issueId - Issue ID (case-sensitive, use normalised form)
- * @param toSpecialist - Specialist agent name e.g. 'review-agent'
- * @param status - New status to set
- * @param result - Optional outcome ('success' | 'failure')
- * @returns true if a record was found and updated
- */
-export async function updateSpecialistHandoffStatus(
+}async function updateSpecialistHandoffStatusPromise(
   issueId: string,
   toSpecialist: string,
   status: 'processing' | 'completed' | 'failed',
@@ -296,27 +272,27 @@ export async function updateSpecialistHandoffStatus(
 
 // ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
 
-export type SpecialistHandoffStats = Awaited<ReturnType<typeof getSpecialistHandoffStats>>;
+export type SpecialistHandoffStats = Awaited<ReturnType<typeof getSpecialistHandoffStatsPromise>>;
 
 /**
  * Effect variant of {@link getSpecialistHandoffStats}. Underlying I/O is
  * read-only and best-effort; this wrapper preserves the original contract
  * (never throws) by lifting via `Effect.promise`.
  */
-export const getSpecialistHandoffStatsEffect = (
+export const getSpecialistHandoffStats = (
   options?: { agentsDir?: string },
 ): Effect.Effect<SpecialistHandoffStats> =>
-  Effect.promise(() => getSpecialistHandoffStats(options));
+  Effect.promise(() => getSpecialistHandoffStatsPromise(options));
 
 /**
  * Effect variant of {@link updateSpecialistHandoffStatus}. The Promise version
  * already returns `false` rather than throwing on every failure mode, so the
  * Effect form mirrors that contract.
  */
-export const updateSpecialistHandoffStatusEffect = (
+export const updateSpecialistHandoffStatus = (
   issueId: string,
   toSpecialist: string,
   status: 'processing' | 'completed' | 'failed',
   result?: 'success' | 'failure',
 ): Effect.Effect<boolean> =>
-  Effect.promise(() => updateSpecialistHandoffStatus(issueId, toSpecialist, status, result));
+  Effect.promise(() => updateSpecialistHandoffStatusPromise(issueId, toSpecialist, status, result));

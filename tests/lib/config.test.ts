@@ -19,8 +19,8 @@ describe('config', () => {
 
   describe('getDefaultConfig', () => {
     it('should return default configuration', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       expect(config.panopticon.version).toBe('1.0.0');
       expect(config.sync.backup_before_sync).toBe(true);
@@ -31,8 +31,8 @@ describe('config', () => {
     });
 
     it('should include default traefik config', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       expect(config.traefik).toBeDefined();
       expect(config.traefik.enabled).toBe(false);
@@ -41,8 +41,8 @@ describe('config', () => {
     });
 
     it('should include default Linear config', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       expect(config.trackers.linear).toBeDefined();
       expect(config.trackers.linear?.type).toBe('linear');
@@ -52,8 +52,8 @@ describe('config', () => {
 
   describe('PanopticonConfig type', () => {
     it('should have all required sections', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       // Type checking - these should all exist
       expect(config.panopticon).toBeDefined();
@@ -66,8 +66,8 @@ describe('config', () => {
 
   describe('TrackersConfig type', () => {
     it('should support primary and secondary trackers', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       // Primary is required
       expect(config.trackers.primary).toBeDefined();
@@ -77,8 +77,8 @@ describe('config', () => {
     });
 
     it('should support optional tracker configs', async () => {
-      const { getDefaultConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfig();
+      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
 
       // These are optional
       expect(config.trackers.linear).toBeDefined();

@@ -15,7 +15,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfigSync } from './config.js';
 import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
@@ -76,7 +76,7 @@ export function checkStuckEscalation(
   currentModel: string,
   config?: CloisterConfig
 ): TriggerDetection {
-  const conf = config || loadCloisterConfig();
+  const conf = config || loadCloisterConfigSync();
 
   // Get stuck escalation config
   const stuckConfig = conf.handoffs?.auto_triggers?.stuck_escalation;
@@ -164,7 +164,7 @@ export function checkTestFailure(
   currentModel: string,
   config?: CloisterConfig
 ): TriggerDetection {
-  const conf = config || loadCloisterConfig();
+  const conf = config || loadCloisterConfigSync();
 
   // Get test failure config
   const testConfig = conf.handoffs?.auto_triggers?.test_failure;
@@ -244,33 +244,12 @@ function detectTestFailure(workspace: string): {
     reason: 'Test result detection not yet implemented',
     confidence: 'low',
   };
-}
-
-/**
- * Check if implementation is complete and ready for testing.
- *
- * Detection:
- * - Beads task with "implement" in title is closed
- * - No remaining implementation tasks
- *
- * Cached by `.beads/issues.jsonl` mtime: the polled `/handoff/suggestion`
- * endpoint hits this every 30s per agent panel, and each cold call fires
- * two `bd list --json` invocations (~1.87s + ~1MB I/O each). Cache hits
- * are a single statSync. The cache is invalidated whenever beads changes,
- * so suggestions stay current.
- *
- * @param workspace - Workspace path (used to stat .beads/issues.jsonl).
- *                    When omitted (legacy callers), the cache is bypassed.
- * @param issueId - Issue ID
- * @param config - Cloister configuration
- * @returns Trigger detection result
- */
-export async function checkTaskCompletion(
+}async function checkTaskCompletionPromise(
   issueId: string,
   config?: CloisterConfig,
   workspace?: string,
 ): Promise<TriggerDetection> {
-  const conf = config || loadCloisterConfig();
+  const conf = config || loadCloisterConfigSync();
 
   // Get task completion config
   const completionConfig = conf.handoffs?.auto_triggers?.implementation_complete;
@@ -307,9 +286,10 @@ export async function checkTaskCompletion(
 
   const computePromise = (async (): Promise<TriggerDetection> => {
     try {
-      const { stdout: output } = await withBdMutex(() => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
-        encoding: 'utf-8',
-      }));
+      const { stdout: output } = await Effect.runPromise(withBdMutex(() => Effect.tryPromise({
+        try: () => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, { encoding: 'utf-8' }),
+        catch: (cause) => cause,
+      })));
       const tasks = JSON.parse(output);
       const implementTask = tasks.find((t: any) =>
         t.title.toLowerCase().includes('implement') ||
@@ -361,20 +341,7 @@ export async function checkTaskCompletion(
     }
   }
   return computePromise;
-}
-
-/**
- * Check all triggers for an agent
- *
- * @param agentId - Agent ID
- * @param workspace - Workspace path
- * @param issueId - Issue ID
- * @param currentModel - Current model
- * @param health - Agent health state
- * @param config - Cloister configuration
- * @returns Array of triggered detections
- */
-export async function checkAllTriggers(
+}async function checkAllTriggersPromise(
   agentId: string,
   workspace: string,
   issueId: string,
@@ -391,7 +358,7 @@ export async function checkAllTriggers(
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
 
-  const completionCheck = await checkTaskCompletion(issueId, config, workspace);
+  const completionCheck = await Effect.runPromise(checkTaskCompletion(issueId, config, workspace));
   if (completionCheck.triggered) triggers.push(completionCheck);
 
   return triggers;
@@ -404,19 +371,19 @@ export async function checkAllTriggers(
  * implementation; never fails (the underlying function swallows errors and
  * returns a "not triggered" detection on failure).
  */
-export function checkTaskCompletionEffect(
+export function checkTaskCompletion(
   issueId: string,
   config?: CloisterConfig,
   workspace?: string,
 ): Effect.Effect<TriggerDetection> {
-  return Effect.promise(() => checkTaskCompletion(issueId, config, workspace));
+  return Effect.promise(() => checkTaskCompletionPromise(issueId, config, workspace));
 }
 
 /**
  * Effect-typed variant of {@link checkAllTriggers}. Never fails — uses
  * `Effect.promise` because the underlying async path absorbs bd / fs errors.
  */
-export function checkAllTriggersEffect(
+export function checkAllTriggers(
   agentId: string,
   workspace: string,
   issueId: string,
@@ -424,5 +391,5 @@ export function checkAllTriggersEffect(
   health: AgentHealth,
   config?: CloisterConfig,
 ): Effect.Effect<TriggerDetection[]> {
-  return Effect.promise(() => checkAllTriggers(agentId, workspace, issueId, currentModel, health, config));
+  return Effect.promise(() => checkAllTriggersPromise(agentId, workspace, issueId, currentModel, health, config));
 }

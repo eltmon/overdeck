@@ -1,6 +1,7 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { join } from 'path';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { PAN_DIRNAME } from '../../lib/pan-dir/types.js';
 import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from '../../lib/cloister/review-monitor.js';
 import { spawnReviewSubRoleForIssue } from '../../lib/cloister/review-agent.js';
@@ -34,7 +35,7 @@ export async function reviewSpawnReviewerCommand(
     process.exit(1);
   }
 
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved && !opts.workspace) {
     console.error(chalk.red(`Error: cannot resolve project workspace for ${issueId}`));
     process.exit(1);
@@ -44,7 +45,7 @@ export async function reviewSpawnReviewerCommand(
   const outputPath = opts.output ?? reviewerOutputPath(workspace, opts.runId, subRole);
   const contextManifestPath = opts.context ?? join(workspace, PAN_DIRNAME, 'review', opts.runId, 'context.json');
 
-  const result = await spawnReviewSubRoleForIssue({
+  const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
     issueId,
     workspace,
     subRole,
@@ -52,7 +53,7 @@ export async function reviewSpawnReviewerCommand(
     outputPath,
     contextManifestPath,
     model: opts.model,
-  });
+  }));
 
   if (!result.success) {
     console.error(chalk.red(`Error: ${result.error ?? result.message}`));

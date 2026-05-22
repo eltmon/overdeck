@@ -9,7 +9,7 @@
 import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
 import type { ReviewStatus, StatusHistoryEntry } from '../review-status.js';
-import { normalizeReviewStatus } from '../review-status-normalize.js';
+import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 
 /**
  * PAN-1249: Local typed error for SQLite failures against review_status.
@@ -27,7 +27,7 @@ export class DatabaseError extends Data.TaggedError('DatabaseError')<{
  * Upsert a review status record atomically.
  * Replaces the JSON read-modify-write cycle with a single transaction.
  */
-export function upsertReviewStatus(status: ReviewStatus): void {
+export function upsertReviewStatusSync(status: ReviewStatus): void {
   const db = getDatabase();
 
   const upsert = db.transaction((s: ReviewStatus) => {
@@ -162,7 +162,7 @@ export function deleteReviewStatus(issueId: string): void {
 // failure mode is typed (DatabaseError). The Promise return type is kept
 // to satisfy existing callers in src/lib/review-status.ts.
 
-export const upsertReviewStatusEffect = (
+export const upsertReviewStatus = (
   status: ReviewStatus,
 ): Effect.Effect<void, DatabaseError> =>
   Effect.tryPromise({
@@ -170,7 +170,7 @@ export const upsertReviewStatusEffect = (
       new Promise<void>((resolve, reject) => {
         setImmediate(() => {
           try {
-            upsertReviewStatus(status);
+            upsertReviewStatusSync(status);
             resolve();
           } catch (err) {
             reject(err);
@@ -180,7 +180,7 @@ export const upsertReviewStatusEffect = (
     catch: (cause) => new DatabaseError({ operation: 'upsertReviewStatusEffect', cause }),
   });
 
-export const getReviewStatusFromDbEffect = (
+export const getReviewStatusFromDb = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, DatabaseError> =>
   Effect.tryPromise({
@@ -188,7 +188,7 @@ export const getReviewStatusFromDbEffect = (
       new Promise<ReviewStatus | null>((resolve, reject) => {
         setImmediate(() => {
           try {
-            resolve(getReviewStatusFromDb(issueId));
+            resolve(getReviewStatusFromDbSync(issueId));
           } catch (err) {
             reject(err);
           }
@@ -203,7 +203,7 @@ export function upsertReviewStatusAsync(status: ReviewStatus): Promise<void> {
       new Promise<void>((resolve, reject) => {
         setImmediate(() => {
           try {
-            upsertReviewStatus(status);
+            upsertReviewStatusSync(status);
             resolve();
           } catch (err) {
             reject(err);
@@ -219,7 +219,7 @@ export function getReviewStatusFromDbAsync(issueId: string): Promise<ReviewStatu
   const program = Effect.promise<ReviewStatus | null>(() =>
     new Promise((resolve) => {
       setImmediate(() => {
-        resolve(getReviewStatusFromDb(issueId));
+        resolve(getReviewStatusFromDbSync(issueId));
       });
     }),
   );
@@ -231,7 +231,7 @@ export function getReviewStatusFromDbAsync(issueId: string): Promise<ReviewStatu
 /**
  * Get a single review status by issue ID.
  */
-export function getReviewStatusFromDb(issueId: string): ReviewStatus | null {
+export function getReviewStatusFromDbSync(issueId: string): ReviewStatus | null {
   const db = getDatabase();
   const normalizedId = issueId.toUpperCase();
 
@@ -394,7 +394,7 @@ interface DbReviewStatusRow {
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
-  return normalizeReviewStatus({
+  return normalizeReviewStatusSync({
     issueId: row.issue_id.toUpperCase(),
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -54,7 +55,7 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
 vi.mock('../../../lib/tmux.js', async () => {
   const { Effect } = await import('effect');
   return {
-    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
+    sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)))),
   };
 });
 

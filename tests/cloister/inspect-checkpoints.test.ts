@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * PAN-382: Tests for inspect checkpoint system
  */
@@ -128,15 +129,15 @@ describe('inspect-checkpoints', () => {
     it('uses merge-base when no checkpoint exists', async () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('abc123def456');
+      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
+      (await Effect.runPromise(expect(base))).toBe('abc123def456');
     });
 
     it('uses last checkpoint SHA when checkpoints exist', async () => {
       saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
 
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('checkpoint-sha');
+      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
+      (await Effect.runPromise(expect(base))).toBe('checkpoint-sha');
     });
 
     it('falls back to main when merge-base fails', async () => {
@@ -144,8 +145,8 @@ describe('inspect-checkpoints', () => {
         throw new Error('not a git repo');
       });
 
-      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
-      expect(base).toBe('main');
+      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
+      (await Effect.runPromise(expect(base))).toBe('main');
     });
   });
 
@@ -153,8 +154,8 @@ describe('inspect-checkpoints', () => {
     it('returns diff stats from git', async () => {
       execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
 
-      const stats = await getDiffStats('/tmp/workspace', 'abc123');
-      expect(stats).toContain('3 files changed');
+      const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
+      (await Effect.runPromise(expect(stats))).toContain('3 files changed');
     });
 
     it('returns fallback message on error', async () => {
@@ -162,8 +163,8 @@ describe('inspect-checkpoints', () => {
         throw new Error('git error');
       });
 
-      const stats = await getDiffStats('/tmp/workspace', 'abc123');
-      expect(stats).toBe('Unable to compute diff stats');
+      const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
+      (await Effect.runPromise(expect(stats))).toBe('Unable to compute diff stats');
     });
   });
 
@@ -171,8 +172,8 @@ describe('inspect-checkpoints', () => {
     it('returns HEAD sha', async () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
-      const head = await getCurrentHead('/tmp/workspace');
-      expect(head).toBe('abc123def456');
+      const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
+      (await Effect.runPromise(expect(head))).toBe('abc123def456');
     });
 
     it('returns unknown on error', async () => {
@@ -180,8 +181,8 @@ describe('inspect-checkpoints', () => {
         throw new Error('not a git repo');
       });
 
-      const head = await getCurrentHead('/tmp/workspace');
-      expect(head).toBe('unknown');
+      const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
+      (await Effect.runPromise(expect(head))).toBe('unknown');
     });
   });
 });

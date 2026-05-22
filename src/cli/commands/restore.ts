@@ -1,11 +1,11 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { listBackups, restoreBackup } from '../../lib/backup.js';
+import { listBackupsSync, restoreBackupSync } from '../../lib/backup.js';
 import { SYNC_TARGET } from '../../lib/paths.js';
 
 export async function restoreCommand(timestamp?: string): Promise<void> {
-  const backups = listBackups();
+  const backups = listBackupsSync();
 
   if (backups.length === 0) {
     console.log(chalk.yellow('No backups found.'));
@@ -67,7 +67,7 @@ export async function restoreCommand(timestamp?: string): Promise<void> {
       'commands': SYNC_TARGET.commands,
     };
 
-    restoreBackup(timestamp!, targetDirs);
+    restoreBackupSync(timestamp!, targetDirs);
 
     spinner.succeed(`Restored backup: ${timestamp}`);
 

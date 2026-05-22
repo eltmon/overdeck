@@ -42,10 +42,10 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
-import { sessionExistsAsyncEffect, killSessionAsyncEffect, createSessionAsyncEffect, listSessions } from '../tmux.js'
-import { parsePiSession } from '../cost-parsers/pi-parser.js'
-import { generateLauncherScript } from '../launcher-generator.js'
-import { createPiFifo, destroyPiFifo, writePiCommand, piFifoPaths, PiNotReady } from './pi-fifo.js'
+import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
+import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
+import { generateLauncherScriptSync } from '../launcher-generator.js'
+import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 
 const execAsync = promisify(exec)
@@ -112,7 +112,7 @@ function readStoredSessionId(agentId: string): string | null {
   }
 }
 
-export class PiRuntime implements AgentRuntime {
+export class PiRuntimeSync implements AgentRuntime {
   readonly name = 'pi' as const
 
   /** Resolve the latest Pi session JSONL for an agent. Pi nests files under
@@ -181,7 +181,7 @@ export class PiRuntime implements AgentRuntime {
 
     // 3. tmux session creation time (best-effort).
     try {
-      const sess = listSessions().find(s => s.name === agentId)
+      const sess = listSessionsSync().find(s => s.name === agentId)
       if (sess) {
         return {
           timestamp: sess.created,
@@ -199,7 +199,7 @@ export class PiRuntime implements AgentRuntime {
   getTokenUsage(agentId: string): TokenUsage | null {
     const session = this.getSessionPath(agentId)
     if (!session) return null
-    const parsed = parsePiSession(session)
+    const parsed = parsePiSessionSync(session)
     return parsed?.usage ?? null
   }
 
@@ -210,7 +210,7 @@ export class PiRuntime implements AgentRuntime {
   getSessionCost(agentId: string): CostBreakdown | null {
     const session = this.getSessionPath(agentId)
     if (!session) return null
-    const parsed = parsePiSession(session)
+    const parsed = parsePiSessionSync(session)
     if (!parsed) return null
     const totalCost = parsed.cost_v2 ?? parsed.cost ?? 0
     return {
@@ -227,7 +227,7 @@ export class PiRuntime implements AgentRuntime {
     if (!existsSync(readyPathFor(agentId))) {
       throw new PiNotReady(`Pi agent ${agentId}: ready.json not present yet`)
     }
-    writePiCommand(agentId, { id: randomUUID(), type: 'prompt', message })
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message })
   }
 
   /**
@@ -246,7 +246,7 @@ export class PiRuntime implements AgentRuntime {
   async killAgent(agentId: string): Promise<void> {
     // Step 1: graceful RPC abort.
     try {
-      writePiCommand(agentId, { id: randomUUID(), type: 'abort' })
+      writePiCommandSync(agentId, { id: randomUUID(), type: 'abort' })
     } catch {
       // No reader / not ready — fall through to signal escalation.
     }
@@ -278,8 +278,8 @@ export class PiRuntime implements AgentRuntime {
 
     // Step 5: SIGKILL fallback via tmux kill-session.
     try {
-      if (await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
-        await Effect.runPromise(killSessionAsyncEffect(agentId))
+      if (await Effect.runPromise(sessionExists(agentId))) {
+        await Effect.runPromise(killSession(agentId))
       }
     } finally {
       cleanupPiTransientFiles(agentId)
@@ -304,7 +304,7 @@ export class PiRuntime implements AgentRuntime {
     mkdirSync(sessionDir, { recursive: true, mode: 0o700 })
 
     // Writer side relies on the fifo existing before tmux starts the launcher.
-    const fifoPath = await createPiFifo(agentId)
+    const fifoPath = await Effect.runPromise(createPiFifo(agentId))
 
     const promptFile = config.prompt ? writeAgentPromptFile(agentId, config.prompt) : undefined
 
@@ -320,7 +320,7 @@ export class PiRuntime implements AgentRuntime {
       )
     }
 
-    const launcherScript = generateLauncherScript({
+    const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
       harness: 'pi',
@@ -339,7 +339,7 @@ export class PiRuntime implements AgentRuntime {
     writeFileSync(launcherPath, launcherScript)
     chmodSync(launcherPath, 0o755)
 
-    await Effect.runPromise(createSessionAsyncEffect(agentId, config.workspace, `bash ${launcherPath}`, {
+    await Effect.runPromise(createSession(agentId, config.workspace, `bash ${launcherPath}`, {
       env: { PANOPTICON_AGENT_ID: agentId },
     }))
 
@@ -366,7 +366,7 @@ export class PiRuntime implements AgentRuntime {
       const files: { path: string; mtime: number }[] = []
       walkJsonl(sessionRoot, files)
       for (const file of files) {
-        const parsed = parsePiSession(file.path)
+        const parsed = parsePiSessionSync(file.path)
         if (!parsed) continue
         sessions.push({
           id: parsed.sessionId,
@@ -383,12 +383,12 @@ export class PiRuntime implements AgentRuntime {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExistsAsyncEffect(agentId))
+    return await Effect.runPromise(sessionExists(agentId))
   }
 }
 
-export function createPiRuntime(): PiRuntime {
-  return new PiRuntime()
+export function createPiRuntimeSync(): PiRuntimeSync {
+  return new PiRuntimeSync()
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -398,16 +398,16 @@ export function createPiRuntime(): PiRuntime {
 // new Effect-native callers who want typed error channels.
 
 /**
- * Effect-channel variant of {@link PiRuntime}. Lifts async kill/spawn/send
+ * Effect-channel variant of {@link PiRuntimeSync}. Lifts async kill/spawn/send
  * methods into typed Effects (ProcessSpawnError / ProcessTimeoutError /
  * TmuxError). PiSpawnTimeout is preserved as the legacy Error class; Effect
  * callers receive ProcessTimeoutError instead.
  */
-export class PiRuntimeEffect implements AgentRuntimeEffect {
+export class PiRuntime implements AgentRuntimeEffect {
   readonly name = 'pi' as const
-  private readonly inner: PiRuntime
+  private readonly inner: PiRuntimeSync
 
-  constructor(inner: PiRuntime = new PiRuntime()) {
+  constructor(inner: PiRuntimeSync = new PiRuntimeSync()) {
     this.inner = inner
   }
 
@@ -480,9 +480,9 @@ export class PiRuntimeEffect implements AgentRuntimeEffect {
   }
 }
 
-/** Effect-flavored constructor companion to {@link createPiRuntime}. */
-export function createPiRuntimeEffect(): PiRuntimeEffect {
-  return new PiRuntimeEffect()
+/** Effect-flavored constructor companion to {@link createPiRuntimeSync}. */
+export function createPiRuntime(): PiRuntime {
+  return new PiRuntime()
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -492,7 +492,7 @@ export function createPiRuntimeEffect(): PiRuntimeEffect {
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExistsAsyncEffect(agentId)))) return true
+    if (!(await Effect.runPromise(sessionExists(agentId)))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false
@@ -504,7 +504,7 @@ async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise
  * under <agentDir>/sessions/ — those are sacred (CLAUDE.md).
  */
 function cleanupPiTransientFiles(agentId: string): void {
-  try { destroyPiFifo(agentId) } catch { /* ignore */ }
+  try { destroyPiFifoSync(agentId) } catch { /* ignore */ }
   const dir = agentDirFor(agentId)
   for (const transient of ['ready.json', 'completed']) {
     const path = join(dir, transient)

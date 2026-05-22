@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -26,10 +27,10 @@ describe('validation', () => {
 
   describe('runMergeValidation', () => {
     it('should return skipped when validation script does not exist', async () => {
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       // No validation script = skip (specialist already ran build + tests)
       expect(result.success).toBe(true);
@@ -60,10 +61,10 @@ exit 0
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.success).toBe(true);
       expect(result.valid).toBe(true);
@@ -91,10 +92,10 @@ exit 1
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.success).toBe(true); // Script ran successfully
       expect(result.valid).toBe(false); // But validation failed
@@ -124,10 +125,10 @@ exit 1
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.valid).toBe(false);
       expect(result.conflictMarkersFound).toBe(false);
@@ -158,10 +159,10 @@ exit 1
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.valid).toBe(false);
       expect(result.conflictMarkersFound).toBe(false);
@@ -194,10 +195,10 @@ exit 1
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.valid).toBe(false);
       expect(result.failures).toHaveLength(2); // conflict + build
@@ -227,10 +228,10 @@ exit 0
         { mode: 0o755 }
       );
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
-      });
+      }));
 
       expect(result.valid).toBe(true);
       expect(result.buildPassed).toBe(null); // Skipped, not passed or failed
@@ -269,9 +270,9 @@ exit 0
       expect(afterCommit).not.toBe(beforeCommit);
 
       // Revert using ORIG_HEAD
-      const success = await autoRevertMerge(testDir);
+      const success = await Effect.runPromise(autoRevertMerge(testDir));
 
-      expect(success).toBe(true);
+      (await Effect.runPromise(expect(success))).toBe(true);
 
       // Verify HEAD is back to first commit
       const { stdout: commit3 } = await execAsync('git rev-parse HEAD', { cwd: testDir });
@@ -284,9 +285,9 @@ exit 0
 
     it('should return false when git command fails', async () => {
       // Non-git directory
-      const success = await autoRevertMerge(testDir);
+      const success = await Effect.runPromise(autoRevertMerge(testDir));
 
-      expect(success).toBe(false);
+      (await Effect.runPromise(expect(success))).toBe(false);
     });
   });
 });

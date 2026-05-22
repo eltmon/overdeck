@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Deacon safety-net: re-dispatch ship when review+test passed but the reactive
  * shipping trigger was swallowed (e.g. by a stale/zombie ship session).
@@ -47,15 +48,15 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   };
 });
@@ -130,7 +131,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    expect(mockOnIssueStateChange).toHaveBeenCalledWith('PAN-977', 'shipping');
+    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledWith('PAN-977', 'shipping');
     expect(actions).toHaveLength(1);
   });
 
@@ -148,7 +149,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -166,7 +167,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -185,7 +186,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
       } as unknown as ReturnType<typeof loadReviewStatuses>);
 
       const actions = await checkUndispatchedShip();
-      expect(mockOnIssueStateChange).not.toHaveBeenCalled();
+      (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
       expect(actions).toHaveLength(0);
     }
   });
@@ -205,10 +206,10 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     } as unknown as ReturnType<typeof loadReviewStatuses>);
 
     await checkUndispatchedShip();
-    expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledTimes(1);
 
     // Immediate second patrol tick — cooldown must suppress the re-dispatch.
     await checkUndispatchedShip();
-    expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledTimes(1);
   });
 });

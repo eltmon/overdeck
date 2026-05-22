@@ -13,21 +13,21 @@ import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
 import { Effect } from 'effect';
 import { AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
-import { getDevrootPath } from '../config.js';
-import { getClaudePermissionFlagsString } from '../claude-permissions.js';
-import { getProject } from '../projects.js';
-import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
+import { getDevrootPathSync } from '../config.js';
+import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { getProjectSync } from '../projects.js';
+import { getAllSessionFilesSync, parseClaudeSessionSync } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import type { ModelId } from '../settings.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfigSync } from './config.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
-import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
-import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
+import { generateLauncherScriptSync, generateLauncherWrapperSync } from '../launcher-generator.js';
 import { getSpecialistHarness } from './router.js';
-import { killSessionAsyncEffect, listPaneValuesAsyncEffect, sessionExistsAsyncEffect } from '../tmux.js';
-import { notifyPipeline } from '../pipeline-notifier.js';
-import { isTaskReady } from './task-readiness.js';
+import { killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { notifyPipelineSync } from '../pipeline-notifier.js';
+import { isTaskReadySync } from './task-readiness.js';
 
 const execAsync = promisify(exec);
 
@@ -137,11 +137,11 @@ async function buildSpecialistBaseCommand(
   model: string,
   sessionName?: string,
 ): Promise<string> {
-  const { canUseHarness } = await import('../harness-policy.js');
+  const { canUseHarnessSync } = await import('../harness-policy.js');
   const { getAgentRuntimeBaseCommand, getProviderAuthMode } = await import('../agents.js');
   const requestedHarness = getSpecialistHarness(specialistType);
   const authMode = await getProviderAuthMode(model);
-  const decision = canUseHarness(requestedHarness, model, authMode);
+  const decision = canUseHarnessSync(requestedHarness, model, authMode);
   const harness = decision.allowed ? requestedHarness : 'claude-code';
   if (!decision.allowed) {
     console.warn(
@@ -187,7 +187,7 @@ export async function buildSpecialistCavemanExports(
   if (specialistType === 'inspect-agent' || !config.enabled) return '';
 
   // Read the workspace's A/B variant if we have a workspace path
-  const variant = workspacePath ? await readCavemanVariant(workspacePath) : 'off';
+  const variant = workspacePath ? await Effect.runPromise(readCavemanVariant(workspacePath)) : 'off';
   if (variant === 'off') return '';
   if (variant === 'disabled') {
     return `export PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
@@ -898,8 +898,8 @@ export async function signalSpecialistCompletion(
   // Finalize log if there's a current run
   if (metadata.currentRun) {
     try {
-      const { finalizeRunLog } = await import('./specialist-logs.js');
-      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
+      const { finalizeRunLogSync } = await import('./specialist-logs.js');
+      finalizeRunLogSync(projectKey, specialistType, metadata.currentRun, {
         status: result.status,
         notes: result.notes,
       });
@@ -953,7 +953,7 @@ export async function terminateSpecialist(
 
   try {
     // Kill tmux session
-    await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
+    await Effect.runPromise(killSession(tmuxSession));
     console.log(`[specialist] Terminated ${projectKey}/${specialistType}`);
   } catch (error) {
     console.error(`[specialist] Failed to kill tmux session ${tmuxSession}:`, error);
@@ -961,10 +961,10 @@ export async function terminateSpecialist(
 
   // Finalize log if there's a current run
   if (metadata.currentRun) {
-    const { finalizeRunLog } = await import('./specialist-logs.js');
+    const { finalizeRunLogSync } = await import('./specialist-logs.js');
 
     try {
-      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
+      finalizeRunLogSync(projectKey, specialistType, metadata.currentRun, {
         status: metadata.lastRunStatus || 'incomplete',
         notes: 'Specialist terminated',
       });
@@ -1007,11 +1007,11 @@ function scheduleLogCleanup(projectKey: string, specialistType: SpecialistAgentN
   // Run async without awaiting
   Promise.resolve().then(async () => {
     try {
-      const { cleanupOldLogs } = await import('./specialist-logs.js');
+      const { cleanupOldLogsSync } = await import('./specialist-logs.js');
       const { getSpecialistRetention } = await import('../projects.js');
 
       const retention = getSpecialistRetention(projectKey);
-      const deleted = cleanupOldLogs(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
+      const deleted = cleanupOldLogsSync(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
       if (deleted > 0) {
         console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);
@@ -1255,7 +1255,7 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
   tmuxSession: string;
 }>> {
   const registry = loadRegistry();
-  const { getAgentRuntimeState } = await import('../agents.js');
+  const { getAgentRuntimeStateSync } = await import('../agents.js');
 
   const results: Array<{
     projectKey: string;
@@ -1276,7 +1276,7 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
       const tmuxSession = metadata.tmuxSession
         ?? getTmuxSessionName(specialistType as SpecialistAgentName, projectKey, issueId);
 
-      const runtimeState = getAgentRuntimeState(tmuxSession);
+      const runtimeState = getAgentRuntimeStateSync(tmuxSession);
       const sessionRunning = await isRunning(specialistType as SpecialistAgentName, projectKey).catch(() => false);
       const running = isProjectSpecialistActivelyRunning(runtimeState, sessionRunning);
       const effectiveMetadata = running ? metadata : { ...metadata, currentRun: null };
@@ -1355,7 +1355,7 @@ export function getEnabledSpecialists(): LegacySpecialistDefinition[] {
  */
 export function findSessionFile(sessionId: string): string | null {
   try {
-    const allFiles = getAllSessionFiles();
+    const allFiles = getAllSessionFilesSync();
 
     for (const file of allFiles) {
       const fileSessionId = basename(file, '.jsonl');
@@ -1392,7 +1392,7 @@ export function countContextTokens(name: SpecialistAgentName): number | null {
     return null;
   }
 
-  const sessionUsage = parseClaudeSession(sessionFile);
+  const sessionUsage = parseClaudeSessionSync(sessionFile);
 
   if (!sessionUsage) {
     return null;
@@ -1418,12 +1418,12 @@ export async function isRunning(name: SpecialistAgentName, projectKey?: string):
   const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
-    const exists = await Effect.runPromise(sessionExistsAsyncEffect(tmuxSession));
+    const exists = await Effect.runPromise(sessionExists(tmuxSession));
     if (!exists) return false;
     // Session exists — but check if the pane actually has a running process.
     // When Claude Code crashes, the pane's process exits but the tmux session persists,
     // making has-session return success even though nothing is running.
-    const panePid = (await Effect.runPromise(listPaneValuesAsyncEffect(tmuxSession, '#{pane_pid}')))[0]?.trim() ?? '';
+    const panePid = (await Effect.runPromise(listPaneValues(tmuxSession, '#{pane_pid}')))[0]?.trim() ?? '';
     if (!panePid) return false;
     // Check if the pane's process has any child processes (Claude Code / bash)
     const { stdout: children } = await execAsync(
@@ -1462,9 +1462,9 @@ export async function getSpecialistStatus(
   const contextTokens = countContextTokens(name);
 
   // Determine state from hook-based runtime state (PAN-80)
-  const { getAgentRuntimeState } = await import('../agents.js');
+  const { getAgentRuntimeStateSync } = await import('../agents.js');
   const tmuxSession = getTmuxSessionName(name, projectKey);
-  const runtimeState = getAgentRuntimeState(tmuxSession);
+  const runtimeState = getAgentRuntimeStateSync(tmuxSession);
 
   let state: SpecialistLifecycleState;
   if (runtimeState) {
@@ -1623,13 +1623,13 @@ export async function sendFeedbackToAgent(
   const specialist = specialistMap[fromSpecialist] || 'review-agent';
   const outcome = feedback.feedbackType === 'success' ? 'approved' : feedback.feedbackType === 'failure' ? 'failed' : feedback.feedbackType;
 
-  const fileResult = await writeFeedbackFile({
+  const fileResult = await Effect.runPromise(writeFeedbackFile({
     issueId: toIssueId,
     specialist,
     outcome,
     summary: summary.slice(0, 100),
     markdownBody: feedbackMessage,
-  });
+  }));
 
   if (!fileResult.success) {
     console.error(`[specialist] Failed to write feedback file for ${toIssueId}: ${fileResult.error}`);

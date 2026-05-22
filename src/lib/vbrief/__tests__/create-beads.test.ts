@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join, basename } from 'path';
@@ -102,7 +103,7 @@ describe('createBeadsFromVBrief', () => {
   it('returns error when bd CLI is not found', async () => {
     mockExecAsync.mockRejectedValueOnce(new Error('which: no bd in (PATH)'));
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await Effect.runPromise(createBeadsFromVBrief(WORKSPACE_DIR));
 
     expect(result.success).toBe(false);
     expect(result.errors).toContain('bd (beads) CLI not found in PATH');
@@ -123,7 +124,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await Effect.runPromise(createBeadsFromVBrief(WORKSPACE_DIR));
 
     expect(result.success).toBe(true);
     expect(result.created).toEqual(['PAN-500: First task', 'PAN-500: Second task']);
@@ -141,7 +142,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' });    // bd create
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await Effect.runPromise(createBeadsFromVBrief(WORKSPACE_DIR));
 
     // Redirect file must have been written
     const redirectContent = readFileSync(join(WORKSPACE_DIR, '.beads', 'redirect'), 'utf-8');
@@ -163,7 +164,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd doctor --fix
       .mockRejectedValueOnce(dbError);                                 // bd ping --json (retry)
 
-    const result = await createBeadsFromVBrief(ws2.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws2.workspacePath));
 
     const doctorCalls = mockExecAsync.mock.calls.filter(
       ([file, args]: [string, string[]]) =>
@@ -198,7 +199,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-recovered\n', stderr: '' }); // bd create
 
-    const result = await createBeadsFromVBrief(ws3.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws3.workspacePath));
 
     const doctorCalls = mockExecAsync.mock.calls.filter(
       ([file, args]: [string, string[]]) =>
@@ -232,7 +233,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });
 
-    const result = await createBeadsFromVBrief(ws9.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws9.workspacePath));
 
     const createCalls = mockExecAsync.mock.calls.filter(
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
@@ -260,7 +261,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
-    const result = await createBeadsFromVBrief(ws3.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws3.workspacePath));
 
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
@@ -290,7 +291,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })  // bd create item-a
       .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });  // bd create item-b
 
-    const result = await createBeadsFromVBrief(ws4.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws4.workspacePath));
 
     expect(result.success).toBe(true);
     expect(result.errors).toHaveLength(0);
@@ -315,7 +316,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-43
       .mockResolvedValueOnce({ stdout: 'fresh-bead-1\n', stderr: '' }); // bd create
 
-    const result = await createBeadsFromVBrief(ws5.workspacePath);
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws5.workspacePath));
 
     // execFile form: mockExecAsync('bd', ['delete', '<id>', '--force'], opts)
     const deleteCalls = mockExecAsync.mock.calls.filter(
@@ -351,7 +352,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-auto\n', stderr: '' });
 
-    await createBeadsFromVBrief(ws6.workspacePath);
+    await Effect.runPromise(createBeadsFromVBrief(ws6.workspacePath));
 
     const createCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
@@ -382,7 +383,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-deep\n', stderr: '' });
 
-    await createBeadsFromVBrief(ws7.workspacePath);
+    await Effect.runPromise(createBeadsFromVBrief(ws7.workspacePath));
 
     const createCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',

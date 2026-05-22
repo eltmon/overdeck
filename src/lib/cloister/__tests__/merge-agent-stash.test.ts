@@ -9,8 +9,8 @@ const setReviewStatusMock = vi.hoisted(() => vi.fn());
 const resolveGitHubIssueMock = vi.hoisted(() => vi.fn(() => ({ isGitHub: false })));
 const tmuxMocks = vi.hoisted(() => ({
   killSession: vi.fn(),
-  killSessionAsyncEffect: vi.fn(async () => {}),
-  listSessionNamesAsyncEffect: vi.fn(async () => [] as string[]),
+  killSession: vi.fn(async () => {}),
+  listSessionNames: vi.fn(async () => [] as string[]),
   sessionExists: vi.fn(() => false),
 }));
 const closeIssueMock = vi.hoisted(() => vi.fn(async () => []));
@@ -36,13 +36,13 @@ vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitAct
 vi.mock('../../tmux.js', async () => {
   const { Effect } = await import('effect');
   return {
-    capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
-    listSessionNamesAsyncEffect: () => Effect.promise(() => tmuxMocks.listSessionNamesAsyncEffect()),
-    sendKeysEffect: vi.fn(() => Effect.void),
+    capturePane: (await Effect.runPromise(vi.fn(() => Effect.succeed('')))),
+    listSessionNames: () => Effect.promise(() => tmuxMocks.listSessionNames()),
+    sendKeysEffect: (await Effect.runPromise(vi.fn(() => Effect.void))),
     sessionExists: tmuxMocks.sessionExists,
-    sessionExistsAsyncEffect: (name: string) => Effect.sync(() => tmuxMocks.sessionExists(name)),
+    sessionExists: (name: string) => Effect.sync(() => tmuxMocks.sessionExists(name)),
     killSession: tmuxMocks.killSession,
-    killSessionAsyncEffect: (name: string) => Effect.promise(() => tmuxMocks.killSessionAsyncEffect(name)),
+    killSession: (name: string) => Effect.promise(() => tmuxMocks.killSession(name)),
   };
 });
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/workspace' })), loadProjectsConfig: vi.fn(() => ({ projects: {} })) }));
@@ -112,7 +112,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
     resetPostMergeState('PAN-1');
     resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
     tmuxMocks.sessionExists.mockReturnValue(false);
-    tmuxMocks.listSessionNamesAsyncEffect.mockResolvedValue([]);
+    tmuxMocks.listSessionNames.mockResolvedValue([]);
     setAgentPausedMock.mockReturnValue(true);
     setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(((fn: TimerHandler) => {
       if (typeof fn === 'function') fn();
@@ -154,7 +154,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
     expect(prompt).toContain('/api/review/PAN-1/status');
     expect(prompt).toContain('"readyForMerge":true');
     expect(prompt).toContain('Do NOT run gh pr merge');
-    expect(dropStash).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(dropStash))).not.toHaveBeenCalled();
   });
 
   it('does not start the ship role when the source branch is missing on the remote', async () => {
@@ -179,7 +179,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
       if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
       callback(null, { stdout: '', stderr: '' });
     });
-    vi.mocked(listStashes).mockResolvedValueOnce([
+    (await Effect.runPromise(vi.mocked(listStashes)))se(vi.mocked(listStashes).mockResolvedValueOnce([
       {
         ref: 'def456abc123def456abc123def456abc123def4',
         stackRef: 'stash@{1}',
@@ -197,12 +197,12 @@ describe('merge-agent ship role and stash lifecycle', () => {
         shortDescription: 'user work',
         createdAt: new Date('2026-04-27T14:15:16Z'),
       },
-    ] as any);
+    ] as any)));
 
     await postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true });
 
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'def456abc123def456abc123def456abc123def4');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    (await Effect.runPromise(expect(dropStash))).toHaveBeenCalledWith('/tmp/workspace', 'def456abc123def456abc123def456abc123def4');
+    (await Effect.runPromise(expect(dropStash))).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
   });
 
   it('blocks post-merge completion when verifying_on_main transition fails', async () => {
@@ -227,7 +227,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
     });
     expect(setAgentPausedMock).not.toHaveBeenCalled();
     expect(tmuxMocks.killSession).not.toHaveBeenCalled();
-    expect(tmuxMocks.killSessionAsyncEffect).not.toHaveBeenCalled();
+    expect(tmuxMocks.killSession).not.toHaveBeenCalled();
   });
 
   it('performs a non-destructive verify-on-main handoff after merge', async () => {
@@ -256,7 +256,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
       resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
       tmuxMocks.sessionExists.mockReturnValue(true);
-      tmuxMocks.listSessionNamesAsyncEffect.mockResolvedValue([
+      tmuxMocks.listSessionNames.mockResolvedValue([
         'agent-pan-1-test',
         'agent-pan-1-ship',
         'agent-pan-1-review-synthesis',
@@ -278,13 +278,13 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
       expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('agent-pan-1');
       expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('planning-pan-1');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('planning-pan-1');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-test');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-ship');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
-      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
-      expect(tmuxMocks.killSessionAsyncEffect).not.toHaveBeenCalledWith('unrelated-session');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('planning-pan-1');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1-test');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1-ship');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
+      expect(tmuxMocks.killSession).not.toHaveBeenCalledWith('unrelated-session');
 
       const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
       expect(commands.some(command => command.includes('--add-label') && command.includes('verifying-on-main'))).toBe(true);

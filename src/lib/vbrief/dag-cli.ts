@@ -25,7 +25,7 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { findPlan, readWorkspaceContinueSync, readWorkspacePlan, writeWorkspaceContinueSync } from './io.js';
+import { findPlanSync, readWorkspaceContinueSync, readWorkspacePlanSync, writeWorkspaceContinueSync } from './io.js';
 
 function assertSingleWriter(planPath: string, writerId: string): void {
   const owner = activePlanWriters.get(planPath);
@@ -123,7 +123,7 @@ function mirrorTaskOperationToContinueFile(
   overrides[itemId] = status;
 
   // Derive affected subItems from the plan for canonical overlay
-  const doc = readWorkspacePlan(workspacePath);
+  const doc = readWorkspacePlanSync(workspacePath);
   if (doc) {
     const item = doc.plan.items.find(i => i.id === itemId);
     if (item?.subItems) {
@@ -186,7 +186,7 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
 
   // PAN-977: next/show read the canonical merged view (main spec + continue statusOverrides)
   if (command === 'next' || command === 'show') {
-    const doc = readWorkspacePlan(options.workspacePath);
+    const doc = readWorkspacePlanSync(options.workspacePath);
     if (!doc) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
     validatePlanIssue(doc, options.issueId);
     if (command === 'next') return getDispatchableItems(doc, options.mergedItemIds ?? new Set());
@@ -198,7 +198,7 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
 
   // Mutations write to the canonical spec on main (PAN-1124) AND to the continue
   // file statusOverrides so canonical readers see the change.
-  const planPath = findPlan(options.workspacePath);
+  const planPath = findPlanSync(options.workspacePath);
   if (!planPath) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
   const doc = readPlanFile(planPath);
   validatePlanIssue(doc, options.issueId);

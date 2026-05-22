@@ -8,10 +8,10 @@ import {
   DEFAULT_FPP_CONFIG,
   checkAgentForViolations,
   sendNudge,
-  resolveViolation,
+  resolveViolationSync,
   getActiveViolations,
   getAgentViolations,
-  clearOldViolations,
+  clearOldViolationsSync,
   type FPPViolation,
 } from '../../src/lib/cloister/fpp-violations.js';
 
@@ -38,11 +38,11 @@ vi.mock('fs', () => ({
 
 import { getRuntimeForAgent } from '../../src/lib/runtimes/index.js';
 import { getAgentHealth } from '../../src/lib/cloister/health.js';
-import { checkHook } from '../../src/lib/hooks.js';
+import { checkHookSync } from '../../src/lib/hooks.js';
 
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
 const mockGetAgentHealth = vi.mocked(getAgentHealth);
-const mockCheckHook = vi.mocked(checkHook);
+const mockCheckHook = vi.mocked(checkHookSync);
 
 describe('fpp-violations', () => {
   beforeEach(() => {
@@ -324,7 +324,7 @@ describe('fpp-violations', () => {
       checkAgentForViolations('agent-resolve');
 
       // Resolve it
-      resolveViolation('agent-resolve', 'hook_idle');
+      resolveViolationSync('agent-resolve', 'hook_idle');
 
       // Check it's resolved
       const violations = getAgentViolations('agent-resolve');
@@ -333,7 +333,7 @@ describe('fpp-violations', () => {
 
     it('should handle non-existent violations gracefully', () => {
       // Should not throw
-      expect(() => resolveViolation('non-existent', 'hook_idle')).not.toThrow();
+      expect(() => resolveViolationSync('non-existent', 'hook_idle')).not.toThrow();
     });
   });
 
@@ -356,7 +356,7 @@ describe('fpp-violations', () => {
 
       // Create and resolve a violation
       checkAgentForViolations('agent-active-test');
-      resolveViolation('agent-active-test', 'hook_idle');
+      resolveViolationSync('agent-active-test', 'hook_idle');
 
       const violations = getActiveViolations();
       const agentViolation = violations.find(v => v.agentId === 'agent-active-test');
@@ -398,12 +398,12 @@ describe('fpp-violations', () => {
 
   describe('clearOldViolations', () => {
     it('should not throw when clearing violations', () => {
-      expect(() => clearOldViolations(24)).not.toThrow();
+      expect(() => clearOldViolationsSync(24)).not.toThrow();
     });
 
     it('should accept custom hours parameter', () => {
-      expect(() => clearOldViolations(48)).not.toThrow();
-      expect(() => clearOldViolations(1)).not.toThrow();
+      expect(() => clearOldViolationsSync(48)).not.toThrow();
+      expect(() => clearOldViolationsSync(1)).not.toThrow();
     });
   });
 });

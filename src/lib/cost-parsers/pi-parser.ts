@@ -116,7 +116,7 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set([
  * Returns null if the file does not exist, is empty, or is unparseable. Errors
  * during line parsing are tolerated (the line is skipped); we never throw.
  */
-export function parsePiSession(filePath: string): SessionUsage | null {
+export function parsePiSessionSync(filePath: string): SessionUsage | null {
   if (!existsSync(filePath)) return null;
   const result = parsePiSessionContent(readFileSync(filePath, 'utf8'), filePath);
   return result.ok ? result.usage! : null;
@@ -333,10 +333,10 @@ function emptyUsage(filePath: string, root: PiSessionRoot): SessionUsage {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Effect variant of parsePiSession. */
-export const parsePiSessionEffect = (
+export const parsePiSession = (
   filePath: string,
 ): Effect.Effect<SessionUsage | null, FsError> =>
   Effect.try({
-    try: () => parsePiSession(filePath),
+    try: () => parsePiSessionSync(filePath),
     catch: (cause) => new FsError({ path: filePath, operation: 'parsePiSession', cause }),
   });

@@ -59,16 +59,7 @@ export function piFifoPaths(agentId: string, home: string = homedir()): PiFifoPa
     readyPath: join(agentDir, 'ready.json'),
     fifoPath: join(agentDir, 'rpc.in'),
   }
-}
-
-/**
- * Create the per-agent fifo. Idempotent: if a fifo (or any other inode)
- * already exists at the path, it is unlinked first so we always get a clean
- * fifo with mode 0600.
- *
- * Returns the absolute fifo path.
- */
-export async function createPiFifo(agentId: string, home?: string): Promise<string> {
+}async function createPiFifoPromise(agentId: string, home?: string): Promise<string> {
   const paths = piFifoPaths(agentId, home)
   mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 })
   if (existsSync(paths.fifoPath)) {
@@ -84,7 +75,7 @@ export async function createPiFifo(agentId: string, home?: string): Promise<stri
 /**
  * Unlink the fifo. Safe to call when the fifo does not exist.
  */
-export function destroyPiFifo(agentId: string, home?: string): void {
+export function destroyPiFifoSync(agentId: string, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   try {
     unlinkSync(paths.fifoPath)
@@ -108,7 +99,7 @@ export function destroyPiFifo(agentId: string, home?: string): void {
  * The command is JSON-stringified and a single trailing newline is added so
  * Pi's JSONL parser sees one record per line.
  */
-export function writePiCommand(agentId: string, command: unknown, home?: string): void {
+export function writePiCommandSync(agentId: string, command: unknown, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   if (!existsSync(paths.readyPath)) {
     throw new PiNotReady(
@@ -157,12 +148,12 @@ export class PiFifoError extends Data.TaggedError('PiFifoError')<{
 }> {}
 
 /** Effect variant of `createPiFifo`. */
-export const createPiFifoEffect = (
+export const createPiFifo = (
   agentId: string,
   home?: string,
 ): Effect.Effect<string, PiFifoError> =>
   Effect.tryPromise({
-    try: () => createPiFifo(agentId, home),
+    try: () => createPiFifoPromise(agentId, home),
     catch: (cause) =>
       new PiFifoError({
         agentId,
@@ -176,13 +167,13 @@ export const createPiFifoEffect = (
  * Effect variant of `writePiCommand`. Lifts the sync FD ops via `Effect.try`.
  * The PiNotReady signal is preserved in the cause field so callers can branch.
  */
-export const writePiCommandEffect = (
+export const writePiCommand = (
   agentId: string,
   command: unknown,
   home?: string,
 ): Effect.Effect<void, PiFifoError> =>
   Effect.try({
-    try: () => writePiCommand(agentId, command, home),
+    try: () => writePiCommandSync(agentId, command, home),
     catch: (cause) =>
       new PiFifoError({
         agentId,
@@ -193,12 +184,12 @@ export const writePiCommandEffect = (
   })
 
 /** Effect variant of `destroyPiFifo`. */
-export const destroyPiFifoEffect = (
+export const destroyPiFifo = (
   agentId: string,
   home?: string,
 ): Effect.Effect<void, PiFifoError> =>
   Effect.try({
-    try: () => destroyPiFifo(agentId, home),
+    try: () => destroyPiFifoSync(agentId, home),
     catch: (cause) =>
       new PiFifoError({
         agentId,

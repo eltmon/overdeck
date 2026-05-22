@@ -9,8 +9,8 @@ import { reopenWorkspaceState } from '../../lib/reopen.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
-import { resolveTrackerType, isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveTrackerTypeSync, isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 
 interface ReopenOptions {
   json?: boolean;
@@ -129,7 +129,7 @@ interface GitHubIssueResult {
  * Fetch a GitHub issue by its full identifier (e.g., "PAN-457")
  */
 async function fetchGitHubIssue(issueId: string): Promise<GitHubIssueResult> {
-  const gh = resolveGitHubIssue(issueId);
+  const gh = resolveGitHubIssueSync(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -158,7 +158,7 @@ async function fetchGitHubIssue(issueId: string): Promise<GitHubIssueResult> {
  * Transition a GitHub issue to "open" state (reopen) and add in-progress label
  */
 async function reopenGitHubIssue(issueId: string): Promise<void> {
-  const gh = resolveGitHubIssue(issueId);
+  const gh = resolveGitHubIssueSync(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -192,7 +192,7 @@ async function reopenGitHubIssue(issueId: string): Promise<void> {
  * Add a comment to a GitHub issue
  */
 async function addGitHubComment(issueId: string, body: string): Promise<void> {
-  const gh = resolveGitHubIssue(issueId);
+  const gh = resolveGitHubIssueSync(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -213,7 +213,7 @@ async function addGitHubComment(issueId: string, body: string): Promise<void> {
  * Get GitHub token from config-yaml or environment
  */
 async function getGitHubToken(): Promise<string> {
-  const { loadConfig: loadYamlConfig } = await import('../../lib/config-yaml.js');
+  const { loadConfigSync: loadYamlConfig } = await import('../../lib/config-yaml.js');
   const yamlConfig = loadYamlConfig();
   const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
   if (!token) {
@@ -260,7 +260,7 @@ export function findLocalWorkspace(issueId: string, startDir?: string): string |
   const normalizedId = issueId.toLowerCase();
 
   // Try project registry first
-  const resolved = resolveProjectFromIssue(issueId, []);
+  const resolved = resolveProjectFromIssueSync(issueId, []);
   if (resolved) {
     const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${normalizedId}`);
     if (existsSync(workspacePath)) return workspacePath;
@@ -285,7 +285,7 @@ export function findLocalWorkspace(issueId: string, startDir?: string): string |
 export async function reopenCommand(id: string, options: ReopenOptions = {}): Promise<void> {
   // Resolve tracker type using the same logic as `pan start` so GitHub issues
   // (e.g. pan-457) don't misroute to Linear (MIN-848).
-  const trackerType = resolveTrackerType(id);
+  const trackerType = resolveTrackerTypeSync(id);
 
   if (trackerType === 'github') {
     await reopenGitHubIssueCommand(id, options);
@@ -409,7 +409,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
   const spinner = ora(`Fetching issue ${id}...`).start();
 
   try {
-    const apiKey = Effect.runSync(getLinearApiKey());
+    const apiKey = await Effect.runPromise(getLinearApiKey());
     if (!apiKey) {
       spinner.fail('LINEAR_API_KEY not found');
       console.log('');
@@ -562,10 +562,10 @@ async function resetWorkspaceState(id: string, options: ReopenOptions): Promise<
     }
 
     const resetSpinner = ora('Resetting workspace state...').start();
-    const result = await reopenWorkspaceState(id, workspacePath, {
+    const result = await Effect.runPromise(reopenWorkspaceState(id, workspacePath, {
       reason: options.reason,
       trackerContext,
-    });
+    }));
     resetSpinner.succeed('Workspace state reset');
 
     console.log('');
@@ -601,9 +601,9 @@ async function resetWorkspaceState(id: string, options: ReopenOptions): Promise<
 async function printNextSteps(id: string): Promise<void> {
   // Check if agent is currently running and suggest appropriate next step
   try {
-    const { getAgentState } = await import('../../lib/agents.js');
+    const { getAgentStateSync } = await import('../../lib/agents.js');
     const agentId = `agent-${id.toLowerCase()}`;
-    const agentState = getAgentState(agentId);
+    const agentState = getAgentStateSync(agentId);
     const agentRunning = agentState?.status === 'running' || agentState?.status === 'starting';
 
     if (agentRunning) {

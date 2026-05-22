@@ -7,7 +7,7 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
-import { loadConfig } from '../../../lib/config.js';
+import { loadConfigSync } from '../../../lib/config.js';
 import { createFlyProviderFromConfig, isRemoteAvailable } from '../../../lib/remote/index.js';
 
 interface StatusOptions {
@@ -18,7 +18,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const spinner = ora('Checking remote status...').start();
 
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
     const remoteConfig = config.remote;
 
     // Check if remote is enabled

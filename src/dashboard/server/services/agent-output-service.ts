@@ -11,8 +11,8 @@
  */
 
 import { Effect } from 'effect'
-import { listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js'
-import { capturePaneAsyncEffect } from '../../../lib/tmux.js'
+import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
+import { capturePane } from '../../../lib/tmux.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentOutputReceivedEvent } from '@panctl/contracts'
@@ -69,7 +69,7 @@ export function diffLines(previous: string[], current: string[]): string[] {
 export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
   let runningAgents: RunningAgent[]
   try {
-    runningAgents = await Effect.runPromise(listRunningAgentsEffect())
+    runningAgents = await Effect.runPromise(listRunningAgents())
   } catch {
     return
   }
@@ -77,66 +77,69 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
   const eventStore = getEventStore()
   const activeAgents = runningAgents.filter((a) => a.tmuxActive)
 
-  await withConcurrencyLimit(
-    activeAgents.map((agent) => async () => {
-      const { id: agentId } = agent
+  await Effect.runPromise(withConcurrencyLimit(
+    activeAgents.map((agent) => Effect.tryPromise({
+      try: async () => {
+        const { id: agentId } = agent
 
-      // Check for remote agent
-      let stdout: string
-      try {
-        const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json')
-        const remoteState = await readFile(remoteStateFile, 'utf-8')
-          .then((text) => JSON.parse(text) as { location?: string; vmName?: string })
-          .catch(() => null)
+        // Check for remote agent
+        let stdout: string
+        try {
+          const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json')
+          const remoteState = await readFile(remoteStateFile, 'utf-8')
+            .then((text) => JSON.parse(text) as { location?: string; vmName?: string })
+            .catch(() => null)
 
-        if (remoteState?.location === 'remote' && remoteState?.vmName) {
-          const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
-          stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
-        } else {
-          stdout = await Effect.runPromise(capturePaneAsyncEffect(agentId, 50))
+          if (remoteState?.location === 'remote' && remoteState?.vmName) {
+            const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
+            stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
+          } else {
+            stdout = await Effect.runPromise(capturePane(agentId, 50))
+          }
+        } catch {
+          stdout = await Effect.runPromise(
+            capturePane(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
+          )
         }
-      } catch {
-        stdout = await Effect.runPromise(
-          capturePaneAsyncEffect(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
-        )
-      }
 
-      if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
-        return
-      }
+        if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
+          return
+        }
 
-      const previousOutput = state.lastOutput.get(agentId) ?? ''
-      if (stdout === previousOutput) {
-        return
-      }
+        const previousOutput = state.lastOutput.get(agentId) ?? ''
+        if (stdout === previousOutput) {
+          return
+        }
 
-      const previousLines = splitLines(previousOutput)
-      const currentLines = splitLines(stdout)
-      const newLines = diffLines(previousLines, currentLines)
+        const previousLines = splitLines(previousOutput)
+        const currentLines = splitLines(stdout)
+        const newLines = diffLines(previousLines, currentLines)
 
-      state.lastOutput.set(agentId, stdout)
+        state.lastOutput.set(agentId, stdout)
 
-      if (newLines.length === 0) {
-        return
-      }
+        if (newLines.length === 0) {
+          return
+        }
 
-      const event: Omit<AgentOutputReceivedEvent, 'sequence'> = {
-        type: 'agent.output_received',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId,
-          lines: newLines,
-        },
-      }
+        const event: Omit<AgentOutputReceivedEvent, 'sequence'> = {
+          type: 'agent.output_received',
+          timestamp: new Date().toISOString(),
+          payload: {
+            agentId,
+            lines: newLines,
+          },
+        }
 
-      try {
-        await eventStore.appendAsync(event as never)
-      } catch {
-        // Non-fatal — event store may not be initialized yet at startup
-      }
-    }),
+        try {
+          await eventStore.appendAsync(event as never)
+        } catch {
+          // Non-fatal — event store may not be initialized yet at startup
+        }
+      },
+      catch: (cause) => cause,
+    })),
     4,
-  )
+  ))
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map((a) => a.id))

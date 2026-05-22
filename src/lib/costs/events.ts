@@ -9,7 +9,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
 import { insertCostEvent } from '../database/cost-events-db.js';
-import { appendToWal } from './wal.js';
+import { appendToWalSync } from './wal.js';
 import { FsError } from '../errors.js';
 
 // ============== Types ==============
@@ -99,7 +99,7 @@ function ensureEventsFile(): void {
  * 2. Event timestamps provide ordering
  * 3. Aggregation is commutative (order doesn't affect totals)
  */
-export function appendCostEvent(event: CostEvent): void {
+export function appendCostEventSync(event: CostEvent): void {
   ensureEventsFile();
 
   // Validate required fields
@@ -120,7 +120,7 @@ export function appendCostEvent(event: CostEvent): void {
 
   // Append to per-project WAL file (best-effort — enables multi-developer sync)
   try {
-    appendToWal(event);
+    appendToWalSync(event);
   } catch (err) {
     console.error('[cost-events] WAL write failed (continuing):', err);
   }
@@ -131,7 +131,7 @@ export function appendCostEvent(event: CostEvent): void {
 /**
  * Read all events from the log with optional filters
  */
-export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
+export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
   if (!existsSync(getEventsFile())) {
     return [];
   }
@@ -187,7 +187,7 @@ export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
 /**
  * Get the last N events from the log
  */
-export function tailEvents(n: number): CostEvent[] {
+export function tailEventsSync(n: number): CostEvent[] {
   if (!existsSync(getEventsFile())) {
     return [];
   }
@@ -214,7 +214,7 @@ export function tailEvents(n: number): CostEvent[] {
  * Useful for incremental processing
  * Returns both events and the new line position to handle malformed lines correctly
  */
-export function readEventsFromLine(startLine: number): { events: CostEvent[]; newLine: number } {
+export function readEventsFromLineSync(startLine: number): { events: CostEvent[]; newLine: number } {
   if (!existsSync(getEventsFile())) {
     return { events: [], newLine: startLine };
   }
@@ -239,7 +239,7 @@ export function readEventsFromLine(startLine: number): { events: CostEvent[]; ne
 /**
  * Get metadata about the event log
  */
-export function getLastEventMetadata(): EventMetadata {
+export function getLastEventMetadataSync(): EventMetadata {
   if (!existsSync(getEventsFile())) {
     return {
       lastEventTs: null,
@@ -273,7 +273,7 @@ export function getLastEventMetadata(): EventMetadata {
  * Replace the entire events log with new content
  * Used by retention pruning - DANGEROUS, use with caution
  */
-export function replaceEventsFile(events: CostEvent[]): void {
+export function replaceEventsFileSync(events: CostEvent[]): void {
   ensureEventsFile();
 
   // Write to temp file first
@@ -301,7 +301,7 @@ export function replaceEventsFile(events: CostEvent[]): void {
  *
  * Returns the number of duplicate events removed.
  */
-export function deduplicateEvents(): number {
+export function deduplicateEventsSync(): number {
   if (!existsSync(getEventsFile())) {
     return 0;
   }
@@ -354,7 +354,7 @@ export function deduplicateEvents(): number {
 
   const removed = lines.length - kept.length;
   if (removed > 0) {
-    replaceEventsFile(kept);
+    replaceEventsFileSync(kept);
   }
   return removed;
 }
@@ -384,60 +384,60 @@ export function getEventsFilePath(): string {
  * error channel instead of thrown exceptions. SQLite and WAL best-effort
  * writes preserve the same semantics as the sync variant.
  */
-export const appendCostEventEffect = (
+export const appendCostEvent = (
   event: CostEvent,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => appendCostEvent(event),
+    try: () => appendCostEventSync(event),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'appendCostEvent', cause }),
   });
 
 /** Effect variant of readEvents. */
-export const readEventsEffect = (
+export const readEvents = (
   options: ReadEventsOptions = {},
 ): Effect.Effect<CostEvent[], FsError> =>
   Effect.try({
-    try: () => readEvents(options),
+    try: () => readEventsSync(options),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'readEvents', cause }),
   });
 
 /** Effect variant of tailEvents. */
-export const tailEventsEffect = (
+export const tailEvents = (
   n: number,
 ): Effect.Effect<CostEvent[], FsError> =>
   Effect.try({
-    try: () => tailEvents(n),
+    try: () => tailEventsSync(n),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'tailEvents', cause }),
   });
 
 /** Effect variant of readEventsFromLine. */
-export const readEventsFromLineEffect = (
+export const readEventsFromLine = (
   startLine: number,
 ): Effect.Effect<{ events: CostEvent[]; newLine: number }, FsError> =>
   Effect.try({
-    try: () => readEventsFromLine(startLine),
+    try: () => readEventsFromLineSync(startLine),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'readEventsFromLine', cause }),
   });
 
 /** Effect variant of getLastEventMetadata. */
-export const getLastEventMetadataEffect = (): Effect.Effect<EventMetadata, FsError> =>
+export const getLastEventMetadata = (): Effect.Effect<EventMetadata, FsError> =>
   Effect.try({
-    try: () => getLastEventMetadata(),
+    try: () => getLastEventMetadataSync(),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'getLastEventMetadata', cause }),
   });
 
 /** Effect variant of replaceEventsFile. */
-export const replaceEventsFileEffect = (
+export const replaceEventsFile = (
   events: CostEvent[],
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => replaceEventsFile(events),
+    try: () => replaceEventsFileSync(events),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'replaceEventsFile', cause }),
   });
 
 /** Effect variant of deduplicateEvents. */
-export const deduplicateEventsEffect = (): Effect.Effect<number, FsError> =>
+export const deduplicateEvents = (): Effect.Effect<number, FsError> =>
   Effect.try({
-    try: () => deduplicateEvents(),
+    try: () => deduplicateEventsSync(),
     catch: (cause) => new FsError({ path: getEventsFile(), operation: 'deduplicateEvents', cause }),
   });

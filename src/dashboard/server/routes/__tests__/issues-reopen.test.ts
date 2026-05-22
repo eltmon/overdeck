@@ -130,9 +130,9 @@ async function postReopen(issueId: string) {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(routeServicesLayer(appendedEvents))),
+      ).pipe(Effect.provide(routeServicesLayer(appendedEvents)))))icesLayer(appendedEvents))),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;

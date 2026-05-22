@@ -8,7 +8,7 @@
 import type { AgentRuntime, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfigSync } from './config.js';
 import {
   getAgentHealth,
   getMultipleAgentHealth,
@@ -25,18 +25,18 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentStateEffect, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
-import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
+import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
 import {
   checkAgentForViolations,
   sendNudge,
-  resolveViolation,
+  resolveViolationSync,
   hasExceededMaxNudges,
-  clearOldViolations,
+  clearOldViolationsSync,
   type FPPViolation,
 } from './fpp-violations.js';
 import {
@@ -64,14 +64,14 @@ import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renam
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
-import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
-import { sessionExistsAsyncEffect, killSessionAsyncEffect } from '../tmux.js';
+import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import { sessionExists, killSession } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 const execAsync = promisify(exec);
-import { emitActivityEntry } from '../activity-logger.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
@@ -195,11 +195,11 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
   // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
   if (role === 'plan') {
     const legacyId = `planning-${issueLower}`;
-    const legacyState = await Effect.runPromise(getAgentStateEffect(legacyId));
+    const legacyState = await Effect.runPromise(getAgentState(legacyId));
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
       // S1: if stuck at 'starting' with no live tmux session, treat as not-alive
       // so the next retry can spawn a fresh run without being blocked.
-      if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExistsAsyncEffect(legacyId)))) {
+      if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExists(legacyId)))) {
         return false;
       }
       return true;
@@ -210,13 +210,13 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     ? `agent-${issueLower}`
     : `agent-${issueLower}-${role}`;
 
-  const state = await Effect.runPromise(getAgentStateEffect(candidateId));
+  const state = await Effect.runPromise(getAgentState(candidateId));
   if (!state) return false;
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
 
   // S1: treat a 'starting' state with no live tmux session as not-alive.
-  if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExistsAsyncEffect(candidateId)))) {
+  if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExists(candidateId)))) {
     return false;
   }
 
@@ -267,24 +267,12 @@ Required steps:
  */
 async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
-  const agentState = await Effect.runPromise(getAgentStateEffect(`agent-${issueLower}`));
+  const agentState = await Effect.runPromise(getAgentState(`agent-${issueLower}`));
   if (agentState?.workspace) return agentState.workspace;
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return null;
   return `${resolved.projectPath}/workspaces/feature-${issueLower}`;
-}
-
-/**
- * Reactive Cloister entrypoint: start the role that owns a new issue state.
- *
- * PAN-1048 review feedback 003: review and test roles dispatch through their
- * dedicated wrappers (spawnReviewRoleForIssue, dispatchTestAgentAndNotify)
- * instead of bare spawnRun(). The wrappers carry the contract pieces the
- * reactive path was previously dropping — review-temp stash, reviewSpawnedAt,
- * feedback archival, status-posting prompt, idempotency guards, and the
- * `/api/review/:issueId/status` integration that flips readyForMerge.
- */
-export async function onIssueStateChange(issueId: string, newState: string): Promise<void> {
+}async function onIssueStateChangePromise(issueId: string, newState: string): Promise<void> {
   const normalizedIssueId = normalizeIssueId(issueId);
   const role = stateToRole(newState);
   if (!role) {
@@ -299,7 +287,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   if (await activeRoleRunExists(normalizedIssueId, role, workspace ?? undefined)) {
     const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 
@@ -310,12 +298,12 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   // dead one.
   const issueLower = normalizedIssueId.toLowerCase();
   const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
-  if (await Effect.runPromise(sessionExistsAsyncEffect(roleSessionId))) {
+  if (await Effect.runPromise(sessionExists(roleSessionId))) {
     const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     try {
-      await Effect.runPromise(killSessionAsyncEffect(roleSessionId));
+      await Effect.runPromise(killSession(roleSessionId));
     } catch (err) {
       console.error(`[cloister] failed to kill stale session ${roleSessionId}:`, err instanceof Error ? err.message : String(err));
     }
@@ -326,25 +314,25 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       if (!workspace) {
         const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
         console.error(`[cloister] ${failure}`);
-        emitActivityEntry({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
+        emitActivityEntrySync({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
         return;
       }
       const branch = `feature/${normalizedIssueId.toLowerCase()}`;
       const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-      const result = await spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch });
+      const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch }));
       const message = `${normalizedIssueId}: review role dispatched from lifecycle state '${newState}' (${result.message})`;
       console.log(`[cloister] ${message}`);
-      emitActivityEntry({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
+      emitActivityEntrySync({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
       return;
     }
 
     if (role === 'test') {
       const branch = `feature/${normalizedIssueId.toLowerCase()}`;
       const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
-      await dispatchTestAgentAndNotify(normalizedIssueId, workspace ?? undefined, branch);
+      await Effect.runPromise(dispatchTestAgentAndNotify(normalizedIssueId, workspace ?? undefined, branch));
       const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
       console.log(`[cloister] ${message}`);
-      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
       return;
     }
 
@@ -354,17 +342,17 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     });
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('already running')) {
       const skipMessage = `${normalizedIssueId}: ${role} role already running; skipping lifecycle spawn`;
       console.log(`[cloister] ${skipMessage}`);
-      emitActivityEntry({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
       return;
     }
     console.error(`[cloister] Failed to start ${role} role for ${normalizedIssueId}:`, error);
-    emitActivityEntry({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
+    emitActivityEntrySync({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
   }
 }
 
@@ -404,12 +392,10 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
     default:
       return null;
   }
-}
-
-export async function handleCloisterDomainEvent(event: CloisterDomainEventLike): Promise<void> {
+}async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
   const change = issueStateChangeFromDomainEvent(event);
   if (!change) return;
-  await onIssueStateChange(change.issueId, change.state);
+  await Effect.runPromise(onIssueStateChange(change.issueId, change.state));
 }
 
 /**
@@ -545,7 +531,7 @@ export class CloisterService {
   private readonly STATUS_CACHE_TTL_MS = 3_000;
 
   constructor(config?: CloisterConfig) {
-    this.config = config || loadCloisterConfig();
+    this.config = config || loadCloisterConfigSync();
   }
 
   private getDashboardApiUrl(): string {
@@ -594,13 +580,13 @@ export class CloisterService {
       const statuses = loadReviewStatuses();
       for (const [issueId, status] of Object.entries(statuses)) {
         if (status.verificationStatus === 'running') {
-          setReviewStatus(issueId, { verificationStatus: 'pending' });
+          setReviewStatusSync(issueId, { verificationStatus: 'pending' });
           console.log(`  ✓ Reset orphaned verification 'running' → 'pending' for ${issueId}`);
           resetVerificationCount++;
         }
       }
       if (resetVerificationCount > 0) {
-        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Reset ${resetVerificationCount} orphaned verification 'running' → 'pending' on startup` });
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Reset ${resetVerificationCount} orphaned verification 'running' → 'pending' on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to reset orphaned verification states:', error);
@@ -623,7 +609,7 @@ export class CloisterService {
           if (!entry.isDirectory()) continue;
           const parsed = parseSpecialistAgentSession(entry.name);
           if (!parsed) continue;
-          const runtimeState = getAgentRuntimeState(entry.name);
+          const runtimeState = getAgentRuntimeStateSync(entry.name);
           if (!runtimeState?.currentIssue) continue;
 
           if (runtimeState.state === 'idle') {
@@ -635,7 +621,7 @@ export class CloisterService {
             // For issue-scoped specialists, check the exact tmux session instead of the legacy
             // project/type singleton lookup, which cannot represent PAN-754 session identity.
             const stillRunning = parsed.issueId
-              ? await Effect.runPromise(sessionExistsAsyncEffect(entry.name))
+              ? await Effect.runPromise(sessionExists(entry.name))
               : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {
@@ -650,7 +636,7 @@ export class CloisterService {
         }
       }
       if (clearedSpecialistCount > 0) {
-        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to clear stale specialist states:', error);
@@ -661,7 +647,7 @@ export class CloisterService {
     // completes, the issue is stuck. On startup, find such issues and re-dispatch directly.
     try {
       const reviewStatuses = loadReviewStatuses();
-      const { resolveProjectFromIssue } = await import('../projects.js');
+      const { resolveProjectFromIssueSync } = await import('../projects.js');
       const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
@@ -670,14 +656,14 @@ export class CloisterService {
         const projSpecs = await getAllProjectSpecialistStatuses();
         for (const ps of projSpecs) {
           if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
-          const rs = getAgentRuntimeState(ps.tmuxSession);
+          const rs = getAgentRuntimeStateSync(ps.tmuxSession);
           if (rs?.state === 'active' && rs.currentIssue) {
             activeReviewIssues.add(rs.currentIssue.toUpperCase());
           }
         }
         // Also check global review-agent session
         const globalSession = getTmuxSessionName('review-agent');
-        const globalRs = getAgentRuntimeState(globalSession);
+        const globalRs = getAgentRuntimeStateSync(globalSession);
         if (globalRs?.state === 'active' && globalRs.currentIssue) {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
         }
@@ -685,8 +671,8 @@ export class CloisterService {
         // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
         // Replaces the legacy getActiveParallelReviewIssues helper that scanned
         // tmux for dispatchParallelReview's coordinator session naming pattern.
-        const { listRunningAgentsEffect } = await import('../agents.js');
-        const agents = await Effect.runPromise(listRunningAgentsEffect());
+        const { listRunningAgents } = await import('../agents.js');
+        const agents = await Effect.runPromise(listRunningAgents());
         for (const agent of agents) {
           if (agent.status === 'stopped' || agent.status === 'error') continue;
           const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
@@ -702,26 +688,26 @@ export class CloisterService {
 
       if (orphanedReviewing.length > 0) {
         console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
-        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Found ${orphanedReviewing.length} orphaned reviewStatus='reviewing' issue(s) on startup`, details: orphanedReviewing.join(', ') });
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Found ${orphanedReviewing.length} orphaned reviewStatus='reviewing' issue(s) on startup`, details: orphanedReviewing.join(', ') });
 
         for (const issueId of orphanedReviewing) {
 
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const agentState = getAgentState(agentId);
+          const agentState = getAgentStateSync(agentId);
           const workspace = agentState?.workspace;
 
           if (!workspace) {
             console.log(`  ⚠ ${issueId}: orphaned reviewing but no workspace found — resetting to pending`);
-            setReviewStatus(issueId, { reviewStatus: 'pending' });
-            emitActivityEntry({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no workspace found`, issueId });
+            setReviewStatusSync(issueId, { reviewStatus: 'pending' });
+            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no workspace found`, issueId });
             continue;
           }
 
-          const resolved = resolveProjectFromIssue(issueId);
+          const resolved = resolveProjectFromIssueSync(issueId);
           if (!resolved) {
             console.log(`  ⚠ ${issueId}: orphaned reviewing but no project configured — resetting to pending`);
-            setReviewStatus(issueId, { reviewStatus: 'pending' });
-            emitActivityEntry({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no project configured`, issueId });
+            setReviewStatusSync(issueId, { reviewStatus: 'pending' });
+            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no project configured`, issueId });
             continue;
           }
 
@@ -730,10 +716,10 @@ export class CloisterService {
           // (loads roles/review.md → Agent tool fans out to convoy reviewers)
           // instead of the legacy `pan review run` coordinator.
           const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-          await spawnReviewRoleForIssue({ issueId, workspace, branch });
+          await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
           // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
-          emitActivityEntry({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
+          emitActivityEntrySync({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
         }
       }
     } catch (error) {
@@ -749,10 +735,10 @@ export class CloisterService {
       console.log('  → Starting deacon health monitor...');
       startDeacon();
       console.log('  ✓ Deacon started');
-      emitActivityEntry({ source: 'cloister', level: 'info', message: 'Deacon health monitor started' });
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon health monitor started' });
     } catch (error) {
       console.error('  ✗ Failed to start deacon:', error);
-      emitActivityEntry({ source: 'cloister', level: 'error', message: `Failed to start deacon: ${error instanceof Error ? error.message : String(error)}` });
+      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
@@ -760,7 +746,7 @@ export class CloisterService {
     this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
-    emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
     await this.subscribeToDomainEvents();
 
@@ -775,9 +761,9 @@ export class CloisterService {
       const { initEventStore } = await import('../../dashboard/server/event-store.js');
       const store = await initEventStore();
       this.domainEventUnsubscribe = store.subscribe((event) => {
-        void handleCloisterDomainEvent(event).catch((error) => {
+        void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
           console.error('[cloister] Reactive lifecycle event handling failed:', error);
-          emitActivityEntry({
+          emitActivityEntrySync({
             source: 'cloister',
             level: 'error',
             message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -787,7 +773,7 @@ export class CloisterService {
       console.log('  ✓ Cloister reactive lifecycle scheduler subscribed to domain events');
     } catch (error) {
       console.error('  ✗ Failed to subscribe Cloister reactive lifecycle scheduler:', error);
-      emitActivityEntry({
+      emitActivityEntrySync({
         source: 'cloister',
         level: 'error',
         message: `Failed to subscribe reactive lifecycle scheduler: ${error instanceof Error ? error.message : String(error)}`,
@@ -848,7 +834,7 @@ export class CloisterService {
   emergencyStop(): string[] {
     console.log('🚨 EMERGENCY STOP - Killing all agents');
 
-    const runningAgents = listRunningAgents();
+    const runningAgents = listRunningAgentsSync();
     const killedAgents: string[] = [];
 
     for (const agent of runningAgents) {
@@ -893,7 +879,7 @@ export class CloisterService {
    */
   private async performHealthCheck(): Promise<void> {
     try {
-      const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
+      const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 
@@ -992,7 +978,7 @@ export class CloisterService {
       // Clean up old resolved violations (daily)
       if (Math.random() < 0.01) {
         // ~1% chance each check = roughly once per day
-        clearOldViolations(24);
+        clearOldViolationsSync(24);
       }
     } catch (error) {
       console.error('Cloister health check failed:', error);
@@ -1070,8 +1056,8 @@ export class CloisterService {
 
         // Skip if review is already in progress or passed — `pan done` already triggered it.
         // This completion marker scan is only a fallback for when the HTTP call from `pan done` fails.
-        const { getReviewStatus } = await import('../review-status.js');
-        const existingReview = getReviewStatus(issueId);
+        const { getReviewStatusSync } = await import('../review-status.js');
+        const existingReview = getReviewStatusSync(issueId);
         if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
           console.log(`🔔 Cloister: Completion marker for ${issueId} — review already ${existingReview.reviewStatus}, marking processed`);
           try { renameSync(completedFile, processedFile); } catch {}
@@ -1203,12 +1189,12 @@ export class CloisterService {
     // Both state.json and runtime.json must be checked — stopAgent writes both,
     // but a race between the CLI kill and this health check poll could see one
     // but not the other if only one file is consulted.
-    const agentState = getAgentState(agentId);
+    const agentState = getAgentStateSync(agentId);
     if (!agentState || agentState.status === 'stopped') {
       console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
       return;
     }
-    const runtimeState = getAgentRuntimeState(agentId);
+    const runtimeState = getAgentRuntimeStateSync(agentId);
     if (runtimeState?.state === 'suspended') {
       console.log(`🔔 Agent ${agentId} is suspended, skipping restart`);
       return;
@@ -1297,7 +1283,7 @@ export class CloisterService {
     }
 
     // Get agent state to find session ID and workspace
-    const agentState = getAgentState(agentId);
+    const agentState = getAgentStateSync(agentId);
     if (!agentState?.sessionId) {
       throw new Error(`No session ID found for agent ${agentId}`);
     }
@@ -1462,7 +1448,7 @@ export class CloisterService {
    */
   private async checkSpecialistRotations(): Promise<void> {
     // Check merge-agent (the main candidate for rotation)
-    const mergeAgentResult = await checkAndRotateIfNeeded('merge-agent', process.cwd());
+    const mergeAgentResult = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', process.cwd()));
     if (mergeAgentResult) {
       this.emit({ type: 'session_rotated', specialistName: 'merge-agent', result: mergeAgentResult });
 
@@ -1528,21 +1514,21 @@ export class CloisterService {
     for (const health of agentHealths) {
       try {
         // Get agent state
-        const agentState = getAgentState(health.agentId);
+        const agentState = getAgentStateSync(health.agentId);
         if (!agentState) continue;
 
         // Skip if no workspace (can't determine context)
         if (!agentState.workspace) continue;
 
         // Check all triggers
-        const triggers = await checkAllTriggers(
+        const triggers = await Effect.runPromise(checkAllTriggers(
           health.agentId,
           agentState.workspace,
           agentState.issueId,
           agentState.model,
           health,
           this.config
-        );
+        ));
 
         // Execute handoff for first triggered condition
         // (Priority: stuck > planning > test > completion)
@@ -1564,10 +1550,10 @@ export class CloisterService {
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
 
           // Perform handoff
-          const result = await performHandoff(health.agentId, {
+          const result = await Effect.runPromise(performHandoff(health.agentId, {
             targetModel: trigger.suggestedModel || 'sonnet',
             reason: trigger.reason,
-          });
+          }));
 
           this.emit({ type: 'handoff_completed', agentId: health.agentId, result });
 
@@ -1581,7 +1567,7 @@ export class CloisterService {
               result.success,
               result.error
             );
-            logHandoffEvent(event);
+            logHandoffEventSync(event);
           }
 
           if (result.success) {
@@ -1627,7 +1613,7 @@ export class CloisterService {
       return this._statusCache;
     }
 
-    const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
+    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
     const agentIds = runningAgents.map((a) => a.id);
 
     const agentHealths: AgentHealth[] = [];
@@ -1672,7 +1658,7 @@ export class CloisterService {
    * Get health for all running agents
    */
   getAllAgentHealth(): AgentHealth[] {
-    const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
+    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
     const agentHealths: AgentHealth[] = [];
 
     for (const agent of runningAgents) {
@@ -1725,7 +1711,7 @@ export class CloisterService {
    * Reload configuration
    */
   reloadConfig(): void {
-    this.config = loadCloisterConfig();
+    this.config = loadCloisterConfigSync();
 
     // Restart monitoring loop with new interval if running
     if (this.running && this.checkInterval) {
@@ -1831,18 +1817,18 @@ export function setCloisterService(service: CloisterService): void {
  * Effect-typed variant of {@link onIssueStateChange}. Never fails — failures
  * surface through `emitActivityEntry` inside the legacy implementation.
  */
-export function onIssueStateChangeEffect(
+export function onIssueStateChange(
   issueId: string,
   newState: string,
 ): Effect.Effect<void> {
-  return Effect.promise(() => onIssueStateChange(issueId, newState));
+  return Effect.promise(() => onIssueStateChangePromise(issueId, newState));
 }
 
 /**
  * Effect-typed variant of {@link handleCloisterDomainEvent}. Never fails.
  */
-export function handleCloisterDomainEventEffect(
+export function handleCloisterDomainEvent(
   event: CloisterDomainEventLike,
 ): Effect.Effect<void> {
-  return Effect.promise(() => handleCloisterDomainEvent(event));
+  return Effect.promise(() => handleCloisterDomainEventPromise(event));
 }

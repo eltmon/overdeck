@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for checkUncommittedChanges pre-flight helper.
  *
@@ -50,8 +51,8 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
-    expect(result).toEqual([]);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    (await Effect.runPromise(expect(result))).toEqual([]);
   });
 
   it('monorepo: returns failure lines when there are uncommitted changes', async () => {
@@ -61,7 +62,7 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
     expect(result.length).toBeGreaterThan(0);
     expect(result[0]).toBe('  Uncommitted changes:');
     expect(result[1]).toContain('src/foo.ts');
@@ -75,8 +76,8 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
-    expect(result).toEqual([]);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    (await Effect.runPromise(expect(result))).toEqual([]);
   });
 
   // ── Polyrepo (sub-dirs with .git) ─────────────────────────────────────────
@@ -93,8 +94,8 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
-    expect(result).toEqual([]);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    (await Effect.runPromise(expect(result))).toEqual([]);
   });
 
   it('polyrepo: reports dirty sub-repos individually', async () => {
@@ -112,7 +113,7 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
     expect(result.some((l) => l.includes('repo-a'))).toBe(true);
     expect(result.some((l) => l.includes('dirty-file.ts'))).toBe(true);
     // repo-b is clean — should not appear
@@ -129,9 +130,9 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
     // Hidden dir is skipped — no failures
-    expect(result).toEqual([]);
+    (await Effect.runPromise(expect(result))).toEqual([]);
   });
 
   it('polyrepo: skips sub-dirs without .git', async () => {
@@ -142,7 +143,7 @@ describe('checkUncommittedChanges', () => {
     });
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkUncommittedChanges(tempDir);
-    expect(result).toEqual([]);
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    (await Effect.runPromise(expect(result))).toEqual([]);
   });
 });

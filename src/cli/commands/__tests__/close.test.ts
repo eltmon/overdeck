@@ -79,7 +79,7 @@ describe('closeOutCommand', () => {
     expect(output).toContain("Issue should normally be in 'verifying-on-main' before close-out.");
     expect(output).toContain("Warning: current canonical state is 'todo', not 'verifying_on_main'.");
     expect(mocks.createInterface).toHaveBeenCalledOnce();
-    expect(mocks.closeOut).toHaveBeenCalledWith({
+    (await Effect.runPromise(expect(mocks.closeOut))).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
       projectPath: '/repo',
       github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
@@ -90,6 +90,6 @@ describe('closeOutCommand', () => {
     await closeOutCommand('PAN-1190', { force: true });
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
-    expect(mocks.closeOut).toHaveBeenCalledOnce();
+    (await Effect.runPromise(expect(mocks.closeOut))).toHaveBeenCalledOnce();
   });
 });

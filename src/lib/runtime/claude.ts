@@ -19,12 +19,12 @@ import type {
 } from './interface.js';
 import { CLAUDE_FEATURES } from './interface.js';
 import { FsError } from '../errors.js';
-import { generateLauncherScript } from '../launcher-generator.js';
-import { getClaudePermissionFlags } from '../claude-permissions.js';
+import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
-export function createClaudeAdapter(): RuntimeAdapter {
+export function createClaudeAdapterSync(): RuntimeAdapter {
   const config: RuntimeConfig = {
     type: 'claude',
     name: 'Claude Code',
@@ -87,7 +87,7 @@ export function createClaudeAdapter(): RuntimeAdapter {
         }
 
         // Add permission flags for autonomous agents (auto by default; bypass via config/--yolo)
-        args.push(...getClaudePermissionFlags());
+        args.push(...getClaudePermissionFlagsSync());
 
         // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;
@@ -102,7 +102,7 @@ export function createClaudeAdapter(): RuntimeAdapter {
         const launcherScript = join(agentDir, 'launcher.sh');
         writeFileSync(
           launcherScript,
-          generateLauncherScript({
+          generateLauncherScriptSync({
             role: 'work',
             workingDir: options.workingDir,
             setTerminalEnv: true,
@@ -320,8 +320,8 @@ export function createClaudeAdapter(): RuntimeAdapter {
  * keep that contract; methods that can produce FS errors lift them via
  * {@link Effect.tryPromise}.
  */
-export function createClaudeAdapterEffect(): RuntimeAdapterEffect {
-  const adapter = createClaudeAdapter();
+export function createClaudeAdapter(): RuntimeAdapterEffect {
+  const adapter = createClaudeAdapterSync();
   return {
     type: adapter.type,
     config: adapter.config,

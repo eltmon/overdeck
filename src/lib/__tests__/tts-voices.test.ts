@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -33,57 +34,57 @@ afterEach(async () => {
 
 describe('tts voices library', () => {
   it('returns an empty voice list when the library file is missing', async () => {
-    await expect(loadVoices()).resolves.toEqual([]);
+    await (await Effect.runPromise(expect(loadVoices()))).runPromise(loadVoices()))).resolves.toEqual([]);
   });
 
   it('adds and persists a generated voice record', async () => {
-    const voice = await addVoice({
+    const voice = await Effect.runPromise(addVoice({
       name: 'Narrator',
       kind: 'preset',
       presetName: 'vivian',
       instruct: 'calm and clear',
-    });
+    }));
 
     expect(voice.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(voice.createdAt).toEqual(expect.any(String));
-    expect(voice).toMatchObject({
+    (await Effect.runPromise(expect(voice))).toMatchObject({
       name: 'Narrator',
       kind: 'preset',
       presetName: 'vivian',
       instruct: 'calm and clear',
     });
-    await expect(loadVoices()).resolves.toEqual([voice]);
+    await (await Effect.runPromise(expect(loadVoices()))).runPromise(loadVoices()))).resolves.toEqual([voice]);
   });
 
   it('deletes voices by id and reports unknown ids', async () => {
-    const first = await addVoice({ name: 'First', kind: 'design', description: 'warm' });
-    const second = await addVoice({ name: 'Second', kind: 'clone', embedding: [0.1, 0.2] });
+    const first = await Effect.runPromise(addVoice({ name: 'First', kind: 'design', description: 'warm' }));
+    const second = await Effect.runPromise(addVoice({ name: 'Second', kind: 'clone', embedding: [0.1, 0.2] }));
 
-    await expect(deleteVoice(first.id)).resolves.toBe(true);
-    await expect(deleteVoice('missing')).resolves.toBe(false);
-    await expect(loadVoices()).resolves.toEqual([second]);
+    await (await Effect.runPromise(expect(deleteVoice(first.id))))se(deleteVoice(first.id)))).resolves.toBe(true);
+    await (await Effect.runPromise(expect(deleteVoice('missing'))))e(deleteVoice('missing')))).resolves.toBe(false);
+    await (await Effect.runPromise(expect(loadVoices()))).runPromise(loadVoices()))).resolves.toEqual([second]);
   });
 
   it('clears all voices with one library rewrite', async () => {
-    await addVoice({ name: 'First', kind: 'preset', presetName: 'vivian' });
-    await addVoice({ name: 'Second', kind: 'clone', embedding: [0.1, 0.2] });
+    await Effect.runPromise(addVoice({ name: 'First', kind: 'preset', presetName: 'vivian' }));
+    await Effect.runPromise(addVoice({ name: 'Second', kind: 'clone', embedding: [0.1, 0.2] }));
 
-    await expect(clearVoices()).resolves.toBe(2);
-    await expect(clearVoices()).resolves.toBe(0);
-    await expect(loadVoices()).resolves.toEqual([]);
+    await (await Effect.runPromise(expect(clearVoices())))runPromise(clearVoices()))).resolves.toBe(2);
+    await (await Effect.runPromise(expect(clearVoices())))runPromise(clearVoices()))).resolves.toBe(0);
+    await (await Effect.runPromise(expect(loadVoices()))).runPromise(loadVoices()))).resolves.toEqual([]);
   });
 
   it('finds voices by id and name after addVoice', async () => {
-    const voice = await addVoice({ name: 'Status', kind: 'clone', embedding: [1, 2, 3] });
+    const voice = await Effect.runPromise(addVoice({ name: 'Status', kind: 'clone', embedding: [1, 2, 3] }));
 
-    await expect(findVoiceById(voice.id)).resolves.toEqual(voice);
-    await expect(findVoiceByName('Status')).resolves.toEqual(voice);
-    await expect(findVoiceById('missing')).resolves.toBeUndefined();
-    await expect(findVoiceByName('Missing')).resolves.toBeUndefined();
+    await (await Effect.runPromise(expect(findVoiceById(voice.id))))(findVoiceById(voice.id)))).resolves.toEqual(voice);
+    await (await Effect.runPromise(expect(findVoiceByName('Status'))))indVoiceByName('Status')))).resolves.toEqual(voice);
+    await (await Effect.runPromise(expect(findVoiceById('missing'))))findVoiceById('missing')))).resolves.toBeUndefined();
+    await (await Effect.runPromise(expect(findVoiceByName('Missing'))))ndVoiceByName('Missing')))).resolves.toBeUndefined();
   });
 
   it('saves embeddings in the separate voice library file with owner-only permissions', async () => {
-    await saveVoices([
+    await Effect.runPromise(saveVoices([
       {
         id: 'voice-id',
         name: 'Clone',
@@ -91,7 +92,7 @@ describe('tts voices library', () => {
         createdAt: '2026-05-16T00:00:00.000Z',
         embedding: [0.1, 0.2, 0.3],
       },
-    ]);
+    ]));
 
     const written = await readFile(getTtsVoicesPath(), 'utf-8');
     const mode = (await stat(getTtsVoicesPath())).mode & 0o777;

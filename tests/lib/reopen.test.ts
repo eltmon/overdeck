@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for src/lib/reopen.ts — reopenWorkspaceState()
  *
@@ -111,7 +112,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    const result = await reopenWorkspaceState('PAN-999', wsDir);
+    const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     expect(result.specialistStatesReset).toBe(true);
     expect(result.previousReviewStatus).toBe('passed');
@@ -130,7 +131,7 @@ describe('reopenWorkspaceState', () => {
   it('creates initial pending status when no prior status exists', async () => {
     const wsDir = createWorkspace();
 
-    const result = await reopenWorkspaceState('PAN-999', wsDir);
+    const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     expect(result.specialistStatesReset).toBe(true);
     expect(result.previousReviewStatus).toBeNull();
@@ -154,7 +155,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    await reopenWorkspaceState('PAN-999', wsDir);
+    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     const row = readStatus('PAN-999')!;
     expect(row.pr_url).toBe('https://github.com/org/repo/pull/42');
@@ -168,7 +169,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    await reopenWorkspaceState('PAN-999', wsDir);
+    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     const row = readStatus('PAN-999')!;
     expect(row.auto_requeue_count).toBe(0);
@@ -179,7 +180,7 @@ describe('reopenWorkspaceState', () => {
   it('returns empty queueItemsRemoved when no queue items exist', async () => {
     const wsDir = createWorkspace();
 
-    const result = await reopenWorkspaceState('PAN-999', wsDir);
+    const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     expect(result.queueItemsRemoved).toEqual({});
 
@@ -200,7 +201,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    await reopenWorkspaceState('PAN-999', wsDir);
+    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     const row = readStatus('PAN-999')!;
     expect(row.stuck).toBeFalsy();
@@ -221,7 +222,7 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
-    await reopenWorkspaceState('PAN-999', wsDir);
+    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     const row = readStatus('PAN-999')!;
     expect(row.reviewed_at_commit).toBeNull();
@@ -269,7 +270,7 @@ describe('reopenWorkspaceState', () => {
       });
       const wsDir = createWorkspace();
 
-      const result = await reopenWorkspaceState('PAN-901', wsDir, { reason: 'redo merge' });
+      const result = await Effect.runPromise(reopenWorkspaceState('PAN-901', wsDir, { reason: 'redo merge' }));
       expect(result.continueFileUpdated).toBe(true);
 
       // Active dir must NOT have been auto-created with a fresh continue file.
@@ -301,7 +302,7 @@ describe('reopenWorkspaceState', () => {
       });
       const wsDir = createWorkspace();
 
-      await reopenWorkspaceState('PAN-902', wsDir);
+      await Effect.runPromise(reopenWorkspaceState('PAN-902', wsDir));
 
       expect(existsSync(activeContinuePath)).toBe(false);
 

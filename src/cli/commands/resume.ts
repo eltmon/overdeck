@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { createInterface } from 'node:readline/promises';
 import { resumeAgent } from '../../lib/agents.js';
-import { assertCanResumeSession } from '../../lib/work-agent-lifecycle.js';
+import { assertCanResumeSessionSync } from '../../lib/work-agent-lifecycle.js';
 
 interface ResumeOptions {
   host?: boolean;
@@ -32,7 +32,7 @@ async function confirmHostOverride(options: ResumeOptions): Promise<boolean> {
 export async function resumeCommand(id: string, options: ResumeOptions = {}): Promise<void> {
   let lifecycle;
   try {
-    lifecycle = assertCanResumeSession(id);
+    lifecycle = assertCanResumeSessionSync(id);
   } catch (error) {
     console.error(chalk.red((error as Error).message));
     process.exit(1);

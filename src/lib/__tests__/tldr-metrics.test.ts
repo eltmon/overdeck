@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getTldrMetrics, captureTldrMetrics } from '../tldr-daemon.js';
+import { getTldrMetricsSync, captureTldrMetricsSync } from '../tldr-daemon.js';
 
 let TEST_WORKSPACE: string;
 
@@ -51,7 +51,7 @@ function writeCheckpoint(interceptionsLine: number, bypassesLine: number): void 
 
 describe('getTldrMetrics', () => {
   it('returns zeros when workspace has no log files', () => {
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.interceptions).toBe(0);
     expect(metrics.bypasses).toBe(0);
     expect(metrics.estimatedTokensSaved).toBe(0);
@@ -65,21 +65,21 @@ describe('getTldrMetrics', () => {
       '1700000002 12000 src/lib/costs/events.ts',
       '1700000003 5000 src/lib/tldr-daemon.ts',
     ]);
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.interceptions).toBe(3);
   });
 
   it('estimates tokens saved from file sizes', () => {
     // 8000 bytes → ~2000 tokens full; 2000 - 1000 = 1000 saved
     writeInterceptions(['1700000001 8000 src/lib/agents.ts']);
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.estimatedTokensSaved).toBe(1000);
   });
 
   it('never produces negative token savings for small files', () => {
     // 3500 bytes → ~875 tokens full; summary (~1000) > full → savings = 0
     writeInterceptions(['1700000001 3500 src/lib/small.ts']);
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.estimatedTokensSaved).toBe(0);
   });
 
@@ -89,7 +89,7 @@ describe('getTldrMetrics', () => {
       '1700000002 8000 src/lib/agents.ts', // same file twice
       '1700000003 8000 src/lib/costs.ts',
     ]);
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.filesAnalyzed).toHaveLength(2);
     expect(metrics.filesAnalyzed).toContain('src/lib/agents.ts');
     expect(metrics.filesAnalyzed).toContain('src/lib/costs.ts');
@@ -101,7 +101,7 @@ describe('getTldrMetrics', () => {
       '1700000002 offset-limit src/lib/costs.ts',
       '1700000003 recently-edited src/lib/settings.ts',
     ]);
-    const metrics = getTldrMetrics(TEST_WORKSPACE);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics.bypasses).toBe(3);
     expect(metrics.bypassReasons['offset-limit']).toBe(2);
     expect(metrics.bypassReasons['recently-edited']).toBe(1);
@@ -115,7 +115,7 @@ describe('getTldrMetrics', () => {
     ]);
     writeCheckpoint(2, 0); // 2 interceptions already captured
 
-    const metrics = getTldrMetrics(TEST_WORKSPACE, true);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE, true);
     expect(metrics.interceptions).toBe(1); // only line 2
     expect(metrics.filesAnalyzed).toEqual(['src/lib/new-file.ts']);
   });
@@ -127,7 +127,7 @@ describe('getTldrMetrics', () => {
     ]);
     writeCheckpoint(1, 0); // 1 already captured
 
-    const metrics = getTldrMetrics(TEST_WORKSPACE, false);
+    const metrics = getTldrMetricsSync(TEST_WORKSPACE, false);
     expect(metrics.interceptions).toBe(2); // all lines
   });
 });
@@ -139,14 +139,14 @@ describe('captureTldrMetrics', () => {
     const noTldrWorkspace = join(tmpdir(), `no-tldr-${Date.now()}`);
     mkdirSync(noTldrWorkspace, { recursive: true });
     try {
-      expect(captureTldrMetrics(noTldrWorkspace)).toBeNull();
+      expect(captureTldrMetricsSync(noTldrWorkspace)).toBeNull();
     } finally {
       rmSync(noTldrWorkspace, { recursive: true, force: true });
     }
   });
 
   it('returns empty metrics and writes checkpoint when no logs exist', () => {
-    const metrics = captureTldrMetrics(TEST_WORKSPACE);
+    const metrics = captureTldrMetricsSync(TEST_WORKSPACE);
     expect(metrics).not.toBeNull();
     expect(metrics!.interceptions).toBe(0);
     expect(metrics!.bypasses).toBe(0);
@@ -165,7 +165,7 @@ describe('captureTldrMetrics', () => {
     ]);
     writeCheckpoint(1, 0); // 1 interception captured, 0 bypasses captured
 
-    const metrics = captureTldrMetrics(TEST_WORKSPACE)!;
+    const metrics = captureTldrMetricsSync(TEST_WORKSPACE)!;
     expect(metrics.interceptions).toBe(1);  // only line 1 (index 1)
     expect(metrics.filesAnalyzed).toEqual(['src/lib/costs.ts']);
     expect(metrics.bypasses).toBe(1);
@@ -183,22 +183,22 @@ describe('captureTldrMetrics', () => {
 
   it('uses byte checkpoints for subsequent captures', () => {
     writeInterceptions(['1700000001 8000 src/lib/agents.ts']);
-    captureTldrMetrics(TEST_WORKSPACE);
+    captureTldrMetricsSync(TEST_WORKSPACE);
     writeInterceptions([
       '1700000001 8000 src/lib/agents.ts',
       '1700000002 8000 src/lib/new.ts',
     ]);
 
-    const second = captureTldrMetrics(TEST_WORKSPACE)!;
+    const second = captureTldrMetricsSync(TEST_WORKSPACE)!;
     expect(second.interceptions).toBe(1);
     expect(second.filesAnalyzed).toEqual(['src/lib/new.ts']);
   });
 
   it('returns zero delta on second capture with no new events', () => {
     writeInterceptions(['1700000001 8000 src/lib/agents.ts']);
-    captureTldrMetrics(TEST_WORKSPACE); // first capture
+    captureTldrMetricsSync(TEST_WORKSPACE); // first capture
 
-    const second = captureTldrMetrics(TEST_WORKSPACE)!;
+    const second = captureTldrMetricsSync(TEST_WORKSPACE)!;
     expect(second.interceptions).toBe(0);
     expect(second.bypasses).toBe(0);
     expect(second.estimatedTokensSaved).toBe(0);
@@ -210,7 +210,7 @@ describe('captureTldrMetrics', () => {
       '1700000001 8000 src/a.ts',
       '1700000002 8000 src/b.ts',
     ]);
-    const first = captureTldrMetrics(TEST_WORKSPACE)!;
+    const first = captureTldrMetricsSync(TEST_WORKSPACE)!;
     expect(first.interceptions).toBe(2);
 
     // Second batch: 1 more interception
@@ -219,7 +219,7 @@ describe('captureTldrMetrics', () => {
       '1700000002 8000 src/b.ts',
       '1700000003 8000 src/c.ts',
     ]);
-    const second = captureTldrMetrics(TEST_WORKSPACE)!;
+    const second = captureTldrMetricsSync(TEST_WORKSPACE)!;
     expect(second.interceptions).toBe(1); // only the new one
     expect(second.filesAnalyzed).toEqual(['src/c.ts']);
   });

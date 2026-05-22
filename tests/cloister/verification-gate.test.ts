@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for runQualityGates SSH support and DEFAULT_GATES (PAN-336)
  *
@@ -50,27 +51,27 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('uses SSH prefix for remote workspaces', async () => {
-    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    });
+    }));
 
     const calls = execMock.mock.calls.map(c => c[0] as string);
     expect(calls.every(cmd => cmd.startsWith('fly ssh console -a'))).toBe(true);
   });
 
   it('does not set cwd for remote workspaces', async () => {
-    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    });
+    }));
 
     const calls = execMock.mock.calls;
     expect(calls.every(c => c[1]?.cwd === undefined)).toBe(true);
   });
 
   it('uses local cwd for non-remote workspaces', async () => {
-    await runQualityGates(DEFAULT_GATES, workspacePath);
+    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
 
     const calls = execMock.mock.calls;
     expect(calls.every(c => !(c[0] as string).startsWith('ssh'))).toBe(true);
@@ -78,23 +79,27 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('throws when isRemote is true but vmName is missing', async () => {
-    await expect(
+    await (await Effect.runPromise(expect(
       runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: undefined })
+    )))mName: undefined })))
     ).rejects.toThrow('Remote workspace requires vmName');
   });
 
   it('throws when vmName contains invalid characters', async () => {
-    await expect(
+    await (await Effect.runPromise(expect(
       runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: 'vm; rm -rf /' })
+    ))): 'vm; rm -rf /' })))
     ).rejects.toThrow('Invalid vmName for SSH');
   });
 
   it('throws when workspacePath contains unsafe characters for SSH', async () => {
-    await expect(
+    await (await Effect.runPromise(expect(
       runQualityGates(DEFAULT_GATES, '/path/with spaces/workspace', 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
+    ))): 'my-vm',
+      })))
     ).rejects.toThrow('Workspace path contains unsafe characters');
   });
 
@@ -102,11 +107,13 @@ describe('runQualityGates — SSH remote support', () => {
     const gatesWithBadPath = {
       lint: { command: 'pnpm lint', path: 'frontend;rm -rf /' },
     };
-    await expect(
+    await (await Effect.runPromise(expect(
       runQualityGates(gatesWithBadPath, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
+    ))): 'my-vm',
+      })))
     ).rejects.toThrow('unsafe characters for SSH');
   });
 
@@ -114,11 +121,13 @@ describe('runQualityGates — SSH remote support', () => {
     const gatesWithQuotes = {
       lint: { command: 'echo "hello"' },
     };
-    await expect(
+    await (await Effect.runPromise(expect(
       runQualityGates(gatesWithQuotes, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
+    ))): 'my-vm',
+      })))
     ).rejects.toThrow('double quotes which are unsafe in SSH context');
   });
 
@@ -127,20 +136,20 @@ describe('runQualityGates — SSH remote support', () => {
       lint: { command: 'pnpm lint', path: 'frontend' },
     };
 
-    await runQualityGates(gatesWithPath, workspacePath, 'pre_push', {
+    await Effect.runPromise(runQualityGates(gatesWithPath, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    });
+    }));
 
     const cmd = execMock.mock.calls[0][0] as string;
     expect(cmd).toContain(`cd ${workspacePath}/frontend &&`);
   });
 
   it('passes 5-minute timeout to each execAsync call for SSH', async () => {
-    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    });
+    }));
 
     const FIVE_MINUTES_MS = 5 * 60 * 1000;
     for (const call of execMock.mock.calls) {
@@ -156,10 +165,10 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
   });
 
   it('runs all 2 default gates when all pass', async () => {
-    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
+    const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
 
     expect(execMock).toHaveBeenCalledTimes(2);
-    expect(results).toHaveLength(2);
+    (await Effect.runPromise(expect(results))).toHaveLength(2);
     expect(results.every(r => r.passed)).toBe(true);
     expect(results.map(r => r.name)).toEqual(['typecheck', 'lint']);
   });
@@ -171,11 +180,11 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     });
     execMock.mockRejectedValueOnce(typecheckErr);
 
-    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
+    const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
 
     // Only typecheck ran — lint and test were not called
     expect(execMock).toHaveBeenCalledTimes(1);
-    expect(results).toHaveLength(1);
+    (await Effect.runPromise(expect(results))).toHaveLength(1);
     expect(results[0].name).toBe('typecheck');
     expect(results[0].passed).toBe(false);
   });

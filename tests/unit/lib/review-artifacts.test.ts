@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -112,7 +113,7 @@ describe('review-artifacts', () => {
       id: '7',
     });
 
-    const result = await createReviewArtifactsForIssue('MIN-632', workspacePath);
+    const result = await Effect.runPromise(createReviewArtifactsForIssue('MIN-632', workspacePath));
 
     expect(result.artifacts).toEqual([
       {

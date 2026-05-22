@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../agents.js', () => ({
@@ -13,8 +14,8 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 import { spawnRun } from '../../agents.js';
-import { resolveProjectFromIssue } from '../../projects.js';
-import { setReviewStatus } from '../../review-status.js';
+import { resolveProjectFromIssueSync } from '../../projects.js';
+import { setReviewStatusSync } from '../../review-status.js';
 import { buildTestRolePrompt, dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 
 describe('test role dispatch', () => {
@@ -42,13 +43,13 @@ describe('test role dispatch', () => {
   it('starts spawnRun(issueId, test) and marks testing', async () => {
     const notifyAgent = vi.fn(async () => {});
 
-    await dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503', notifyAgent);
+    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503', notifyAgent));
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'test', expect.objectContaining({
       workspace: '/tmp/workspace',
       prompt: expect.stringContaining('TEST TASK for PAN-503'),
     }));
-    expect(setReviewStatus).toHaveBeenCalledWith('PAN-503', { testStatus: 'testing' });
+    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', { testStatus: 'testing' });
     expect(notifyAgent).toHaveBeenCalledWith(
       'agent-pan-503',
       expect.stringContaining('The test role has been dispatched automatically'),
@@ -56,12 +57,12 @@ describe('test role dispatch', () => {
   });
 
   it('does not spawn when no project is configured', async () => {
-    vi.mocked(resolveProjectFromIssue).mockReturnValueOnce(null);
+    vi.mocked(resolveProjectFromIssueSync).mockReturnValueOnce(null);
 
-    await dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503');
+    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503'));
 
     expect(spawnRun).not.toHaveBeenCalled();
-    expect(setReviewStatus).toHaveBeenCalledWith('PAN-503', {
+    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', {
       testStatus: 'dispatch_failed',
       testNotes: 'No project configured for PAN-503. Add it to projects.yaml.',
     });

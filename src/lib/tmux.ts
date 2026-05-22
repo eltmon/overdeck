@@ -7,8 +7,8 @@ import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
-import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
-import { buildChildEnv } from './child-env.js';
+import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
+import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
@@ -86,7 +86,7 @@ function reloadManagedTmuxConfigSync(): void {
     // the tmux server doesn't inherit stale provider config. Without this,
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
-    const cleanEnv = buildChildEnv();
+    const cleanEnv = buildChildEnvSync();
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -97,7 +97,7 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    const cleanEnv = buildChildEnv();
+    const cleanEnv = buildChildEnvSync();
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -120,22 +120,13 @@ async function ensureManagedTmuxConfigAsync(): Promise<void> {
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   await reloadManagedTmuxConfigAsync();
   tmuxContextPrepared = true;
-}
-
-/**
- * Explicit one-shot init for the managed tmux context. Call awaited from the
- * dashboard server entry point before `server.listen` so that no request path
- * ever pays the prep cost (file write + tmux start-server + source-file).
- *
- * In `inherit-user` mode this is a no-op. Safe to call multiple times.
- */
-export async function ensureManagedTmuxContextOnce(): Promise<void> {
+}async function ensureManagedTmuxContextOncePromise(): Promise<void> {
   const mode = getTmuxConfigMode();
   await ensureTmuxContextPreparedAsync(mode);
 }
 
 export function getTmuxConfigMode(): TmuxConfigMode {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   return config.tmux.configMode;
 }
 
@@ -262,7 +253,7 @@ export interface TmuxSession {
   windows: number;
 }
 
-export function listSessions(): TmuxSession[] {
+export function listSessionsSync(): TmuxSession[] {
   try {
     const output = tmuxExecSync(
       ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
@@ -284,8 +275,8 @@ export function listSessions(): TmuxSession[] {
 }
 
 
-export function listSessionNames(): string[] {
-  return listSessions().map((session) => session.name);
+export function listSessionNamesSync(): string[] {
+  return listSessionsSync().map((session) => session.name);
 }
 
 
@@ -323,7 +314,7 @@ export function exactPaneTarget(name: string): string {
   return `=${name}:`;
 }
 
-export function sessionExists(name: string): boolean {
+export function sessionExistsSync(name: string): boolean {
   try {
     tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
     return true;
@@ -334,10 +325,10 @@ export function sessionExists(name: string): boolean {
 
 
 /**
- * @deprecated Legacy sync function — blocks the event loop. Use `createSessionAsyncEffect` instead.
+ * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
  * Kept for CLI-only callers. Never call from server-reachable code.
  */
-export function createSession(
+export function createSessionSync(
   name: string,
   cwd: string,
   initialCommand?: string,
@@ -365,7 +356,7 @@ export function createSession(
 }
 
 
-export function killSession(name: string): void {
+export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
   tmuxExecSync(['kill-session', '-t', exactSession(name)]);
@@ -392,7 +383,7 @@ export class MessageDeliveryFailed extends Error {
  * Send keys to a tmux session (sync, blocks event loop).
  * Only use from CLI commands — NEVER from the dashboard server.
  */
-export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+export function sendKeysSync(sessionName: string, keys: string, caller?: string): void {
   validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
@@ -411,7 +402,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
   }
 }
 
-export function capturePane(sessionName: string, lines: number = 50): string {
+export function capturePaneSync(sessionName: string, lines: number = 50): string {
   try {
     return tmuxExecSync(['capture-pane', '-t', exactPaneTarget(sessionName), '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
@@ -439,7 +430,7 @@ async function capturePaneText(
   }
 }
 
-export function listPaneValues(target: string, format: string): string[] {
+export function listPaneValuesSync(target: string, format: string): string[] {
   try {
     const output = tmuxExecSync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -515,7 +506,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
  * those. We normalize a copy to a single-spaced string for matching, then
  * preserve the original for the `raw` diagnostics field.
  */
-export function detectTerminalApiError(paneOutput: string): TerminalApiError | null {
+export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError | null {
   if (!paneOutput) return null;
   const normalized = paneOutput.replace(/\s+/g, ' ');
   for (const entry of TERMINAL_API_ERROR_PATTERNS) {
@@ -534,21 +525,15 @@ export function detectTerminalApiError(paneOutput: string): TerminalApiError | n
     }
   }
   return null;
-}
-
-/**
- * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
- * Polls tmux output until the prompt appears or timeout is reached.
- */
-export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
+}async function waitForClaudePromptPromise(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
   let consecutivePromptPolls = 0;
 
   while (Date.now() - start < timeoutMs) {
-    if (!await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) return false;
+    if (!await Effect.runPromise(sessionExists(sessionName))) return false;
 
-    const output = await Effect.runPromise(capturePaneAsyncEffect(sessionName, 10));
+    const output = await Effect.runPromise(capturePane(sessionName, 10));
     const lines = output.split('\n').filter(l => l.trim());
     // Use lines.some() instead of lastLine — the status bar/footer is often the
     // last line, so checking only lastLine misses the prompt. (feature/pan-704)
@@ -556,7 +541,7 @@ export async function waitForClaudePrompt(sessionName: string, timeoutMs: number
 
     if (hasPromptLine) {
       consecutivePromptPolls += 1;
-      if (consecutivePromptPolls >= 2 && await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) {
+      if (consecutivePromptPolls >= 2 && await Effect.runPromise(sessionExists(sessionName))) {
         return true;
       }
     } else {
@@ -599,7 +584,7 @@ export async function confirmDelivery(
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
-    const after = await Effect.runPromise(capturePaneAsyncEffect(sessionName, 50));
+    const after = await Effect.runPromise(capturePane(sessionName, 50));
     const afterText = after.trimEnd();
     if (afterText === beforeText) continue;
 
@@ -614,8 +599,8 @@ export async function confirmDelivery(
   return false;
 }
 
-export function getAgentSessions(): TmuxSession[] {
-  return listSessions().filter(s => s.name.startsWith('agent-'));
+export function getAgentSessionsSync(): TmuxSession[] {
+  return listSessionsSync().filter(s => s.name.startsWith('agent-'));
 }
 
 
@@ -629,13 +614,13 @@ const toTmuxError = (op: string, cause: unknown): TmuxError =>
   });
 
 /** Prepare the managed tmux config + server (idempotent). */
-export const ensureManagedTmuxContextOnceEffect = (): Effect.Effect<void, TmuxError> =>
+export const ensureManagedTmuxContextOnce = (): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => ensureManagedTmuxContextOnce(),
+    try: () => ensureManagedTmuxContextOncePromise(),
     catch: (cause) => toTmuxError('ensureManagedTmuxContext', cause),
   });
 
-export const listSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+export const listSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   Effect.tryPromise({
     try: async () => {
       try {
@@ -659,7 +644,7 @@ export const listSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[],
     catch: (cause) => toTmuxError('list-sessions', cause),
   });
 
-export const listSessionNamesAsyncEffect = (): Effect.Effect<readonly string[], TmuxError> =>
+export const listSessionNames = (): Effect.Effect<readonly string[], TmuxError> =>
   Effect.tryPromise({
     try: async () => {
       try {
@@ -672,7 +657,7 @@ export const listSessionNamesAsyncEffect = (): Effect.Effect<readonly string[], 
     catch: (cause) => toTmuxError('list-session-names', cause),
   });
 
-export const getWindowDimensionsAsyncEffect = (
+export const getWindowDimensions = (
   sessionName: string,
 ): Effect.Effect<{ cols: number; rows: number } | null, TmuxError> =>
   Effect.tryPromise({
@@ -695,7 +680,7 @@ export const getWindowDimensionsAsyncEffect = (
     catch: (cause) => toTmuxError('window-dimensions', cause),
   });
 
-export const sessionExistsAsyncEffect = (
+export const sessionExists = (
   name: string,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.tryPromise({
@@ -710,7 +695,7 @@ export const sessionExistsAsyncEffect = (
     catch: (cause) => toTmuxError('session-exists', cause),
   });
 
-export const createSessionAsyncEffect = (
+export const createSession = (
   name: string,
   cwd: string,
   initialCommand?: string,
@@ -721,13 +706,13 @@ export const createSessionAsyncEffect = (
     catch: (cause) => toTmuxError('create-session', cause),
   });
 
-export const killSessionAsyncEffect = (name: string): Effect.Effect<void, TmuxError> =>
+export const killSession = (name: string): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
     try: () => tmuxExecAsync(['kill-session', '-t', exactSession(name)], { encoding: 'utf-8' }).then(() => undefined),
     catch: (cause) => toTmuxError('kill-session', cause),
   });
 
-export const setOptionAsyncEffect = (
+export const setOption = (
   target: string,
   option: string,
   value: string,
@@ -737,7 +722,7 @@ export const setOptionAsyncEffect = (
     catch: (cause) => toTmuxError('set-option', cause),
   });
 
-export const resizeWindowAsyncEffect = (
+export const resizeWindow = (
   target: string,
   cols: number,
   rows: number,
@@ -747,7 +732,7 @@ export const resizeWindowAsyncEffect = (
     catch: (cause) => toTmuxError('resize-window', cause),
   });
 
-export const sendRawKeystrokeAsyncEffect = (
+export const sendRawKeystroke = (
   sessionName: string,
   key: string,
   caller?: string,
@@ -761,7 +746,7 @@ export const sendRawKeystrokeAsyncEffect = (
     catch: (cause) => toTmuxError('send-raw-key', cause),
   });
 
-export const sendKeysEffect = (
+export const sendKeys = (
   sessionName: string,
   keys: string,
   caller?: string,
@@ -849,7 +834,7 @@ export const sendKeysEffect = (
     catch: (cause) => cause instanceof MessageDeliveryFailed ? cause : toTmuxError('send-keys', cause),
   });
 
-export const capturePaneAsyncEffect = (
+export const capturePane = (
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean },
@@ -859,7 +844,7 @@ export const capturePaneAsyncEffect = (
     catch: (cause) => toTmuxError('capture-pane', cause),
   });
 
-export const listPaneValuesAsyncEffect = (
+export const listPaneValues = (
   target: string,
   format: string,
 ): Effect.Effect<readonly string[], TmuxError> =>
@@ -868,34 +853,34 @@ export const listPaneValuesAsyncEffect = (
     catch: (cause) => toTmuxError('list-pane-values', cause),
   });
 
-export const isPaneDeadAsyncEffect = (
+export const isPaneDead = (
   sessionName: string,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.gen(function* () {
-    const values = yield* listPaneValuesAsyncEffect(sessionName, '#{pane_dead}');
+    const values = yield* listPaneValues(sessionName, '#{pane_dead}');
     return values.some(v => v === '1');
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 
-export const detectTerminalApiErrorEffect = (
+export const detectTerminalApiError = (
   paneOutput: string,
 ): Effect.Effect<TerminalApiError | null> =>
-  Effect.sync(() => detectTerminalApiError(paneOutput));
+  Effect.sync(() => detectTerminalApiErrorSync(paneOutput));
 
-export const waitForClaudePromptEffect = (
+export const waitForClaudePrompt = (
   sessionName: string,
   timeoutMs: number = 15000,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.tryPromise({
-    try: () => waitForClaudePrompt(sessionName, timeoutMs),
+    try: () => waitForClaudePromptPromise(sessionName, timeoutMs),
     catch: (cause) => toTmuxError('wait-claude-prompt', cause),
   });
 
-export const getAgentSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  listSessionsAsyncEffect().pipe(
+export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  listSessions().pipe(
     Effect.map((sessions) => sessions.filter(s => s.name.startsWith('agent-'))),
   );
 
-export const getReviewSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  listSessionsAsyncEffect().pipe(
+export const getReviewSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  listSessions().pipe(
     Effect.map((sessions) => sessions.filter(s => /^review-/.test(s.name))),
   );

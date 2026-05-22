@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -646,23 +647,23 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generatePanopticonTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } = await import('../lib/traefik.js');
+        const { generatePanopticonTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
 
         // Clean stale tls: sections from older config files
-        cleanupStaleTlsSections();
+        cleanupStaleTlsSectionsSync();
 
-        if (generatePanopticonTraefikConfig()) {
+        if (generatePanopticonTraefikConfigSync()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
         }
 
         // Generate missing certs for registered projects
-        const generatedDomains = ensureProjectCerts();
+        const generatedDomains = ensureProjectCertsSync();
         for (const domain of generatedDomains) {
           console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
         }
 
         // Generate tls.yml from all discovered certs
-        if (generateTlsConfig()) {
+        if (generateTlsConfigSync()) {
           console.log(chalk.dim('  Generated TLS config (tls.yml)'));
         }
       } catch {
@@ -801,9 +802,9 @@ program
       // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
       // sidecar still comes up and will pick up credentials once they log in.
       try {
-        const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
+        const { startCliproxySync, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
         console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-        startCliproxy();
+        startCliproxySync();
         console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
@@ -812,9 +813,9 @@ program
 
       // Start smee-client webhook relay (optional — non-fatal)
       try {
-        const { startSmeeProcess } = await import('../lib/smee.js');
+        const { startSmeeProcessSync } = await import('../lib/smee.js');
         console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-        startSmeeProcess();
+        startSmeeProcessSync();
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
         console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
@@ -822,12 +823,12 @@ program
 
       // Start TLDR daemon on project root (if Python3 and venv available)
       try {
-        const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
+        const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
         const projectRoot = process.cwd();
         const venvPath = join(projectRoot, '.venv');
         if (existsSync(venvPath)) {
           console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-          const tldrService = getTldrDaemonService(projectRoot, venvPath);
+          const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
           await tldrService.start(true);  // background mode
           console.log(chalk.green('✓ TLDR daemon started'));
         } else {
@@ -840,12 +841,12 @@ program
       }
 
       try {
-        const { loadConfig } = await import('../lib/config-yaml.js');
+        const { loadConfigSync } = await import('../lib/config-yaml.js');
         const { startTtsDaemon } = await import('../lib/tts-daemon.js');
-        const ttsConfig = loadConfig().config.tts;
+        const ttsConfig = loadConfigSync().config.tts;
         if (ttsConfig.daemonAutoStart) {
           console.log(chalk.dim('\nStarting Qwen TTS daemon...'));
-          const result = await startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 });
+          const result = await Effect.runPromise(startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 }));
           if (result.ok) {
             console.log(chalk.green(`✓ Qwen TTS daemon listening on http://${ttsConfig.daemonHost}:${ttsConfig.daemonPort}`));
           } else {
@@ -860,9 +861,9 @@ program
       // separate port so the dashboard's Force Restart button still works
       // when the dashboard process itself has crashed.
       try {
-        const { startSupervisorProcess, getSupervisorPort } = await import('../lib/supervisor.js');
-        startSupervisorProcess();
-        console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
+        const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
+        startSupervisorProcessSync();
+        console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
         console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
@@ -907,15 +908,15 @@ program
       }
     }
 
-    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
-    const platformConfig = readPlatformConfig();
-    await stopDashboard({
+    const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfigSync();
+    await Effect.runPromise(stopDashboard({
       ...platformConfig,
       dashboardPort,
       dashboardApiPort,
       traefikEnabled,
       traefikDomain,
-    });
+    }));
 
     // Start dashboard
     if (isProduction) {
@@ -986,7 +987,7 @@ program
       // recoverable state (dashboard-side failure, sidecars still usable).
       try {
         const { waitForDashboardHealth } = await import('../lib/platform-lifecycle.js');
-        await waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000 });
+        await Effect.runPromise(waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000 }));
         console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
       } catch (err: any) {
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
@@ -1047,9 +1048,9 @@ program
 
     // Stop smee-client webhook relay
     try {
-      const { stopSmeeProcess } = await import('../lib/smee.js');
+      const { stopSmeeProcessSync } = await import('../lib/smee.js');
       console.log(chalk.dim('Stopping smee-client webhook relay...'));
-      stopSmeeProcess();
+      stopSmeeProcessSync();
       console.log(chalk.green('✓ smee-client stopped'));
     } catch {
       console.log(chalk.dim('  smee-client not running'));
@@ -1057,10 +1058,10 @@ program
 
     // Stop the supervisor sidecar
     try {
-      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
-      if (isSupervisorRunning()) {
+      const { stopSupervisorProcessSync, isSupervisorRunningSync } = await import('../lib/supervisor.js');
+      if (isSupervisorRunningSync()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
-        stopSupervisorProcess();
+        stopSupervisorProcessSync();
         console.log(chalk.green('✓ Supervisor stopped'));
       }
     } catch {
@@ -1090,10 +1091,10 @@ program
     // have identical teardown semantics.
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
-      const platformConfig = readPlatformConfig();
+      const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
+      const platformConfig = readPlatformConfigSync();
       // Respect whatever ports this block already parsed out of config.toml.
-      await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
+      await Effect.runPromise(stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort }));
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
@@ -1104,7 +1105,7 @@ program
     console.log(chalk.dim('Stopping review sessions...'));
     try {
       const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
-      const { killed, failed } = await killAllReviewSessions();
+      const { killed, failed } = await Effect.runPromise(killAllReviewSessions());
       if (killed.length > 0) {
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }
@@ -1137,10 +1138,10 @@ program
 
     // Stop CLIProxyAPI sidecar
     try {
-      const { stopCliproxy, isCliproxyRunning } = await import('../lib/cliproxy.js');
-      if (isCliproxyRunning()) {
+      const { stopCliproxySync, isCliproxyRunningSync } = await import('../lib/cliproxy.js');
+      if (isCliproxyRunningSync()) {
         console.log(chalk.dim('Stopping CLIProxyAPI sidecar...'));
-        stopCliproxy();
+        stopCliproxySync();
         console.log(chalk.green('✓ CLIProxyAPI stopped'));
       }
     } catch {
@@ -1149,7 +1150,7 @@ program
 
     // Stop TLDR daemon on project root
     try {
-      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
+      const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
@@ -1159,7 +1160,7 @@ program
 
       if (existsSync(venvPath)) {
         console.log(chalk.dim('\nStopping TLDR daemon...'));
-        const tldrService = getTldrDaemonService(projectRoot, venvPath);
+        const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
         await tldrService.stop();
         console.log(chalk.green('✓ TLDR daemon stopped'));
       }

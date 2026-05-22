@@ -15,9 +15,9 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, openSync, readSync,
 import { execFileSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
-import { calculateCost, getPricing, AIProvider } from '../../src/lib/cost.js';
-import { appendCostEvent } from '../../src/lib/costs/events.js';
-import { captureTldrMetrics, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
+import { calculateCostSync, getPricingSync, AIProvider } from '../../src/lib/cost.js';
+import { appendCostEventSync } from '../../src/lib/costs/events.js';
+import { captureTldrMetricsSync, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
 
 // ============== Types ==============
 
@@ -153,7 +153,7 @@ try {
     stdio: ['pipe', 'pipe', 'pipe'],
   }).trim();
   if (workspaceRoot) {
-    tldrMetrics = captureTldrMetrics(workspaceRoot);
+    tldrMetrics = captureTldrMetricsSync(workspaceRoot);
   }
 } catch { /* git not available or no workspace — skip TLDR metrics */ }
 
@@ -203,10 +203,10 @@ for (const line of lines) {
     }
 
     // Get pricing and calculate cost
-    const pricing = getPricing(provider, model);
+    const pricing = getPricingSync(provider, model);
     if (!pricing) continue;
 
-    const cost = calculateCost({
+    const cost = calculateCostSync({
       inputTokens,
       outputTokens,
       cacheReadTokens,
@@ -231,7 +231,7 @@ for (const line of lines) {
     }
 
     // Record the cost event
-    appendCostEvent({
+    appendCostEventSync({
       ts: new Date().toISOString(),
       type: 'cost',
       agentId,

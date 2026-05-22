@@ -11,8 +11,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
-import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeState } from './agents.js';
-import { capturePaneAsyncEffect, listSessionNamesAsyncEffect, sessionExistsAsyncEffect } from './tmux.js';
+import { recoverAgent, stopAgentSync, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
+import { capturePane, listSessionNames, sessionExists } from './tmux.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 export class HealthError extends Data.TaggedError('HealthError')<{
@@ -85,13 +85,8 @@ export function saveAgentHealth(health: AgentHealth): void {
   const dir = join(AGENTS_DIR, health.agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(getHealthFile(health.agentId), JSON.stringify(health, null, 2));
-}
-
-/**
- * Check if agent's tmux session is alive
- */
-export async function isAgentAlive(agentId: string): Promise<boolean> {
-  return Effect.runPromise(sessionExistsAsyncEffect(agentId));
+}async function isAgentAlivePromise(agentId: string): Promise<boolean> {
+  return Effect.runPromise(sessionExists(agentId));
 }
 
 /**
@@ -99,7 +94,7 @@ export async function isAgentAlive(agentId: string): Promise<boolean> {
  */
 export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
   try {
-    const output = await Effect.runPromise(capturePaneAsyncEffect(agentId, lines));
+    const output = await Effect.runPromise(capturePane(agentId, lines));
     return output.trim();
   } catch {
     return null;
@@ -111,7 +106,7 @@ export async function getAgentOutput(agentId: string, lines: number = 20): Promi
  * Returns true if we detect activity, false otherwise
  */
 export async function sendHealthNudge(agentId: string): Promise<boolean> {
-  if (!(await isAgentAlive(agentId))) {
+  if (!(await Effect.runPromise(isAgentAlive(agentId)))) {
     return false;
   }
 
@@ -127,12 +122,7 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * Ping an agent and update health status
- */
-export async function pingAgent(
+}async function pingAgentPromise(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -145,9 +135,9 @@ export async function pingAgent(
   const now = new Date();
   health.lastPing = now.toISOString();
 
-  const state = getAgentState(agentId);
-  const runtime = getAgentRuntimeState(agentId);
-  const alive = await isAgentAlive(agentId);
+  const state = getAgentStateSync(agentId);
+  const runtime = getAgentRuntimeStateSync(agentId);
+  const alive = await Effect.runPromise(isAgentAlive(agentId));
   const runtimeLastActivity = runtime?.lastActivity ? new Date(runtime.lastActivity) : null;
   const stateLastActivity = state?.lastActivity ? new Date(state.lastActivity) : null;
   const lastActivity = runtimeLastActivity ?? stateLastActivity;
@@ -212,12 +202,7 @@ export async function pingAgent(
 
   saveAgentHealth(health);
   return health;
-}
-
-/**
- * Handle a stuck agent - force kill and respawn with context
- */
-export async function handleStuckAgent(
+}async function handleStuckAgentPromise(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -251,7 +236,7 @@ export async function handleStuckAgent(
 
   // Force kill the agent
   try {
-    stopAgent(agentId);
+    stopAgentSync(agentId);
   } catch {}
 
   // Record the force kill
@@ -274,12 +259,7 @@ export async function handleStuckAgent(
   } catch {}
 
   return { action: 'recovered', reason: 'Force killed (respawn failed)' };
-}
-
-/**
- * Run a single health check cycle for all agents
- */
-export async function runHealthCheck(
+}async function runHealthCheckPromise(
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
     consecutiveFailures: DEFAULT_CONSECUTIVE_FAILURES,
@@ -306,7 +286,7 @@ export async function runHealthCheck(
   // Get all agent sessions
   let sessions: string[] = [];
   try {
-    sessions = (await Effect.runPromise(listSessionNamesAsyncEffect()))
+    sessions = (await Effect.runPromise(listSessionNames()))
       .filter((s) => s.startsWith('agent-'));
   } catch {}
 
@@ -328,7 +308,7 @@ export async function runHealthCheck(
   for (const agentId of sessions) {
     results.checked++;
 
-    const health = await pingAgent(agentId, config);
+    const health = await Effect.runPromise(pingAgent(agentId, config));
 
     switch (health.status) {
       case 'healthy':
@@ -340,7 +320,7 @@ export async function runHealthCheck(
       case 'stuck':
         results.stuck++;
         // Handle stuck agent
-        const result = await handleStuckAgent(agentId, config);
+        const result = await Effect.runPromise(handleStuckAgent(agentId, config));
         if (result.action === 'recovered') {
           results.recovered.push(agentId);
         }
@@ -348,7 +328,7 @@ export async function runHealthCheck(
       case 'dead':
         results.dead++;
         // Handle dead agent
-        const deadResult = await handleStuckAgent(agentId, config);
+        const deadResult = await Effect.runPromise(handleStuckAgent(agentId, config));
         if (deadResult.action === 'recovered') {
           results.recovered.push(agentId);
         }
@@ -372,14 +352,14 @@ export function startHealthDaemon(
     cooldownMs: DEFAULT_COOLDOWN_MS,
     checkIntervalMs: DEFAULT_CHECK_INTERVAL_MS,
   },
-  onCheck?: (results: Awaited<ReturnType<typeof runHealthCheck>>) => void
+  onCheck?: (results: Awaited<ReturnType<typeof runHealthCheckPromise>>) => void
 ): () => void {
   let running = true;
 
   const runLoop = async () => {
     while (running) {
       try {
-        const results = await runHealthCheck(config);
+        const results = await Effect.runPromise(runHealthCheck(config));
         if (onCheck) {
           onCheck(results);
         }
@@ -459,35 +439,35 @@ const healthCatch = (agentId: string, operation: string) => (cause: unknown) =>
   });
 
 /** Effect-native isAgentAlive — tmux session liveness probe, never fails. */
-export const isAgentAliveEffect = (agentId: string): Effect.Effect<boolean, never> =>
-  Effect.promise(() => isAgentAlive(agentId));
+export const isAgentAlive = (agentId: string): Effect.Effect<boolean, never> =>
+  Effect.promise(() => isAgentAlivePromise(agentId));
 
 /**
  * Effect-native pingAgent — full classify + persist cycle.
  * Fails with HealthError if classification throws (e.g. tmux capture-pane fails
  * outside the swallowed branches).
  */
-export const pingAgentEffect = (
+export const pingAgent = (
   agentId: string,
   config?: HealthConfig,
 ): Effect.Effect<AgentHealth, HealthError> =>
   Effect.tryPromise({
-    try: () => (config ? pingAgent(agentId, config) : pingAgent(agentId)),
+    try: () => (config ? pingAgentPromise(agentId, config) : pingAgentPromise(agentId)),
     catch: healthCatch(agentId, 'pingAgent'),
   });
 
 /** Effect-native handleStuckAgent — stop + recover with cooldown gates. */
-export const handleStuckAgentEffect = (
+export const handleStuckAgent = (
   agentId: string,
   config?: HealthConfig,
 ): Effect.Effect<{ action: 'recovered' | 'cooldown' | 'skipped'; reason: string }, HealthError> =>
   Effect.tryPromise({
-    try: () => (config ? handleStuckAgent(agentId, config) : handleStuckAgent(agentId)),
+    try: () => (config ? handleStuckAgentPromise(agentId, config) : handleStuckAgentPromise(agentId)),
     catch: healthCatch(agentId, 'handleStuckAgent'),
   });
 
 /** Effect-native runHealthCheck — single sweep of all agents. */
-export const runHealthCheckEffect = (
+export const runHealthCheck = (
   config?: HealthConfig,
 ): Effect.Effect<
   {
@@ -501,6 +481,6 @@ export const runHealthCheckEffect = (
   HealthError
 > =>
   Effect.tryPromise({
-    try: () => (config ? runHealthCheck(config) : runHealthCheck()),
+    try: () => (config ? runHealthCheckPromise(config) : runHealthCheckPromise()),
     catch: healthCatch('*', 'runHealthCheck'),
   });

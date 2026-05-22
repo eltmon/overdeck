@@ -86,16 +86,7 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
   } catch {
     return null
   }
-}
-
-/**
- * Capture a checkpoint at the current working tree state.
- *
- * Uses a temporary git index to include uncommitted changes in the checkpoint
- * without affecting the user's staging area. Creates a hidden ref that persists
- * until explicitly deleted.
- */
-export async function captureCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
+}async function captureCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
   const tempDir = await mkdtemp(join(tmpdir(), 'pan-checkpoint-'))
   const tempIndex = join(tempDir, `index-${randomUUID()}`)
@@ -164,21 +155,11 @@ export async function captureCheckpoint(cwd: string, agentId: string, turnId: st
   } finally {
     await rm(tempDir, { recursive: true, force: true })
   }
-}
-
-/**
- * Check whether a checkpoint exists for the given turn.
- */
-export async function hasCheckpoint(cwd: string, agentId: string, turnId: string): Promise<boolean> {
+}async function hasCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<boolean> {
   assertSafeAgentId(agentId)
   const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
   return commit !== null
-}
-
-/**
- * Delete a checkpoint ref. No-op if it doesn't exist.
- */
-export async function deleteCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
+}async function deleteCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
   try {
     await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
@@ -188,13 +169,7 @@ export async function deleteCheckpoint(cwd: string, agentId: string, turnId: str
   } catch {
     // No-op if ref doesn't exist
   }
-}
-
-/**
- * Compute unified diff between two checkpoints.
- * Returns the raw git diff output.
- */
-export async function diffCheckpoints(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
+}async function diffCheckpointsPromise(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
   assertSafeAgentId(agentId)
   const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
   const toCommit = await resolveCheckpointCommit(cwd, agentId, toTurnId)
@@ -209,13 +184,7 @@ export async function diffCheckpoints(cwd: string, agentId: string, fromTurnId: 
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
 
   return stdout
-}
-
-/**
- * Compute diff between a checkpoint and the current HEAD.
- * Useful for showing what changed since a specific turn.
- */
-export async function diffCheckpointToHead(cwd: string, agentId: string, turnId: string): Promise<string> {
+}async function diffCheckpointToHeadPromise(cwd: string, agentId: string, turnId: string): Promise<string> {
   assertSafeAgentId(agentId)
   const checkpointCommit = await resolveCheckpointCommit(cwd, agentId, turnId)
   if (!checkpointCommit) {
@@ -227,13 +196,7 @@ export async function diffCheckpointToHead(cwd: string, agentId: string, turnId:
   ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
 
   return stdout
-}
-
-/**
- * Get file change summary between two checkpoints.
- * Returns per-file additions/deletions without the full patch.
- */
-export async function diffCheckpointFiles(
+}async function diffCheckpointFilesPromise(
   cwd: string,
   agentId: string,
   fromTurnId: string,
@@ -283,13 +246,7 @@ export async function diffCheckpointFiles(
   }
 
   return files.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-/**
- * Get the committer date (ISO 8601) of a checkpoint commit.
- * Returns current time as fallback if the ref can't be resolved.
- */
-export async function getCheckpointTimestamp(cwd: string, agentId: string, turnId: string): Promise<string> {
+}async function getCheckpointTimestampPromise(cwd: string, agentId: string, turnId: string): Promise<string> {
   assertSafeAgentId(agentId)
   try {
     const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
@@ -302,42 +259,26 @@ export async function getCheckpointTimestamp(cwd: string, agentId: string, turnI
   } catch {
     return new Date().toISOString()
   }
-}
-
-/**
- * Get the list of checkpoint turn IDs for a workspace.
- */
-export async function listCheckpoints(cwd: string, agentId: string): Promise<string[]> {
+}async function listCheckpointsPromise(cwd: string, agentId: string): Promise<string[]> {
   assertSafeAgentId(agentId)
   const { stdout } = await execFileAsync('git', [
     'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
   ], { cwd, encoding: 'utf-8' })
   return stdout.split('\n').filter(Boolean).sort()
-}
-
-/**
- * Delete all checkpoint refs for a workspace.
- */
-export async function deleteAllCheckpoints(cwd: string, agentId: string): Promise<void> {
+}async function deleteAllCheckpointsPromise(cwd: string, agentId: string): Promise<void> {
   assertSafeAgentId(agentId)
-  const turns = await listCheckpoints(cwd, agentId)
+  const turns = await Effect.runPromise(listCheckpoints(cwd, agentId))
   for (const turnId of turns) {
-    await deleteCheckpoint(cwd, agentId, turnId)
+    await Effect.runPromise(deleteCheckpoint(cwd, agentId, turnId))
   }
-}
-
-/**
- * Delete all checkpoint refs for a set of agent IDs.
- * Used at workspace teardown (merge/close-out) to clean up refs for specific agents.
- */
-export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string[]): Promise<number> {
+}async function pruneCheckpointRefsForAgentsPromise(cwd: string, agentIds: string[]): Promise<number> {
   let totalRefs = 0
   for (const agentId of agentIds) {
     assertSafeAgentId(agentId)
-    const turns = await listCheckpoints(cwd, agentId)
+    const turns = await Effect.runPromise(listCheckpoints(cwd, agentId))
     if (turns.length === 0) continue
     for (const turnId of turns) {
-      await deleteCheckpoint(cwd, agentId, turnId)
+      await Effect.runPromise(deleteCheckpoint(cwd, agentId, turnId))
     }
     console.log(`[checkpoint] Pruned ${turns.length} ref(s) for agent ${agentId}`)
     totalRefs += turns.length
@@ -346,13 +287,7 @@ export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string
     console.log(`[checkpoint] No checkpoint refs found for agents: ${agentIds.join(', ')}`)
   }
   return totalRefs
-}
-
-/**
- * Delete all checkpoint refs older than olderThanDays days across all agents.
- * Safety net for abandoned workspaces whose postMergeLifecycle was never called.
- */
-export async function pruneStaleCheckpointRefs(cwd: string, olderThanDays: number): Promise<number> {
+}async function pruneStaleCheckpointRefsPromise(cwd: string, olderThanDays: number): Promise<number> {
   try {
     const { stdout } = await execFileAsync('git', [
       'for-each-ref',
@@ -389,14 +324,7 @@ export async function pruneStaleCheckpointRefs(cwd: string, olderThanDays: numbe
     console.warn(`[checkpoint] Stale ref sweep failed: ${err}`)
     return 0
   }
-}
-
-/**
- * One-time migration: delete legacy unscoped checkpoint refs (refs/pan/turn/<turnId>)
- * that were created before per-agent namespacing was introduced.
- * Safe to run multiple times (no-op if already migrated).
- */
-export async function deleteLegacyCheckpointRefs(cwd: string): Promise<number> {
+}async function deleteLegacyCheckpointRefsPromise(cwd: string): Promise<number> {
   try {
     // Old layout: refs/pan/turn/<turnId> — exactly 3 components (strip=3 gives the turnId directly, no slash)
     // New layout: refs/pan/turn/<agentId>/<turnId> — has a slash in strip=3 output
@@ -419,24 +347,12 @@ export async function deleteLegacyCheckpointRefs(cwd: string): Promise<number> {
   } catch {
     return 0
   }
-}
-
-/**
- * Compute unified diff of the workspace against the main branch.
- * Uses `git diff main...HEAD` (three-dot) to show changes on the
- * feature branch since it diverged from main.
- */
-export async function diffAgainstMain(cwd: string, filePath?: string): Promise<string> {
+}async function diffAgainstMainPromise(cwd: string, filePath?: string): Promise<string> {
   const args = ['diff', '--patch', '--minimal', '--no-color', 'main...HEAD']
   if (filePath) args.push('--', filePath)
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
-}
-
-/**
- * Get file change summary of the workspace against the main branch.
- */
-export async function diffAgainstMainFiles(cwd: string): Promise<TurnDiffFileChange[]> {
+}async function diffAgainstMainFilesPromise(cwd: string): Promise<TurnDiffFileChange[]> {
   // Get additions/deletions per file
   const { stdout: numstat } = await execFileAsync('git', [
     'diff', '--numstat', '--no-color', 'main...HEAD',
@@ -473,11 +389,7 @@ export async function diffAgainstMainFiles(cwd: string): Promise<TurnDiffFileCha
   }
 
   return files.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-// ─── Conversation diff helpers ───────────────────────────────────────────────
-
-export async function findCommitAtTime(cwd: string, isoTimestamp: string): Promise<string | null> {
+}async function findCommitAtTimePromise(cwd: string, isoTimestamp: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync('git', [
       'rev-list', '-1', `--before=${isoTimestamp}`, 'HEAD',
@@ -487,18 +399,14 @@ export async function findCommitAtTime(cwd: string, isoTimestamp: string): Promi
   } catch {
     return null
   }
-}
-
-export async function diffSinceCommit(cwd: string, baseCommit: string): Promise<TurnDiffFileChange[]> {
+}async function diffSinceCommitPromise(cwd: string, baseCommit: string): Promise<TurnDiffFileChange[]> {
   const [numstatResult, nameStatusResult] = await Promise.all([
     execFileAsync('git', ['diff', '--numstat', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
     execFileAsync('git', ['diff', '--name-status', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
   ])
 
   return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
-}
-
-export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
+}async function diffFilesAgainstHeadPromise(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
   if (filePaths.length === 0) return []
 
   const [numstatResult, nameStatusResult] = await Promise.all([
@@ -507,16 +415,12 @@ export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Pr
   ])
 
   return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
-}
-
-export async function diffPatchSinceCommit(cwd: string, baseCommit: string, filePath?: string): Promise<string> {
+}async function diffPatchSinceCommitPromise(cwd: string, baseCommit: string, filePath?: string): Promise<string> {
   const args = ['diff', '--patch', '--minimal', '--no-color', baseCommit]
   if (filePath) args.push('--', filePath)
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
-}
-
-export async function diffPatchFilesAgainstHead(cwd: string, filePaths: string[]): Promise<string> {
+}async function diffPatchFilesAgainstHeadPromise(cwd: string, filePaths: string[]): Promise<string> {
   if (filePaths.length === 0) return ''
   const { stdout } = await execFileAsync('git', [
     'diff', '--patch', '--minimal', '--no-color', 'HEAD', '--', ...filePaths,
@@ -568,7 +472,7 @@ function assertSafeAgentIdEffect(agentId: string): Effect.Effect<void, InvalidAg
 }
 
 /** Capture a checkpoint at the current working tree state. */
-export function captureCheckpointEffect(
+export function captureCheckpoint(
   cwd: string,
   agentId: string,
   turnId: string,
@@ -576,7 +480,7 @@ export function captureCheckpointEffect(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
     yield* Effect.tryPromise({
-      try: () => captureCheckpoint(cwd, agentId, turnId),
+      try: () => captureCheckpointPromise(cwd, agentId, turnId),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'capture', message: String(cause), cause }),
     })
@@ -584,31 +488,31 @@ export function captureCheckpointEffect(
 }
 
 /** Check whether a checkpoint exists for the given turn. */
-export function hasCheckpointEffect(
+export function hasCheckpoint(
   cwd: string,
   agentId: string,
   turnId: string,
 ): Effect.Effect<boolean, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
-    return yield* Effect.promise(() => hasCheckpoint(cwd, agentId, turnId))
+    return yield* Effect.promise(() => hasCheckpointPromise(cwd, agentId, turnId))
   })
 }
 
 /** Delete a checkpoint ref. No-op if it doesn't exist. */
-export function deleteCheckpointEffect(
+export function deleteCheckpoint(
   cwd: string,
   agentId: string,
   turnId: string,
 ): Effect.Effect<void, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
-    yield* Effect.promise(() => deleteCheckpoint(cwd, agentId, turnId))
+    yield* Effect.promise(() => deleteCheckpointPromise(cwd, agentId, turnId))
   })
 }
 
 /** Compute unified diff between two checkpoints. */
-export function diffCheckpointsEffect(
+export function diffCheckpoints(
   cwd: string,
   agentId: string,
   fromTurnId: string,
@@ -618,7 +522,7 @@ export function diffCheckpointsEffect(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpoints(cwd, agentId, fromTurnId, toTurnId, filePath),
+      try: () => diffCheckpointsPromise(cwd, agentId, fromTurnId, toTurnId, filePath),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff', message: String(cause), cause }),
     })
@@ -626,7 +530,7 @@ export function diffCheckpointsEffect(
 }
 
 /** Compute diff between a checkpoint and the current HEAD. */
-export function diffCheckpointToHeadEffect(
+export function diffCheckpointToHead(
   cwd: string,
   agentId: string,
   turnId: string,
@@ -634,7 +538,7 @@ export function diffCheckpointToHeadEffect(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointToHead(cwd, agentId, turnId),
+      try: () => diffCheckpointToHeadPromise(cwd, agentId, turnId),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff-to-head', message: String(cause), cause }),
     })
@@ -642,7 +546,7 @@ export function diffCheckpointToHeadEffect(
 }
 
 /** Get file change summary between two checkpoints. */
-export function diffCheckpointFilesEffect(
+export function diffCheckpointFiles(
   cwd: string,
   agentId: string,
   fromTurnId: string,
@@ -651,7 +555,7 @@ export function diffCheckpointFilesEffect(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointFiles(cwd, agentId, fromTurnId, toTurnId),
+      try: () => diffCheckpointFilesPromise(cwd, agentId, fromTurnId, toTurnId),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff-files', message: String(cause), cause }),
     })
@@ -659,135 +563,135 @@ export function diffCheckpointFilesEffect(
 }
 
 /** Get the committer date (ISO 8601) of a checkpoint commit. */
-export function getCheckpointTimestampEffect(
+export function getCheckpointTimestamp(
   cwd: string,
   agentId: string,
   turnId: string,
 ): Effect.Effect<string, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
-    return yield* Effect.promise(() => getCheckpointTimestamp(cwd, agentId, turnId))
+    return yield* Effect.promise(() => getCheckpointTimestampPromise(cwd, agentId, turnId))
   })
 }
 
 /** Get the list of checkpoint turn IDs for a workspace. */
-export function listCheckpointsEffect(
+export function listCheckpoints(
   cwd: string,
   agentId: string,
 ): Effect.Effect<string[], InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
-    return yield* Effect.promise(() => listCheckpoints(cwd, agentId))
+    return yield* Effect.promise(() => listCheckpointsPromise(cwd, agentId))
   })
 }
 
 /** Delete all checkpoint refs for a workspace. */
-export function deleteAllCheckpointsEffect(
+export function deleteAllCheckpoints(
   cwd: string,
   agentId: string,
 ): Effect.Effect<void, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdEffect(agentId)
-    yield* Effect.promise(() => deleteAllCheckpoints(cwd, agentId))
+    yield* Effect.promise(() => deleteAllCheckpointsPromise(cwd, agentId))
   })
 }
 
 /** Delete all checkpoint refs for a set of agent IDs. */
-export function pruneCheckpointRefsForAgentsEffect(
+export function pruneCheckpointRefsForAgents(
   cwd: string,
   agentIds: string[],
 ): Effect.Effect<number> {
-  return Effect.promise(() => pruneCheckpointRefsForAgents(cwd, agentIds))
+  return Effect.promise(() => pruneCheckpointRefsForAgentsPromise(cwd, agentIds))
 }
 
 /** Delete all checkpoint refs older than olderThanDays days. */
-export function pruneStaleCheckpointRefsEffect(
+export function pruneStaleCheckpointRefs(
   cwd: string,
   olderThanDays: number,
 ): Effect.Effect<number> {
-  return Effect.promise(() => pruneStaleCheckpointRefs(cwd, olderThanDays))
+  return Effect.promise(() => pruneStaleCheckpointRefsPromise(cwd, olderThanDays))
 }
 
 /** One-time migration: delete legacy unscoped checkpoint refs. */
-export function deleteLegacyCheckpointRefsEffect(cwd: string): Effect.Effect<number> {
-  return Effect.promise(() => deleteLegacyCheckpointRefs(cwd))
+export function deleteLegacyCheckpointRefs(cwd: string): Effect.Effect<number> {
+  return Effect.promise(() => deleteLegacyCheckpointRefsPromise(cwd))
 }
 
 /** Compute unified diff of the workspace against the main branch. */
-export function diffAgainstMainEffect(
+export function diffAgainstMain(
   cwd: string,
   filePath?: string,
 ): Effect.Effect<string, VcsError> {
   return Effect.tryPromise({
-    try: () => diffAgainstMain(cwd, filePath),
+    try: () => diffAgainstMainPromise(cwd, filePath),
     catch: (cause) =>
       new VcsError({ operation: 'diff-against-main', message: String(cause), cause }),
   })
 }
 
 /** Get file change summary of the workspace against the main branch. */
-export function diffAgainstMainFilesEffect(
+export function diffAgainstMainFiles(
   cwd: string,
 ): Effect.Effect<TurnDiffFileChange[], VcsError> {
   return Effect.tryPromise({
-    try: () => diffAgainstMainFiles(cwd),
+    try: () => diffAgainstMainFilesPromise(cwd),
     catch: (cause) =>
       new VcsError({ operation: 'diff-against-main-files', message: String(cause), cause }),
   })
 }
 
 /** Find the commit SHA at the given timestamp (rev-list --before). */
-export function findCommitAtTimeEffect(
+export function findCommitAtTime(
   cwd: string,
   isoTimestamp: string,
 ): Effect.Effect<string | null> {
-  return Effect.promise(() => findCommitAtTime(cwd, isoTimestamp))
+  return Effect.promise(() => findCommitAtTimePromise(cwd, isoTimestamp))
 }
 
 /** Diff since a given base commit. */
-export function diffSinceCommitEffect(
+export function diffSinceCommit(
   cwd: string,
   baseCommit: string,
 ): Effect.Effect<TurnDiffFileChange[], VcsError> {
   return Effect.tryPromise({
-    try: () => diffSinceCommit(cwd, baseCommit),
+    try: () => diffSinceCommitPromise(cwd, baseCommit),
     catch: (cause) =>
       new VcsError({ operation: 'diff-since-commit', message: String(cause), cause }),
   })
 }
 
 /** Diff specific file paths against HEAD. */
-export function diffFilesAgainstHeadEffect(
+export function diffFilesAgainstHead(
   cwd: string,
   filePaths: string[],
 ): Effect.Effect<TurnDiffFileChange[], VcsError> {
   return Effect.tryPromise({
-    try: () => diffFilesAgainstHead(cwd, filePaths),
+    try: () => diffFilesAgainstHeadPromise(cwd, filePaths),
     catch: (cause) =>
       new VcsError({ operation: 'diff-files-against-head', message: String(cause), cause }),
   })
 }
 
 /** Patch diff since a given base commit. */
-export function diffPatchSinceCommitEffect(
+export function diffPatchSinceCommit(
   cwd: string,
   baseCommit: string,
   filePath?: string,
 ): Effect.Effect<string, VcsError> {
   return Effect.tryPromise({
-    try: () => diffPatchSinceCommit(cwd, baseCommit, filePath),
+    try: () => diffPatchSinceCommitPromise(cwd, baseCommit, filePath),
     catch: (cause) =>
       new VcsError({ operation: 'diff-patch-since-commit', message: String(cause), cause }),
   })
 }
 
 /** Patch diff for specific file paths against HEAD. */
-export function diffPatchFilesAgainstHeadEffect(
+export function diffPatchFilesAgainstHead(
   cwd: string,
   filePaths: string[],
 ): Effect.Effect<string, VcsError> {
   return Effect.tryPromise({
-    try: () => diffPatchFilesAgainstHead(cwd, filePaths),
+    try: () => diffPatchFilesAgainstHeadPromise(cwd, filePaths),
     catch: (cause) =>
       new VcsError({ operation: 'diff-patch-files-against-head', message: String(cause), cause }),
   })

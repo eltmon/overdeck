@@ -4,17 +4,17 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
+import { getAgentRuntimeState } from '../../../lib/agents.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
-import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../../../lib/projects.js';
-import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
-import { getReviewStatus } from '../review-status.js';
+import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
+import { listSessionNames } from '../../../lib/tmux.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
-import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
+import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -250,7 +250,7 @@ async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
 
 async function loadTmuxSessions(): Promise<string[]> {
   try {
-    return (await Effect.runPromise(listSessionNamesAsyncEffect())).map((name) => name.trim()).filter(Boolean);
+    return (await Effect.runPromise(listSessionNames())).map((name) => name.trim()).filter(Boolean);
   } catch {
     return [];
   }
@@ -288,7 +288,7 @@ async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
       );
       const prs = JSON.parse(stdout) as GhPullRequest[];
       for (const pr of prs) {
-        const issueId = parseIssueIdFromText(pr.headRefName);
+        const issueId = parseIssueIdFromTextSync(pr.headRefName);
         if (!issueId) continue;
         const existing = pullRequests.get(issueId) ?? [];
         existing.push(pr);
@@ -369,7 +369,7 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
 }
 
 async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue[]> {
-  const projects = listProjects() as ProjectRef[];
+  const projects = listProjectsSync() as ProjectRef[];
   const [trackerIssues, tmuxSessions, dockerContainers, pullRequests] = await Promise.all([
     loadTrackerIssues(),
     loadTmuxSessions(),
@@ -395,7 +395,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
   const resolveProjectRef = (issueId: string, preferredProject?: ProjectRef): ProjectRef | null => {
     if (preferredProject) return preferredProject;
-    const resolvedProject = resolveProjectFromIssue(issueId);
+    const resolvedProject = resolveProjectFromIssueSync(issueId);
     if (resolvedProject) return projectRefFromResolved(resolvedProject);
     const prefix = issueId.toUpperCase().match(/^([A-Z]+)-\d+$/)?.[1] ?? '';
     return projectByPrefix.get(prefix) ?? null;
@@ -423,7 +423,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       hasState: false,
       isShadow: false,
       agentStatus: null,
-      readyForMerge: getReviewStatus(upper)?.readyForMerge ?? false,
+      readyForMerge: getReviewStatusSync(upper)?.readyForMerge ?? false,
       lastActivity: null,
       resourceSources: new Set<ResourceSource>(),
       resourceDetails: {
@@ -455,7 +455,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     if (!sessionName.startsWith('agent-') && !sessionName.startsWith('planning-') && !sessionName.startsWith('specialist-') && !sessionName.startsWith('review-')) {
       continue;
     }
-    const issueId = parseIssueIdFromText(sessionName);
+    const issueId = parseIssueIdFromTextSync(sessionName);
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -466,7 +466,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   for (const containerName of dockerContainers) {
-    const issueId = parseIssueIdFromText(containerName.replace(/feature\//g, 'feature-'));
+    const issueId = parseIssueIdFromTextSync(containerName.replace(/feature\//g, 'feature-'));
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -504,7 +504,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     }));
 
     for (const branch of branches.local) {
-      const issueId = parseIssueIdFromText(branch);
+      const issueId = parseIssueIdFromTextSync(branch);
       if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
       if (!issue) continue;
@@ -515,7 +515,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     }
 
     for (const branch of branches.remote) {
-      const issueId = parseIssueIdFromText(branch);
+      const issueId = parseIssueIdFromTextSync(branch);
       if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
       if (!issue) continue;
@@ -540,7 +540,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
     const issueLower = issue.issueId.toLowerCase();
     const agentId = `agent-${issueLower}`;
-    const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId)).catch(() => null);
+    const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId)).catch(() => null);
     if (!runtimeState) return;
 
     issue.agentStatus = runtimeState.state;

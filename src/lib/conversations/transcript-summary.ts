@@ -22,7 +22,7 @@
  */
 import { spawn } from 'node:child_process';
 import type { ChatMessage } from '@panctl/contracts';
-import { buildChildEnv } from '../child-env.js';
+import { buildChildEnvSync } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
 
 /** Haiku — fast/cheap, used for every conversation title and about-summary. */
@@ -108,7 +108,7 @@ async function invokeClaudeStructured(
   timeoutMs = 30_000,
 ): Promise<Record<string, unknown>> {
   const providerEnv = await getProviderEnvForModel(model);
-  const childEnv = { ...buildChildEnv(), ...providerEnv };
+  const childEnv = { ...buildChildEnvSync(), ...providerEnv };
 
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(

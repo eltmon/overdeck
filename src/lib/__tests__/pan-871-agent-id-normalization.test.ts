@@ -68,7 +68,7 @@ vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), 
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
 vi.mock('../paths.js', () => ({ AGENTS_DIR: '/tmp/test-agents' }));
 
-import { getAgentState, listRunningAgents } from '../agents.js';
+import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
 
 describe('agent ID normalization (PAN-871)', () => {
   beforeEach(() => {
@@ -76,14 +76,14 @@ describe('agent ID normalization (PAN-871)', () => {
   });
 
   it('normalizes bare issue IDs when reading state', () => {
-    const state = getAgentState('PAN-871');
+    const state = getAgentStateSync('PAN-871');
 
     expect(state?.id).toBe('agent-pan-871');
     expect(state?.issueId).toBe('PAN-871');
   });
 
   it('marks tmux active using the canonical agent-pan session id', () => {
-    const agents = listRunningAgents();
+    const agents = listRunningAgentsSync();
 
     expect(agents).toHaveLength(1);
     expect(agents[0].id).toBe('agent-pan-871');
@@ -95,6 +95,6 @@ describe('agent ID normalization (PAN-871)', () => {
     vi.mocked(existsSync).mockImplementation((path: string) => String(path).includes('agent-pan-bad/state.json'));
     vi.mocked(readFileSync).mockImplementation(() => '{bad json');
 
-    expect(getAgentState('PAN-BAD')).toBeNull();
+    expect(getAgentStateSync('PAN-BAD')).toBeNull();
   });
 });

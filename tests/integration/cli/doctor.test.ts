@@ -38,8 +38,8 @@ describe('doctor command', () => {
     });
 
     it('should validate config structure', async () => {
-      const { loadConfig } = await import('../../../src/lib/config.js');
-      const config = loadConfig();
+      const { loadConfigSync } = await import('../../../src/lib/config.js');
+      const config = loadConfigSync();
 
       expect(config).toHaveProperty('panopticon');
       expect(config).toHaveProperty('sync');

@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+
 import { loadConfigAsyncNoMigration } from '../lib/config-yaml.js';
 import { getTtsDaemonStatus, hasTtsDaemonState, isTtsDaemonManuallyStopped, startTtsDaemon } from '../lib/tts-daemon.js';
 import { parsePositiveIntEnv } from './watchdog.js';
@@ -101,16 +103,16 @@ export class TtsWatchdog {
     if (this.ticking) return;
     this.ticking = true;
     try {
-      const ttsConfig = (await loadConfigAsyncNoMigration()).config.tts;
-      const manuallyStopped = await isTtsDaemonManuallyStopped();
-      this.active = !manuallyStopped && (ttsConfig.daemonAutoStart || await hasTtsDaemonState());
+      const ttsConfig = (await Effect.runPromise(loadConfigAsyncNoMigration())).config.tts;
+      const manuallyStopped = await Effect.runPromise(isTtsDaemonManuallyStopped());
+      this.active = !manuallyStopped && (ttsConfig.daemonAutoStart || await Effect.runPromise(hasTtsDaemonState()));
       if (!this.active) {
         this.consecutiveFailures = 0;
         this.lastError = null;
         return;
       }
 
-      const status = await getTtsDaemonStatus(ttsConfig);
+      const status = await Effect.runPromise(getTtsDaemonStatus(ttsConfig));
       if (status.ok || status.initializing) {
         this.consecutiveFailures = 0;
         this.lastError = status.initializing ? status.error ?? 'TTS daemon starting' : null;
@@ -130,7 +132,7 @@ export class TtsWatchdog {
       }
 
       await this.options.log(`tts watchdog restarting daemon after ${this.consecutiveFailures} failures: ${this.lastError}`);
-      const result = await startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: this.options.config.startTimeoutMs });
+      const result = await Effect.runPromise(startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: this.options.config.startTimeoutMs }));
       this.restartAttempts.push(now);
       this.lastRestartAt = new Date(now).toISOString();
       if (result.ok) {

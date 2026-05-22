@@ -80,10 +80,10 @@ describe('WorkspaceService — integration', () => {
     it('creates workspace and returns path when workspace does not exist', async () => {
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const ws = yield* WorkspaceService;
         return yield* ws.create('PAN-1');
-      }).pipe(Effect.provide(WorkspaceServiceLive));
+      }).pipe(Effect.provide(WorkspaceServiceLive))));
 
       const path = await runEffect(program);
       expect(path).toContain('feature-pan-1');
@@ -96,10 +96,10 @@ describe('WorkspaceService — integration', () => {
       mockExistsSync.mockReturnValue(true);
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const ws = yield* WorkspaceService;
         return yield* ws.create('PAN-1');
-      }).pipe(Effect.provide(WorkspaceServiceLive));
+      }).pipe(Effect.provide(WorkspaceServiceLive))));
 
       const path = await runEffect(program);
       expect(path).toContain('feature-pan-1');
@@ -110,10 +110,10 @@ describe('WorkspaceService — integration', () => {
       mockResolveProjectFromIssue.mockReturnValue(null);
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const ws = yield* WorkspaceService;
         return yield* ws.create('UNKNOWN-1');
-      }).pipe(Effect.provide(WorkspaceServiceLive));
+      }).pipe(Effect.provide(WorkspaceServiceLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('WorkspaceCreateError');
@@ -130,10 +130,10 @@ describe('WorkspaceService — integration', () => {
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const ws = yield* WorkspaceService;
         return yield* ws.clean('PAN-1', true);
-      }).pipe(Effect.provide(WorkspaceServiceLive));
+      }).pipe(Effect.provide(WorkspaceServiceLive))));
 
       const result = await runEffect(program);
       expect(result.preview).toBe(true);
@@ -144,10 +144,10 @@ describe('WorkspaceService — integration', () => {
       mockExistsSync.mockReturnValue(false);
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const ws = yield* WorkspaceService;
         return yield* ws.clean('PAN-1');
-      }).pipe(Effect.provide(WorkspaceServiceLive));
+      }).pipe(Effect.provide(WorkspaceServiceLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('WorkspaceNotFound');

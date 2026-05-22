@@ -24,12 +24,12 @@ import { join } from 'path';
 
 import {
   getAgentDir,
-  saveAgentState,
+  saveAgentStateSync,
   saveSessionId,
 } from '../../../../../src/lib/agents.js';
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
-import { getWorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateSync } from '../../../../../src/lib/work-agent-lifecycle.js';
 import type { WorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
 import * as tmux from '../../../../../src/lib/tmux.js';
 
@@ -62,7 +62,7 @@ describe('resume route gate predicate', () => {
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
 
-    saveAgentState({
+    saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1014',
       workspace,
@@ -78,7 +78,7 @@ describe('resume route gate predicate', () => {
     saveSessionId(agentId, 'session-active');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
-    const lifecycle = getWorkAgentLifecycleState(agentId);
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must BLOCK — agent is genuinely running, isRunning:true, isRunningButStuck:false.
     expect(lifecycle.isRunning).toBe(true);
@@ -97,7 +97,7 @@ describe('resume route gate predicate', () => {
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
 
-    saveAgentState({
+    saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1014',
       workspace,
@@ -113,7 +113,7 @@ describe('resume route gate predicate', () => {
     saveSessionId(agentId, 'session-stuck');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
-    const lifecycle = getWorkAgentLifecycleState(agentId);
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — agent is running-but-stuck, isRunningButStuck:true.
     expect(lifecycle.isRunning).toBe(true);
@@ -130,7 +130,7 @@ describe('resume route gate predicate', () => {
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
 
-    saveAgentState({
+    saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1014',
       workspace,
@@ -145,7 +145,7 @@ describe('resume route gate predicate', () => {
     saveSessionId(agentId, 'session-stopped');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
-    const lifecycle = getWorkAgentLifecycleState(agentId);
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — canResumeSession:true (stopped + saved session).
     expect(lifecycle.isRunning).toBe(false);
@@ -161,7 +161,7 @@ describe('resume route gate predicate', () => {
     const agentId = makeAgentId('no-state');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
-    const lifecycle = getWorkAgentLifecycleState(agentId);
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isRunning).toBe(false);
     expect(lifecycle.isRunningButStuck).toBe(false);

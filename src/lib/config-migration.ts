@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstat
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { loadSettings, type SettingsConfig } from './settings.js';
+import { loadSettingsSync, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
 import { type ModelId } from './settings.js';
 import { FsError } from './errors.js';
@@ -28,14 +28,14 @@ const BACKUP_SETTINGS_PATH = join(homedir(), '.panopticon', 'settings.json.backu
  * Check if migration is needed
  * Returns true if settings.json exists and config.yaml doesn't
  */
-export function needsMigration(): boolean {
+export function needsMigrationSync(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH) && !existsSync(NEW_CONFIG_PATH);
 }
 
 /**
  * Check if legacy settings exist (even if already migrated)
  */
-export function hasLegacySettings(): boolean {
+export function hasLegacySettingsSync(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH);
 }
 
@@ -59,7 +59,7 @@ function detectEnabledProviders(settings: SettingsConfig): {
 /**
  * Convert legacy settings.json to new config.yaml format
  */
-export function convertToYamlConfig(settings: SettingsConfig): YamlConfig {
+export function convertToYamlConfigSync(settings: SettingsConfig): YamlConfig {
   const providers = detectEnabledProviders(settings);
 
   const config: YamlConfig = {
@@ -97,12 +97,12 @@ export interface MigrationResult {
   error?: string;
 }
 
-export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
+export function migrateConfigSync(options: MigrationOptions = {}): MigrationResult {
   const { backup = true, deleteLegacy = false, dryRun = false } = options;
 
   try {
     // Check if migration is needed
-    if (!needsMigration()) {
+    if (!needsMigrationSync()) {
       if (existsSync(NEW_CONFIG_PATH)) {
         return {
           success: true,
@@ -120,10 +120,10 @@ export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
     }
 
     // Load legacy settings
-    const settings = loadSettings();
+    const settings = loadSettingsSync();
 
     // Convert to YAML config
-    const yamlConfig = convertToYamlConfig(settings);
+    const yamlConfig = convertToYamlConfigSync(settings);
 
     // Generate YAML content
     const yamlContent = yaml.dump(yamlConfig, {
@@ -184,13 +184,13 @@ export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
 /**
  * Get migration status
  */
-export function getMigrationStatus(): {
+export function getMigrationStatusSync(): {
   needsMigration: boolean;
   hasLegacySettings: boolean;
   hasNewConfig: boolean;
 } {
   return {
-    needsMigration: needsMigration(),
+    needsMigration: needsMigrationSync(),
     hasLegacySettings: existsSync(LEGACY_SETTINGS_PATH),
     hasNewConfig: existsSync(NEW_CONFIG_PATH),
   };
@@ -209,7 +209,7 @@ export interface LegacyCleanupResult {
   errors: string[];
 }
 
-export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
+export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
   const legacyDirs = [
     { name: 'codex', base: join(homedir(), '.codex') },
     { name: 'cursor', base: join(homedir(), '.cursor') },
@@ -257,7 +257,7 @@ export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
  * Migrate legacy sync config by stripping the 'targets' field from config.toml.
  * This handles users who had `targets = ["claude", "codex"]` in their config.
  */
-export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: boolean } {
+export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTargets: boolean } {
   const configPath = join(homedir(), '.panopticon', 'config.toml');
 
   if (!existsSync(configPath)) {
@@ -293,40 +293,40 @@ export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: 
 // Effect.sync is appropriate here.
 
 /** True when legacy settings.json exists and config.yaml doesn't. Pure. */
-export const needsMigrationEffect = (): Effect.Effect<boolean> =>
-  Effect.sync(() => needsMigration());
+export const needsMigration = (): Effect.Effect<boolean> =>
+  Effect.sync(() => needsMigrationSync());
 
 /** True if any legacy settings.json is present (with or without yaml). Pure. */
-export const hasLegacySettingsEffect = (): Effect.Effect<boolean> =>
-  Effect.sync(() => hasLegacySettings());
+export const hasLegacySettings = (): Effect.Effect<boolean> =>
+  Effect.sync(() => hasLegacySettingsSync());
 
 /** Convert a SettingsConfig into a YamlConfig. Pure. */
-export const convertToYamlConfigEffect = (
+export const convertToYamlConfig = (
   settings: SettingsConfig,
-): Effect.Effect<YamlConfig> => Effect.sync(() => convertToYamlConfig(settings));
+): Effect.Effect<YamlConfig> => Effect.sync(() => convertToYamlConfigSync(settings));
 
 /** Run the settings.json → config.yaml migration. Surfaces FsError on IO failure. */
-export const migrateConfigEffect = (
+export const migrateConfig = (
   options: MigrationOptions = {},
 ): Effect.Effect<MigrationResult, FsError> =>
   Effect.try({
-    try: () => migrateConfig(options),
+    try: () => migrateConfigSync(options),
     catch: (cause) =>
       new FsError({ path: NEW_CONFIG_PATH, operation: 'migrate-config', cause }),
   });
 
 /** Inspect migration state without modifying anything. Pure. */
-export const getMigrationStatusEffect = (): Effect.Effect<
-  ReturnType<typeof getMigrationStatus>
-> => Effect.sync(() => getMigrationStatus());
+export const getMigrationStatus = (): Effect.Effect<
+  ReturnType<typeof getMigrationStatusSync>
+> => Effect.sync(() => getMigrationStatusSync());
 
 /** Sweep legacy runtime symlinks under ~/.panopticon (idempotent). */
-export const cleanupLegacyRuntimeSymlinksEffect =
+export const cleanupLegacyRuntimeSymlinks =
   (): Effect.Effect<LegacyCleanupResult> =>
-    Effect.sync(() => cleanupLegacyRuntimeSymlinks());
+    Effect.sync(() => cleanupLegacyRuntimeSymlinksSync());
 
 /** Migrate `targets = [...]` lines out of config.toml. Pure-ish (catches). */
-export const migrateSyncTargetsEffect = (): Effect.Effect<{
+export const migrateSyncTargets = (): Effect.Effect<{
   migrated: boolean;
   hadNonClaudeTargets: boolean;
-}> => Effect.sync(() => migrateSyncTargets());
+}> => Effect.sync(() => migrateSyncTargetsSync());

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../agents.js', async () => {
@@ -102,13 +103,13 @@ vi.mock('../../tmux.js', async () => {
     return fn;
   };
   return {
-  sessionExistsAsyncEffect: effectMock(false),
-  killSessionAsyncEffect: effectMock(undefined),
+  sessionExists: effectMock(false),
+  killSession: effectMock(undefined),
   };
 });
 
-import { listRunningAgents, listRunningAgentsEffect, spawnRun, getAgentStateEffect } from '../../agents.js';
-import { sessionExistsAsyncEffect, killSessionAsyncEffect } from '../../tmux.js';
+import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState } from '../../agents.js';
+import { sessionExists, killSession } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import {
@@ -121,12 +122,12 @@ import {
 describe('reactive Cloister scheduler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(listRunningAgents).mockReturnValue([]);
-    vi.mocked(listRunningAgentsEffect).mockResolvedValue([]);
+    vi.mocked(listRunningAgentsSync).mockReturnValue([]);
+    vi.mocked(listRunningAgents).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
-    vi.mocked(getAgentStateEffect).mockResolvedValue(null);
-    vi.mocked(sessionExistsAsyncEffect).mockResolvedValue(false);
-    vi.mocked(killSessionAsyncEffect).mockResolvedValue(undefined);
+    vi.mocked(getAgentState).mockResolvedValue(null);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+    vi.mocked(killSession).mockResolvedValue(undefined);
     mockHeadSha = 'newhead1';
   });
 
@@ -141,11 +142,11 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {
-    await onIssueStateChange('pan-503', 'in_review');
+    await Effect.runPromise(onIssueStateChange('pan-503', 'in_review'));
 
     // Review dispatches through spawnReviewRoleForIssue so the wrapper carries
     // review-temp stash + reviewSpawnedAt + status-posting prompt + idempotency.
-    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+    (await Effect.runPromise(expect(spawnReviewRoleForIssue))).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-503',
       branch: 'feature/pan-503',
     }));
@@ -156,7 +157,7 @@ describe('reactive Cloister scheduler', () => {
     // PAN-1048 P1 + C2: activeRoleRunExists no longer requires tmuxActive — any
     // non-stopped state.json with the matching role counts as in-flight, which
     // closes the spawn-route race against the reactive scheduler.
-    vi.mocked(listRunningAgentsEffect).mockResolvedValue([
+    (await Effect.runPromise(vi.mocked(listRunningAgents)))mocked(listRunningAgents).mockResolvedValue([
       {
         id: 'agent-pan-503-review',
         issueId: 'PAN-503',
@@ -168,9 +169,9 @@ describe('reactive Cloister scheduler', () => {
         startedAt: new Date().toISOString(),
         tmuxActive: true,
       },
-    ] as any);
+    ] as any)));
 
-    await onIssueStateChange('PAN-503', 'in_review');
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_review'));
 
     expect(spawnRun).not.toHaveBeenCalled();
   });
@@ -198,19 +199,19 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('reacts to work, review, and test completion events by routing each role through its dispatcher', async () => {
-    await handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } });
-    await handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } });
-    await handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } });
+    await Effect.runPromise(handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } }));
+    await Effect.runPromise(handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } }));
+    await Effect.runPromise(handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } }));
 
     // PAN-1048 review feedback 003: review/test go through dedicated wrappers,
     // ship still uses bare spawnRun().
-    expect(spawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
-    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+    (await Effect.runPromise(expect(spawnReviewRoleForIssue))).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(spawnReviewRoleForIssue))).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-503',
       branch: 'feature/pan-503',
     }));
-    expect(dispatchTestAgentAndNotify).toHaveBeenCalledTimes(1);
-    expect(dispatchTestAgentAndNotify).toHaveBeenCalledWith(
+    (await Effect.runPromise(expect(dispatchTestAgentAndNotify))).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(dispatchTestAgentAndNotify))).toHaveBeenCalledWith(
       'PAN-503',
       expect.any(String),
       'feature/pan-503',
@@ -248,19 +249,19 @@ describe('reactive Cloister scheduler', () => {
   it('treats a ship session as still-active when its roleRunHead matches the workspace HEAD', async () => {
     // A genuinely in-flight ship run: state.json HEAD marker == current HEAD.
     // The scheduler must NOT re-dispatch — that would double-spawn ship.
-    vi.mocked(getAgentStateEffect).mockImplementation(async (id: string) => {
+    (await Effect.runPromise(vi.mocked(getAgentState)))(vi.mocked(getAgentState).mockImplementation(async (id: string) => {
       if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
       if (id === 'agent-pan-503-ship') {
         return { role: 'ship', status: 'running', roleRunHead: 'samehead', workspace: '/tmp/ws' } as any;
       }
       return null;
-    });
+    })));
     mockHeadSha = 'samehead';
 
-    await onIssueStateChange('PAN-503', 'shipping');
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
 
     expect(spawnRun).not.toHaveBeenCalled();
-    expect(killSessionAsyncEffect).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(killSession))).not.toHaveBeenCalled();
   });
 
   it('re-dispatches ship when the existing ship session is a stale zombie (HEAD moved past roleRunHead)', async () => {
@@ -268,20 +269,20 @@ describe('reactive Cloister scheduler', () => {
     // state.json status:'running' forever. Once the workspace HEAD advances
     // past the run's roleRunHead marker, that session is stale — the scheduler
     // must kill it and dispatch a fresh ship run for the new HEAD.
-    vi.mocked(getAgentStateEffect).mockImplementation(async (id: string) => {
+    (await Effect.runPromise(vi.mocked(getAgentState)))(vi.mocked(getAgentState).mockImplementation(async (id: string) => {
       if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
       if (id === 'agent-pan-503-ship') {
         return { role: 'ship', status: 'running', roleRunHead: 'oldhead0', workspace: '/tmp/ws' } as any;
       }
       return null;
-    });
+    })));
     // Zombie tmux session still physically present.
-    vi.mocked(sessionExistsAsyncEffect).mockResolvedValue(true);
+    (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockResolvedValue(true)));
     mockHeadSha = 'newhead1';
 
-    await onIssueStateChange('PAN-503', 'shipping');
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
 
-    expect(killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-503-ship');
+    (await Effect.runPromise(expect(killSession))).toHaveBeenCalledWith('agent-pan-503-ship');
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'ship', expect.any(Object));
   });
 });

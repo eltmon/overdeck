@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
@@ -60,22 +61,24 @@ describe('runGitClean', () => {
   });
 
   it('hard-fails with DangerousOpBlockedError when userInvoked is false', async () => {
-    await expect(
+    await (await Effect.runPromise(expect(
       runGitClean({
         workspacePath: repo,
         userInvoked: false,
         reason: 'agent attempted auto-clean',
       }),
+    )))o-clean',
+      }))),
     ).rejects.toBeInstanceOf(DangerousOpBlockedError);
   });
 
   it('blocked error carries a structured payload for routes to surface', async () => {
     try {
-      await runGitClean({
+      await Effect.runPromise(runGitClean({
         workspacePath: repo,
         userInvoked: false,
         reason: 'agent attempted auto-clean',
-      });
+      }));
       expect.fail('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(DangerousOpBlockedError);
@@ -90,11 +93,11 @@ describe('runGitClean', () => {
   });
 
   it('with userInvoked=true, deletes only paths NOT in the protected list', async () => {
-    await runGitClean({
+    await Effect.runPromise(runGitClean({
       workspacePath: repo,
       userInvoked: true,
       reason: 'pan workspace deep-clean test',
-    });
+    }));
     expect(existsSync(join(repo, 'untracked.txt'))).toBe(false);
     // Protected paths survived.
     expect(existsSync(join(repo, '.env'))).toBe(true);
@@ -103,8 +106,8 @@ describe('runGitClean', () => {
   });
 
   it('dry-run lists what would be deleted without touching anything', async () => {
-    const out = await dryRunGitClean({ workspacePath: repo });
-    expect(out).toContain('untracked.txt');
+    const out = await Effect.runPromise(dryRunGitClean({ workspacePath: repo }));
+    (await Effect.runPromise(expect(out))).toContain('untracked.txt');
     expect(out.every(p => !p.includes('.env'))).toBe(true);
     expect(out.every(p => !p.includes('.devcontainer'))).toBe(true);
     // Filesystem unchanged.
@@ -126,21 +129,23 @@ describe('runGitResetHard', () => {
   });
 
   it('runs without a userInvoked gate (tracked-only op)', async () => {
-    const result = await runGitResetHard({
+    const result = await Effect.runPromise(runGitResetHard({
       workspacePath: repo,
       ref: 'HEAD',
       reason: 'unit test',
-    });
-    expect(result).toBeDefined();
+    }));
+    (await Effect.runPromise(expect(result))).toBeDefined();
   });
 
   it('rejects refs containing shell metacharacters', async () => {
-    await expect(
+    await (await Effect.runPromise(expect(
       runGitResetHard({
         workspacePath: repo,
         ref: 'HEAD; rm -rf /',
         reason: 'unit test',
       }),
+    )))it test',
+      }))),
     ).rejects.toThrow(/unsafe ref/i);
   });
 });

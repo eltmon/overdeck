@@ -1,11 +1,12 @@
+import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildAnthropicMessagesUrl, invalidateProbeCache, probeProvider } from '../../src/lib/provider-health.js';
+import { buildAnthropicMessagesUrl, invalidateProbeCacheSync, probeProvider } from '../../src/lib/provider-health.js';
 import { PROVIDERS } from '../../src/lib/providers.js';
 
 describe('provider health endpoint construction', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    invalidateProbeCache();
+    invalidateProbeCacheSync();
   });
 
   it('appends /v1/messages for provider roots that are not versioned', () => {
@@ -30,7 +31,7 @@ describe('provider health endpoint construction', () => {
     const fetchMock = vi.fn(async () => new Response('{"content":[]}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(probeProvider(PROVIDERS.minimax, 'sk-minimax-test', 'minimax-m2.7')).resolves.toEqual({ ok: true });
+    await (await Effect.runPromise(expect(probeProvider(PROVIDERS.minimax, 'sk-minimax-test', 'minimax-m2.7'))))x-test', 'minimax-m2.7')))).resolves.toEqual({ ok: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.minimax.io/anthropic/v1/messages',

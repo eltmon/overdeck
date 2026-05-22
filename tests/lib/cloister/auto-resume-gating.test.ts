@@ -202,14 +202,14 @@ describe('auto-resume gates', () => {
     const agents = await import('../../../src/lib/agents.js');
     const lifecycle = await import('../../../src/lib/work-agent-lifecycle.js');
     const start = await import('../../../src/cli/commands/start.js');
-    return { agents, issueCommand: start.issueCommand, assertCanStartFresh: lifecycle.assertCanStartFresh };
+    return { agents, issueCommand: start.issueCommand, assertCanStartFresh: lifecycle.assertCanStartFreshSync };
   }
 
   it('skips paused agents even when review feedback is pending', async () => {
     const agentId = 'agent-pan-1141-paused';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -235,7 +235,7 @@ describe('auto-resume gates', () => {
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
     const reviewStatus = await import('../../../src/lib/review-status.js');
     const logger = await import('../../../src/lib/persistent-logger.js');
-    vi.mocked(reviewStatus.getReviewStatus).mockReturnValue({
+    vi.mocked(reviewStatus.getReviewStatusSync).mockReturnValue({
       issueId: 'PAN-1141',
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -243,7 +243,7 @@ describe('auto-resume gates', () => {
       readyForMerge: false,
       updatedAt: BASE_TIME.toISOString(),
     });
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -261,14 +261,14 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-    expect(vi.mocked(logger.logDeaconEvent)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
+    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
   });
 
   it('pan pause stops stale-running agents without live tmux sessions', async () => {
     const agentId = 'agent-pan-1141';
     const { agents } = await loadDeaconWithResumeMock();
     const pause = await import('../../../src/cli/commands/pause.js');
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -281,7 +281,7 @@ describe('auto-resume gates', () => {
 
     await pause.pauseCommand('PAN-1141', { reason: 'manual inspection' });
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.status).toBe('stopped');
     expect(state?.paused).toBe(true);
     expect(state?.pausedReason).toBe('manual inspection');
@@ -292,7 +292,7 @@ describe('auto-resume gates', () => {
   it('coalesces concurrent orphan recovery scans', async () => {
     const agentId = 'agent-pan-1141-orphan';
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -308,7 +308,7 @@ describe('auto-resume gates', () => {
       recoverOrphanedAgents('patrol'),
     ]);
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.status).toBe('stopped');
     expect(state?.consecutiveFailures).toBe(1);
   });
@@ -318,7 +318,7 @@ describe('auto-resume gates', () => {
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
     const reviewStatus = await import('../../../src/lib/review-status.js');
     const logger = await import('../../../src/lib/persistent-logger.js');
-    vi.mocked(reviewStatus.getReviewStatus).mockReturnValue({
+    vi.mocked(reviewStatus.getReviewStatusSync).mockReturnValue({
       issueId: 'PAN-1141',
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -326,7 +326,7 @@ describe('auto-resume gates', () => {
       readyForMerge: false,
       updatedAt: BASE_TIME.toISOString(),
     });
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -342,17 +342,17 @@ describe('auto-resume gates', () => {
 
     const actions = await recoverOrphanedAgents('patrol');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(actions).toEqual([]);
     expect(state?.status).toBe('running');
     expect(state?.consecutiveFailures).toBeUndefined();
-    expect(vi.mocked(logger.logDeaconEvent)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
+    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
   });
 
   it('queues feedback without resuming paused agents', async () => {
     const agentId = 'agent-pan-1141-feedback-paused';
     const { agents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -368,7 +368,7 @@ describe('auto-resume gates', () => {
 
     await agents.messageAgent(agentId, 'review feedback');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.status).toBe('stopped');
     expect(state?.paused).toBe(true);
     const mailDir = join(agents.getAgentDir(agentId), 'mail');
@@ -381,7 +381,7 @@ describe('auto-resume gates', () => {
     const agentId = 'agent-pan-1141-paused-stop';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -397,12 +397,12 @@ describe('auto-resume gates', () => {
       pausedAt: BASE_TIME.toISOString(),
     });
 
-    agents.clearAgentPaused(agentId);
+    agents.clearAgentPausedSync(agentId);
     const resumed = await autoResumeStoppedWorkAgents();
 
     expect(resumed).toEqual([agentId]);
     expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.paused).toBeUndefined();
     expect(state?.stoppedByPause).toBeUndefined();
     expect(state?.stoppedByUser).toBeUndefined();
@@ -412,7 +412,7 @@ describe('auto-resume gates', () => {
     const agentId = 'agent-pan-1141-paused-killed';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -427,19 +427,19 @@ describe('auto-resume gates', () => {
       pausedAt: BASE_TIME.toISOString(),
     });
 
-    agents.clearAgentPaused(agentId);
+    agents.clearAgentPausedSync(agentId);
     const resumed = await autoResumeStoppedWorkAgents();
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-    expect(agents.getAgentState(agentId)?.stoppedByUser).toBe(true);
+    expect(agents.getAgentStateSync(agentId)?.stoppedByUser).toBe(true);
   });
 
   it('skips troubled agents', async () => {
     const agentId = 'agent-pan-1141-troubled';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -466,7 +466,7 @@ describe('auto-resume gates', () => {
     const runningAgentId = 'agent-pan-1141-no-resume-running';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: stoppedAgentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(stoppedAgentId),
@@ -476,7 +476,7 @@ describe('auto-resume gates', () => {
       status: 'stopped',
       startedAt: BASE_TIME.toISOString(),
     });
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: runningAgentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(runningAgentId),
@@ -493,7 +493,7 @@ describe('auto-resume gates', () => {
     expect(resumed).toEqual([]);
     expect(recovered).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-    expect(agents.getAgentState(runningAgentId)?.status).toBe('running');
+    expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('running');
   });
 
   it('clears paused state and spawns when pan start --force is not a dry run', async () => {
@@ -507,7 +507,7 @@ describe('auto-resume gates', () => {
     });
     mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads'), { recursive: true });
     writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: join(projectRoot, 'workspaces', 'feature-pan-1141'),
@@ -527,7 +527,7 @@ describe('auto-resume gates', () => {
 
     expect(assertCanStartFresh).toHaveBeenCalledWith('PAN-1141', { allowPausedForce: true });
     expect(agents.spawnAgent).toHaveBeenCalled();
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.paused).toBeUndefined();
     expect(state?.pausedReason).toBeUndefined();
     expect(state?.pausedAt).toBeUndefined();
@@ -538,7 +538,7 @@ describe('auto-resume gates', () => {
   it('keeps paused state when pan start --force is only a dry run', async () => {
     const { agents, issueCommand } = await loadStartCommand();
     const agentId = 'agent-pan-1141';
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: join(projectRoot, 'workspaces', 'feature-pan-1141'),
@@ -554,7 +554,7 @@ describe('auto-resume gates', () => {
 
     await issueCommand('PAN-1141', { model: '', force: true, dryRun: true } as any);
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.paused).toBe(true);
     expect(state?.pausedReason).toBe('manual inspection');
     expect(state?.pausedAt).toBe(BASE_TIME.toISOString());
@@ -563,7 +563,7 @@ describe('auto-resume gates', () => {
   it('refuses pan start without --force when paused', async () => {
     const { agents, issueCommand } = await loadStartCommand();
     const agentId = 'agent-pan-1141';
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: join(projectRoot, 'workspaces', 'feature-pan-1141'),
@@ -587,7 +587,7 @@ describe('auto-resume gates', () => {
     expect(written).toContain('agent-pan-1141');
     expect(written).toContain('manual inspection');
     expect(written).toContain('pan unpause PAN-1141');
-    expect(agents.getAgentState(agentId)?.paused).toBe(true);
+    expect(agents.getAgentStateSync(agentId)?.paused).toBe(true);
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
   });

@@ -48,7 +48,7 @@ function parseEnvFile(content: string): Record<string, string> {
  *
  * @returns Object with loaded variables and any errors
  */
-export function loadPanopticonEnv(): {
+export function loadPanopticonEnvSync(): {
   loaded: string[];
   skipped: string[];
   error?: string;
@@ -133,12 +133,12 @@ export function getEnvFilePath(): string {
  * but unreadable; missing file is reported via the loaded/skipped/error
  * payload, not via the typed error channel.
  */
-export const loadPanopticonEnvEffect = (): Effect.Effect<
+export const loadPanopticonEnv = (): Effect.Effect<
   { loaded: string[]; skipped: string[]; error?: string },
   FsError
 > =>
   Effect.try({
-    try: () => loadPanopticonEnv(),
+    try: () => loadPanopticonEnvSync(),
     catch: (cause) =>
       new FsError({ path: ENV_FILE_PATH, operation: 'loadPanopticonEnv', cause }),
   });

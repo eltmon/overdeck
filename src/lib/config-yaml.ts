@@ -18,7 +18,7 @@ import yaml from 'js-yaml';
 import { parseDocument } from 'yaml';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
-import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -603,8 +603,8 @@ export function resolveConversationWatchDirs(config: RuntimeConversationsConfig)
   };
 }
 
-export function getConversationsConfig(): RuntimeConversationsConfig {
-  const { config } = loadConfig();
+export function getConversationsConfigSync(): RuntimeConversationsConfig {
+  const { config } = loadConfigSync();
   return resolveConversationWatchDirs({
     ...config.conversations,
     apiKeys: config.apiKeys,
@@ -612,39 +612,7 @@ export function getConversationsConfig(): RuntimeConversationsConfig {
   });
 }
 
-export async function getConversationsConfigAsync(): Promise<RuntimeConversationsConfig> {
-  const { config } = await loadConfigAsyncNoMigration();
-  return resolveConversationWatchDirs({
-    ...config.conversations,
-    apiKeys: config.apiKeys,
-    enabledProviders: config.enabledProviders,
-  });
-}
 
-export async function updateConversationsConfigAsync(updates: ConversationsConfig): Promise<void> {
-  await loadConfigAsyncNoMigration();
-  let existingContent = '{}\n';
-  try {
-    const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');
-    existingContent = content.trim().length > 0 ? content : '{}\n';
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== 'ENOENT') throw error;
-  }
-
-  const doc = parseDocument(existingContent);
-  if (doc.contents === null) {
-    doc.contents = parseDocument('{}\n').contents;
-  }
-
-  for (const [key, value] of Object.entries(updates) as Array<[keyof ConversationsConfig, unknown]>) {
-    if (value !== undefined) doc.setIn(['conversations', key], value);
-  }
-
-  await mkdirAsync(dirname(GLOBAL_CONFIG_PATH), { recursive: true });
-  await writeFileAsync(GLOBAL_CONFIG_PATH, doc.toString({ lineWidth: 120 }), 'utf-8');
-  clearConfigCache();
-}
 
 export interface MigrationResult {
   /** List of migrated model IDs */
@@ -885,7 +853,7 @@ function loadGlobalConfig(): YamlConfig | null {
   return loadYamlFile(GLOBAL_CONFIG_PATH);
 }
 
-async function loadYamlFileAsync(filePath: string): Promise<YamlConfig | null> {
+async function loadYamlFileFromDisk(filePath: string): Promise<YamlConfig | null> {
   try {
     const content = await readFileAsync(filePath, 'utf-8');
     const parsed = yaml.load(content) as YamlConfig;
@@ -898,7 +866,7 @@ async function loadYamlFileAsync(filePath: string): Promise<YamlConfig | null> {
   }
 }
 
-async function findProjectRootAsync(startDir: string = process.cwd()): Promise<string | null> {
+async function findProjectRootFromDisk(startDir: string = process.cwd()): Promise<string | null> {
   let currentDir = startDir;
 
   while (currentDir !== '/') {
@@ -912,29 +880,29 @@ async function findProjectRootAsync(startDir: string = process.cwd()): Promise<s
   return null;
 }
 
-async function loadProjectConfigAsync(): Promise<YamlConfig | null> {
-  const projectRoot = await findProjectRootAsync();
+async function loadProjectConfigFromDisk(): Promise<YamlConfig | null> {
+  const projectRoot = await findProjectRootFromDisk();
   if (!projectRoot) return null;
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
-  if (await pathExistsAsync(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileAsync(newConfigPath));
+  if (await pathExistsFromDisk(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileFromDisk(newConfigPath));
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
-  if (await pathExistsAsync(legacyConfigPath)) {
+  if (await pathExistsFromDisk(legacyConfigPath)) {
     process.stderr.write(
       `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return stripProjectTtsEndpoint(await loadYamlFileAsync(legacyConfigPath));
+    return stripProjectTtsEndpoint(await loadYamlFileFromDisk(legacyConfigPath));
   }
 
   return null;
 }
 
-async function loadGlobalConfigAsync(): Promise<YamlConfig | null> {
-  return loadYamlFileAsync(GLOBAL_CONFIG_PATH);
+async function loadGlobalConfigFromDisk(): Promise<YamlConfig | null> {
+  return loadYamlFileFromDisk(GLOBAL_CONFIG_PATH);
 }
 
-async function pathExistsAsync(filePath: string): Promise<boolean> {
+async function pathExistsFromDisk(filePath: string): Promise<boolean> {
   try {
     await statAsync(filePath);
     return true;
@@ -1064,7 +1032,7 @@ export function derefWorkhorse(
   config: Pick<NormalizedConfig, 'workhorses'>,
   fieldPath = 'model',
 ): ModelId {
-  if (!isWorkhorseRef(ref)) return resolveModelId(ref) as ModelId;
+  if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref) as ModelId;
 
   const slot = workhorseSlotFromRef(ref) as WorkhorseSlot;
   const resolved = config.workhorses?.[slot];
@@ -1074,7 +1042,7 @@ export function derefWorkhorse(
   if (isWorkhorseRef(resolved)) {
     throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
   }
-  return resolveModelId(resolved) as ModelId;
+  return resolveModelIdSync(resolved) as ModelId;
 }
 
 export function resolveModel(
@@ -1158,7 +1126,7 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
     if (isWorkhorseRef(ref)) {
       throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
     }
-    resolveModelId(ref);
+    resolveModelIdSync(ref);
   }
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
@@ -1363,7 +1331,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
-      result.conversations.compactionModel = resolveModelId(config.conversations.compaction_model);
+      result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
     }
     if (config.conversations?.manual_compact_mode) {
       result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
@@ -1372,7 +1340,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.conversations.richCompaction = config.conversations.rich_compaction;
     }
     if (config.conversations?.title_model) {
-      result.conversations.titleModel = resolveModelId(config.conversations.title_model);
+      result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
     }
     if (config.conversations?.watch_dirs) {
       result.conversations.watchDirs = config.conversations.watch_dirs;
@@ -1549,7 +1517,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.ttsSummarizer.enabled = s.enabled;
       }
       if (s.model) {
-        result.ttsSummarizer.model = resolveModelId(s.model) as ModelId;
+        result.ttsSummarizer.model = resolveModelIdSync(s.model) as ModelId;
       }
       if (s.batch_window_seconds !== undefined) {
         result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
@@ -1757,14 +1725,14 @@ function getConfigMtimes(): { global: number; project: number } {
   return { global: globalMtime, project: projectMtime };
 }
 
-async function getConfigMtimesAsync(): Promise<{ global: number; project: number }> {
-  const globalMtime = await getMtimeAsync(GLOBAL_CONFIG_PATH);
+async function getConfigMtimesFromDisk(): Promise<{ global: number; project: number }> {
+  const globalMtime = await getMtimeFromDisk(GLOBAL_CONFIG_PATH);
   let projectMtime = 0;
 
-  const projectRoot = await findProjectRootAsync();
+  const projectRoot = await findProjectRootFromDisk();
   if (projectRoot) {
     for (const name of ['.pan.yaml', '.panopticon.yaml']) {
-      projectMtime = await getMtimeAsync(join(projectRoot, name));
+      projectMtime = await getMtimeFromDisk(join(projectRoot, name));
       if (projectMtime > 0) break;
     }
   }
@@ -1772,7 +1740,7 @@ async function getConfigMtimesAsync(): Promise<{ global: number; project: number
   return { global: globalMtime, project: projectMtime };
 }
 
-async function getMtimeAsync(filePath: string): Promise<number> {
+async function getMtimeFromDisk(filePath: string): Promise<number> {
   try {
     return (await statAsync(filePath)).mtimeMs;
   } catch {
@@ -1780,8 +1748,8 @@ async function getMtimeAsync(filePath: string): Promise<number> {
   }
 }
 
-export async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
-  const mtimes = await getConfigMtimesAsync();
+async function loadConfigWithoutMigration(): Promise<ConfigLoadResult> {
+  const mtimes = await getConfigMtimesFromDisk();
   if (
     configCache &&
     configCache.globalMtime === mtimes.global &&
@@ -1791,14 +1759,14 @@ export async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
   }
 
   const [globalConfig, projectConfig] = await Promise.all([
-    loadGlobalConfigAsync(),
-    loadProjectConfigAsync(),
+    loadGlobalConfigFromDisk(),
+    loadProjectConfigFromDisk(),
   ]);
   const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
   applyEnvironmentFallbacks(config, explicitlyDisabled);
 
   const result: ConfigLoadResult = { config };
-  const freshMtimes = await getConfigMtimesAsync();
+  const freshMtimes = await getConfigMtimesFromDisk();
   configCache = {
     globalMtime: freshMtimes.global,
     projectMtime: freshMtimes.project,
@@ -1817,7 +1785,7 @@ export async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
  * Results are cached in memory and invalidated when the underlying config
  * files change (checked via mtime).
  */
-export function loadConfig(): ConfigLoadResult {
+export function loadConfigSync(): ConfigLoadResult {
   const mtimes = getConfigMtimes();
   if (
     configCache &&
@@ -1990,22 +1958,22 @@ export function getProjectConfigPath(): string | null {
  * project, and env-var sources at the moment of the call.
  */
 export function isClaudeCodeChannelsEnabled(): boolean {
-  return loadConfig().config.experimental.claudeCodeChannels;
+  return loadConfigSync().config.experimental.claudeCodeChannels;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Effect-native loadConfigAsyncNoMigration. Reads global + project config,
+ * Effect-native loadConfigWithoutMigration. Reads global + project config,
  * merges with defaults, applies env fallbacks. Fails with ConfigParseError
  * for malformed YAML or ConfigError for other I/O failures.
  */
-export const loadConfigAsyncNoMigrationEffect = (): Effect.Effect<
+export const loadConfigAsyncNoMigration = (): Effect.Effect<
   ConfigLoadResult,
   ConfigError | ConfigParseError
 > =>
   Effect.tryPromise({
-    try: () => loadConfigAsyncNoMigration(),
+    try: () => loadConfigWithoutMigration(),
     catch: (cause) =>
       new ConfigError({
         message: cause instanceof Error ? cause.message : String(cause),
@@ -2013,17 +1981,17 @@ export const loadConfigAsyncNoMigrationEffect = (): Effect.Effect<
       }),
   });
 
-export const getConversationsConfigAsyncEffect = (): Effect.Effect<
+export const getConversationsConfig = (): Effect.Effect<
   RuntimeConversationsConfig,
-  ConfigError
+  ConfigError | ConfigParseError
 > =>
-  Effect.tryPromise({
-    try: () => getConversationsConfigAsync(),
-    catch: (cause) =>
-      new ConfigError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
+  Effect.gen(function* () {
+    const { config } = yield* loadConfigAsyncNoMigration();
+    return resolveConversationWatchDirs({
+      ...config.conversations,
+      apiKeys: config.apiKeys,
+      enabledProviders: config.enabledProviders,
+    });
   });
 
 /**
@@ -2031,9 +1999,9 @@ export const getConversationsConfigAsyncEffect = (): Effect.Effect<
  * ConfigError. Use this from Effect contexts that need merged config without
  * forcing the codebase to migrate every loadConfig call site.
  */
-export const loadConfigEffect = (): Effect.Effect<ConfigLoadResult, ConfigError> =>
+export const loadConfig = (): Effect.Effect<ConfigLoadResult, ConfigError> =>
   Effect.try({
-    try: () => loadConfig(),
+    try: () => loadConfigSync(),
     catch: (cause) =>
       new ConfigError({
         message: cause instanceof Error ? cause.message : String(cause),
@@ -2046,11 +2014,34 @@ export const loadConfigEffect = (): Effect.Effect<ConfigLoadResult, ConfigError>
  * ConversationsConfig overrides into config.yaml. Fails with ConfigError on
  * write failure.
  */
-export const updateConversationsConfigAsyncEffect = (
+export const updateConversationsConfig = (
   updates: ConversationsConfig,
-): Effect.Effect<void, ConfigError> =>
+): Effect.Effect<void, ConfigError | ConfigParseError> =>
   Effect.tryPromise({
-    try: () => updateConversationsConfigAsync(updates),
+    try: async () => {
+      await loadConfigWithoutMigration();
+      let existingContent = '{}\n';
+      try {
+        const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');
+        existingContent = content.trim().length > 0 ? content : '{}\n';
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ENOENT') throw error;
+      }
+
+      const doc = parseDocument(existingContent);
+      if (doc.contents === null) {
+        doc.contents = parseDocument('{}\n').contents;
+      }
+
+      for (const [key, value] of Object.entries(updates) as Array<[keyof ConversationsConfig, unknown]>) {
+        if (value !== undefined) doc.setIn(['conversations', key], value);
+      }
+
+      await mkdirAsync(dirname(GLOBAL_CONFIG_PATH), { recursive: true });
+      await writeFileAsync(GLOBAL_CONFIG_PATH, doc.toString({ lineWidth: 120 }), 'utf-8');
+      clearConfigCache();
+    },
     catch: (cause) =>
       new ConfigError({
         message: cause instanceof Error ? cause.message : String(cause),

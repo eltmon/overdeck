@@ -7,16 +7,16 @@
 
 export * from './types.js';
 export {
+  ClaudeCodeRuntimeSync,
   ClaudeCodeRuntime,
-  ClaudeCodeRuntimeEffect,
+  createClaudeCodeRuntimeSync,
   createClaudeCodeRuntime,
-  createClaudeCodeRuntimeEffect,
 } from './claude-code.js';
 export {
+  PiRuntimeSync,
   PiRuntime,
-  PiRuntimeEffect,
+  createPiRuntimeSync,
   createPiRuntime,
-  createPiRuntimeEffect,
   PiSpawnTimeout,
 } from './pi.js';
 
@@ -25,9 +25,9 @@ import type {
   RuntimeName,
   RuntimeRegistry as RuntimeRegistryInterface,
 } from './types.js';
-import { getAgentState } from '../agents.js';
-import { createClaudeCodeRuntime } from './claude-code.js';
-import { createPiRuntime } from './pi.js';
+import { getAgentStateSync } from '../agents.js';
+import { createClaudeCodeRuntimeSync } from './claude-code.js';
+import { createPiRuntimeSync } from './pi.js';
 
 /**
  * Runtime registry implementation
@@ -67,7 +67,7 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
    * to preserve back-compat (PAN-636 ac2).
    */
   getRuntimeForAgent(agentId: string): AgentRuntime | null {
-    const state = getAgentState(agentId);
+    const state = getAgentStateSync(agentId);
     if (!state) {
       return null;
     }
@@ -95,8 +95,8 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry = new RuntimeRegistry();
 
     // Register Claude Code (default) and Pi runtimes (PAN-636).
-    globalRegistry.register(createClaudeCodeRuntime());
-    globalRegistry.register(createPiRuntime());
+    globalRegistry.register(createClaudeCodeRuntimeSync());
+    globalRegistry.register(createPiRuntimeSync());
   }
   return globalRegistry;
 }

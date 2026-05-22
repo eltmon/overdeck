@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for buildRichPRBody — rich PR description generator (PAN-475)
  */
@@ -22,7 +23,7 @@ describe('buildRichPRBody', () => {
     projectRoot = join(tmpdir(), `pan-test-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     workspacePath = join(projectRoot, 'workspaces', 'feature-pan-42');
     mkdirSync(workspacePath, { recursive: true });
-    vi.mocked(queryBeadsForIssue).mockReset().mockResolvedValue([]);
+    (await Effect.runPromise(vi.mocked(queryBeadsForIssue)))ocked(queryBeadsForIssue).mockReset()))eadsForIssue).mockReset().mockResolvedValue([])));
   });
 
   afterEach(async () => {
@@ -83,7 +84,7 @@ describe('buildRichPRBody', () => {
       { id: 'bead-1', title: 'pan-42: Fix the bug', status: 'closed', labels: ['pan-42'] },
       { id: 'bead-2', title: 'pan-42: Add the feature', status: 'open', labels: ['pan-42'] },
     ];
-    vi.mocked(queryBeadsForIssue).mockResolvedValue(beads);
+    (await Effect.runPromise(vi.mocked(queryBeadsForIssue)))ocked(queryBeadsForIssue).mockResolvedValue(beads)));
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Implementation Tasks');
@@ -105,7 +106,7 @@ describe('buildRichPRBody', () => {
     await writeMainSpec('PAN-42', plan);
 
     const bead = { id: 'b1', title: 'pan-42: Task one', status: 'closed', labels: ['pan-42'] };
-    vi.mocked(queryBeadsForIssue).mockResolvedValue([bead]);
+    (await Effect.runPromise(vi.mocked(queryBeadsForIssue)))ocked(queryBeadsForIssue).mockResolvedValue([bead])));
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Acceptance Criteria');

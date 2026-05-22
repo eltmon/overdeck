@@ -31,8 +31,8 @@ describe('checkVBriefACStatus', () => {
 
   it('returns empty array when getVBriefACStatus returns null (no plan)', async () => {
     mockGetVBriefACStatus.mockReturnValue(null);
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    expect(checkVBriefACStatus('/fake/workspace')).toEqual([]);
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    expect(checkVBriefACStatusSync('/fake/workspace')).toEqual([]);
   });
 
   it('returns empty array when all criteria are completed', async () => {
@@ -55,8 +55,8 @@ describe('checkVBriefACStatus', () => {
       ],
     });
 
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    expect(checkVBriefACStatus('/fake/workspace')).toEqual([]);
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    expect(checkVBriefACStatusSync('/fake/workspace')).toEqual([]);
   });
 
   it('returns failure lines when there are pending acceptance criteria', async () => {
@@ -79,8 +79,8 @@ describe('checkVBriefACStatus', () => {
       ],
     });
 
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    const result = checkVBriefACStatus('/fake/workspace');
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    const result = checkVBriefACStatusSync('/fake/workspace');
     expect(result.length).toBeGreaterThan(0);
     expect(result[0]).toMatch(/Incomplete acceptance criteria.*1\/2/);
     // Completed criteria should not appear
@@ -111,8 +111,8 @@ describe('checkVBriefACStatus', () => {
       ],
     });
 
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    const result = checkVBriefACStatus('/fake/workspace');
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    const result = checkVBriefACStatusSync('/fake/workspace');
     expect(result.some((l) => l.includes('Cancelled AC'))).toBe(false);
     expect(result.some((l) => l.includes('Open AC'))).toBe(true);
   });
@@ -148,8 +148,8 @@ describe('checkVBriefACStatus', () => {
       ],
     });
 
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    const result = checkVBriefACStatus('/fake/workspace');
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    const result = checkVBriefACStatusSync('/fake/workspace');
     expect(result.some((l) => l.includes('A pending'))).toBe(true);
     expect(result.some((l) => l.includes('Feature A'))).toBe(true);
     expect(result.some((l) => l.includes('B pending'))).toBe(true);
@@ -161,7 +161,7 @@ describe('checkVBriefACStatus', () => {
       throw new Error('filesystem error');
     });
 
-    const { checkVBriefACStatus } = await import('../../../src/lib/work/done-preflight.js');
-    expect(checkVBriefACStatus('/fake/workspace')).toEqual([]);
+    const { checkVBriefACStatusSync } = await import('../../../src/lib/work/done-preflight.js');
+    expect(checkVBriefACStatusSync('/fake/workspace')).toEqual([]);
   });
 });

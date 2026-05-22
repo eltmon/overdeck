@@ -27,7 +27,7 @@ vi.mock('../../../lib/restart-status.js', () => ({
 }))
 
 import { statusCommand } from '../status.js'
-import { listRunningAgents } from '../../../lib/agents.js'
+import { listRunningAgentsSync } from '../../../lib/agents.js'
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js'
 import { readRestartStatus } from '../../../lib/restart-status.js'
 
@@ -53,7 +53,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('AC: prints a "Harness:" line for each running agent (pi value when configured)', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         id: 'agent-pi-1',
         issueId: 'PAN-636',
@@ -73,7 +73,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('AC: defaults to claude-code when harness is missing on legacy agent state', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         id: 'agent-legacy-1',
         issueId: 'PAN-100',
@@ -93,7 +93,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('json mode includes harness in the agent payload', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         id: 'agent-pi-2',
         issueId: 'PAN-636',
@@ -114,7 +114,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('prints the latest dashboard restart status', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
     ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       ts: new Date().toISOString(),
       trigger: 'pan reload',
@@ -133,7 +133,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('shows a prominent marker when the watchdog gave up', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
     ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       ts: new Date().toISOString(),
       trigger: 'watchdog',
@@ -152,7 +152,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('prints broken Docker workspace stacks without agent state', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([
       {
         id: 'init1',
@@ -176,7 +176,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   })
 
   it('prints gating reasons only for non-running gated agents', async () => {
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         id: 'agent-paused',
         issueId: 'PAN-1141',
@@ -244,7 +244,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       ok: true,
       json: async () => ({ active: true, since: '2026-05-17T17:00:00.000Z' }),
     })
-    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         id: 'agent-no-resume',
         issueId: 'PAN-1141',

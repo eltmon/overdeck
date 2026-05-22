@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -51,12 +52,12 @@ describe('deliverReviewVerdictFeedback', () => {
     await writeFile(join(reviewDir, 'synthesis.md'), '## Verdict\n\nRequest changes for correctness.');
 
     const { deliverReviewVerdictFeedback } = await import('../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await deliverReviewVerdictFeedback({
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId: 'pan-1059',
       verdict: 'blocked',
       notes: 'correctness blocker',
       workspacePath: workspace,
-    });
+    }));
 
     expect(result.prCommentPosted).toBe(true);
     expect(result.agentMessageSent).toBe(true);

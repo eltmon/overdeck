@@ -31,12 +31,7 @@ export interface InferenceDocument {
   artifactsAnalyzed: string[];
   gaps: string[];
   risks: string[];
-}
-
-/**
- * Gather all available artifacts for analysis
- */
-export async function gatherArtifacts(config: MonitoringAgentConfig): Promise<{
+}async function gatherArtifactsPromise(config: MonitoringAgentConfig): Promise<{
   issueDescription?: string;
   comments: string[];
   transcripts: string[];
@@ -110,7 +105,7 @@ export async function gatherArtifacts(config: MonitoringAgentConfig): Promise<{
  */
 export function generateMonitoringPrompt(
   config: MonitoringAgentConfig,
-  artifacts: Awaited<ReturnType<typeof gatherArtifacts>>,
+  artifacts: Awaited<ReturnType<typeof gatherArtifactsPromise>>,
   existingInference?: string
 ): string {
   const sections: string[] = [];
@@ -166,7 +161,7 @@ export function generateMonitoringPrompt(
  */
 export function generateBasicInference(
   config: MonitoringAgentConfig,
-  artifacts: Awaited<ReturnType<typeof gatherArtifacts>>
+  artifacts: Awaited<ReturnType<typeof gatherArtifactsPromise>>
 ): string {
   const now = new Date().toISOString();
   const sections: string[] = [];
@@ -209,7 +204,7 @@ export function generateBasicInference(
 /**
  * Update the INFERENCE.md file
  */
-export function updateInferenceDocument(workspacePath: string, content: string): void {
+export function updateInferenceDocumentSync(workspacePath: string, content: string): void {
   const panDir = join(workspacePath, PAN_DIRNAME);
   mkdirSync(panDir, { recursive: true });
   writeFileSync(join(panDir, 'INFERENCE.md'), content, 'utf-8');
@@ -218,7 +213,7 @@ export function updateInferenceDocument(workspacePath: string, content: string):
 /**
  * Read existing INFERENCE.md if it exists
  */
-export function readInferenceDocument(workspacePath: string): string | null {
+export function readInferenceDocumentSync(workspacePath: string): string | null {
   const filePath = join(workspacePath, PAN_DIRNAME, 'INFERENCE.md');
   if (!existsSync(filePath)) return null;
   return readFileSync(filePath, 'utf-8');
@@ -252,29 +247,29 @@ const liftMonitoringError = (
   });
 
 /** Effect variant of `gatherArtifacts`. */
-export const gatherArtifactsEffect = (
+export const gatherArtifacts = (
   config: MonitoringAgentConfig,
-): Effect.Effect<Awaited<ReturnType<typeof gatherArtifacts>>, MonitoringAgentError> =>
+): Effect.Effect<Awaited<ReturnType<typeof gatherArtifactsPromise>>, MonitoringAgentError> =>
   Effect.tryPromise({
-    try: () => gatherArtifacts(config),
+    try: () => gatherArtifactsPromise(config),
     catch: (cause) => liftMonitoringError(config.issueId, 'gatherArtifacts', cause),
   });
 
 /** Effect variant of `updateInferenceDocument`. */
-export const updateInferenceDocumentEffect = (
+export const updateInferenceDocument = (
   workspacePath: string,
   content: string,
 ): Effect.Effect<void, MonitoringAgentError> =>
   Effect.try({
-    try: () => updateInferenceDocument(workspacePath, content),
+    try: () => updateInferenceDocumentSync(workspacePath, content),
     catch: (cause) => liftMonitoringError(workspacePath, 'updateInferenceDocument', cause),
   });
 
 /** Effect variant of `readInferenceDocument`. */
-export const readInferenceDocumentEffect = (
+export const readInferenceDocument = (
   workspacePath: string,
 ): Effect.Effect<string | null, MonitoringAgentError> =>
   Effect.try({
-    try: () => readInferenceDocument(workspacePath),
+    try: () => readInferenceDocumentSync(workspacePath),
     catch: (cause) => liftMonitoringError(workspacePath, 'readInferenceDocument', cause),
   });

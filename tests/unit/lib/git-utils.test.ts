@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock child_process before importing the module under test
@@ -26,7 +27,7 @@ describe('getWorkspaceGitInfo', () => {
       return {} as any;
     });
 
-    const result = await getWorkspaceGitInfo('/some/workspace');
+    const result = await Effect.runPromise(getWorkspaceGitInfo('/some/workspace'));
 
     expect(result.HEAD).toBe('abc1234def5678abc1234def5678abc1234def56');
     expect(result.branch).toBe('feature/pan-342');
@@ -42,7 +43,7 @@ describe('getWorkspaceGitInfo', () => {
       return {} as any;
     });
 
-    const result = await getWorkspaceGitInfo('/some/workspace');
+    const result = await Effect.runPromise(getWorkspaceGitInfo('/some/workspace'));
 
     expect(result.HEAD).toBe('deadbeef');
     expect(result.branch).toBe('main');
@@ -54,7 +55,7 @@ describe('getWorkspaceGitInfo', () => {
       return {} as any;
     });
 
-    await expect(getWorkspaceGitInfo('/not/a/repo')).rejects.toThrow(
+    await (await Effect.runPromise(expect(getWorkspaceGitInfo('/not/a/repo'))))ceGitInfo('/not/a/repo')))).rejects.toThrow(
       'getWorkspaceGitInfo failed for /not/a/repo'
     );
   });

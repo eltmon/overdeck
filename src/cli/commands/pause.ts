@@ -1,28 +1,28 @@
 import chalk from 'chalk';
-import { getAgentState, setAgentPaused, stopAgent } from '../../lib/agents.js';
-import { resolveIssueId } from '../../lib/issue-id.js';
-import { sessionExists } from '../../lib/tmux.js';
+import { getAgentStateSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
+import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { sessionExistsSync } from '../../lib/tmux.js';
 
 interface PauseOptions {
   reason?: string;
 }
 
 export async function pauseCommand(id: string, options: PauseOptions): Promise<void> {
-  const issueId = resolveIssueId(id);
+  const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const state = getAgentState(agentId);
+  const state = getAgentStateSync(agentId);
 
   if (!state) {
     console.error(chalk.red(`Agent ${agentId} not found.`));
     process.exit(1);
   }
 
-  const shouldStop = sessionExists(agentId) || state.status === 'running' || state.status === 'starting';
+  const shouldStop = sessionExistsSync(agentId) || state.status === 'running' || state.status === 'starting';
 
   try {
-    setAgentPaused(agentId, options.reason, shouldStop);
+    setAgentPausedSync(agentId, options.reason, shouldStop);
     if (shouldStop) {
-      stopAgent(agentId);
+      stopAgentSync(agentId);
     }
 
     const reason = options.reason ? ` (${options.reason})` : '';

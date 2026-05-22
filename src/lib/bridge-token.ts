@@ -16,7 +16,7 @@ export function getBridgeTokenPath(agentId: string): string {
   return join(bridgeTokensDir(), `${agentId}.token`);
 }
 
-export function readBridgeToken(agentId: string): string | null {
+export function readBridgeTokenSync(agentId: string): string | null {
   const path = getBridgeTokenPath(agentId);
   if (!existsSync(path)) return null;
   try {
@@ -27,7 +27,7 @@ export function readBridgeToken(agentId: string): string | null {
   }
 }
 
-export function writeBridgeToken(agentId: string): string {
+export function writeBridgeTokenSync(agentId: string): string {
   const dir = bridgeTokensDir();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -49,16 +49,16 @@ export function writeBridgeToken(agentId: string): string {
  * Read the bridge token for an agent. Returns `null` if no token exists.
  * Effect-native variant — never fails (errors are swallowed to null like the Promise version).
  */
-export const readBridgeTokenEffect = (agentId: string): Effect.Effect<string | null> =>
-  Effect.sync(() => readBridgeToken(agentId));
+export const readBridgeToken = (agentId: string): Effect.Effect<string | null> =>
+  Effect.sync(() => readBridgeTokenSync(agentId));
 
 /**
  * Generate and persist a new bridge token. Returns the new token.
  * Effect-native variant — fails with FsError if the write cannot be persisted.
  */
-export const writeBridgeTokenEffect = (agentId: string): Effect.Effect<string, FsError> =>
+export const writeBridgeToken = (agentId: string): Effect.Effect<string, FsError> =>
   Effect.try({
-    try: () => writeBridgeToken(agentId),
+    try: () => writeBridgeTokenSync(agentId),
     catch: (cause) =>
       new FsError({
         path: getBridgeTokenPath(agentId),

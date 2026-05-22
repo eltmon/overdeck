@@ -13,8 +13,8 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { Effect } from 'effect';
 import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-config.js';
-import { replacePlaceholders } from '../workspace-config.js';
-import { loadConfig } from '../config.js';
+import { replacePlaceholdersSync } from '../workspace-config.js';
+import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
@@ -180,15 +180,7 @@ function parseValidationOutput(output: string, exitCode: number): ValidationResu
     failures,
     output,
   };
-}
-
-/**
- * Run merge validation on a project
- *
- * @param context - Validation context
- * @returns Promise resolving to validation result
- */
-export async function runMergeValidation(
+}async function runMergeValidationPromise(
   context: ValidationContext
 ): Promise<ValidationResult> {
   const { projectPath, validationScript } = context;
@@ -250,19 +242,7 @@ export async function runMergeValidation(
 
     return result;
   }
-}
-
-/**
- * Auto-revert a merge if validation fails
- *
- * Uses ORIG_HEAD which git sets automatically at merge time to the commit
- * HEAD pointed to right before the merge. This is always correct regardless
- * of commits added between task start and merge execution.
- *
- * @param projectPath - Project root path
- * @returns Promise resolving to success status
- */
-export async function autoRevertMerge(projectPath: string): Promise<boolean> {
+}async function autoRevertMergePromise(projectPath: string): Promise<boolean> {
   console.log(`[validation] Auto-reverting merge in ${projectPath}`);
 
   try {
@@ -332,24 +312,7 @@ export interface QualityGateRunOptions {
 export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
-};
-
-/**
- * Run all quality gates for a project
- *
- * Executes each gate in declaration order, stopping on first required failure.
- * Returns results for all gates that were run.
- *
- * Supports both local and remote (SSH) workspaces. For remote workspaces,
- * commands are wrapped with SSH and run on the specified VM.
- *
- * @param gates - Quality gate configs from projects.yaml (or DEFAULT_GATES)
- * @param projectPath - Project root (or workspace root)
- * @param phase - Which phase to run ('pre_push' or 'post_push')
- * @param opts - Optional remote workspace options
- * @returns Array of gate results
- */
-export async function runQualityGates(
+};async function runQualityGatesPromise(
   gates: Record<string, QualityGateConfig>,
   projectPath: string,
   phase: 'pre_push' | 'post_push' = 'pre_push',
@@ -410,13 +373,13 @@ export async function runQualityGates(
       if (gate.command.includes('"')) {
         throw new Error(`Gate "${name}" command contains double quotes which are unsafe in SSH context`);
       }
-      const flyAppName = loadConfig().remote?.fly?.app ?? 'pan-workspaces';
+      const flyAppName = loadConfigSync().remote?.fly?.app ?? 'pan-workspaces';
       resolvedCommand = `fly ssh console -a ${flyAppName} -C "cd ${cwd} && ${gate.command}"`;
     } else if (gate.container && gate.container_name) {
       // Run inside Docker container — resolve container name from placeholders
       let containerName = gate.container_name;
       if (opts.placeholders) {
-        containerName = replacePlaceholders(containerName, opts.placeholders);
+        containerName = replacePlaceholdersSync(containerName, opts.placeholders);
       }
       // Use -w to set working directory inside the container.
       // The container mounts workspace code at /workspaces/feature/<subdir>,
@@ -556,21 +519,21 @@ async function runHttpHealthGate(
  * its own errors and returns a structured {@link ValidationResult}, so the
  * Effect form simply lifts it via `Effect.promise`.
  */
-export const runMergeValidationEffect = (
+export const runMergeValidation = (
   context: ValidationContext,
 ): Effect.Effect<ValidationResult> =>
-  Effect.promise(() => runMergeValidation(context));
+  Effect.promise(() => runMergeValidationPromise(context));
 
 /**
  * Effect variant of {@link autoRevertMerge}. Surfaces git failure through a
  * typed {@link GitError} channel instead of returning `false` silently.
  */
-export const autoRevertMergeEffect = (
+export const autoRevertMerge = (
   projectPath: string,
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
     try: async () => {
-      const ok = await autoRevertMerge(projectPath);
+      const ok = await autoRevertMergePromise(projectPath);
       if (!ok) throw new Error('autoRevertMerge returned false');
     },
     catch: (cause) =>
@@ -587,10 +550,10 @@ export const autoRevertMergeEffect = (
  * with `Effect.promise` because the existing function already aggregates per-
  * gate failures into the returned array — it does not throw on gate failure.
  */
-export const runQualityGatesEffect = (
+export const runQualityGates = (
   gates: Record<string, QualityGateConfig>,
   projectPath: string,
   phase: 'pre_push' | 'post_push' = 'pre_push',
   opts: QualityGateRunOptions = {},
 ): Effect.Effect<QualityGateResult[]> =>
-  Effect.promise(() => runQualityGates(gates, projectPath, phase, opts));
+  Effect.promise(() => runQualityGatesPromise(gates, projectPath, phase, opts));

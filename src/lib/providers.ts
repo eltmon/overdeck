@@ -164,7 +164,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
 /**
  * Get provider for a given model ID
  */
-export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
+export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
@@ -223,7 +223,7 @@ export function getDirectProviders(): ProviderConfig[] {
 /**
  * Get environment variables for spawning agent with specific provider
  */
-export function getProviderEnv(
+export function getProviderEnvSync(
   provider: ProviderConfig,
   apiKey: string
 ): Record<string, string> {
@@ -294,7 +294,7 @@ export function getProviderEnv(
  * This writes to .claude/settings.local.json in the workspace directory.
  * Must be called before spawning the agent.
  */
-export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath: string): void {
+export function setupCredentialFileAuthSync(provider: ProviderConfig, workspacePath: string): void {
   if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
 
   const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
@@ -327,7 +327,7 @@ export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath:
  * .claude/settings.local.json. Otherwise Claude Code will keep using the stale
  * token helper and fail with "Invalid API key".
  */
-export function clearCredentialFileAuth(workspacePath: string): void {
+export function clearCredentialFileAuthSync(workspacePath: string): void {
   const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
   if (!existsSync(settingsPath)) return;
 
@@ -342,19 +342,19 @@ export function clearCredentialFileAuth(workspacePath: string): void {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of {@link getProviderForModel}. Pure lookup; cannot fail. */
-export const getProviderForModelEffect = (modelId: ModelId | string): Effect.Effect<ProviderConfig, never> =>
-  Effect.sync(() => getProviderForModel(modelId));
+/** Effect variant of {@link getProviderForModelSync}. Pure lookup; cannot fail. */
+export const getProviderForModel = (modelId: ModelId | string): Effect.Effect<ProviderConfig, never> =>
+  Effect.sync(() => getProviderForModelSync(modelId));
 
-/** Effect variant of {@link getProviderEnv}. Pure transform; cannot fail. */
-export const getProviderEnvEffect = (
+/** Effect variant of {@link getProviderEnvSync}. Pure transform; cannot fail. */
+export const getProviderEnv = (
   provider: ProviderConfig,
   apiKey: string,
 ): Effect.Effect<Record<string, string>, never> =>
-  Effect.sync(() => getProviderEnv(provider, apiKey));
+  Effect.sync(() => getProviderEnvSync(provider, apiKey));
 
-/** Effect variant of {@link setupCredentialFileAuth}. */
-export const setupCredentialFileAuthEffect = (
+/** Effect variant of {@link setupCredentialFileAuthSync}. */
+export const setupCredentialFileAuth = (
   provider: ProviderConfig,
   workspacePath: string,
 ): Effect.Effect<void, FsError> =>
@@ -384,8 +384,8 @@ export const setupCredentialFileAuthEffect = (
       new FsError({ path: workspacePath, operation: 'setupCredentialFileAuth', cause }),
   });
 
-/** Effect variant of {@link clearCredentialFileAuth}. Swallows all errors (non-fatal). */
-export const clearCredentialFileAuthEffect = (workspacePath: string): Effect.Effect<void, never> =>
+/** Effect variant of {@link clearCredentialFileAuthSync}. Swallows all errors (non-fatal). */
+export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<void, never> =>
   Effect.promise(async () => {
     const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
     if (!existsSync(settingsPath)) return;

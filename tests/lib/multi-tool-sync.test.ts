@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { syncSkillsToTools, resolveAlsoSyncTools, runMultiToolSync } from '../../src/lib/multi-tool-sync.js';
+import { syncSkillsToToolsSync, resolveAlsoSyncToolsSync, runMultiToolSyncSync } from '../../src/lib/multi-tool-sync.js';
 
 const TEST_DIR = join(process.cwd(), '.test-multi-tool-sync');
 const SKILLS_DIR = join(TEST_DIR, 'skills');
@@ -39,18 +39,18 @@ afterEach(() => {
 describe('syncSkillsToTools', () => {
   it('returns empty results when no tools configured', () => {
     createSkill('my-skill');
-    const results = syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, []);
+    const results = syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, []);
     expect(results).toHaveLength(0);
   });
 
   it('returns empty results when skills dir does not exist', () => {
-    const results = syncSkillsToTools(join(TEST_DIR, 'nonexistent'), PROJECT_DIR, ['cursor']);
+    const results = syncSkillsToToolsSync(join(TEST_DIR, 'nonexistent'), PROJECT_DIR, ['cursor']);
     expect(results).toHaveLength(0);
   });
 
   it('syncs skill to cursor as .mdc file', () => {
     createSkill('my-skill');
-    const results = syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['cursor']);
+    const results = syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['cursor']);
     expect(results).toHaveLength(1);
     expect(results[0].tool).toBe('cursor');
     expect(results[0].written).toContain('my-skill');
@@ -64,7 +64,7 @@ describe('syncSkillsToTools', () => {
 
   it('syncs skill to windsurf as .md file', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['windsurf']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['windsurf']);
 
     const md = join(PROJECT_DIR, '.windsurf', 'rules', 'my-skill.md');
     expect(existsSync(md)).toBe(true);
@@ -75,7 +75,7 @@ describe('syncSkillsToTools', () => {
 
   it('syncs skill to cline as .md file', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['cline']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['cline']);
 
     const md = join(PROJECT_DIR, '.clinerules', 'my-skill.md');
     expect(existsSync(md)).toBe(true);
@@ -85,7 +85,7 @@ describe('syncSkillsToTools', () => {
 
   it('syncs skill to copilot as .instructions.md file', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['copilot']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['copilot']);
 
     const md = join(PROJECT_DIR, '.github', 'instructions', 'my-skill.instructions.md');
     expect(existsSync(md)).toBe(true);
@@ -95,7 +95,7 @@ describe('syncSkillsToTools', () => {
 
   it('syncs skill to codex as named block in AGENTS.md', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['codex']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['codex']);
 
     const agentsMd = join(PROJECT_DIR, 'AGENTS.md');
     expect(existsSync(agentsMd)).toBe(true);
@@ -107,7 +107,7 @@ describe('syncSkillsToTools', () => {
 
   it('syncs skill to aider as named block in CONVENTIONS.md', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['aider']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['aider']);
 
     const conventionsMd = join(PROJECT_DIR, 'CONVENTIONS.md');
     expect(existsSync(conventionsMd)).toBe(true);
@@ -118,9 +118,9 @@ describe('syncSkillsToTools', () => {
 
   it('updates existing named block in AGENTS.md without duplicating', () => {
     createSkill('my-skill');
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['codex']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['codex']);
     // Sync again
-    syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['codex']);
+    syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['codex']);
 
     const agentsMd = join(PROJECT_DIR, 'AGENTS.md');
     const content = readFileSync(agentsMd, 'utf-8');
@@ -132,7 +132,7 @@ describe('syncSkillsToTools', () => {
   it('syncs multiple skills to multiple tools', () => {
     createSkill('skill-a', `---\nname: skill-a\n---\n# Skill A\nContent`);
     createSkill('skill-b', `---\nname: skill-b\n---\n# Skill B\nContent`);
-    const results = syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['cursor', 'windsurf']);
+    const results = syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['cursor', 'windsurf']);
     expect(results).toHaveLength(2);
     const cursor = results.find(r => r.tool === 'cursor')!;
     expect(cursor.written).toHaveLength(2);
@@ -142,14 +142,14 @@ describe('syncSkillsToTools', () => {
 
   it('skips skill dir with no readable .md file', () => {
     mkdirSync(join(SKILLS_DIR, 'empty-skill'), { recursive: true });
-    const results = syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['cursor']);
+    const results = syncSkillsToToolsSync(SKILLS_DIR, PROJECT_DIR, ['cursor']);
     expect(results[0].skipped).toContain('empty-skill');
   });
 });
 
 describe('resolveAlsoSyncTools', () => {
   it('returns empty array when no config exists', () => {
-    const tools = resolveAlsoSyncTools(PROJECT_DIR);
+    const tools = resolveAlsoSyncToolsSync(PROJECT_DIR);
     // Since global ~/.panopticon/config.yaml may or may not have tools, we just check it returns an array
     expect(Array.isArray(tools)).toBe(true);
   });
@@ -157,7 +157,7 @@ describe('resolveAlsoSyncTools', () => {
   it('reads tools from project .pan.yaml', () => {
     const panYaml = join(PROJECT_DIR, '.pan.yaml');
     writeFileSync(panYaml, 'tools:\n  also_sync:\n    - cursor\n    - windsurf\n', 'utf-8');
-    const tools = resolveAlsoSyncTools(PROJECT_DIR);
+    const tools = resolveAlsoSyncToolsSync(PROJECT_DIR);
     expect(tools).toContain('cursor');
     expect(tools).toContain('windsurf');
   });
@@ -165,7 +165,7 @@ describe('resolveAlsoSyncTools', () => {
   it('ignores unknown tool names', () => {
     const panYaml = join(PROJECT_DIR, '.pan.yaml');
     writeFileSync(panYaml, 'tools:\n  also_sync:\n    - cursor\n    - unknown-tool\n', 'utf-8');
-    const tools = resolveAlsoSyncTools(PROJECT_DIR);
+    const tools = resolveAlsoSyncToolsSync(PROJECT_DIR);
     expect(tools).toContain('cursor');
     expect(tools).not.toContain('unknown-tool');
   });

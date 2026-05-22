@@ -14,9 +14,9 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { findPlan, readPlanEffect } from '../vbrief/io.js';
-import { findVBriefByIssue } from '../vbrief/lifecycle-io.js';
-import { getDevrootPath } from '../config.js';
+import { findPlanSync, readPlan } from '../vbrief/io.js';
+import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
+import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
 
 const execAsync = promisify(exec);
@@ -188,10 +188,10 @@ async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; t
 
 async function extractAcceptanceCriteria(workspace: string, issueId: string): Promise<string[]> {
   // Try workspace-local spec first
-  const planPath = findPlan(workspace);
+  const planPath = findPlanSync(workspace);
   if (planPath) {
     try {
-      const doc = await Effect.runPromise(readPlanEffect(planPath));
+      const doc = await Effect.runPromise(readPlan(planPath));
       return flattenAC(doc);
     } catch {
       // Fall through to lifecycle lookup
@@ -200,9 +200,9 @@ async function extractAcceptanceCriteria(workspace: string, issueId: string): Pr
 
   // Try project-root lifecycle directories
   try {
-    const projectRoot = getDevrootPath();
+    const projectRoot = getDevrootPathSync();
     if (!projectRoot) return [];
-    const found = findVBriefByIssue(projectRoot, issueId);
+    const found = findVBriefByIssueSync(projectRoot, issueId);
     if (found) {
       return flattenAC(found.document);
     }
@@ -333,9 +333,7 @@ export function formatTier1Summary(
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
   return lines.join('\n');
-}
-
-export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
+}async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
   const { runId, issueId, workspace } = opts;
 
   if (!existsSync(workspace)) {
@@ -390,11 +388,11 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
  * strings instead of failing — so the only error this Effect can surface is
  * the workspace-not-found {@link FsError}.
  */
-export const buildReviewContextEffect = (
+export const buildReviewContext = (
   opts: BuildReviewContextOpts,
 ): Effect.Effect<ReviewContextManifest, FsError> =>
   Effect.tryPromise({
-    try: () => buildReviewContext(opts),
+    try: () => buildReviewContextPromise(opts),
     catch: (cause) =>
       new FsError({
         path: opts.workspace,

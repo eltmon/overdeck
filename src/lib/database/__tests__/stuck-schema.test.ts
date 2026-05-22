@@ -79,11 +79,11 @@ describe('stuck state schema (PAN-653)', () => {
 
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
-    const { getReviewStatusFromDb } = await import('../review-status-db.js');
+    const { getReviewStatusFromDbSync } = await import('../review-status-db.js');
 
     markWorkspaceStuck('PAN-653', 'main_diverged', { localSha: 'abc123', remoteSha: 'def456' });
 
-    const row = getReviewStatusFromDb('PAN-653');
+    const row = getReviewStatusFromDbSync('PAN-653');
     expect(row).not.toBeNull();
     expect(row?.stuck).toBe(true);
     expect(row?.stuckReason).toBe('main_diverged');
@@ -93,13 +93,13 @@ describe('stuck state schema (PAN-653)', () => {
 
   it('clearWorkspaceStuck removes the stuck flag', async () => {
     const { markWorkspaceStuck, clearWorkspaceStuck } = await import('../../review-status.js');
-    const { getReviewStatusFromDb } = await import('../review-status-db.js');
+    const { getReviewStatusFromDbSync } = await import('../review-status-db.js');
 
     markWorkspaceStuck('PAN-100', 'main_diverged');
-    expect(getReviewStatusFromDb('PAN-100')?.stuck).toBe(true);
+    expect(getReviewStatusFromDbSync('PAN-100')?.stuck).toBe(true);
 
     clearWorkspaceStuck('PAN-100');
-    const row = getReviewStatusFromDb('PAN-100');
+    const row = getReviewStatusFromDbSync('PAN-100');
     expect(row?.stuck).toBeFalsy();
     expect(row?.stuckReason).toBeUndefined();
     expect(row?.stuckAt).toBeUndefined();
@@ -126,13 +126,13 @@ describe('stuck state schema (PAN-653)', () => {
 
   it('stuck state survives upsert without overwriting other fields', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
-    const { upsertReviewStatus, getReviewStatusFromDb } = await import('../review-status-db.js');
+    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../review-status-db.js');
 
     // Mark stuck first
     markWorkspaceStuck('PAN-200', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
 
     // Normal upsert via setReviewStatus (e.g. review status update) that doesn't include stuck field
-    upsertReviewStatus({
+    upsertReviewStatusSync({
       issueId: 'PAN-200',
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -144,7 +144,7 @@ describe('stuck state schema (PAN-653)', () => {
     // (it will write stuck=false since the ReviewStatus object doesn't have it)
     // This test verifies the DB round-trip integrity, not that stuck survives arbitrary upserts
     // (for that, callers must use markWorkspaceStuck separately)
-    const row = getReviewStatusFromDb('PAN-200');
+    const row = getReviewStatusFromDbSync('PAN-200');
     expect(row).not.toBeNull();
     expect(row?.reviewStatus).toBe('passed');
   });

@@ -11,7 +11,7 @@
 
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
-import { loadPanopticonEnv } from '../../lib/env-loader.js';
+import { loadPanopticonEnvSync } from '../../lib/env-loader.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export const ServerConfigLayer = Layer.effect(
   ServerConfig,
   Effect.sync((): ServerConfigShape => {
     // Load .panopticon.env (idempotent)
-    loadPanopticonEnv();
+    loadPanopticonEnvSync();
 
     const portStr = process.env['API_PORT'] ?? process.env['PORT'] ?? '3011';
     const port = parseInt(portStr, 10);

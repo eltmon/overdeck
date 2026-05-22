@@ -72,9 +72,9 @@ async function postCloseOut(issueId: string, headers: Record<string, string> = {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(eventStoreLayer)),
+      ).pipe(Effect.provide(eventStoreLayer))))t.provide(eventStoreLayer)),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;
@@ -93,9 +93,9 @@ async function postBulkCloseOut(headers: Record<string, string> = {}) {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(eventStoreLayer)),
+      ).pipe(Effect.provide(eventStoreLayer))))t.provide(eventStoreLayer)),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;

@@ -67,7 +67,7 @@ export interface GitOperationFilter {
  * Append a git operation event to the persistent log.
  * Called by git helper wrappers (src/lib/git/operations.ts) after each operation.
  */
-export function appendGitOperation(op: Omit<GitOperation, 'id'>): number {
+export function appendGitOperationSync(op: Omit<GitOperation, 'id'>): number {
   const db = getDatabase();
   const result = db.prepare(`
     INSERT INTO git_operations (
@@ -93,7 +93,7 @@ export function appendGitOperation(op: Omit<GitOperation, 'id'>): number {
  * List git operation events, optionally filtered.
  * Results are ordered by ts DESC (most recent first).
  */
-export function listGitOperations(filter: GitOperationFilter = {}): GitOperation[] {
+export function listGitOperationsSync(filter: GitOperationFilter = {}): GitOperation[] {
   const db = getDatabase();
 
   const conditions: string[] = [];
@@ -158,11 +158,11 @@ export function listGitOperations(filter: GitOperationFilter = {}): GitOperation
  * Effect-native appendGitOperation — typed-error variant of the SQLite write.
  * Fails with GitActivityDbError if the insert throws (e.g. DB locked).
  */
-export const appendGitOperationEffect = (
+export const appendGitOperation = (
   op: Omit<GitOperation, 'id'>,
 ): Effect.Effect<number, GitActivityDbError> =>
   Effect.try({
-    try: () => appendGitOperation(op),
+    try: () => appendGitOperationSync(op),
     catch: (cause) => new GitActivityDbError({ operation: 'appendGitOperation', cause }),
   });
 
@@ -170,10 +170,10 @@ export const appendGitOperationEffect = (
  * Effect-native listGitOperations — typed-error variant of the SQLite read.
  * Fails with GitActivityDbError on query failure.
  */
-export const listGitOperationsEffect = (
+export const listGitOperations = (
   filter: GitOperationFilter = {},
 ): Effect.Effect<readonly GitOperation[], GitActivityDbError> =>
   Effect.try({
-    try: () => listGitOperations(filter),
+    try: () => listGitOperationsSync(filter),
     catch: (cause) => new GitActivityDbError({ operation: 'listGitOperations', cause }),
   });

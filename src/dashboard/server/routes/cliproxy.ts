@@ -3,12 +3,12 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import {
-  isCliproxyRunningEffect,
+  isCliproxyRunning,
   isCliproxyInstalled,
-  installCliproxyEffect,
-  restartCliproxyEffect,
-  stopCliproxyEffect,
-  startCliproxyEffect,
+  installCliproxy,
+  restartCliproxy,
+  stopCliproxy,
+  startCliproxy,
   readPidFile,
 } from '../../../lib/cliproxy.js';
 
@@ -27,7 +27,7 @@ export function getCachedCliproxyStatus(): CliproxyStatus | null {
 }
 
 async function refreshStatus(): Promise<void> {
-  const running = await Effect.runPromise(isCliproxyRunningEffect());
+  const running = await Effect.runPromise(isCliproxyRunning());
   const pid = readPidFile();
   lastStatus = { running, pid, checkedAt: new Date().toISOString() };
 }
@@ -55,7 +55,7 @@ export function startCliproxyWatchdog(): void {
         }
         if (!isCliproxyInstalled()) lastInstallAttemptAt = now;
         console.log('[cliproxy-watchdog] CLIProxy is down, attempting auto-restart...');
-        await Effect.runPromise(restartCliproxyEffect());
+        await Effect.runPromise(restartCliproxy());
         await refreshStatus();
         if (lastStatus?.running) {
           console.log('[cliproxy-watchdog] CLIProxy auto-restarted successfully');
@@ -109,11 +109,11 @@ const postCliproxyRestartRoute = HttpRouter.add(
         // Force-reinstall: stop, redownload binary at the pinned version, restart.
         // Required when bumping CLIPROXY_RELEASE_VERSION — otherwise install* skips
         // because the old binary is still on disk.
-        yield* stopCliproxyEffect();
-        yield* installCliproxyEffect(true);
-        yield* startCliproxyEffect();
+        yield* stopCliproxy();
+        yield* installCliproxy(true);
+        yield* startCliproxy();
       } else {
-        yield* restartCliproxyEffect();
+        yield* restartCliproxy();
       }
 
       yield* Effect.promise(() => refreshStatus());

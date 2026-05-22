@@ -51,7 +51,7 @@ function getMailDir(agentId: string): string {
 /**
  * Initialize hook structure for an agent
  */
-export function initHook(agentId: string): void {
+export function initHookSync(agentId: string): void {
   const hookDir = getHookDir(agentId);
   const mailDir = getMailDir(agentId);
 
@@ -71,7 +71,7 @@ export function initHook(agentId: string): void {
 /**
  * Get the hook for an agent
  */
-export function getHook(agentId: string): Hook | null {
+export function getHookSync(agentId: string): Hook | null {
   const hookFile = getHookFile(agentId);
   if (!existsSync(hookFile)) {
     return null;
@@ -88,10 +88,10 @@ export function getHook(agentId: string): Hook | null {
 /**
  * Add work to an agent's hook (FPP trigger)
  */
-export function pushToHook(agentId: string, item: Omit<HookItem, 'id' | 'createdAt'>): HookItem {
-  initHook(agentId);
+export function pushToHookSync(agentId: string, item: Omit<HookItem, 'id' | 'createdAt'>): HookItem {
+  initHookSync(agentId);
 
-  const hook = getHook(agentId) || { agentId, items: [] };
+  const hook = getHookSync(agentId) || { agentId, items: [] };
 
   const newItem: HookItem = {
     ...item,
@@ -108,8 +108,8 @@ export function pushToHook(agentId: string, item: Omit<HookItem, 'id' | 'created
 /**
  * Check if agent has pending work (FPP check)
  */
-export function checkHook(agentId: string): { hasWork: boolean; urgentCount: number; items: HookItem[] } {
-  const hook = getHook(agentId);
+export function checkHookSync(agentId: string): { hasWork: boolean; urgentCount: number; items: HookItem[] } {
+  const hook = getHookSync(agentId);
 
   if (!hook || hook.items.length === 0) {
     // Also check mail directory for incoming messages
@@ -161,8 +161,8 @@ export function checkHook(agentId: string): { hasWork: boolean; urgentCount: num
 /**
  * Pop the next work item from hook (after execution)
  */
-export function popFromHook(agentId: string, itemId: string): boolean {
-  const hook = getHook(agentId);
+export function popFromHookSync(agentId: string, itemId: string): boolean {
+  const hook = getHookSync(agentId);
   if (!hook) return false;
 
   const index = hook.items.findIndex((i) => i.id === itemId);
@@ -178,8 +178,8 @@ export function popFromHook(agentId: string, itemId: string): boolean {
 /**
  * Clear all items from hook
  */
-export function clearHook(agentId: string): void {
-  const hook = getHook(agentId);
+export function clearHookSync(agentId: string): void {
+  const hook = getHookSync(agentId);
   if (!hook) return;
 
   hook.items = [];
@@ -191,8 +191,8 @@ export function clearHook(agentId: string): void {
  * Reorder hook items by providing a new order of item IDs
  * Used for manual queue management from dashboard
  */
-export function reorderHookItems(agentId: string, orderedItemIds: string[]): boolean {
-  const hook = getHook(agentId);
+export function reorderHookItemsSync(agentId: string, orderedItemIds: string[]): boolean {
+  const hook = getHookSync(agentId);
   if (!hook) return false;
 
   // Validate that all provided IDs exist in the hook
@@ -228,13 +228,13 @@ export function reorderHookItems(agentId: string, orderedItemIds: string[]): boo
 /**
  * Send a message to an agent's mailbox
  */
-export function sendMail(
+export function sendMailSync(
   toAgentId: string,
   from: string,
   message: string,
   priority: HookItem['priority'] = 'normal'
 ): void {
-  initHook(toAgentId);
+  initHookSync(toAgentId);
   const mailDir = getMailDir(toAgentId);
 
   const mailItem: HookItem = {
@@ -255,7 +255,7 @@ export function sendMail(
 /**
  * Get and clear mail for an agent
  */
-export function collectMail(agentId: string): HookItem[] {
+export function collectMailSync(agentId: string): HookItem[] {
   const mailDir = getMailDir(agentId);
   if (!existsSync(mailDir)) return [];
 
@@ -279,8 +279,8 @@ export function collectMail(agentId: string): HookItem[] {
 /**
  * Generate Fixed Point prompt for agent startup
  */
-export function generateFixedPointPrompt(agentId: string): string | null {
-  const { hasWork, urgentCount, items } = checkHook(agentId);
+export function generateFixedPointPromptSync(agentId: string): string | null {
+  const { hasWork, urgentCount, items } = checkHookSync(agentId);
 
   if (!hasWork) return null;
 
@@ -335,77 +335,77 @@ export function generateFixedPointPrompt(agentId: string): string | null {
 // mutating paths surface FsError on disk failure.
 
 /** Initialize an empty hook for an agent (no-op if it exists). */
-export const initHookEffect = (agentId: string): Effect.Effect<void, FsError> =>
+export const initHook = (agentId: string): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => initHook(agentId),
+    try: () => initHookSync(agentId),
     catch: (cause) => new FsError({ path: agentId, operation: 'init-hook', cause }),
   });
 
 /** Load an agent's hook (null when missing). Pure-ish. */
-export const getHookEffect = (agentId: string): Effect.Effect<Hook | null> =>
-  Effect.sync(() => getHook(agentId));
+export const getHook = (agentId: string): Effect.Effect<Hook | null> =>
+  Effect.sync(() => getHookSync(agentId));
 
 /** Push a new item onto the agent's hook. */
-export const pushToHookEffect = (
+export const pushToHook = (
   agentId: string,
   item: Omit<HookItem, 'id' | 'createdAt'>,
 ): Effect.Effect<HookItem, FsError> =>
   Effect.try({
-    try: () => pushToHook(agentId, item),
+    try: () => pushToHookSync(agentId, item),
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'push-to-hook', cause }),
   });
 
 /** Inspect an agent's hook for pending work. Pure-ish. */
-export const checkHookEffect = (
+export const checkHook = (
   agentId: string,
-): Effect.Effect<ReturnType<typeof checkHook>> => Effect.sync(() => checkHook(agentId));
+): Effect.Effect<ReturnType<typeof checkHookSync>> => Effect.sync(() => checkHookSync(agentId));
 
 /** Pop a specific item from the hook by id. */
-export const popFromHookEffect = (
+export const popFromHook = (
   agentId: string,
   itemId: string,
 ): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => popFromHook(agentId, itemId),
+    try: () => popFromHookSync(agentId, itemId),
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'pop-from-hook', cause }),
   });
 
 /** Clear all items from the hook. */
-export const clearHookEffect = (agentId: string): Effect.Effect<void, FsError> =>
+export const clearHook = (agentId: string): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => clearHook(agentId),
+    try: () => clearHookSync(agentId),
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'clear-hook', cause }),
   });
 
 /** Reorder hook items by id (best-effort, only existing ids). */
-export const reorderHookItemsEffect = (
+export const reorderHookItems = (
   agentId: string,
   orderedItemIds: string[],
 ): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => reorderHookItems(agentId, orderedItemIds),
+    try: () => reorderHookItemsSync(agentId, orderedItemIds),
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'reorder-hook', cause }),
   });
 
 /** Send a mail item to an agent's mail drop (becomes hook item on collect). */
-export const sendMailEffect = (
-  ...args: Parameters<typeof sendMail>
-): Effect.Effect<ReturnType<typeof sendMail>, FsError> =>
+export const sendMail = (
+  ...args: Parameters<typeof sendMailSync>
+): Effect.Effect<ReturnType<typeof sendMailSync>, FsError> =>
   Effect.try({
-    try: () => sendMail(...args),
+    try: () => sendMailSync(...args),
     catch: (cause) =>
       new FsError({ path: args[0], operation: 'send-mail', cause }),
   });
 
 /** Drain an agent's mail drop into hook items. Pure-ish. */
-export const collectMailEffect = (agentId: string): Effect.Effect<HookItem[]> =>
-  Effect.sync(() => collectMail(agentId));
+export const collectMail = (agentId: string): Effect.Effect<HookItem[]> =>
+  Effect.sync(() => collectMailSync(agentId));
 
 /** Build the FPP prompt text for an agent's pending work. Pure-ish. */
-export const generateFixedPointPromptEffect = (
+export const generateFixedPointPrompt = (
   agentId: string,
-): Effect.Effect<string | null> => Effect.sync(() => generateFixedPointPrompt(agentId));
+): Effect.Effect<string | null> => Effect.sync(() => generateFixedPointPromptSync(agentId));

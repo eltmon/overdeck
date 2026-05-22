@@ -12,7 +12,7 @@
  */
 
 import { Effect, Layer, Option, Context } from 'effect';
-import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { GitHubClient } from './github-client.js';
 import { GitHubClientOptionalLive } from './github-client.js';
 import { LinearClient } from './linear-client.js';
@@ -197,11 +197,11 @@ export const IssueLifecycleLive = Layer.effect(
     const impl: IssueLifecycleShape = {
       transitionTo: (issueId, state) =>
         Effect.gen(function* () {
-          const trackerType = resolveTrackerType(issueId);
+          const trackerType = resolveTrackerTypeSync(issueId);
 
           if (trackerType === 'github') {
             // GitHub state is managed via labels
-            const ghInfo = resolveGitHubIssue(issueId);
+            const ghInfo = resolveGitHubIssueSync(issueId);
             if (!ghInfo.isGitHub) return;
             const labelOps = GITHUB_STATE_LABELS[state];
             for (const label of labelOps.add) {
@@ -248,30 +248,30 @@ export const IssueLifecycleLive = Layer.effect(
 
       addLabel: (issueId, label) =>
         Effect.gen(function* () {
-          const trackerType = resolveTrackerType(issueId);
+          const trackerType = resolveTrackerTypeSync(issueId);
           if (trackerType !== 'github') return; // no-op for Linear/Rally
 
-          const ghInfo = resolveGitHubIssue(issueId);
+          const ghInfo = resolveGitHubIssueSync(issueId);
           if (!ghInfo.isGitHub) return;
           yield* github.addLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
         }),
 
       removeLabel: (issueId, label) =>
         Effect.gen(function* () {
-          const trackerType = resolveTrackerType(issueId);
+          const trackerType = resolveTrackerTypeSync(issueId);
           if (trackerType !== 'github') return; // no-op for Linear/Rally
 
-          const ghInfo = resolveGitHubIssue(issueId);
+          const ghInfo = resolveGitHubIssueSync(issueId);
           if (!ghInfo.isGitHub) return;
           yield* github.removeLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
         }),
 
       close: (issueId) =>
         Effect.gen(function* () {
-          const trackerType = resolveTrackerType(issueId);
+          const trackerType = resolveTrackerTypeSync(issueId);
 
           if (trackerType === 'github') {
-            const ghInfo = resolveGitHubIssue(issueId);
+            const ghInfo = resolveGitHubIssueSync(issueId);
             if (!ghInfo.isGitHub) return;
             // Remove workflow labels then close
             for (const label of ['in-progress', 'in-review', 'planned', 'in-planning', 'verifying-on-main', 'ready-for-merge']) {

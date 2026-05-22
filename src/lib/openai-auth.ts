@@ -14,7 +14,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
-import { bridgeCodexAuthToCliproxy } from './cliproxy.js';
+import { bridgeCodexAuthToCliproxySync } from './cliproxy.js';
 
 export interface OpenAIAuthStatus {
   /** True if Codex auth storage exists locally. */
@@ -126,9 +126,7 @@ function buildStatus(raw: RawAuthFile | null, installed: boolean, bridgedFromCod
     hasOpenAIApiKey: hasApiKey(raw),
     bridgedFromCodex,
   };
-}
-
-export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
+}async function getOpenAIAuthStatusPromise(): Promise<OpenAIAuthStatus> {
   const codexDir = join(homedir(), '.codex');
   const authPath = getCodexAuthPath();
   const installed = existsSync(codexDir) || existsSync(authPath);
@@ -136,7 +134,7 @@ export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
 
   let bridgedFromCodex = false;
   try {
-    if (bridgeCodexAuthToCliproxy()) {
+    if (bridgeCodexAuthToCliproxySync()) {
       bridgedFromCodex = true;
     }
   } catch { /* non-fatal — cliproxy bridge is best-effort */ }
@@ -145,9 +143,9 @@ export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
 }
 
 /** Effect variant of {@link getOpenAIAuthStatus}. */
-export const getOpenAIAuthStatusEffect = (): Effect.Effect<OpenAIAuthStatus, FsError> =>
+export const getOpenAIAuthStatus = (): Effect.Effect<OpenAIAuthStatus, FsError> =>
   Effect.tryPromise({
-    try: () => getOpenAIAuthStatus(),
+    try: () => getOpenAIAuthStatusPromise(),
     catch: (cause) => new FsError({ path: getCodexAuthPath(), operation: 'getOpenAIAuthStatus', cause }),
   });
 
@@ -160,7 +158,7 @@ export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
 
   let bridgedFromCodex = false;
   try {
-    if (bridgeCodexAuthToCliproxy()) {
+    if (bridgeCodexAuthToCliproxySync()) {
       bridgedFromCodex = true;
     }
   } catch { /* non-fatal */ }

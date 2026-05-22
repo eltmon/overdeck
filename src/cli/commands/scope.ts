@@ -12,23 +12,23 @@ import { Effect } from 'effect';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
-  findVBriefByIssue,
+  findVBriefByIssueSync,
   transitionVBriefOnMain,
   type VBriefTransitionResult,
 } from '../../lib/vbrief/lifecycle-io.js';
-import { findPlan, readPlan } from '../../lib/vbrief/io.js';
-import { readContinueState } from '../../lib/vbrief/continue-state.js';
-import { listVBriefsEffect, readVBriefDocumentEffect } from '../../lib/vbrief/vbrief-index.js';
-import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam, listProjects } from '../../lib/projects.js';
+import { findPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
+import { readContinueStateSync } from '../../lib/vbrief/continue-state.js';
+import { listVBriefs, readVBriefDocument } from '../../lib/vbrief/vbrief-index.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
 function getProjectPath(issueId: string): string {
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved?.projectPath) {
     return resolved.projectPath;
   }
   const teamPrefix = extractTeamPrefix(issueId);
-  const project = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const project = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   if (project?.path) {
     return project.path;
   }
@@ -66,7 +66,7 @@ interface ScopeRow {
 
 function safeReadPlan(path: string): VBriefDocument | null {
   try {
-    return readPlan(path);
+    return readPlanSync(path);
   } catch {
     return null;
   }
@@ -91,9 +91,9 @@ function rowCreatedDate(doc: VBriefDocument | null, filenameDate: string | null,
 function collectLifecycleRows(projectKey: string, projectPath: string) {
   return Effect.gen(function* () {
     const rows: ScopeRow[] = [];
-    const entries = yield* listVBriefsEffect(projectPath);
+    const entries = yield* listVBriefs(projectPath);
     for (const entry of entries) {
-      const doc = yield* readVBriefDocumentEffect(entry.path).pipe(
+      const doc = yield* readVBriefDocument(entry.path).pipe(
         Effect.catch(() => Effect.succeed(null)),
       );
       rows.push({
@@ -124,7 +124,7 @@ function collectInFlightRows(projectKey: string, projectPath: string): ScopeRow[
   for (const ws of dirs) {
     if (!ws.startsWith('feature-')) continue;
     const wsPath = join(workspacesDir, ws);
-    const planPath = findPlan(wsPath);
+    const planPath = findPlanSync(wsPath);
     if (!planPath) continue;
     const doc = safeReadPlan(planPath);
     const inferredId = ws.replace(/^feature-/, '').toUpperCase();
@@ -243,7 +243,7 @@ async function listCommand(options: { project?: string }): Promise<void> {
       rows.push(...collectInFlightRows(key, path));
     } else {
       // Enumerate ALL registered projects + their in-flight worktrees.
-      const projects = listProjects();
+      const projects = listProjectsSync();
       if (projects.length === 0) {
         console.log(
           chalk.yellow('No projects registered in projects.yaml. Pass --project <path> or add a project first.'),
@@ -266,7 +266,7 @@ async function listCommand(options: { project?: string }): Promise<void> {
 async function showCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
   const upperId = issueId.toUpperCase();
-  const found = findVBriefByIssue(projectPath, upperId);
+  const found = findVBriefByIssueSync(projectPath, upperId);
   if (!found) {
     console.log(chalk.red(`No vBRIEF found for ${upperId} in ${projectPath}`));
     process.exit(1);
@@ -354,7 +354,7 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   // Continue-state summary (last session, decisions count, hazards count)
   let cs;
   try {
-    cs = readContinueState(projectPath, upperId);
+    cs = readContinueStateSync(projectPath, upperId);
   } catch (err: any) {
     console.log();
     console.log(chalk.bold('Continue State:'));
@@ -390,55 +390,55 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
 
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionVBriefOnMain(
     projectPath,
     issueId,
     'proposed',
     'proposed',
     `scope: propose ${issueId.toUpperCase()} vBRIEF`,
-  );
+  ));
   console.log(formatTransition(result, issueId));
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionVBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: approve ${issueId.toUpperCase()} vBRIEF`,
-  );
+  ));
   console.log(formatTransition(result, issueId));
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionVBriefOnMain(
     projectPath,
     issueId,
     'completed',
     'completed',
     `scope: complete ${issueId.toUpperCase()} vBRIEF`,
-  );
+  ));
   console.log(formatTransition(result, issueId));
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionVBriefOnMain(
     projectPath,
     issueId,
     'cancelled',
     'cancelled',
     `scope: cancel ${issueId.toUpperCase()} vBRIEF`,
-  );
+  ));
   console.log(formatTransition(result, issueId));
 }
 
 async function restoreCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const found = findVBriefByIssue(projectPath, issueId);
+  const found = findVBriefByIssueSync(projectPath, issueId);
   if (!found) {
     console.log(chalk.red(`No vBRIEF found for ${issueId}`));
     process.exit(1);
@@ -447,13 +447,13 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`vBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     process.exit(1);
   }
-  const result = await transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionVBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: restore ${issueId.toUpperCase()} vBRIEF`,
-  );
+  ));
   console.log(formatTransition(result, issueId));
 }
 

@@ -35,7 +35,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
 import {
-  replacePlaceholders,
+  replacePlaceholdersSync,
   type ProjectConfig,
   type TemplatePlaceholders,
 } from '../workspace-config.js';
@@ -52,7 +52,7 @@ export const DEVCONTAINER_DIRNAME = '.devcontainer';
  * for a workspace. Keeping this in one place stops two renderers from
  * disagreeing on what `{{FEATURE_FOLDER}}` means.
  */
-export function createWorkspacePlaceholders(
+export function createWorkspacePlaceholdersSync(
   projectConfig: ProjectConfig,
   featureName: string,
   workspacePath: string,
@@ -82,7 +82,7 @@ export function createWorkspacePlaceholders(
  * Replace hardcoded user home paths in a compose file with `${HOME}` so the
  * file works across machines and after `cp -r` between users.
  */
-export function sanitizeComposeFile(filePath: string): void {
+export function sanitizeComposeFileSync(filePath: string): void {
   if (!existsSync(filePath)) return;
 
   let content = readFileSync(filePath, 'utf-8');
@@ -117,7 +117,7 @@ interface TemplateMapping {
  *
  * Files named `dev` or ending in `.sh` get +x mode so they're executable.
  */
-export function processTemplates(
+export function processTemplatesSync(
   templateDir: string,
   targetDir: string,
   placeholders: TemplatePlaceholders,
@@ -131,7 +131,7 @@ export function processTemplates(
       const sourcePath = join(templateDir, source);
       const targetPath = join(targetDir, target);
       if (!existsSync(sourcePath)) continue;
-      const processed = replacePlaceholders(readFileSync(sourcePath, 'utf-8'), placeholders);
+      const processed = replacePlaceholdersSync(readFileSync(sourcePath, 'utf-8'), placeholders);
       mkdirSync(dirname(targetPath), { recursive: true });
       writeFileSync(targetPath, processed);
       steps.push(`Processed template: ${source} -> ${target}`);
@@ -144,7 +144,7 @@ export function processTemplates(
     const sourcePath = join(templateDir, file);
     const baseName = file.replace('.template', '');
     const targetPath = join(targetDir, baseName);
-    const processed = replacePlaceholders(readFileSync(sourcePath, 'utf-8'), placeholders);
+    const processed = replacePlaceholdersSync(readFileSync(sourcePath, 'utf-8'), placeholders);
     writeFileSync(targetPath, processed);
     if (baseName === 'dev' || baseName.endsWith('.sh')) {
       chmodSync(targetPath, 0o755);
@@ -185,7 +185,7 @@ export interface DevcontainerRenderOptions {
  * Throws if the project doesn't define a compose template (then there is
  * nothing to render and the caller should handle that gracefully).
  */
-export function renderDevcontainer(
+export function renderDevcontainerSync(
   opts: DevcontainerRenderOptions,
 ): DevcontainerRenderResult {
   const result: DevcontainerRenderResult = {
@@ -208,7 +208,7 @@ export function renderDevcontainer(
 
   mkdirSync(result.devcontainerDir, { recursive: true });
 
-  const placeholders = createWorkspacePlaceholders(
+  const placeholders = createWorkspacePlaceholdersSync(
     opts.projectConfig,
     opts.featureName,
     opts.workspacePath,
@@ -216,7 +216,7 @@ export function renderDevcontainer(
 
   // 1. Render every *.template file.
   result.steps.push(
-    ...processTemplates(templateDir, result.devcontainerDir, placeholders),
+    ...processTemplatesSync(templateDir, result.devcontainerDir, placeholders),
   );
 
   // 2. Copy non-template files (Dockerfile, scripts, etc.).
@@ -232,7 +232,7 @@ export function renderDevcontainer(
   let sanitized = 0;
   for (const file of readdirSync(result.devcontainerDir)) {
     if (file.includes('compose') && (file.endsWith('.yml') || file.endsWith('.yaml'))) {
-      sanitizeComposeFile(join(result.devcontainerDir, file));
+      sanitizeComposeFileSync(join(result.devcontainerDir, file));
       sanitized++;
     }
   }
@@ -273,43 +273,43 @@ const toRenderFsError = (op: string, path: string, cause: unknown): FsError =>
   new FsError({ path, operation: op, cause });
 
 /** Build the canonical placeholder set (Effect variant — pure, never fails). */
-export const createWorkspacePlaceholdersEffect = (
+export const createWorkspacePlaceholders = (
   projectConfig: ProjectConfig,
   featureName: string,
   workspacePath: string,
   extra: Partial<TemplatePlaceholders> = {},
 ): Effect.Effect<TemplatePlaceholders> =>
   Effect.sync(() =>
-    createWorkspacePlaceholders(projectConfig, featureName, workspacePath, extra),
+    createWorkspacePlaceholdersSync(projectConfig, featureName, workspacePath, extra),
   );
 
 /** Sanitize hardcoded $HOME paths in a compose file (Effect variant). */
-export const sanitizeComposeFileEffect = (
+export const sanitizeComposeFile = (
   filePath: string,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => sanitizeComposeFile(filePath),
+    try: () => sanitizeComposeFileSync(filePath),
     catch: (cause) => toRenderFsError('sanitizeComposeFile', filePath, cause),
   });
 
 /** Render every `*.template` from `templateDir` (Effect variant). */
-export const processTemplatesEffect = (
+export const processTemplates = (
   templateDir: string,
   targetDir: string,
   placeholders: TemplatePlaceholders,
   mappings?: { source: string; target: string }[],
 ): Effect.Effect<string[], FsError> =>
   Effect.try({
-    try: () => processTemplates(templateDir, targetDir, placeholders, mappings),
+    try: () => processTemplatesSync(templateDir, targetDir, placeholders, mappings),
     catch: (cause) => toRenderFsError('processTemplates', templateDir, cause),
   });
 
 /** Render `<workspace>/.devcontainer/` (Effect variant). */
-export const renderDevcontainerEffect = (
+export const renderDevcontainer = (
   opts: DevcontainerRenderOptions,
 ): Effect.Effect<DevcontainerRenderResult, FsError> =>
   Effect.try({
-    try: () => renderDevcontainer(opts),
+    try: () => renderDevcontainerSync(opts),
     catch: (cause) =>
       toRenderFsError('renderDevcontainer', opts.workspacePath, cause),
   });

@@ -87,10 +87,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue('MIN-1');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
@@ -105,10 +105,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue(UUID_A);
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const issue = await runEffect(program);
       expect(issue.id).toBe(UUID_A);
@@ -122,10 +122,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue('MIN-1');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const issue = await runEffect(program);
       expect(issue.identifier).toBe('MIN-1');
@@ -141,10 +141,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue('MIN-7');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const issue = await runEffect(program);
       expect(issue.identifier).toBe('MIN-7');
@@ -156,10 +156,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue(UUID_B);
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
@@ -171,10 +171,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue('MIN-999');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
@@ -185,10 +185,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getIssue(UUID_A);
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
@@ -210,10 +210,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getTeamStates('team-1');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const states = await runEffect(program);
       expect(states).toHaveLength(2);
@@ -226,10 +226,10 @@ describe('LinearClient Effect service', () => {
     it('calls SDK updateIssue with stateId', async () => {
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         yield* client.updateState(UUID_A, 'state-uuid');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       await runEffect(program);
       expect(mockSdkUpdateIssue).toHaveBeenCalledWith(UUID_A, { stateId: 'state-uuid' });
@@ -240,10 +240,10 @@ describe('LinearClient Effect service', () => {
     it('calls SDK createComment', async () => {
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         yield* client.addComment(UUID_A, 'hello world');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       await runEffect(program);
       expect(mockSdkCreateComment).toHaveBeenCalledWith({
@@ -261,10 +261,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.findOrCreateLabel('team-1', 'merged');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const label = await runEffect(program);
       expect(label.id).toBe('label-1');
@@ -279,10 +279,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.findOrCreateLabel('team-1', 'merged', '#00c000');
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const label = await runEffect(program);
       expect(label.id).toBe('label-new');
@@ -316,10 +316,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getComments(UUID_A);
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const comments = await runEffect(program);
       expect(comments).toHaveLength(2);
@@ -335,10 +335,10 @@ describe('LinearClient Effect service', () => {
 
       const { LinearClient, LinearClientLive } = await import('../linear-client.js');
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const client = yield* LinearClient;
         return yield* client.getComments(UUID_A);
-      }).pipe(Effect.provide(LinearClientLive));
+      }).pipe(Effect.provide(LinearClientLive))));
 
       const comments = await runEffect(program);
       expect(comments).toHaveLength(0);

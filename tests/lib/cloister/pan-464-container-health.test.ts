@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for PAN-464: workspace container health monitoring.
  *
@@ -70,17 +71,17 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   };
   return {
     sessionExists: vi.fn().mockReturnValue(true),
-    sessionExistsAsyncEffect: effectMock(true),
+    sessionExists: effectMock(true),
     sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
     buildTmuxCommandString: vi.fn().mockReturnValue(''),
-    capturePaneAsyncEffect: effectMock(''),
-    createSessionAsyncEffect: effectMock(undefined),
-    isPaneDeadAsyncEffect: effectMock(false),
+    capturePane: effectMock(''),
+    createSession: effectMock(undefined),
+    isPaneDead: effectMock(false),
     killSession: vi.fn(),
-    killSessionAsyncEffect: effectMock(undefined),
+    killSession: effectMock(undefined),
     listPaneValues: vi.fn().mockReturnValue([]),
-    listPaneValuesAsyncEffect: effectMock([]),
-    listSessionNamesAsyncEffect: effectMock([]),
+    listPaneValues: effectMock([]),
+    listSessionNames: effectMock([]),
   };
 });
 
@@ -129,7 +130,7 @@ import {
   checkWorkspaceContainerHealth,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
-import { sessionExistsAsyncEffect } from '../../../src/lib/tmux.js';
+import { sessionExists } from '../../../src/lib/tmux.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -380,7 +381,7 @@ describe('checkWorkspaceContainerHealth', () => {
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (1) 2 minutes ago\n` },
     });
-    vi.mocked(sessionExistsAsyncEffect).mockResolvedValueOnce(false);
+    (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockResolvedValueOnce(false)));
 
     const actions = await checkWorkspaceContainerHealth();
 
