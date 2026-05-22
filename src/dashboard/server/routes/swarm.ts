@@ -33,6 +33,7 @@ import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { normalizeModelOverride } from '../../../lib/model-validation.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../../../lib/config-yaml.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
@@ -358,7 +359,7 @@ async function persistSynthesisOutput(
   ].join('\n');
   await writeContinueStateAsync(continueDirForWorkspace(workspacePath), issueId, (cont) => {
     const existingRuntime = cont?.swarmRuntime ?? {
-      model: DEFAULT_SWARM_MODEL,
+      model: defaultSwarmModel(),
       slots: [],
       synthesisOutputs: {},
       createdAt: now,
@@ -979,7 +980,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  const swarmModel = modelGuard.value || DEFAULT_SWARM_MODEL;
+  const swarmModel = modelGuard.value || defaultSwarmModel();
   const resourceConfig = getResourceConfig();
   const envLimit = process.env['PAN_AGENT_BLOCK_COUNT'];
   const parsedEnvLimit = envLimit !== undefined ? Number(envLimit) : undefined;
@@ -1620,7 +1621,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   } else if (synthesisOutput && resolvedItemId) {
     await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
       const runtime = cont?.swarmRuntime ?? {
-        model: DEFAULT_SWARM_MODEL,
+        model: defaultSwarmModel(),
         slots: [],
         synthesisOutputs: {},
         createdAt: now,
@@ -2003,7 +2004,14 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-const DEFAULT_SWARM_MODEL = 'kimi-k2.6';
+/**
+ * Default model for swarm work slots. PAN-1192: resolves from config
+ * `roles.work.model` (the model a single work agent gets) instead of a
+ * hardcoded constant. `pan swarm --model <m>` still overrides per-dispatch.
+ */
+function defaultSwarmModel(): string {
+  return resolveModel('work', undefined, loadYamlConfig().config);
+}
 
 async function resolveParentFeatureBranch(
   _projectPath: string,
