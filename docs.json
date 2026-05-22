@@ -83,6 +83,7 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/harnesses",
               "configuration/issue-trackers",
               "configuration/polyrepo"
             ]
@@ -109,6 +110,8 @@
             "group": "Reference",
             "pages": [
               "reference/architecture",
+              "reference/harness-landscape",
+              "reference/template-conversations",
               "reference/prompts",
               "reference/troubleshooting"
             ]

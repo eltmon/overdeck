@@ -1,4 +1,5 @@
 ---
+scope: dev
 paths:
   - "**/*.test.ts"
   - "**/__tests__/**/*.ts"

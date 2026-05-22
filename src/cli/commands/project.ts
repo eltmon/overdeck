@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, symlinkSync, mkdirSync, readdirSync, statSync } from 'fs';
-import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join, resolve } from 'path';
 import {
   listProjects,
   registerProject,
@@ -13,12 +12,11 @@ import {
   IssueRoutingRule,
   getIssuePrefix,
 } from '../../lib/projects.js';
+import { SYNC_SOURCES } from '../../lib/paths.js';
+import { ensureProjectLayer } from '../../lib/context-layers/index.js';
 
-// Get path to bundled git hooks
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// After build: dist/cli/commands/project.js -> dist -> package root -> scripts/git-hooks
-const BUNDLED_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
+// Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
+const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
 
 /**
  * Install Panopticon git hooks in a directory
@@ -134,9 +132,16 @@ export async function projectAddCommand(
 
   registerProject(key, projectConfig);
 
+  // PAN-1201: seed the project's context layer (.pan/context/project.md) so
+  // `pan sync` can render it into the project's CLAUDE.md.
+  const seededLayer = ensureProjectLayer(fullPath);
+
   console.log(chalk.green(`✓ Added project: ${name}`));
   console.log(chalk.dim(`  Key: ${key}`));
   console.log(chalk.dim(`  Path: ${fullPath}`));
+  if (seededLayer) {
+    console.log(chalk.dim('  Context layer: .pan/context/project.md (commit this)'));
+  }
   if (linearTeam) {
     console.log(chalk.dim(`  Linear team: ${linearTeam}`));
   }

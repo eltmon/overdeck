@@ -1,0 +1,481 @@
+---
+title: Harness Landscape
+description: A survey of coding-agent harnesses Panopticon could drive, and how each one handles skills, MCP, and AGENTS.md
+---
+
+# Harness Landscape
+
+A survey of the AI coding-agent harnesses Panopticon could drive, the skill /
+extensibility mechanism each one exposes, and what that means for future
+features.
+
+<Note>
+**This is a planning survey, not a support matrix.** Panopticon supports exactly
+two harnesses today — `claude-code` and `pi` (see [Harnesses](/configuration/harnesses)
+for the operational guide). Every other harness on this page is surveyed for
+*evaluation*; it is **not integrated**. Facts are current as of May 2026 and
+should be re-verified before any decision. Items flagged **⚠ verify** could not
+be cleanly confirmed.
+</Note>
+
+## Why this document exists
+
+The field is now large enough, and converging fast enough on shared standards,
+that "which harness next?" is a real product question. It is also entangled with
+a specific feature request — [template conversations](/reference/template-conversations),
+the ability to load a curated *group* of skills into one conversation. Some
+harnesses have a native primitive for exactly that; others would need Panopticon
+to synthesize it. This survey records the facts needed to weigh both.
+
+## Harness vs. model
+
+A **harness** is the binary that runs in tmux and drives a workspace — it owns
+the agent loop, tool calls, context management, and the on-disk extensibility
+surface. A **model** is the LLM the harness calls. They are chosen
+independently. "Adding a harness" means teaching Panopticon a new
+`AgentRuntime` adapter (`src/lib/runtimes/`): how to spawn it, deliver prompts,
+detect readiness/heartbeat/completion, and parse cost. "Adding a model" is a
+routing-table change. This document is about **harnesses**.
+
+## The three extensibility layers
+
+Every modern harness exposes some subset of three *complementary* layers. They
+are not competitors — a mature setup uses all three.
+
+| Layer | Answers | Form | When loaded |
+| --- | --- | --- | --- |
+| **AGENTS.md** | "How does this repo work?" | One Markdown file in the repo | Session start, always-on |
+| **Agent Skills** (`SKILL.md`) | "How do I do task X?" | Versioned folder, may bundle scripts/assets | Name+description always; body on-demand |
+| **MCP** (Model Context Protocol) | "How do I reach external system Y?" | Running JSON-RPC server | Connect-time, persistent |
+
+- **AGENTS.md** — an open, tool-agnostic standard (a "README for agents"):
+  setup commands, conventions, build/test instructions. Emerged 2025 from a
+  cross-vendor effort (OpenAI Codex, Amp, Cursor, Factory, Google Jules), now
+  stewarded by the **Agentic AI Foundation** under the Linux Foundation. Read by
+  25+ tools.
+- **Agent Skills / `SKILL.md`** — originated in Claude Code; Anthropic released
+  the spec as an **open standard** (most sources: 2025-12-18). A skill is a
+  directory with a required `SKILL.md` (YAML frontmatter: `name` +
+  `description` required) plus optional `scripts/`, `references/`, `assets/`,
+  `templates/`. Three-stage progressive disclosure: discovery (load
+  name+description) → activation (load body on task match) → execution (run
+  bundled code). By early 2026, ~32 tools read `SKILL.md` — skills are portable
+  across harnesses with no modification.
+- **MCP** — the live-tool-connection protocol. Near-universal, with one notable
+  holdout (Pi).
+
+<Info>
+**Why this matters for Panopticon:** `SKILL.md` portability means Panopticon's
+own `skills/` tree is *already* harness-agnostic. The same skill directories
+`pan sync` writes to `~/.claude/skills/` are loadable, unmodified, by Codex,
+Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and Pi. Adding a harness does
+**not** mean re-authoring skills — it means teaching that harness where to read
+them.
+</Info>
+
+## What Panopticon supports today
+
+| Harness | Status | Runtime adapter |
+| --- | --- | --- |
+| `claude-code` | **Supported** (default) | none needed — drop-in `claude` |
+| `pi` | **Supported** (alternative) | `src/lib/runtimes/pi.ts` + vendored `packages/pi-extension/` |
+
+Everything else in this document is **not supported** — surveyed for planning.
+One nuance: Panopticon already authenticates **ChatGPT-subscription OAuth
+tokens** via CLIProxy to drive GPT *models*. That is model routing, not a Codex
+*harness* integration — but it lowers the auth cost of adding the Codex CLI
+harness later.
+
+## Harness profiles
+
+Each profile follows the same shape. Versions are "latest observed, May 2026"
+and should be re-checked before any decision.
+
+### Claude Code — Supported (default)
+
+- **Vendor / model:** Anthropic. Anthropic models; non-Anthropic via CLIProxy.
+- **OSS / license:** Proprietary (binary distribution).
+- **Auth:** Claude Code OAuth subscription **or** Anthropic API key (exclusive).
+- **Extensibility:** The richest surface in the field —
+  - **Skills** at enterprise / personal (`~/.claude/skills/`) / project
+    (`.claude/skills/`) / plugin scope, with name-conflict precedence
+    enterprise > personal > project; plugin skills are namespaced and cannot
+    conflict.
+  - **Plugins** — distributable bundles (`.claude-plugin/plugin.json`) that can
+    carry skills, subagents, commands, hooks, MCP servers, LSP servers,
+    monitors, binaries, and output styles. **Marketplaces**
+    (`.claude-plugin/marketplace.json`) catalog them; `/plugin marketplace add`,
+    `/plugin install`.
+  - **Session-scoped loading** — `--plugin-dir <path>`, `--plugin-url <url>`,
+    `--agents '<json>'`, `--mcp-config` (+`--strict-mcp-config`),
+    `--settings <file|json>`. This is the basis for
+    [template conversations](/reference/template-conversations).
+  - **Subagents** (`.claude/agents/*.md`, `--agents`), **hooks**, **output
+    styles**, **MCP** (local/project/user/plugin scopes).
+- **Headless:** `claude -p` / print mode; structured output; `--agent` to run
+  the main thread as a named agent.
+- **Why it's the default:** required for Anthropic-subscription users; the
+  largest agent/skill/plugin surface; Panopticon's pipeline prompts assume it.
+
+### Pi Coding Agent — Supported (alternative)
+
+- **Vendor / model:** Mario Zechner ("badlogic"). **30+ providers** via its
+  `pi-ai` layer — subscription auth for Anthropic, OpenAI, GitHub Copilot;
+  API-key for ~25 more (Gemini, Vertex, Bedrock, Groq, Cerebras, xAI,
+  OpenRouter, MiniMax, …).
+- **OSS / license:** MIT. TypeScript / Node.
+- **Repo / package:** `github.com/badlogic/pi-mono`. **⚠ verify:** the project
+  is mirrored under `earendil-works/pi` and current docs name the package
+  `@earendil-works/pi-coding-agent`; Panopticon's [Harnesses](/configuration/harnesses)
+  guide and `doctor.ts` still reference `@mariozechner/pi-coding-agent`. Confirm
+  the canonical install target on the next Pi version bump.
+- **Extensibility:**
+  - **Skills** — reads `SKILL.md`. Discovery: `~/.pi/agent/skills/`,
+    `.pi/skills/`, `~/.agents/skills/`, `.agents/skills/`, `skills/` in
+    `package.json`, the `skills` array in `settings.json`, **and the repeatable
+    `--skill <path>` CLI flag.** The `settings.json` `skills` array accepts
+    arbitrary directories — Panopticon already exploits this by writing
+    `~/.pi/agent/settings.json` with `"skills": ["~/.claude/skills"]`.
+  - **Extensions** — TypeScript modules subscribing to a rich lifecycle-event
+    bus (`session_start`, `tool_execution_end`, `agent_start/end`, …); loaded by
+    auto-discovery, `settings.json`, or `--extension`. Panopticon vendors one at
+    `packages/pi-extension/`.
+  - **No MCP** — a deliberate design stance. Pi tells users to wrap CLI tools as
+    skills instead. The only path to MCP is a custom extension.
+  - **AGENTS.md** read by default.
+- **Headless:** `pi --mode rpc` — JSONL command/event protocol over stdin/stdout
+  (Panopticon delivers commands via a named-pipe `mkfifo`).
+- **Why it's supported:** multi-provider without CLIProxy; named-pipe RPC is
+  faster than tmux paste-buffer; the only ToS-blocked cell is `pi` + Anthropic
+  model + Anthropic subscription auth.
+
+### OpenAI Codex CLI — Not supported (strong candidate)
+
+- **Vendor / model:** OpenAI. OpenAI-centric (GPT-5.4, GPT-5.3-Codex); `--oss`
+  flag runs open-weight models on local Ollama/LM Studio/MLX. Non-OpenAI cloud
+  providers need a translating gateway.
+- **OSS / license:** Open source, **Apache-2.0**. Written in **Rust**. Install
+  via `npm i -g @openai/codex` or Homebrew. v0.133.0 (2026-05-21).
+- **Auth:** Sign in with ChatGPT (Plus/Pro/Business/Edu/Enterprise) **or** API
+  key. Panopticon's CLIProxy already mints ChatGPT-subscription tokens.
+- **Extensibility:**
+  - **Skills — yes**, `SKILL.md`, Claude Code-compatible. `~/.codex/skills/`,
+    `.codex/skills/`.
+  - **AGENTS.md — yes**, native and layered (root-down concatenation,
+    closer-file-overrides, 32 KiB cap).
+  - **MCP — yes**; Codex can also *run as* an MCP server (`codex mcp-server`).
+  - Profiles in `config.toml` selected via `--profile`.
+- **Headless / RPC:** `codex exec` non-interactive; `--json` newline-delimited
+  event stream; `--output-schema` for validated output; `codex mcp-server` for
+  stdio orchestration. Among the strongest headless interfaces in the field.
+- **Why a candidate:** Apache-2.0, native AGENTS.md + skills, excellent headless
+  story, and Panopticon's ChatGPT-subscription auth already exists. The Codex
+  *harness* would let GPT-subscription users run a first-party OpenAI agent loop
+  instead of CLIProxy-routing GPT into Claude Code.
+
+### Google Gemini CLI — Not supported (candidate)
+
+- **Vendor / model:** Google. Gemini 3 models, 1M-token context. Google-locked.
+- **OSS / license:** Open source, **Apache-2.0**. TypeScript. v0.43.0
+  (2026-05-22).
+- **Auth:** Google OAuth (free tier) / Gemini API key / Vertex AI (enterprise).
+- **Extensibility:**
+  - **Skills — yes**, `SKILL.md`, four discovery tiers (built-in →
+    extension-bundled → user `~/.gemini/skills/` or `~/.agents/skills/` →
+    workspace). Activated via an `activate_skill` tool with a confirmation
+    prompt.
+  - **⭐ Per-session skill toggling** — `/skills enable <name>` /
+    `/skills disable <name>` turn skills on/off **for the current session**.
+    This is a *native* primitive close to what template conversations want.
+  - **GEMINI.md** context file; **AGENTS.md** opt-in via `contextFileName`.
+  - **Extensions** bundle MCP servers + context file + custom TOML commands.
+  - **MCP — yes**.
+- **Headless / RPC:** `-p`/`--prompt`; `--output-format json` or
+  `stream-json` (typed JSONL events); documented exit codes.
+- **Why a candidate:** the `/skills enable/disable` primitive is a working
+  reference for per-session skill curation; generous free tier; clean headless
+  JSONL stream.
+
+### Cursor CLI (`cursor-agent`) — Not supported
+
+- **Vendor / model:** Anysphere. Multi-provider — Anthropic, OpenAI, Gemini,
+  plus Cursor's in-house Composer model; `auto` selection.
+- **OSS / license:** Proprietary, no public license. Standalone CLI (beta) plus
+  the Cursor IDE.
+- **Auth:** Cursor subscription; headless via `CURSOR_API_KEY`.
+- **Extensibility:**
+  - **Skills — yes** (Cursor 2.4+), `SKILL.md`. Reads `.cursor/skills/`,
+    `.agents/skills/`, **and `.claude/skills/`** for compatibility — a Claude
+    Code skill runs in Cursor unmodified.
+  - **Rules** — `.cursor/rules/*.mdc` with four activation modes (always /
+    intelligent / auto-attached by glob / manual `@rule`).
+  - **AGENTS.md — yes**; **MCP — yes**; Claude Code-compatible **hooks**.
+- **Headless / RPC:** `cursor-agent -p`; `--output-format text|json|stream-json`.
+- **Why not yet:** proprietary with no license clarity; its differentiators
+  (Composer model, IDE) are weak fits for a tmux-driven orchestrator. Skill
+  portability means little integration cost if priorities change.
+
+### Warp / Oz — Not supported (notable for skill interop)
+
+- **Vendor / model:** Warp.dev. Multi-provider hosted models (OpenAI, Anthropic,
+  Google) on a credit system; BYOK supported.
+- **OSS / license:** **⚠ verify** — the terminal client went open source
+  April 2026; sources disagree (AGPL-3.0, or dual MIT + AGPL-3.0). The **Oz**
+  cloud orchestrator is reported MIT. Rust client.
+- **Auth:** Warp account + credits; BYOK provider keys; `WARP_API_KEY` for
+  headless Oz.
+- **Extensibility:**
+  - **Skills — yes**, and the **most aggressive cross-tool reader in the
+    field**: Warp loads skills from `.agents/skills/`, `.warp/skills/`, **and
+    `.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, `.gemini/skills/`**
+    and more. It directly consumes every other harness's skill directory.
+  - **Rules** (persistent guidelines, distinct from skills), stored in-repo or
+    in **Warp Drive** (shared team config).
+  - **AGENTS.md / WARP.md — yes**; **MCP — yes**, and Warp *imports* MCP config
+    from Claude Code and Codex.
+- **Headless / RPC:** **Oz CLI** — `oz agent run` / `run-cloud`, `--profile`,
+  `--mcp`, `--output-format json`. **⚠ verify** depth of the Oz API/SDK.
+- **Why notable:** Warp's "read everyone's skill directory" model is the
+  end-state of skill portability — a useful design reference even if Warp itself
+  is never adopted.
+
+### Amp (Sourcegraph) — Not supported
+
+- **Vendor / model:** Sourcegraph. Multi-model behind named **modes** —
+  `smart` (Claude Opus 4.7), `deep` (GPT-5.5 reasoning), `rush` (fast GPT-5.5);
+  users pick a mode, not a raw model.
+- **OSS / license:** Proprietary. CLI-first (`amp`), plus IDE integrations.
+  Consumption/credits billing, no subscription.
+- **Auth:** ampcode.com sign-in; `AMP_API_KEY` for headless.
+- **Extensibility:** Among the richest non-Anthropic surfaces —
+  - **Skills — yes**, `SKILL.md`; a skill can **bundle its own MCP server**
+    (`mcp.json` inside the skill folder, tools hidden until the skill
+    activates). `amp.skills.path` adds extra skill dirs.
+  - **AGENTS.md — yes** (also reads `AGENT.md`, `CLAUDE.md`).
+  - **Plugins** — event-driven **TypeScript** extensions (`.amp/plugins/*.ts`)
+    with `session.start`/`tool.call`/… hooks, `registerCommand`,
+    `registerTool` — the most powerful programmatic extension surface surveyed.
+  - **Toolboxes** (script-based tools, no MCP server); **MCP — yes**.
+- **Headless / RPC:** `amp -x`; `--stream-json` output, `--stream-json-input`
+  for multi-turn stdin, mid-run steering.
+- **Why notable:** skill-bundled MCP and the TS plugin API are design ideas
+  worth borrowing regardless of adoption.
+
+### OpenCode — Not supported (candidate)
+
+- **Vendor / model:** SST / Anomaly. Provider-agnostic — any LLM provider via
+  configurable keys; ships a curated "OpenCode Zen" model list.
+- **OSS / license:** Open source (**⚠ verify exact license**). The live repo is
+  `sst/opencode` — distinct from the archived Go `opencode-ai/opencode`.
+- **Auth:** per-provider API keys; OpenCode Zen billing.
+- **Extensibility:**
+  - **Skills — yes**, `SKILL.md`; reads `.opencode/skills/`, `.claude/skills/`,
+    `.agents/skills/` (and `~/` equivalents). Pattern-based per-agent skill
+    permissions in `opencode.json`.
+  - **⭐ Custom Agents** — primary agents (Build / Plan) and subagents
+    (General / Explore / Scout), each a markdown file or `opencode.json` entry
+    with its own `model`, `prompt`, `permission`, `temperature`, `tools`. The
+    closest thing OpenCode has to a loadable per-session profile.
+  - **AGENTS.md — yes**; **MCP — yes**.
+- **Headless / RPC:** CLI run mode, Web mode, **Server/SDK** mode — drivable by
+  an orchestrator (**⚠ verify** exact flags/JSON schema).
+- **Why a candidate:** fully open, multi-provider, `SKILL.md`-native, and its
+  custom-Agent model is a clean fit for Panopticon's role taxonomy.
+
+### Goose (Block) — Not supported (strongest "bundle" primitive)
+
+- **Vendor / model:** Block. 15+ providers (Anthropic, OpenAI, Google, Ollama,
+  OpenRouter, Bedrock, …); can also bridge existing subscriptions via the
+  **Agent Client Protocol (ACP)**.
+- **OSS / license:** Open source, **Apache-2.0**. **Rust**. Desktop app + full
+  CLI + embeddable API. Contributed to the Linux Foundation's Agentic AI
+  Foundation (Dec 2025), alongside MCP and AGENTS.md.
+- **Auth:** per-provider API keys; local models need none.
+- **Extensibility:**
+  - **Skills — yes**, `SKILL.md`; reads `~/.agents/skills/`, `.agents/skills/`,
+    **`.claude/skills/`, `~/.claude/skills/`**, `.goose/skills/`.
+  - **⭐⭐ Recipes** — portable **YAML** files that bundle `title`,
+    `description`, typed templated `parameters`, `prompt`, **required
+    extensions**, retry logic, and **subrecipes**. Shareable, CI-runnable. This
+    is the **strongest native "load a curated bundle into a session"
+    primitive** of any harness surveyed — it is, structurally, a "conversation
+    template."
+  - **.goosehints** (persistent project context); **AGENTS.md — yes**.
+  - **Extensions = MCP** — 70+ first-party, plus the 3,000+ community MCP
+    servers.
+- **Headless / RPC:** `goose run` (`-t`, `--recipe`, `--no-session`); embeddable
+  API.
+- **Why notable:** if Panopticon ever wants a *native* per-session bundle
+  instead of synthesizing one, Goose Recipes are the reference design — and a
+  concrete reason to consider adopting Goose specifically.
+
+### Charm Crush — Not supported
+
+- **Vendor / model:** Charmbracelet. Multi-provider — Anthropic, OpenAI, Gemini,
+  Groq, OpenRouter, Bedrock, Azure, Copilot, MiniMax, +15 more.
+- **OSS / license:** **Source-available, FSL-1.1-MIT** (Functional Source
+  License — converts to MIT after a delay; not OSI-open at release). **Go**.
+- **Auth:** API keys; also subscription plans from Synthetic, Z.ai, Kimi,
+  MiniMax.
+- **Extensibility:**
+  - **Skills — yes**, open Agent Skills standard; `user-invocable: true`
+    surfaces a skill in the command palette.
+  - **AGENTS.md — yes** (default generated context file; `CRUSH.md` also).
+  - **MCP — yes** (stdio/http/sse); **LSP** integration; preliminary **hooks**.
+- **Headless / RPC:** `crush run -q` (**⚠ verify** JSON output options — least
+  documented headless interface surveyed).
+- **Why not yet:** FSL licensing is a redistribution caveat; headless interface
+  underdocumented.
+
+### Aider — Not supported (poor fit)
+
+- **Vendor / model:** Aider-AI (Paul Gauthier). Widest model support surveyed —
+  OpenAI, Anthropic, Gemini, Azure, DeepSeek, Bedrock, Vertex, xAI, OpenRouter,
+  Groq, Copilot, local via Ollama/LM Studio, any OpenAI-compatible endpoint.
+- **OSS / license:** Open source, **Apache-2.0**. **Python**. v0.86.0
+  (2025-08-09 — **⚠ verify** newer release).
+- **Auth:** API keys only.
+- **Extensibility — the field's outlier:**
+  - **No Agent Skills** — does not implement `SKILL.md`.
+  - **No native AGENTS.md.**
+  - **No MCP** (open RFC only).
+  - Customization is `CONVENTIONS.md` files loaded via `--read` / `/read` or
+    `.aider.conf.yml`. Built-in slash commands only; no plugins.
+- **Headless / RPC:** `--message` / `--message-file`; **no JSON output**; an
+  unsupported, unstable Python API.
+- **Why a poor fit:** no skills, no MCP, no machine-readable output. Aider's
+  one-commit-per-change model is excellent for solo pairing but ill-suited to an
+  orchestrator. Skill portability gives Panopticon *nothing* here — Aider can't
+  read the `skills/` tree at all.
+
+### Cline — Not supported
+
+- **Vendor / model:** Cline Bot Inc. Multi-provider (Anthropic, OpenAI, Gemini,
+  OpenRouter 200+, Bedrock, Vertex, Cerebras, Groq, Ollama, …).
+- **OSS / license:** Open source, **Apache-2.0**. TypeScript. Historically a
+  VS Code extension; now also a preview CLI, a Node SDK (`@cline/sdk`), and a
+  web Kanban multi-agent board.
+- **Auth:** per-provider API keys; optional Cline account.
+- **Extensibility:**
+  - **Rules** — `.clinerules/` directory; **⭐ each rule has a per-session
+    UI toggle** (its main per-session-curation primitive).
+  - **AGENTS.md — yes** (Agent Rules spec v1.0).
+  - **Skills (`SKILL.md`) — ⚠ unverified, likely not first-class** — docs
+    describe rules + Workflows, not the `SKILL.md` format.
+  - **MCP — yes** (first-class since 2024).
+- **Headless / RPC:** preview CLI with JSON output; `@cline/sdk` programmatic
+  agent API.
+- **Why not yet:** historically IDE-bound; uncertain `SKILL.md` support means
+  Panopticon's `skills/` tree may not port cleanly.
+
+### Continue — Not supported (notable for the bundle primitive)
+
+- **Vendor / model:** Continue.dev. Multi-provider. Open source. IDE extension
+  plus a CLI (`cn`).
+- **Extensibility:** Its defining concept is **Continue Agents** — shareable,
+  remixable definitions in `config.yaml` that bundle **models + rules + tools
+  (MCP servers)** together. `cn --rule <namespace/name>` pulls a specific
+  hub-hosted rule into one session. **AGENTS.md / SKILL.md — ⚠ unverified,
+  likely not first-class.**
+- **Why notable:** like Goose Recipes, "Continue Agents" are a native
+  loadable-bundle primitive — a second reference design for template
+  conversations.
+
+## Comparison matrix
+
+| Harness | OSS / License | Lang | `SKILL.md` | Reads `.claude/skills` | AGENTS.md | MCP | Headless JSON | Native per-session bundle | Panopticon |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Claude Code** | Proprietary | — | ✅ | ✅ (own) | Fallback only¹ | ✅ | ✅ | Synth via `--plugin-dir` | **Supported** |
+| **Pi** | MIT | TS | ✅ | ✅ | ✅ | ❌ (by design) | ✅ (RPC) | `--skill` flag | **Supported** |
+| **Codex CLI** | Apache-2.0 | Rust | ✅ | ✅ | ✅ native | ✅ (+is a server) | ✅ | Profiles | Candidate |
+| **Gemini CLI** | Apache-2.0 | TS | ✅ | ✅ | Opt-in | ✅ | ✅ | ⭐ `/skills enable` | Candidate |
+| **Cursor CLI** | Proprietary | — | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
+| **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |
+| **Amp** | Proprietary | — | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
+| **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | Candidate |
+| **Goose** | Apache-2.0 | Rust | ✅ | ✅ | ✅ | ✅ (=ext) | ✅ | ⭐⭐ Recipes | Candidate |
+| **Crush** | FSL-1.1-MIT | Go | ✅ | ⚠ | ✅ | ✅ | ⚠ | — | No |
+| **Aider** | Apache-2.0 | Python | ❌ | ❌ | ❌ | ❌ | ❌ | — | No (poor fit) |
+| **Cline** | Apache-2.0 | TS | ⚠ | — | ✅ | ✅ | ✅ | ⭐ rule toggles | No |
+| **Continue** | OSS | TS | ⚠ | — | ⚠ | ✅ | ✅ | ⭐ Continue Agents | No |
+
+¹ Claude Code uses `CLAUDE.md`; AGENTS.md works only as a fallback when no
+`CLAUDE.md` exists, or via explicit `@AGENTS.md` import. Native support is an
+open feature request ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)).
+
+⭐ = a native primitive relevant to [template conversations](/reference/template-conversations).
+
+## Implications for Panopticon
+
+1. **Skill portability is real and already paid for.** Panopticon's `skills/`
+   tree is `SKILL.md`-format. Codex, Gemini CLI, Cursor, OpenCode, Goose, Amp,
+   Warp, and Pi all read `SKILL.md`, and most read `.claude/skills/` directly.
+   Adding any of them is a *runtime adapter* problem, not a *skill re-authoring*
+   problem. **Aider is the lone exception** — no skills, no MCP, no JSON output;
+   not worth pursuing.
+
+2. **Codex CLI is the highest-value next harness.** Apache-2.0, native
+   AGENTS.md + skills, a best-in-class headless interface (`codex exec --json`,
+   and it can *be* an MCP server), and Panopticon **already mints
+   ChatGPT-subscription tokens via CLIProxy**. The Codex harness would give
+   GPT-subscription users a first-party OpenAI agent loop instead of routing GPT
+   through Claude Code.
+
+3. **For template conversations, harness choice matters.** Three harnesses ship
+   a *native* loadable-bundle primitive that Panopticon would otherwise have to
+   synthesize:
+   - **Goose Recipes** — parameterized YAML bundles of prompt + extensions +
+     subrecipes. Structurally identical to a "conversation template."
+   - **Continue Agents** — `config.yaml` bundles of models + rules + tools.
+   - **Gemini CLI `/skills enable/disable`** — true per-session skill toggling.
+
+   Claude Code and Pi have no native bundle object, but **can synthesize one**:
+   Claude Code via `--plugin-dir`, Pi via repeatable `--skill`. The
+   [template-conversations proposal](/reference/template-conversations) builds
+   on those. "Adding a harness specifically for its bundle primitive" is
+   therefore a *real option* — Goose is the candidate if Panopticon wants the
+   primitive native rather than synthesized.
+
+4. **MCP is near-universal; Pi is the exception.** Any feature that assumes MCP
+   availability must account for Pi rejecting MCP by design.
+
+5. **Headless quality varies and gates orchestration.** Codex, Gemini CLI,
+   Cursor, and Amp have first-class JSON/stream interfaces. Aider has none.
+   Crush's is underdocumented. A harness without a machine-readable interface is
+   expensive for Panopticon to drive.
+
+6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license, Pi's
+   canonical package name, OpenCode/Crush licenses and headless schemas, Cline's
+   `SKILL.md` support, the Agent Skills spec date — must be confirmed against
+   primary sources at decision time. This document is a snapshot of a
+   fast-moving field.
+
+## Sources
+
+Primary documentation consulted (May 2026):
+
+- Claude Code — [code.claude.com/docs](https://code.claude.com/docs/en/skills)
+- Pi — [pi-mono](https://github.com/badlogic/pi-mono)
+- Codex CLI — [openai/codex](https://github.com/openai/codex),
+  [developers.openai.com/codex](https://developers.openai.com/codex/cli)
+- Gemini CLI — [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
+- Cursor — [cursor.com/docs/cli](https://cursor.com/docs/cli/overview)
+- Warp — [docs.warp.dev/agent-platform](https://docs.warp.dev/agent-platform/)
+- Amp — [ampcode.com/manual](https://ampcode.com/manual)
+- OpenCode — [opencode.ai/docs](https://opencode.ai/docs/)
+- Goose — [goose-docs.ai](https://goose-docs.ai/)
+- Crush — [charmbracelet/crush](https://github.com/charmbracelet/crush)
+- Aider — [aider.chat/docs](https://aider.chat/docs/)
+- Cline — [cline/cline](https://github.com/cline/cline)
+- Continue — [docs.continue.dev](https://docs.continue.dev/)
+- Standards — [agents.md](https://agents.md/),
+  [agentskills/agentskills](https://github.com/agentskills/agentskills),
+  [vercel-labs/skills](https://github.com/vercel-labs/skills)
+
+## See also
+
+- [Harnesses](/configuration/harnesses) — operational guide for the two
+  supported harnesses (install, picker locations, ToS rules, troubleshooting)
+- [Template Conversations](/reference/template-conversations) — proposal:
+  loading curated skill bundles into a single conversation
+- [Skills System](/features/skills) — how Panopticon distributes skills

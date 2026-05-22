@@ -1,0 +1,305 @@
+---
+title: Template Conversations
+description: Proposal — loading curated skill bundles into a single conversation
+---
+
+# Template Conversations
+
+Loading a curated *group* of skills into one conversation — including skills
+that are not in Panopticon's global skill set.
+
+<Warning>
+**This is a proposal, not a shipped feature.** Nothing on this page is
+implemented yet. It documents a design under consideration so the idea is
+recorded, reviewable, and open to feedback. Commands like `pan bundle` and
+`pan template` do **not** exist today. Status: research / proposal — not
+scheduled.
+</Warning>
+
+## The idea in one paragraph
+
+A **template conversation** is a conversation (or agent run) you start by
+picking a named **skill bundle** — a curated group of skills — instead of
+inheriting whatever the global `pan sync` happens to have installed. The bundle
+can contain skills that are **not** in Panopticon's `skills/` tree and are
+**not** synced to every agent: a Stripe-integration skill pulled from a public
+registry, a client's house-style skill, an experimental skill you're trialing.
+The bundle loads into *that one conversation* using the harness's
+session-scoped loading mechanism, and is gone when the conversation ends. The
+global skill set is untouched.
+
+## Why today's model is not enough
+
+`pan sync` is a **global, all-or-nothing** distribution path:
+
+```
+skills/pan-*/SKILL.md  ──pan sync──►  ~/.panopticon/skills/  ──►  ~/.claude/skills/
+                                                              └─►  ~/.pi/agent/settings.json
+```
+
+Every Claude Code session and every Pi agent on the machine then sees the **same
+skill set** (~60 skills today). That is correct for the `pan-*` workflow skills —
+every Panopticon agent needs `pan-done`, `pan-workflow`, `rebase-and-submit`.
+But it has three limits:
+
+1. **No per-conversation curation.** A conversation doing MYN frontend work and
+   a conversation doing Panopticon infra work load an identical skill set. There
+   is no way to say "this conversation gets `myn-standards` +
+   `react-best-practices` + `web-design-guidelines`, that one does not."
+2. **Third-party skills require a global install.** To use a skill from
+   `vercel-labs/agent-skills`, `mattpocock/skills`, or `agentskills.io`, you
+   must copy it into the global skills tree — where it then loads into *every*
+   session and spends *every* session's skill-listing context budget, forever,
+   for one conversation's benefit.
+3. **Context budget is a shared, finite resource.** Claude Code keeps every
+   skill's name+description in context (default budget: 1% of the model context
+   window). Sixty skills already pay rent on every prompt. Globally installing
+   niche skills makes every agent slower and more distractible to serve a few
+   conversations.
+
+The request is the **runtime, per-conversation** version of what `npx skills add`
+does at **install time**.
+
+## Prior art — `mattpocock/skills` and the `skills` CLI
+
+[`github.com/mattpocock/skills`](https://github.com/mattpocock/skills) is a
+curated collection of ~20 agent skills (engineering / productivity / misc),
+installed with:
+
+```bash
+npx skills@latest add mattpocock/skills
+```
+
+The `skills` CLI itself is **`vercel-labs/skills`** (MIT, ~19k★ — *not* an
+Anthropic project), billed as "the CLI for the open agent skills ecosystem." Its
+relevant capabilities:
+
+- **Selective install** — `--skill <name>` (repeatable) installs a *subset*;
+  `--skill '*'` installs all; `--list` previews without installing.
+- **Multi-agent targeting** — `-a claude-code -a opencode …` installs into one
+  or more agents' skill directories.
+- **Scope** — project or `--global`; `--copy` to copy instead of symlink.
+- **Sources** — `owner/repo`, a full git URL, a path to a single skill in a
+  repo, GitLab, or a local path.
+
+What it **does not** have: any **bundle / collection / group / profile**
+primitive. Selection is per-skill or wildcard. `mattpocock/skills` organizes
+skills into `engineering` / `productivity` / `misc` *directories*, but that is a
+repo convention — the CLI cannot install "the engineering group" as a unit.
+
+<Info>
+**Takeaway.** The `skills` ecosystem has solved *selective, multi-target
+installation* but has **no named-bundle concept and no per-session (runtime)
+mode**. Template conversations are exactly the gap: a named bundle, loaded at
+conversation start, scoped to that conversation. Panopticon can build on the
+`skills` CLI as a *resolver* for registry-sourced skills rather than reinventing
+the fetch/parse logic.
+</Info>
+
+## How harnesses support dynamic (non-`.claude/skills`) skill loading
+
+The premise of the feature is that skills need **not** live in the persistent
+`~/.claude/skills/` or `.claude/skills/` directories. Each harness offers a
+session-scoped path.
+
+### Claude Code
+
+Claude Code can scope a full capability set to **one `claude` invocation**, with
+nothing written to the persistent skill tree:
+
+| Flag | Effect |
+| --- | --- |
+| `--plugin-dir <path>` | Load a plugin (a dir or `.zip`) **for this session only**. Repeatable. A plugin bundles `skills/`, `agents/`, `commands/`, `hooks/`, MCP servers. |
+| `--plugin-url <url>` | Same, fetching a plugin `.zip` from a URL. |
+| `--agents '<json>'` | Define session-only subagents inline as JSON; never written to disk. |
+| `--mcp-config <files\|json>` (+`--strict-mcp-config`) | Scope the exact MCP server set to this run. |
+| `--settings <file\|json>` | Per-session settings overrides. |
+| `--add-dir <dir>` | A `.claude/skills/` **inside** an added dir is auto-loaded. |
+
+**The clean primitive: a per-conversation plugin.** Panopticon can materialize a
+bundle as a throwaway plugin directory —
+
+```
+<staging>/
+  .claude-plugin/plugin.json     # { "name": "pan-bundle-<id>", "version": "0.0.0" }
+  skills/
+    stripe-integration/SKILL.md
+    myn-standards/SKILL.md
+    ...
+```
+
+— and spawn `claude --plugin-dir <staging>`. The bundle's skills load,
+**namespaced** (`pan-bundle-<id>:stripe-integration`, so they cannot collide
+with global skills), scoped to that one agent, and `~/.claude/skills/` is never
+touched.
+
+### Pi
+
+Pi has a **first-class repeatable flag**: `pi --skill <path>` loads a skill
+directory for that run. Equivalently, a per-conversation `.pi/settings.json`
+with a `skills` array. Panopticon already uses the array form globally; the
+per-conversation form is the same mechanism, narrower in scope.
+
+### Other harnesses (for completeness)
+
+If Panopticon ever adds these, the same feature has a native or near-native
+landing spot — see the [Harness Landscape](/reference/harness-landscape):
+
+- **Gemini CLI** — `/skills enable|disable <name>` toggles skills **per
+  session**. The closest thing to a native template-conversation control.
+- **Goose** — **Recipes**: portable YAML bundling prompt + required extensions +
+  parameters + subrecipes. Structurally *is* a conversation template.
+- **Continue** — **Continue Agents**: `config.yaml` bundles of models + rules +
+  tools.
+- **Codex CLI** — `--profile` selects a named `config.toml` profile.
+
+<Note>
+**Strategic note.** Goose Recipes and Continue Agents are *native* loadable
+bundles. If Panopticon wants the bundle to be a real object the harness
+understands — rather than something Panopticon synthesizes — that is a concrete
+reason to add Goose or Continue. For the two harnesses we support today, the
+bundle is **synthesized** (Claude Code plugin / Pi `--skill`), which keeps the
+feature available now.
+</Note>
+
+## Proposed design
+
+### Two new concepts
+
+**Skill bundle** — a named, declarative list of skill *sources*:
+
+```yaml
+# ~/.panopticon/skill-bundles/myn-frontend.yaml
+name: myn-frontend
+description: MYN React frontend work — house standards + perf + design review
+skills:
+  - local: myn-standards            # from Panopticon's own skills/ tree
+  - local: react-best-practices
+  - local: web-design-guidelines
+  - local: clear-writing
+  - registry: vercel-labs/agent-skills#frontend-design   # resolved via `skills` CLI
+  - git: github.com/acme/house-skills//stripe-checkout    # arbitrary git repo + subdir
+```
+
+A `local` source is a directory already in `skills/`. A `registry` source is
+resolved through the `skills` CLI. A `git` source is a clone + subdir checkout.
+None of these require the skill to be globally synced.
+
+**Conversation template** — a bundle plus the rest of a conversation's starting
+posture:
+
+```yaml
+# ~/.panopticon/conversation-templates/myn-frontend.yaml
+name: myn-frontend
+description: Start a MYN frontend conversation
+bundle: myn-frontend
+harness: claude-code          # default; user can still override at start
+includeGlobalSkills: true     # keep pan-* workflow skills, or not
+```
+
+### CLI surface
+
+```
+pan bundle list                       # show defined bundles
+pan bundle show <name>                # resolved skill list + sources
+pan bundle create <name> --skill ...  # author a bundle
+pan bundle materialize <name> <dir>   # resolve + stage (debuggable)
+
+pan template list
+pan template show <name>
+pan conv new --template myn-frontend  # start a templated conversation
+pan start <ISSUE> --template myn-frontend   # templated work agent
+```
+
+### Dashboard surface
+
+The conversation panel and the work-agent **Start** menu already carry
+harness + model selectors. Add a **Template** selector beside them. Picking a
+template pre-fills harness/model and shows the resolved skill list before
+launch — so the operator sees exactly what context the conversation pays for.
+
+### Materialization & spawn
+
+A new `materializeBundle(bundleName, destDir)`:
+
+1. Resolve every source — copy `local` dirs from `skills/`; `npx skills add
+   --copy` for `registry`; shallow git clone + subdir for `git`.
+2. Validate each `SKILL.md` (required `name` + `description`).
+3. For Claude Code: write `<destDir>/.claude-plugin/plugin.json` and arrange
+   skills under `<destDir>/skills/`.
+4. Return the staging path.
+
+Spawn then becomes harness-specific — Claude Code adds `--plugin-dir <staging>`;
+Pi adds `--skill` per skill. Staging lives under the agent/conversation state
+dir and is removed with the conversation. No global state mutates; `pan sync` is
+never involved.
+
+### Relationship to `pan sync`
+
+`pan sync` stays the **global baseline** — the `pan-*` workflow skills every
+agent needs to move work through the pipeline. Bundles are **additive and
+per-conversation**. The two never fight: bundle skills are namespaced, so a
+bundle skill named `clear-writing` and a globally-synced `clear-writing` coexist
+without collision.
+
+## Security & trust
+
+A bundle can pull and run third-party code (skills may bundle `scripts/`).
+Non-negotiables:
+
+- **Explicit, previewed sources.** `registry`/`git` sources resolve only what
+  the bundle file names. The dashboard shows the full resolved skill list, with
+  origin, before launch.
+- **No silent shell.** Honor Claude Code's `disableSkillShellExecution` for
+  bundle skills by default; require an opt-in per bundle to allow skill shell
+  injection.
+- **Version pinning.** `git`/`registry` sources should pin a ref/SHA so a bundle
+  is reproducible.
+- **Workspace isolation.** Templated *work agents* already run in
+  Docker-isolated workspaces — third-party skill code is contained there.
+  Templated *conversations* on the host are higher-risk; consider restricting
+  host conversations to `local`-only bundles, or surfacing a clear trust prompt.
+
+## Open questions
+
+1. **Subtracting global skills.** A template may want *fewer* skills than the
+   global sync, not more. Claude Code has no per-session way to hide a
+   globally-installed personal skill except `skillOverrides` injected via
+   `--settings`. Worth scoping separately — harder than the additive case.
+2. **Registry choice.** Lean on `vercel-labs/skills` as the resolver, or also
+   index `agentskills.io` / `skills.sh`? Start with the `skills` CLI only.
+3. **Bundle authoring UX.** File-based YAML is enough to ship; a dashboard
+   bundle editor is a fast follow.
+4. **Should bundles be a harness-native object?** For Claude Code/Pi we
+   synthesize. If template conversations become central, adopting **Goose**
+   (Recipes) makes the bundle a first-class, portable, CI-runnable artifact.
+5. **Context budget accounting.** The dashboard preview should estimate the
+   skill-listing token cost of a bundle before launch.
+
+## Recommendation
+
+Ship the **additive** case first, for the two supported harnesses:
+
+1. `skill-bundle` + `conversation-template` YAML formats.
+2. `materializeBundle()` + Claude Code `--plugin-dir` / Pi `--skill` spawn
+   wiring.
+3. `pan bundle` / `pan template` CLI verbs.
+4. Template selector + resolved-skill preview in the conversation panel and the
+   Start menu.
+
+Defer global-skill *subtraction* and the harness-native-bundle question to
+follow-ups. This delivers the requested capability — pick a curated skill group,
+load it into one conversation, including skills outside `pan sync` — without
+touching global state and without blocking on a new harness.
+
+## See also
+
+- [Harness Landscape](/reference/harness-landscape) — full harness survey;
+  per-harness dynamic-loading mechanisms and native bundle primitives
+- [Harnesses](/configuration/harnesses) — operational guide for supported
+  harnesses
+- [Skills System](/features/skills) — current skill distribution
+- [SKILLS-CONVENTION.md](https://github.com/eltmon/panopticon-cli/blob/main/docs/SKILLS-CONVENTION.md)
+  — skills ↔ `pan` CLI convention (engineering docs)
+- [SKILL-DISTRIBUTION-ANALYSIS.md](https://github.com/eltmon/panopticon-cli/blob/main/docs/SKILL-DISTRIBUTION-ANALYSIS.md)
+  — current skill distribution architecture (engineering docs)

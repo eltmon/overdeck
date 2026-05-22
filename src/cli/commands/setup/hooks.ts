@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { readSettingsOrAbortSync, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
+import { SYNC_SOURCES } from '../../../lib/paths.js';
 
 export interface HookConfig {
   matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
@@ -251,28 +252,15 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'tldr-post-edit',
     'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   ];
-  const { fileURLToPath } = await import('url');
-  const { dirname } = await import('path');
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-
   for (const scriptName of hookScripts) {
-    // Find the script in the Panopticon installation
-    const devSource = join(process.cwd(), 'scripts', scriptName);
-    const installedSource = join(__dirname, '..', '..', '..', 'scripts', scriptName);
+    // Hook scripts ship under sync-sources/hooks/ (PAN-1201). SYNC_SOURCES.hooks
+    // resolves correctly from both a checkout and an installed package.
+    const sourcePath = join(SYNC_SOURCES.hooks, scriptName);
     const scriptDest = join(binDir, scriptName);
 
-    // Check if script exists (try dev mode first, then installed mode)
-    let sourcePath: string | null = null;
-    if (existsSync(devSource)) {
-      sourcePath = devSource;
-    } else if (existsSync(installedSource)) {
-      sourcePath = installedSource;
-    }
-
-    if (!sourcePath) {
+    if (!existsSync(sourcePath)) {
       console.log(chalk.red(`✗ Could not find ${scriptName} script`));
-      console.log(chalk.dim(`  Checked: ${devSource}`));
-      console.log(chalk.dim(`  Checked: ${installedSource}`));
+      console.log(chalk.dim(`  Checked: ${sourcePath}`));
       process.exit(1);
     }
 
