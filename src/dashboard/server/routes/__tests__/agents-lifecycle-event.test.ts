@@ -25,8 +25,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateAsync: vi.fn(),
-  stopAgentAsync: vi.fn(),
+  getAgentStateEffect: vi.fn(),
+  stopAgentEffect: vi.fn(),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
@@ -40,10 +40,10 @@ vi.mock('../origin-validation.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { createAgentStopHandler } from '../agents.js';
-import { getAgentStateAsync, stopAgentAsync } from '../../../../lib/agents.js';
+import { getAgentStateEffect, stopAgentEffect } from '../../../../lib/agents.js';
 
-const mockGetAgentStateAsync = vi.mocked(getAgentStateAsync);
-const mockStopAgentAsync = vi.mocked(stopAgentAsync);
+const mockGetAgentStateEffect = vi.mocked(getAgentStateEffect);
+const mockStopAgentEffect = vi.mocked(stopAgentEffect);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,11 +87,11 @@ function getLastAppendedLogLine(): { event?: string } | null {
 describe('createAgentStopHandler lifecycle events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentStateAsync.mockResolvedValue({
+    mockGetAgentStateEffect.mockReturnValue(Effect.succeed({
       issueId: 'PAN-TEST',
       role: 'work',
-    } as any);
-    mockStopAgentAsync.mockResolvedValue(undefined);
+    } as any));
+    mockStopAgentEffect.mockReturnValue(Effect.void);
     mockAppendFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);
   });
@@ -112,10 +112,10 @@ describe('createAgentStopHandler lifecycle events', () => {
     expect(log?.event).toBe('agent.stop_requested');
   });
 
-  it('calls stopAgentAsync and getAgentStateAsync', async () => {
+  it('calls stopAgentEffect and getAgentStateEffect', async () => {
     await runAgentStopHandler('agent.stop_requested', 'agent-pan-999');
 
-    expect(mockGetAgentStateAsync).toHaveBeenCalledWith('agent-pan-999');
-    expect(mockStopAgentAsync).toHaveBeenCalledWith('agent-pan-999');
+    expect(mockGetAgentStateEffect).toHaveBeenCalledWith('agent-pan-999');
+    expect(mockStopAgentEffect).toHaveBeenCalledWith('agent-pan-999');
   });
 });
