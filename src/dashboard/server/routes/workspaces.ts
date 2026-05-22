@@ -5950,6 +5950,8 @@ const getMergeQueueRoute = HttpRouter.add(
 //   { type: 'status_changed', issueId }
 //     — Server re-reads ReviewStatus from SQLite (avoids stale snapshots) and
 //       dispatches via in-process handler.
+//   { type: 'review.approved', issueId }
+//   { type: 'test.passed', issueId }
 //   { type: 'task_queued', specialist, issueId }
 //   { type: 'reviewer_started', issueId, role, sessionName }
 //   { type: 'reviewer_completed', issueId, role }
@@ -5999,6 +6001,15 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
           return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
         }
         notifyPipeline({ type: 'status_changed', issueId, status });
+        return jsonResponse({ ok: true });
+      }
+      case 'review.approved':
+      case 'test.passed': {
+        const issueId = event.issueId as string | undefined;
+        if (!issueId) {
+          return jsonResponse({ ok: false, error: `${type} requires issueId` }, 400);
+        }
+        notifyPipeline({ type, issueId });
         return jsonResponse({ ok: true });
       }
       case 'task_queued': {

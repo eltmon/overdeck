@@ -31,6 +31,9 @@ describe('test role dispatch', () => {
     });
 
     expect(prompt).toContain('TEST TASK for PAN-503');
+    expect(prompt).toContain('verify you are in the workspace above with `pwd`');
+    expect(prompt).toContain('Never run build, test, git, or dashboard commands from the main checkout');
+    expect(prompt).toContain('build and run the dashboard from the workspace above, not from main');
     expect(prompt).toContain('use the Playwright MCP tools available to the test role');
     expect(prompt).toContain('Do not spawn or wake a separate UAT agent');
     expect(prompt).toContain('/api/review/PAN-503/status');
