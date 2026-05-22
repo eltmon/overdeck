@@ -2332,8 +2332,8 @@
     "hash": "77158e9f6538cd39d1e0f2e8bb2923d8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/lib/vbrief/dag.ts": {
-    "mtime": 1779420421.0455892,
-    "hash": "7b597a5d893481cc8d71ba0ba6953514"
+    "mtime": 1779435510.9847836,
+    "hash": "dbfe772d6f7348a822e9127690d63bb9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/lib/vbrief/__tests__/dag-writer-lock-dead-pid.test.ts": {
     "mtime": 1779420421.044855,
@@ -2572,8 +2572,8 @@
     "hash": "87e3da2f6e8205a0c91da3967ad75781"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/lib/database/review-status-db.ts": {
-    "mtime": 1779420421.0367672,
-    "hash": "1005b473281491cdf7d3fefa9ef7f20d"
+    "mtime": 1779435510.9847836,
+    "hash": "d907c4d88b35324553e14e05f2557302"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/lib/database/app-settings.ts": {
     "mtime": 1779420421.0364208,
@@ -4920,8 +4920,8 @@
     "hash": "3f16286de9d8da4f9ca613c7b28f2ee6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/issue-data-service.ts": {
-    "mtime": 1779420421.0100977,
-    "hash": "2cac593ef4a5a08bce173c3a529d9b75"
+    "mtime": 1779437220.3053272,
+    "hash": "1795ac5af2a0efa6158fc5626bd6bf52"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/agent-output-service.ts": {
     "mtime": 1779420421.0088816,
@@ -4960,8 +4960,8 @@
     "hash": "de4410f12243d32c6e8affabccbc8991"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/system-health-service.ts": {
-    "mtime": 1779420421.0106697,
-    "hash": "7a57e279d2767e81ae71d299734104c9"
+    "mtime": 1779437195.572433,
+    "hash": "2d0beba5f2a58f5510e4818ac79d4830"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/typed-errors.ts": {
     "mtime": 1779420421.0106697,
@@ -4984,8 +4984,8 @@
     "hash": "861a0dfb86afb0ff3a2daf799455eb33"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/resource-discovery.ts": {
-    "mtime": 1779420421.0100977,
-    "hash": "a77909cdd4bd70e2a7464fc78a23183e"
+    "mtime": 1779437210.256964,
+    "hash": "49d335f01d2b49fd344dc2ba386a015a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1/src/dashboard/server/services/agent-state-service.ts": {
     "mtime": 1779420421.0088816,
