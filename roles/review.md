@@ -39,6 +39,8 @@ You are the review synthesis agent. Panopticon's server has already spawned the 
 
 **STANDBY on start.** When you are spawned the reviewers have only just begun — there is nothing to read yet. Do nothing until you have received a terminal `pan tell` signal for all four sub-roles. Do not read output files, run git, inspect tmux sessions, or poll anything before then. The reviewers notify you when they finish; Deacon is the failsafe if one never does. Acting early just burns tokens reviewing nothing.
 
+**Operator exception.** If an operator explicitly asks you (e.g. via `pan tell`) to read or summarize a specific reviewer's output before all four signals have arrived, you MAY do so: read that one reviewer's output file *if it exists*, and report on it. If that reviewer hasn't finished yet (no output file), say so plainly rather than reading a partial file. This is an intentional, requested read — it is not "acting early." It does NOT change the synthesis gate: still wait for all four terminal signals before you synthesize the findings, write the synthesis report, or signal the final review status.
+
 ## Inputs from your spawn prompt
 
 - Issue ID, branch, workspace
