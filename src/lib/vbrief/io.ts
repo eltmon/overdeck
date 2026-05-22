@@ -532,6 +532,33 @@ export const readPlanEffect = (
     return obj as VBriefDocument;
   });
 
+export const findWorkspaceDraftPlanEffect = (
+  workspacePath: string,
+): Effect.Effect<string | null, FsError> =>
+  Effect.gen(function* () {
+    const path = workspaceDraftPath(workspacePath);
+    const exists = yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          await readFile(path, 'utf-8');
+          return true;
+        } catch (error: any) {
+          if (error?.code === 'ENOENT') return false;
+          throw error;
+        }
+      },
+      catch: (cause) => new FsError({ path, operation: 'readFile', cause }),
+    });
+    if (!exists) return null;
+
+    const issueId = issueIdFromWorkspacePath(workspacePath);
+    if (!issueId) return path;
+
+    const doc = yield* readPlanEffect(path).pipe(Effect.orElseSucceed(() => null));
+    const planIssueId = doc?.plan?.id;
+    return planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase() ? null : path;
+  });
+
 /**
  * Effect variant of findPlanAsync. Returns null when the workspace has no
  * resolvable plan — only IO/decoding failures surface as errors.
@@ -539,9 +566,15 @@ export const readPlanEffect = (
 export const findPlanEffect = (
   workspacePath: string,
 ): Effect.Effect<string | null, FsError> =>
-  Effect.tryPromise({
-    try: () => findPlanAsync(workspacePath),
-    catch: (cause) => new FsError({ path: workspacePath, operation: 'findPlan', cause }),
+  Effect.gen(function* () {
+    const issueId = issueIdFromWorkspacePath(workspacePath);
+    if (!issueId) return null;
+    const projectRoot = projectRootFromWorkspace(workspacePath);
+    const entry = yield* Effect.tryPromise({
+      try: () => findSpecByIssueAsyncLocal(projectRoot, issueId),
+      catch: (cause) => new FsError({ path: projectRoot, operation: 'findSpecByIssue', cause }),
+    });
+    return entry ? entry.path : yield* findWorkspaceDraftPlanEffect(workspacePath);
   });
 
 /**
@@ -562,4 +595,18 @@ export const readWorkspacePlanEffect = (
       return applyStatusOverrides(doc, continueState.statusOverrides);
     }
     return doc;
+  });
+
+export const isPlanningCompleteEffect = (
+  workspacePath: string,
+  _planningDir?: string,
+): Effect.Effect<boolean, VBriefReadError> =>
+  Effect.gen(function* () {
+    const planPath = yield* findPlanEffect(workspacePath);
+    if (!planPath) return false;
+    const doc = yield* readPlanEffect(planPath).pipe(Effect.orElseSucceed(() => null));
+    const status = doc?.plan?.status;
+    if (status && PLANNING_FINISHED_STATUSES.has(status)) return true;
+    if (status) return false;
+    return false;
   });
