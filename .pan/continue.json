@@ -1,0 +1,134 @@
+{
+  "version": "1",
+  "issueId": "PAN-1385",
+  "created": "2026-05-22T21:54:35.410Z",
+  "updated": "2026-05-22T22:05:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1385",
+    "sha": "a55bd9b86",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Coexist with Nous: add `dashscope` as a parallel provider; do NOT remove or remap `qwen/qwen3.6-plus` from Nous Portal.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Use Alibaba's DashScope Singapore-intl OpenAI-compatible base URL: `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`. Route via Panopticon's existing local Anthropic↔OpenAI adapter (`getOpenAICompatibleProxyBaseUrl('dashscope')`), mirroring the Nous pattern.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Initial model set: `qwen3-max` (opus tier), `qwen3-coder-plus` (sonnet tier), `qwen3-plus` (haiku tier). `haikuModel` = `qwen3-plus`.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "API key is loaded from `DASHSCOPE_API_KEY` env (via `loadSettings`) and from `apiKeys.dashscope` in `~/.panopticon/config.yaml`/settings.json, mirroring `nous`.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Ship with `tested: false` until a real spawn on `qwen3-max` has been verified end-to-end on this workspace's environment.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Bead boundaries follow the file/system-layer split: lib/settings types, lib/openai-compatible-proxy upstream, lib/providers config+routing, lib/model-capabilities entries, server settings route, frontend types, frontend Settings UI tile, frontend label maps, test fixtures, routing tests, docs, smoke test. Two foundation beads (types in lib/settings, types in frontend Settings/types.ts) get `requiresInspection: true` because their literal field name `'dashscope'` propagates through every downstream bead.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Do NOT change Cloister tier-default routing or workhorse defaults. Adding the provider exposes the models in pickers; downstream Settings-level decisions about which agents pick them are out of scope per the issue's explicit out-of-scope list.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Skip qwen3-vl-plus (vision). Explicit open question in the issue; defer until a multimodal workflow needs it.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Skip mainland-China DashScope endpoint (`dashscope.aliyuncs.com`). Explicit out-of-scope per issue.",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Display name: 'Alibaba DashScope' (full string), placeholder `sk-...` in the Settings provider tile (DashScope keys are sk-prefixed).",
+      "recordedAt": "2026-05-22T22:05:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Scope addition (user request 2026-05-22T22:15:00Z): wire `qwen3.7` as a first-class DashScope model alongside qwen3-max/coder-plus/plus. `qwen3.7` is listed in PROVIDERS.dashscope.models[] but NOT in tierModels (Cloister opus-tier default stays qwen3-max because its DashScope ID is unambiguous). The smoke-test bead absorbs canonical-ID verification.",
+      "recordedAt": "2026-05-22T22:15:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "DashScope intl (Singapore, `dashscope-intl.aliyuncs.com`) and mainland (`dashscope.aliyuncs.com`) use DIFFERENT keys. Hard-code the intl URL in the proxy upstream and call it out in the model-capabilities `notes` field. Do not generalize to a single 'dashscope' upstream — that's a follow-up if/when mainland support is added.",
+      "mitigation": "Use exactly `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` in `UPSTREAMS.dashscope`. Add an `ap-southeast-1 / intl` note to each MODEL_CAPABILITIES entry's `notes` so it surfaces in the picker."
+    },
+    {
+      "id": "H2",
+      "summary": "ProvidersConfig in the frontend (`Settings/types.ts`) has the booleans as required (not optional). Adding `dashscope: boolean` is a breaking change for every test fixture that constructs a ProvidersConfig literal — missing the field is a TypeScript error.",
+      "mitigation": "The fixture-update bead must touch every place that builds a `ProvidersConfig` literal. Search `nous: false` and `nous: true` in tests and add a matching `dashscope:` line. Same for `ApiKeysConfig` fixtures."
+    },
+    {
+      "id": "H3",
+      "summary": "`getProviderForModel()` in providers.ts checks `if (modelId.includes('/')) return PROVIDERS.openrouter` AFTER the explicit-nous shortcut. DashScope model IDs (`qwen3-max`, `qwen3-coder-plus`, `qwen3-plus`) contain no slash, so they will fall through to the default Anthropic branch unless we add an explicit check before that default.",
+      "mitigation": "Add an explicit `if (['qwen3-max','qwen3-coder-plus','qwen3-plus'].includes(modelId)) return PROVIDERS.dashscope;` check, placed near the existing nous shortcut. Update the routing test in tandem."
+    },
+    {
+      "id": "H4",
+      "summary": "The local OpenAI-compatible proxy server (`src/lib/openai-compatible-proxy.ts`) registers upstreams in a module-scope `UPSTREAMS` constant. Adding `dashscope` is a one-line change, but the proxy is a singleton process bound to `127.0.0.1:12436`. If a workspace's proxy is already running from an older build, it won't know about the new upstream until restart.",
+      "mitigation": "Document in the smoke-test bead that the agent must be spawned fresh (or `pan reload` run) after the change lands, so a new proxy server picks up the updated upstream map. Not a code change — just a verification step."
+    },
+    {
+      "id": "H5",
+      "summary": "Dashboard server's settings route (`src/dashboard/server/routes/settings.ts`) has provider-specific `case 'nous': { ... }` blocks for `/test-api-key` and `/validate-api-key`. Adding `dashscope` requires mirroring those blocks AND updating the allow-list array on line ~442 (`['openai', 'google', 'kimi', 'minimax', 'zai', 'mimo', 'nous']`).",
+      "mitigation": "The dashboard-settings-route bead's acceptance criteria explicitly call out (a) adding the provider to the allow-list and (b) wiring both probe (test) and listing (validate) endpoints to point at `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`."
+    },
+    {
+      "id": "H6",
+      "summary": "Smoke-test cannot be guaranteed in this workspace's environment because we don't know a-priori whether `DASHSCOPE_API_KEY` is present in `~/.panopticon/config.yaml` or env.",
+      "mitigation": "Smoke-test bead has a conditional: IF a key is present, spawn a throwaway agent on `qwen3-max` and confirm it boots + responds; THEN flip `tested: true` in providers.ts. IF NO key is present, document the manual verification steps in the bead and leave `tested: false` so the picker continues to flag it as untested."
+    },
+    {
+      "id": "H7",
+      "summary": "The provider union in `model-capabilities.ts` line 93 enumerates allowed providers; if we add `'dashscope'` to that union but forget to update it in even one place, the TypeScript build fails. There are also union duplicates in `Settings/types.ts` (frontend) and `providers.ts` (lib).",
+      "mitigation": "When the foundation type beads land, the work agent MUST run `npm run typecheck` before moving on. The two `requiresInspection: true` beads exist specifically to catch this kind of literal-name drift before downstream beads compound it."
+    },
+    {
+      "id": "H8",
+      "summary": "**Open question Q1 — canonical DashScope intl model ID for Qwen3.7 is unknown at planning time.** The user wrote `qwen3.7` (with a dot), but Alibaba's existing intl naming convention uses hyphens (qwen3-max, qwen3-plus, qwen3-coder-plus). Plausible canonical IDs include `qwen3.7`, `qwen3.7-max`, `qwen3-7-max`, `qwen-3.7`, or a dated snapshot. Guessing wrong means runtime 404s from DashScope when an agent is spawned on the literal.",
+      "mitigation": "The placeholder literal `qwen3.7` is used in all artifacts as a single point of substitution. The manual-smoke-test bead's AC4 makes canonical-ID verification a hard acceptance criterion: hit `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or read current Alibaba intl docs) and substitute the canonical literal across every artifact in one focused diff. If Qwen3.7 is NOT yet on the intl endpoint, the work agent removes the qwen3.7 entries and records a deferred-scope note rather than guessing or landing a broken literal."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-22T21:54:35.410Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-22T22:05:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning complete: wrote continue.json + vBRIEF for 12-bead implementation plan mirroring the existing Nous provider shape.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-22T22:15:00.000Z",
+      "reason": "planning",
+      "note": "Scope addition from user: include qwen3.7 as a first-class DashScope model. Extended affected beads (add-dashscope-types, register-and-route-dashscope-provider, add-qwen3-capabilities, frontend-settings-ui, add-routing-tests, manual-smoke-test) to include qwen3.7 as a placeholder literal. Recorded canonical-ID ambiguity as open question Q1 in the vBRIEF narrative and hazard H8 here. Canonical-ID verification is now a hard acceptance criterion on the smoke-test bead (ac4).",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
