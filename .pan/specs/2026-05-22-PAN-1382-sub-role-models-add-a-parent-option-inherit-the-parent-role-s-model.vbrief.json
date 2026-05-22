@@ -4,17 +4,17 @@
     "created": "2026-05-22T20:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1382: Sub-role models: add a 'Parent' option (inherit the parent role's model)",
-    "updated": "2026-05-22T20:30:49.884Z"
+    "updated": "2026-05-22T22:37:23.456Z"
   },
   "plan": {
     "id": "pan-1382",
     "title": "Sub-role models: add a 'Parent' option (inherit the parent role's model)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7f2a1c9d-4e6b-4a83-bd05-9c8e3f1a2b74",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 45,
     "created": "2026-05-22T20:40:00.000Z",
-    "updated": "2026-05-22T20:30:49.884Z",
+    "updated": "2026-05-22T22:37:23.456Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1382",
@@ -276,8 +276,71 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-22-PAN-1382-sub-role-models-add-a-parent-option-inherit-the-parent-role-s-model.vbrief.json"
+      "canonicalFilename": "2026-05-22-PAN-1382-sub-role-models-add-a-parent-option-inherit-the-parent-role-s-model.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1382",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-22T22:13:32.602Z",
+        "work": {
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:13:32.602Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "notes": "All four convoy reviewers clean; PAN-1382 approved.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:13:32.602Z",
+              "notes": "All four convoy reviewers clean; PAN-1382 approved."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "notes": "Workspace docker stack for PAN-1382 is not healthy: No Docker containers found for workspace stack pan-1382. Run 'pan workspace rebuild PAN-1382' or retry with --host to override.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:13:32.602Z",
+              "notes": "Workspace docker stack for PAN-1382 is not healthy: No Docker containers found for workspace stack pan-1382. Run 'pan workspace rebuild PAN-1382' or retry with --host to override."
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-22T22:13:32.602Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-22T22:13:32.602Z"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1384"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
