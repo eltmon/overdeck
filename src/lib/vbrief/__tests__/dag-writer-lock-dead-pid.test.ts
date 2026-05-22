@@ -80,7 +80,7 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
     expect(isPidDead(-1)).toBe(false);
   });
 
-  it('removeStaleLockAsync removes lock dir and sibling .tmp files', async () => {
+  it('removeStaleLockEffect removes lock dir and sibling .tmp files', async () => {
     const lockPath = `${planPath}.writer.lock`;
     mkdirSync(lockPath, { recursive: true });
     writeFileSync(join(lockPath, 'owner.json'), '{}', 'utf-8');

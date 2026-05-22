@@ -2372,12 +2372,12 @@
     "hash": "77158e9f6538cd39d1e0f2e8bb2923d8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312/src/lib/vbrief/dag.ts": {
-    "mtime": 1779448241.5629766,
-    "hash": "dbfe772d6f7348a822e9127690d63bb9"
+    "mtime": 1779456787.1065073,
+    "hash": "1cfe00c4d651e7a0011343c2698b5264"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312/src/lib/vbrief/__tests__/dag-writer-lock-dead-pid.test.ts": {
-    "mtime": 1779453740.410715,
-    "hash": "f2b130cdeea4934c4fd1bd7df3d45f46"
+    "mtime": 1779456793.7347994,
+    "hash": "54d277d7a56e743f7c0de580b1dc1d55"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312/src/lib/vbrief/__tests__/auto-synthesize.test.ts": {
     "mtime": 1779418663.0148346,
@@ -2388,8 +2388,8 @@
     "hash": "f193a4b6d0b8565fa9d83e581e1cd7d8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312/src/lib/vbrief/__tests__/dag-writer-lock-recovery.test.ts": {
-    "mtime": 1779418663.0148346,
-    "hash": "eb456f01c70c90e5cd6fe22b6291e180"
+    "mtime": 1779456812.846463,
+    "hash": "babe1cbe3c2731af550f5d70a393e8fb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312/src/lib/vbrief/__tests__/continue-state-swarm.test.ts": {
     "mtime": 1779453740.410715,
