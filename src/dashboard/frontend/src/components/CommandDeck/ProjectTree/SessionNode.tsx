@@ -518,8 +518,11 @@ export function SessionNode({
         displayStatus,
         lastHeardLabel,
       });
-  // Use "Start" label when session has ended (agent stopped); "Restart" when live
-  const restartLabel = session.type === 'review' ? 'Restart all' : !isLive ? 'Start' : undefined;
+  const restartLabel = session.type === 'review'
+    ? 'Restart all'
+    : session.type === 'reviewer'
+      ? 'Restart review'
+      : !isLive ? 'Start' : undefined;
 
   return (
     <ContextMenuRoot>
