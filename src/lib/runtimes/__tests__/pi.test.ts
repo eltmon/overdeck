@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Effect } from 'effect'
 
 import { PiRuntime, createPiRuntime, PiSpawnTimeout } from '../pi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
@@ -168,9 +169,9 @@ vi.mock('../../tmux.js', async () => {
   const actual = await vi.importActual<typeof import('../../tmux.js')>('../../tmux.js')
   return {
     ...actual,
-    createSessionAsync: vi.fn(async () => undefined),
-    sessionExistsAsync: vi.fn(async () => false),
-    killSessionAsync: vi.fn(async () => undefined),
+    createSessionAsyncEffect: vi.fn(() => Effect.void),
+    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+    killSessionAsyncEffect: vi.fn(() => Effect.void),
   }
 })
 
