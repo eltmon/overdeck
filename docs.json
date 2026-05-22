@@ -127,11 +127,5 @@
   "feedback": {
     "thumbsRating": true,
     "suggestEdit": true
-  },
-  "analytics": {
-    "posthog": {
-      "apiKey": "",
-      "host": "https://us.i.posthog.com"
-    }
   }
 }
