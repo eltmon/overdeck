@@ -1,0 +1,76 @@
+{
+  "version": "1",
+  "issueId": "PAN-1382",
+  "created": "2026-05-22T20:25:09.159Z",
+  "updated": "2026-05-22T20:40:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1382",
+    "sha": "2353b087c",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Chose option (b) — explicit \"parent\" sentinel — over option (a) UI-only. A sub-role model of \"parent\" is resolved by resolveModel to the parent role's model. Rationale: self-documenting in raw config.yaml; avoids the implicit \"absent/empty {} sub-config means inherit\" magic that option (a) would require; and option (a) is not actually UI-only because settings-api.ts validateModelRef rejects an absent model field. The #1201 collision flagged in the issue is moot — PAN-1201 already merged (commit 817c2c713).",
+      "recordedAt": "2026-05-22T20:40:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "\"parent\" is valid ONLY in roles.<role>.sub.<subRole>.model. It is rejected for role-level roles.<role>.model and for workhorses.<slot>. resolveModel treats a sub-role model of \"parent\" as equivalent to an absent sub-role model, falling through to roleModel ?? DEFAULT_MODEL_REFS[role].",
+      "recordedAt": "2026-05-22T20:40:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "resolveModel is the single model-resolution point. Intercepting \"parent\" there covers every runtime caller (agents.ts, review-agent.ts, inspect-agent.ts, specialist-context.ts, swarm/specialists/flywheel routes, etc.) with no per-caller change.",
+      "recordedAt": "2026-05-22T20:40:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Each code bead ships with its own unit tests rather than splitting tests into separate test-only beads. This keeps every bead independently reviewable and testable in isolation.",
+      "recordedAt": "2026-05-22T20:40:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Role-level \"Parent\" inheritance is out of scope. Roles (plan/work/review/test/ship/flywheel) have no parent role; \"parent\" applies only to sub-roles. The role-level model picker does not gain a \"Parent\" option.",
+      "recordedAt": "2026-05-22T20:40:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "derefWorkhorse would silently return a bogus model id if it ever received the literal \"parent\" (isWorkhorseRef is false, resolveModelId passes it through unchecked).",
+      "mitigation": "resolveModel normalizes a sub-role \"parent\" to undefined before calling derefWorkhorse, and validateRoleModelRefs skips derefWorkhorse for sub-role configs whose model is \"parent\". Additionally add a fail-fast guard in derefWorkhorse that throws a clear error if \"parent\" reaches it — it must be resolved away upstream, never dereferenced."
+    },
+    {
+      "id": "H2",
+      "summary": "mergeConfigs calls validateRoleModelRefs at load time (config-yaml.ts:1585). A config with a sub-role model of \"parent\" must not throw there, or every config load fails.",
+      "mitigation": "validateRoleModelRefs skips the derefWorkhorse call for sub-role entries whose model equals \"parent\"."
+    },
+    {
+      "id": "H3",
+      "summary": "The frontend ModelPicker component in RolesPanel.tsx is shared between the role-level picker and the sub-role pickers. The \"Parent\" option must appear ONLY in sub-role pickers.",
+      "mitigation": "Gate the \"Parent\" option on a new optional parentModelRef prop. Only the sub-role call site passes it; the role-level call site omits it."
+    },
+    {
+      "id": "H4",
+      "summary": "ModelPicker helpers (isWorkhorseRef, modelExists / currentSpecificModelMissing, displayModelRef, modelRefTooltip, resolveModelRef, providerWarning) assume the value is a workhorse ref or a concrete model id. \"parent\" is neither and would be flagged as a missing specific model or produce a spurious provider warning.",
+      "mitigation": "Special-case the \"parent\" value in those helpers so it is never flagged as missing, the tooltip/Resolved line shows the parent role's effective model, and no invalid-provider warning fires."
+    },
+    {
+      "id": "H5",
+      "summary": "The dashboard frontend does not import from src/lib, so it cannot reuse the PARENT_MODEL_REF constant defined in config-yaml.ts.",
+      "mitigation": "Define a local \"parent\" literal in RolesPanel.tsx and keep it identical to PARENT_MODEL_REF. The settings-api round-trip test (bead settings-validation) and the resolver test (bead core-resolver) both anchor the canonical string, so drift surfaces in CI."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-22T20:25:09.159Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1382: Sub-role models: add a 'Parent' option (inherit the parent role's model)",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ]
+}

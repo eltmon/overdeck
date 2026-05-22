@@ -1,0 +1,282 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-22T20:40:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1382: Sub-role models: add a 'Parent' option (inherit the parent role's model)",
+    "updated": "2026-05-22T20:30:49.884Z"
+  },
+  "plan": {
+    "id": "pan-1382",
+    "title": "Sub-role models: add a 'Parent' option (inherit the parent role's model)",
+    "status": "proposed",
+    "uid": "7f2a1c9d-4e6b-4a83-bd05-9c8e3f1a2b74",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-22T20:40:00.000Z",
+    "updated": "2026-05-22T20:30:49.884Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1382",
+        "label": "PAN-1382",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "config",
+      "settings",
+      "models",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Sub-roles (review's security/correctness/performance/requirements/synthesis; work's inspect/inspect-deep) are sub-models of a role, yet the dashboard Settings sub-role model picker offers only concrete models and workhorse slots. An operator cannot express 'use whatever the parent role's model is'. resolveModel() already falls back subModel ?? roleModel, but in practice DEFAULT_ROLES hardcodes a concrete model for every sub-role, so that implicit-inherit path never fires and there is no surfaced, self-documenting way to opt into it.",
+      "Proposal": "Add an explicit \"parent\" sentinel (option (b) from the issue). A sub-role whose model is the literal \"parent\" inherits the parent role's model. config-yaml.ts gains a PARENT_MODEL_REF constant; resolveModel normalizes a sub-role \"parent\" to undefined so it falls through to roleModel; validateRoleModelRefs skips dereferencing it; derefWorkhorse fails fast if it ever sees \"parent\". settings-api.ts's validateModelRef accepts \"parent\" only for sub-role model fields. The dashboard sub-role model picker gains a selectable \"Parent\" option. \"parent\" is valid ONLY for sub-roles — never role-level model or workhorse slots."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement option (b) — explicit \"parent\" sentinel — rather than option (a) UI-only.",
+        "rationale": "Option (a) is not truly UI-only: settings-api.ts validateModelRef rejects an absent/empty sub-role model, so clearing the field would fail validation. Option (b) is self-documenting in raw config.yaml (model: parent reads clearly), aligns with the 'No Bandaids' rule (explicit semantics over implicit 'empty {} means inherit' magic), and the #1201 coordination concern is moot because PAN-1201 already merged (commit 817c2c713)."
+      },
+      {
+        "summary": "Restrict \"parent\" to sub-role model fields; reject it for role-level model and workhorse slots.",
+        "rationale": "The issue scopes the feature to sub-roles inheriting the parent role's model. Roles have no parent role, and workhorse slots are concrete model anchors, so accepting \"parent\" there would be meaningless and resolve to nothing."
+      },
+      {
+        "summary": "Ship each code bead with its own unit tests instead of separate test-only beads.",
+        "rationale": "The change is small and layered; bundling tests with each layer keeps every bead independently reviewable and testable in isolation, and leaves the tree green after each bead."
+      },
+      {
+        "summary": "Document the new option in docs/REVIEW-AGENT-ARCHITECTURE.md rather than creating a new doc.",
+        "rationale": "That file already has a 'Model and harness configuration' section showing the roles.<role>.sub.<subRole>.model YAML; the new value belongs alongside it."
+      }
+    ],
+    "items": [
+      {
+        "id": "core-resolver",
+        "title": "Add 'parent' sentinel to resolveModel and config-load validation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T20:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1382",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "settings-validation",
+            "frontend-picker"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml.ts: export a PARENT_MODEL_REF constant set to the literal 'parent'. In resolveModel(), read the raw sub-role model and, when it equals PARENT_MODEL_REF, normalize it to undefined before resolution so it falls through to roleModel ?? DEFAULT_MODEL_REFS[role] (and the fieldPath used for errors points at roles.<role>.model, exactly as for an absent sub-model). In validateRoleModelRefs(), skip the derefWorkhorse() call for any sub-role config whose model equals PARENT_MODEL_REF (so config load via mergeConfigs does not throw). Add a fail-fast guard in derefWorkhorse() that throws a clear error if it is ever called with 'parent' — it must be resolved away by resolveModel and never dereferenced. 'parent' is accepted only as a sub-role model: a role-level roles.<role>.model of 'parent' must still fail config-load validation. Cover all of this with unit tests in src/lib/__tests__/config-yaml-roles.test.ts (and src/lib/__tests__/model-validation.test.ts if a load-path case fits better there)."
+        },
+        "subItems": [
+          {
+            "id": "core-resolver.ac1",
+            "title": "resolveModel('review','security',config) with roles.review.sub.security.model='parent' returns the model resolved from roles.review.model (the parent role's model).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-resolver.ac2",
+            "title": "When roles.review.model is itself absent, a sub-role model of 'parent' resolves to DEFAULT_MODEL_REFS.review.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-resolver.ac3",
+            "title": "mergeConfigs / validateRoleModelRefs accepts a config containing a sub-role model of 'parent' without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-resolver.ac4",
+            "title": "A config with a role-level roles.<role>.model of 'parent' is rejected at load with a clear error; 'parent' is never accepted for a workhorse slot.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-resolver.ac5",
+            "title": "derefWorkhorse('parent', ...) throws an explicit error identifying 'parent' as a resolve-only sub-role sentinel.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-resolver.ac6",
+            "title": "PARENT_MODEL_REF is exported from config-yaml.ts and equals the literal 'parent'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-validation",
+        "title": "Accept 'parent' sub-role model in the Settings API validator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T20:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1382",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/settings-api.ts, update validateModelRef() to accept the 'parent' sentinel (imported as PARENT_MODEL_REF from config-yaml.ts) via a new allowParentRef boolean parameter. allowParentRef is passed true only at the roles.<role>.sub.<subRole>.model call site; the workhorses.<slot> and roles.<role>.model call sites keep their existing behavior (allowParentRef false / default), so 'parent' is still rejected there. When allowParentRef is true and the ref equals PARENT_MODEL_REF, the ref is valid and no further model-capability check runs. Add settings-api.test.ts cases."
+        },
+        "subItems": [
+          {
+            "id": "settings-validation.ac1",
+            "title": "validateSettings on a payload with roles.review.sub.security.model='parent' returns no errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-validation.ac2",
+            "title": "validateSettings on a payload with roles.review.model='parent' returns a validation error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-validation.ac3",
+            "title": "validateSettings on a payload with workhorses.mid='parent' returns a validation error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-validation.ac4",
+            "title": "A sub-role model saved as 'parent' round-trips unchanged through writing and re-reading settings (loadSettingsApi returns roles.<role>.sub.<subRole>.model === 'parent').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-picker",
+        "title": "Add a 'Parent' option to the dashboard sub-role model picker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T20:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1382",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx, add an optional parentModelRef prop to the inline ModelPicker component. When parentModelRef is supplied (sub-role pickers only — the role-level picker call site omits it), render a selectable 'Parent' option with value 'parent' whose label communicates the inherited model (e.g. 'Parent (inherits <Role> model)'). Selecting it routes through the existing saveRoleConfig path so it persists roles.<role>.sub.<subRole>.model = 'parent'. Special-case the 'parent' value in the picker helpers (isWorkhorseRef / modelExists / currentSpecificModelMissing, displayModelRef, modelRefTooltip, resolveModelRef, providerWarning) so 'parent' is never flagged as a missing specific model, never produces a spurious invalid-provider warning, and the 'Resolved:' line shows the parent role's effective resolved model. Define a local 'parent' literal kept identical to PARENT_MODEL_REF. Add RolesPanel.test.tsx cases."
+        },
+        "subItems": [
+          {
+            "id": "frontend-picker.ac1",
+            "title": "A sub-role model picker (e.g. Review > Security) shows a selectable 'Parent' option; the role-level model picker does not show a 'Parent' option.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-picker.ac2",
+            "title": "Selecting 'Parent' issues a save that sets roles.<role>.sub.<subRole>.model to 'parent'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-picker.ac3",
+            "title": "When a sub-role's saved model is 'parent', the picker shows the 'Parent' option selected and the 'Resolved:' line shows the parent role's effective model.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-picker.ac4",
+            "title": "The 'parent' value does not trigger the 'current specific model missing' optgroup or any invalid-provider warning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the 'parent' sub-role model option",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T20:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1382",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the 'Model and harness configuration' section of docs/REVIEW-AGENT-ARCHITECTURE.md to document model: parent as a sub-role value meaning 'inherit the parent role's model'. Include a short YAML example showing a sub-role set to parent, and state explicitly that parent is valid only for sub-roles (not role-level model, not workhorse slots)."
+        },
+        "subItems": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md documents model: parent for sub-roles with a YAML example and the sub-role-only constraint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "core-resolver",
+        "to": "settings-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "core-resolver",
+        "to": "frontend-picker",
+        "type": "informs"
+      },
+      {
+        "from": "core-resolver",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "settings-validation",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-picker",
+        "to": "docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-22-PAN-1382-sub-role-models-add-a-parent-option-inherit-the-parent-role-s-model.vbrief.json"
+    }
+  }
+}
