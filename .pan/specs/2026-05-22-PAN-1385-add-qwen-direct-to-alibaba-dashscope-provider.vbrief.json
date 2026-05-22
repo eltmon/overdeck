@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:47:28.315Z"
+    "updated": "2026-05-22T23:49:47.358Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:47:28.315Z",
+    "updated": "2026-05-22T23:49:47.358Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -174,7 +174,7 @@
       {
         "id": "register-and-route-dashscope-provider",
         "title": "Register `dashscope` in PROVIDERS and route qwen3-* model IDs",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -190,7 +190,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac1",
             "title": "`ProviderName` union in providers.ts includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -198,7 +198,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac2",
             "title": "PROVIDERS.dashscope has `tested: false`, `authType: 'static'`, and `tierModels` populated with the three qwen3-* IDs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -206,7 +206,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac3",
             "title": "`getProviderForModel('qwen3-max')`, `getProviderForModel('qwen3-coder-plus')`, `getProviderForModel('qwen3-plus')`, and `getProviderForModel('qwen3.7')` (or its verified canonical equivalent) all return PROVIDERS.dashscope.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -214,7 +214,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac6",
             "title": "PROVIDERS.dashscope.models includes the qwen3.7 literal (canonical-verified per open question); tierModels.opus remains `qwen3-max` (qwen3.7 is NOT promoted to the default opus pick to keep the Cloister opus-tier default on an unambiguous ID).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -222,7 +222,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac4",
             "title": "`getProviderForModel('qwen/qwen3.6-plus')` still returns PROVIDERS.nous (Nous routing is untouched).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -230,7 +230,7 @@
           {
             "id": "register-and-route-dashscope-provider.ac5",
             "title": "`getProviderEnv(PROVIDERS.dashscope, 'sk-test')` produces an env object with `ANTHROPIC_BASE_URL` (proxy URL), `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` — no changes required to getProviderEnv itself; verify via a unit-test-friendly assertion.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
