@@ -152,7 +152,7 @@ Beads (closed list with mono IDs and durations) │ ● review-perf finished
 Review specialists (4 verdict rows)             │ ● work closed bd-3479
                                                 │ ● Plan approved · 9 beads
 
-[Action bar: Reset · Stop agent · View PR · Merge]
+[Action bar: phase-primary actions · ⋯ overflow (full catalog §4.8) · View PR · Merge]
 ```
 
 Width: 980px max, full-height drawer pinned to right. Parent surface dims (4% accent overlay + 2px blur) behind. Closed via Esc, X button, or click-on-scrim. URL is the persistence layer: `?issue=PAN-1052&tab=overview`.
@@ -330,6 +330,7 @@ The values below are the literal contract — what an implementer follows when n
 | Labels | 4px gap, wrap, same chip styling as Issue Row labels |
 | Bead progress | Row of: label (10px muted, e.g. "Beads 7/12") + 3px-tall track (`background: var(--accent)`, radius 2px) with phase-colored fill |
 | Foot | 8px top padding, 1px top border, agent two-line cell on the left + runtime mono on the right + 18×18 avatar |
+| Action row | Below the foot, 1px top border: 1–2 **phase-primary** action buttons (28px height, ghost) + a `⋯` overflow button opening the full §4.8 action menu. Revealed on card hover (pointer devices); always visible when the issue has a running agent or a pending action. See §4.8.3 |
 
 #### 4.7.7 Verb badges
 
@@ -385,7 +386,7 @@ Universal: 10px DM Sans weight 500, letter-spacing `0.05em`, **uppercase**, padd
 
 **Side rail (live activity):** `border-left: 1px solid var(--border)`, background `color-mix(in srgb, var(--background) 97%, var(--color-white))`, padding `16px 18px`, overflow-y auto. Stream items: `grid-template-columns: 14px 1fr`, gap 10px, padding-bottom 10px, 1px bottom border. 8×8 status dot (work/review/ship/done/info) + 12px text foreground with a 10px mono muted "when" line below.
 
-**Action bar (drawer footer):** padding `12px 22px`, 1px top border, background `color-mix(in srgb, var(--background) 96%, var(--color-white))`. Ghost buttons left, spacer, ghost "View PR" + primary "Merge to main" (primary uses `background: var(--success)`, color `#000` for contrast).
+**Action bar (drawer footer):** padding `12px 22px`, 1px top border, background `color-mix(in srgb, var(--background) 96%, var(--color-white))`. Left cluster is the **phase-aware action set** from §4.8 (ghost buttons for the applicable verbs plus a `⋯` overflow), spacer, then ghost "View PR" + primary "Merge to main" (primary uses `background: var(--success)`, color `#000` for contrast). The drawer is the canonical full-coverage action surface — every issue-scoped `pan` verb is reachable here per §4.8.
 
 #### 4.7.9 Agent Card (Agents view)
 
@@ -442,6 +443,119 @@ No bounce, no spring, no elastic — per style-guide §12.3.
 | Command Deck | 48px (within feature header) | 5-tile mini stats in feature header | Per-tab toolbar | App rail (48px) + tree (280px) + feature detail |
 | Agents | 52px | 6-tile strip | Phase pills + project/model dropdowns | App rail (48px) + main |
 | Issue Detail | — | — | — | Drawer over any surface, 980px |
+
+### 4.8 Action surface
+
+> **Amendment — 2026-05-21.** Added after the redesign shipped. It revises the
+> original §1 / §4.3 position that Board cards are "status-only" and that the
+> drawer carries a fixed four-button action bar. That position assumed
+> configure-then-launch had fully moved to dedicated planning; in practice it
+> stranded ~20 issue-scoped `pan` verbs with no dashboard entry point outside
+> the Command Deck. The redesign did **not** delete those actions —
+> `ZoneActionStrip` (~25 actions) and every dialog (`PlanDialog`, `BeadsDialog`,
+> model/harness pickers, `SwitchModelModal`) still exist — it only failed to
+> wire them into Board, Pipeline, Agents, and the drawer. This section makes the
+> action surface a first-class, system-wide contract.
+
+**Principle.** Every `pan` verb that operates on a single issue has a dashboard
+entry point. The CLI is the lower bound on capability, never the upper bound.
+Actions are defined **once** in a canonical registry and rendered by **one
+shared primitive** on every surface — the same "build once, fix once" rule the
+redesign already applies to Issue Row / Issue Card / verb badges.
+
+#### 4.8.1 Canonical action registry
+
+A single `issueActions` registry is the source of truth, replacing the stale
+`commandDeckSurfaceRegistry.ts` parity table (which currently *claims* the
+drawer carries actions it does not render). Each entry declares: `key`, `label`,
+the `pan` verb it mirrors, the HTTP endpoint, an `enabledWhen` phase/state
+predicate, a `kind` (`safe` · `dialog` · `destructive`), and a lifecycle
+`group`. The registry is surface-agnostic — surfaces *select and present* from
+it, they never define actions inline.
+
+| Action | `pan` verb | Endpoint | Enabled when | Kind |
+|---|---|---|---|---|
+| Plan… | `plan` | opens `PlanDialog` | no plan, or re-plan allowed | dialog |
+| Auto-plan | `plan --auto` | `PlanDialog` (auto) | same | dialog |
+| Watch planning | — | `PlanDialog` (live) | `PLANNING` | dialog |
+| Done planning | `plan` (finalize) | `POST /api/issues/:id/complete-planning` | plan proposed, plan agent idle | safe |
+| Start agent… | `start` | opens start dialog → `POST /api/agents` | plan proposed/approved, no work agent | dialog |
+| Start — skip planning | `start --auto` | `POST /api/agents` (`auto:true`) | Todo, no plan (closes #637) | dialog |
+| Swarm… | `swarm` | `POST /api/swarm` | plan has parallelizable items | dialog |
+| Tell agent… | `tell` | `POST /api/agents/:id/tell` | any agent running | dialog |
+| Done (complete work) | `done` | `POST /api/agents/:id/done` | `WORK RUNNING` | safe |
+| Request review | `review` | `POST /api/review/:id/trigger` | work complete, not in review | safe |
+| Restart review | `review restart` | `POST /api/specialists/:id/review/restart` | review running/stalled | safe |
+| Recover (reset review) | `review reset` / `recover` | `POST /api/review/:id/reset` | review/test/merge stuck | safe |
+| Stop agent | `kill` | `POST /api/agents/:id/stop` | agent running | safe |
+| Pause agent… | `pause` | `POST /api/agents/:id/pause` | agent running, not paused | dialog |
+| Unpause agent | `unpause` | `POST /api/agents/:id/unpause` | agent paused | safe |
+| Clear troubled | `untroubled` | `POST /api/agents/:id/untroubled` | agent troubled | safe |
+| Recover agent | `recover` | `POST /api/agents/:id/recover` | agent crashed/stopped | safe |
+| Resume session… | `resume` | `POST /api/agents/:id/resume` | stopped agent w/ saved session | dialog |
+| Switch model / restart… | — | restart-with-model | agent running | dialog |
+| Sync with main | `sync-main` | `POST /api/issues/:id/sync-main` | workspace exists, behind main | safe |
+| Inspect bead… | `inspect` | per-bead inspect *(verify/new endpoint)* | bead awaiting inspection | dialog |
+| Reopen | `reopen` | `POST /api/issues/:id/reopen` | issue closed/completed/cancelled | safe |
+| Close out… | `close` | `POST /api/issues/:id/close-out` | merged / `verifying-on-main` | destructive |
+| Wipe… | `wipe` | `POST /api/issues/:id/deep-wipe` | always | destructive |
+| Destroy workspace… | `destroy` | `POST /api/workspaces/:id/destroy` | workspace exists | destructive |
+| Open in editor | `open` | `PanOpenInPicker` (client) | workspace exists | safe |
+| View PR | — | external link | PR exists | safe |
+| Merge to main | — (human only) | `POST /api/issues/:id/merge` | `READY TO MERGE` | safe |
+| Reset issue… | — | `POST /api/issues/:id/reset` | always | destructive |
+
+All endpoints already exist except where flagged. §5.1's "no new endpoints"
+holds for the read model; the action surface may add the small set of
+write-endpoint gaps the table flags (per-bead `inspect`), which is in scope.
+
+#### 4.8.2 Shared rendering — `<IssueActionMenu>`
+
+One primitive renders the registry everywhere. It takes an issue, computes the
+enabled subset via each `enabledWhen` predicate, and renders either a menu
+(`⋯` / right-click) or an inline button cluster. Rules:
+
+- **`destructive` actions** require a typed/confirm dialog (matching today's
+  `ResetIssueButton` / deep-wipe confirm). Never one-click.
+- **`dialog` actions** open the existing dialog component — no re-implementation
+  (`PlanDialog`, start dialog, `SwitchModelModal`, Tell composer).
+- **Disabled** actions whose `enabledWhen` is false are shown greyed with a
+  tooltip reason, not hidden — discoverability over a moving target.
+- **Merge** stays human-only; no agent or automation path may invoke it.
+
+#### 4.8.3 Per-surface presentation
+
+| Surface | Presentation |
+|---|---|
+| **Board card** | Hybrid: 1–2 **phase-primary** inline ghost buttons + `⋯` overflow with the full enabled set (§4.7.6 Action row). Right-click also opens the menu. |
+| **Issue Detail drawer** | Canonical full surface. Footer action bar shows the phase-primary set as ghost buttons + `⋯` overflow; `View PR` + `Merge` stay pinned right. Every registry action reachable here. |
+| **Command Deck** | Already near-complete — reconcile `ZoneActionStrip` + the project-tree context menu onto the shared registry so coverage and labels match. Add the gaps it still lacks (Clear troubled, per-bead Inspect). |
+| **Pipeline row** | `⋯` overflow on row hover + right-click — same primitive, no inline buttons (rows stay dense). |
+| **Agents card** | Wire the existing dead `⋯` button to the menu (agent-scoped subset: Tell, Stop, Pause, Recover, Switch model). |
+
+**Phase-primary inline selection** (the 1–2 buttons surfaced before the `⋯`):
+
+| Phase / verb badge | Primary inline actions |
+|---|---|
+| `QUEUED FOR PLAN` / Todo | Plan… · Start agent… |
+| `PLANNING` | Watch planning · Done planning |
+| Planned (proposed, idle) | Start agent… |
+| `WORK RUNNING` | Tell agent… · Done |
+| `INPUT` | Open (respond) · Tell agent… |
+| `REVIEW RUNNING` / `SHIP RUNNING` | Tell agent… · Recover |
+| `CHANGES REQUESTED` | Open · Request review |
+| `STUCK` | Recover · Tell agent… |
+| `READY TO MERGE` | View PR · Merge to main |
+| `MERGED` | Close out… |
+
+#### 4.8.4 CLI ↔ dashboard parity gate
+
+The `pan` ↔ skill convention (CLAUDE.md) already keeps the CLI honest. The
+mirror gate for the dashboard: a test asserts every issue-scoped `pan` verb has
+a registry entry, and every registry entry resolves to a `<IssueActionMenu>`
+render on the drawer. This is the action-surface analogue of the §8
+styleguide-conformance test — it makes "the CLI is the lower bound" enforceable
+rather than aspirational, and closes the long-standing #243 audit.
 
 ## 5. Data & API
 

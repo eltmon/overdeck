@@ -251,3 +251,87 @@ Integration:
 - `tests/cli/commands/sync-mirror.test.ts`, `tests/lib/context/*.test.ts` (new)
 - `docs/HARNESSES.md` — section on layered context
 - `docs/CONTEXT-LAYERS.md` (new) — full reference
+
+## Consolidated Scope — Panopticon's Own Bundled Content Sources (added 2026-05-22)
+
+This issue absorbs **#1359** and the `sync-sources/` consolidation. Rationale: #1201
+rewrites `pan sync` end-to-end; the bundled-content-source cleanup touches the *same*
+code path — doing them separately means two churns of `pan sync` / `paths.ts`. One
+piece of work.
+
+### The second problem
+
+`pan sync` distributes two distinct kinds of content; the layered model above covers
+only the first:
+
+1. **User context layers** — global / project / workspace markdown + the user's own
+   skills/agents (covered above).
+2. **Panopticon's *own* bundled content** — the skills, agents, rules, hook scripts,
+   and workspace templates that ship *with the package*. Today these live in sprawled
+   top-level repo dirs — `skills/`, `dev-skills/`, `agents/`, `rules/`, `scripts/`,
+   `templates/` — indistinguishable from ~25 other top-level dirs (`docs/`, `guides/`,
+   `reference/`, `roles/`, `site/`, `marketing/`, …). `pan sync` reads them via the
+   `SOURCE_*_DIR` constants in `src/lib/paths.ts`.
+
+That ambiguity caused **#1359**: `SOURCE_RULES_DIR` points at `<root>/rules/`, which
+went stale 2026-02-25 (4 files) while the maintained rules accumulated in
+`<root>/.claude/rules/` (8 files). Rules added since — `dashboard-node22-only`,
+`fake-timers-for-retry-tests`, `single-deacon-invariant`, `work-agents-via-pan` —
+never reach `pan sync`. Nothing in the repo layout signals which dirs are sync
+sources, so the wrong one was wired in and silently rotted.
+
+### Design — explicit `sync-sources/` root
+
+Consolidate every Panopticon-bundled sync source under one explicit top-level dir:
+
+```
+sync-sources/
+  skills/      dev-skills/   agents/
+  rules/       commands/     hooks/        templates/
+```
+
+`src/lib/paths.ts` collapses the scattered `SOURCE_*_DIR` constants to one
+`SYNC_SOURCES_ROOT`. The name is deliberately self-documenting — a glance at the repo
+root shows exactly what `pan sync` distributes.
+
+### Content preservation — hard requirement
+
+The reorg must **lose zero content**:
+
+- Every file under today's `skills/` (97 skills), `dev-skills/`, `agents/`, hook
+  `scripts/`, and `templates/` (docker / traefik / claude-md sections) moves into
+  `sync-sources/` intact — same content, same relative structure.
+- The rules source becomes the **de-duplicated union** of `<root>/rules/` (4) and
+  `<root>/.claude/rules/` (8) — all 8 distinct rules, current content, none dropped.
+- `templates/claude-md/sections/` content (`beads.md`, `commands-skills.md`,
+  `warnings.md`, `workspace-info.md`) is preserved and folded into the layered
+  CLAUDE.md model — not deleted.
+- A pre/post content-hash inventory confirms nothing was lost.
+
+### Additional acceptance criteria
+
+- All Panopticon-bundled sync sources live under `sync-sources/`; no top-level
+  `skills/`/`rules/`/`agents/`/`dev-skills/`/`templates/` remain (or only thin
+  redirects during a deprecation window).
+- `paths.ts` exposes a single `SYNC_SOURCES_ROOT`; the stale `<root>/rules/` is gone
+  and `pan sync` distributes all 8 rules.
+- `package.json` `files` array, CI, and `scripts/lint-skills.sh` are updated to the
+  new paths in the same change.
+- Pre/post content-hash inventory proves zero content loss.
+- #1359 is resolved by this work.
+
+### Decide during planning
+
+`.claude/rules/` mixes universally-distributable rules (`work-agents-via-pan`,
+`no-destructive-requests`) with panopticon-cli-development-only ones
+(`fake-timers-for-retry-tests` is a test-writing rule; `dashboard-node22-only` /
+`single-deacon-invariant` concern developing Panopticon itself). Planning must decide
+whether `pan sync` distributes dev-only rules everywhere, or whether the two sets need
+an explicit split (a frontmatter `scope:` field, or a subdir convention).
+
+### Related CLAUDE.md content issues (ride-along scope)
+
+Downstream of the distribution mechanism — link, address opportunistically:
+#605 (CLAUDE.md prompt assembly across agent types), #591 (Karpathy guidelines into
+CLAUDE.md templates), #592 (planning-agent CLAUDE.md/STATE.md audit), #589
+(commands-skills.md refresh).

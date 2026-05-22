@@ -21,15 +21,16 @@ vi.mock('node:fs', () => ({
 // ─── Mock lib/agents.ts ───────────────────────────────────────────────────────
 
 const mockGetAgentState = vi.fn();
-const mockGetAgentStateAsync = vi.fn();
+const mockGetAgentStateEffect = vi.fn();
 const mockSpawnAgent = vi.fn();
 const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
-  getAgentStateAsync: mockGetAgentStateAsync,
+  getAgentStateEffect: mockGetAgentStateEffect,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
+  stopAgentEffect: (agentId: string) => Effect.sync(() => mockStopAgent(agentId)),
   messageAgent: mockMessageAgent,
   normalizeAgentId: (id: string) => id.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
 }));
@@ -78,6 +79,7 @@ describe('AgentSpawner — integration', () => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockGetAgentState.mockReturnValue(null);
+    mockGetAgentStateEffect.mockReturnValue(Effect.succeed(null));
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);
@@ -128,7 +130,7 @@ describe('AgentSpawner — integration', () => {
     });
 
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
-      mockGetAgentStateAsync.mockResolvedValue({ status: 'running', issueId: 'PAN-1' });
+      mockGetAgentStateEffect.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
       const program = Effect.gen(function* () {

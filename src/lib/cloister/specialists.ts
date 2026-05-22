@@ -11,6 +11,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
+import { Effect } from 'effect';
 import { AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
@@ -24,7 +25,7 @@ import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth }
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
 import { getSpecialistHarness } from './router.js';
-import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
+import { killSessionAsyncEffect, listPaneValuesAsyncEffect, sessionExistsAsyncEffect } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
 
@@ -569,7 +570,7 @@ export const REVIEWER_ROLES: readonly ReviewerRole[] = [
  * Get the canonical reviewer tmux session name (PAN-830 / PAN-1048).
  *
  * Pattern: `agent-<issueId>-review-<role>`. One tmux session per role per
- * issue — sessions are reused across review rounds via `sendKeysAsync`
+ * issue — sessions are reused across review rounds via the agent message delivery path.
  * resumption. Round 2 of `review-correctness` does NOT spawn a new session;
  * it injects a follow-up prompt into the existing pane.
  *
@@ -952,7 +953,7 @@ export async function terminateSpecialist(
 
   try {
     // Kill tmux session
-    await killSessionAsync(tmuxSession);
+    await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
     console.log(`[specialist] Terminated ${projectKey}/${specialistType}`);
   } catch (error) {
     console.error(`[specialist] Failed to kill tmux session ${tmuxSession}:`, error);
@@ -1417,12 +1418,12 @@ export async function isRunning(name: SpecialistAgentName, projectKey?: string):
   const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
-    const exists = await sessionExistsAsync(tmuxSession);
+    const exists = await Effect.runPromise(sessionExistsAsyncEffect(tmuxSession));
     if (!exists) return false;
     // Session exists — but check if the pane actually has a running process.
     // When Claude Code crashes, the pane's process exits but the tmux session persists,
     // making has-session return success even though nothing is running.
-    const panePid = (await listPaneValuesAsync(tmuxSession, '#{pane_pid}'))[0]?.trim() ?? '';
+    const panePid = (await Effect.runPromise(listPaneValuesAsyncEffect(tmuxSession, '#{pane_pid}')))[0]?.trim() ?? '';
     if (!panePid) return false;
     // Check if the pane's process has any child processes (Claude Code / bash)
     const { stdout: children } = await execAsync(

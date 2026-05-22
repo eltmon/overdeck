@@ -361,10 +361,10 @@ export const ReadModelServiceLive = Layer.effect(
           // The projection cache may be stale if an agent's tmux session died while
           // the server was down — the cache still says 'running' but state.json says
           // 'stopped'. Without this step the dashboard shows incorrect action buttons.
-          const { listRunningAgentsAsync: listRunningForReconcile } = yield* Effect.promise(
+          const { listRunningAgentsEffect: listRunningForReconcile } = yield* Effect.promise(
             () => import('../../lib/agents.js'),
           );
-          const groundTruthAgents = yield* Effect.promise(() => listRunningForReconcile());
+          const groundTruthAgents = yield* listRunningForReconcile();
           const cachedAgentById = new Map(allAgents.map((a: any) => [a.id, a]));
           const agentsById: Record<string, AgentSnapshot> = {};
           for (const a of groundTruthAgents) {
@@ -454,7 +454,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgentsEffect, warnOnBareNumericIssueIds }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/review-status.js')),
@@ -467,7 +467,7 @@ export const ReadModelServiceLive = Layer.effect(
         yield* Effect.promise(() => warnOnBareNumericIssueIds());
 
         // ── Agents ────────────────────────────────────────────────────────────
-        const running = yield* Effect.promise(() => listRunningAgentsAsync());
+        const running = yield* listRunningAgentsEffect();
         const agentsById: Record<string, AgentSnapshot> = {};
 
         // Compute enrichment for all agents in parallel during bootstrap

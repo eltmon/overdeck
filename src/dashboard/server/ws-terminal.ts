@@ -18,9 +18,10 @@
 import http from 'node:http';
 import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
+import { Effect } from 'effect';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
-import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { buildTmuxArgs, capturePaneAsyncEffect, getWindowDimensionsAsyncEffect, listSessionNamesAsyncEffect, resizeWindowAsyncEffect, sessionExistsAsyncEffect } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
@@ -127,11 +128,11 @@ async function captureFreshSnapshot(
   requestedCols: number,
   requestedRows: number,
 ): Promise<{ cols: number; rows: number; data: string }> {
-  const dims = await getWindowDimensionsAsync(sessionName);
+  const dims = await Effect.runPromise(getWindowDimensionsAsyncEffect(sessionName));
   if (!dims) {
     return { cols: requestedCols, rows: requestedRows, data: '' };
   }
-  const data = await capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
+  const data = await Effect.runPromise(capturePaneAsyncEffect(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true }));
   return { cols: dims.cols, rows: dims.rows, data };
 }
 
@@ -143,7 +144,7 @@ async function captureFreshSnapshot(
  * naturally covers it. `-S 0` starts capture from the first visible line.
  */
 async function captureViewportSnapshot(sessionName: string): Promise<string> {
-  return capturePaneAsync(sessionName, 0, { escapeSequences: true });
+  return Effect.runPromise(capturePaneAsyncEffect(sessionName, 0, { escapeSequences: true }));
 }
 
 /**
@@ -257,7 +258,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     // Check if tmux session exists and set up PTY (async)
     (async () => {
       try {
-        const sessions = await listSessionNamesAsync();
+        const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
         if (!sessions.includes(sessionName)) {
           // The session may legitimately be gone, OR it may be in the
           // middle of a switch-model / resume / restart-all kill→spawn
@@ -373,7 +374,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           } catch {
             // PTY may be mid-teardown; subsequent operations will notice.
           }
-          resizeWindowAsync(sessionName, requestedCols, requestedRows).catch(() => {});
+          Effect.runPromise(resizeWindowAsyncEffect(sessionName, requestedCols, requestedRows)).catch(() => {});
           for (const client of existingHub.clients) {
             if (client !== ws) {
               sendControl(client, { type: 'size', cols: requestedCols, rows: requestedRows });
@@ -402,7 +403,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             } catch {
               return;
             }
-            resizeWindowAsync(sessionName, parsed.cols, parsed.rows)
+            Effect.runPromise(resizeWindowAsyncEffect(sessionName, parsed.cols, parsed.rows))
               .catch(() => {});
             for (const client of existingHub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
@@ -464,7 +465,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       const startLocalPty = async () => {
         if (ptyStarted) return;
         try {
-          let exists = await sessionExistsAsync(sessionName);
+          let exists = await Effect.runPromise(sessionExistsAsyncEffect(sessionName));
           // Mirror the upfront 4404 guard: tolerate the kill→spawn gap of
           // an in-progress respawn rather than emitting fatal 4404 the
           // client won't retry.
@@ -569,7 +570,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           hub.rows = parsed.rows;
           if (ptyProcess) {
             ptyProcess.resize(parsed.cols, parsed.rows);
-            resizeWindowAsync(sessionName, parsed.cols, parsed.rows)
+            Effect.runPromise(resizeWindowAsyncEffect(sessionName, parsed.cols, parsed.rows))
               .catch(() => {});
             for (const client of hub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });

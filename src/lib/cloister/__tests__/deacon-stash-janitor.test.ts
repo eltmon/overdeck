@@ -43,20 +43,41 @@ vi.mock('../config.js', () => ({
     monitoring: {},
   })),
 }));
-vi.mock('../../../lib/tmux.js', () => ({
+vi.mock('../../../lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsync: vi.fn(async () => ''),
-  createSessionAsync: vi.fn(async () => {}),
+  capturePaneAsyncEffect: effectMock(''),
+  createSessionAsyncEffect: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsync: vi.fn(async () => {}),
+  killSessionAsyncEffect: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsync: vi.fn(async () => []),
-  listSessionNamesAsync: vi.fn(async () => []),
+  listPaneValuesAsyncEffect: effectMock([]),
+  listSessionNamesAsyncEffect: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsync: vi.fn(async () => false),
-  sendKeysAsync: vi.fn(async () => {}),
-  isPaneDeadAsync: vi.fn(async () => false),
-}));
+  sessionExistsAsyncEffect: effectMock(false),
+  sendKeysEffect: effectMock(undefined),
+  isPaneDeadAsyncEffect: effectMock(false),
+  };
+});
 vi.mock('../../paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
@@ -94,15 +115,15 @@ import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatus, setReviewStatus } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
 import { loadCloisterConfig } from '../config.js';
-import { listSessionNamesAsync, killSessionAsync, sessionExists, sessionExistsAsync } from '../../../lib/tmux.js';
+import { listSessionNamesAsyncEffect, killSessionAsyncEffect, sessionExists, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentState = vi.mocked(getAgentState);
 const mockSaveAgentState = vi.mocked(saveAgentState);
-const mockListSessionNamesAsync = vi.mocked(listSessionNamesAsync);
-const mockKillSessionAsync = vi.mocked(killSessionAsync);
+const mockListSessionNamesAsync = vi.mocked(listSessionNamesAsyncEffect);
+const mockKillSessionAsync = vi.mocked(killSessionAsyncEffect);
 const mockSessionExists = vi.mocked(sessionExists);
-const mockSessionExistsAsync = vi.mocked(sessionExistsAsync);
+const mockSessionExistsAsync = vi.mocked(sessionExistsAsyncEffect);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);

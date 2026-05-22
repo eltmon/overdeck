@@ -54,19 +54,35 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
 }));
 
-vi.mock('../../../src/lib/tmux.js', () => ({
-  sessionExists: vi.fn().mockReturnValue(true),
-  sessionExistsAsync: vi.fn().mockResolvedValue(true),
-  sendKeysAsync: mockSendKeysAsync,
-  buildTmuxCommandString: vi.fn().mockReturnValue(''),
-  capturePaneAsync: vi.fn().mockResolvedValue(''),
-  createSessionAsync: vi.fn().mockResolvedValue(undefined),
-  killSession: vi.fn(),
-  killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  listPaneValues: vi.fn().mockReturnValue([]),
-  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
-  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-}));
+vi.mock('../../../src/lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    return fn;
+  };
+  return {
+    sessionExists: vi.fn().mockReturnValue(true),
+    sessionExistsAsyncEffect: effectMock(true),
+    sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
+    buildTmuxCommandString: vi.fn().mockReturnValue(''),
+    capturePaneAsyncEffect: effectMock(''),
+    createSessionAsyncEffect: effectMock(undefined),
+    isPaneDeadAsyncEffect: effectMock(false),
+    killSession: vi.fn(),
+    killSessionAsyncEffect: effectMock(undefined),
+    listPaneValues: vi.fn().mockReturnValue([]),
+    listPaneValuesAsyncEffect: effectMock([]),
+    listSessionNamesAsyncEffect: effectMock([]),
+  };
+});
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
@@ -113,7 +129,7 @@ import {
   checkWorkspaceContainerHealth,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
-import { sessionExistsAsync } from '../../../src/lib/tmux.js';
+import { sessionExistsAsyncEffect } from '../../../src/lib/tmux.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -364,7 +380,7 @@ describe('checkWorkspaceContainerHealth', () => {
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (1) 2 minutes ago\n` },
     });
-    vi.mocked(sessionExistsAsync).mockResolvedValueOnce(false);
+    vi.mocked(sessionExistsAsyncEffect).mockResolvedValueOnce(false);
 
     const actions = await checkWorkspaceContainerHealth();
 
