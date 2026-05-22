@@ -743,6 +743,21 @@ export function CommandDeck({
   // (e.g. popstate), not on every conversations refetch.
   const appliedConvId = useRef<string | null>(null);
 
+  // Resolve the registered project (by name) that owns a conversation's cwd,
+  // or null when the conversation is unscoped — cwd not under any registered
+  // project (e.g. created without a projectKey, so cwd defaults to ~/Projects).
+  const resolveConversationProjectName = useCallback(
+    (conv: Conversation | null | undefined): string | null => {
+      if (!conv?.cwd) return null;
+      const cwd = conv.cwd;
+      const matched = registeredProjects.find(
+        (rp) => !!rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')),
+      );
+      return matched ? (matched.name ?? matched.key) : null;
+    },
+    [registeredProjects],
+  );
+
   // On mount or when convId changes (popstate), apply the deep-link
   useEffect(() => {
     if (!convId || conversations.length === 0) return;
@@ -750,10 +765,13 @@ export function CommandDeck({
     const conv = conversations.find((c) => String(c.id) === convId);
     if (conv) {
       setSelectedConversation(conv.name);
-      setSelectedProject(null);
+      // A conversation selection owns the right pane — clear any feature so a
+      // stale resolvedProjectForFeature can't shadow it (see handleSelectConversation).
+      setSelectedFeature(null);
+      setSelectedProject(resolveConversationProjectName(conv));
       appliedConvId.current = convId;
     }
-  }, [convId, conversations]);
+  }, [convId, conversations, resolveConversationProjectName]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected
   const hasAutoSelected = useRef(false);
@@ -1044,7 +1062,19 @@ export function CommandDeck({
     if (selectedFeature) {
       selectSession(selectedFeature, null);
     }
-  }, [selectSession, selectedFeature]);
+    if (name) {
+      // Selecting a conversation supersedes any feature/project selection.
+      // Without clearing selectedFeature, resolvedProjectForFeature keeps
+      // rightPaneProject pinned to the previously-selected issue, which both
+      // hides unscoped conversations (they only render when rightPaneProject
+      // is null) and shows a mismatched ZoneA issue header over scoped ones.
+      // Anchoring selectedProject to the conversation's own project keeps the
+      // "Back to conversations" control working for project-scoped chats.
+      setSelectedFeature(null);
+      const conv = conversations.find((c) => c.name === name);
+      setSelectedProject(resolveConversationProjectName(conv));
+    }
+  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName]);
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
@@ -1192,14 +1222,10 @@ export function CommandDeck({
   const resolvedProjectForConversation = useMemo(() => {
     if (!selectedConversation) return null;
     const conv = conversations.find(c => c.name === selectedConversation);
-    if (!conv || !conv.cwd) return null;
-    const matched = registeredProjects.find(rp =>
-      conv.cwd === rp.path || conv.cwd.startsWith(rp.path + '/'),
-    );
-    if (!matched) return null;
-    const name = matched.name ?? matched.key;
-    return projectsWithSessions.find(p => p.name === name) ?? null;
-  }, [conversations, selectedConversation, registeredProjects, projectsWithSessions]);
+    const projectName = resolveConversationProjectName(conv);
+    if (!projectName) return null;
+    return projectsWithSessions.find(p => p.name === projectName) ?? null;
+  }, [conversations, selectedConversation, resolveConversationProjectName, projectsWithSessions]);
 
   const rightPaneProject = selectedProjectData ?? resolvedProjectForFeature ?? resolvedProjectForConversation;
 
