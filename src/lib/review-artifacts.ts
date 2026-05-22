@@ -3,20 +3,20 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Data, Effect } from 'effect';
-import { findPlan } from './vbrief/io.js';
+import { findPlanSync } from './vbrief/io.js';
 import { promisify } from 'node:util';
 import { queryBeadsForIssue } from './beads-query.js';
 import { getForgeAdapter } from './forge.js';
-import { extractNumber } from './issue-id.js';
+import { extractNumberSync } from './issue-id.js';
 import {
-  ensureMergeSetForIssue,
-  upsertMergeSet,
-  withRepoArtifactUrl,
-  withRepoState,
+  ensureMergeSetForIssueSync,
+  upsertMergeSetSync,
+  withRepoArtifactUrlSync,
+  withRepoStateSync,
   type MergeSet,
   type MergeSetRepoState,
 } from './merge-set.js';
-import { emitActivityEntry } from './activity-logger.js';
+import { emitActivityEntrySync } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -29,20 +29,14 @@ export interface ReviewArtifactCreationResult {
     url?: string;
     id?: string;
   }>;
-}
-
-/**
- * Build the PR/MR body from the workspace planning artifacts.
- * Shared by both `pan done` and dashboard review startup.
- */
-export async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
+}async function buildRichReviewArtifactBodyPromise(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
+  lines.push(`Closes #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
   try {
-    const planPath = findPlan(workspacePath);
+    const planPath = findPlanSync(workspacePath);
     if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
@@ -62,7 +56,7 @@ export async function buildRichReviewArtifactBody(issueId: string, workspacePath
   }
 
   try {
-    const beads = await queryBeadsForIssue(workspacePath, issueId);
+    const beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
     if (beads.length > 0) {
       lines.push('## Implementation Tasks');
       lines.push('');
@@ -109,18 +103,16 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     if (typeof err?.code === 'number' && err.code === 1) return true;
     return true;
   }
-}
-
-export async function createReviewArtifactsForIssue(
+}async function createReviewArtifactsForIssuePromise(
   issueId: string,
   workspacePath: string
 ): Promise<ReviewArtifactCreationResult> {
-  let mergeSet = ensureMergeSetForIssue(issueId);
+  let mergeSet = ensureMergeSetForIssueSync(issueId);
   if (!mergeSet) {
     return { mergeSet: null, artifacts: [] };
   }
 
-  const body = await buildRichReviewArtifactBody(issueId, workspacePath);
+  const body = await Effect.runPromise(buildRichReviewArtifactBody(issueId, workspacePath));
   const artifacts: ReviewArtifactCreationResult['artifacts'] = [];
 
   for (const repo of mergeSet.repos) {
@@ -128,7 +120,7 @@ export async function createReviewArtifactsForIssue(
     const hasChanges = await repoHasChanges(repoWorkspacePath, repo.targetBranch);
 
     if (!hasChanges) {
-      mergeSet = withRepoState(mergeSet, repo.repoKey, {
+      mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
         reviewStatus: 'skipped',
         testStatus: 'skipped',
         rebaseStatus: 'skipped',
@@ -149,9 +141,9 @@ export async function createReviewArtifactsForIssue(
     });
 
     if (artifact.url) {
-      mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifact.url, artifact.id);
+      mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifact.url, artifact.id);
     }
-    mergeSet = withRepoState(mergeSet, repo.repoKey, {
+    mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
       artifactId: artifact.id,
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -161,7 +153,7 @@ export async function createReviewArtifactsForIssue(
     });
     if (artifact.created) {
       const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
-      emitActivityEntry({
+      emitActivityEntrySync({
         source: 'ship',
         level: 'info',
         message: `Merge request created for ${issueId}${repoSuffix}`,
@@ -183,7 +175,7 @@ export async function createReviewArtifactsForIssue(
     status: 'reviewing',
     updatedAt: new Date().toISOString(),
   };
-  upsertMergeSet(mergeSet);
+  upsertMergeSetSync(mergeSet);
 
   return { mergeSet, artifacts };
 }
@@ -199,12 +191,12 @@ export class ReviewArtifactError extends Data.TaggedError('ReviewArtifactError')
 }> {}
 
 /** Effect variant of `buildRichReviewArtifactBody`. */
-export const buildRichReviewArtifactBodyEffect = (
+export const buildRichReviewArtifactBody = (
   issueId: string,
   workspacePath: string,
 ): Effect.Effect<string, ReviewArtifactError> =>
   Effect.tryPromise({
-    try: () => buildRichReviewArtifactBody(issueId, workspacePath),
+    try: () => buildRichReviewArtifactBodyPromise(issueId, workspacePath),
     catch: (cause) =>
       new ReviewArtifactError({
         issueId,
@@ -215,12 +207,12 @@ export const buildRichReviewArtifactBodyEffect = (
   });
 
 /** Effect variant of `createReviewArtifactsForIssue`. */
-export const createReviewArtifactsForIssueEffect = (
+export const createReviewArtifactsForIssue = (
   issueId: string,
   workspacePath: string,
 ): Effect.Effect<ReviewArtifactCreationResult, ReviewArtifactError> =>
   Effect.tryPromise({
-    try: () => createReviewArtifactsForIssue(issueId, workspacePath),
+    try: () => createReviewArtifactsForIssuePromise(issueId, workspacePath),
     catch: (cause) =>
       new ReviewArtifactError({
         issueId,

@@ -95,17 +95,17 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
-  isPaneDeadAsyncEffect: effectMock(false),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
+  isPaneDead: effectMock(false),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sendKeysEffect: effectMock(undefined),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExists: effectMock(false),
   };
 });
 
@@ -119,7 +119,7 @@ vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn
 vi.mock('../../lifecycle/workflows.js', async () => {
   // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
   const { Effect } = await import('effect');
-  return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
+  return { closeOut: (await Effect.runPromise(vi.fn(() => Effect.succeed({ success: true, steps: [] })))) };
 });
 vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
@@ -163,19 +163,19 @@ vi.mock('../specialists.js', () => ({
 }));
 
 import { autoCloseOut } from '../deacon.js';
-import { loadCloisterConfigEffect } from '../config.js';
-import { loadReviewStatuses, setReviewStatus } from '../../../lib/review-status.js';
-import { resolveProjectFromIssue } from '../../projects.js';
-import { resolveGitHubIssue } from '../../tracker-utils.js';
-import { emitActivityEntry } from '../../activity-logger.js';
+import { loadCloisterConfig } from '../config.js';
+import { loadReviewStatuses, setReviewStatusSync } from '../../../lib/review-status.js';
+import { resolveProjectFromIssueSync } from '../../projects.js';
+import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+import { emitActivityEntrySync } from '../../activity-logger.js';
 import { closeOut } from '../../lifecycle/workflows.js';
 
-const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigEffect);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
-const mockSetReviewStatus = vi.mocked(setReviewStatus);
-const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
-const mockResolveGitHubIssue = vi.mocked(resolveGitHubIssue);
-const mockEmitActivityEntry = vi.mocked(emitActivityEntry);
+const mockSetReviewStatus = vi.mocked(setReviewStatusSync);
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssueSync);
+const mockResolveGitHubIssue = vi.mocked(resolveGitHubIssueSync);
+const mockEmitActivityEntry = vi.mocked(emitActivityEntrySync);
 const mockCloseOut = vi.mocked(closeOut);
 
 function installIssueView(labels: string[], state = 'OPEN') {
@@ -212,14 +212,14 @@ describe('autoCloseOut', () => {
   });
 
   it('returns without side effects when automatic close-out is disabled', async () => {
-    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    (await Effect.runPromise(mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any)));
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
 
     const actions = await autoCloseOut(now);
 
     expect(actions).toEqual([]);
     expect(execFileMock).not.toHaveBeenCalled();
-    expect(mockCloseOut).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockCloseOut))).not.toHaveBeenCalled();
     expect(mockEmitActivityEntry).not.toHaveBeenCalled();
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
@@ -229,7 +229,7 @@ describe('autoCloseOut', () => {
 
     const actions = await autoCloseOut(now);
 
-    expect(mockCloseOut).toHaveBeenCalledWith({
+    (await Effect.runPromise(expect(mockCloseOut))).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
       projectPath: '/repo',
       auto: true,
@@ -255,16 +255,16 @@ describe('autoCloseOut', () => {
     const actions = await autoCloseOut(now);
 
     expect(actions).toEqual([]);
-    expect(mockCloseOut).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockCloseOut))).not.toHaveBeenCalled();
   });
 
   it('records failure through review status and activity so retry backs off via updatedAt', async () => {
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
     // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
-    mockCloseOut.mockReturnValue(Effect.succeed({
+    (await Effect.runPromise(mockCloseOut.mockReturnValue(Effect.succeed({
       success: false,
       steps: [{ step: 'close-out:archive', success: false, skipped: false, error: 'archive failed' }],
-    }) as any);
+    }) as any)));
 
     const actions = await autoCloseOut(now);
 

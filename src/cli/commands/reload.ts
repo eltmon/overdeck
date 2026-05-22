@@ -1,8 +1,9 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { spawn } from 'child_process';
 import { statSync } from 'fs';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
-import { readPlatformConfig, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
+import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { resolveBundledServerPath, spawnDashboardDetached } from './restart.js';
 
@@ -44,14 +45,14 @@ function runBuild(): Promise<number> {
 }
 
 async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
-  await writeRestartStatus({
+  await Effect.runPromise(writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan reload',
     success,
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
-  });
+  }));
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
@@ -65,9 +66,9 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  const lock = await acquireRestartLock('pan reload');
+  const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
   if (!lock) {
-    const holder = await readRestartLockHolder();
+    const holder = await Effect.runPromise(readRestartLockHolder());
     const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
     const error = `restart in progress (${heldBy})`;
     console.error(chalk.yellow(error));
@@ -76,7 +77,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  const config = readPlatformConfig();
+  const config = readPlatformConfigSync();
   const disableDeacon = options.deacon === false;
 
   try {
@@ -101,9 +102,9 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }
     }
 
-    await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
+    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
       healthTimeoutMs,
-    });
+    }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
   } catch (error) {

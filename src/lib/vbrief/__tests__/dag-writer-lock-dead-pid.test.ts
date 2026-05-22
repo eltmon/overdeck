@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { VBriefDocument } from '../types.js';
-import { applyTaskOperationToPlanFileEffect, isPidDead, removeStaleLockEffect } from '../dag.js';
+import { applyTaskOperationToPlanFile, isPidDead, removeStaleLock } from '../dag.js';
 
 function makeDoc(): VBriefDocument {
   return {
@@ -86,7 +86,7 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
     writeFileSync(join(lockPath, 'owner.json'), '{}', 'utf-8');
     const tmpPath = `${planPath}.${process.pid}.123.tmp`;
     writeFileSync(tmpPath, '{}', 'utf-8');
-    await Effect.runPromise(removeStaleLockEffect(planPath));
+    await Effect.runPromise(removeStaleLock(planPath));
     expect(existsSync(lockPath)).toBe(false);
     expect(existsSync(tmpPath)).toBe(false);
   });
@@ -106,7 +106,7 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
       'utf-8',
     );
 
-    const result = await Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
+    const result = await Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
       type: 'claim',
       itemId: 'item-1',
       expectedSequence: 1,
@@ -135,7 +135,7 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
     );
 
     await expect(
-      Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
+      Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
         type: 'claim',
         itemId: 'item-1',
         expectedSequence: 1,

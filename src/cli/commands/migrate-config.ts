@@ -9,9 +9,9 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import {
-  needsMigration,
-  hasLegacySettings,
-  migrateConfig,
+  needsMigrationSync,
+  hasLegacySettingsSync,
+  migrateConfigSync,
   type MigrationOptions,
 } from '../../lib/config-migration.js';
 
@@ -30,7 +30,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   console.log('');
 
   // Check if legacy settings exist
-  if (!hasLegacySettings()) {
+  if (!hasLegacySettingsSync()) {
     console.log(chalk.yellow('✓ No legacy settings.json found'));
     console.log(chalk.dim('  You are already using the new config.yaml format.'));
     console.log('');
@@ -38,7 +38,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   }
 
   // Check if migration is needed
-  if (!needsMigration() && !options.force) {
+  if (!needsMigrationSync() && !options.force) {
     console.log(chalk.green('✓ Already migrated to config.yaml'));
     console.log(chalk.dim('  Use --force to regenerate config.yaml from settings.json'));
     console.log('');
@@ -48,7 +48,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   // Preview mode - dry run
   if (options.preview) {
     const spinner = ora('Generating migration preview...').start();
-    const preview = migrateConfig({ dryRun: true });
+    const preview = migrateConfigSync({ dryRun: true });
 
     if (!preview.success) {
       spinner.fail('Preview failed');
@@ -75,7 +75,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   // Confirm migration
   if (!options.force) {
     // Do a dry run to show what will happen
-    const preview = migrateConfig({ dryRun: true });
+    const preview = migrateConfigSync({ dryRun: true });
 
     if (preview.success) {
       console.log(chalk.bold('Migration will:'));
@@ -117,7 +117,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
     deleteLegacy: options.deleteLegacy || false,
   };
 
-  const result = migrateConfig(migrationOptions);
+  const result = migrateConfigSync(migrationOptions);
 
   if (!result.success) {
     spinner.fail('Migration failed');

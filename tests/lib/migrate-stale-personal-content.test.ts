@@ -67,7 +67,7 @@ describe('migrateStalePersonalContent', () => {
     mockHomedirFn = () => fakeHome;
 
     const mod = await import('../../src/lib/sync.js');
-    migrateStalePersonalContent = mod.migrateStalePersonalContent;
+    migrateStalePersonalContent = mod.migrateStalePersonalContentSync;
   });
 
   afterEach(() => {

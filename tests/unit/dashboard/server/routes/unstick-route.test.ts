@@ -68,8 +68,8 @@ afterEach(() => {
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
 import { processUnstickRequest } from '../../../../../src/dashboard/server/routes/workspaces.js';
-import { markWorkspaceStuck, getReviewStatusFromDb } from '../../../../../src/lib/database/review-status-db.js';
-import { setReviewStatus, getReviewStatus } from '../../../../../src/lib/review-status.js';
+import { markWorkspaceStuck, getReviewStatusFromDbSync } from '../../../../../src/lib/database/review-status-db.js';
+import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
 
   it('400: returns httpStatus=400 when workspace exists but is not stuck', () => {
     // workspace exists (workspaceExists=true) but currentStatus has stuck=false/undefined
-    const notStuckStatus = getReviewStatus('PAN-NOT-STUCK');  // returns null — not stuck
+    const notStuckStatus = getReviewStatusSync('PAN-NOT-STUCK');  // returns null — not stuck
 
     const result = processUnstickRequest('PAN-NOT-STUCK', true, notStuckStatus, true);
 
@@ -95,8 +95,8 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
 
   it('400: returns httpStatus=400 even when a non-stuck status row exists', () => {
     // Pre-populate a non-stuck status row
-    setReviewStatus('PAN-PENDING', { reviewStatus: 'pending', testStatus: 'pending' });
-    const status = getReviewStatus('PAN-PENDING');  // stuck is falsy
+    setReviewStatusSync('PAN-PENDING', { reviewStatus: 'pending', testStatus: 'pending' });
+    const status = getReviewStatusSync('PAN-PENDING');  // stuck is falsy
 
     const result = processUnstickRequest('PAN-PENDING', true, status, true);
 
@@ -106,9 +106,9 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
   it('409: returns httpStatus=409 when workspace is stuck but git state not yet repaired', () => {
     // Simulate operator clicking Unstick before running `git reset --hard origin/main`.
     // gitSafeState=false means local main is still ahead of origin/main.
-    setReviewStatus('PAN-NOTRESET', { reviewStatus: 'passed', testStatus: 'passed' });
+    setReviewStatusSync('PAN-NOTRESET', { reviewStatus: 'passed', testStatus: 'passed' });
     markWorkspaceStuck('PAN-NOTRESET', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
-    const stuckStatus = getReviewStatus('PAN-NOTRESET');
+    const stuckStatus = getReviewStatusSync('PAN-NOTRESET');
 
     const result = processUnstickRequest('PAN-NOTRESET', true, stuckStatus, false);
 
@@ -117,15 +117,15 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect((result.body as { error: string }).error).toMatch(/git reset --hard origin\/main/i);
 
     // Stuck flag must NOT be cleared — workspace is still unrepaired
-    expect(getReviewStatusFromDb('PAN-NOTRESET')?.stuck).toBe(true);
+    expect(getReviewStatusFromDbSync('PAN-NOTRESET')?.stuck).toBe(true);
   });
 
   it('200: returns httpStatus=200 and clears stuck flag for a genuinely stuck workspace', () => {
     // Set up a stuck workspace with gitSafeState=true (operator has reset main)
-    setReviewStatus('PAN-STUCK', { reviewStatus: 'passed', testStatus: 'passed' });
+    setReviewStatusSync('PAN-STUCK', { reviewStatus: 'passed', testStatus: 'passed' });
     markWorkspaceStuck('PAN-STUCK', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
 
-    const stuckStatus = getReviewStatus('PAN-STUCK');
+    const stuckStatus = getReviewStatusSync('PAN-STUCK');
     expect(stuckStatus?.stuck).toBe(true);  // precondition
 
     const result = processUnstickRequest('PAN-STUCK', true, stuckStatus, true);
@@ -136,24 +136,24 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect((result.body as { previousReason?: string }).previousReason).toBe('main_diverged');
 
     // Side effect: stuck flag must be cleared
-    const after = getReviewStatusFromDb('PAN-STUCK');
+    const after = getReviewStatusFromDbSync('PAN-STUCK');
     expect(after?.stuck).toBeFalsy();
   });
 
   it('200: resets reviewStatus/testStatus to pending after unstick (lifecycle invalidated)', () => {
     // Unstick resets lifecycle because recovery requires `git reset --hard origin/main`
     // which changes HEAD, making prior passed results invalid.
-    setReviewStatus('PAN-RESET', {
+    setReviewStatusSync('PAN-RESET', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
     });
     markWorkspaceStuck('PAN-RESET', 'main_diverged');
-    const stuckStatus = getReviewStatus('PAN-RESET');
+    const stuckStatus = getReviewStatusSync('PAN-RESET');
 
     processUnstickRequest('PAN-RESET', true, stuckStatus, true);
 
-    const after = getReviewStatus('PAN-RESET');
+    const after = getReviewStatusSync('PAN-RESET');
     // Stuck flag cleared — Deacon will process the issue again
     expect(after?.stuck).toBeFalsy();
     // Lifecycle reset — prior results are invalid after `git reset --hard origin/main`
@@ -163,9 +163,9 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
   });
 
   it('200: includes previousReason in the response body', () => {
-    setReviewStatus('PAN-REASON', { reviewStatus: 'reviewing' });
+    setReviewStatusSync('PAN-REASON', { reviewStatus: 'reviewing' });
     markWorkspaceStuck('PAN-REASON', 'main_diverged');
-    const stuckStatus = getReviewStatus('PAN-REASON');
+    const stuckStatus = getReviewStatusSync('PAN-REASON');
 
     const result = processUnstickRequest('PAN-REASON', true, stuckStatus, true);
 
@@ -177,18 +177,18 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // Regression: without clearing reviewedAtCommit, Deacon's checkPostReviewCommits()
     // would detect HEAD != reviewedAtCommit immediately after unstick and reset the
     // pipeline a second time, causing duplicate invalidation / stale state.
-    setReviewStatus('PAN-RAC-CLEAR', {
+    setReviewStatusSync('PAN-RAC-CLEAR', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
       reviewedAtCommit: 'sha-before-divergence',
     });
     markWorkspaceStuck('PAN-RAC-CLEAR', 'main_diverged');
-    const stuckStatus = getReviewStatus('PAN-RAC-CLEAR');
+    const stuckStatus = getReviewStatusSync('PAN-RAC-CLEAR');
 
     processUnstickRequest('PAN-RAC-CLEAR', true, stuckStatus, true);
 
-    const after = getReviewStatus('PAN-RAC-CLEAR');
+    const after = getReviewStatusSync('PAN-RAC-CLEAR');
     expect(after?.reviewedAtCommit).toBeUndefined();
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { isTaskReady, getUnblockedItems } from '../task-readiness.js';
+import { isTaskReadySync, getUnblockedItemsSync } from '../task-readiness.js';
 import type { VBriefDocument } from '../../vbrief/types.js';
 
 let PROJECT_ROOT: string;
@@ -44,12 +44,12 @@ afterEach(() => {
 
 describe('isTaskReady', () => {
   it('returns true when no plan exists', () => {
-    expect(isTaskReady('any-id', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('any-id', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns true for item with no blockers', () => {
     writePlan(makeDoc([{ id: 'a' }, { id: 'b' }], []));
-    expect(isTaskReady('a', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('a', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns false when blocker is pending', () => {
@@ -57,7 +57,7 @@ describe('isTaskReady', () => {
       [{ id: 'a', status: 'pending' }, { id: 'b', status: 'pending' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(false);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns false when blocker is in_progress', () => {
@@ -65,7 +65,7 @@ describe('isTaskReady', () => {
       [{ id: 'a', status: 'in_progress' }, { id: 'b', status: 'pending' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(false);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns true when blocker is completed', () => {
@@ -73,7 +73,7 @@ describe('isTaskReady', () => {
       [{ id: 'a', status: 'completed' }, { id: 'b', status: 'pending' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns true when blocker is cancelled', () => {
@@ -81,7 +81,7 @@ describe('isTaskReady', () => {
       [{ id: 'a', status: 'cancelled' }, { id: 'b', status: 'pending' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns false when one of multiple blockers is not done', () => {
@@ -93,7 +93,7 @@ describe('isTaskReady', () => {
       ],
       [{ from: 'a', to: 'c' }, { from: 'b', to: 'c' }],
     ));
-    expect(isTaskReady('c', WORKSPACE_PATH)).toBe(false);
+    expect(isTaskReadySync('c', WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns true when all of multiple blockers are done', () => {
@@ -105,7 +105,7 @@ describe('isTaskReady', () => {
       ],
       [{ from: 'a', to: 'c' }, { from: 'b', to: 'c' }],
     ));
-    expect(isTaskReady('c', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('c', WORKSPACE_PATH)).toBe(true);
   });
 
   it('ignores non-blocking edge types', () => {
@@ -114,7 +114,7 @@ describe('isTaskReady', () => {
       [{ from: 'a', to: 'b', type: 'informs' }],
     ));
     // 'informs' edge should not block 'b'
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns true for unknown blocker ID', () => {
@@ -122,7 +122,7 @@ describe('isTaskReady', () => {
       [{ id: 'b', status: 'pending' }],
       [{ from: 'ghost', to: 'b' }],
     ));
-    expect(isTaskReady('b', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('b', WORKSPACE_PATH)).toBe(true);
   });
 
   it('returns true for item ID not present in the plan (phantom item)', () => {
@@ -131,18 +131,18 @@ describe('isTaskReady', () => {
       [{ from: 'a', to: 'b' }],
     ));
     // 'phantom' is not in the plan at all — should not be blocked
-    expect(isTaskReady('phantom', WORKSPACE_PATH)).toBe(true);
+    expect(isTaskReadySync('phantom', WORKSPACE_PATH)).toBe(true);
   });
 });
 
 describe('getUnblockedItems', () => {
   it('returns [] when no plan exists', () => {
-    expect(getUnblockedItems(WORKSPACE_PATH, 'any-id')).toEqual([]);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'any-id')).toEqual([]);
   });
 
   it('returns [] when completed item does not block anything', () => {
     writePlan(makeDoc([{ id: 'a', status: 'completed' }], []));
-    expect(getUnblockedItems(WORKSPACE_PATH, 'a')).toEqual([]);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'a')).toEqual([]);
   });
 
   it('returns newly unblocked item when its only blocker completes', () => {
@@ -150,7 +150,7 @@ describe('getUnblockedItems', () => {
       [{ id: 'a', status: 'completed' }, { id: 'b', status: 'pending' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(getUnblockedItems(WORKSPACE_PATH, 'a')).toEqual(['b']);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'a')).toEqual(['b']);
   });
 
   it('does not return item still blocked by other unfinished blockers', () => {
@@ -163,7 +163,7 @@ describe('getUnblockedItems', () => {
       [{ from: 'a', to: 'b' }, { from: 'x', to: 'b' }],
     ));
     // 'a' completed but 'x' is still pending — 'b' is not unblocked
-    expect(getUnblockedItems(WORKSPACE_PATH, 'a')).toEqual([]);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'a')).toEqual([]);
   });
 
   it('returns item when all other blockers are already terminal', () => {
@@ -175,7 +175,7 @@ describe('getUnblockedItems', () => {
       ],
       [{ from: 'a', to: 'b' }, { from: 'x', to: 'b' }],
     ));
-    expect(getUnblockedItems(WORKSPACE_PATH, 'a')).toEqual(['b']);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'a')).toEqual(['b']);
   });
 
   it('does not return already-completed items', () => {
@@ -183,7 +183,7 @@ describe('getUnblockedItems', () => {
       [{ id: 'a', status: 'completed' }, { id: 'b', status: 'completed' }],
       [{ from: 'a', to: 'b' }],
     ));
-    expect(getUnblockedItems(WORKSPACE_PATH, 'a')).toEqual([]);
+    expect(getUnblockedItemsSync(WORKSPACE_PATH, 'a')).toEqual([]);
   });
 
   it('returns multiple unblocked items', () => {
@@ -195,7 +195,7 @@ describe('getUnblockedItems', () => {
       ],
       [{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }],
     ));
-    const result = getUnblockedItems(WORKSPACE_PATH, 'a');
+    const result = getUnblockedItemsSync(WORKSPACE_PATH, 'a');
     expect(result.sort()).toEqual(['b', 'c']);
   });
 });

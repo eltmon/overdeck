@@ -118,9 +118,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
       edges: [],
     },
   };
-}
-
-export async function writeAutoStartVBrief(
+}async function writeAutoStartVBriefPromise(
   projectRoot: string,
   workspacePath: string,
   issue: AutoSynthesizeIssueInput,
@@ -153,13 +151,13 @@ export async function writeAutoStartVBrief(
  * FsError channel so callers in Effect-native code can compose with this
  * synthesis step without losing failure typing.
  */
-export const writeAutoStartVBriefEffect = (
+export const writeAutoStartVBrief = (
   projectRoot: string,
   workspacePath: string,
   issue: AutoSynthesizeIssueInput,
 ): Effect.Effect<AutoSynthesizeResult, FsError> =>
   Effect.tryPromise({
-    try: () => writeAutoStartVBrief(projectRoot, workspacePath, issue),
+    try: () => writeAutoStartVBriefPromise(projectRoot, workspacePath, issue),
     catch: (cause) =>
       new FsError({ path: projectRoot, operation: 'writeAutoStartVBrief', cause }),
   });

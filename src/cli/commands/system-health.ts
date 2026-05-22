@@ -14,8 +14,8 @@ export async function systemHealthCommand(): Promise<void> {
 
   // Dashboard health
   try {
-    const { getDashboardApiUrl } = await import('../../lib/config.js');
-    const dashboardUrl = getDashboardApiUrl();
+    const { getDashboardApiUrlSync } = await import('../../lib/config.js');
+    const dashboardUrl = getDashboardApiUrlSync();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${dashboardUrl}/api/health`, { method: 'GET', signal: controller.signal });
@@ -31,7 +31,7 @@ export async function systemHealthCommand(): Promise<void> {
 
   // smee-client webhook relay
   try {
-    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
+    const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.panopticon', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
@@ -39,7 +39,7 @@ export async function systemHealthCommand(): Promise<void> {
         status: 'unknown',
         message: 'Not configured',
       });
-    } else if (isSmeeProcessRunning()) {
+    } else if (isSmeeProcessRunningSync()) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'healthy',
@@ -62,8 +62,8 @@ export async function systemHealthCommand(): Promise<void> {
 
   // CLIProxy sidecar
   try {
-    const { isCliproxyRunning } = await import('../../lib/cliproxy.js');
-    if (isCliproxyRunning()) {
+    const { isCliproxyRunningSync } = await import('../../lib/cliproxy.js');
+    if (isCliproxyRunningSync()) {
       checks.push({ name: 'CLIProxyAPI', status: 'healthy', message: 'Running' });
     } else {
       checks.push({ name: 'CLIProxyAPI', status: 'degraded', message: 'Not running' });

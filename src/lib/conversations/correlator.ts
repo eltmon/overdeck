@@ -24,7 +24,7 @@ export interface CorrelationResult {
  *
  * @param jsonlPaths  All JSONL paths discovered in this scan run
  */
-export function buildCorrelationMap(
+export function buildCorrelationMapSync(
   jsonlPaths: string[],
 ): Map<string, CorrelationResult> {
   const db = getDatabase();
@@ -118,8 +118,8 @@ export function buildCorrelationMap(
 // access, so this is just a sync lift for callers that compose with Effect.
 
 /** Effect variant of buildCorrelationMap — pure sync lift. */
-export function buildCorrelationMapEffect(
+export function buildCorrelationMap(
   jsonlPaths: string[],
 ): Effect.Effect<Map<string, CorrelationResult>> {
-  return Effect.sync(() => buildCorrelationMap(jsonlPaths));
+  return Effect.sync(() => buildCorrelationMapSync(jsonlPaths));
 }

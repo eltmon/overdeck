@@ -23,8 +23,8 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { getProject, resolveProjectFromIssue } from '../projects.js';
-import { ensureDevcontainer } from './ensure-devcontainer.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { ensureDevcontainerSync } from './ensure-devcontainer.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -115,8 +115,8 @@ export const rebuildWorkspaceStack = (
   const progress = options.onProgress ?? (() => {});
   const normalizedIssueId = issueId.toLowerCase();
 
-  const resolvedProject = resolveProjectFromIssue(issueId);
-  const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
+  const resolvedProject = resolveProjectFromIssueSync(issueId);
+  const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
   if (!resolvedProject || !projectConfig) {
     return Effect.succeed({ success: false, error: `No project found for issue ${issueId}` });
   }
@@ -153,7 +153,7 @@ export const rebuildWorkspaceStack = (
     if (existsSync(devcontainerDir)) {
       rmSync(devcontainerDir, { recursive: true, force: true });
     }
-    const ensured = ensureDevcontainer({ workspacePath, issueId: normalizedIssueId });
+    const ensured = ensureDevcontainerSync({ workspacePath, issueId: normalizedIssueId });
     if (!ensured.step.success) {
       return {
         success: false,

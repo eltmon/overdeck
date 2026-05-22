@@ -5,15 +5,15 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { emitActivityEntry } from '../activity-logger.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
 import {
   getCachedDockerContainerLifecycleObservedAt,
   getCachedDockerContainerLifecycleSnapshot,
   recordDockerContainerLifecycleSnapshot,
   type DockerContainerLifecycle,
 } from '../docker-stats.js';
-import { parseIssueId } from '../issue-id.js';
-import { getProject, resolveProjectFromIssue } from '../projects.js';
+import { parseIssueIdSync } from '../issue-id.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -54,12 +54,12 @@ interface DockerPsJson {
 const lastHealthByIssue = new Map<string, boolean>();
 
 function normalizeIssue(issueId: string): string {
-  return parseIssueId(issueId)?.normalized ?? issueId.toLowerCase();
+  return parseIssueIdSync(issueId)?.normalized ?? issueId.toLowerCase();
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
-  const resolved = resolveProjectFromIssue(issueId);
-  return resolved ? getProject(resolved.projectKey) : null;
+  const resolved = resolveProjectFromIssueSync(issueId);
+  return resolved ? getProjectSync(resolved.projectKey) : null;
 }
 
 function hasDockerWorkspace(projectConfig: WorkspaceStackProject | null | undefined): boolean {
@@ -259,7 +259,7 @@ export function recordWorkspaceStackHealthTransition(issueId: string, health: Wo
 
   if (previous !== true || health.healthy) return false;
 
-  emitActivityEntry({
+  emitActivityEntrySync({
     source: 'cloister',
     level: 'error',
     issueId: issueId.toUpperCase(),

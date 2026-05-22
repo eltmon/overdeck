@@ -145,16 +145,7 @@ function buildContinuation(fromHarness: RuntimeName, transcript: string): string
 /** Short opaque id in Pi's `<8-hex>` style. */
 function shortId(): string {
   return randomBytes(4).toString('hex');
-}
-
-/**
- * Convert a conversation transcript from one harness format to another and
- * write a fresh, resumable session file in the target format. Returns the new
- * session id and the path of the file written.
- *
- * Never mutates or deletes the source file — JSONL session files are sacred.
- */
-export async function convertConversationTranscript(opts: ConvertOptions): Promise<ConvertResult> {
+}async function convertConversationTranscriptPromise(opts: ConvertOptions): Promise<ConvertResult> {
   if (opts.fromHarness === opts.toHarness) {
     throw new Error(`convertConversationTranscript called with no harness change (${opts.fromHarness})`);
   }
@@ -238,11 +229,11 @@ export class SessionConvertError extends Data.TaggedError('SessionConvertError')
 }> {}
 
 /** Effect variant of `convertConversationTranscript`. */
-export const convertConversationTranscriptEffect = (
+export const convertConversationTranscript = (
   opts: ConvertOptions,
 ): Effect.Effect<ConvertResult, SessionConvertError> =>
   Effect.tryPromise({
-    try: () => convertConversationTranscript(opts),
+    try: () => convertConversationTranscriptPromise(opts),
     catch: (cause) =>
       new SessionConvertError({
         fromHarness: opts.fromHarness,

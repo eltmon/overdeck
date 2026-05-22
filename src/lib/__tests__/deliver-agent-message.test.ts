@@ -11,20 +11,20 @@ let socketDir: string;
 
 vi.mock('../tmux.js', () => ({
   createSession: vi.fn(),
-  createSessionAsyncEffect: vi.fn(() => Effect.void),
+  createSession: vi.fn(() => Effect.void),
   killSession: vi.fn(),
-  killSessionAsyncEffect: vi.fn(() => Effect.void),
+  killSession: vi.fn(() => Effect.void),
   sendKeysEffect: vi.fn(() => Effect.void),
-  sendRawKeystrokeAsyncEffect: vi.fn(() => Effect.void),
+  sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn(),
-  sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+  sessionExists: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn(),
-  getAgentSessionsAsyncEffect: vi.fn(() => Effect.succeed([])),
+  getAgentSessions: vi.fn(() => Effect.succeed([])),
   capturePane: vi.fn(),
-  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(() => Effect.succeed('')),
   listPaneValues: vi.fn(),
-  listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
-  setOptionAsyncEffect: vi.fn(() => Effect.void),
+  listPaneValues: vi.fn(() => Effect.succeed([])),
+  setOption: vi.fn(() => Effect.void),
   waitForClaudePrompt: vi.fn(async () => true),
 }));
 
@@ -38,9 +38,9 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
-import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
-import { sendKeysEffect } from '../tmux.js';
+import { sendKeys } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
   const dir = join(stateDir, agentId);
@@ -120,7 +120,7 @@ describe('channel bridge delivery', () => {
     mkdirSync(stateDir, { recursive: true });
     mkdirSync(socketDir, { recursive: true });
     process.env.PANOPTICON_HOME = tmpHome;
-    vi.mocked(sendKeysEffect).mockClear();
+    vi.mocked(sendKeys).mockClear();
   });
 
   afterEach(() => {
@@ -132,25 +132,25 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
     await deliverAgentMessage(agentId, 'hello', 'test');
-    expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledWith(agentId, 'hello');
+    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'hello');
   });
 
   it('state-file missing: delegates to sendKeysEffect (treat as flag-off)', async () => {
     await deliverAgentMessage('agent-no-state', 'hello', 'test');
-    expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
   });
 
   it('flag-on, socket-success: posts to bridge and does NOT call sendKeysEffect', async () => {
     const agentId = 'agent-channels';
     writeAgentState(agentId, { channelsEnabled: true });
-    const token = writeBridgeToken(agentId);
+    const token = writeBridgeTokenSync(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
       await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
-      expect(vi.mocked(sendKeysEffect)).not.toHaveBeenCalled();
+      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
       expect(parsed).toMatchObject({ content: 'channel hi', meta: { caller: 'caller-x' } });
@@ -165,20 +165,20 @@ describe('channel bridge delivery', () => {
     writeAgentState(agentId, { channelsEnabled: true });
     // Do NOT start a bridge — socket file does not exist.
     await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
-    expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledWith(agentId, 'fallback hi');
+    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
+    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'fallback hi');
   });
 
   it('flag-on, socket-timeout: falls back to sendKeysEffect', async () => {
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
-    writeBridgeToken(agentId);
+    writeBridgeTokenSync(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     // Bridge that delays its response longer than the deliver timeout.
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500 });
     try {
       await deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
-      expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledTimes(1);
+      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -191,8 +191,8 @@ describe('channel bridge delivery', () => {
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
       await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
-      expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(sendKeysEffect)).toHaveBeenCalledWith(agentId, 'fallback no token');
+      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
+      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'fallback no token');
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -201,13 +201,13 @@ describe('channel bridge delivery', () => {
   it('deliverAgentPermissionDecision posts permission_response payload to bridge', async () => {
     const agentId = 'agent-perm-ok';
     writeAgentState(agentId, { channelsEnabled: true });
-    const token = writeBridgeToken(agentId);
+    const token = writeBridgeTokenSync(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
       await deliverAgentPermissionDecision(agentId, 'perm-123', 'deny');
-      expect(vi.mocked(sendKeysEffect)).not.toHaveBeenCalled();
+      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
       expect(parsed).toEqual({

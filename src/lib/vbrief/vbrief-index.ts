@@ -181,7 +181,7 @@ export async function readVBriefDocumentAsync(path: string): Promise<VBriefDocum
  * Effect variant of findVBriefByIssueAsync. Returns null when no vBRIEF maps
  * to the issue; only IO failures surface as typed errors.
  */
-export const findVBriefByIssueEffect = (
+export const findVBriefByIssue = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<FoundVBriefAsync | null, FsError> =>
@@ -191,7 +191,7 @@ export const findVBriefByIssueEffect = (
   });
 
 /** Effect variant of listVBriefsAsync. */
-export const listVBriefsEffect = (
+export const listVBriefs = (
   projectRoot: string,
 ): Effect.Effect<FoundVBriefAsync[], FsError> =>
   Effect.tryPromise({
@@ -203,7 +203,7 @@ export const listVBriefsEffect = (
  * Effect variant of readVBriefDocumentAsync. Returns typed errors for merge
  * conflict markers and invalid spec shape.
  */
-export const readVBriefDocumentEffect = (
+export const readVBriefDocument = (
   path: string,
 ): Effect.Effect<VBriefDocument, VBriefReadError> =>
   Effect.gen(function* () {

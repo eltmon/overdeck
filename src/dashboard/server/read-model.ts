@@ -24,7 +24,7 @@ import {
 } from '@panctl/contracts';
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
-import { logDeaconEvent } from '../../lib/persistent-logger.js';
+import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -361,7 +361,7 @@ export const ReadModelServiceLive = Layer.effect(
           // The projection cache may be stale if an agent's tmux session died while
           // the server was down — the cache still says 'running' but state.json says
           // 'stopped'. Without this step the dashboard shows incorrect action buttons.
-          const { listRunningAgentsEffect: listRunningForReconcile } = yield* Effect.promise(
+          const { listRunningAgents: listRunningForReconcile } = yield* Effect.promise(
             () => import('../../lib/agents.js'),
           );
           const groundTruthAgents = yield* listRunningForReconcile();
@@ -372,10 +372,10 @@ export const ReadModelServiceLive = Layer.effect(
             let reconciled = a.status as AgentStatus | string;
             if (a.tmuxActive && a.status === 'stopped') {
               reconciled = 'running';
-              logDeaconEvent(`readModel cache-reconcile: ${a.id} stopped→running (tmux session alive, resumed outside API)`);
+              logDeaconEventSync(`readModel cache-reconcile: ${a.id} stopped→running (tmux session alive, resumed outside API)`);
             } else if (!a.tmuxActive && a.status === 'running') {
               reconciled = 'stopped';
-              logDeaconEvent(`readModel cache-reconcile: ${a.id} running→stopped (tmux session dead, likely reboot/crash)`);
+              logDeaconEventSync(`readModel cache-reconcile: ${a.id} running→stopped (tmux session dead, likely reboot/crash)`);
             }
             if (cachedAgent && cachedAgent.status !== toAgentStatus(reconciled)) {
               console.log(`[ReadModel] Reconciled ${a.id}: ${cachedAgent.status} → ${reconciled} (tmux=${a.tmuxActive}, state=${a.status})`);
@@ -454,7 +454,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgentsEffect, warnOnBareNumericIssueIds }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getReviewStatusSync }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/review-status.js')),
@@ -467,7 +467,7 @@ export const ReadModelServiceLive = Layer.effect(
         yield* Effect.promise(() => warnOnBareNumericIssueIds());
 
         // ── Agents ────────────────────────────────────────────────────────────
-        const running = yield* listRunningAgentsEffect();
+        const running = yield* listRunningAgents();
         const agentsById: Record<string, AgentSnapshot> = {};
 
         // Compute enrichment for all agents in parallel during bootstrap
@@ -475,13 +475,13 @@ export const ReadModelServiceLive = Layer.effect(
         const enrichmentResults = yield* Effect.promise(() =>
           Promise.all(
             running.map(async (a) => {
-              const reviewStatus = getReviewStatus(a.issueId)
+              const reviewStatus = getReviewStatusSync(a.issueId)
               const hasActiveSpecialist =
                 reviewStatus?.reviewStatus === 'reviewing' ||
                 reviewStatus?.testStatus === 'testing' ||
                 reviewStatus?.mergeStatus === 'merging'
               try {
-                return await computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist)
+                return await Effect.runPromise(computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist))
               } catch {
                 return undefined
               }
@@ -515,10 +515,10 @@ export const ReadModelServiceLive = Layer.effect(
               let reconciled = a.status as AgentStatus | string;
               if (a.tmuxActive && a.status === 'stopped') {
                 reconciled = 'running';
-                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
+                logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
               } else if (!a.tmuxActive && a.status === 'running') {
                 reconciled = 'stopped';
-                logDeaconEvent(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
+                logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
               }
               return toAgentStatus(reconciled);
             })(),
@@ -598,7 +598,7 @@ export const ReadModelServiceLive = Layer.effect(
           // Run against the first agent's workspace (all worktrees share the same parent .git).
           const firstAgentWithWorkspace = agents.find(a => a.workspace);
           if (firstAgentWithWorkspace?.workspace) {
-            const deleted = await deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace);
+            const deleted = await Effect.runPromise(deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace));
             if (deleted > 0) {
               console.log(`[ReadModel] Deleted ${deleted} legacy unscoped checkpoint refs`);
             }
@@ -613,7 +613,7 @@ export const ReadModelServiceLive = Layer.effect(
             if (existingSummaries && existingSummaries.length > 0) continue;
 
             try {
-              const checkpoints = await listCheckpoints(workspace, agent.id);
+              const checkpoints = await Effect.runPromise(listCheckpoints(workspace, agent.id));
               if (checkpoints.length === 0) continue;
 
               const maxRetainedSummaries = getMaxTurnDiffSummariesPerAgent();
@@ -639,10 +639,10 @@ export const ReadModelServiceLive = Layer.effect(
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {
                   try {
-                    files = await diffCheckpointFiles(workspace, agent.id, prevTurnId, turnId);
+                    files = await Effect.runPromise(diffCheckpointFiles(workspace, agent.id, prevTurnId, turnId));
                   } catch { /* checkpoint might be stale */ }
                 }
-                const completedAt = await getCheckpointTimestamp(workspace, agent.id, turnId);
+                const completedAt = await Effect.runPromise(getCheckpointTimestamp(workspace, agent.id, turnId));
                 summaries.push({
                   turnId,
                   completedAt,

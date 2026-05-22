@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
@@ -36,7 +37,7 @@ export async function forkCommand(
   const modeLabel = options.plain ? 'plain fork' : 'summary fork';
   console.log(chalk.gray(`Creating ${modeLabel} from conversation: ${conv.name} (${conv.title || 'untitled'})`));
 
-  const newConv = (await createSummaryFork(conv, options)).conversation;
+  const newConv = (await Effect.runPromise(createSummaryFork(conv, options))).conversation;
 
   console.log(chalk.green(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)}ed conversation ${conv.name} → ${newConv.name}`));
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));

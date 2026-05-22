@@ -96,9 +96,9 @@ describe('AgentState role persistence', () => {
   });
 
   it('requires role and strips legacy state fields when persisting state.json', async () => {
-    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
 
-    saveAgentState({
+    saveAgentStateSync({
       id: 'agent-pan-role',
       issueId: 'PAN-1048',
       workspace: '/tmp/workspace',
@@ -116,7 +116,7 @@ describe('AgentState role persistence', () => {
       type: 'work',
     } as any);
 
-    const state = getAgentState('agent-pan-role');
+    const state = getAgentStateSync('agent-pan-role');
     expect(state?.role).toBe('work');
     expect((state as any).runtime).toBeUndefined();
     expect((state as any).phase).toBeUndefined();
@@ -134,9 +134,9 @@ describe('AgentState role persistence', () => {
   });
 
   it('accepts flywheel role in persisted state.json', async () => {
-    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
 
-    saveAgentState({
+    saveAgentStateSync({
       id: 'agent-flywheel-orchestrator',
       issueId: 'RUN-1',
       workspace: '/tmp/workspace',
@@ -147,7 +147,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     } as any);
 
-    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+    expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
   it('bases Channels eligibility on work role and claude-code harness', async () => {
@@ -194,8 +194,8 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
+      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -242,8 +242,8 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
+      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -287,11 +287,11 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
       sessionExists: vi.fn(() => false),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      capturePaneAsyncEffect: vi.fn(() => Effect.succeed('Claude Code')),
-      setOptionAsyncEffect: vi.fn(() => Effect.void),
+      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
+      capturePane: (await Effect.runPromise(vi.fn(() => Effect.succeed('Claude Code')))),
+      setOption: (await Effect.runPromise(vi.fn(() => Effect.void))),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -335,7 +335,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('treats state.json without a valid role as missing', async () => {
-    const { getAgentState } = await import('../agents.js');
+    const { getAgentStateSync } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'state.json'), JSON.stringify({
@@ -347,7 +347,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    const state = getAgentState('agent-pan-legacy');
+    const state = getAgentStateSync('agent-pan-legacy');
     expect(state).toBeNull();
   });
 

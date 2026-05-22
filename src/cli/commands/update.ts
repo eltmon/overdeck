@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { loadConfig } from '../../lib/config.js';
+import { loadConfigSync } from '../../lib/config.js';
 import { syncCommand } from './sync.js';
 
 // Get current installed version
@@ -106,7 +106,7 @@ export async function updateCommand(options: {
     console.log(chalk.dim('If you previously installed panopticon-cli or @eltmon/panctl, npm now resolves to the renamed package.'));
 
     // Auto-sync if enabled
-    const config = loadConfig();
+    const config = loadConfigSync();
     if (config.sync.auto_sync) {
       console.log(chalk.dim('\nRunning auto-sync...'));
       await syncCommand({});

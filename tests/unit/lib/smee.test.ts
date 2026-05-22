@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for smee.ts (PAN-905)
  */
@@ -5,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   startSmeeClient,
   stopSmeeClient,
-  isSmeeRunning,
+  isSmeeRunningSync,
 } from '../../../src/lib/smee.js';
 
 // ─── Mock state ──────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   // Ensure any pending timers are cleared and client is stopped
-  await stopSmeeClient();
+  await Effect.runPromise(stopSmeeClient());
   vi.clearAllMocks();
   vi.useRealTimers();
 });
@@ -72,7 +73,7 @@ describe('startSmeeClient', () => {
     mockExistsSync.mockReturnValue(false);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await startSmeeClient();
+    await Effect.runPromise(startSmeeClient());
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('No smee-url configured'),
@@ -84,10 +85,10 @@ describe('startSmeeClient', () => {
   it('starts client and sets active state when smee-url exists', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
+    await Effect.runPromise(startSmeeClient());
 
     expect(mockStart).toHaveBeenCalledTimes(1);
-    expect(isSmeeRunning()).toBe(true);
+    expect(isSmeeRunningSync()).toBe(true);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('Relaying'),
     );
@@ -97,8 +98,8 @@ describe('startSmeeClient', () => {
   it('logs and returns early if already running', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
-    await startSmeeClient();
+    await Effect.runPromise(startSmeeClient());
+    await Effect.runPromise(startSmeeClient());
 
     expect(mockStart).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith('[smee] Already running');
@@ -110,14 +111,14 @@ describe('startSmeeClient', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    const promise = startSmeeClient();
+    const promise = (await Effect.runPromise(startSmeeClient()));
     await promise;
 
     expect(errorSpy).toHaveBeenCalledWith(
       '[smee] Failed to start:',
       'connection refused',
     );
-    expect(isSmeeRunning()).toBe(false);
+    expect(isSmeeRunningSync()).toBe(false);
 
     // Advance past first retry delay (1s)
     vi.advanceTimersByTime(1_000);
@@ -132,14 +133,14 @@ describe('startSmeeClient', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await startSmeeClient();
-    expect(isSmeeRunning()).toBe(true);
+    await Effect.runPromise(startSmeeClient());
+    expect(isSmeeRunningSync()).toBe(true);
 
     // Simulate an error from the EventSource
     mockStart.mockRejectedValue(new Error('reconnect failed'));
     capturedOnError?.({});
 
-    expect(isSmeeRunning()).toBe(false);
+    expect(isSmeeRunningSync()).toBe(false);
 
     // Advance past first retry delay
     vi.advanceTimersByTime(1_000);
@@ -155,7 +156,7 @@ describe('startSmeeClient', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
+    await Effect.runPromise(startSmeeClient());
 
     // Trigger 5 retries and fully drain the async restart chain after each step.
     for (let i = 0; i < 5; i++) {
@@ -181,13 +182,13 @@ describe('stopSmeeClient', () => {
   it('stops running client', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
-    expect(isSmeeRunning()).toBe(true);
+    await Effect.runPromise(startSmeeClient());
+    expect(isSmeeRunningSync()).toBe(true);
 
-    await stopSmeeClient();
+    await Effect.runPromise(stopSmeeClient());
 
     expect(mockStop).toHaveBeenCalledTimes(1);
-    expect(isSmeeRunning()).toBe(false);
+    expect(isSmeeRunningSync()).toBe(false);
     expect(logSpy).toHaveBeenCalledWith('[smee] Stopped');
     logSpy.mockRestore();
   });
@@ -195,7 +196,7 @@ describe('stopSmeeClient', () => {
   it('is safe to call when not running', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await stopSmeeClient();
+    await Effect.runPromise(stopSmeeClient());
 
     expect(mockStop).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('[smee] Stopped');
@@ -207,8 +208,8 @@ describe('stopSmeeClient', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
-    await stopSmeeClient();
+    await Effect.runPromise(startSmeeClient());
+    await Effect.runPromise(stopSmeeClient());
 
     // Advance time — no restart should fire
     vi.advanceTimersByTime(60_000);
@@ -225,7 +226,7 @@ describe('webhook target', () => {
     mockLoadConfig.mockReturnValue({ dashboard: { api_port: 9999 } });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await startSmeeClient();
+    await Effect.runPromise(startSmeeClient());
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('http://localhost:9999/api/webhooks/github'),

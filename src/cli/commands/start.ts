@@ -9,15 +9,15 @@ import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
-import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
-import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
-import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { resolveProjectFromIssueSync, hasProjectsSync, listProjectsSync, ProjectConfig } from '../../lib/projects.js';
+import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
+import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { findPlan } from '../../lib/vbrief/io.js';
+import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 
@@ -66,10 +66,10 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
 import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
-import { loadConfig } from '../../lib/config.js';
+import { loadConfigSync } from '../../lib/config.js';
 import {
-  loadWorkspaceMetadata,
-  findRemoteWorkspaceMetadata,
+  loadWorkspaceMetadataSync,
+  findRemoteWorkspaceMetadataSync,
 } from '../../lib/remote/workspace-metadata.js';
 import {
   spawnRemoteAgent,
@@ -79,8 +79,8 @@ import {
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
-import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
-import { normalizeModelOverride } from '../../lib/model-validation.js';
+import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
+import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 
 interface IssueOptions {
   model: string;
@@ -115,7 +115,7 @@ function determineWorkspaceLocation(options: IssueOptions): 'local' | 'remote' |
   }
 
   // Check config for default location
-  const config = loadConfig();
+  const config = loadConfigSync();
   if (config.remote?.enabled && config.remote.default_location) {
     return config.remote.default_location;
   }
@@ -157,7 +157,7 @@ function findWorkspaceWithLocation(
 
   // If explicitly remote, only check remote
   if (location === 'remote') {
-    const remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+    const remoteMetadata = findRemoteWorkspaceMetadataSync(issueId);
     if (remoteMetadata) {
       return { workspacePath: remoteMetadata.id, isRemote: true };
     }
@@ -174,7 +174,7 @@ function findWorkspaceWithLocation(
 
   // If no local workspace found and no explicit local preference, check remote
   if (location === null) {
-    const remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+    const remoteMetadata = findRemoteWorkspaceMetadataSync(issueId);
     if (remoteMetadata) {
       return { workspacePath: remoteMetadata.id, isRemote: true };
     }
@@ -190,7 +190,7 @@ function findLocalWorkspace(issueId: string, labels: string[] = []): string | nu
   const normalizedId = issueId.toLowerCase();
 
   // First, try to resolve from project registry
-  const resolved = resolveProjectFromIssue(issueId, labels);
+  const resolved = resolveProjectFromIssueSync(issueId, labels);
   if (resolved) {
     const workspaceName = `feature-${normalizedId}`;
     const workspacePath = join(resolved.projectPath, 'workspaces', workspaceName);
@@ -240,7 +240,7 @@ function findWorkspace(issueId: string, labels: string[] = []): string | null {
 }
 
 async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIssueInput> {
-  const github = resolveGitHubIssue(issueId);
+  const github = resolveGitHubIssueSync(issueId);
   if (github.isGitHub) {
     try {
       const { stdout } = await execFileAsync('gh', ['issue', 'view', String(github.number), '--repo', `${github.owner}/${github.repo}`, '--json', 'title,body,url'], {
@@ -255,7 +255,7 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   }
 
   if (isLinearIssue(issueId)) {
-    const apiKey = Effect.runSync(getLinearApiKey());
+    const apiKey = await Effect.runPromise(getLinearApiKey());
     if (apiKey) {
       try {
         const { LinearClient } = await import('@linear/sdk');
@@ -281,7 +281,7 @@ async function handleRemoteWorkspace(
   spinner: Ora,
   clearPauseBeforeSpawn: boolean
 ): Promise<void> {
-  const config = loadConfig();
+  const config = loadConfigSync();
 
   // Verify remote is enabled
   if (!config.remote?.enabled) {
@@ -314,14 +314,14 @@ async function handleRemoteWorkspace(
   }
 
   // Check for existing remote workspace
-  let remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+  let remoteMetadata = findRemoteWorkspaceMetadataSync(issueId);
 
   // Auto-create if not found
   if (!remoteMetadata) {
     spinner.text = 'Remote workspace not found, creating...';
     try {
       const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-      remoteMetadata = await createRemoteWorkspace(issueId, { spinner });
+      remoteMetadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner }));
     } catch (error: any) {
       spinner.fail(`Failed to create remote workspace: ${error.message}`);
       process.exit(1);
@@ -372,7 +372,7 @@ async function handleRemoteWorkspace(
 
   try {
     if (clearPauseBeforeSpawn) {
-      clearAgentPaused(agentId);
+      clearAgentPausedSync(agentId);
     }
 
     const remoteAgent = await spawnRemoteAgent({
@@ -389,18 +389,18 @@ async function handleRemoteWorkspace(
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
     // Handle shadow mode
-    const skipTrackerUpdate = await shouldSkipTrackerUpdate(issueId, options.shadow);
+    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId, options.shadow));
 
     if (skipTrackerUpdate) {
-      await createShadowState(issueId, 'open', 'pan start');
-      await updateShadowState(issueId, 'in_progress', 'pan start');
+      await Effect.runPromise(createShadowState(issueId, 'open', 'pan start'));
+      await Effect.runPromise(updateShadowState(issueId, 'in_progress', 'pan start'));
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
-    } else if (isGitHubIssue(issueId)) {
+    } else if (isGitHubIssueSync(issueId)) {
       // GitHub issue — add in-progress label
-      const gh = resolveGitHubIssue(issueId);
+      const gh = resolveGitHubIssueSync(issueId);
       if (gh.isGitHub) {
         try {
-          const { loadConfig: loadYamlConfig } = await import('../../lib/config-yaml.js');
+          const { loadConfigSync: loadYamlConfig } = await import('../../lib/config-yaml.js');
           const yamlConfig = loadYamlConfig();
           const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
           if (token) {
@@ -414,7 +414,7 @@ async function handleRemoteWorkspace(
         }
       }
     } else if (isLinearIssue(issueId)) {
-      const apiKey = Effect.runSync(getLinearApiKey());
+      const apiKey = await Effect.runPromise(getLinearApiKey());
       if (apiKey) {
         const updated = await updateLinearToInProgress(apiKey, issueId);
         if (updated) {
@@ -461,7 +461,7 @@ async function ensureRemoteWorkspace(
   spinner: Ora
 ): Promise<RemoteWorkspaceMetadata | null> {
   // Check if remote workspace already exists
-  const existing = findRemoteWorkspaceMetadata(issueId);
+  const existing = findRemoteWorkspaceMetadataSync(issueId);
   if (existing) {
     return existing;
   }
@@ -469,7 +469,7 @@ async function ensureRemoteWorkspace(
   // Auto-create remote workspace
   spinner.text = 'Creating remote workspace...';
 
-  const config = loadConfig();
+  const config = loadConfigSync();
   if (!config.remote?.enabled) {
     throw new Error('Remote workspaces not enabled. Run `pan remote setup`');
   }
@@ -484,7 +484,7 @@ async function ensureRemoteWorkspace(
   const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
 
   try {
-    const metadata = await createRemoteWorkspace(issueId);
+    const metadata = await Effect.runPromise(createRemoteWorkspace(issueId));
     return metadata;
   } catch (error: any) {
     throw new Error(`Failed to create remote workspace: ${error.message}`);
@@ -498,7 +498,7 @@ async function ensureRemoteWorkspace(
 function findProjectRoot(issueId?: string, labels: string[] = []): string {
   // If we have an issue ID, try to resolve from registry first
   if (issueId) {
-    const resolved = resolveProjectFromIssue(issueId, labels);
+    const resolved = resolveProjectFromIssueSync(issueId, labels);
     if (resolved) {
       return resolved.projectPath;
     }
@@ -574,7 +574,7 @@ export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean 
  * Uses findPlan (resolves main-side spec first, then workspace fallback).
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
-  const planPath = findPlan(workspacePath);
+  const planPath = findPlanSync(workspacePath);
 
   if (!planPath) {
     return { valid: true };
@@ -596,7 +596,7 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
 }
 
 export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number } {
-  const planPath = findPlan(workspacePath);
+  const planPath = findPlanSync(workspacePath);
   const beadCount = countBeadsTasks(workspacePath, issueId);
   if (!planPath) return { valid: true, beadCount, planItemCount: 0 };
 
@@ -678,7 +678,7 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   try {
-    const model = normalizeModelOverride(options.model);
+    const model = normalizeModelOverrideSync(options.model);
     if (model) options.model = model;
   } catch (err) {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
@@ -700,9 +700,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
   if (options.model) {
-    const { canUseHarness } = await import('../../lib/harness-policy.js');
+    const { canUseHarnessSync } = await import('../../lib/harness-policy.js');
     const { getProviderAuthMode } = await import('../../lib/agents.js');
-    const decision = canUseHarness(requestedHarness, options.model, await getProviderAuthMode(options.model));
+    const decision = canUseHarnessSync(requestedHarness, options.model, await getProviderAuthMode(options.model));
     if (!decision.allowed) {
       process.stderr.write(`${decision.reason}\n`);
       process.exit(1);
@@ -712,7 +712,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
-  const existingAgentState = getAgentState(agentId);
+  const existingAgentState = getAgentStateSync(agentId);
   const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
   if (existingAgentState?.paused === true && !options.force) {
     process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
@@ -740,7 +740,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const locationPreference = determineWorkspaceLocation(options);
 
     // Log project resolution info
-    const resolved = resolveProjectFromIssue(id);
+    const resolved = resolveProjectFromIssueSync(id);
     if (resolved) {
       spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
     }
@@ -751,7 +751,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Refuse fresh start when a resumable session already exists.
     // Users must choose resume or reset-session explicitly.
     try {
-      assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+      assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
     } catch (error) {
       if (workspacePath || isRemote) {
         throw error;
@@ -877,13 +877,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       // Show what context would be included
       const planningContext = await readPlanningContext(workspace);
       const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
-      const hasPreWorkspacePRD = await hasPRDDraft(id);
+      const hasPreWorkspacePRD = await Effect.runPromise(hasPRDDraft(id));
       console.log('');
       console.log(chalk.bold('Context:'));
       console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
       if (hasPreWorkspacePRD) {
-        console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPath(id)}`);
+        console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPathSync(id)}`);
       }
       return;
     }
@@ -925,11 +925,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    if (options.auto && !findPlan(workspace)) {
+    if (options.auto && !findPlanSync(workspace)) {
       spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
       const issue = await fetchIssueForAutoStart(id);
-      await writeAutoStartVBrief(projectRoot, workspace, issue);
-      const recovery = await createBeadsFromVBrief(workspace);
+      await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
+      const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
       if (recovery.created.length === 0) {
         await failPostCreateValidation({
           spinner,
@@ -947,7 +947,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
     if (!hasBeadsTasks(workspace, id)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningState = findPlan(workspace) !== null;
+      const hasPlanningState = findPlanSync(workspace) !== null;
       if (!hasPlanningState) {
         spinner.text = `Auto-creating bead for simple issue ${id}...`;
         try {
@@ -973,7 +973,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         spinner.text = `No beads found — attempting recovery from vBRIEF plan...`;
         try {
           const { createBeadsFromVBrief } = await import('../../lib/vbrief/beads.js');
-          const recovery = await createBeadsFromVBrief(workspace);
+          const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
           } else {
@@ -1037,7 +1037,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.text = 'Spawning agent...';
 
     if (shouldClearPauseBeforeSpawn) {
-      clearAgentPaused(agentId);
+      clearAgentPausedSync(agentId);
     }
 
     const agent = await spawnAgent({
@@ -1053,12 +1053,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     // Check shadow mode
-    const skipTrackerUpdate = await shouldSkipTrackerUpdate(id, options.shadow);
+    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
 
     if (skipTrackerUpdate) {
       // Create shadow state instead of updating tracker
-      await createShadowState(id, 'open', 'pan start');
-      await updateShadowState(id, 'in_progress', 'pan start');
+      await Effect.runPromise(createShadowState(id, 'open', 'pan start'));
+      await Effect.runPromise(updateShadowState(id, 'in_progress', 'pan start'));
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
     // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()

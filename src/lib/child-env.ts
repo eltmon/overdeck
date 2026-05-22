@@ -43,7 +43,7 @@ const STRIPPED_KEYS = new Set([...LEAKED_ENV_KEYS, ...PROVIDER_ENV_KEYS]);
  * @param overrides  Key/value pairs to overlay AFTER stripping.
  * @returns  A plain object safe to pass to spawn, pty.spawn, etc.
  */
-export function buildChildEnv(
+export function buildChildEnvSync(
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Record<string, string> {
@@ -78,7 +78,7 @@ export const BLANKED_PROVIDER_ENV: Record<string, string> = Object.fromEntries(
  * Variant that strips ONLY tmux/screen artifacts (not provider keys).
  * Use this when the caller will handle provider env separately (e.g. launcher scripts).
  */
-export function buildChildEnvWithoutTmux(
+export function buildChildEnvWithoutTmuxSync(
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Record<string, string> {
@@ -99,15 +99,15 @@ export function buildChildEnvWithoutTmux(
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Effect-native variant of buildChildEnv. Pure — never fails. */
-export const buildChildEnvEffect = (
+export const buildChildEnv = (
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Effect.Effect<Record<string, string>> =>
-  Effect.sync(() => buildChildEnv(baseEnv, overrides));
+  Effect.sync(() => buildChildEnvSync(baseEnv, overrides));
 
 /** Effect-native variant of buildChildEnvWithoutTmux. Pure — never fails. */
-export const buildChildEnvWithoutTmuxEffect = (
+export const buildChildEnvWithoutTmux = (
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Effect.Effect<Record<string, string>> =>
-  Effect.sync(() => buildChildEnvWithoutTmux(baseEnv, overrides));
+  Effect.sync(() => buildChildEnvWithoutTmuxSync(baseEnv, overrides));

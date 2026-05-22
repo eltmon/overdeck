@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for specialist-handoff-logger.ts - PAN-83
  */
@@ -469,16 +470,16 @@ describe('specialist-handoff-logger', () => {
 
   describe('updateSpecialistHandoffStatus', () => {
     it('should return false when log file does not exist', async () => {
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(false);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(false);
     });
 
     it('should update the most recent matching queued record', async () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(true);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(true);
 
       const handoffs = readSpecialistHandoffs();
       expect(handoffs).toHaveLength(1);
@@ -491,7 +492,7 @@ describe('specialist-handoff-logger', () => {
       logSpecialistHandoff(handoff);
 
       const before = Date.now();
-      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
+      await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
       const after = Date.now();
 
       const handoffs = readSpecialistHandoffs();
@@ -505,7 +506,7 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'processing');
+      await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'processing'));
 
       const handoffs = readSpecialistHandoffs();
       expect(handoffs[0].status).toBe('processing');
@@ -521,16 +522,16 @@ describe('specialist-handoff-logger', () => {
       };
       logSpecialistHandoff(handoff);
 
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(false);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(false);
     });
 
     it('should return false when issueId does not match', async () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      const result = await updateSpecialistHandoffStatus('PAN-999', 'test-agent', 'completed', 'success');
-      expect(result).toBe(false);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-999', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(false);
 
       // Original record unchanged
       const handoffs = readSpecialistHandoffs();
@@ -544,8 +545,8 @@ describe('specialist-handoff-logger', () => {
       logSpecialistHandoff(first);
       logSpecialistHandoff(second);
 
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(true);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(true);
 
       // Only the most recent (second) should be updated
       const handoffs = readSpecialistHandoffs();
@@ -564,8 +565,8 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       writeFileSync(logFile, `{corrupted json}\n${JSON.stringify(handoff)}\n`, 'utf-8');
 
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(true);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(true);
 
       const content = readFileSync(logFile, 'utf-8');
       const lines = content.trim().split('\n').filter(l => l.trim());
@@ -581,8 +582,8 @@ describe('specialist-handoff-logger', () => {
       const logFile = getTestLogFile();
       writeFileSync(logFile, '', 'utf-8');
 
-      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
-      expect(result).toBe(false);
+      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      (await Effect.runPromise(expect(result))).toBe(false);
     });
   });
 });

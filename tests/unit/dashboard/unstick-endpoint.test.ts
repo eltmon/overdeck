@@ -37,9 +37,9 @@ afterEach(() => {
 import {
   markWorkspaceStuck,
   clearWorkspaceStuck,
-  getReviewStatusFromDb,
+  getReviewStatusFromDbSync,
 } from '../../../src/lib/database/review-status-db.js';
-import { setReviewStatus, getReviewStatus } from '../../../src/lib/review-status.js';
+import { setReviewStatusSync, getReviewStatusSync } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -47,7 +47,7 @@ describe('markWorkspaceStuck', () => {
   it('sets stuck=1 with reason, stuckAt, and details', () => {
     markWorkspaceStuck('PAN-100', 'main_diverged', { beforeSha: 'aaa', remoteSha: 'bbb' });
 
-    const row = getReviewStatusFromDb('PAN-100');
+    const row = getReviewStatusFromDbSync('PAN-100');
     expect(row).not.toBeNull();
     expect(row!.stuck).toBe(true);
     expect(row!.stuckReason).toBe('main_diverged');
@@ -58,7 +58,7 @@ describe('markWorkspaceStuck', () => {
   it('creates a minimal placeholder row when no prior status exists', () => {
     markWorkspaceStuck('PAN-FRESH', 'main_diverged');
 
-    const row = getReviewStatusFromDb('PAN-FRESH');
+    const row = getReviewStatusFromDbSync('PAN-FRESH');
     expect(row).not.toBeNull();
     expect(row!.stuck).toBe(true);
     expect(row!.reviewStatus).toBe('pending');
@@ -74,7 +74,7 @@ describe('markWorkspaceStuck', () => {
 
     markWorkspaceStuck('PAN-200', 'main_diverged');
 
-    const row = getReviewStatusFromDb('PAN-200');
+    const row = getReviewStatusFromDbSync('PAN-200');
     expect(row!.stuck).toBe(true);
     expect(row!.reviewStatus).toBe('passed');   // not reset
     expect(row!.testStatus).toBe('passed');     // not reset
@@ -84,11 +84,11 @@ describe('markWorkspaceStuck', () => {
 describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
   it('clears stuck=0 and nullifies reason/details', () => {
     markWorkspaceStuck('PAN-300', 'main_diverged', { sha: 'abc' });
-    expect(getReviewStatusFromDb('PAN-300')!.stuck).toBe(true);
+    expect(getReviewStatusFromDbSync('PAN-300')!.stuck).toBe(true);
 
     clearWorkspaceStuck('PAN-300');
 
-    const row = getReviewStatusFromDb('PAN-300');
+    const row = getReviewStatusFromDbSync('PAN-300');
     expect(row!.stuck).toBeUndefined();  // stuck=0 → undefined
     expect(row!.stuckReason).toBeUndefined();
     expect(row!.stuckAt).toBeUndefined();
@@ -105,22 +105,22 @@ describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
     // Should not throw
     expect(() => clearWorkspaceStuck('PAN-400')).not.toThrow();
 
-    const row = getReviewStatusFromDb('PAN-400');
+    const row = getReviewStatusFromDbSync('PAN-400');
     // stuck=0 in DB maps to undefined (not false) — workspace is not stuck
     expect(row!.stuck).toBeUndefined();
   });
 
   it('round-trip: mark stuck → verify → clear → verify', () => {
     markWorkspaceStuck('PAN-500', 'main_diverged');
-    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBe(true);
+    expect(getReviewStatusFromDbSync('PAN-500')!.stuck).toBe(true);
 
     clearWorkspaceStuck('PAN-500');
     // After clearing, stuck is undefined (not stuck)
-    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBeUndefined();
+    expect(getReviewStatusFromDbSync('PAN-500')!.stuck).toBeUndefined();
 
     // Can be stuck again after clearing
     markWorkspaceStuck('PAN-500', 'main_diverged');
-    expect(getReviewStatusFromDb('PAN-500')!.stuck).toBe(true);
+    expect(getReviewStatusFromDbSync('PAN-500')!.stuck).toBe(true);
   });
 
   it('clearing one issue does not affect another', () => {
@@ -129,8 +129,8 @@ describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
 
     clearWorkspaceStuck('PAN-600');
 
-    expect(getReviewStatusFromDb('PAN-600')!.stuck).toBeUndefined();  // cleared
-    expect(getReviewStatusFromDb('PAN-601')!.stuck).toBe(true);       // still stuck
+    expect(getReviewStatusFromDbSync('PAN-600')!.stuck).toBeUndefined();  // cleared
+    expect(getReviewStatusFromDbSync('PAN-601')!.stuck).toBe(true);       // still stuck
   });
 });
 
@@ -140,7 +140,7 @@ describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
   // processUnstickRequest (the route helper), which calls setReviewStatus() atomically.
 
   it('preserves passed reviewStatus/testStatus after clearing stuck via DB helper', () => {
-    setReviewStatus('PAN-700', {
+    setReviewStatusSync('PAN-700', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: false,
@@ -149,7 +149,7 @@ describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
 
     clearWorkspaceStuck('PAN-700');
 
-    const after = getReviewStatus('PAN-700');
+    const after = getReviewStatusSync('PAN-700');
     expect(after?.stuck).toBeFalsy();
     // DB helper preserves lifecycle — only stuck fields cleared
     expect(after?.reviewStatus).toBe('passed');
@@ -157,7 +157,7 @@ describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
   });
 
   it('preserves readyForMerge=true after clearing stuck via DB helper', () => {
-    setReviewStatus('PAN-800', {
+    setReviewStatusSync('PAN-800', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -166,7 +166,7 @@ describe('clearWorkspaceStuck DB helper — clears only stuck fields', () => {
 
     clearWorkspaceStuck('PAN-800');
 
-    const after = getReviewStatus('PAN-800');
+    const after = getReviewStatusSync('PAN-800');
     expect(after?.stuck).toBeFalsy();
     // DB helper preserves lifecycle — only stuck fields cleared
     expect(after?.readyForMerge).toBe(true);
@@ -179,7 +179,7 @@ describe('mergeRetryCount persistence (restart-safety regression)', () => {
   // would be bypassed and the system could retry indefinitely.
 
   it('persists mergeRetryCount across a simulated restart (re-read from DB)', () => {
-    setReviewStatus('PAN-RC1', {
+    setReviewStatusSync('PAN-RC1', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       mergeStatus: 'failed',
@@ -188,22 +188,22 @@ describe('mergeRetryCount persistence (restart-safety regression)', () => {
     });
 
     // Simulate restart: read directly from DB (bypasses any in-memory cache)
-    const row = getReviewStatusFromDb('PAN-RC1');
+    const row = getReviewStatusFromDbSync('PAN-RC1');
     expect(row?.mergeRetryCount).toBe(3);
   });
 
   it('mergeRetryCount increments and persists correctly across writes', () => {
-    setReviewStatus('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false, mergeRetryCount: 1 });
-    setReviewStatus('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, mergeRetryCount: 2 });
+    setReviewStatusSync('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'failed', readyForMerge: false, mergeRetryCount: 1 });
+    setReviewStatusSync('PAN-RC2', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, mergeRetryCount: 2 });
 
-    const row = getReviewStatusFromDb('PAN-RC2');
+    const row = getReviewStatusFromDbSync('PAN-RC2');
     expect(row?.mergeRetryCount).toBe(2);
   });
 
   it('mergeRetryCount defaults to undefined (not 0) when never set', () => {
-    setReviewStatus('PAN-RC3', { reviewStatus: 'pending', testStatus: 'pending' });
+    setReviewStatusSync('PAN-RC3', { reviewStatus: 'pending', testStatus: 'pending' });
 
-    const status = getReviewStatus('PAN-RC3');
+    const status = getReviewStatusSync('PAN-RC3');
     // Deacon uses `status.mergeRetryCount || 0` so undefined and 0 are equivalent —
     // but the field must not be fabricated as a non-zero value.
     expect(status?.mergeRetryCount == null || status.mergeRetryCount === 0).toBe(true);

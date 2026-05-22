@@ -1,13 +1,13 @@
 import chalk from 'chalk';
 import {
-  appendSummary,
-  logHistory,
-  searchHistory,
-  getRecentHistory,
-  materializeOutput,
-  listMaterialized,
-  readMaterialized,
-  estimateTokens,
+  appendSummarySync,
+  logHistorySync,
+  searchHistorySync,
+  getRecentHistorySync,
+  materializeOutputSync,
+  listMaterializedSync,
+  readMaterializedSync,
+  estimateTokensSync,
 } from '../../lib/context.js';
 import { readFileSync, existsSync } from 'fs';
 
@@ -36,8 +36,8 @@ export async function contextCommand(
         whatWasDone: ['Completed assigned work'],
       };
 
-      appendSummary(agentId, summary);
-      logHistory(agentId, 'context:summary', { title });
+      appendSummarySync(agentId, summary);
+      logHistorySync(agentId, 'context:summary', { title });
 
       console.log(chalk.green(`✓ Summary added: "${title}"`));
       break;
@@ -48,7 +48,7 @@ export async function contextCommand(
       const pattern = arg1;
 
       if (pattern) {
-        const results = searchHistory(agentId, pattern);
+        const results = searchHistorySync(agentId, pattern);
         if (results.length === 0) {
           console.log(chalk.dim('No matches found.'));
           return;
@@ -59,7 +59,7 @@ export async function contextCommand(
           console.log(line);
         }
       } else {
-        const recent = getRecentHistory(agentId, 20);
+        const recent = getRecentHistorySync(agentId, 20);
         if (recent.length === 0) {
           console.log(chalk.dim('No history yet.'));
           return;
@@ -79,14 +79,14 @@ export async function contextCommand(
       const filepath = arg1;
 
       if (filepath && existsSync(filepath)) {
-        const content = readMaterialized(filepath);
+        const content = readMaterializedSync(filepath);
         if (content) {
           console.log(content);
         }
         return;
       }
 
-      const outputs = listMaterialized(agentId);
+      const outputs = listMaterializedSync(agentId);
       if (outputs.length === 0) {
         console.log(chalk.dim('No materialized outputs.'));
         return;
@@ -116,7 +116,7 @@ export async function contextCommand(
         text = readFileSync(target, 'utf-8');
       }
 
-      const tokens = estimateTokens(text);
+      const tokens = estimateTokensSync(text);
       console.log(`Estimated tokens: ${chalk.cyan(tokens.toLocaleString())}`);
       break;
     }

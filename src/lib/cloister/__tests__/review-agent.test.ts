@@ -6,9 +6,9 @@ const mocks = vi.hoisted(() => ({
   spawnRun: vi.fn(),
   saveAgentStateEffect: vi.fn(),
   getAgentStateEffect: vi.fn(),
-  listSessionNamesAsyncEffect: vi.fn(),
-  isPaneDeadAsyncEffect: vi.fn(),
-  killSessionAsyncEffect: vi.fn(),
+  listSessionNames: vi.fn(),
+  isPaneDead: vi.fn(),
+  killSession: vi.fn(),
   emitActivityEntry: vi.fn(),
   getReviewStatus: vi.fn(),
   setReviewStatus: vi.fn(),
@@ -33,9 +33,9 @@ vi.mock('../../agents.js', () => ({
 }));
 
 vi.mock('../../tmux.js', () => ({
-  listSessionNamesAsyncEffect: mocks.listSessionNamesAsyncEffect,
-  isPaneDeadAsyncEffect: mocks.isPaneDeadAsyncEffect,
-  killSessionAsyncEffect: mocks.killSessionAsyncEffect,
+  listSessionNames: mocks.listSessionNames,
+  isPaneDead: mocks.isPaneDead,
+  killSession: mocks.killSession,
 }));
 
 vi.mock('../../activity-logger.js', () => ({
@@ -100,7 +100,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
     mocks.saveAgentStateEffect.mockReturnValue(Effect.void);
     mocks.getAgentStateEffect.mockReturnValue(Effect.succeed({ hostOverride: true }));
-    mocks.listSessionNamesAsyncEffect.mockReturnValue(Effect.succeed([]));
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.listStashes.mockResolvedValue([]);
     mocks.createNamedStash.mockResolvedValue(null);
@@ -110,11 +110,11 @@ describe('spawnReviewRoleForIssue', () => {
   });
 
   it('inherits host override from the completed work agent for synthesis and reviewer spawns', async () => {
-    const result = await spawnReviewRoleForIssue({
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
       workspace: '/tmp/pan-review-host-override',
       branch: 'feature/pan-1194',
-    });
+    }));
 
     expect(result.success).toBe(true);
     expect(mocks.getAgentStateEffect).toHaveBeenCalledWith('agent-pan-1194');

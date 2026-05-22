@@ -40,10 +40,10 @@ vi.mock('../origin-validation.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { createAgentStopHandler } from '../agents.js';
-import { getAgentStateEffect, stopAgentEffect } from '../../../../lib/agents.js';
+import { getAgentState, stopAgent } from '../../../../lib/agents.js';
 
-const mockGetAgentStateEffect = vi.mocked(getAgentStateEffect);
-const mockStopAgentEffect = vi.mocked(stopAgentEffect);
+const mockGetAgentStateEffect = vi.mocked(getAgentState);
+const mockStopAgentEffect = vi.mocked(stopAgent);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ async function runAgentStopHandler(
     Context.add(EventStoreService, mockEventStore as any),
   );
 
-  const handler = createAgentStopHandler(lifecycleEvent);
+  const handler = (await Effect.runPromise(createAgentStopHandler(lifecycleEvent)));
   await Effect.runPromise(Effect.provide(handler, Layer.succeedContext(ctx)));
 }
 
@@ -115,7 +115,7 @@ describe('createAgentStopHandler lifecycle events', () => {
   it('calls stopAgentEffect and getAgentStateEffect', async () => {
     await runAgentStopHandler('agent.stop_requested', 'agent-pan-999');
 
-    expect(mockGetAgentStateEffect).toHaveBeenCalledWith('agent-pan-999');
-    expect(mockStopAgentEffect).toHaveBeenCalledWith('agent-pan-999');
+    (await Effect.runPromise(expect(mockGetAgentStateEffect))).toHaveBeenCalledWith('agent-pan-999');
+    (await Effect.runPromise(expect(mockStopAgentEffect))).toHaveBeenCalledWith('agent-pan-999');
   });
 });

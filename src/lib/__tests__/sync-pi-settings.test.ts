@@ -12,7 +12,7 @@ vi.mock('child_process', async () => {
   }
 })
 
-import { syncPiSettings } from '../sync.js'
+import { syncPiSettingsSync } from '../sync.js'
 
 const PI_SKILLS_TARGET = '/.claude/skills'
 
@@ -49,7 +49,7 @@ describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
       throw new Error(`unexpected command: ${cmd}`)
     })
 
-    const result = syncPiSettings()
+    const result = syncPiSettingsSync()
 
     expect(result.status).toBe('created')
     expect(result.path).toBe(join(h.home, '.pi', 'agent', 'settings.json'))
@@ -75,7 +75,7 @@ describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
       skills: ['/home/me/custom-skills'],
     }, null, 2))
 
-    const result = syncPiSettings()
+    const result = syncPiSettingsSync()
 
     expect(result.status).toBe('updated')
     const parsed = JSON.parse(readFileSync(settingsPath, 'utf-8'))
@@ -92,7 +92,7 @@ describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
     })
 
     const settingsPath = join(h.home, '.pi', 'agent', 'settings.json')
-    const result = syncPiSettings()
+    const result = syncPiSettingsSync()
 
     expect(result.status).toBe('skipped')
     expect(result.reason).toMatch(/pi not on PATH/i)
@@ -105,10 +105,10 @@ describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
       throw new Error(`unexpected command: ${cmd}`)
     })
 
-    const first = syncPiSettings()
+    const first = syncPiSettingsSync()
     expect(first.status).toBe('created')
 
-    const second = syncPiSettings()
+    const second = syncPiSettingsSync()
     expect(second.status).toBe('unchanged')
   })
 
@@ -123,7 +123,7 @@ describe('syncPiSettings (PAN-636 — workspace-63b)', () => {
     const malformed = '{ this is not valid json '
     writeFileSync(settingsPath, malformed)
 
-    const result = syncPiSettings()
+    const result = syncPiSettingsSync()
 
     expect(result.status).toBe('skipped')
     expect(result.reason).toMatch(/not valid JSON/i)

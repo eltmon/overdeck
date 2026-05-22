@@ -20,11 +20,11 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  readEvents,
-  tailEvents,
-  migrateAllSessions,
-  rebuildCache,
-  deduplicateEvents,
+  readEventsSync,
+  tailEventsSync,
+  migrateAllSessionsSync,
+  rebuildCacheSync,
+  deduplicateEventsSync,
   reconcile,
 } from '../../../lib/costs/index.js';
 import {
@@ -49,9 +49,9 @@ const getCostsSummaryRoute = HttpRouter.add(
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const todayEntries = readEvents({ startDate: today });
-      const weekEntries = readEvents({ startDate: weekAgo });
-      const monthEntries = readEvents({ startDate: monthAgo });
+      const todayEntries = readEventsSync({ startDate: today });
+      const weekEntries = readEventsSync({ startDate: weekAgo });
+      const monthEntries = readEventsSync({ startDate: monthAgo });
 
       const summarize = (entries: { cost?: number; input?: number; output?: number; model?: string }[]) => ({
         totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
@@ -124,8 +124,8 @@ const postCostsRebuildRoute = HttpRouter.add(
   httpHandler(Effect.try({
     try: () => {
       console.log('Manual cost cache rebuild requested...');
-      const migrationStats = migrateAllSessions();
-      const cache = rebuildCache();
+      const migrationStats = migrateAllSessionsSync();
+      const cache = rebuildCacheSync();
       return jsonResponse({
         success: true,
         message: 'Cost cache rebuilt successfully',
@@ -153,7 +153,7 @@ const postCostsDeduplicateRoute = HttpRouter.add(
   '/api/costs/deduplicate',
   httpHandler(Effect.try({
     try: () => {
-      const removed = deduplicateEvents();
+      const removed = deduplicateEventsSync();
       return jsonResponse({
         success: true,
         message: `Deduplication complete: ${removed} duplicate event${removed !== 1 ? 's' : ''} removed`,
@@ -181,7 +181,7 @@ const getCostsStreamRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const events = since ? readEvents({ startDate: since, limit }) : tailEvents(limit);
+        const events = since ? readEventsSync({ startDate: since, limit }) : tailEventsSync(limit);
 
         const byIssue: Record<string, unknown[]> = {};
         for (const event of events) {

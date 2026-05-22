@@ -121,10 +121,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearGetIssue).toHaveBeenCalledWith('MIN-1');
@@ -136,10 +136,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_planning');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inplanning');
@@ -149,10 +149,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_review');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inreview');
@@ -160,20 +160,20 @@ describe('IssueLifecycle Effect service', () => {
 
     it('prefers a verifying state by name', async () => {
       mockLinearGetTeamStates.mockReturnValue(
-        ok([
+        (await Effect.runPromise(ok([
           { id: 'state-open', name: 'Todo', type: 'unstarted' },
           { id: 'state-inprogress', name: 'In Progress', type: 'started' },
           { id: 'state-verifying', name: 'Verifying On Main', type: 'started' },
           { id: 'state-inreview', name: 'In Review', type: 'started' },
-        ]),
+        ]))),
       );
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'verifying_on_main');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-verifying');
@@ -183,10 +183,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'closed');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-done');
@@ -209,10 +209,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('APP-42', 'in_progress');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
@@ -223,10 +223,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('APP-42', 'in_review');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
@@ -249,10 +249,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('APP-42', 'verifying_on_main');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubEnsureLabel).toHaveBeenCalledWith('acme', 'myapp', 'verifying-on-main', 'fbca04', 'Merged — awaiting verification on main');
@@ -267,10 +267,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('APP-42', 'closed');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('acme', 'myapp', 42);
@@ -286,10 +286,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('US1234', 'in_progress');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockRallyUpdateState).toHaveBeenCalledWith('US1234', 'in_progress');
@@ -306,10 +306,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.addLabel('APP-5', 'some-label');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 5, 'some-label');
@@ -319,10 +319,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.addLabel('MIN-1', 'some-label');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).not.toHaveBeenCalled();
@@ -334,10 +334,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.close('MIN-1');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-done');
@@ -352,10 +352,10 @@ describe('IssueLifecycle Effect service', () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
 
-      const program = Effect.gen(function* () {
+      const program = (await Effect.runPromise(Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.close('APP-10');
-      }).pipe(Effect.provide(layer));
+      }).pipe(Effect.provide(layer))));
 
       await runEffect(program);
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('acme', 'myapp', 10);

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -65,10 +66,10 @@ exit 0
       );
 
       // Execute validation
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testRepo,
         issueId: 'TEST-CLEAN',
-      });
+      }));
 
       // Verify
       expect(result.success).toBe(true);
@@ -99,10 +100,10 @@ exit 1
       );
 
       // Execute validation
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testRepo,
         issueId: 'TEST-CONFLICT',
-      });
+      }));
 
       // Verify
       expect(result.success).toBe(true); // Script ran
@@ -134,10 +135,10 @@ exit 1
       );
 
       // Execute validation
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testRepo,
         issueId: 'TEST-BUILD-FAIL',
-      });
+      }));
 
       // Verify
       expect(result.valid).toBe(false);
@@ -173,10 +174,10 @@ exit 1
       );
 
       // Execute validation
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testRepo,
         issueId: 'TEST-TEST-FAIL',
-      });
+      }));
 
       // Verify
       expect(result.valid).toBe(false);
@@ -214,10 +215,10 @@ exit 1
       expect(mergeCommit).not.toBe(initialCommit);
 
       // Execute auto-revert (uses ORIG_HEAD)
-      const revertSuccess = await autoRevertMerge(testRepo);
+      const revertSuccess = await Effect.runPromise(autoRevertMerge(testRepo));
 
       // Verify
-      expect(revertSuccess).toBe(true);
+      (await Effect.runPromise(expect(revertSuccess))).toBe(true);
 
       const { stdout: afterRevert } = await execAsync('git rev-parse HEAD', { cwd: testRepo });
       const revertedCommit = afterRevert.trim();
@@ -231,10 +232,10 @@ exit 1
     it('should handle gracefully when validation script is missing', async () => {
       // No validation script created
 
-      const result = await runMergeValidation({
+      const result = await Effect.runPromise(runMergeValidation({
         projectPath: testRepo,
         issueId: 'TEST-NO-SCRIPT',
-      });
+      }));
 
       // No validation script = skip (specialist already ran build + tests)
       expect(result.success).toBe(true);

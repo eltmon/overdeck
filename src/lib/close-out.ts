@@ -18,11 +18,11 @@ import {
   PROJECT_PRDS_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
-import { findPrdAtStatus, canonicalPrdSubdir } from './prd-locations.js';
-import { killSessionAsyncEffect, sessionExists, listSessionNamesAsyncEffect } from './tmux.js';
+import { findPrdAtStatusSync, canonicalPrdSubdirSync } from './prd-locations.js';
+import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
-import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
+import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -160,26 +160,21 @@ export interface CloseOutContext {
 }
 
 const CLOSED_OUT_LABEL = 'closed-out';
-const CLOSED_OUT_COLOR = '1d4ed8';
-
-/**
- * Execute the full close-out ceremony for a merged issue.
- */
-export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutResult> {
+const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: CloseOutContext): Promise<CloseOutResult> {
   const steps: CloseOutStep[] = [];
   const issueLower = ctx.issueId.toLowerCase();
 
   // Step 1: Verify PRD preserved.
   // Tolerates all four legacy formats (subdir/flat × lowercase/uppercase) via findPrdAtStatus.
   try {
-    if (findPrdAtStatus(ctx.projectPath, ctx.issueId, 'completed')) {
+    if (findPrdAtStatusSync(ctx.projectPath, ctx.issueId, 'completed')) {
       steps.push({ name: 'Verify PRD preserved', status: 'passed', message: 'PRD in completed/' });
     } else {
-      const source = findPrdAtStatus(ctx.projectPath, ctx.issueId, 'active');
+      const source = findPrdAtStatusSync(ctx.projectPath, ctx.issueId, 'active');
       if (!source) {
         steps.push({ name: 'Verify PRD preserved', status: 'skipped', message: 'No PRD found (may not have had one)' });
       } else {
-        const completedSubdir = canonicalPrdSubdir(ctx.projectPath, ctx.issueId, 'completed');
+        const completedSubdir = canonicalPrdSubdirSync(ctx.projectPath, ctx.issueId, 'completed');
         const completedFlat = join(
           ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
           PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`,
@@ -249,9 +244,9 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     // Kill tmux sessions for this issue
     const exactPatterns = [agentSession, `test-${issueLower}`, `merge-${issueLower}`];
     for (const session of exactPatterns) {
-      if (sessionExists(session)) {
+      if (sessionExistsSync(session)) {
         try {
-          await Effect.runPromise(killSessionAsyncEffect(session));
+          await Effect.runPromise(killSession(session));
           cleaned = true;
         } catch { /* session may already be dead */ }
       }
@@ -259,12 +254,12 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
 
     // Review sessions use timestamped names: review-<issue>-<timestamp>-<role>
     try {
-      const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+      const allSessions = await Effect.runPromise(listSessionNames());
       const reviewRegex = new RegExp(`^review-${issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
       const reviewSessions = allSessions.filter(s => reviewRegex.test(s));
       for (const session of reviewSessions) {
         try {
-          await Effect.runPromise(killSessionAsyncEffect(session));
+          await Effect.runPromise(killSession(session));
           cleaned = true;
         } catch { /* session may already be dead */ }
       }
@@ -274,7 +269,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     if (workspacePath && existsSync(workspacePath)) {
       try {
         const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        await stopWorkspaceDocker(workspacePath, issueLower);
+        await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
         cleaned = true;
       } catch { /* Docker may not be running */ }
 
@@ -319,8 +314,8 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     const { pruneCheckpointRefsForAgents, pruneStaleCheckpointRefs } = await import('./checkpoint/checkpoint-manager.js');
     const issueLower = ctx.issueId.toLowerCase();
     const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
-    await pruneCheckpointRefsForAgents(ctx.projectPath, agentIds);
-    const stalePruned = await pruneStaleCheckpointRefs(ctx.projectPath, 30);
+    await Effect.runPromise(pruneCheckpointRefsForAgents(ctx.projectPath, agentIds));
+    const stalePruned = await Effect.runPromise(pruneStaleCheckpointRefs(ctx.projectPath, 30));
     steps.push({
       name: 'Prune checkpoint refs',
       status: 'passed',
@@ -377,8 +372,8 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
 
       // Find the issue by identifier using issues filter (searchIssues returns
       // IssueSearchResult which lacks .update(); client.issue() needs the UUID)
-      const issueNumber = extractNumber(ctx.issueId);
-      const issuePrefix = extractPrefix(ctx.issueId);
+      const issueNumber = extractNumberSync(ctx.issueId);
+      const issuePrefix = extractPrefixSync(ctx.issueId);
       if (issueNumber === null || issuePrefix === null) {
         steps.push({ name: 'Close issue on tracker', status: 'failed', message: `Could not parse issue ID: ${ctx.issueId}` });
         return { success: false, issueId: ctx.issueId, steps, error: `Could not parse issue ID: ${ctx.issueId}` };
@@ -445,8 +440,8 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
         if (linearApiKey) {
           const { LinearClient } = await import('@linear/sdk');
           const client = new LinearClient({ apiKey: linearApiKey });
-          const issueNum = extractNumber(ctx.issueId);
-          const teamKey = extractPrefix(ctx.issueId);
+          const issueNum = extractNumberSync(ctx.issueId);
+          const teamKey = extractPrefixSync(ctx.issueId);
           if (issueNum !== null && teamKey !== null) {
             const results = await client.issues({
               filter: {
@@ -548,11 +543,11 @@ export class CloseOutError extends Data.TaggedError('CloseOutError')<{
  * (e.g. dynamic import of @linear/sdk explodes). Step-level failures stay
  * in the returned `success/steps` shape so callers can display them.
  */
-export const executeCloseOutEffect = (
+export const executeCloseOut = (
   ctx: CloseOutContext,
 ): Effect.Effect<CloseOutResult, CloseOutError> =>
   Effect.tryPromise({
-    try: () => executeCloseOut(ctx),
+    try: () => executeCloseOutPromise(ctx),
     catch: (cause) =>
       new CloseOutError({
         issueId: ctx.issueId,

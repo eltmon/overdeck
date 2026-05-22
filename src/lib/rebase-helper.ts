@@ -33,12 +33,7 @@ export interface RebaseAllResult {
   success: boolean;
   results: RebaseResult[];
   firstFailure?: RebaseResult;
-}
-
-/**
- * Rebase every repo in the merge set onto its target branch and push.
- */
-export async function rebaseAndPushRepos(
+}async function rebaseAndPushReposPromise(
   workspacePath: string,
   mergeSet: MergeSet
 ): Promise<RebaseAllResult> {
@@ -224,12 +219,12 @@ export class RebaseError extends Data.TaggedError('RebaseError')<{
 /** Effect variant of `rebaseAndPushRepos`. Failure shape never throws — the
  *  result's `success: false` carries the failed-repo details. The Effect
  *  channel surfaces unexpected exceptions only. */
-export const rebaseAndPushReposEffect = (
+export const rebaseAndPushRepos = (
   workspacePath: string,
   mergeSet: MergeSet,
 ): Effect.Effect<RebaseAllResult, RebaseError> =>
   Effect.tryPromise({
-    try: () => rebaseAndPushRepos(workspacePath, mergeSet),
+    try: () => rebaseAndPushReposPromise(workspacePath, mergeSet),
     catch: (cause) =>
       new RebaseError({
         workspacePath,

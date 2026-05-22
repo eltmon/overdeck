@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import {
   getAgentHealth,
@@ -12,7 +13,7 @@ import {
   DEFAULT_CHECK_INTERVAL_MS,
   type HealthConfig,
 } from '../../lib/health.js';
-import { listRunningAgents } from '../../lib/agents.js';
+import { listRunningAgentsSync } from '../../lib/agents.js';
 
 interface HealthOptions {
   json?: boolean;
@@ -37,7 +38,7 @@ export async function healthCommand(
       // Run a single health check
       console.log(chalk.bold('Running health check...\n'));
 
-      const results = await runHealthCheck(config);
+      const results = await Effect.runPromise(runHealthCheck(config));
 
       if (options.json) {
         console.log(JSON.stringify(results, null, 2));
@@ -62,7 +63,7 @@ export async function healthCommand(
 
     case 'status': {
       // Show health status of all agents
-      const agents = listRunningAgents();
+      const agents = listRunningAgentsSync();
 
       if (agents.length === 0) {
         console.log(chalk.dim('No agents found.'));
@@ -99,7 +100,7 @@ export async function healthCommand(
       const agentId = arg.startsWith('agent-') ? arg : `agent-${arg.toLowerCase()}`;
       console.log(chalk.dim(`Pinging ${agentId}...`));
 
-      const health = await pingAgent(agentId, config);
+      const health = await Effect.runPromise(pingAgent(agentId, config));
 
       if (options.json) {
         console.log(JSON.stringify(health, null, 2));
@@ -124,7 +125,7 @@ export async function healthCommand(
 
       // Override config to allow immediate recovery
       const forceConfig = { ...config, consecutiveFailures: 0 };
-      const result = await handleStuckAgent(agentId, forceConfig);
+      const result = await Effect.runPromise(handleStuckAgent(agentId, forceConfig));
 
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));

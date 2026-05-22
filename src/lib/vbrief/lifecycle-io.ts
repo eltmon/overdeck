@@ -14,17 +14,17 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameS
 import { Effect } from 'effect';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
-import { appendFeedbackEntry, appendSessionEntry, clearFeedback, continueFilename, readContinueState, writeContinueState, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import { appendFeedbackEntrySync, appendSessionEntrySync, clearFeedbackSync, continueFilename, readContinueStateSync, writeContinueStateSync, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
-  ensureVBriefDirs,
+  ensureVBriefDirsSync,
   generateVBriefFilename,
   parseVBriefFilename,
   resolveVBriefDir,
   slugify,
   type VBriefLifecycleDir,
 } from './lifecycle.js';
-import { readPlan } from './io.js';
+import { readPlanSync } from './io.js';
 import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { findSpecByIssue, getProjectPanPaths, updateSpecStatus, writeSpecForIssue } from '../pan-dir/specs.js';
@@ -177,7 +177,7 @@ function findLegacyVBriefByIssue(projectRoot: string, issueId: string): FoundVBr
       if (!parts || parts.issueId !== issueId) continue;
       const path = join(dirPath, entry);
       try {
-        const document = readPlan(path);
+        const document = readPlanSync(path);
         return { path, lifecycleDir, document, ...parts };
       } catch {
         continue;
@@ -187,7 +187,7 @@ function findLegacyVBriefByIssue(projectRoot: string, issueId: string): FoundVBr
   return null;
 }
 
-export function findVBriefByIssue(projectRoot: string, issueId: string): FoundVBrief | null {
+export function findVBriefByIssueSync(projectRoot: string, issueId: string): FoundVBrief | null {
   const spec = findSpecByIssueSync(projectRoot, issueId);
   if (spec) {
     return specEntryToFound(spec);
@@ -222,7 +222,7 @@ function ensurePanSpecForIssue(projectRoot: string, found: FoundVBrief): EnsureP
 }
 
 export function updatePlanStatus(filePath: string, newStatus: string): void {
-  const doc = readPlan(filePath);
+  const doc = readPlanSync(filePath);
   const now = new Date().toISOString();
   doc.plan.status = newStatus;
   doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
@@ -231,19 +231,17 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   const tmp = filePath + '.tmp';
   writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
   renameSync(tmp, filePath);
-}
-
-export async function moveVBrief(
+}async function moveVBriefPromise(
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
 ): Promise<{ from: FoundVBrief; toPath: string }> {
-  const found = findVBriefByIssue(projectRoot, issueId);
+  const found = findVBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirs(projectRoot);
+  ensureVBriefDirsSync(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const updatedSpec = await Effect.runPromise(updateSpecStatus(projectRoot, issueId, targetDir));
   if (!updatedSpec) {
@@ -272,12 +270,12 @@ export function moveVBriefFilesOnly(
   issueId: string,
   targetDir: VBriefLifecycleDir,
 ): { from: FoundVBrief; toPath: string } {
-  const found = findVBriefByIssue(projectRoot, issueId);
+  const found = findVBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirs(projectRoot);
+  ensureVBriefDirsSync(projectRoot);
   ensurePanSpecForIssue(projectRoot, found);
   const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
   if (!updatedSpec) {
@@ -292,7 +290,7 @@ export function moveVBriefFilesOnly(
 }
 
 export function deleteVBrief(projectRoot: string, issueId: string): boolean {
-  const found = findVBriefByIssue(projectRoot, issueId);
+  const found = findVBriefByIssueSync(projectRoot, issueId);
   if (!found) return false;
 
   const spec = findSpecByIssueSync(projectRoot, issueId);
@@ -315,21 +313,19 @@ export interface VBriefTransitionResult {
   statusUpdated: boolean;
   committed: boolean;
   moved: boolean;
-}
-
-export async function transitionVBriefOnMain(
+}async function transitionVBriefOnMainPromise(
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
   newStatus: string,
   commitMessage: string,
 ): Promise<VBriefTransitionResult> {
-  const found = findVBriefByIssue(projectRoot, issueId);
+  const found = findVBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirs(projectRoot);
+  ensureVBriefDirsSync(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const ensuredSpec = ensured.found;
   const needsMove = ensuredSpec.lifecycleDir !== targetDir;
@@ -435,7 +431,7 @@ export function promoteVBriefToProposed(
     throw new Error(`No workspace spec found at ${join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)}`);
   }
 
-  const planDoc = readPlan(sourceVBrief);
+  const planDoc = readPlanSync(sourceVBrief);
   const upperIssueId = issueId.toUpperCase();
   const existingFilename = planDoc.plan.metadata?.canonicalFilename;
   const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
@@ -465,7 +461,7 @@ export function readContinueStateForIssue(
   issueId: string,
 ): ContinueState | null {
   try {
-    return readContinueState(projectRoot, issueId);
+    return readContinueStateSync(projectRoot, issueId);
   } catch {
     return null;
   }
@@ -476,7 +472,7 @@ export function writeContinueStateForIssue(
   issueId: string,
   state: ContinueState,
 ): void {
-  writeContinueState(projectRoot, issueId, state);
+  writeContinueStateSync(projectRoot, issueId, state);
 }
 
 export function appendContinueSessionEntryForIssue(
@@ -484,7 +480,7 @@ export function appendContinueSessionEntryForIssue(
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): ContinueState {
-  return appendSessionEntry(projectRoot, issueId, entry);
+  return appendSessionEntrySync(projectRoot, issueId, entry);
 }
 
 export function appendFeedbackEntryForIssue(
@@ -492,14 +488,14 @@ export function appendFeedbackEntryForIssue(
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): ContinueState {
-  return appendFeedbackEntry(projectRoot, issueId, entry);
+  return appendFeedbackEntrySync(projectRoot, issueId, entry);
 }
 
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  return clearFeedback(projectRoot, issueId);
+  return clearFeedbackSync(projectRoot, issueId);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -510,28 +506,28 @@ export function clearFeedbackForIssue(
 // vbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
 
 /** Effect variant of `findVBriefByIssue` — failures surface as typed errors. */
-export const findVBriefByIssueEffect = (
+export const findVBriefByIssue = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<FoundVBrief | null, FsError> =>
   Effect.try({
-    try: () => findVBriefByIssue(projectRoot, issueId),
+    try: () => findVBriefByIssueSync(projectRoot, issueId),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'findVBriefByIssue', cause }),
   });
 
 /** Effect variant of `moveVBrief`. */
-export const moveVBriefEffect = (
+export const moveVBrief = (
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
 ): Effect.Effect<{ from: FoundVBrief; toPath: string }, FsError> =>
   Effect.tryPromise({
-    try: () => moveVBrief(projectRoot, issueId, targetDir),
+    try: () => moveVBriefPromise(projectRoot, issueId, targetDir),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'moveVBrief', cause }),
   });
 
 /** Effect variant of `transitionVBriefOnMain`. */
-export const transitionVBriefOnMainEffect = (
+export const transitionVBriefOnMain = (
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
@@ -539,6 +535,6 @@ export const transitionVBriefOnMainEffect = (
   commitMessage: string,
 ): Effect.Effect<VBriefTransitionResult, FsError> =>
   Effect.tryPromise({
-    try: () => transitionVBriefOnMain(projectRoot, issueId, targetDir, newStatus, commitMessage),
+    try: () => transitionVBriefOnMainPromise(projectRoot, issueId, targetDir, newStatus, commitMessage),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'transitionVBriefOnMain', cause }),
   });

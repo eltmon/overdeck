@@ -13,7 +13,7 @@ import { homedir } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
-import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 
 const execFileAsync = promisify(execFile);
@@ -72,13 +72,13 @@ export async function closeOutCommand(issueId: string, options: CloseOutOptions)
 
   // Resolve project
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   let projectPath = '';
 
   if (projectConfig) {
     projectPath = projectConfig.path;
   } else {
-    const resolved = resolveProjectFromIssue(issueId);
+    const resolved = resolveProjectFromIssueSync(issueId);
     if (resolved) {
       projectPath = resolved.projectPath;
     }

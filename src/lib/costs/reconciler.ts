@@ -26,7 +26,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import { getDatabase } from '../database/index.js';
 import { insertCostEvents } from '../database/cost-events-db.js';
-import { calculateCost, getPricing, type AIProvider, type TokenUsage } from '../cost.js';
+import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
 
 // ============== Types ==============
@@ -293,11 +293,11 @@ function extractCostEvents(
 
       // Strip claudish prefix for pricing lookup: "oai@gpt-5.4" → "gpt-5.4"
       const pricingModel = model.replace(/^(?:oai|cx|go)@/, '');
-      const pricing = getPricing(provider, pricingModel);
+      const pricing = getPricingSync(provider, pricingModel);
       if (!pricing) continue;
 
       const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };
-      const cost = calculateCost(tokenUsage, pricing);
+      const cost = calculateCostSync(tokenUsage, pricing);
       const timestamp = entry.timestamp || entry.ts || entry.created_at || new Date().toISOString();
 
       events.push({
@@ -322,17 +322,7 @@ function extractCostEvents(
   }
 
   return events;
-}
-
-// ============== Main Reconcile ==============
-
-/**
- * Run a full reconciliation sweep.
- *
- * Scans ~/.claude/projects/ directly to find ALL transcript files,
- * then uses the session-to-agent index and path inference for attribution.
- */
-export async function reconcile(): Promise<ReconcileResult> {
+}async function reconcilePromise(): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     sessionsWithNewData: 0,
@@ -480,8 +470,8 @@ export async function reconcile(): Promise<ReconcileResult> {
  * `result.errors`; only catastrophic failures (e.g. SQLite open failure)
  * surface on the Effect error channel.
  */
-export const reconcileEffect = (): Effect.Effect<ReconcileResult, FsError> =>
+export const reconcile = (): Effect.Effect<ReconcileResult, FsError> =>
   Effect.tryPromise({
-    try: () => reconcile(),
+    try: () => reconcilePromise(),
     catch: (cause) => new FsError({ path: '<reconciler>', operation: 'reconcile', cause }),
   });

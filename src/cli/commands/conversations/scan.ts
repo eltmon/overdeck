@@ -5,7 +5,7 @@
 import chalk from 'chalk';
 import { scan } from '../../../lib/conversations/scanner.js';
 import type { ScanProgress } from '../../../lib/conversations/scanner.js';
-import { getConversationsConfig } from '../../../lib/config-yaml.js';
+import { getConversationsConfigSync } from '../../../lib/config-yaml.js';
 
 export async function scanAction(opts: {
   mode?: string;
@@ -45,7 +45,7 @@ export async function scanAction(opts: {
   const result = await scan({
     mode,
     dirs: opts.dirs,
-    watchDirs: getConversationsConfig().watchDirs,
+    watchDirs: getConversationsConfigSync().watchDirs,
     dryRun: opts.dryRun,
     maxParallel: opts.maxParallel ? parseInt(opts.maxParallel, 10) : undefined,
     onProgress: renderProgress,

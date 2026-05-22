@@ -79,7 +79,7 @@ describe('getCavemanSkillsDir', () => {
 
 describe('setupCavemanHooks', () => {
   it('fails with FsNotFoundError when vendored directory does not exist', async () => {
-    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    const exit = await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks())));
     expect(exit._tag).toBe('Failure');
   });
 
@@ -89,7 +89,7 @@ describe('setupCavemanHooks', () => {
     for (const f of ['caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
-    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    const exit = await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks())));
     expect(exit._tag).toBe('Failure');
   });
 
@@ -99,14 +99,14 @@ describe('setupCavemanHooks', () => {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
     // No skills/ directory — SKILL.md files are missing
-    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    const exit = await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks())));
     expect(exit._tag).toBe('Failure');
   });
 
   it('succeeds and installs all files on success', async () => {
     createFakeVendoredFiles();
 
-    const exit = await Effect.runPromiseExit(setupCavemanHooks());
+    const exit = await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks())));
     expect(exit._tag).toBe('Success');
 
     const hooksDir = getCavemanHooksDir();
@@ -121,8 +121,8 @@ describe('setupCavemanHooks', () => {
 
   it('is idempotent — succeeds on repeated calls', async () => {
     createFakeVendoredFiles();
-    expect((await Effect.runPromiseExit(setupCavemanHooks()))._tag).toBe('Success');
-    expect((await Effect.runPromiseExit(setupCavemanHooks()))._tag).toBe('Success');
+    expect((await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks()))))._tag).toBe('Success');
+    expect((await Effect.runPromiseExit((await Effect.runPromise(setupCavemanHooks()))))._tag).toBe('Success');
   });
 });
 

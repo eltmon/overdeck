@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateLauncherScript, generateLauncherWrapper, type LauncherConfig } from '../launcher-generator.js';
+import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
 
 const DEFAULT_CONFIG: LauncherConfig = {
   role: 'work',
@@ -8,7 +8,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
 
 describe('generateLauncherScript', () => {
   it('work agent spawn (basic)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
@@ -24,7 +24,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent with provider and caveman exports', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"\nexport ANTHROPIC_AUTH_TOKEN="tok"',
@@ -45,7 +45,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent resume (PAN-982: permissions via --agent frontmatter)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -66,7 +66,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning agent spawn', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'plan',
       workingDir: '/workspace/project',
@@ -108,7 +108,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review role script supports specialist-style prompt launch', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'review',
       workingDir: '/workspace/project',
@@ -148,7 +148,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('supports prompt files on stdin for headless launchers', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/tmp/prompt.md',
@@ -162,7 +162,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review sub-role launcher owns the synthesis signal (PAN-977)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/agents/agent-pan-1-review-security/initial-prompt.md',
@@ -200,7 +200,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work role identity prompt launch', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -232,7 +232,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review agent', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'review',
       workingDir: '/workspace/project',
@@ -255,7 +255,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('conversation panel (new session)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'conversation',
@@ -290,7 +290,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('conversation panel (resume)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'conversation',
@@ -320,7 +320,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('remote agent', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'remote',
@@ -342,7 +342,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('runtime adapter', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -361,7 +361,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning continuation', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -379,7 +379,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('escapeForBase64 escapes $ characters', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'remote',
@@ -399,7 +399,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent without changeDir', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       changeDir: false,
@@ -419,7 +419,7 @@ describe('generateLauncherScript', () => {
   // the generator must pass it through verbatim into the exec line.
 
   it('work agent with --agent flag (Anthropic model — no --model, no permission flags)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent',
@@ -431,7 +431,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent with --agent flag and --model override (non-Anthropic)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
@@ -443,7 +443,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning agent with --agent flag', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'plan',
       promptFile: '/tmp/init-prompt.txt',
@@ -455,7 +455,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('resume agent preserves --agent across --resume', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -469,7 +469,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review role with --agent flag', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/tmp/prompt.md',
@@ -482,7 +482,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('--agent with --name produces both flags', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent --name agent-pan-982',
@@ -494,7 +494,7 @@ describe('generateLauncherScript', () => {
 
 describe('generateLauncherWrapper', () => {
   it('returns null when not using script wrapper', () => {
-    const wrapper = generateLauncherWrapper({
+    const wrapper = generateLauncherWrapperSync({
       ...DEFAULT_CONFIG,
       useScriptWrapper: false,
     });
@@ -502,7 +502,7 @@ describe('generateLauncherWrapper', () => {
   });
 
   it('returns null when scriptLogFile is missing', () => {
-    const wrapper = generateLauncherWrapper({
+    const wrapper = generateLauncherWrapperSync({
       ...DEFAULT_CONFIG,
       useScriptWrapper: true,
     });
@@ -510,7 +510,7 @@ describe('generateLauncherWrapper', () => {
   });
 
   it('generates script wrapper with innerScriptPath', () => {
-    const wrapper = generateLauncherWrapper({
+    const wrapper = generateLauncherWrapperSync({
       ...DEFAULT_CONFIG,
       useScriptWrapper: true,
       scriptLogFile: '/tmp/log.txt',
@@ -524,7 +524,7 @@ describe('generateLauncherWrapper', () => {
   });
 
   it('falls back to workingDir-based inner script path', () => {
-    const wrapper = generateLauncherWrapper({
+    const wrapper = generateLauncherWrapperSync({
       ...DEFAULT_CONFIG,
       useScriptWrapper: true,
       scriptLogFile: '/tmp/log.txt',
@@ -546,7 +546,7 @@ describe('generateLauncherWrapper', () => {
     };
 
     it('flag-off: output is byte-identical to pre-PAN-985 behaviour', () => {
-      const script = generateLauncherScript(FIXTURE_CONFIG);
+      const script = generateLauncherScriptSync(FIXTURE_CONFIG);
       expect(script).toBe(
         [
           '#!/bin/bash',
@@ -560,7 +560,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on: appends --mcp-config and --dangerously-load-development-channels before --session-id', () => {
-      const script = generateLauncherScript({
+      const script = generateLauncherScriptSync({
         ...FIXTURE_CONFIG,
         channelsBridgeMcpConfig: '/tmp/agent-x/.mcp.json',
       });
@@ -572,7 +572,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on with custom server name: uses the override', () => {
-      const script = generateLauncherScript({
+      const script = generateLauncherScriptSync({
         ...FIXTURE_CONFIG,
         channelsBridgeMcpConfig: '/tmp/x/.mcp.json',
         channelsBridgeServerName: 'custom-bridge',
@@ -582,7 +582,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on for review role: same flags applied before session/model', () => {
-      const script = generateLauncherScript({
+      const script = generateLauncherScriptSync({
         ...DEFAULT_CONFIG,
         role: 'review',
         baseCommand: 'claude',
@@ -600,7 +600,7 @@ describe('generateLauncherWrapper', () => {
 
 describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   it('emits pi --mode rpc with --no-context-files, --extension, and stdin from fifo (AC1, AC2, AC4)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'pi',
@@ -636,7 +636,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   });
 
   it('uses non-deadlocking <> FIFO redirection so Pi can emit ready.json before any writer attaches (PAN-1055 regression)', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       agentType: 'work',
       harness: 'pi',
@@ -654,7 +654,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   });
 
   it('appends --session for resumeSessionId on pi launchers', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -672,7 +672,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   it('throws when pi launcher is missing required path config', () => {
     // piSessionDir is the universal requirement (rpc + tui both need it)
     expect(() =>
-      generateLauncherScript({
+      generateLauncherScriptSync({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'pi',
@@ -682,7 +682,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
 
     // rpc-mode (default) additionally requires piExtensionPath and piFifoPath.
     expect(() =>
-      generateLauncherScript({
+      generateLauncherScriptSync({
         ...DEFAULT_CONFIG,
         agentType: 'work',
         harness: 'pi',
@@ -693,7 +693,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     ).toThrow(/piExtensionPath/);
 
     expect(() =>
-      generateLauncherScript({
+      generateLauncherScriptSync({
         ...DEFAULT_CONFIG,
         agentType: 'work',
         harness: 'pi',
@@ -706,7 +706,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   });
 
   it('pi tui mode launcher omits --mode rpc and FIFO redirect', () => {
-    const script = generateLauncherScript({
+    const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       agentType: 'conversation',
       harness: 'pi',
@@ -725,12 +725,12 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   });
 
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
-    const a = generateLauncherScript({
+    const a = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    const b = generateLauncherScript({
+    const b = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'claude-code',

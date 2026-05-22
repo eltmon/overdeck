@@ -225,9 +225,9 @@ describe('embedSessions', () => {
 
   it('stores OpenAI text-embedding-3-small embeddings as 1536 dimensions', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+    const embedFn = (await Effect.runPromise(vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
       Effect.succeed({ embedding: new Float32Array(1536).fill(0.1), model: opts.model }),
-    );
+    )));
 
     const result = await embedSessions({
       model: 'text-embedding-3-small',
@@ -237,15 +237,15 @@ describe('embedSessions', () => {
     });
 
     expect(result.embedded).toBe(1);
-    expect(embedFn).toHaveBeenCalledWith('openai', expect.objectContaining({ model: 'text-embedding-3-small' }));
+    (await Effect.runPromise(expect(embedFn))).toHaveBeenCalledWith('openai', expect.objectContaining({ model: 'text-embedding-3-small' }));
     expect(getEmbedding(session!.id, 'text-embedding-3-small')?.length).toBe(1536);
   });
 
   it('uses nomic-embed-text as the Ollama provider default', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+    const embedFn = (await Effect.runPromise(vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
       Effect.succeed({ embedding: new Float32Array(768).fill(0.1), model: opts.model }),
-    );
+    )));
 
     const result = await embedSessions({
       provider: 'ollama',
@@ -267,15 +267,15 @@ describe('embedSessions', () => {
     });
 
     expect(result.embedded).toBe(1);
-    expect(embedFn).toHaveBeenCalledWith('ollama', expect.objectContaining({ model: 'nomic-embed-text' }));
+    (await Effect.runPromise(expect(embedFn))).toHaveBeenCalledWith('ollama', expect.objectContaining({ model: 'nomic-embed-text' }));
     expect(getEmbedding(session!.id, 'nomic-embed-text')?.length).toBe(768);
   });
 
   it('stores Voyage voyage-code-3 embeddings as 1024 dimensions', async () => {
     const session = seedEnrichedSession(1);
-    const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
+    const embedFn = (await Effect.runPromise(vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
       Effect.succeed({ embedding: new Float32Array(1024).fill(0.1), model: opts.model }),
-    );
+    )));
 
     const result = await embedSessions({
       provider: 'voyage',
@@ -297,7 +297,7 @@ describe('embedSessions', () => {
     });
 
     expect(result.embedded).toBe(1);
-    expect(embedFn).toHaveBeenCalledWith('voyage', expect.objectContaining({ model: 'voyage-code-3' }));
+    (await Effect.runPromise(expect(embedFn))).toHaveBeenCalledWith('voyage', expect.objectContaining({ model: 'voyage-code-3' }));
     expect(getEmbedding(session!.id, 'voyage-code-3')?.length).toBe(1024);
   });
 

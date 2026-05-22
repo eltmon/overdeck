@@ -3,18 +3,18 @@ import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  createRunLog,
-  appendToRunLog,
-  finalizeRunLog,
-  getRunLog,
+  createRunLogSync,
+  appendToRunLogSync,
+  finalizeRunLogSync,
+  getRunLogSync,
   parseLogMetadata,
-  listRunLogs,
+  listRunLogsSync,
   getRecentRunLogs,
-  cleanupOldLogs,
+  cleanupOldLogsSync,
   isRunLogActive,
   getRunLogSize,
   checkLogSizeLimit,
-  cleanupAllLogs,
+  cleanupAllLogsSync,
   getRunsDirectory,
   generateRunId,
   getRunLogPath,
@@ -57,7 +57,7 @@ describe('specialist-logs', () => {
 
   describe('createRunLog', () => {
     it('should create log file with header', () => {
-      const { runId, filePath } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId, filePath } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
 
       expect(existsSync(filePath)).toBe(true);
       const content = readFileSync(filePath, 'utf-8');
@@ -69,14 +69,14 @@ describe('specialist-logs', () => {
 
     it('should include context seed if provided', () => {
       const contextSeed = 'This is test context';
-      const { filePath } = createRunLog('testproject', 'review-agent', 'TEST-123', contextSeed);
+      const { filePath } = createRunLogSync('testproject', 'review-agent', 'TEST-123', contextSeed);
 
       const content = readFileSync(filePath, 'utf-8');
       expect(content).toContain(contextSeed);
     });
 
     it('should show no context available if not provided', () => {
-      const { filePath } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { filePath } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
 
       const content = readFileSync(filePath, 'utf-8');
       expect(content).toContain('[No context digest available]');
@@ -85,29 +85,29 @@ describe('specialist-logs', () => {
 
   describe('appendToRunLog', () => {
     it('should append content to existing log', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
-      appendToRunLog('testproject', 'review-agent', runId, 'New content\n');
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
+      appendToRunLogSync('testproject', 'review-agent', runId, 'New content\n');
 
-      const content = getRunLog('testproject', 'review-agent', runId);
+      const content = getRunLogSync('testproject', 'review-agent', runId);
       expect(content).toContain('New content');
     });
 
     it('should throw error for non-existent log', () => {
       expect(() => {
-        appendToRunLog('testproject', 'review-agent', 'nonexistent', 'content');
+        appendToRunLogSync('testproject', 'review-agent', 'nonexistent', 'content');
       }).toThrow('Run log not found');
     });
   });
 
   describe('finalizeRunLog', () => {
     it('should add result section with status and duration', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
-      finalizeRunLog('testproject', 'review-agent', runId, {
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
+      finalizeRunLogSync('testproject', 'review-agent', runId, {
         status: 'passed',
         notes: 'All good',
       });
 
-      const content = getRunLog('testproject', 'review-agent', runId)!;
+      const content = getRunLogSync('testproject', 'review-agent', runId)!;
       expect(content).toContain('## Result');
       expect(content).toContain('Status: passed');
       expect(content).toContain('Notes: All good');
@@ -116,42 +116,42 @@ describe('specialist-logs', () => {
     });
 
     it('should calculate duration correctly', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
       // Wait a bit
       const start = Date.now();
       while (Date.now() - start < 100);
 
-      finalizeRunLog('testproject', 'review-agent', runId, { status: 'passed' });
+      finalizeRunLogSync('testproject', 'review-agent', runId, { status: 'passed' });
 
-      const content = getRunLog('testproject', 'review-agent', runId)!;
+      const content = getRunLogSync('testproject', 'review-agent', runId)!;
       expect(content).toMatch(/Duration: \d+m \d+s/);
     });
   });
 
   describe('getRunLog', () => {
     it('should return log content', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
-      const content = getRunLog('testproject', 'review-agent', runId);
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
+      const content = getRunLogSync('testproject', 'review-agent', runId);
 
       expect(content).toBeTruthy();
       expect(content).toContain('TEST-123');
     });
 
     it('should return null for non-existent log', () => {
-      const content = getRunLog('testproject', 'review-agent', 'nonexistent');
+      const content = getRunLogSync('testproject', 'review-agent', 'nonexistent');
       expect(content).toBeNull();
     });
   });
 
   describe('parseLogMetadata', () => {
     it('should extract metadata from log content', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
-      finalizeRunLog('testproject', 'review-agent', runId, {
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
+      finalizeRunLogSync('testproject', 'review-agent', runId, {
         status: 'passed',
         notes: 'Test notes',
       });
 
-      const content = getRunLog('testproject', 'review-agent', runId)!;
+      const content = getRunLogSync('testproject', 'review-agent', runId)!;
       const metadata = parseLogMetadata(content);
 
       expect(metadata.project).toBe('testproject');
@@ -165,35 +165,35 @@ describe('specialist-logs', () => {
 
   describe('listRunLogs', () => {
     it('should list all runs for a specialist', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
-      createRunLog('testproject', 'review-agent', 'TEST-2');
-      createRunLog('testproject', 'review-agent', 'TEST-3');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-2');
+      createRunLogSync('testproject', 'review-agent', 'TEST-3');
 
-      const runs = listRunLogs('testproject', 'review-agent');
+      const runs = listRunLogsSync('testproject', 'review-agent');
       expect(runs).toHaveLength(3);
       expect(runs[0].metadata.issueId).toBe('TEST-3'); // Most recent first
     });
 
     it('should return empty array for no runs', () => {
-      const runs = listRunLogs('testproject', 'review-agent');
+      const runs = listRunLogsSync('testproject', 'review-agent');
       expect(runs).toEqual([]);
     });
 
     it('should apply limit', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
-      createRunLog('testproject', 'review-agent', 'TEST-2');
-      createRunLog('testproject', 'review-agent', 'TEST-3');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-2');
+      createRunLogSync('testproject', 'review-agent', 'TEST-3');
 
-      const runs = listRunLogs('testproject', 'review-agent', { limit: 2 });
+      const runs = listRunLogsSync('testproject', 'review-agent', { limit: 2 });
       expect(runs).toHaveLength(2);
     });
 
     it('should apply offset', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
-      createRunLog('testproject', 'review-agent', 'TEST-2');
-      createRunLog('testproject', 'review-agent', 'TEST-3');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-2');
+      createRunLogSync('testproject', 'review-agent', 'TEST-3');
 
-      const runs = listRunLogs('testproject', 'review-agent', { offset: 1, limit: 2 });
+      const runs = listRunLogsSync('testproject', 'review-agent', { offset: 1, limit: 2 });
       expect(runs).toHaveLength(2);
       expect(runs[0].metadata.issueId).toBe('TEST-2');
     });
@@ -201,9 +201,9 @@ describe('specialist-logs', () => {
 
   describe('getRecentRunLogs', () => {
     it('should return N most recent runs', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
-      createRunLog('testproject', 'review-agent', 'TEST-2');
-      createRunLog('testproject', 'review-agent', 'TEST-3');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-2');
+      createRunLogSync('testproject', 'review-agent', 'TEST-3');
 
       const runs = getRecentRunLogs('testproject', 'review-agent', 2);
       expect(runs).toHaveLength(2);
@@ -214,13 +214,13 @@ describe('specialist-logs', () => {
 
   describe('isRunLogActive', () => {
     it('should return true for logs without result section', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
       expect(isRunLogActive('testproject', 'review-agent', runId)).toBe(true);
     });
 
     it('should return false for finalized logs', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
-      finalizeRunLog('testproject', 'review-agent', runId, { status: 'passed' });
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
+      finalizeRunLogSync('testproject', 'review-agent', runId, { status: 'passed' });
       expect(isRunLogActive('testproject', 'review-agent', runId)).toBe(false);
     });
 
@@ -231,7 +231,7 @@ describe('specialist-logs', () => {
 
   describe('getRunLogSize', () => {
     it('should return file size in bytes', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
       const size = getRunLogSize('testproject', 'review-agent', runId);
       expect(size).toBeGreaterThan(0);
     });
@@ -244,16 +244,16 @@ describe('specialist-logs', () => {
 
   describe('checkLogSizeLimit', () => {
     it('should return null if size is under limit', () => {
-      const { runId } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
       const result = checkLogSizeLimit('testproject', 'review-agent', runId);
       expect(result).toBeNull();
     });
 
     it('should return warning if size exceeds limit', () => {
-      const { runId, filePath } = createRunLog('testproject', 'review-agent', 'TEST-123');
+      const { runId, filePath } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
       // Append large content to exceed limit
       const largeContent = 'x'.repeat(MAX_LOG_SIZE + 1000);
-      appendToRunLog('testproject', 'review-agent', runId, largeContent);
+      appendToRunLogSync('testproject', 'review-agent', runId, largeContent);
 
       const result = checkLogSizeLimit('testproject', 'review-agent', runId);
       expect(result).toBeTruthy();
@@ -265,44 +265,44 @@ describe('specialist-logs', () => {
   describe('cleanupOldLogs', () => {
     it('should delete logs older than maxDays', () => {
       // Create old log
-      const { runId: oldRunId } = createRunLog('testproject', 'review-agent', 'TEST-OLD');
+      const { runId: oldRunId } = createRunLogSync('testproject', 'review-agent', 'TEST-OLD');
       // Create new log
-      const { runId: newRunId } = createRunLog('testproject', 'review-agent', 'TEST-NEW');
+      const { runId: newRunId } = createRunLogSync('testproject', 'review-agent', 'TEST-NEW');
 
       // Manually set old log's mtime to 31 days ago
       const oldPath = getRunLogPath('testproject', 'review-agent', oldRunId);
       const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
       // Note: utimesSync would be used in real implementation
 
-      const deleted = cleanupOldLogs('testproject', 'review-agent', {
+      const deleted = cleanupOldLogsSync('testproject', 'review-agent', {
         maxDays: 30,
         maxRuns: 1,
       });
 
       // Should keep at least 1 run (maxRuns)
-      const remaining = listRunLogs('testproject', 'review-agent');
+      const remaining = listRunLogsSync('testproject', 'review-agent');
       expect(remaining.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should keep last N runs even if older than maxDays', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
-      createRunLog('testproject', 'review-agent', 'TEST-2');
-      createRunLog('testproject', 'review-agent', 'TEST-3');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-2');
+      createRunLogSync('testproject', 'review-agent', 'TEST-3');
 
-      const deleted = cleanupOldLogs('testproject', 'review-agent', {
+      const deleted = cleanupOldLogsSync('testproject', 'review-agent', {
         maxDays: 0,
         maxRuns: 2,
       });
 
-      const remaining = listRunLogs('testproject', 'review-agent');
+      const remaining = listRunLogsSync('testproject', 'review-agent');
       expect(remaining.length).toBe(2);
       expect(deleted).toBe(1);
     });
 
     it('should return 0 if no logs to delete', () => {
-      createRunLog('testproject', 'review-agent', 'TEST-1');
+      createRunLogSync('testproject', 'review-agent', 'TEST-1');
 
-      const deleted = cleanupOldLogs('testproject', 'review-agent', {
+      const deleted = cleanupOldLogsSync('testproject', 'review-agent', {
         maxDays: 30,
         maxRuns: 10,
       });

@@ -16,12 +16,12 @@ import {
   SKILLS_DIR,
   SYNC_SOURCES,
 } from '../../lib/paths.js';
-import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
+import { getDefaultConfigSync, saveConfigSync, loadConfigSync } from '../../lib/config.js';
 import { Effect } from 'effect';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
-import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
-import { refreshCache } from '../../lib/sync.js';
+import { generatePanopticonTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
+import { refreshCacheSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
@@ -216,7 +216,7 @@ function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolea
 async function installCommand(options: InstallOptions): Promise<void> {
   console.log(chalk.bold('\nPanopticon Installation\n'));
 
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   console.log(`Platform: ${chalk.cyan(plat)}\n`);
 
   // Step 1: Check prerequisites
@@ -245,7 +245,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   // Step 2b: Refresh cache — copy all skills/agents/rules from repo to ~/.panopticon/
   spinner.start('Refreshing skill cache...');
   try {
-    const cacheResult = refreshCache();
+    const cacheResult = refreshCacheSync();
     const parts = [];
     if (cacheResult.skills.copied > 0) parts.push(`${cacheResult.skills.copied} skills`);
     if (cacheResult.agents.copied > 0) parts.push(`${cacheResult.agents.copied} agents`);
@@ -284,7 +284,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     if (!hasMkcert) {
       spinner.start('Installing mkcert...');
       try {
-        const plat = Effect.runSync(detectPlatform());
+        const plat = await Effect.runPromise(detectPlatform());
         if (plat === 'darwin') {
           execSync('brew install mkcert', { stdio: 'pipe', timeout: 120000 });
           spinner.succeed('mkcert installed via Homebrew');
@@ -329,11 +329,11 @@ async function installCommand(options: InstallOptions): Promise<void> {
         spinner.succeed('Wildcard certificates generated (*.pan.localhost, *.localhost)');
 
         // Generate certs for registered projects and build tls.yml
-        const generatedDomains = ensureProjectCerts();
+        const generatedDomains = ensureProjectCertsSync();
         for (const domain of generatedDomains) {
           spinner.succeed(`Generated wildcard cert for *.${domain}`);
         }
-        if (generateTlsConfig()) {
+        if (generateTlsConfigSync()) {
           spinner.succeed('TLS config generated (tls.yml)');
         }
       } catch (error) {
@@ -354,7 +354,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
       const ttydPath = join(binDir, 'ttyd');
 
       // Determine platform and download appropriate binary
-      const plat = Effect.runSync(detectPlatform());
+      const plat = await Effect.runPromise(detectPlatform());
       let downloadUrl = '';
       if (plat === 'darwin') {
         // macOS - try homebrew first
@@ -389,7 +389,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   if (!hasAstGrepNow) {
     spinner.start('Installing ast-grep...');
     try {
-      const plat = Effect.runSync(detectPlatform());
+      const plat = await Effect.runPromise(detectPlatform());
       if (plat === 'darwin') {
         try {
           execSync('brew install ast-grep', { stdio: 'pipe', timeout: 120000 });
@@ -417,7 +417,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     if (!hasBeadsNow) {
     spinner.start('Installing beads CLI (bd)...');
     try {
-      const plat = Effect.runSync(detectPlatform());
+      const plat = await Effect.runPromise(detectPlatform());
       if (plat === 'darwin') {
         // macOS - try homebrew
         try {
@@ -461,7 +461,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
         const recommendedVersion = 1 * 10000 + 0 * 100 + 4; // v1.0.4 required for ping, doctor, prune
         if (currentVersion < recommendedVersion) {
           spinner.start(`Upgrading beads from v${major}.${minor}.${patch} to v1.0.4+...`);
-          const plat = Effect.runSync(detectPlatform());
+          const plat = await Effect.runPromise(detectPlatform());
           if (plat === 'darwin') {
             execSync('brew upgrade gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
           } else {
@@ -514,7 +514,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     spinner.info('Skipping Qwen TTS daemon install (--skip-tts-daemon)');
   } else {
     spinner.start('Installing Qwen TTS daemon dependencies (creates venv, CUDA torch download is large)...');
-    const result = await installTtsDaemonDependencies();
+    const result = await Effect.runPromise(installTtsDaemonDependencies());
     if (result.status === 'installed') {
       spinner.succeed(result.message);
     } else if (result.status === 'skipped') {
@@ -534,19 +534,19 @@ async function installCommand(options: InstallOptions): Promise<void> {
       if (!existsSync(join(TRAEFIK_DIR, 'docker-compose.yml'))) {
         copyDirectoryRecursive(SYNC_SOURCES.traefikTemplates, TRAEFIK_DIR);
         // Remove .template files from runtime dir (they stay in source only)
-        cleanupTemplateFiles();
+        cleanupTemplateFilesSync();
         spinner.succeed('Traefik configuration created from templates');
       } else {
         spinner.info('Traefik static config already exists (skipping)');
       }
 
       // Always regenerate panopticon.yml from template to pick up config changes
-      if (generatePanopticonTraefikConfig()) {
+      if (generatePanopticonTraefikConfigSync()) {
         spinner.succeed('Traefik dynamic config generated (panopticon.yml)');
       }
 
       // Always regenerate tls.yml from discovered certs
-      if (generateTlsConfig()) {
+      if (generateTlsConfigSync()) {
         spinner.succeed('TLS config generated (tls.yml)');
       }
 
@@ -581,7 +581,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   // Load existing config (or defaults if none exists)
-  const config = configExists ? loadConfig() : getDefaultConfig();
+  const config = configExists ? loadConfigSync() : getDefaultConfigSync();
 
   // Configure Traefik based on minimal flag (always update this section)
   if (options.minimal) {
@@ -656,12 +656,12 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   spinner.start('Saving configuration...');
-  saveConfig(config);
+  saveConfigSync(config);
   spinner.succeed(configExists ? 'Config updated' : 'Config created');
 
   // Regenerate Traefik dynamic config now that config is saved
   if (config.traefik?.enabled) {
-    generatePanopticonTraefikConfig();
+    generatePanopticonTraefikConfigSync();
   }
 
   // Ensure base domain DNS entry

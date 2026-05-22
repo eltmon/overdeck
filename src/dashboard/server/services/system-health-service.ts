@@ -9,9 +9,9 @@ import type { DashboardSnapshot } from '@panctl/contracts';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
-import { listRunningAgentsEffect, getAgentRuntimeStateEffect, type AgentState } from '../../../lib/agents.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { listPaneValuesAsyncEffect } from '../../../lib/tmux.js';
+import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../../lib/agents.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { initEventStore } from '../event-store.js';
 
@@ -491,16 +491,16 @@ function evaluateSeverity(
 }
 
 async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
-  const agents = await Effect.runPromise(listRunningAgentsEffect());
+  const agents = await Effect.runPromise(listRunningAgents());
   const activeAgents = agents.filter((agent) => agent.status !== 'stopped');
   const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
 
   return Promise.all(
     activeAgents.map(async (agent) => {
-      const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agent.id)).catch(() => null);
+      const runtimeState = await Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null);
       // PAN-977 round-12 high-2: panePid cache field was removed from
       // AgentRuntimeState; always query tmux for the current pane PID.
-      const panePidValue = (await Effect.runPromise(listPaneValuesAsyncEffect(agent.id, '#{pane_pid}')))[0];
+      const panePidValue = (await Effect.runPromise(listPaneValues(agent.id, '#{pane_pid}')))[0];
       const panePid = Number(panePidValue ?? '0');
       const descendants = Number.isFinite(panePid) && panePid > 0
         ? getDescendantPids(panePid, processTable)
@@ -532,7 +532,7 @@ function buildTopConsumers(
     const isSpecialist = agent.kind === 'specialist';
     const leaked = leakedByName.has(agent.id.replace(/^specialist-/, '')) || leakedByName.has(agent.id);
     const currentIssue = agent.currentIssue ?? agent.issueId;
-    const resolved = currentIssue ? resolveProjectFromIssue(currentIssue) : null;
+    const resolved = currentIssue ? resolveProjectFromIssueSync(currentIssue) : null;
     const specialistType = isSpecialist
       ? agent.id.startsWith('specialist-')
         ? agent.id.replace(/^specialist-/, '')

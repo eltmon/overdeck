@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { cleanupGitignore, cleanupWorkspaceGitignore } from '../../../src/lib/skills-merge.js';
+import { cleanupGitignoreSync, cleanupWorkspaceGitignoreSync } from '../../../src/lib/skills-merge.js';
 
 describe('skills-merge', () => {
   let testDir: string;
@@ -22,7 +22,7 @@ describe('skills-merge', () => {
 
   describe('cleanupGitignore', () => {
     it('should return early for non-existent file', () => {
-      const result = cleanupGitignore(join(testDir, 'does-not-exist'));
+      const result = cleanupGitignoreSync(join(testDir, 'does-not-exist'));
       expect(result).toEqual({ cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 });
     });
 
@@ -30,7 +30,7 @@ describe('skills-merge', () => {
       const gitignorePath = join(testDir, '.gitignore');
       writeFileSync(gitignorePath, '# Some other gitignore\nnode_modules\ndist\n');
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result).toEqual({ cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 });
 
       // Content should be unchanged
@@ -50,7 +50,7 @@ release
 `;
       writeFileSync(gitignorePath, originalContent);
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0);
       expect(result.entriesAfter).toBe(0);
@@ -78,7 +78,7 @@ bug-fix
 `;
       writeFileSync(gitignorePath, duplicatedContent);
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
       expect(result.entriesAfter).toBe(0); // Entire section removed
@@ -113,7 +113,7 @@ feature-work
 `;
       writeFileSync(gitignorePath, content);
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
 
@@ -141,7 +141,7 @@ middle
 `;
       writeFileSync(gitignorePath, content);
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result.cleaned).toBe(true);
       expect(result.entriesAfter).toBe(0);
 
@@ -166,7 +166,7 @@ middle
 
       writeFileSync(gitignorePath, content);
 
-      const result = cleanupGitignore(gitignorePath);
+      const result = cleanupGitignoreSync(gitignorePath);
       expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
       expect(result.entriesAfter).toBe(0); // Entire section removed
@@ -200,7 +200,7 @@ skill1
 skill2
 `);
 
-      const result = cleanupWorkspaceGitignore(workspacePath);
+      const result = cleanupWorkspaceGitignoreSync(workspacePath);
       expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
       expect(result.entriesAfter).toBe(0); // Entire section removed
@@ -213,7 +213,7 @@ skill2
     });
 
     it('should handle missing workspace', () => {
-      const result = cleanupWorkspaceGitignore(join(testDir, 'nonexistent'));
+      const result = cleanupWorkspaceGitignoreSync(join(testDir, 'nonexistent'));
       expect(result).toEqual({ cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 });
     });
   });

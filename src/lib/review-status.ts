@@ -3,22 +3,22 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlanEffect } from './vbrief/io.js';
-import { notifyPipeline } from './pipeline-notifier.js';
-import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
-import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileEffect } from './vbrief/dag.js';
+import { findPlan } from './vbrief/io.js';
+import { notifyPipelineSync } from './pipeline-notifier.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
+import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile } from './vbrief/dag.js';
 import {
-  upsertReviewStatus as dbUpsert,
+  upsertReviewStatusSync as dbUpsert,
   deleteReviewStatus as dbDelete,
-  getReviewStatusFromDb,
+  getReviewStatusFromDbSync,
   getAllReviewStatusesFromDb,
   getReviewStatusesFromDb,
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
-  getReviewStatusFromDbEffect,
+  getReviewStatusFromDb,
 } from './database/review-status-db.js';
-import { normalizeReviewStatus } from './review-status-normalize.js';
+import { normalizeReviewStatusSync } from './review-status-normalize.js';
 
 async function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): Promise<void> {
   try {
@@ -163,7 +163,7 @@ export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, fileP
   }
 }
 
-export function setReviewStatus(
+export function setReviewStatusSync(
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
@@ -190,7 +190,7 @@ export function setReviewStatus(
   // races when two concurrent calls for different issue IDs run concurrently).
   // If `existing` is provided (e.g. from mutateBlockers), skip the DB read to
   // avoid double-read on the webhook ingestion path (PAN-905).
-  const status: ReviewStatus = existing ?? getReviewStatusFromDb(issueId) ?? {
+  const status: ReviewStatus = existing ?? getReviewStatusFromDbSync(issueId) ?? {
     issueId,
     reviewStatus: 'pending' as const,
     testStatus: 'pending' as const,
@@ -203,7 +203,7 @@ export function setReviewStatus(
   // This is belt-and-suspenders — endpoint-level guards should catch this first.
   if (update.reviewStatus === 'reviewing' && status.reviewStatus === 'passed' && update.mergeStatus === undefined) {
     console.warn(`[review-status] Rejecting reviewStatus regression from 'passed' to 'reviewing' for ${issueId} (mergeStatus not being reset)`);
-    notifyPipeline({ type: 'status_changed', issueId, status: status as ReviewStatus });
+    notifyPipelineSync({ type: 'status_changed', issueId, status: status as ReviewStatus });
     return status as ReviewStatus;
   }
 
@@ -248,7 +248,7 @@ export function setReviewStatus(
         ? update.readyForMerge
         : merged.readyForMerge ?? false);
 
-  const updated: ReviewStatus = normalizeReviewStatus({
+  const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
     issueId,
     updatedAt: now,
@@ -295,7 +295,7 @@ export function setReviewStatus(
 
   mirrorPipelineStatusToVBrief(issueId, updated);
 
-  notifyPipeline({ type: 'status_changed', issueId, status: updated });
+  notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 
   // Emit activity log entries for meaningful pipeline state transitions.
   // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
@@ -307,8 +307,8 @@ export function setReviewStatus(
       skipped:  { level: 'info',    msg: `${issueId} — verification skipped`, tts: `${issueId} verification skipped`, ttsPriority: 2 },
     };
     const entry = vMap[update.verificationStatus];
-    if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
-    if (entry?.tts) emitActivityTts({
+    if (entry) emitActivityEntrySync({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
+    if (entry?.tts) emitActivityTtsSync({
       utterance: entry.tts,
       priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
@@ -331,8 +331,8 @@ export function setReviewStatus(
       blocked:   { level: 'warn',    msg: `${issueId} — review blocked (changes requested)`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
-    if (entry) emitActivityEntry({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
-    if (entry?.tts) emitActivityTts({
+    if (entry) emitActivityEntrySync({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
+    if (entry?.tts) emitActivityTtsSync({
       utterance: entry.tts,
       priority: entry.level === 'error' ? 0 : 1,
       issueId,
@@ -349,8 +349,8 @@ export function setReviewStatus(
       dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed`, tts: `${issueId} test dispatch failed`, ttsPriority: 1 },
     };
     const entry = tMap[update.testStatus];
-    if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
-    if (entry?.tts) emitActivityTts({
+    if (entry) emitActivityEntrySync({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
+    if (entry?.tts) emitActivityTtsSync({
       utterance: entry.tts,
       priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
@@ -367,8 +367,8 @@ export function setReviewStatus(
       failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
-    if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
-    if (entry?.tts) emitActivityTts({
+    if (entry) emitActivityEntrySync({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
+    if (entry?.tts) emitActivityTtsSync({
       utterance: entry.tts,
       priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
@@ -377,8 +377,8 @@ export function setReviewStatus(
     });
   }
   if (update.readyForMerge === true && !status.readyForMerge) {
-    emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
-    emitActivityTts({
+    emitActivityEntrySync({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
+    emitActivityTtsSync({
       utterance: `${issueId} ready for merge`,
       priority: 1,
       issueId,
@@ -401,8 +401,8 @@ export function setReviewStatus(
 
     if (canSkipTests) {
       console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
-      emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
-      setReviewStatus(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
+      setReviewStatusSync(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
       void emitReactiveLifecycleEvent('test.passed', issueId);
     } else {
       void emitReactiveLifecycleEvent('review.approved', issueId);
@@ -416,8 +416,8 @@ export function setReviewStatus(
   return updated;
 }
 
-export function getReviewStatus(issueId: string): ReviewStatus | null {
-  return getReviewStatusFromDb(issueId) ?? null;
+export function getReviewStatusSync(issueId: string): ReviewStatus | null {
+  return getReviewStatusFromDbSync(issueId) ?? null;
 }
 
 export async function setReviewStatusAsync(
@@ -428,7 +428,7 @@ export async function setReviewStatusAsync(
   return new Promise((resolve, reject) => {
     setImmediate(() => {
       try {
-        resolve(setReviewStatus(issueId, update, existing));
+        resolve(setReviewStatusSync(issueId, update, existing));
       } catch (err) {
         reject(err);
       }
@@ -437,7 +437,7 @@ export async function setReviewStatusAsync(
 }
 
 export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
-  return Effect.runPromise(getReviewStatusFromDbEffect(issueId));
+  return Effect.runPromise(getReviewStatusFromDb(issueId));
 }
 
 /**
@@ -462,7 +462,7 @@ export function clearStuckMergeStatuses(): void {
       (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
       verificationSatisfied(s) &&
       (s.uatStatus === undefined || s.uatStatus === 'passed');
-    setReviewStatus(s.issueId, {
+    setReviewStatusSync(s.issueId, {
       mergeStatus: 'pending',
       ...(shouldBeReady ? { readyForMerge: true } : {}),
     });
@@ -499,7 +499,7 @@ export function fixStuckReadyForMerge(): void {
   console.log(`[review-status] Restoring readyForMerge for ${stuck.length} issue(s) with passed review+test`);
   for (const s of stuck) {
     console.log(`[review-status] Restoring readyForMerge=true for ${s.issueId} (verif=${s.verificationStatus}, merge=${s.mergeStatus})`);
-    setReviewStatus(s.issueId, { readyForMerge: true });
+    setReviewStatusSync(s.issueId, { readyForMerge: true });
   }
 }
 
@@ -550,7 +550,7 @@ export function fixStuckCommentedReviews(): void {
   for (const issueId of toFix) {
     console.log(`[review-status] Restoring reviewStatus='passed' for ${issueId}`);
     // reviewStatus='passed' will trigger readyForMerge recomputation in setReviewStatus
-    setReviewStatus(issueId, { reviewStatus: 'passed' });
+    setReviewStatusSync(issueId, { reviewStatus: 'passed' });
   }
 }
 
@@ -580,8 +580,8 @@ export function markWorkspaceStuck(
   try {
     dbMarkStuck(issueId, reason, details);
     console.log(`[review-status] Marked ${issueId} as stuck: ${reason}`);
-    const updated = getReviewStatus(issueId);
-    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to mark ${issueId} as stuck:`, err);
   }
@@ -596,8 +596,8 @@ export function clearWorkspaceStuck(issueId: string): void {
   try {
     dbClearStuck(issueId);
     console.log(`[review-status] Cleared stuck state for ${issueId}`);
-    const updated = getReviewStatus(issueId);
-    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
   }
@@ -616,8 +616,8 @@ export function setDeaconIgnored(
   try {
     dbSetDeaconIgnored(issueId, ignored, reason);
     console.log(`[review-status] deaconIgnored=${ignored} for ${issueId}${reason ? ` (${reason})` : ''}`);
-    const updated = getReviewStatus(issueId);
-    if (updated) notifyPipeline({ type: 'status_changed', issueId, status: updated });
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to set deaconIgnored for ${issueId}:`, err);
   }
@@ -632,12 +632,12 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
       if (!existsSync(workStateFile)) return;
       const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
       if (!workState.workspace) return;
-      const planPath = await Effect.runPromise(findPlanEffect(workState.workspace));
+      const planPath = await Effect.runPromise(findPlan(workState.workspace));
       if (!planPath) {
         console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
         return;
       }
-      const result = await Effect.runPromise(writePipelineMirrorToPlanFileEffect(
+      const result = await Effect.runPromise(writePipelineMirrorToPlanFile(
         planPath,
         buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
         `review-status-${process.pid}`,
@@ -668,7 +668,7 @@ export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
 }> {}
 
 /** Effect variant of `setReviewStatusAsync`. */
-export const setReviewStatusAsyncEffect = (
+export const setReviewStatus = (
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
@@ -685,7 +685,7 @@ export const setReviewStatusAsyncEffect = (
   });
 
 /** Effect variant of `getReviewStatusAsync`. */
-export const getReviewStatusAsyncEffect = (
+export const getReviewStatus = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
   Effect.tryPromise({

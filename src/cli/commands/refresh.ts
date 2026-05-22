@@ -68,7 +68,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   const spinner = ora(`Refreshing tracker status for ${id}...`).start();
 
   const issueId = id.toUpperCase();
-  const state = await getShadowState(issueId);
+  const state = await Effect.runPromise(getShadowState(issueId));
 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
@@ -82,7 +82,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   };
 
   if (isLinearIssue(issueId)) {
-    const apiKey = Effect.runSync(getLinearApiKey());
+    const apiKey = await Effect.runPromise(getLinearApiKey());
     if (apiKey) {
       result = await refreshFromLinear(apiKey, issueId);
     } else {
@@ -100,7 +100,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   }
 
   // Update the cache
-  await updateTrackerStatusCache(issueId, result.state!);
+  await Effect.runPromise(updateTrackerStatusCache(issueId, result.state!));
 
   spinner.succeed(`Refreshed tracker status for ${issueId}`);
 

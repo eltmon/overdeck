@@ -15,7 +15,7 @@ import {
   MODEL_CAPABILITIES,
   SkillDimension,
   ModelCapability,
-  getModelCapability,
+  getModelCapabilitySync,
 } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
@@ -271,7 +271,7 @@ function calculateSkillScore(
   model: ModelId,
   requirements: SkillRequirement[]
 ): number {
-  const cap = getModelCapability(model);
+  const cap = getModelCapabilitySync(model);
   let totalScore = 0;
   let totalWeight = 0;
 
@@ -321,7 +321,7 @@ function isAccessibleAtTier(
 /**
  * Select the best model for a work type from available models
  */
-export function selectModel(
+export function selectModelSync(
   workType: string,
   availableModels: ModelId[],
   options: SelectionOptions = {}
@@ -363,7 +363,7 @@ export function selectModel(
   const eligible = candidates.filter((c) => {
     if (!c.available || c.skillScore < minCapability) return false;
     if (userTier === undefined) return true; // caller responsible for tier filtering
-    const cap = getModelCapability(c.model);
+    const cap = getModelCapabilitySync(c.model);
     return isAccessibleAtTier(cap.minTier, userTier);
   });
 
@@ -403,7 +403,7 @@ export function selectModel(
   }
 
   const selected = eligible[0];
-  const cap = getModelCapability(selected.model);
+  const cap = getModelCapabilitySync(selected.model);
 
   // Generate reason
   const topSkills = requirements
@@ -428,7 +428,7 @@ export function selectModel(
 /**
  * Select models for all work types at once
  */
-export function selectAllModels(
+export function selectAllModelsSync(
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): Record<string, ModelSelectionResult> {
@@ -436,7 +436,7 @@ export function selectAllModels(
   const results: Record<string, ModelSelectionResult> = {};
 
   for (const workType of workTypes) {
-    results[workType] = selectModel(workType, availableModels, options);
+    results[workType] = selectModelSync(workType, availableModels, options);
   }
 
   return results;
@@ -445,11 +445,11 @@ export function selectAllModels(
 /**
  * Get simple model mapping (for backward compatibility with presets)
  */
-export function getSimpleModelMapping(
+export function getSimpleModelMappingSync(
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): Record<string, ModelId> {
-  const results = selectAllModels(availableModels, options);
+  const results = selectAllModelsSync(availableModels, options);
   const mapping: Record<string, ModelId> = {} as Record<string, ModelId>;
 
   for (const [workType, result] of Object.entries(results)) {
@@ -481,23 +481,23 @@ export function formatSelectionResults(
 // stay end-to-end Effect without `Effect.sync`-wrapping every call site.
 
 /** Select the best model for a single work type. Pure. */
-export const selectModelEffect = (
+export const selectModel = (
   workType: string,
   availableModels: readonly ModelId[],
   options: SelectionOptions = {},
 ): Effect.Effect<ModelSelectionResult> =>
-  Effect.sync(() => selectModel(workType, [...availableModels], options));
+  Effect.sync(() => selectModelSync(workType, [...availableModels], options));
 
 /** Select the best model for every known work type. Pure. */
-export const selectAllModelsEffect = (
+export const selectAllModels = (
   availableModels: readonly ModelId[],
   options: SelectionOptions = {},
 ): Effect.Effect<Record<string, ModelSelectionResult>> =>
-  Effect.sync(() => selectAllModels([...availableModels], options));
+  Effect.sync(() => selectAllModelsSync([...availableModels], options));
 
 /** Compact map { workType → selected model } for preset compatibility. Pure. */
-export const getSimpleModelMappingEffect = (
+export const getSimpleModelMapping = (
   availableModels: readonly ModelId[],
   options: SelectionOptions = {},
 ): Effect.Effect<Record<string, ModelId>> =>
-  Effect.sync(() => getSimpleModelMapping([...availableModels], options));
+  Effect.sync(() => getSimpleModelMappingSync([...availableModels], options));

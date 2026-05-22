@@ -46,15 +46,7 @@ interface CliproxyCodexCredentials {
   access_token?: string;
   email?: string;
   type?: string;
-}
-
-/**
- * Check whether the Codex OAuth credentials stored for CLIProxy are still valid.
- *
- * Reads ~/.panopticon/cliproxy/auth/codex-primary.json, decodes the JWT
- * access_token exp claim, and compares it to the current time.
- */
-export async function checkCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
+}async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const credPath = join(getCliproxyAuthDir(), 'codex-primary.json');
 
   let raw: string;
@@ -205,11 +197,11 @@ async function applyBurnedTokenOverride(
  * with CodexAuthCheckError if the underlying call itself throws unexpectedly
  * (i.e., not from the documented "missing/unknown" branches).
  */
-export const checkCodexAuthStatusEffect = (
+export const checkCodexAuthStatus = (
   options: { ignoreBurnBefore?: number } = {},
 ): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
   Effect.tryPromise({
-    try: () => checkCodexAuthStatus(options),
+    try: () => checkCodexAuthStatusPromise(options),
     catch: (cause) =>
       new CodexAuthCheckError({
         message: cause instanceof Error ? cause.message : String(cause),

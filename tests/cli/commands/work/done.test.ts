@@ -124,28 +124,28 @@ function makeAgentState(workspace: string) {
 
 describe('resolveIssueId normalization', () => {
   it('converts agent-pan-714 to PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('agent-pan-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('agent-pan-714')).toBe('PAN-714');
   });
 
   it('converts pan-714 (lowercase) to PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('pan-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('pan-714')).toBe('PAN-714');
   });
 
   it('preserves already-normalized PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('PAN-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('PAN-714')).toBe('PAN-714');
   });
 
   it('strips agent- prefix case-insensitively', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('AGENT-MIN-42')).toBe('MIN-42');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('AGENT-MIN-42')).toBe('MIN-42');
   });
 
   it('uppercases the result regardless of input case', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('min-42')).toBe('MIN-42');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('min-42')).toBe('MIN-42');
   });
 });
 

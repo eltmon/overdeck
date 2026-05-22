@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
+import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
 import { readWorkspaceContinue as readWorkspaceContinueEffect } from '../../src/lib/pan-dir/continue.js';
 import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
 
@@ -87,7 +87,7 @@ function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
 }
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
-  return readPlan(join(workspacePath, '.pan', 'spec.vbrief.json'));
+  return readPlanSync(join(workspacePath, '.pan', 'spec.vbrief.json'));
 }
 
 beforeEach(() => {
@@ -106,14 +106,14 @@ describe('vBRIEFInfo v0.5 fields', () => {
   it('readPlan preserves vBRIEFInfo.author', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.vBRIEFInfo.author).toBe('panopticon-cli/0.6.0');
   });
 
   it('readPlan preserves vBRIEFInfo.description', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.vBRIEFInfo.description).toBe('Plan for PAN-453: Full vBRIEF v0.5 Spec Support');
   });
 });
@@ -124,28 +124,28 @@ describe('VBriefPlan v0.5 fields', () => {
   it('readPlan preserves plan.uid', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.uid).toBe('f47ac10b-58cc-4372-a567-0e02b2c3d479');
   });
 
   it('readPlan preserves plan.sequence', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.sequence).toBe(1);
   });
 
   it('readPlan preserves plan.created', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.created).toBe('2026-01-01T00:00:00Z');
   });
 
   it('readPlan preserves plan.references', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.references).toHaveLength(2);
     expect(result.plan.references![0]).toEqual({
       uri: 'https://github.com/eltmon/panopticon-cli/issues/453',
@@ -166,14 +166,14 @@ describe('VBriefItem created/completed fields', () => {
   it('readPlan preserves item.created', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.items[0].created).toBe('2026-01-01T00:00:00Z');
   });
 
   it('readPlan preserves subItem.created', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.items[0].subItems![0].created).toBe('2026-01-01T00:00:00Z');
   });
 });
@@ -195,7 +195,7 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
     const planPath = writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const raw = readPlan(planPath);
+    const raw = readPlanSync(planPath);
     expect(raw.plan.sequence).toBe(1);
     expect(raw.plan.items[0].status).toBe('pending');
   });
@@ -205,7 +205,7 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const item = merged!.plan.items.find(i => i.id === 'update-types');
     expect(item?.status).toBe('running');
   });
@@ -216,7 +216,7 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
     const before = Date.now();
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const item = merged!.plan.items.find(i => i.id === 'update-types');
 
     expect(item?.completed).toBeDefined();
@@ -229,7 +229,7 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const item = merged!.plan.items.find(i => i.id === 'update-types');
 
     expect(item?.completed).toBeUndefined();
@@ -253,7 +253,7 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
     expect(subItem?.status).toBe('completed');
   });
@@ -264,7 +264,7 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
     const before = Date.now();
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
 
     expect(subItem?.completed).toBeDefined();
@@ -277,7 +277,7 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'running');
-    const merged = readWorkspacePlan(TEST_DIR);
+    const merged = readWorkspacePlanSync(TEST_DIR);
     const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
 
     expect(subItem?.completed).toBeUndefined();

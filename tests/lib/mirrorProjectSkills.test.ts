@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { mirrorProjectSkills } from '../../src/lib/sync.js';
+import { mirrorProjectSkillsSync } from '../../src/lib/sync.js';
 
 describe('mirrorProjectSkills', () => {
   let cwd: string;
@@ -44,7 +44,7 @@ describe('mirrorProjectSkills', () => {
   }
 
   it('is a no-op when skills/ directory does not exist', () => {
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
     expect(result).toEqual({ added: [], updated: [], removed: [] });
     expect(existsSync(claudeSkillsDir)).toBe(false);
   });
@@ -53,7 +53,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(skillsDir, 'not-a-skill'), { recursive: true });
     writeFileSync(join(skillsDir, 'not-a-skill', 'README.md'), '# not a skill', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
     expect(result).toEqual({ added: [], updated: [], removed: [] });
     expect(existsSync(claudeSkillsDir)).toBe(false);
   });
@@ -61,7 +61,7 @@ describe('mirrorProjectSkills', () => {
   it('adds a new skill directory and SKILL.md when missing from target', () => {
     createSkill('pan-help', '# Help\nUse pan help.');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toEqual(['pan-help']);
     expect(result.updated).toEqual([]);
@@ -78,7 +78,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'pan-help\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toEqual([]);
     expect(result.updated).toEqual(['pan-help']);
@@ -91,7 +91,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'pan-help'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'pan-help', 'SKILL.md'), '# Help\nSame content.', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result).toEqual({ added: [], updated: [], removed: [] });
   });
@@ -105,7 +105,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'old-skill\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.removed).toContain('old-skill');
     expect(existsSync(join(claudeSkillsDir, 'old-skill'))).toBe(false);
@@ -116,7 +116,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(claudeSkillsDir, { recursive: true });
     writeFileSync(join(claudeSkillsDir, '.gitignore'), '*.log\n', 'utf-8');
 
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(existsSync(join(claudeSkillsDir, '.gitignore'))).toBe(true);
     expect(readFileSync(join(claudeSkillsDir, '.gitignore'), 'utf-8')).toBe('*.log\n');
@@ -125,7 +125,7 @@ describe('mirrorProjectSkills', () => {
   it('recognises lowercase skill.md and mirrors it as SKILL.md in target', () => {
     createSkill('workspace-add-repo', '# Workspace\nAdd repo.', 'skill.md');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toContain('workspace-add-repo');
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
@@ -141,7 +141,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'workspace-add-repo\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     // Filename must be normalized: SKILL.md created, skill.md removed
     expect(existsSync(join(claudeSkillsDir, 'workspace-add-repo', 'SKILL.md'))).toBe(true);
@@ -159,7 +159,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'workspace-add-repo\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.updated).toEqual(['workspace-add-repo']);
     // New canonical SKILL.md must exist with updated content
@@ -177,7 +177,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'pan-help\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toEqual(['pan-help']);
     expect(result.updated).toEqual([]);
@@ -192,7 +192,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(join(claudeSkillsDir, 'test-specialist-workflow'), { recursive: true });
     writeFileSync(join(claudeSkillsDir, 'test-specialist-workflow', 'SKILL.md'), '# Test Specialist\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.removed).not.toContain('conv-lookup');
     expect(result.removed).not.toContain('test-specialist-workflow');
@@ -208,7 +208,7 @@ describe('mirrorProjectSkills', () => {
     // .gitignore lists pan-help but NOT new-unlisted-skill — both must be mirrored
     writeFileSync(join(claudeSkillsDir, '.gitignore'), 'pan-help\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toContain('pan-help');
     expect(result.added).toContain('new-unlisted-skill');
@@ -219,7 +219,7 @@ describe('mirrorProjectSkills', () => {
   it('does not create .mirror-manifest inside .claude/skills/ (no untracked repo files)', () => {
     createSkill('pan-help', '# Help');
 
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     // Manifest must NOT appear inside the target skills dir (would create untracked repo files)
     expect(existsSync(join(claudeSkillsDir, '.mirror-manifest'))).toBe(false);
@@ -230,14 +230,14 @@ describe('mirrorProjectSkills', () => {
   it('does not modify files in .claude/skills/ on repeated runs with unchanged skills (idempotent)', () => {
     createSkill('pan-help', '# Help\nContent.');
 
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     // Record all files in claudeSkillsDir after first run
     const skillMdPath = join(claudeSkillsDir, 'pan-help', 'SKILL.md');
     const contentAfterFirst = readFileSync(skillMdPath, 'utf-8');
     const manifestAfterFirst = readFileSync(join(manifestDir, 'manifest'), 'utf-8');
 
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(readFileSync(skillMdPath, 'utf-8')).toBe(contentAfterFirst);
     expect(readFileSync(join(manifestDir, 'manifest'), 'utf-8')).toBe(manifestAfterFirst);
@@ -258,7 +258,7 @@ describe('mirrorProjectSkills', () => {
     writeFileSync(join(skillDir, 'resources', 'component-template.tsx'), 'export {};\n', 'utf-8');
     writeFileSync(join(skillDir, 'scripts', 'validate.js'), 'console.log("ok");\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added).toContain('stitch-react');
 
@@ -277,12 +277,12 @@ describe('mirrorProjectSkills', () => {
     writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"version":1}', 'utf-8');
 
     // First sync — populate target
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     // Update companion file in source
     writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"version":2}', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.updated).toContain('stitch-react');
     expect(readFileSync(join(claudeSkillsDir, 'stitch-react', 'resources', 'style-guide.json'), 'utf-8'))
@@ -296,7 +296,7 @@ describe('mirrorProjectSkills', () => {
     writeFileSync(join(skillDir, 'resources', 'style-guide.json'), '{"colors":[]}', 'utf-8');
 
     // First sync — populate target including companion file
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
 
     const companionInTarget = join(claudeSkillsDir, 'stitch-react', 'resources', 'style-guide.json');
     expect(existsSync(companionInTarget)).toBe(true);
@@ -304,7 +304,7 @@ describe('mirrorProjectSkills', () => {
     // Remove companion file from source
     rmSync(join(skillDir, 'resources', 'style-guide.json'));
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.updated).toContain('stitch-react');
     expect(existsSync(companionInTarget)).toBe(false);
@@ -319,14 +319,14 @@ describe('mirrorProjectSkills', () => {
     chmodSync(srcScript, 0o755);
 
     // Initial mirror — target script must be executable
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
     const dstScript = join(claudeSkillsDir, 'pan-tts', 'scripts', 'say.sh');
     expect(statSync(dstScript).mode & 0o111).toBeGreaterThan(0);
 
     // Update script content — mode must still be preserved after update
     writeFileSync(srcScript, '#!/bin/sh\necho world\n', 'utf-8');
     chmodSync(srcScript, 0o755);
-    mirrorProjectSkills(cwd, { manifestDir });
+    mirrorProjectSkillsSync(cwd, { manifestDir });
     expect(readFileSync(dstScript, 'utf-8')).toBe('#!/bin/sh\necho world\n');
     expect(statSync(dstScript).mode & 0o111).toBeGreaterThan(0);
   });
@@ -341,7 +341,7 @@ describe('mirrorProjectSkills', () => {
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest'), 'old-removed\n', 'utf-8');
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     expect(result.added.sort()).toEqual(['commit', 'pan-help']);
     expect(result.removed).toContain('old-removed');
@@ -355,7 +355,7 @@ describe('mirrorProjectSkills', () => {
     const subdir = join(cwd, 'src', 'lib');
     mkdirSync(subdir, { recursive: true });
 
-    const result = mirrorProjectSkills(subdir, { manifestDir });
+    const result = mirrorProjectSkillsSync(subdir, { manifestDir });
 
     // Skills must be mirrored into cwd/.claude/skills/, not subdir/.claude/skills/
     expect(result.added).toContain('pan-help');
@@ -375,7 +375,7 @@ describe('mirrorProjectSkills', () => {
     writeFileSync(join(userSkillDir, 'extra-file.txt'), 'user extra', 'utf-8');
 
     // First run: pan-help is new, conv-lookup is user-managed (not in manifest yet)
-    const result1 = mirrorProjectSkills(cwd, { manifestDir });
+    const result1 = mirrorProjectSkillsSync(cwd, { manifestDir });
     expect(result1.added).toContain('pan-help');
     expect(result1.added).not.toContain('conv-lookup');
 
@@ -388,7 +388,7 @@ describe('mirrorProjectSkills', () => {
     expect(manifest).not.toContain('conv-lookup');
 
     // Second run: manifest now exists; conv-lookup still not in it — must still be skipped
-    const result2 = mirrorProjectSkills(cwd, { manifestDir });
+    const result2 = mirrorProjectSkillsSync(cwd, { manifestDir });
     expect(result2.added).not.toContain('conv-lookup');
     expect(result2.updated).not.toContain('conv-lookup');
     expect(result2.removed).not.toContain('conv-lookup');
@@ -408,7 +408,7 @@ describe('mirrorProjectSkills', () => {
     writeFileSync(join(userSkillDir, 'user-only-file.txt'), 'user extra', 'utf-8');
     // No manifest — pan-help not recorded as mirror-managed
 
-    const result = mirrorProjectSkills(cwd, { manifestDir });
+    const result = mirrorProjectSkillsSync(cwd, { manifestDir });
 
     // Ownership guard must skip pan-help: user content preserved
     expect(readFileSync(userSkillMd, 'utf-8')).toBe('# Help\nUser-managed content.');
@@ -450,7 +450,7 @@ describe('mirrorProjectSkills', () => {
       const gitManifestDir = join(gitCwd, 'manifest-store');
       mkdirSync(gitManifestDir, { recursive: true });
 
-      const result = mirrorProjectSkills(gitCwd, { manifestDir: gitManifestDir });
+      const result = mirrorProjectSkillsSync(gitCwd, { manifestDir: gitManifestDir });
 
       // Git-tracked dir must be mirrored (updated) — not skipped by the ownership guard
       const updatedContent = readFileSync(join(targetSkillDir, 'SKILL.md'), 'utf-8');

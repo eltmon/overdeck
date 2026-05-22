@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * PAN-653: End-to-end divergence guard integration tests.
  *
@@ -107,7 +108,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush, MainDivergedError } = await import('../operations.js');
 
     // First push succeeds
-    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' }))
+    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' })))) issueId: 'PAN-FIRST' }))))
       .resolves.not.toThrow();
 
     // Now origin/main has advanced (hotfix landed)
@@ -120,7 +121,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     // Second push throws MainDivergedError
-    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' }))
+    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' }))))issueId: 'PAN-SECOND' }))))
       .rejects.toThrow(MainDivergedError);
   });
 
@@ -137,7 +138,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     let divergedErr: InstanceType<typeof MainDivergedError> | undefined;
 
     try {
-      await gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' });
+      await Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' }));
     } catch (err) {
       if (err instanceof MainDivergedError) {
         divergedErr = err;
@@ -156,14 +157,14 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     // Step 3: verify stuck flag is persisted
-    const { getReviewStatus } = await import('../../review-status.js');
-    const status = getReviewStatus('PAN-FLOW');
+    const { getReviewStatusSync } = await import('../../review-status.js');
+    const status = getReviewStatusSync('PAN-FLOW');
     expect(status?.stuck).toBe(true);
     expect(status?.stuckReason).toBe('main_diverged');
 
     // Step 4: main_diverged event was written to git_operations
-    const { listGitOperations } = await import('../../../lib/git-activity.js');
-    const ops = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const ops = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(ops.length).toBeGreaterThan(0);
     expect(ops[0].status).toBe('aborted');
     expect(ops[0].beforeSha).toBe('localABC');
@@ -173,14 +174,14 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     await resetDb();
 
     // After restart, stuck state is still persisted in SQLite
-    const statusAfterRestart = getReviewStatus('PAN-FLOW');
+    const statusAfterRestart = getReviewStatusSync('PAN-FLOW');
     expect(statusAfterRestart?.stuck).toBe(true);
 
     // Step 6: unstick clears the flag
     const { clearWorkspaceStuck } = await import('../../review-status.js');
     clearWorkspaceStuck('PAN-FLOW');
 
-    const statusAfterUnstick = getReviewStatus('PAN-FLOW');
+    const statusAfterUnstick = getReviewStatusSync('PAN-FLOW');
     expect(statusAfterUnstick?.stuck).toBeFalsy();
   });
 
@@ -193,12 +194,12 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperations } = await import('../../../lib/git-activity.js');
+    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' }))
+    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' })))) { issueId: 'PAN-OPS' }))))
       .rejects.toThrow();
 
-    const allOps = listGitOperations({ issueId: 'PAN-OPS' });
+    const allOps = listGitOperationsSync({ issueId: 'PAN-OPS' });
     // fetch and main_diverged should be recorded (rev_parse is unfiltered by issueId)
     const opTypes = allOps.map((o) => o.operation);
     expect(opTypes).toContain('fetch');

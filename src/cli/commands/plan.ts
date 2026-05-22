@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 
 interface PlanOptions {
   auto?: boolean;
@@ -21,7 +21,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   const spinner = ora(`${options.auto ? 'Auto-planning' : 'Starting planning for'} ${issueId}...`).start();
 
   try {
-    const response = await fetch(`${getDashboardApiUrl()}/api/issues/${encodeURIComponent(issueId)}/start-planning`, {
+    const response = await fetch(`${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(issueId)}/start-planning`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

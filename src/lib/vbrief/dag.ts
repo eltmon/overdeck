@@ -752,7 +752,7 @@ async function removeStaleLockFromDisk(planPath: string): Promise<void> {
   } catch { /* best effort */ }
 }
 
-export const removeStaleLockEffect = (planPath: string): Effect.Effect<void, VBriefDagError> =>
+export const removeStaleLock = (planPath: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
     try: () => removeStaleLockFromDisk(planPath),
     catch: (cause) => liftDagError(planPath, 'removeStaleLock', cause),
@@ -821,7 +821,7 @@ async function assertSingleWriterForPlan(planPath: string, writerId: string): Pr
   throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
 }
 
-export const assertSingleWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
+export const assertSingleWriter = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
     try: () => assertSingleWriterForPlan(planPath, writerId),
     catch: (cause) => liftDagError(planPath, 'assertSingleWriter', cause),
@@ -832,7 +832,7 @@ async function releasePlanWriterForPlan(planPath: string, writerId: string): Pro
   await rm(lockPathForPlan(planPath), { recursive: true, force: true });
 }
 
-export const releasePlanWriterEffect = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
+export const releasePlanWriter = (planPath: string, writerId: string): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
     try: () => releasePlanWriterForPlan(planPath, writerId),
     catch: (cause) => liftDagError(planPath, 'releasePlanWriter', cause),
@@ -857,7 +857,7 @@ async function writePlanFileAtomically(planPath: string, doc: VBriefDocument): P
   await rename(tmp, planPath);
 }
 
-export const writePlanFileAtomicEffect = (planPath: string, doc: VBriefDocument): Effect.Effect<void, VBriefDagError> =>
+export const writePlanFileAtomic = (planPath: string, doc: VBriefDocument): Effect.Effect<void, VBriefDagError> =>
   Effect.tryPromise({
     try: () => writePlanFileAtomically(planPath, doc),
     catch: (cause) => liftDagError(planPath, 'writePlanFileAtomic', cause),
@@ -906,7 +906,7 @@ const mirrorTaskOperationToContinueFileEffect = (
     Effect.catch((cause) => Effect.fail(liftDagError(workspacePath, 'mirrorTaskOperationToContinueFile', cause))),
   );
 
-export const applyTaskOperationToPlanFileEffect = (
+export const applyTaskOperationToPlanFile = (
   planPath: string,
   operation: PersistedTaskOperation,
   workspacePath?: string,
@@ -920,18 +920,18 @@ export const applyTaskOperationToPlanFileEffect = (
       ));
     }
 
-    yield* assertSingleWriterEffect(planPath, operation.writerId);
+    yield* assertSingleWriter(planPath, operation.writerId);
     const operationEffect = Effect.gen(function* () {
-      const current = yield* readPlanFileEffect(planPath);
+      const current = yield* readPlanFile(planPath);
       const result = applyTaskOperation(current, operation);
-      yield* writePlanFileAtomicEffect(planPath, result.doc);
+      yield* writePlanFileAtomic(planPath, result.doc);
       const wsPath = workspacePath ?? dirname(dirname(planPath));
       yield* mirrorTaskOperationToContinueFileEffect(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
       return result;
     });
 
     return yield* operationEffect.pipe(
-      Effect.ensuring(releasePlanWriterEffect(planPath, operation.writerId).pipe(Effect.catch(() => Effect.void))),
+      Effect.ensuring(releasePlanWriter(planPath, operation.writerId).pipe(Effect.catch(() => Effect.void))),
     );
   });
 
@@ -1058,13 +1058,13 @@ async function readPlanFileFromDisk(planPath: string): Promise<VBriefDocument> {
   return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
 }
 
-export const readPlanFileEffect = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>
+export const readPlanFile = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>
   Effect.tryPromise({
     try: () => readPlanFileFromDisk(planPath),
     catch: (cause) => liftDagError(planPath, 'readPlanFile', cause),
   });
 
-export const writePipelineMirrorToPlanFileEffect = (
+export const writePipelineMirrorToPlanFile = (
   planPath: string,
   mirror: NestedPlanPipelineMirror,
   writerId = `pipeline-${process.pid}`,
@@ -1072,20 +1072,20 @@ export const writePipelineMirrorToPlanFileEffect = (
   Effect.gen(function* () {
     if (!existsSync(planPath)) return null;
 
-    yield* assertSingleWriterEffect(planPath, writerId);
+    yield* assertSingleWriter(planPath, writerId);
     const writeEffect = Effect.gen(function* () {
-      const doc = yield* readPlanFileEffect(planPath);
+      const doc = yield* readPlanFile(planPath);
       setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
       const now = new Date().toISOString();
       doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
       doc.plan.updated = now;
       doc.vBRIEFInfo.updated = now;
-      yield* writePlanFileAtomicEffect(planPath, doc);
+      yield* writePlanFileAtomic(planPath, doc);
       return doc;
     });
 
     return yield* writeEffect.pipe(
-      Effect.ensuring(releasePlanWriterEffect(planPath, writerId).pipe(Effect.catch(() => Effect.void))),
+      Effect.ensuring(releasePlanWriter(planPath, writerId).pipe(Effect.catch(() => Effect.void))),
     );
   });
 

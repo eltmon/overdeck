@@ -14,7 +14,7 @@ import { readFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { emitDashboardLifecycle } from '../../lib/activity-logger.js';
+import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
 
 export const PENDING_FILE = join(homedir(), '.panopticon', 'pending-post-merge.json');
 export const RESTART_MARKER = join(homedir(), '.panopticon', 'dashboard-restarting.json');
@@ -86,7 +86,7 @@ export async function processPendingLifecycle(options?: {
       const age = now - (marker.timestamp ?? 0);
 
       if (age <= staleThresholdMs) {
-        emitDashboardLifecycle('started', {
+        emitDashboardLifecycleSync('started', {
           reason: marker.reason ?? 'post-merge',
           issueId: marker.issueId,
           trigger: marker.trigger ?? 'deploy-script',
@@ -126,14 +126,14 @@ export async function processPendingLifecycle(options?: {
     setTimeout(async () => {
       try {
         await runner(pending);
-        emitDashboardLifecycle('completed', {
+        emitDashboardLifecycleSync('completed', {
           reason: pending.reason ?? 'post-merge',
           issueId: pending.issueId,
           durationMs: Date.now() - startTime,
         });
       } catch (err: any) {
         console.error(`[panopticon] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
-        emitDashboardLifecycle('failed', {
+        emitDashboardLifecycleSync('failed', {
           reason: pending.reason ?? 'post-merge',
           issueId: pending.issueId,
           error: err.message,

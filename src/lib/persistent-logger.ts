@@ -32,7 +32,7 @@ function timestamp(): string {
 }
 
 /** Append a line to ~/.panopticon/logs/deacon.log */
-export function logDeaconEvent(message: string): void {
+export function logDeaconEventSync(message: string): void {
   ensureLogsDir();
   try {
     appendFileSync(join(LOGS_DIR, 'deacon.log'), `[${timestamp()}] ${message}\n`);
@@ -42,7 +42,7 @@ export function logDeaconEvent(message: string): void {
 }
 
 /** Append a line to ~/.panopticon/agents/<agentId>/lifecycle.log */
-export function logAgentLifecycle(agentId: string, message: string): void {
+export function logAgentLifecycleSync(agentId: string, message: string): void {
   ensureAgentDir(agentId);
   try {
     appendFileSync(
@@ -59,8 +59,8 @@ export function logAgentLifecycle(agentId: string, message: string): void {
 // Logging must NEVER break recovery logic, so both Effect variants swallow all
 // errors and return Effect<void, never> — they never fail the parent Effect.
 
-/** Effect variant of {@link logDeaconEvent}. Failures are swallowed silently. */
-export const logDeaconEventEffect = (message: string): Effect.Effect<void, never> =>
+/** Effect variant of {@link logDeaconEventSync}. Failures are swallowed silently. */
+export const logDeaconEvent = (message: string): Effect.Effect<void, never> =>
   Effect.promise(async () => {
     try {
       await mkdir(LOGS_DIR, { recursive: true });
@@ -70,8 +70,8 @@ export const logDeaconEventEffect = (message: string): Effect.Effect<void, never
     }
   });
 
-/** Effect variant of {@link logAgentLifecycle}. Failures are swallowed silently. */
-export const logAgentLifecycleEffect = (agentId: string, message: string): Effect.Effect<void, never> =>
+/** Effect variant of {@link logAgentLifecycleSync}. Failures are swallowed silently. */
+export const logAgentLifecycle = (agentId: string, message: string): Effect.Effect<void, never> =>
   Effect.promise(async () => {
     try {
       await mkdir(join(AGENTS_DIR, agentId), { recursive: true });

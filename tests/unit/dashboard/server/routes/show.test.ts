@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Route logic tests for /api/show/:issueId endpoints (PAN-705).
  *
@@ -62,16 +63,16 @@ describe('GET /api/show/:issueId/shadow', () => {
   it('404 path — getShadowState returns null when no file exists', async () => {
     const issueId = uniqueIssueId('NOEXIST');
     // Route decision: if (!shadowState) → 404
-    expect(await getShadowState(issueId)).toBeNull();
+    (await Effect.runPromise(expect(await getShadowState(issueId))))dowState(issueId))).toBeNull();
   });
 
   it('200 path — getShadowState returns real state after createShadowState', async () => {
     const issueId = uniqueIssueId('EXIST');
-    const created = await createShadowState(issueId, 'in_progress', 'test');
+    const created = await Effect.runPromise(createShadowState(issueId, 'in_progress', 'test'));
 
-    const result = await getShadowState(issueId);
+    const result = await Effect.runPromise(getShadowState(issueId));
 
-    expect(result).not.toBeNull();
+    (await Effect.runPromise(expect(result))).not.toBeNull();
     expect(result?.issueId).toBe(issueId.toUpperCase());
     expect(result?.shadowStatus).toBe('in_progress');
     expect(result?.shadowedAt).toBe(created.shadowedAt);
@@ -80,13 +81,13 @@ describe('GET /api/show/:issueId/shadow', () => {
 
   it('roundtrip — state persisted to disk matches state read back', async () => {
     const issueId = uniqueIssueId('ROUNDTRIP');
-    await createShadowState(issueId, 'in_review', 'test-script');
+    await Effect.runPromise(createShadowState(issueId, 'in_review', 'test-script'));
 
-    const first = await getShadowState(issueId);
-    const second = await getShadowState(issueId);
+    const first = await Effect.runPromise(getShadowState(issueId));
+    const second = await Effect.runPromise(getShadowState(issueId));
 
     // Two independent reads of the same file must be consistent
-    expect(second).toEqual(first);
+    (await Effect.runPromise(expect(second))).toEqual(first);
     expect(second?.trackerStatus).toBe('in_review');
   });
 });
@@ -110,16 +111,16 @@ describe('GET /api/show/:issueId (summary)', () => {
 
   it('shadow field is populated from real getShadowState for existing issue', async () => {
     const issueId = uniqueIssueId('SUMMARY');
-    await createShadowState(issueId, 'done', 'test');
+    await Effect.runPromise(createShadowState(issueId, 'done', 'test'));
 
-    const shadow = await getShadowState(issueId);
-    expect(shadow).not.toBeNull();
+    const shadow = await Effect.runPromise(getShadowState(issueId));
+    (await Effect.runPromise(expect(shadow))).not.toBeNull();
     expect(shadow?.shadowStatus).toBe('done');
   });
 
   it('shadow field is null for unknown issue (and route must tolerate that)', async () => {
     const issueId = uniqueIssueId('SUMMARY-UNKNOWN');
-    expect(await getShadowState(issueId)).toBeNull();
+    (await Effect.runPromise(expect(await getShadowState(issueId))))dowState(issueId))).toBeNull();
   });
 });
 

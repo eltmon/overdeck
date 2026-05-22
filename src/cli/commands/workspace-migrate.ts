@@ -21,12 +21,12 @@ import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { loadConfig } from '../../lib/config.js';
-import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam, type ProjectConfig } from '../../lib/projects.js';
+import { loadConfigSync } from '../../lib/config.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, type ProjectConfig } from '../../lib/projects.js';
 import {
-  loadWorkspaceMetadata,
-  saveWorkspaceMetadata,
-  deleteWorkspaceMetadata,
+  loadWorkspaceMetadataSync,
+  saveWorkspaceMetadataSync,
+  deleteWorkspaceMetadataSync,
 } from '../../lib/remote/workspace-metadata.js';
 import {
   createFlyProviderFromConfig,
@@ -60,13 +60,13 @@ function detectWorkspaceLocation(issueId: string): 'local' | 'remote' | 'none' {
   const normalizedId = issueId.toLowerCase();
 
   // Check for remote workspace metadata
-  const remoteMetadata = loadWorkspaceMetadata(issueId);
+  const remoteMetadata = loadWorkspaceMetadataSync(issueId);
   if (remoteMetadata) {
     return 'remote';
   }
 
   // Check for local workspace
-  const resolved = resolveProjectFromIssue(issueId, []);
+  const resolved = resolveProjectFromIssueSync(issueId, []);
   if (resolved) {
     const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${normalizedId}`);
     if (existsSync(workspacePath)) {
@@ -82,7 +82,7 @@ function detectWorkspaceLocation(issueId: string): 'local' | 'remote' | 'none' {
  */
 function findLocalWorkspacePath(issueId: string): string | null {
   const normalizedId = issueId.toLowerCase();
-  const resolved = resolveProjectFromIssue(issueId, []);
+  const resolved = resolveProjectFromIssueSync(issueId, []);
 
   if (resolved) {
     const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${normalizedId}`);
@@ -198,7 +198,7 @@ async function cloneReposOnVm(
   }
 
   // Create workspace directory on VM
-  await provider.ssh(vmName, 'mkdir -p ~/workspace');
+  await Effect.runPromise(provider.ssh(vmName, 'mkdir -p ~/workspace'));
 
   for (const repo of gitDirs) {
     if (!repo.remote) {
@@ -218,7 +218,7 @@ async function cloneReposOnVm(
           continue;
         }
         // Checkout branch
-        await provider.ssh(vmName, `cd ~/workspace && git fetch origin && git checkout ${branchName} || git checkout -b ${branchName}`);
+        await Effect.runPromise(provider.ssh(vmName, `cd ~/workspace && git fetch origin && git checkout ${branchName} || git checkout -b ${branchName}`));
         steps.push(`Cloned ${repo.name} and checked out ${branchName}`);
       } else {
         // Polyrepo - clone to ~/workspace/<name>
@@ -228,7 +228,7 @@ async function cloneReposOnVm(
           continue;
         }
         // Checkout branch
-        await provider.ssh(vmName, `cd ~/workspace/${repo.name} && git fetch origin && git checkout ${branchName} || git checkout -b ${branchName}`);
+        await Effect.runPromise(provider.ssh(vmName, `cd ~/workspace/${repo.name} && git fetch origin && git checkout ${branchName} || git checkout -b ${branchName}`));
         steps.push(`Cloned ${repo.name} and checked out ${branchName}`);
       }
     } catch (error: any) {
@@ -314,11 +314,11 @@ async function copyWorkspacePanStateToRemote(
   }
 
   try {
-    await provider.ssh(vmName, `mkdir -p ~/workspace/${PAN_DIRNAME}/${PAN_FEEDBACK_DIRNAME}`);
+    await Effect.runPromise(provider.ssh(vmName, `mkdir -p ~/workspace/${PAN_DIRNAME}/${PAN_FEEDBACK_DIRNAME}`));
     for (const file of files) {
       const remoteDir = dirname(file.remotePath.replace(/^~\//, ''));
-      await provider.ssh(vmName, `mkdir -p ~/${remoteDir}`);
-      await provider.copyToVm(vmName, file.localPath, file.remotePath);
+      await Effect.runPromise(provider.ssh(vmName, `mkdir -p ~/${remoteDir}`));
+      await Effect.runPromise(provider.copyToVm(vmName, file.localPath, file.remotePath));
       steps.push(`Copied ${file.label}`);
     }
   } catch (error: any) {
@@ -359,7 +359,7 @@ async function copyWorkspacePanStateFromRemote(
     const existsResult = await Effect.runPromise(provider.ssh(vmName, `[ -f ${remotePath} ] && echo present`));
     if (existsResult.exitCode === 0 && existsResult.stdout.trim()) {
       try {
-        await provider.copyFromVm(vmName, remotePath, join(localPanDir, file.name));
+        await Effect.runPromise(provider.copyFromVm(vmName, remotePath, join(localPanDir, file.name)));
         steps.push(`Copied ${file.label}`);
       } catch (error: any) {
         errors.push(`${file.label}: ${error.message}`);
@@ -371,11 +371,11 @@ async function copyWorkspacePanStateFromRemote(
   if (feedbackList.exitCode === 0 && feedbackList.stdout.trim()) {
     for (const entry of feedbackList.stdout.trim().split('\n').filter(Boolean)) {
       try {
-        await provider.copyFromVm(
+        await Effect.runPromise(provider.copyFromVm(
           vmName,
           `${remotePanDir}/${PAN_FEEDBACK_DIRNAME}/${entry}`,
           join(localFeedbackDir, entry),
-        );
+        ));
         steps.push(`Copied feedback/${entry}`);
       } catch (error: any) {
         errors.push(`feedback/${entry}: ${error.message}`);
@@ -409,10 +409,10 @@ async function copyPlanningStateToRemote(
   for (const beadsDir of beadsLocations) {
     if (existsSync(beadsDir)) {
       try {
-        await provider.ssh(vmName, 'mkdir -p ~/workspace/.beads');
+        await Effect.runPromise(provider.ssh(vmName, 'mkdir -p ~/workspace/.beads'));
         const beadsFiles = readdirSync(beadsDir).filter(f => f.endsWith('.db') || f.endsWith('.jsonl'));
         for (const file of beadsFiles) {
-          await provider.copyToVm(vmName, join(beadsDir, file), `~/workspace/.beads/${file}`);
+          await Effect.runPromise(provider.copyToVm(vmName, join(beadsDir, file), `~/workspace/.beads/${file}`));
         }
         steps.push('Copied beads database');
         break;
@@ -448,7 +448,7 @@ async function copyPlanningStateFromRemote(
       const files = beadsCheck.stdout.trim().split('\n').filter(f => f.endsWith('.db') || f.endsWith('.jsonl'));
       for (const file of files) {
         try {
-          await provider.copyFromVm(vmName, `~/workspace/.beads/${file}`, join(localBeadsDir, file));
+          await Effect.runPromise(provider.copyFromVm(vmName, `~/workspace/.beads/${file}`, join(localBeadsDir, file)));
         } catch {
           // scp might not work for all files
         }
@@ -489,7 +489,7 @@ export async function migrateLocalToRemote(
     result.steps.push(`Found local workspace: ${localPath}`);
 
     // 2. Check if remote already exists
-    const existingRemote = loadWorkspaceMetadata(issueId);
+    const existingRemote = loadWorkspaceMetadataSync(issueId);
     if (existingRemote && !options.force) {
       spinner.fail('Remote workspace already exists');
       result.errors.push(`Remote workspace already exists for ${issueId}. Use --force to overwrite.`);
@@ -498,7 +498,7 @@ export async function migrateLocalToRemote(
 
     // 3. Check remote provider availability
     spinner.text = 'Checking remote provider...';
-    const config = loadConfig();
+    const config = loadConfigSync();
     if (!config.remote?.enabled) {
       spinner.fail('Remote workspaces not enabled');
       result.errors.push('Remote workspaces not enabled in config. Set remote.enabled = true');
@@ -516,9 +516,9 @@ export async function migrateLocalToRemote(
     result.steps.push('Authenticated with Fly.io');
 
     // 4. Get project info for VM naming
-    const resolved = resolveProjectFromIssue(issueId, []);
+    const resolved = resolveProjectFromIssueSync(issueId, []);
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
     const projectName = projectConfig?.name?.toLowerCase().replace(/\s+/g, '-') || resolved?.projectName?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
     const vmName = `pan-${projectName}-${issueId.toLowerCase()}-ws`;
 
@@ -572,14 +572,14 @@ export async function migrateLocalToRemote(
 
     // 7. Setup SSH for git access (matching createRemoteWorkspace pattern)
     spinner.text = 'Setting up SSH access...';
-    await provider.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh');
+    await Effect.runPromise(provider.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh'));
 
     // Add SSH host keys for detected git hosts
     if (isGitHub) {
-      await provider.ssh(vmName, 'ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
+      await Effect.runPromise(provider.ssh(vmName, 'ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null'));
     }
     if (isGitLab) {
-      await provider.ssh(vmName, 'ssh-keyscan -t ed25519,rsa gitlab.com >> ~/.ssh/known_hosts 2>/dev/null');
+      await Effect.runPromise(provider.ssh(vmName, 'ssh-keyscan -t ed25519,rsa gitlab.com >> ~/.ssh/known_hosts 2>/dev/null'));
     }
 
     // Copy SSH key for git access
@@ -592,7 +592,7 @@ export async function migrateLocalToRemote(
     if (sshKeyPath) {
       const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
       const keyFilename = sshKeyPath.includes('id_rsa') ? 'id_rsa' : 'id_ed25519';
-      await provider.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`);
+      await Effect.runPromise(provider.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`));
       result.steps.push(`Synced SSH key (${keyFilename})`);
     }
 
@@ -710,7 +710,7 @@ export async function migrateLocalToRemote(
       created: new Date(),
       location: 'remote',
     };
-    saveWorkspaceMetadata(metadata);
+    saveWorkspaceMetadataSync(metadata);
     result.steps.push('Saved workspace metadata');
 
     // 14. Cleanup local (unless --keep)
@@ -719,10 +719,10 @@ export async function migrateLocalToRemote(
       spinner.text = 'Cleaning up local workspace...';
       try {
         if (projectConfig) {
-          const removeResult = await removeWorkspace({
+          const removeResult = await Effect.runPromise(removeWorkspace({
             projectConfig,
             featureName: issueId.toLowerCase(),
-          });
+          }));
           result.steps.push(...removeResult.steps);
           if (removeResult.errors.length > 0) {
             result.errors.push(...removeResult.errors);
@@ -765,7 +765,7 @@ export async function migrateRemoteToLocal(
 
   try {
     // 1. Load remote workspace metadata
-    const remoteMetadata = loadWorkspaceMetadata(issueId);
+    const remoteMetadata = loadWorkspaceMetadataSync(issueId);
     if (!remoteMetadata) {
       spinner.fail('Remote workspace not found');
       result.errors.push(`No remote workspace found for ${issueId}`);
@@ -782,7 +782,7 @@ export async function migrateRemoteToLocal(
     }
 
     // 3. Get provider
-    const config = loadConfig();
+    const config = loadConfigSync();
     const provider = createFlyProviderFromConfig(config.remote);
 
     // 4. Verify VM is accessible
@@ -802,20 +802,20 @@ export async function migrateRemoteToLocal(
 
     // 6. Create local workspace
     spinner.text = 'Creating local workspace...';
-    const resolved = resolveProjectFromIssue(issueId, []);
+    const resolved = resolveProjectFromIssueSync(issueId, []);
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
     if (!projectConfig) {
       spinner.fail('Cannot resolve project config');
       result.errors.push(`Cannot resolve project config for ${issueId}`);
       return result;
     }
 
-    const workspaceResult = await createWorkspace({
+    const workspaceResult = await Effect.runPromise(createWorkspace({
       projectConfig,
       featureName: issueId.toLowerCase(),
       startDocker: !options.noDocker,
-    });
+    }));
 
     if (!workspaceResult.success) {
       spinner.fail('Failed to create local workspace');
@@ -844,12 +844,12 @@ export async function migrateRemoteToLocal(
     if (!options.keep) {
       spinner.text = 'Cleaning up remote workspace...';
       try {
-        await provider.deleteVm(remoteMetadata.vmName);
+        await Effect.runPromise(provider.deleteVm(remoteMetadata.vmName));
         result.steps.push(`Deleted VM: ${remoteMetadata.vmName}`);
       } catch (error: any) {
         result.errors.push(`Warning: Failed to delete VM: ${error.message}`);
       }
-      deleteWorkspaceMetadata(issueId);
+      deleteWorkspaceMetadataSync(issueId);
       result.steps.push('Deleted workspace metadata');
     } else {
       result.steps.push('Remote workspace kept (--keep flag)');

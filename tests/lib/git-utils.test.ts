@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -47,7 +48,7 @@ describe('git-utils', () => {
       expect(existsSync(lockFile)).toBe(true);
 
       // Run cleanup
-      const result = await cleanupStaleLocks(testRepoPath);
+      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
 
       // Debug output
       console.log('Cleanup result:', JSON.stringify(result, null, 2));
@@ -62,7 +63,7 @@ describe('git-utils', () => {
     });
 
     it('should return empty arrays when no locks exist', async () => {
-      const result = await cleanupStaleLocks(testRepoPath);
+      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
 
       expect(result.found).toHaveLength(0);
       expect(result.removed).toHaveLength(0);
@@ -83,7 +84,7 @@ describe('git-utils', () => {
       }
       writeFileSync(refLock, '');
 
-      const result = await cleanupStaleLocks(testRepoPath);
+      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
 
       expect(result.found.length).toBeGreaterThanOrEqual(2);
       expect(result.removed.length).toBeGreaterThanOrEqual(2);
@@ -94,8 +95,8 @@ describe('git-utils', () => {
 
   describe('hasStaleLocks', () => {
     it('should return false when no locks exist', async () => {
-      const result = await hasStaleLocks(testRepoPath);
-      expect(result).toBe(false);
+      const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
+      (await Effect.runPromise(expect(result))).toBe(false);
     });
 
     it('should return true when stale locks exist', async () => {
@@ -103,8 +104,8 @@ describe('git-utils', () => {
       const lockFile = join(testRepoPath, '.git', 'index.lock');
       writeFileSync(lockFile, '');
 
-      const result = await hasStaleLocks(testRepoPath);
-      expect(result).toBe(true);
+      const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
+      (await Effect.runPromise(expect(result))).toBe(true);
 
       // Clean up
       rmSync(lockFile);

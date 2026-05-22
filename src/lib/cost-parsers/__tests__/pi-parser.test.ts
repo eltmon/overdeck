@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { join } from 'path'
-import { parsePiSession } from '../pi-parser.js'
+import { parsePiSessionSync } from '../pi-parser.js'
 
 const FIXTURES = join(__dirname, 'fixtures', 'pi')
 
@@ -16,7 +16,7 @@ describe('parsePiSession', () => {
   })
 
   it('linear session: sums per-message usage and cost across the active branch (AC1, AC6)', () => {
-    const result = parsePiSession(join(FIXTURES, 'linear.jsonl'))
+    const result = parsePiSessionSync(join(FIXTURES, 'linear.jsonl'))
     expect(result).not.toBeNull()
     expect(result!.sessionId).toBe('019df5a5-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
     expect(result!.messageCount).toBe(2)
@@ -30,7 +30,7 @@ describe('parsePiSession', () => {
   })
 
   it('forked session: counts only the active (latest-leaf) branch (AC2)', () => {
-    const result = parsePiSession(join(FIXTURES, 'forked.jsonl'))
+    const result = parsePiSessionSync(join(FIXTURES, 'forked.jsonl'))
     expect(result).not.toBeNull()
     // Active branch: f1 -> f2 -> f3 (cost 0.00045) -> f4-active -> f5-active (cost 0.0012).
     // Abandoned branch carries cost 198 — it MUST NOT be summed.
@@ -42,7 +42,7 @@ describe('parsePiSession', () => {
   })
 
   it('model_change session: modelBreakdown contains both models with separate totals (AC3)', () => {
-    const result = parsePiSession(join(FIXTURES, 'model-change.jsonl'))
+    const result = parsePiSessionSync(join(FIXTURES, 'model-change.jsonl'))
     expect(result).not.toBeNull()
     expect(result!.messageCount).toBe(2)
     expect(Object.keys(result!.modelBreakdown!)).toEqual(
@@ -64,7 +64,7 @@ describe('parsePiSession', () => {
   })
 
   it('compaction session: input tokens are NOT double-counted across the boundary (AC4)', () => {
-    const result = parsePiSession(join(FIXTURES, 'compaction.jsonl'))
+    const result = parsePiSessionSync(join(FIXTURES, 'compaction.jsonl'))
     expect(result).not.toBeNull()
     // Three assistant messages on the active branch:
     //   c3 (pre-compact): input=1000, output=200, cost=0.006
@@ -82,7 +82,7 @@ describe('parsePiSession', () => {
   })
 
   it('unknown event types are logged once (deduped) and do not throw (AC5)', () => {
-    const result = parsePiSession(join(FIXTURES, 'unknown-event.jsonl'))
+    const result = parsePiSessionSync(join(FIXTURES, 'unknown-event.jsonl'))
     expect(result).not.toBeNull()
     expect(result!.messageCount).toBe(1)
     expect(result!.usage.inputTokens).toBe(50)
@@ -96,6 +96,6 @@ describe('parsePiSession', () => {
   })
 
   it('returns null for a missing file', () => {
-    expect(parsePiSession('/nonexistent/path/session.jsonl')).toBeNull()
+    expect(parsePiSessionSync('/nonexistent/path/session.jsonl')).toBeNull()
   })
 })

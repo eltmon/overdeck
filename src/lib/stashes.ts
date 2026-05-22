@@ -157,9 +157,7 @@ export function parseStashListLine(line: string): ParsedStashEntry | null {
   const message = legacyMatch[2].trim();
   const parsed = parseCanonicalStashMessage(message);
   return { ...parsed, ref: stackRef, stackRef, message };
-}
-
-export async function listStashes(repoPath: string): Promise<ParsedStashEntry[]> {
+}async function listStashesPromise(repoPath: string): Promise<ParsedStashEntry[]> {
   const { stdout } = await execAsync('git stash list --format="%gd%x09%H%x09%cI%x09%gs"', {
     cwd: repoPath,
     encoding: 'utf-8',
@@ -168,9 +166,7 @@ export async function listStashes(repoPath: string): Promise<ParsedStashEntry[]>
     .split('\n')
     .map((line) => parseStashListLine(line))
     .filter((entry): entry is ParsedStashEntry => entry !== null);
-}
-
-export async function createNamedStash(repoPath: string, message: string, includeUntracked = true): Promise<string | null> {
+}async function createNamedStashPromise(repoPath: string, message: string, includeUntracked = true): Promise<string | null> {
   const command = includeUntracked
     ? `git stash push -u -m ${JSON.stringify(message)}`
     : `git stash push -m ${JSON.stringify(message)}`;
@@ -203,7 +199,7 @@ async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?
     throw new Error(`Stash ${ref} no longer matches ${candidateRef}`);
   }
 
-  const stashes = await listStashes(repoPath);
+  const stashes = await Effect.runPromise(listStashes(repoPath));
   const matchingEntry = stashes.find((entry) => entry.ref === ref);
   if (!matchingEntry?.stackRef) {
     throw new Error(`Stash ${ref} not found`);
@@ -218,24 +214,16 @@ async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?
   }
 
   return matchingEntry.stackRef;
-}
-
-export async function popStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+}async function popStashPromise(repoPath: string, ref: string, stackRef?: string): Promise<void> {
   const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash pop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
-}
-
-export async function dropStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+}async function dropStashPromise(repoPath: string, ref: string, stackRef?: string): Promise<void> {
   const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash drop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
-}
-
-export async function applyStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+}async function applyStashPromise(repoPath: string, ref: string, stackRef?: string): Promise<void> {
   const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash apply ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
-}
-
-export async function createRecoveryBranchFromStash(
+}async function createRecoveryBranchFromStashPromise(
   repoPath: string,
   stashRef: string,
   issueId: string,
@@ -283,60 +271,60 @@ const toGitError = (op: string, cause: unknown): GitError =>
   });
 
 /** List parsed stash entries (newest first per git's natural ordering). */
-export const listStashesEffect = (
+export const listStashes = (
   repoPath: string,
 ): Effect.Effect<readonly ParsedStashEntry[], GitError> =>
   Effect.tryPromise({
-    try: () => listStashes(repoPath),
+    try: () => listStashesPromise(repoPath),
     catch: (cause) => toGitError('list', cause),
   });
 
 /** Create a named stash; returns null if there were no changes to save. */
-export const createNamedStashEffect = (
+export const createNamedStash = (
   repoPath: string,
   message: string,
   includeUntracked = true,
 ): Effect.Effect<string | null, GitError> =>
   Effect.tryPromise({
-    try: () => createNamedStash(repoPath, message, includeUntracked),
+    try: () => createNamedStashPromise(repoPath, message, includeUntracked),
     catch: (cause) => toGitError('push', cause),
   });
 
 /** Pop a stash by SHA (preferred) or stack ref. */
-export const popStashEffect = (
+export const popStash = (
   repoPath: string,
   ref: string,
   stackRef?: string,
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
-    try: () => popStash(repoPath, ref, stackRef),
+    try: () => popStashPromise(repoPath, ref, stackRef),
     catch: (cause) => toGitError('pop', cause),
   });
 
 /** Drop a stash by SHA (preferred) or stack ref. */
-export const dropStashEffect = (
+export const dropStash = (
   repoPath: string,
   ref: string,
   stackRef?: string,
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
-    try: () => dropStash(repoPath, ref, stackRef),
+    try: () => dropStashPromise(repoPath, ref, stackRef),
     catch: (cause) => toGitError('drop', cause),
   });
 
 /** Apply a stash without removing it. */
-export const applyStashEffect = (
+export const applyStash = (
   repoPath: string,
   ref: string,
   stackRef?: string,
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
-    try: () => applyStash(repoPath, ref, stackRef),
+    try: () => applyStashPromise(repoPath, ref, stackRef),
     catch: (cause) => toGitError('apply', cause),
   });
 
 /** Materialise a recovery branch from a stash. Returns the new branch name. */
-export const createRecoveryBranchFromStashEffect = (
+export const createRecoveryBranchFromStash = (
   repoPath: string,
   stashRef: string,
   issueId: string,
@@ -345,6 +333,6 @@ export const createRecoveryBranchFromStashEffect = (
 ): Effect.Effect<string, GitError> =>
   Effect.tryPromise({
     try: () =>
-      createRecoveryBranchFromStash(repoPath, stashRef, issueId, shortDescription, stackRef),
+      createRecoveryBranchFromStashPromise(repoPath, stashRef, issueId, shortDescription, stackRef),
     catch: (cause) => toGitError('branch', cause),
   });

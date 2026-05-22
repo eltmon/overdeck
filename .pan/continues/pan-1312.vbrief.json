@@ -2,19 +2,25 @@
   "version": "1",
   "issueId": "PAN-1312",
   "created": "2026-05-22T03:27:22.833Z",
-  "updated": "2026-05-22T13:35:01Z",
+  "updated": "2026-05-22T14:17:32.980Z",
   "gitState": {
     "branch": "feature/pan-1312",
-    "dirty": false
+    "dirty": true,
+    "sha": "57bb0b84f"
   },
   "decisions": [],
   "hazards": [],
   "resumePoint": {
-    "description": "Wave 2a vbrief/dag deletion complete: src/lib/vbrief/dag.ts no longer exports the writer-lock *Async helpers, dead Effect.runPromise bridges are gone from the source file, typecheck passes, and dag-writer-lock tests pass. Continue remaining Wave 2a deletion beads in vBRIEF order.",
-    "beadId": "workspace-k212",
+    "description": "Wave 2b canonicalization complete: src/lib Effect function/const exports are now unsuffixed, sync survivors use *Sync, static suffix proofs are clean, npm run typecheck and npm run lint pass, and the agent output service regression test passes. Continue with workspace-gd1m Wave 2c final verification: run the final *Async import/export/dead-bridge proofs plus full npm test and behavior spot checks.",
+    "beadId": "workspace-gd1m",
     "filesToRead": [
       ".pan/spec.vbrief.json",
-      ".pan/continue.json"
+      ".pan/continue.json",
+      ".pan/continues/pan-1312.vbrief.json",
+      ".pan/static-proof-pzn7.log",
+      ".pan/typecheck-pzn7.log",
+      ".pan/lint-pzn7.log",
+      ".pan/test-agent-output-pzn7.log"
     ]
   },
   "beadsMapping": {},
@@ -47,6 +53,12 @@
       "timestamp": "2026-05-22T13:35:01Z",
       "reason": "bead-complete",
       "note": "Completed workspace-k212: deleted the src/lib/vbrief/dag.ts *Async writer-lock bridge exports, moved task and pipeline plan writes into Effect-owned flows, migrated DAG writer-lock tests to Effect helpers, and verified npm run typecheck plus the dag-writer-lock tests pass.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-22T14:17:32.980Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-pzn7: canonicalized src/lib naming so Effect exports are unsuffixed, sync survivors use explicit *Sync names, stale *Effect/*AsyncEffect function/const exports are gone, and npm run typecheck, npm run lint, the agent-output-service targeted test, static suffix proofs, and graphify update pass.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -436,9 +448,10 @@
         "sessionName": "agent-pan-1312-1",
         "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1",
         "branch": "feature/pan-1312-slot-1",
-        "status": "running",
+        "status": "merged",
         "phase": "implementation",
-        "dispatchedAt": "2026-05-22T13:27:28.588Z"
+        "dispatchedAt": "2026-05-22T13:27:28.588Z",
+        "mergedAt": "2026-05-22T13:37:58.714Z"
       },
       {
         "slotId": 2,
@@ -471,9 +484,10 @@
         "sessionName": "agent-pan-1312-4",
         "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
         "branch": "feature/pan-1312-slot-4",
-        "status": "running",
+        "status": "merged",
         "phase": "implementation",
-        "dispatchedAt": "2026-05-22T13:27:47.032Z"
+        "dispatchedAt": "2026-05-22T13:27:47.032Z",
+        "mergedAt": "2026-05-22T13:43:59.092Z"
       },
       {
         "slotId": 6,
@@ -514,7 +528,7 @@
       }
     },
     "createdAt": "2026-05-22T03:27:22.833Z",
-    "updatedAt": "2026-05-22T13:32:59.383Z"
+    "updatedAt": "2026-05-22T14:17:02.982Z"
   },
   "feedback": [],
   "statusOverrides": {
@@ -541,6 +555,10 @@
     "w2a-vbrief-dag.ac1": "completed",
     "w2a-vbrief-dag.ac2": "completed",
     "w2a-vbrief-dag.w2a-vbrief-dag.ac1": "completed",
-    "w2a-vbrief-dag.w2a-vbrief-dag.ac2": "completed"
+    "w2a-vbrief-dag.w2a-vbrief-dag.ac2": "completed",
+    "w2b-canonicalize": "completed",
+    "w2b-canonicalize.ac1": "completed",
+    "w2b-canonicalize.ac2": "completed",
+    "w2b-canonicalize.ac3": "completed"
   }
 }

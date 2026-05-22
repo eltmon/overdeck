@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * `pan workspace deep-clean <issueId>` — interactive, user-only entry point
  * for `git clean -fd` against a workspace.
@@ -28,7 +29,7 @@ import {
   DangerousOpBlockedError,
 } from '../../lib/safety/dangerous-git-ops.js';
 import { GIT_CLEAN_EXCLUDES } from '../../lib/safety/protected-paths.js';
-import { extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
 
 export interface WorkspaceDeepCleanOptions {
   /** Skip the interactive confirmation. Only honoured when stdin is a TTY. */
@@ -56,7 +57,7 @@ export async function workspaceDeepCleanCommand(
 
   const issueLower = issueId.toLowerCase();
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   if (!projectConfig) {
     console.error(chalk.red(`✗ No project found for issue ${issueId}`));
     process.exit(1);
@@ -84,7 +85,7 @@ export async function workspaceDeepCleanCommand(
 
   let toDelete: string[];
   try {
-    toDelete = await dryRunGitClean({ workspacePath });
+    toDelete = await Effect.runPromise(dryRunGitClean({ workspacePath }));
   } catch (err: any) {
     console.error(chalk.red(`✗ git clean dry-run failed: ${err.message ?? err}`));
     process.exit(1);
@@ -126,11 +127,11 @@ export async function workspaceDeepCleanCommand(
   }
 
   try {
-    await runGitClean({
+    await Effect.runPromise(runGitClean({
       workspacePath,
       userInvoked: true,
       reason: `pan workspace deep-clean ${issueId} (TTY-confirmed)`,
-    });
+    }));
   } catch (err: any) {
     if (err instanceof DangerousOpBlockedError) {
       console.error(chalk.red(`\n✗ ${err.message}\n  ${err.recovery}\n`));

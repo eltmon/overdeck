@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for checkFailedMergeRetry — CI failure notification state machine.
  * Tests for checkPostReviewCommits — ciRetryMap.delete on new-commit detection.
@@ -38,16 +39,16 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   return {
     sessionExists: (...args: unknown[]) => mockSessionExists(...args),
     sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
-    sessionExistsAsyncEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
+    sessionExists: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
     buildTmuxCommandString: vi.fn(),
-    capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
-    createSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
-    isPaneDeadAsyncEffect: vi.fn(() => Effect.succeed(false)),
+    capturePane: (await Effect.runPromise(vi.fn(() => Effect.succeed('')))),
+    createSession: (await Effect.runPromise(vi.fn(() => Effect.succeed(undefined)))),
+    isPaneDead: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
     killSession: vi.fn(),
-    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
+    killSession: (await Effect.runPromise(vi.fn(() => Effect.succeed(undefined)))),
     listPaneValues: vi.fn(),
-    listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
-    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    listPaneValues: (await Effect.runPromise(vi.fn(() => Effect.succeed([])))),
+    listSessionNames: (await Effect.runPromise(vi.fn(() => Effect.succeed([])))),
   };
 });
 

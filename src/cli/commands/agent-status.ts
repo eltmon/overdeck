@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
-import { listRunningAgentsEffect } from '../../lib/agents.js';
-import { listSessionsAsyncEffect, capturePaneAsyncEffect } from '../../lib/tmux.js';
+import { listRunningAgents } from '../../lib/agents.js';
+import { listSessions, capturePane } from '../../lib/tmux.js';
 
 interface AgentStatusOptions {
   json?: boolean;
@@ -82,7 +82,7 @@ function detectStatus(output: string): { status: SessionInfo['status']; detail: 
 
 function analyzeSession(name: string, lines: number) {
   return Effect.gen(function* () {
-    const output = yield* capturePaneAsyncEffect(name, lines);
+    const output = yield* capturePane(name, lines);
     const model = extractModel(output);
     const cost = extractCost(output);
     const { status, detail } = detectStatus(output);
@@ -104,8 +104,8 @@ export async function agentStatusCommand(options: AgentStatusOptions): Promise<v
   const { agentInfos, reviewInfos, planningInfos } = await Effect.runPromise(
     Effect.gen(function* () {
       const [allAgents, sessions] = yield* Effect.all([
-        listRunningAgentsEffect(),
-        listSessionsAsyncEffect(),
+        listRunningAgents(),
+        listSessions(),
       ], { concurrency: 'unbounded' });
 
       const tmuxSessionNames = new Set(sessions.map(s => s.name));

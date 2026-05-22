@@ -109,7 +109,7 @@ export function initHealthDatabase(): Database.Database {
   `);
 
   // Run cleanup on initialization
-  cleanupOldEvents(db);
+  cleanupOldEventsSync(db);
 
   return db;
 }
@@ -140,7 +140,7 @@ export function closeHealthDatabase(): void {
  * @param event - Health event to store
  * @returns The ID of the inserted event
  */
-export function writeHealthEvent(event: Omit<HealthEvent, 'id'>): number {
+export function writeHealthEventSync(event: Omit<HealthEvent, 'id'>): number {
   const database = getHealthDatabase();
 
   const stmt = database.prepare(`
@@ -166,7 +166,7 @@ export function writeHealthEvent(event: Omit<HealthEvent, 'id'>): number {
  * @param events - Array of health events to store
  * @returns Number of events inserted
  */
-export function writeHealthEvents(events: Omit<HealthEvent, 'id'>[]): number {
+export function writeHealthEventsSync(events: Omit<HealthEvent, 'id'>[]): number {
   const database = getHealthDatabase();
 
   const stmt = database.prepare(`
@@ -199,7 +199,7 @@ export function writeHealthEvents(events: Omit<HealthEvent, 'id'>[]): number {
  * @param endTime - End of time range (ISO 8601)
  * @returns Array of health events, ordered by timestamp
  */
-export function getHealthHistory(
+export function getHealthHistorySync(
   agentId: string,
   startTime: string,
   endTime: string
@@ -230,7 +230,7 @@ export function getHealthHistory(
  * @param limit - Maximum number of events to return (default: 100)
  * @returns Array of health events, ordered by timestamp descending
  */
-export function getRecentHealthHistory(
+export function getRecentHealthHistorySync(
   agentId: string,
   limit: number = 100
 ): HealthEventWithMetadata[] {
@@ -263,7 +263,7 @@ export function getRecentHealthHistory(
  * @param endTime - End of time range (ISO 8601)
  * @returns Array of health events, ordered by timestamp
  */
-export function getAllHealthHistory(
+export function getAllHealthHistorySync(
   startTime: string,
   endTime: string
 ): HealthEventWithMetadata[] {
@@ -292,7 +292,7 @@ export function getAllHealthHistory(
  * @param agentId - Agent identifier
  * @returns Latest health event or null if none exist
  */
-export function getLatestHealthEvent(agentId: string): HealthEventWithMetadata | null {
+export function getLatestHealthEventSync(agentId: string): HealthEventWithMetadata | null {
   const database = getHealthDatabase();
 
   const stmt = database.prepare(`
@@ -321,7 +321,7 @@ export function getLatestHealthEvent(agentId: string): HealthEventWithMetadata |
  *
  * @returns Array of unique agent IDs
  */
-export function getAgentsWithHistory(): string[] {
+export function getAgentsWithHistorySync(): string[] {
   const database = getHealthDatabase();
 
   const stmt = database.prepare(`
@@ -341,7 +341,7 @@ export function getAgentsWithHistory(): string[] {
  * @param retentionDays - Number of days to retain (default: 7)
  * @returns Number of events deleted
  */
-export function cleanupOldEvents(
+export function cleanupOldEventsSync(
   database: Database.Database = getHealthDatabase(),
   retentionDays: number = RETENTION_DAYS
 ): number {
@@ -364,7 +364,7 @@ export function cleanupOldEvents(
  * @param agentId - Agent identifier
  * @returns Number of events deleted
  */
-export function deleteAgentHistory(agentId: string): number {
+export function deleteAgentHistorySync(agentId: string): number {
   const database = getHealthDatabase();
 
   const stmt = database.prepare(`
@@ -381,7 +381,7 @@ export function deleteAgentHistory(agentId: string): number {
  *
  * @returns Statistics about the health history database
  */
-export function getDatabaseStats(): {
+export function getDatabaseStatsSync(): {
   totalEvents: number;
   uniqueAgents: number;
   oldestEvent: string | null;
@@ -416,11 +416,11 @@ export function getDatabaseStats(): {
 // wrapping every call.
 
 /** Effect variant of `writeHealthEvent`. */
-export const writeHealthEventEffect = (
+export const writeHealthEvent = (
   event: Omit<HealthEvent, 'id'>,
 ): Effect.Effect<number, CloisterDatabaseError> =>
   Effect.try({
-    try: () => writeHealthEvent(event),
+    try: () => writeHealthEventSync(event),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'writeHealthEvent',
@@ -430,11 +430,11 @@ export const writeHealthEventEffect = (
   });
 
 /** Effect variant of `writeHealthEvents`. */
-export const writeHealthEventsEffect = (
+export const writeHealthEvents = (
   events: Omit<HealthEvent, 'id'>[],
 ): Effect.Effect<number, CloisterDatabaseError> =>
   Effect.try({
-    try: () => writeHealthEvents(events),
+    try: () => writeHealthEventsSync(events),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'writeHealthEvents',
@@ -444,13 +444,13 @@ export const writeHealthEventsEffect = (
   });
 
 /** Effect variant of `getHealthHistory`. */
-export const getHealthHistoryEffect = (
+export const getHealthHistory = (
   agentId: string,
   startTime: string,
   endTime: string,
 ): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
   Effect.try({
-    try: () => getHealthHistory(agentId, startTime, endTime),
+    try: () => getHealthHistorySync(agentId, startTime, endTime),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getHealthHistory',
@@ -460,12 +460,12 @@ export const getHealthHistoryEffect = (
   });
 
 /** Effect variant of `getRecentHealthHistory`. */
-export const getRecentHealthHistoryEffect = (
+export const getRecentHealthHistory = (
   agentId: string,
   limit?: number,
 ): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
   Effect.try({
-    try: () => getRecentHealthHistory(agentId, limit),
+    try: () => getRecentHealthHistorySync(agentId, limit),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getRecentHealthHistory',
@@ -475,12 +475,12 @@ export const getRecentHealthHistoryEffect = (
   });
 
 /** Effect variant of `getAllHealthHistory`. */
-export const getAllHealthHistoryEffect = (
+export const getAllHealthHistory = (
   startTime: string,
   endTime: string,
 ): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
   Effect.try({
-    try: () => getAllHealthHistory(startTime, endTime),
+    try: () => getAllHealthHistorySync(startTime, endTime),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getAllHealthHistory',
@@ -490,11 +490,11 @@ export const getAllHealthHistoryEffect = (
   });
 
 /** Effect variant of `getLatestHealthEvent`. */
-export const getLatestHealthEventEffect = (
+export const getLatestHealthEvent = (
   agentId: string,
 ): Effect.Effect<HealthEventWithMetadata | null, CloisterDatabaseError> =>
   Effect.try({
-    try: () => getLatestHealthEvent(agentId),
+    try: () => getLatestHealthEventSync(agentId),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getLatestHealthEvent',
@@ -504,9 +504,9 @@ export const getLatestHealthEventEffect = (
   });
 
 /** Effect variant of `getAgentsWithHistory`. */
-export const getAgentsWithHistoryEffect = (): Effect.Effect<string[], CloisterDatabaseError> =>
+export const getAgentsWithHistory = (): Effect.Effect<string[], CloisterDatabaseError> =>
   Effect.try({
-    try: () => getAgentsWithHistory(),
+    try: () => getAgentsWithHistorySync(),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getAgentsWithHistory',
@@ -516,11 +516,11 @@ export const getAgentsWithHistoryEffect = (): Effect.Effect<string[], CloisterDa
   });
 
 /** Effect variant of `cleanupOldEvents`. */
-export const cleanupOldEventsEffect = (
+export const cleanupOldEvents = (
   retentionDays?: number,
 ): Effect.Effect<number, CloisterDatabaseError> =>
   Effect.try({
-    try: () => cleanupOldEvents(getHealthDatabase(), retentionDays),
+    try: () => cleanupOldEventsSync(getHealthDatabase(), retentionDays),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'cleanupOldEvents',
@@ -530,11 +530,11 @@ export const cleanupOldEventsEffect = (
   });
 
 /** Effect variant of `deleteAgentHistory`. */
-export const deleteAgentHistoryEffect = (
+export const deleteAgentHistory = (
   agentId: string,
 ): Effect.Effect<number, CloisterDatabaseError> =>
   Effect.try({
-    try: () => deleteAgentHistory(agentId),
+    try: () => deleteAgentHistorySync(agentId),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'deleteAgentHistory',
@@ -544,7 +544,7 @@ export const deleteAgentHistoryEffect = (
   });
 
 /** Effect variant of `getDatabaseStats`. */
-export const getDatabaseStatsEffect = (): Effect.Effect<
+export const getDatabaseStats = (): Effect.Effect<
   {
     totalEvents: number;
     uniqueAgents: number;
@@ -554,7 +554,7 @@ export const getDatabaseStatsEffect = (): Effect.Effect<
   CloisterDatabaseError
 > =>
   Effect.try({
-    try: () => getDatabaseStats(),
+    try: () => getDatabaseStatsSync(),
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getDatabaseStats',

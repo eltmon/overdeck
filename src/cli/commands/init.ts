@@ -4,8 +4,8 @@ import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import ora from 'ora';
 import { INIT_DIRS, CONFIG_FILE, PANOPTICON_HOME, SKILLS_DIR, AGENTS_DIR } from '../../lib/paths.js';
-import { getDefaultConfig, saveConfig } from '../../lib/config.js';
-import { detectShell, getShellRcFile, addAlias, getAliasInstructions } from '../../lib/shell.js';
+import { getDefaultConfigSync, saveConfigSync } from '../../lib/config.js';
+import { detectShellSync, getShellRcFileSync, addAliasSync, getAliasInstructionsSync } from '../../lib/shell.js';
 
 // Get the package root directory (where skills/ and agents/ live)
 // Note: After bundling, code runs from dist/cli/index.js, so go up 2 levels
@@ -97,8 +97,8 @@ export async function initCommand(): Promise<void> {
     spinner.text = 'Created directories...';
 
     // Write default config
-    const config = getDefaultConfig();
-    saveConfig(config);
+    const config = getDefaultConfigSync();
+    saveConfigSync(config);
     spinner.text = 'Created config...';
 
     // Copy bundled skills from package
@@ -110,11 +110,11 @@ export async function initCommand(): Promise<void> {
     const agentsCopied = copyBundledAgents();
 
     // Detect shell and add alias
-    const shell = detectShell();
-    const rcFile = getShellRcFile(shell);
+    const shell = detectShellSync();
+    const rcFile = getShellRcFileSync(shell);
 
     if (rcFile && existsSync(rcFile)) {
-      addAlias(rcFile);
+      addAliasSync(rcFile);
       spinner.succeed('Panopticon initialized!');
       console.log('');
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(PANOPTICON_HOME));
@@ -125,7 +125,7 @@ export async function initCommand(): Promise<void> {
       if (agentsCopied > 0) {
         console.log(chalk.green('✓') + ` Installed ${agentsCopied} bundled agents`);
       }
-      console.log(chalk.green('✓') + ' ' + getAliasInstructions(shell));
+      console.log(chalk.green('✓') + ' ' + getAliasInstructionsSync(shell));
     } else {
       spinner.succeed('Panopticon initialized!');
       console.log('');

@@ -1,11 +1,12 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { PiRuntime, createPiRuntime, PiSpawnTimeout } from '../pi.js'
+import { PiRuntimeSync, createPiRuntimeSync, PiSpawnTimeout } from '../pi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
-import { createClaudeCodeRuntime } from '../claude-code.js'
+import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiFifo } from '../pi-fifo.js'
 import { PiNotReady } from '../pi-fifo.js'
 
@@ -38,8 +39,8 @@ describe('PiRuntime registry registration (AC1)', () => {
 
   it('default global registry contains both claude-code and pi (AC1)', () => {
     const fresh = new RuntimeRegistry()
-    fresh.register(createClaudeCodeRuntime())
-    fresh.register(createPiRuntime())
+    fresh.register(createClaudeCodeRuntimeSync())
+    fresh.register(createPiRuntimeSync())
     setGlobalRegistry(fresh)
     expect(getRuntime('pi')?.name).toBe('pi')
     expect(getRuntime('claude-code')?.name).toBe('claude-code')
@@ -52,7 +53,7 @@ describe('PiRuntime.sendMessage', () => {
   afterEach(() => h.cleanup())
 
   it('rejects with PiNotReady when ready.json is missing (AC3)', async () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     await expect(r.sendMessage('agent-x', 'hello')).rejects.toBeInstanceOf(PiNotReady)
   })
 })
@@ -63,7 +64,7 @@ describe('PiRuntime.spawnAgent precondition checks', () => {
   afterEach(() => h.cleanup())
 
   it('rejects synchronously when piExtensionPath is not provided', async () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     await expect(
       r.spawnAgent({ agentId: 'agent-x', workspace: h.home } as any),
     ).rejects.toThrow(/piExtensionPath/)
@@ -87,7 +88,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
   afterEach(() => h.cleanup())
 
   it('returns active-heartbeat source when the heartbeat file is fresh', () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     const beats = join(h.home, '.panopticon', 'heartbeats')
     mkdirSync(beats, { recursive: true })
     writeFileSync(
@@ -108,7 +109,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
   })
 
   it('falls back to jsonl mtime when heartbeat is stale', () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     const beats = join(h.home, '.panopticon', 'heartbeats')
     mkdirSync(beats, { recursive: true })
     // 5 minutes ago — past 60s TTL.
@@ -132,7 +133,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
   })
 
   it('returns null when no heartbeat file and no jsonl exist', () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     expect(r.getHeartbeat('agent-C')).toBeNull()
   })
 })
@@ -143,7 +144,7 @@ describe('PiRuntime.getSessionCost (AC5)', () => {
   afterEach(() => h.cleanup())
 
   it('returns a CostBreakdown derived from parsePiSession on the active session', () => {
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     const sessRoot = join(h.home, '.panopticon', 'agents', 'agent-D', 'sessions')
     mkdirSync(sessRoot, { recursive: true })
     // Reuse the linear fixture we built earlier to verify total flows through.
@@ -204,7 +205,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
     preCreateReady(agentId)
 
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     await r.spawnAgent({
       agentId,
       workspace: h.home,
@@ -225,7 +226,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     // session.id intentionally absent
     preCreateReady(agentId)
 
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     await r.spawnAgent({
       agentId,
       workspace: h.home,
@@ -244,7 +245,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     const agentId = 'agent-resume-3-first'
     preCreateReady(agentId)
 
-    const r = new PiRuntime()
+    const r = new PiRuntimeSync()
     await r.spawnAgent({
       agentId,
       workspace: h.home,
@@ -263,8 +264,8 @@ describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', 
   afterEach(() => h.cleanup())
 
   it('removes rpc.in, ready.json, completed, and heartbeat — but NEVER session JSONL files', async () => {
-    const r = new PiRuntime()
-    await createPiFifo('agent-K')
+    const r = new PiRuntimeSync()
+    await Effect.runPromise(createPiFifo('agent-K'))
     const agentDir = join(h.home, '.panopticon', 'agents', 'agent-K')
     const heartbeatsRoot = join(h.home, '.panopticon', 'heartbeats')
     const sessRoot = join(agentDir, 'sessions')
@@ -288,8 +289,8 @@ describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', 
   })
 
   it('exits within ~3s when there is no tmux session to escalate against', async () => {
-    const r = new PiRuntime()
-    await createPiFifo('agent-K2')
+    const r = new PiRuntimeSync()
+    await Effect.runPromise(createPiFifo('agent-K2'))
     const start = Date.now()
     await r.killAgent('agent-K2')
     expect(Date.now() - start).toBeLessThan(3_500)

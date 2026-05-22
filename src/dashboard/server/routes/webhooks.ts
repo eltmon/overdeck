@@ -22,7 +22,7 @@ import {
   handlePullRequestReview,
   handlePullRequestReviewThread,
   handleStatus,
-  isTrackedRepository,
+  isTrackedRepositorySync,
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
 
@@ -79,22 +79,22 @@ export function verifySignature(body: string, signature: string, secret: string)
 async function dispatchWebhook(eventType: string, payload: WebhookPayload): Promise<void> {
   switch (eventType) {
     case 'check_suite':
-      await handleCheckSuite(payload);
+      await Effect.runPromise(handleCheckSuite(payload));
       break;
     case 'check_run':
-      await handleCheckRun(payload);
+      await Effect.runPromise(handleCheckRun(payload));
       break;
     case 'pull_request':
-      await handlePullRequest(payload);
+      await Effect.runPromise(handlePullRequest(payload));
       break;
     case 'pull_request_review':
-      await handlePullRequestReview(payload);
+      await Effect.runPromise(handlePullRequestReview(payload));
       break;
     case 'pull_request_review_thread':
-      await handlePullRequestReviewThread(payload);
+      await Effect.runPromise(handlePullRequestReviewThread(payload));
       break;
     case 'status':
-      await handleStatus(payload);
+      await Effect.runPromise(handleStatus(payload));
       break;
     default:
       // Unknown events are silently accepted (GitHub expects 200)
@@ -153,7 +153,7 @@ export function runWebhookHandler(
 
     // Repository authorization: reject events from unconfigured repos
     const repoFullName = payload.repository?.full_name;
-    if (!repoFullName || !isTrackedRepository(repoFullName)) {
+    if (!repoFullName || !isTrackedRepositorySync(repoFullName)) {
       console.warn(`[webhook] Repository not allowed: ${repoFullName ?? 'unknown'}`);
       return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }

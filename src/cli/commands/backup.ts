@@ -1,8 +1,8 @@
 import chalk from 'chalk';
-import { listBackups, cleanOldBackups } from '../../lib/backup.js';
+import { listBackupsSync, cleanOldBackupsSync } from '../../lib/backup.js';
 
 export async function backupListCommand(options: { json?: boolean }): Promise<void> {
-  const backups = listBackups();
+  const backups = listBackupsSync();
 
   if (options.json) {
     console.log(JSON.stringify(backups, null, 2));
@@ -29,7 +29,7 @@ export async function backupListCommand(options: { json?: boolean }): Promise<vo
 
 export async function backupCleanCommand(options: { keep?: string }): Promise<void> {
   const keepCount = parseInt(options.keep || '10', 10);
-  const removed = cleanOldBackups(keepCount);
+  const removed = cleanOldBackupsSync(keepCount);
 
   if (removed === 0) {
     console.log(chalk.dim(`No backups removed (keeping ${keepCount}).`));

@@ -68,12 +68,12 @@ describe('git_operations schema (PAN-653)', () => {
 
 describe('appendGitOperation + listGitOperations (PAN-653)', () => {
   it('appends a row and reads it back', async () => {
-    const { appendGitOperation, listGitOperations } = await import(
+    const { appendGitOperationSync, listGitOperationsSync } = await import(
       '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
-    const id = appendGitOperation({
+    const id = appendGitOperationSync({
       operation: 'push',
       branch: 'main',
       issueId: 'PAN-653',
@@ -86,7 +86,7 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
 
     expect(id).toBeGreaterThan(0);
 
-    const rows = listGitOperations({ issueId: 'PAN-653' });
+    const rows = listGitOperationsSync({ issueId: 'PAN-653' });
     expect(rows).toHaveLength(1);
     expect(rows[0].operation).toBe('push');
     expect(rows[0].branch).toBe('main');
@@ -99,54 +99,54 @@ describe('appendGitOperation + listGitOperations (PAN-653)', () => {
   });
 
   it('filters by operation type', async () => {
-    const { appendGitOperation, listGitOperations } = await import(
+    const { appendGitOperationSync, listGitOperationsSync } = await import(
       '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
-    appendGitOperation({ operation: 'push', issueId: 'PAN-1', status: 'success', ts });
-    appendGitOperation({ operation: 'fetch', issueId: 'PAN-1', status: 'success', ts });
-    appendGitOperation({ operation: 'main_diverged', issueId: 'PAN-1', status: 'aborted', ts });
+    appendGitOperationSync({ operation: 'push', issueId: 'PAN-1', status: 'success', ts });
+    appendGitOperationSync({ operation: 'fetch', issueId: 'PAN-1', status: 'success', ts });
+    appendGitOperationSync({ operation: 'main_diverged', issueId: 'PAN-1', status: 'aborted', ts });
 
-    const pushRows = listGitOperations({ operation: 'push' });
+    const pushRows = listGitOperationsSync({ operation: 'push' });
     expect(pushRows).toHaveLength(1);
     expect(pushRows[0].operation).toBe('push');
 
-    const divergedRows = listGitOperations({ operation: 'main_diverged' });
+    const divergedRows = listGitOperationsSync({ operation: 'main_diverged' });
     expect(divergedRows).toHaveLength(1);
     expect(divergedRows[0].status).toBe('aborted');
   });
 
   it('filters by issueId', async () => {
-    const { appendGitOperation, listGitOperations } = await import(
+    const { appendGitOperationSync, listGitOperationsSync } = await import(
       '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
-    appendGitOperation({ operation: 'push', issueId: 'PAN-100', status: 'success', ts });
-    appendGitOperation({ operation: 'push', issueId: 'PAN-200', status: 'success', ts });
+    appendGitOperationSync({ operation: 'push', issueId: 'PAN-100', status: 'success', ts });
+    appendGitOperationSync({ operation: 'push', issueId: 'PAN-200', status: 'success', ts });
 
-    expect(listGitOperations({ issueId: 'PAN-100' })).toHaveLength(1);
-    expect(listGitOperations({ issueId: 'PAN-200' })).toHaveLength(1);
-    expect(listGitOperations()).toHaveLength(2);
+    expect(listGitOperationsSync({ issueId: 'PAN-100' })).toHaveLength(1);
+    expect(listGitOperationsSync({ issueId: 'PAN-200' })).toHaveLength(1);
+    expect(listGitOperationsSync()).toHaveLength(2);
   });
 
   it('rows survive a simulated restart (new DB connection)', async () => {
-    const { appendGitOperation } = await import(
+    const { appendGitOperationSync } = await import(
       '../../../lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
-    appendGitOperation({ operation: 'push', issueId: 'PAN-999', status: 'success', ts });
+    appendGitOperationSync({ operation: 'push', issueId: 'PAN-999', status: 'success', ts });
 
     // Simulate restart by resetting the DB singleton, then reconnecting
     await resetDb();
 
     // Reconnect to the same SQLite file
-    const { listGitOperations } = await import(
+    const { listGitOperationsSync } = await import(
       '../../../lib/git-activity.js'
     );
-    const rows = listGitOperations({ issueId: 'PAN-999' });
+    const rows = listGitOperationsSync({ issueId: 'PAN-999' });
     expect(rows).toHaveLength(1);
     expect(rows[0].operation).toBe('push');
   });

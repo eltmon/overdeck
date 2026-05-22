@@ -5,7 +5,7 @@
  */
 
 export * from './interface.js';
-export { createClaudeAdapter, createClaudeAdapterEffect } from './claude.js';
+export { createClaudeAdapterSync, createClaudeAdapter } from './claude.js';
 
 import { Effect } from 'effect';
 import type {
@@ -13,7 +13,7 @@ import type {
   RuntimeType,
   RuntimeRegistry,
 } from './interface.js';
-import { createClaudeAdapter } from './claude.js';
+import { createClaudeAdapterSync } from './claude.js';
 
 /**
  * Create a runtime registry with the Claude adapter
@@ -21,7 +21,7 @@ import { createClaudeAdapter } from './claude.js';
 export function createRuntimeRegistry(): RuntimeRegistry {
   const adapters = new Map<RuntimeType, RuntimeAdapter>();
 
-  const claude = createClaudeAdapter();
+  const claude = createClaudeAdapterSync();
   adapters.set('claude', claude);
 
   return {
@@ -74,7 +74,7 @@ export function getRuntimeAdapter(type: RuntimeType): RuntimeAdapter {
   if (type !== 'claude') {
     throw new Error(`Unknown runtime type: ${type}. Only 'claude' is supported.`);
   }
-  return createClaudeAdapter();
+  return createClaudeAdapterSync();
 }
 
 /**
@@ -82,24 +82,14 @@ export function getRuntimeAdapter(type: RuntimeType): RuntimeAdapter {
  */
 export function getSupportedRuntimes(): RuntimeType[] {
   return ['claude'];
-}
-
-/**
- * Check if a runtime is installed
- */
-export async function isRuntimeInstalled(type: RuntimeType): Promise<boolean> {
+}async function isRuntimeInstalledPromise(type: RuntimeType): Promise<boolean> {
   const adapter = getRuntimeAdapter(type);
   return adapter.isAvailable();
-}
-
-/**
- * Get installed runtimes
- */
-export async function getInstalledRuntimes(): Promise<RuntimeType[]> {
+}async function getInstalledRuntimesPromise(): Promise<RuntimeType[]> {
   const installed: RuntimeType[] = [];
 
   for (const type of getSupportedRuntimes()) {
-    if (await isRuntimeInstalled(type)) {
+    if (await Effect.runPromise(isRuntimeInstalled(type))) {
       installed.push(type);
     }
   }
@@ -113,23 +103,23 @@ export async function getInstalledRuntimes(): Promise<RuntimeType[]> {
 // promise variants above remain the canonical API for existing callers.
 
 /** Effect variant of {@link isRuntimeInstalled}. */
-export const isRuntimeInstalledEffect = (
+export const isRuntimeInstalled = (
   type: RuntimeType,
 ): Effect.Effect<boolean> =>
-  Effect.promise(() => isRuntimeInstalled(type));
+  Effect.promise(() => isRuntimeInstalledPromise(type));
 
 /** Effect variant of {@link getInstalledRuntimes}. */
-export const getInstalledRuntimesEffect = (): Effect.Effect<RuntimeType[]> =>
-  Effect.promise(() => getInstalledRuntimes());
+export const getInstalledRuntimes = (): Effect.Effect<RuntimeType[]> =>
+  Effect.promise(() => getInstalledRuntimesPromise());
 
 /** Effect variant of {@link RuntimeRegistry.getAvailable}. */
-export const registryGetAvailableEffect = (
+export const registryGetAvailable = (
   registry: RuntimeRegistry,
 ): Effect.Effect<RuntimeAdapter[]> =>
   Effect.promise(() => registry.getAvailable());
 
 /** Effect variant of {@link RuntimeRegistry.syncToAll}. */
-export const registrySyncToAllEffect = (
+export const registrySyncToAll = (
   registry: RuntimeRegistry,
   sourceDir: string,
   force?: boolean,

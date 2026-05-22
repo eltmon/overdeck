@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 
-export function ensurePlaywrightIsolation(mcpConfig: Record<string, any>): boolean {
+export function ensurePlaywrightIsolationSync(mcpConfig: Record<string, any>): boolean {
   const playwright = mcpConfig?.mcpServers?.playwright;
   if (!playwright || typeof playwright !== 'object') {
     return false;
@@ -46,7 +46,7 @@ const EXCALIDRAW_MCP_DEFAULT: { command: string; args: string[]; env: Record<str
  * it (local-path checkout, Docker image, custom env). We only inject the
  * default when the key is missing entirely or has been blanked out.
  */
-export function ensureExcalidrawMcp(mcpConfig: Record<string, any>): boolean {
+export function ensureExcalidrawMcpSync(mcpConfig: Record<string, any>): boolean {
   if (!mcpConfig || typeof mcpConfig !== 'object') return false;
   if (!mcpConfig.mcpServers || typeof mcpConfig.mcpServers !== 'object') {
     mcpConfig.mcpServers = {};
@@ -63,7 +63,7 @@ export function ensureExcalidrawMcp(mcpConfig: Record<string, any>): boolean {
   return true;
 }
 
-export function getIsolatedPlaywrightMcpConfig(
+export function getIsolatedPlaywrightMcpConfigSync(
   mcpConfig: Record<string, any>
 ): Record<string, any> | null {
   const playwright = mcpConfig?.mcpServers?.playwright;
@@ -77,24 +77,24 @@ export function getIsolatedPlaywrightMcpConfig(
     },
   };
 
-  ensurePlaywrightIsolation(remoteConfig);
+  ensurePlaywrightIsolationSync(remoteConfig);
   return remoteConfig;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Effect-native variant of ensurePlaywrightIsolation. */
-export const ensurePlaywrightIsolationEffect = (
+export const ensurePlaywrightIsolation = (
   mcpConfig: Record<string, any>,
-): Effect.Effect<boolean> => Effect.sync(() => ensurePlaywrightIsolation(mcpConfig));
+): Effect.Effect<boolean> => Effect.sync(() => ensurePlaywrightIsolationSync(mcpConfig));
 
 /** Effect-native variant of ensureExcalidrawMcp. */
-export const ensureExcalidrawMcpEffect = (
+export const ensureExcalidrawMcp = (
   mcpConfig: Record<string, any>,
-): Effect.Effect<boolean> => Effect.sync(() => ensureExcalidrawMcp(mcpConfig));
+): Effect.Effect<boolean> => Effect.sync(() => ensureExcalidrawMcpSync(mcpConfig));
 
 /** Effect-native variant of getIsolatedPlaywrightMcpConfig. */
-export const getIsolatedPlaywrightMcpConfigEffect = (
+export const getIsolatedPlaywrightMcpConfig = (
   mcpConfig: Record<string, any>,
 ): Effect.Effect<Record<string, any> | null> =>
-  Effect.sync(() => getIsolatedPlaywrightMcpConfig(mcpConfig));
+  Effect.sync(() => getIsolatedPlaywrightMcpConfigSync(mcpConfig));

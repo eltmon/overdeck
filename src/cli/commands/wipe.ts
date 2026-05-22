@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { homedir } from 'os';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
-import { extractPrefix } from '../../lib/issue-id.js';
+import { extractPrefixSync } from '../../lib/issue-id.js';
 import { getIssuePrefix } from '../../lib/projects.js';
 
 interface WipeOptions {
@@ -36,7 +36,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  const prefix = extractPrefix(issueId);
+  const prefix = extractPrefixSync(issueId);
   if (!prefix) {
     console.log(chalk.red('  ✗ Could not extract prefix from issue ID'));
     return;

@@ -2,14 +2,14 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { readContinueStateEffect, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
-import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
+import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
-import { findPlan, readWorkspacePlan, readPlan, readWorkspacePlanEffect } from '../vbrief/io.js';
+import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
-import { loadConfig } from '../config.js';
+import { loadConfigSync } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
@@ -59,7 +59,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
   }
 
-  return Effect.runSync(renderPrompt({
+  return await Effect.runPromise(renderPrompt({
     name: 'work',
     vars: {
       ISSUE_ID: ctx.issueId,
@@ -83,7 +83,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
 async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {
   try {
-    const doc = await Effect.runPromise(readWorkspacePlanEffect(workspacePath));
+    const doc = await Effect.runPromise(readWorkspacePlan(workspacePath));
     if (!doc) return '';
     const nextItem = getDispatchableItems(doc, new Set())[0]
       ?? doc.plan.items.find(item => item.status === 'running')
@@ -92,7 +92,7 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
     // PAN-977: continue-state readers internally call `getContinuesDir(projectRoot)`
     // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
     // `.pan` subdirectory, to avoid the double-`.pan` path bug.
-    const cont = await Effect.runPromise(readContinueStateEffect(workspacePath, issueId.toUpperCase()));
+    const cont = await Effect.runPromise(readContinueState(workspacePath, issueId.toUpperCase()));
     const currentItemIds = doc.plan.items
       .filter(item => item.status === 'running' || item.id === nextItem.id)
       .map(item => item.id);
@@ -210,9 +210,9 @@ export async function getTrackerContext(
     }
   } catch { /* ignore */ }
 
-  let config: ReturnType<typeof loadConfig>;
+  let config: ReturnType<typeof loadConfigSync>;
   try {
-    config = loadConfig();
+    config = loadConfigSync();
   } catch {
     return '_Tracker unavailable: could not load configuration. Check tracker settings manually._';
   }
@@ -373,7 +373,7 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
 
   // Deterministic O(1) lookup: query tracker for parentRef, then load directly
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
     const trackersConfig = config.trackers;
     if (!trackersConfig) return null;
 
@@ -413,7 +413,7 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
   if (await Effect.runPromise(readWorkspaceContext(workspacePath))) return;
 
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
     const trackersConfig = config.trackers;
     if (!trackersConfig) return;
 
@@ -437,13 +437,13 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
 
         const projectRoot = dirname(dirname(workspacePath));
         const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
-        const parentPlanPath = findPlan(parentWorkspace);
+        const parentPlanPath = findPlanSync(parentWorkspace);
 
         let contextContent = '';
 
         if (parentPlanPath) {
           try {
-            const parentDoc = readPlan(parentPlanPath);
+            const parentDoc = readPlanSync(parentPlanPath);
             const plan = parentDoc.plan;
 
             const narratives = plan.narratives;
@@ -578,9 +578,9 @@ export async function readBeadsTasks(
 
   const acByTitle = buildACLookupByTitle(workspacePath);
 
-  let beads = await queryBeadsForIssue(workspacePath, issueId);
+  let beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
   if (beads.length === 0) {
-    beads = await queryBeadsForIssue(projectRoot, issueId);
+    beads = await Effect.runPromise(queryBeadsForIssue(projectRoot, issueId));
   }
 
   for (const bead of beads) {
@@ -602,7 +602,7 @@ export async function readBeadsTasks(
  */
 function buildACLookupByTitle(workspacePath: string): Map<string, Array<{ title: string; status: string }>> {
   const lookup = new Map<string, Array<{ title: string; status: string }>>();
-  const doc = readWorkspacePlan(workspacePath);
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return lookup;
 
   const criteria = extractACFromDocument(doc);
@@ -639,7 +639,7 @@ function matchBeadToAC(
  */
 export function buildPolyrepoContext(issueId: string, workspacePath: string): string {
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
 
   if (
     !projectConfig?.workspace?.type ||

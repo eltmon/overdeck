@@ -34,7 +34,7 @@ import type { ConversationFilter, DiscoveredSession } from '../../../lib/databas
 import type { SearchResult } from '../../../lib/conversations/search.js';
 import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
-import { getConversationsConfigAsyncEffect, updateConversationsConfigAsyncEffect } from '../../../lib/config-yaml.js';
+import { getConversationsConfig, updateConversationsConfig } from '../../../lib/config-yaml.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
@@ -321,7 +321,7 @@ const searchRoute = HttpRouter.add(
     const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
     const filter = parseSearchParams(params);
-    const config = yield* getConversationsConfigAsyncEffect();
+    const config = yield* getConversationsConfig();
     return yield* Effect.promise(async () => {
       try {
         const operation = semantic ? 'searchSessionsSemantic' : 'searchSessions';
@@ -426,7 +426,7 @@ const postEnrichByIdRoute = HttpRouter.add(
     const tier = rawTier as 1 | 2 | 3;
 
     try {
-      const config = yield* getConversationsConfigAsyncEffect();
+      const config = yield* getConversationsConfig();
       const eventStore = yield* EventStoreService;
       const result = yield* Effect.promise(() =>
         runDashboardDbJob<{ enriched: number; errors: number; estimatedCost: number; actualCost: number | null; durationMs: number }>('enrichSessions', {
@@ -501,7 +501,7 @@ const postScanRoute = HttpRouter.add(
 
     const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
 
-    const config = yield* getConversationsConfigAsyncEffect();
+    const config = yield* getConversationsConfig();
     const watchDirs = config.watchDirs;
     const eventStore = yield* EventStoreService;
     let lastProgressEmit = 0;
@@ -584,7 +584,7 @@ const postEnrichRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid tier: must be 1, 2, or 3' }, { status: 400 });
     }
     const tier = rawTier as 1 | 2 | 3;
-    const config = yield* getConversationsConfigAsyncEffect();
+    const config = yield* getConversationsConfig();
     const enrichMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : config.enrichment.maxParallel;
     const enrichSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
     const eventStore = yield* EventStoreService;
@@ -669,7 +669,7 @@ const postEmbedRoute = HttpRouter.add(
     if (body.provider !== undefined && !VALID_PROVIDERS.has(body.provider)) {
       return jsonResponse({ error: `Invalid provider: must be one of openai, voyage, ollama` }, { status: 400 });
     }
-    const config = yield* getConversationsConfigAsyncEffect();
+    const config = yield* getConversationsConfig();
     const embedMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : config.enrichment.maxParallel;
     const embedSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
     const eventStore = yield* EventStoreService;
@@ -708,7 +708,7 @@ const getConvConfigRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(req);
     if (authError) return authError;
-    const config = yield* getConversationsConfigAsyncEffect();
+    const config = yield* getConversationsConfig();
     return validatedJsonResponse(ConfigResponseSchema, {
       embeddings: config.embeddings,
       embeddingProvider: config.embeddingProvider,
@@ -733,7 +733,7 @@ const putConvConfigRoute = HttpRouter.add(
     if (!parsedBody.ok) return parsedBody.response;
     const body = parsedBody.body;
 
-    yield* updateConversationsConfigAsyncEffect({
+    yield* updateConversationsConfig({
       embeddings: body.embeddings,
       embedding_provider: body.embeddingProvider as 'openai' | 'voyage' | 'ollama' | undefined,
       embedding_model: body.embeddingModel,

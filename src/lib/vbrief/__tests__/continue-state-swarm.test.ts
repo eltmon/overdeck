@@ -6,10 +6,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import {
+  readContinueStateSync,
+  writeContinueStateSync,
   readContinueState,
   writeContinueState,
-  readContinueStateEffect,
-  writeContinueStateEffect,
   continueFilePath,
   type ContinueState,
   type SwarmRuntime,
@@ -54,8 +54,8 @@ afterEach(() => {
 describe('swarmRuntime in ContinueState', () => {
   it('round-trips swarmRuntime through sync write/read', () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
-    writeContinueState(TEST_DIR, 'PAN-977', state);
-    const read = readContinueState(TEST_DIR, 'PAN-977')!;
+    writeContinueStateSync(TEST_DIR, 'PAN-977', state);
+    const read = readContinueStateSync(TEST_DIR, 'PAN-977')!;
     expect(read.swarmRuntime).toBeDefined();
     expect(read.swarmRuntime!.model).toBe('test-model');
     expect(read.swarmRuntime!.slots).toHaveLength(0);
@@ -63,8 +63,8 @@ describe('swarmRuntime in ContinueState', () => {
 
   it('round-trips swarmRuntime through async write/read', async () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
-    await Effect.runPromise(writeContinueStateEffect(TEST_DIR, 'PAN-977', state));
-    const read = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'PAN-977'));
+    await Effect.runPromise(writeContinueState(TEST_DIR, 'PAN-977', state));
+    const read = await Effect.runPromise(readContinueState(TEST_DIR, 'PAN-977'));
     expect(read?.swarmRuntime?.model).toBe('test-model');
   });
 
@@ -84,8 +84,8 @@ describe('swarmRuntime in ContinueState', () => {
       ],
     };
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: runtime };
-    writeContinueState(TEST_DIR, 'PAN-977', state);
-    const read = readContinueState(TEST_DIR, 'PAN-977')!;
+    writeContinueStateSync(TEST_DIR, 'PAN-977', state);
+    const read = readContinueStateSync(TEST_DIR, 'PAN-977')!;
     expect(read.swarmRuntime!.slots).toHaveLength(1);
     expect(read.swarmRuntime!.slots[0]!.itemId).toBe('item-a');
     expect(read.swarmRuntime!.slots[0]!.status).toBe('running');
@@ -103,8 +103,8 @@ describe('swarmRuntime in ContinueState', () => {
       },
     };
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: runtime };
-    writeContinueState(TEST_DIR, 'PAN-977', state);
-    const read = readContinueState(TEST_DIR, 'PAN-977')!;
+    writeContinueStateSync(TEST_DIR, 'PAN-977', state);
+    const read = readContinueStateSync(TEST_DIR, 'PAN-977')!;
     expect(read.swarmRuntime!.synthesisOutputs['item-c']?.contextUpdate).toBe('upstream A changed the API shape');
   });
 
@@ -113,14 +113,14 @@ describe('swarmRuntime in ContinueState', () => {
   it('rejects malformed swarmRuntime on read', () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
     (state.swarmRuntime as any).slots = 'not-slots';
-    writeContinueState(TEST_DIR, 'PAN-977', state as ContinueState);
-    expect(() => readContinueState(TEST_DIR, 'PAN-977')).toThrow(/swarmRuntime\.slots/);
+    writeContinueStateSync(TEST_DIR, 'PAN-977', state as ContinueState);
+    expect(() => readContinueStateSync(TEST_DIR, 'PAN-977')).toThrow(/swarmRuntime\.slots/);
   });
 
   it('survives round-trip without swarmRuntime (backwards compat)', () => {
     const state = freshState('PAN-946');
-    writeContinueState(TEST_DIR, 'PAN-946', state);
-    const read = readContinueState(TEST_DIR, 'PAN-946')!;
+    writeContinueStateSync(TEST_DIR, 'PAN-946', state);
+    const read = readContinueStateSync(TEST_DIR, 'PAN-946')!;
     expect(read.swarmRuntime).toBeUndefined();
   });
 
@@ -128,26 +128,26 @@ describe('swarmRuntime in ContinueState', () => {
 
   it('canonicalizes lowercase and uppercase issue IDs to the same sync file', () => {
     const state: ContinueState = { ...freshState('pan-977'), swarmRuntime: freshRuntime() };
-    writeContinueState(TEST_DIR, 'pan-977', state);
+    writeContinueStateSync(TEST_DIR, 'pan-977', state);
 
     expect(existsSync(continueFilePath(TEST_DIR, 'PAN-977'))).toBe(true);
     expect(existsSync(continueFilePath(TEST_DIR, 'pan-977'))).toBe(true);
-    const read = readContinueState(TEST_DIR, 'PAN-977')!;
+    const read = readContinueStateSync(TEST_DIR, 'PAN-977')!;
     expect(read.issueId).toBe('PAN-977');
     expect(read.swarmRuntime?.model).toBe('test-model');
   });
 
   it('canonicalizes lowercase and uppercase issue IDs to the same async file', async () => {
     const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
-    await Effect.runPromise(writeContinueStateEffect(TEST_DIR, 'PAN-977', state));
+    await Effect.runPromise(writeContinueState(TEST_DIR, 'PAN-977', state));
 
-    const read = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'pan-977'));
+    const read = await Effect.runPromise(readContinueState(TEST_DIR, 'pan-977'));
     expect(read?.issueId).toBe('PAN-977');
     expect(read?.swarmRuntime?.model).toBe('test-model');
   });
 
   it('async read returns null for missing file', async () => {
-    const result = await Effect.runPromise(readContinueStateEffect(TEST_DIR, 'PAN-NOT-EXIST'));
+    const result = await Effect.runPromise(readContinueState(TEST_DIR, 'PAN-NOT-EXIST'));
     expect(result).toBeNull();
   });
 });

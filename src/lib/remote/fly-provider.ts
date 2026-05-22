@@ -17,9 +17,9 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { parse } from 'yaml';
 import { Effect, Stream } from 'effect';
-import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
-import { buildClaudeUserSettings } from '../claude-permissions.js';
-import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
+import { getIsolatedPlaywrightMcpConfigSync } from '../claude-mcp.js';
+import { buildClaudeUserSettingsSync } from '../claude-permissions.js';
+import { FlyApiClient, createFlyApiClientSync, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 import { RemoteError } from './interface.js';
 
@@ -96,7 +96,7 @@ export class FlyProvider implements RemoteProvider {
 
   private getApi(): FlyApiClient {
     if (!this.api) {
-      this.api = createFlyApiClient(this.config.apiToken || undefined);
+      this.api = createFlyApiClientSync(this.config.apiToken || undefined);
     }
     return this.api;
   }
@@ -479,7 +479,7 @@ with open(path, "w") as f:
     // The defaultMode here is the fallback applied to any `claude` invocation on the
     // VM that doesn't pass --permission-mode; hardcoding bypass would silently
     // escalate any unflagged invocation even when the user has chosen Auto.
-    const settings = JSON.stringify(buildClaudeUserSettings());
+    const settings = JSON.stringify(buildClaudeUserSettingsSync());
     const settingsB64 = Buffer.from(settings).toString('base64');
     await this.sshImpl(vmName, `echo '${settingsB64}' | base64 -d > ~/.claude/settings.json`);
 
@@ -487,7 +487,7 @@ with open(path, "w") as f:
     if (existsSync(localMcpPath)) {
       try {
         const localMcpConfig = JSON.parse(readFileSync(localMcpPath, 'utf-8'));
-        const remoteMcpConfig = getIsolatedPlaywrightMcpConfig(localMcpConfig);
+        const remoteMcpConfig = getIsolatedPlaywrightMcpConfigSync(localMcpConfig);
         if (remoteMcpConfig) {
           const mcpB64 = Buffer.from(JSON.stringify(remoteMcpConfig, null, 2) + '\n').toString('base64');
           await this.sshImpl(vmName, `echo '${mcpB64}' | base64 -d > ~/.claude/mcp.json`);

@@ -10,7 +10,7 @@ import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { loadConfig } from '../../lib/config.js';
+import { loadConfigSync } from '../../lib/config.js';
 import type { Issue, TrackerType } from '../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
 
@@ -28,7 +28,7 @@ interface TriageState {
  * Get tracker config by type from panopticon config
  */
 function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
-  const config = loadConfig();
+  const config = loadConfigSync();
   const trackerConfig = config.trackers[trackerType];
 
   if (!trackerConfig) {
@@ -75,7 +75,7 @@ export async function triageCommand(id?: string, options: TriageOptions = {}): P
   const spinner = ora('Loading triage queue...').start();
 
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
     const primaryType = config.trackers.primary;
     const secondaryType = config.trackers.secondary;
 

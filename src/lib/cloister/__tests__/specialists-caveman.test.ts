@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../caveman/workspace.js', () => ({
@@ -34,36 +35,36 @@ describe('buildSpecialistCavemanExports', () => {
   it('returns empty string for inspect-agent (sentinel protection)', async () => {
     const result = await buildSpecialistCavemanExports('inspect-agent', '/workspace', baseConfig);
     expect(result).toBe('');
-    expect(mockReadVariant).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockReadVariant))).not.toHaveBeenCalled();
   });
 
   it('returns empty string when config.enabled is false', async () => {
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', { ...baseConfig, enabled: false });
     expect(result).toBe('');
-    expect(mockReadVariant).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockReadVariant))).not.toHaveBeenCalled();
   });
 
   it('returns empty string when workspacePath is undefined', async () => {
     const result = await buildSpecialistCavemanExports('review-agent', undefined, baseConfig);
     expect(result).toBe('');
-    expect(mockReadVariant).not.toHaveBeenCalled();
+    (await Effect.runPromise(expect(mockReadVariant))).not.toHaveBeenCalled();
   });
 
   it('returns empty string for unknown specialist type', async () => {
-    mockReadVariant.mockResolvedValue('enabled');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
     const result = await buildSpecialistCavemanExports('unknown-agent', '/workspace', baseConfig);
     expect(result).toBe('');
   });
 
   it('returns only PANOPTICON_CAVEMAN_VARIANT when variant is "disabled"', async () => {
-    mockReadVariant.mockResolvedValue('disabled');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('disabled')));
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', baseConfig);
     expect(result).toBe('export PANOPTICON_CAVEMAN_VARIANT="disabled"\n');
     expect(result).not.toContain('CAVEMAN_DEFAULT_MODE');
   });
 
   it('returns empty string when variant is "off"', async () => {
-    mockReadVariant.mockResolvedValue('off');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('off')));
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', baseConfig);
     expect(result).toBe('');
   });
@@ -73,7 +74,7 @@ describe('buildSpecialistCavemanExports', () => {
     ['test-agent', 'test', 'full' as const],
     ['merge-agent', 'merge', 'lite' as const],
   ] as const)('%s uses the correct mode key', async (specialistType, modeKey, modeValue) => {
-    mockReadVariant.mockResolvedValue('enabled');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
     const config = {
       ...baseConfig,
       modes: { ...baseConfig.modes, [modeKey]: modeValue },
@@ -84,14 +85,14 @@ describe('buildSpecialistCavemanExports', () => {
   });
 
   it('returns empty string when mode is "off"', async () => {
-    mockReadVariant.mockResolvedValue('enabled');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
     const config = { ...baseConfig, modes: { ...baseConfig.modes, review: 'off' as const } };
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', config);
     expect(result).toBe('');
   });
 
   it('returns empty string when mode is "disabled"', async () => {
-    mockReadVariant.mockResolvedValue('enabled');
+    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
     const config = { ...baseConfig, modes: { ...baseConfig.modes, review: 'disabled' as const } };
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', config);
     expect(result).toBe('');

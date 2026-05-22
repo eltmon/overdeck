@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
-import { getVBriefACStatus, syncBeadStatusToVBrief } from '../vbrief/beads.js';
+import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -77,14 +77,7 @@ async function listBeadsByStatus(
     }
     throw error;
   }
-}
-
-/**
- * Check for open beads scoped to the given issue.
- *
- * Returns an array of failure lines (empty = pass).
- */
-export async function checkOpenBeads(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
+}async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
   let stdout: string;
   try {
     stdout = await listBeadsByStatus(workspacePath, issueId, 'open', preloadedBeads);
@@ -113,15 +106,7 @@ export async function checkOpenBeads(workspacePath: string, issueId: string, pre
     lines.push(`    - ${id} ${task}`);
   }
   return lines;
-}
-
-/**
- * Check for uncommitted changes in a workspace.
- *
- * Handles both monorepo (single top-level .git) and polyrepo (subdirs with .git).
- * Returns an array of failure lines (empty = pass).
- */
-export async function checkUncommittedChanges(workspacePath: string): Promise<string[]> {
+}async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
   const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
 
   if (hasTopLevelGit) {
@@ -173,9 +158,9 @@ export async function checkUncommittedChanges(workspacePath: string): Promise<st
  * Returns an array of failure lines (empty = pass or vBRIEF not available).
  * NOTE: Call syncBeadStatusToVBrief before this to ensure closed beads are reflected.
  */
-export function checkVBriefACStatus(workspacePath: string): string[] {
+export function checkVBriefACStatusSync(workspacePath: string): string[] {
   try {
-    const acStatus = getVBriefACStatus(workspacePath);
+    const acStatus = getVBriefACStatusSync(workspacePath);
     if (!acStatus || acStatus.allCompleted) return [];
 
     const lines: string[] = [
@@ -195,31 +180,15 @@ export function checkVBriefACStatus(workspacePath: string): string[] {
     // vBRIEF not available — skip check
     return [];
   }
-}
-
-/**
- * Run all pre-flight checks for `pan done`.
- *
- * Performs in order:
- * 1. Check 1: open beads
- * 2. Check 2: uncommitted changes
- * 3. Sync closed bead statuses to vBRIEF (so Check 3 sees latest state).
- * 4. Check 3: vBRIEF acceptance criteria completion.
- *
- * Pure validation — no git mutations. The caller (pan done) is responsible for
- * committing any planning artifacts dirtied by the sync step.
- *
- * Returns an array of failure lines (empty = all checks passed).
- */
-export async function runPreflightChecks(workspacePath: string, issueId: string): Promise<string[]> {
+}async function runPreflightChecksPromise(workspacePath: string, issueId: string): Promise<string[]> {
   const failures: string[] = [];
 
   // Check 1: Open beads
-  const beadFailures = await checkOpenBeads(workspacePath, issueId);
+  const beadFailures = await Effect.runPromise(checkOpenBeads(workspacePath, issueId));
   failures.push(...beadFailures);
 
   // Check 2: Uncommitted changes
-  const gitFailures = await checkUncommittedChanges(workspacePath);
+  const gitFailures = await Effect.runPromise(checkUncommittedChanges(workspacePath));
   failures.push(...gitFailures);
 
   // Sync closed beads to vBRIEF before AC check
@@ -229,7 +198,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
     let synced = 0;
     for (const bead of closedBeads) {
       if (bead.id) {
-        const itemId = await syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+        const itemId = await Effect.runPromise(syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title));
         if (itemId) synced++;
       }
     }
@@ -242,7 +211,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
   }
 
   // Check 3: vBRIEF AC status
-  const acFailures = checkVBriefACStatus(workspacePath);
+  const acFailures = checkVBriefACStatusSync(workspacePath);
   failures.push(...acFailures);
 
   return failures;
@@ -269,36 +238,36 @@ const toPreflightProcessError = (
   });
 
 /** Check for open beads scoped to an issue (Effect variant). */
-export const checkOpenBeadsEffect = (
+export const checkOpenBeads = (
   workspacePath: string,
   issueId: string,
 ): Effect.Effect<string[], ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => checkOpenBeads(workspacePath, issueId),
+    try: () => checkOpenBeadsPromise(workspacePath, issueId),
     catch: (cause) => toPreflightProcessError('checkOpenBeads', cause),
   });
 
 /** Check for uncommitted changes in a workspace (Effect variant). */
-export const checkUncommittedChangesEffect = (
+export const checkUncommittedChanges = (
   workspacePath: string,
 ): Effect.Effect<string[], ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => checkUncommittedChanges(workspacePath),
+    try: () => checkUncommittedChangesPromise(workspacePath),
     catch: (cause) => toPreflightProcessError('checkUncommittedChanges', cause),
   });
 
 /** Check vBRIEF acceptance-criteria status (Effect variant — pure, never fails). */
-export const checkVBriefACStatusEffect = (
+export const checkVBriefACStatus = (
   workspacePath: string,
 ): Effect.Effect<string[]> =>
-  Effect.sync(() => checkVBriefACStatus(workspacePath));
+  Effect.sync(() => checkVBriefACStatusSync(workspacePath));
 
 /** Run all `pan done` pre-flight checks (Effect variant). */
-export const runPreflightChecksEffect = (
+export const runPreflightChecks = (
   workspacePath: string,
   issueId: string,
 ): Effect.Effect<string[], ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => runPreflightChecks(workspacePath, issueId),
+    try: () => runPreflightChecksPromise(workspacePath, issueId),
     catch: (cause) => toPreflightProcessError('runPreflightChecks', cause),
   });

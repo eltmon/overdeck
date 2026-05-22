@@ -85,7 +85,7 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
   it('removes the lock directory when owner.json write fails so the next call can recover', async () => {
     const lockPath = `${planPath}.writer.lock`;
     // Re-import the module under test AFTER vi.mock takes effect.
-    const { applyTaskOperationToPlanFileEffect } = await import('../dag.js');
+    const { applyTaskOperationToPlanFile } = await import('../dag.js');
 
     // Force the next owner.json write to fail with a non-EEXIST error. This
     // mirrors a transient ENOSPC/EPERM at the worst possible moment: after
@@ -93,7 +93,7 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
     fsHooks.failNextWrite = 'owner.json';
 
     await expect(
-      Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
+      Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
         type: 'claim',
         itemId: 'PAN-977-recover',
         expectedSequence: 1,
@@ -107,7 +107,7 @@ describe('PAN-977 writer-lock orphan cleanup', () => {
     expect(existsSync(lockPath)).toBe(false);
 
     // Subsequent claim must succeed (writeFile is now passthrough).
-    const result = await Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
+    const result = await Effect.runPromise(applyTaskOperationToPlanFile(planPath, {
       type: 'claim',
       itemId: 'PAN-977-recover',
       expectedSequence: 1,

@@ -14,15 +14,7 @@ import { Effect } from 'effect';
 
 let pending: Promise<void> = Promise.resolve();
 
-/**
- * Run a bd command exclusively — waits for any in-flight bd operation to
- * finish before starting, and blocks subsequent operations until this one
- * completes.
- *
- * @param fn - Async function that runs a bd command
- * @returns The result of fn
- */
-export async function withBdMutex<T>(fn: () => Promise<T>): Promise<T> {
+async function withBdMutexPromise<T>(fn: () => Promise<T>): Promise<T> {
   // Chain onto the previous promise — this serializes all callers
   const result = pending.then(fn, fn);
   // Update pending to track this operation's completion (success or failure)
@@ -38,12 +30,12 @@ export { restoreTrackedBeadsExport } from './beads-restore.js';
 
 import { restoreTrackedBeadsExport as restoreBeads } from './beads-restore.js';
 
-export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
-  return withBdMutex(async () => {
+async function withWorkspaceBdMutexPromise<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
+  return withBdMutexPromise(async () => {
     try {
       return await fn();
     } finally {
-      await restoreBeads(workspacePath);
+      await Effect.runPromise(restoreBeads(workspacePath));
     }
   });
 }
@@ -56,11 +48,11 @@ export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => P
  * The wrapped Effect must be no-context (R = never) since it is launched from
  * inside a tryPromise — Layers cannot be threaded through the global mutex.
  */
-export const withBdMutexEffect = <A, E>(
+export const withBdMutex = <A, E>(
   fn: () => Effect.Effect<A, E>,
 ): Effect.Effect<A, E> =>
   Effect.tryPromise({
-    try: () => withBdMutex(() => Effect.runPromise(fn())),
+    try: () => withBdMutexPromise(() => Effect.runPromise(fn())),
     catch: (e) => e as E,
   });
 
@@ -68,11 +60,11 @@ export const withBdMutexEffect = <A, E>(
  * Effect-native variant of withWorkspaceBdMutex. Same context constraint as
  * withBdMutexEffect.
  */
-export const withWorkspaceBdMutexEffect = <A, E>(
+export const withWorkspaceBdMutex = <A, E>(
   workspacePath: string,
   fn: () => Effect.Effect<A, E>,
 ): Effect.Effect<A, E> =>
   Effect.tryPromise({
-    try: () => withWorkspaceBdMutex(workspacePath, () => Effect.runPromise(fn())),
+    try: () => withWorkspaceBdMutexPromise(workspacePath, () => Effect.runPromise(fn())),
     catch: (e) => e as E,
   });
