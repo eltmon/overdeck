@@ -1,0 +1,2161 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-22T03:25:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1312: Finish the Effect migration — migrate all callers to *Effect siblings, then delete the Promise variants from src/lib/",
+    "updated": "2026-05-22T03:19:57.802Z"
+  },
+  "plan": {
+    "id": "pan-1312",
+    "title": "Finish the Effect migration — migrate all callers to *Effect siblings, then delete the Promise variants from src/lib/",
+    "status": "proposed",
+    "uid": "7a4c1e92-3b6d-4f81-a0e5-2c9d8b1f64a3",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-22T03:25:00.000Z",
+    "updated": "2026-05-22T03:19:57.802Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1312",
+        "label": "PAN-1312",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effect-migration",
+      "refactor",
+      "src/lib",
+      "swarm",
+      "tech-debt"
+    ],
+    "narratives": {
+      "Problem": "PAN-1249 made src/lib/ additively Effect-native: every Promise function got an *Effect sibling, but the Promise originals (*Async) were kept to avoid cascade breakage. The result is a permanently half-migrated tree — sync / *Async / *Effect triplets of the same operation, ~60 src/lib/-internal *Async callers, and dead Effect.runPromise bridges. Discovery for this plan also found that PAN-1249 never reached three modules at all: src/lib/agents.ts (verified: zero *Effect exports), src/lib/database/review-status-db.ts, and src/lib/vbrief/dag.ts still expose *Async functions with NO Effect sibling. 'Finishing' the migration therefore means first creating the missing siblings, then migrating every caller, then deleting the Promise variants and canonicalizing the naming so src/lib/ exposes only Effect-native functions.",
+      "Proposal": "One feature branch, dispatched as a dependency-wave swarm. Wave 1a (foundation) creates the missing Effect siblings in agents.ts, review-status-db.ts and dag.ts. Wave 1b/1c/1d migrate ALL callers — src/cli/, src/dashboard/ and ~60 src/lib/-internal files — additively onto the Effect siblings; the *Async variants stay in place so every Wave 1 bead is independently mergeable. Wave 1e gates on a clean grep + full quality gates. Wave 2a then deletes the *Async exports and dead runPromise bridges per module in parallel (safe — no caller imports them anymore). Wave 2b runs a single coordinated repo-wide rename pass to canonicalize naming (*Effect/*AsyncEffect become unsuffixed; surviving sync variants become *Sync). Wave 2c verifies the whole migration with grep proofs and quality gates. src/lib/memory/checkpoint-client.ts is explicitly out of scope (its *Async functions have no Effect sibling and no sync variant, and no cli/dashboard caller) — a follow-up issue should migrate it."
+    },
+    "autoDecisions": [
+      {
+        "summary": "agents.ts / review-status-db.ts / vbrief/dag.ts *Async functions have no Effect sibling; the plan adds Wave 1a to create them before any caller migrates.",
+        "rationale": "Verified directly: agents.ts has zero *Effect exports. Callers cannot migrate to a sibling that does not exist, and the *Async variants cannot be deleted. The issue title says 'finish the migration' — completing what PAN-1249 skipped is in scope. Not a contradiction between authoritative inputs, so no escalation; recorded as a discovered scope gap."
+      },
+      {
+        "summary": "Wave 1 migrates lib-internal callers too, not just src/cli/ and src/dashboard/.",
+        "rationale": "The issue's Wave 1 table listed only cli + dashboard, but ~60 src/lib/-internal files import *Async variants. The deletion acceptance criterion ('all *Async wrappers ... are deleted') cannot pass while lib-internal callers still import them. The issue heading 'migrate all callers' covers them; the scope was already corrected once for src/dashboard/server/."
+      },
+      {
+        "summary": "Wave 2 split into 2a (parallel per-module deletion) and 2b (single atomic canonicalization sweep).",
+        "rationale": "After Wave 1 no caller imports any *Async, so deleting them is pure dead-export removal touching only each module's own file — parallel-safe. Canonicalization renames exported symbols, which cross-couples every importer; doing it per-module in parallel would conflict, so it is one coordinated final bead."
+      },
+      {
+        "summary": "src/lib/memory/checkpoint-client.ts is out of scope.",
+        "rationale": "Its five *Async functions have no *Effect sibling and no sync variant — they are not part of the sync/*Async/*Effect collision the issue targets, and the deletion AC is scoped to '*Async ... that have an *Effect sibling'. They have no cli/dashboard importer. Migrating that client is a separate concern; recommend a follow-up issue."
+      },
+      {
+        "summary": "CLI migration scoped to the three files importing *Async (scope.ts, agent-status.ts, flywheel.ts) with a per-handler Effect.runPromise boundary.",
+        "rationale": "The acceptance criteria require only that no src/cli/ file imports an *Async variant. A wholesale rewrite to a single top-level commander-boundary runPromise across all ~80 commands is not required and would risk repo-wide regression; the existing code already runs Effects at the handler boundary (e.g. close.ts)."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1a-agents-siblings",
+        "title": "Wave 1a — create Effect siblings for src/lib/agents.ts *Async functions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "w1a-gate",
+            "w1b-cli-agent-status",
+            "w1b-cli-flywheel",
+            "w1c-route-agents",
+            "w1c-route-runtime",
+            "w1c-route-session",
+            "w1c-svc-polling",
+            "w1c-svc-health",
+            "w1c-svc-lifecycle",
+            "w1c-svc-flywheel-terminal",
+            "w1c-toplevel-bootstrap",
+            "w1c-health-filtering",
+            "w1d-cloister-orchestration",
+            "w1d-cloister-review",
+            "w1d-cloister-merge-flywheel",
+            "w1d-misc",
+            "w2a-agents"
+          ]
+        },
+        "narrative": {
+          "Action": "src/lib/agents.ts currently exports zero *Effect functions. Create an Effect-returning sibling for every *Async export consumed by callers — getAgentStateEffect, saveAgentStateEffect, setAgentPausedEffect, clearAgentPausedEffect, clearAgentTroubledEffect, recordAgentFailureEffect, getAgentRuntimeStateEffect, listRunningAgentsEffect, stopAgentEffect. Each sibling must be behaviorally identical to its *Async counterpart, use typed errors consistent with src/lib/errors.ts and the *Effect patterns used elsewhere in src/lib/, and compose cleanly (no Effect.runPromise inside). This is additive — do NOT change or delete the *Async functions. existsSync fast stat checks remain acceptable; data-reading FS calls must be async. This bead is the foundation for every agents-consuming caller-migration bead, so its signatures and error channels must be settled before they start.",
+          "Notes": "deliverAgentMessage / deliverAgentPermissionDecision (the Channels delivery primitive) call getAgentStateAsync — their migration happens later, but design the getAgentStateEffect error channel so the tmux-fallback policy can still be expressed."
+        },
+        "subItems": [
+          {
+            "id": "w1a-agents-siblings.ac1",
+            "title": "Every *Async export in src/lib/agents.ts has a corresponding Effect-returning sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-agents-siblings.ac2",
+            "title": "New siblings use typed errors consistent with src/lib/errors.ts and contain no Effect.runPromise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-agents-siblings.ac3",
+            "title": "The *Async functions in agents.ts are unchanged; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1a-reviewdb-siblings",
+        "title": "Wave 1a — create Effect siblings for src/lib/database/review-status-db.ts *Async functions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/database/review-status-db.ts exports upsertReviewStatusAsync and getReviewStatusFromDbAsync with no Effect sibling. Create upsertReviewStatusEffect and getReviewStatusFromDbEffect — behaviorally identical, typed errors (DatabaseError), additive. Do not change the *Async functions."
+        },
+        "subItems": [
+          {
+            "id": "w1a-reviewdb-siblings.ac1",
+            "title": "review-status-db.ts exports Effect siblings for upsertReviewStatusAsync and getReviewStatusFromDbAsync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-reviewdb-siblings.ac2",
+            "title": "*Async functions unchanged; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1a-dag-siblings",
+        "title": "Wave 1a — create Effect siblings for src/lib/vbrief/dag.ts *Async writer-lock helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/vbrief/dag.ts exports *Async helpers that back the single-writer plan-file lock — writePlanFileAtomicAsync, applyTaskOperationToPlanFileAsync, removeStaleLockAsync, writePipelineMirrorToPlanFileAsync, readPlanFileAsync, assertSingleWriterAsync, releasePlanWriterAsync — with no Effect sibling. Create Effect-returning siblings, additive, preserving writer-lock acquisition, stale-lock recovery and atomic-write semantics EXACTLY. This is a PAN concurrency invariant — do not relax it."
+        },
+        "subItems": [
+          {
+            "id": "w1a-dag-siblings.ac1",
+            "title": "Every *Async writer-lock helper in vbrief/dag.ts has a corresponding Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-dag-siblings.ac2",
+            "title": "Single-writer-lock and atomic-write semantics preserved; vbrief dag-writer-lock tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-dag-siblings.ac3",
+            "title": "*Async functions unchanged; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1a-gate",
+        "title": "Wave 1a gate — confirm every in-scope *Async function has an Effect sibling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Build a documented mapping: for every *Async export across the 15 in-scope src/lib/ modules (all 16 *Async-exporting modules except memory/checkpoint-client.ts), record its Effect sibling — a pre-existing *Effect or *AsyncEffect export, a plain-named Effect function with a deprecated *Async alias (pan-dir/specs.ts, pan-dir/continue.ts), or one newly created in Wave 1a. Verify npm run typecheck and npm run build pass. This mapping is the lookup table every Wave 1 caller-migration bead uses."
+        },
+        "subItems": [
+          {
+            "id": "w1a-gate.ac1",
+            "title": "Every in-scope *Async function maps to a known Effect sibling in a documented mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-gate.ac2",
+            "title": "checkpoint-client.ts *Async functions are explicitly recorded as out of scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1a-gate.ac3",
+            "title": "npm run typecheck and npm run build pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1b-cli-scope",
+        "title": "Wave 1b — migrate src/cli/commands/scope.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "scope.ts imports listVBriefsAsync and readVBriefDocumentAsync from lib/vbrief/vbrief-index. Convert the collectLifecycleRows / list-command body to consume listVBriefsEffect and readVBriefDocumentEffect via an Effect.gen pipeline, run it with a single Effect.runPromise at the command-handler boundary, and map typed failures to the existing console output and process.exit codes. Additive — the *Async exports stay."
+        },
+        "subItems": [
+          {
+            "id": "w1b-cli-scope.ac1",
+            "title": "src/cli/commands/scope.ts imports no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1b-cli-scope.ac2",
+            "title": "pan scope/list command output, error messages and exit codes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1b-cli-agent-status",
+        "title": "Wave 1b — migrate src/cli/commands/agent-status.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "agent-status.ts imports listRunningAgentsAsync (lib/agents), listSessionsAsync and capturePaneAsync (lib/tmux). Migrate to the Effect siblings (listRunningAgentsEffect from Wave 1a, listSessionsAsyncEffect, capturePaneAsyncEffect), composing them in an Effect pipeline run via a single Effect.runPromise at the handler boundary. Preserve the current output."
+        },
+        "subItems": [
+          {
+            "id": "w1b-cli-agent-status.ac1",
+            "title": "src/cli/commands/agent-status.ts imports no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1b-cli-agent-status.ac2",
+            "title": "pan agent-status output is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1b-cli-flywheel",
+        "title": "Wave 1b — migrate src/cli/commands/flywheel.ts and its test off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "flywheel.ts imports stopAgentAsync (lib/agents) and sessionExistsAsync (lib/tmux). Migrate to stopAgentEffect (Wave 1a) and sessionExistsAsyncEffect, run via Effect.runPromise at the handler boundary. Update the colocated test src/cli/commands/__tests__/flywheel.test.ts to match (update any *Async mocks/spies to the Effect siblings)."
+        },
+        "subItems": [
+          {
+            "id": "w1b-cli-flywheel.ac1",
+            "title": "flywheel.ts and __tests__/flywheel.test.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1b-cli-flywheel.ac2",
+            "title": "flywheel CLI commands behave unchanged; flywheel.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-agents",
+        "title": "Wave 1c — migrate src/dashboard/server/routes/agents.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/agents.ts imports findPlanAsync/readPlanAsync (vbrief/io), getWorkAgentLifecycleStateAsync (work-agent-lifecycle) and several tmux *Async (capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync). The handlers are already Effect.gen — replace each *Async call with its Effect sibling (yield* the sibling directly) and remove the surrounding Effect.tryPromise wrapper. Migrate the colocated test routes/__tests__/agents-lifecycle-event.test.ts (update *Async mocks)."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-agents.ac1",
+            "title": "routes/agents.ts and routes/__tests__/agents-lifecycle-event.test.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-agents.ac2",
+            "title": "agents route endpoints behave identically; the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-issues-workspaces",
+        "title": "Wave 1c — migrate routes/issues.ts and routes/workspaces.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/issues.ts and routes/workspaces.ts import *Async from vbrief/io (findPlanAsync, readPlanAsync, findWorkspaceDraftPlanAsync, isPlanningCompleteAsync), vbrief/vbrief-index (findVBriefByIssueAsync, readVBriefDocumentAsync), lib/tmux and lib/agents. Replace each with its Effect sibling inside the existing Effect.gen handlers, dropping Effect.tryPromise wrappers. Resolve any dynamic imports of *Async variants too."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-issues-workspaces.ac1",
+            "title": "routes/issues.ts and routes/workspaces.ts import no *Async variant from src/lib/ (including dynamic imports)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-issues-workspaces.ac2",
+            "title": "issue and workspace endpoints behave identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-swarm",
+        "title": "Wave 1c — migrate routes/swarm.ts and its test off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/swarm.ts imports *Async from vbrief/io, pan-dir/continue (readWorkspaceContinueAsync), vbrief/continue-state (readContinueStateAsync, writeContinueStateAsync), vbrief/dag and lib/tmux. Replace each with its Effect sibling in the Effect.gen handlers. Migrate routes/__tests__/swarm.test.ts (update *Async mocks). Preserve dag writer-lock behavior."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-swarm.ac1",
+            "title": "routes/swarm.ts and routes/__tests__/swarm.test.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-swarm.ac2",
+            "title": "swarm endpoints behave identically; swarm.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-session",
+        "title": "Wave 1c — migrate routes/misc.ts, command-deck.ts and reviewer-tree.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/misc.ts imports tmux *Async (createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync), vbrief/io *Async and the dashboard health-filtering *Async wrappers; command-deck.ts imports lib/agents and lib/tmux *Async; reviewer-tree.ts imports capturePaneAsync. Replace each with its Effect sibling. reviewer-tree.ts is plain-async — run the Effect via Effect.runPromise at the function boundary. NOTE H6: misc.ts keeps tmux send-keys delivery (sendKeysEffect) — do NOT switch it to the channels bridge."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-session.ac1",
+            "title": "routes/misc.ts, command-deck.ts and reviewer-tree.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-session.ac2",
+            "title": "endpoints behave identically; tmux send-keys delivery is unchanged (not switched to the channels bridge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-runtime",
+        "title": "Wave 1c — migrate routes/hooks.ts, metrics.ts, projects.ts and jsonl-resolver.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "These routes import lib/agents *Async (getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync) and lib/tmux listSessionNamesAsync. Replace with the Effect siblings. hooks/metrics/projects are Effect.gen — yield* the siblings; jsonl-resolver.ts is plain-async — run via Effect.runPromise at the function boundary."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-runtime.ac1",
+            "title": "routes/hooks.ts, metrics.ts, projects.ts and jsonl-resolver.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-runtime.ac2",
+            "title": "the affected endpoints behave identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-route-infra",
+        "title": "Wave 1c — migrate routes/cliproxy.ts, codex-auth.ts, flywheel.ts, specialists.ts and discovered-sessions.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "These routes import lib/cliproxy *Async (bridgeCodexAuthToCliproxyAsync, etc.), lib/tmux *Async (createSessionAsync, killSessionAsync, sessionExistsAsync, listSessionNamesAsync) and lib/config-yaml (getConversationsConfigAsync, updateConversationsConfigAsync). Replace each with its Effect sibling in the Effect.gen handlers; resolve dynamic *Async imports (e.g. specialists.ts dynamically imports sessionExistsAsync)."
+        },
+        "subItems": [
+          {
+            "id": "w1c-route-infra.ac1",
+            "title": "routes/cliproxy.ts, codex-auth.ts, flywheel.ts, specialists.ts and discovered-sessions.ts import no *Async variant from src/lib/ (including dynamic imports)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-route-infra.ac2",
+            "title": "the affected endpoints behave identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-svc-polling",
+        "title": "Wave 1c — migrate agent polling services off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "services/agent-enrichment-service.ts, agent-output-service.ts and running-agents-cache.ts are plain-async poller loops importing listRunningAgentsAsync (agents) and capturePaneAsync (tmux). Replace each *Async with its Effect sibling and run the Effect via Effect.runPromise inside the existing async poll loop — non-blocking, no *Sync FS. Migrate the colocated tests (agent-output-service.test.ts, running-agents-cache.test.ts), updating *Async mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1c-svc-polling.ac1",
+            "title": "agent-enrichment-service.ts, agent-output-service.ts, running-agents-cache.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-svc-polling.ac2",
+            "title": "poller behavior is unchanged; the colocated tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-svc-health",
+        "title": "Wave 1c — migrate system-health, resource-discovery and issue-data services off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "services/system-health-service.ts, resource-discovery.ts and issue-data-service.ts import lib/agents *Async (listRunningAgentsAsync, getAgentRuntimeStateAsync, getAgentStateAsync), lib/tmux listPaneValuesAsync, and vbrief/io findPlanAsync/readWorkspacePlanAsync. Replace each with its Effect sibling; run via Effect.runPromise at the async-service boundary."
+        },
+        "subItems": [
+          {
+            "id": "w1c-svc-health.ac1",
+            "title": "system-health-service.ts, resource-discovery.ts and issue-data-service.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-svc-health.ac2",
+            "title": "service behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-svc-lifecycle",
+        "title": "Wave 1c — migrate conversation-lifecycle, pending-respawn and agent-spawner services off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "services/conversation-lifecycle.ts, pending-respawn.ts and agent-spawner.ts import lib/tmux *Async (listSessionNamesAsync, sessionExistsAsync) and lib/agents stopAgentAsync (a dynamic import in agent-spawner). Replace each with its Effect sibling; run via Effect.runPromise at the async boundary. Migrate the colocated tests (conversation-lifecycle.test.ts, pending-respawn.test.ts, agent-spawner.test.ts, agent-spawner.unit.test.ts), updating *Async mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1c-svc-lifecycle.ac1",
+            "title": "conversation-lifecycle.ts, pending-respawn.ts, agent-spawner.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-svc-lifecycle.ac2",
+            "title": "service behavior is unchanged; the colocated tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-svc-flywheel-terminal",
+        "title": "Wave 1c — migrate flywheel-actions and terminal services off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "services/flywheel-actions.ts imports lib/config-yaml loadConfigAsyncNoMigration, lib/tmux sessionExistsAsync and lib/agents stopAgentAsync (static + dynamic import); services/terminal-service.ts is Effect.gen and imports lib/tmux resizeWindowAsync and sessionExistsAsync. Replace each *Async with its Effect sibling."
+        },
+        "subItems": [
+          {
+            "id": "w1c-svc-flywheel-terminal.ac1",
+            "title": "flywheel-actions.ts and terminal-service.ts import no *Async variant from src/lib/ (including dynamic imports)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-svc-flywheel-terminal.ac2",
+            "title": "flywheel-actions and terminal-service behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-toplevel-bootstrap",
+        "title": "Wave 1c — migrate main.ts, pending-feedback.ts and read-model.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/dashboard/server/main.ts and pending-feedback.ts import lib/agents *Async (getAgentStateAsync, messageAgent); read-model.ts imports *Async variants used during read-model bootstrap. Replace each with its Effect sibling, run via Effect.runPromise at the async/bootstrap boundary. Migrate the colocated __tests__/read-model-diff-summaries.test.ts."
+        },
+        "subItems": [
+          {
+            "id": "w1c-toplevel-bootstrap.ac1",
+            "title": "main.ts, pending-feedback.ts, read-model.ts and read-model-diff-summaries.test.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-toplevel-bootstrap.ac2",
+            "title": "server bootstrap and read-model behavior is unchanged; the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-toplevel-ws",
+        "title": "Wave 1c — migrate ws-rpc.ts and ws-terminal.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "ws-rpc.ts (Effect.gen RPC handlers) imports lib/tmux listSessionNamesAsync and lib/config-yaml getConversationsConfigAsync; ws-terminal.ts (raw WebSocket, plain-async) imports lib/tmux *Async (capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync). Replace each with its Effect sibling; ws-rpc yields directly, ws-terminal runs via Effect.runPromise inside its async IIFEs. Do not change PTY/terminal lifecycle behavior."
+        },
+        "subItems": [
+          {
+            "id": "w1c-toplevel-ws.ac1",
+            "title": "ws-rpc.ts and ws-terminal.ts import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-toplevel-ws.ac2",
+            "title": "WebSocket RPC and terminal streaming behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1c-health-filtering",
+        "title": "Wave 1c — migrate src/dashboard/lib/health-filtering.ts off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/dashboard/lib/health-filtering.ts is a shared dashboard helper (consumed by routes/misc.ts) that imports lib/agents *Async variants. Replace them with the Effect siblings. Acceptance criterion 2 of the issue greps all of src/dashboard, so this file outside src/dashboard/server/ is still in scope."
+        },
+        "subItems": [
+          {
+            "id": "w1c-health-filtering.ac1",
+            "title": "src/dashboard/lib/health-filtering.ts imports no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1c-health-filtering.ac2",
+            "title": "health-filtering behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-cloister-orchestration",
+        "title": "Wave 1d — migrate cloister orchestration files (deacon, service, session-rotation, specialists) off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/deacon.ts, service.ts, session-rotation.ts and specialists.ts (and their __tests__) onto the Effect siblings. These are orchestration helpers — replace *Async calls with Effect siblings run via Effect.runPromise where the surrounding code stays imperative. Update test mocks/spies for the Effect siblings."
+        },
+        "subItems": [
+          {
+            "id": "w1d-cloister-orchestration.ac1",
+            "title": "cloister deacon.ts, service.ts, session-rotation.ts, specialists.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-cloister-orchestration.ac2",
+            "title": "orchestration behavior is unchanged; the affected cloister tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-cloister-review",
+        "title": "Wave 1d — migrate cloister review files (review-agent, review-context, review-monitor, inspect-agent) off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/review-agent.ts, review-context.ts, review-monitor.ts and inspect-agent.ts (and their __tests__) onto the Effect siblings. Update test mocks for the Effect siblings."
+        },
+        "subItems": [
+          {
+            "id": "w1d-cloister-review.ac1",
+            "title": "cloister review-agent.ts, review-context.ts, review-monitor.ts, inspect-agent.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-cloister-review.ac2",
+            "title": "review-pipeline behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-cloister-merge-flywheel",
+        "title": "Wave 1d — migrate cloister merge/flywheel files (merge-agent, flywheel, work-agent-prompt) off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/cloister/merge-agent.ts, flywheel.ts and work-agent-prompt.ts (and their __tests__) onto the Effect siblings. work-agent-prompt.ts already uses Effect.runPromise for some calls — consume the Effect siblings directly there. Update test mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1d-cloister-merge-flywheel.ac1",
+            "title": "cloister merge-agent.ts, flywheel.ts, work-agent-prompt.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-cloister-merge-flywheel.ac2",
+            "title": "merge/flywheel behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-memory",
+        "title": "Wave 1d — migrate src/lib/memory/ caller files off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/memory/pipeline.ts, poller.ts, reconciliation.ts and transcript-source.ts (and memory __tests__) onto the Effect siblings. NOTE: memory/checkpoint-client.ts itself is OUT OF SCOPE (its own *Async functions have no Effect sibling) — only migrate memory files' usage of OTHER modules' *Async variants; calls to checkpoint-client's own *Async functions stay."
+        },
+        "subItems": [
+          {
+            "id": "w1d-memory.ac1",
+            "title": "src/lib/memory/ files import no *Async variant from OTHER src/lib/ modules (checkpoint-client.ts's own *Async usage is out of scope)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-memory.ac2",
+            "title": "memory pipeline behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-lifecycle",
+        "title": "Wave 1d — migrate src/lib/lifecycle/ caller files off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/lifecycle/close-issue.ts, teardown-workspace.ts and workflows.ts onto the Effect siblings."
+        },
+        "subItems": [
+          {
+            "id": "w1d-lifecycle.ac1",
+            "title": "src/lib/lifecycle/ files import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-lifecycle.ac2",
+            "title": "lifecycle workflow behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-agent-modules",
+        "title": "Wave 1d — migrate agent-* lib modules off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/agent-directory-cleanup.ts, agent-enrichment.ts and agent-input-detection.ts (and their __tests__) onto the Effect siblings. Update test mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1d-agent-modules.ac1",
+            "title": "agent-directory-cleanup.ts, agent-enrichment.ts, agent-input-detection.ts and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-agent-modules.ac2",
+            "title": "behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-runtimes",
+        "title": "Wave 1d — migrate src/lib/runtimes/ files off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in src/lib/runtimes/claude-code.ts and pi.ts (and runtimes __tests__) onto the Effect siblings. Update test mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1d-runtimes.ac1",
+            "title": "src/lib/runtimes/ files and their tests import no *Async variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-runtimes.ac2",
+            "title": "runtime behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-vbrief-internal",
+        "title": "Wave 1d — migrate cross-module *Async usage within src/lib/vbrief/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "The vbrief modules call each other's *Async variants (io, dag, continue-state, vbrief-index). Migrate every cross-module *Async import within src/lib/vbrief/io.ts, dag.ts, continue-state.ts and vbrief-index.ts (and vbrief __tests__) onto the Effect siblings. This bead migrates CALLER usage only — a module's own *Async exports are deleted later in Wave 2a. Preserve dag writer-lock semantics."
+        },
+        "subItems": [
+          {
+            "id": "w1d-vbrief-internal.ac1",
+            "title": "no src/lib/vbrief/ file imports another vbrief module's *Async variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-vbrief-internal.ac2",
+            "title": "vbrief behavior is unchanged; vbrief tests pass (including dag-writer-lock tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-config-internal",
+        "title": "Wave 1d — migrate cross-module *Async usage within config / review-status lib modules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every cross-module *Async import within src/lib/config.ts, config-yaml.ts, cloister/config.ts, review-status.ts, review-status-enrichment.ts and database/review-status-db.ts onto the Effect siblings — caller usage only; own *Async exports are deleted in Wave 2a. NOTE: review-status.ts setReviewStatus is a sync function that internally fire-and-forgets dbUpsert work — preserve that fire-and-forget shape; convert the inner call to the Effect sibling run via Effect.runPromise."
+        },
+        "subItems": [
+          {
+            "id": "w1d-config-internal.ac1",
+            "title": "config.ts, config-yaml.ts, cloister/config.ts, review-status.ts, review-status-enrichment.ts and review-status-db.ts import no other module's *Async variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-config-internal.ac2",
+            "title": "config loading and review-status behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1d-misc",
+        "title": "Wave 1d — migrate remaining src/lib/ caller files off *Async",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Migrate every *Async import from src/lib/ in the remaining lib caller files — close-out.ts, health.ts, webhook-handlers.ts, planning/spawn-planning-session.ts, pan-dir/index.ts, pan-dir/specs.ts, pan-dir/continue.ts, work-agent-lifecycle.ts (cross-module usage) and any remaining src/lib/__tests__ — onto the Effect siblings. After this bead, no src/lib/ file imports another module's *Async variant. Update test mocks."
+        },
+        "subItems": [
+          {
+            "id": "w1d-misc.ac1",
+            "title": "the remaining src/lib/ caller files and tests import no *Async variant from another src/lib/ module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1d-misc.ac2",
+            "title": "behavior is unchanged; the affected tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1e-gate",
+        "title": "Wave 1e gate — verify zero *Async-from-src/lib/ imports remain in any caller",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Verify Wave 1 is fully landed: no file in src/cli/ or src/dashboard/ imports an *Async Promise variant from src/lib/; no src/lib/ file imports another module's *Async variant (only same-module *Async definitions remain, plus the out-of-scope checkpoint-client.ts). Run the full quality gates. This gate unblocks Wave 2 deletion."
+        },
+        "subItems": [
+          {
+            "id": "w1e-gate.ac1",
+            "title": "No file in src/cli/ or src/dashboard/ imports an *Async Promise variant from src/lib/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1e-gate.ac2",
+            "title": "No src/lib/ file imports another module's *Async variant (checkpoint-client.ts excepted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1e-gate.ac3",
+            "title": "npm run typecheck, npm run lint and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-agents",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/agents.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/agents.ts that now has an Effect sibling (getAgentStateAsync, saveAgentStateAsync, setAgentPausedAsync, clearAgentPausedAsync, clearAgentTroubledAsync, recordAgentFailureAsync, getAgentRuntimeStateAsync, listRunningAgentsAsync, stopAgentAsync). Delete any internal Effect.runPromise bridge that existed only to span the Promise↔Effect boundary. After Wave 1 nothing imports these, so this only edits agents.ts."
+        },
+        "subItems": [
+          {
+            "id": "w2a-agents.ac1",
+            "title": "src/lib/agents.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-agents.ac2",
+            "title": "no dead Effect.runPromise bridge remains in agents.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-tmux",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/tmux.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/tmux.ts that has an Effect sibling (listSessionsAsync, listSessionNamesAsync, sessionExistsAsync, createSessionAsync, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, capturePaneAsync, listPaneValuesAsync, isPaneDeadAsync, getWindowDimensionsAsync, setOptionAsync, resizeWindowAsync, getAgentSessionsAsync, getReviewSessionsAsync, etc.). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-tmux.ac1",
+            "title": "src/lib/tmux.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-tmux.ac2",
+            "title": "no dead Effect.runPromise bridge remains in tmux.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-cliproxy",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/cliproxy.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/cliproxy.ts that has an Effect sibling (bridgeCodexAuthToCliproxyAsync, bridgeGeminiAuthToCliproxyAsync, installCliproxyAsync, isCliproxyRunningAsync, checkCliproxyPortAsync, startCliproxyAsync, stopCliproxyAsync, restartCliproxyAsync). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-cliproxy.ac1",
+            "title": "src/lib/cliproxy.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-cliproxy.ac2",
+            "title": "no dead Effect.runPromise bridge remains in cliproxy.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-config",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/config.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/config.ts that has an Effect sibling (loadConfigAsync, saveConfigAsync, getConversationsConfigAsync). Delete dead Effect.runPromise bridges. Be careful with the two Effect-suffix styles present (loadConfigEffect and loadConfigAsyncEffect) — canonicalization is Wave 2b's job; here only delete the *Async Promise wrappers."
+        },
+        "subItems": [
+          {
+            "id": "w2a-config.ac1",
+            "title": "src/lib/config.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-config.ac2",
+            "title": "no dead Effect.runPromise bridge remains in config.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-config-yaml",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/config-yaml.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/config-yaml.ts that has an Effect sibling (loadConfigAsync, loadConfigAsyncNoMigration, loadYamlFileAsync, loadGlobalConfigAsync, loadProjectConfigAsync, getConversationsConfigAsync, updateConversationsConfigAsync). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-config-yaml.ac1",
+            "title": "src/lib/config-yaml.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-config-yaml.ac2",
+            "title": "no dead Effect.runPromise bridge remains in config-yaml.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-cloister-config",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/cloister/config.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/cloister/config.ts that has an Effect sibling (loadCloisterConfigAsync, saveCloisterConfigAsync, updateCloisterConfigAsync). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-cloister-config.ac1",
+            "title": "src/lib/cloister/config.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-cloister-config.ac2",
+            "title": "no dead Effect.runPromise bridge remains in cloister/config.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-review-status",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/review-status.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/review-status.ts that has an Effect sibling (setReviewStatusAsync, getReviewStatusAsync — siblings are setReviewStatusAsyncEffect / getReviewStatusAsyncEffect). Delete dead Effect.runPromise bridges. Leave the sync setReviewStatus fire-and-forget path intact."
+        },
+        "subItems": [
+          {
+            "id": "w2a-review-status.ac1",
+            "title": "src/lib/review-status.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-review-status.ac2",
+            "title": "no dead Effect.runPromise bridge remains in review-status.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-review-status-db",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/database/review-status-db.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete upsertReviewStatusAsync and getReviewStatusFromDbAsync from src/lib/database/review-status-db.ts (their Effect siblings were created in Wave 1a). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-review-status-db.ac1",
+            "title": "src/lib/database/review-status-db.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-review-status-db.ac2",
+            "title": "no dead Effect.runPromise bridge remains in review-status-db.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-vbrief-io",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/io.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete every *Async export in src/lib/vbrief/io.ts that has an Effect sibling (findWorkspaceDraftPlanAsync, findPlanAsync, readPlanAsync, readWorkspacePlanAsync, isPlanningProposedAsync, isPlanningCompleteAsync, checkPlanStatusAsync). Delete dead Effect.runPromise bridges. The sync variants (readPlan, findPlan, readWorkspacePlan, isPlanningProposed, ...) stay for now — they are canonicalized in Wave 2b."
+        },
+        "subItems": [
+          {
+            "id": "w2a-vbrief-io.ac1",
+            "title": "src/lib/vbrief/io.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-vbrief-io.ac2",
+            "title": "no dead Effect.runPromise bridge remains in vbrief/io.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-vbrief-continue-state",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/continue-state.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete writeContinueStateAsync and readContinueStateAsync from src/lib/vbrief/continue-state.ts (siblings: writeContinueStateEffect / readContinueStateEffect). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-vbrief-continue-state.ac1",
+            "title": "src/lib/vbrief/continue-state.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-vbrief-continue-state.ac2",
+            "title": "no dead Effect.runPromise bridge remains in continue-state.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-vbrief-dag",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/dag.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete the *Async writer-lock helpers from src/lib/vbrief/dag.ts (writePlanFileAtomicAsync, applyTaskOperationToPlanFileAsync, removeStaleLockAsync, writePipelineMirrorToPlanFileAsync, readPlanFileAsync, assertSingleWriterAsync, releasePlanWriterAsync — their Effect siblings were created in Wave 1a). Delete dead Effect.runPromise bridges. Run the dag-writer-lock tests to confirm the lock invariant still holds."
+        },
+        "subItems": [
+          {
+            "id": "w2a-vbrief-dag.ac1",
+            "title": "src/lib/vbrief/dag.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-vbrief-dag.ac2",
+            "title": "no dead Effect.runPromise bridge remains in dag.ts; dag-writer-lock tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-vbrief-index",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/vbrief-index.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete findVBriefByIssueAsync, listVBriefsAsync and readVBriefDocumentAsync from src/lib/vbrief/vbrief-index.ts (siblings: findVBriefByIssueEffect / listVBriefsEffect / readVBriefDocumentEffect). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-vbrief-index.ac1",
+            "title": "src/lib/vbrief/vbrief-index.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-vbrief-index.ac2",
+            "title": "no dead Effect.runPromise bridge remains in vbrief-index.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-work-agent-lifecycle",
+        "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/work-agent-lifecycle.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete getWorkAgentLifecycleStateAsync from src/lib/work-agent-lifecycle.ts (siblings: getWorkAgentLifecycleStateEffect / getWorkAgentLifecycleStateAsyncEffect). Delete dead Effect.runPromise bridges."
+        },
+        "subItems": [
+          {
+            "id": "w2a-work-agent-lifecycle.ac1",
+            "title": "src/lib/work-agent-lifecycle.ts exports no *Async function that has an Effect sibling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-work-agent-lifecycle.ac2",
+            "title": "no dead Effect.runPromise bridge remains in work-agent-lifecycle.ts; npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2a-pan-dir",
+        "title": "Wave 2a — delete deprecated *Async aliases from src/lib/pan-dir/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/pan-dir/specs.ts and pan-dir/continue.ts expose *Async only as deprecated aliases to already-Effect-returning plain-named functions (findSpecByIssueAsync = findSpecByIssue, readWorkspaceContinueAsync = readWorkspaceContinue, writeWorkspaceContinueAsync = writeWorkspaceContinue). Delete those alias export lines."
+        },
+        "subItems": [
+          {
+            "id": "w2a-pan-dir.ac1",
+            "title": "src/lib/pan-dir/specs.ts and continue.ts export no *Async alias",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2a-pan-dir.ac2",
+            "title": "npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2b-canonicalize",
+        "title": "Wave 2b — canonicalize naming: Effect variants become unsuffixed, sync survivors become *Sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "One coordinated repo-wide rename pass, run after ALL Wave 2a deletions. For each naming family in src/lib/, rename the Effect variant — currently *Effect or *AsyncEffect (e.g. readPlanEffect, capturePaneAsyncEffect, loadConfigAsyncEffect, getReviewStatusAsyncEffect) — to the unsuffixed canonical name. Where the canonical name still collides with a synchronous variant, keep the sync variant ONLY if a call site genuinely requires synchronous execution and rename it with an explicit *Sync suffix; delete sync variants that have no remaining caller. Update every importer across src/cli, src/dashboard and src/lib in the same pass. This is deliberately a single bead because renaming exported symbols cross-couples all importers and cannot be parallelized per-module."
+        },
+        "subItems": [
+          {
+            "id": "w2b-canonicalize.ac1",
+            "title": "No src/lib/ export carries an *Effect or *AsyncEffect suffix — the Effect variant is the canonical unsuffixed name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2b-canonicalize.ac2",
+            "title": "Surviving sync variants carry an explicit *Sync suffix; sync variants with no remaining caller are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2b-canonicalize.ac3",
+            "title": "All importers updated; npm run typecheck and npm run lint pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2c-verify",
+        "title": "Wave 2c — final verification: migration complete, no regression",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T03:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1312",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Confirm every PAN-1312 acceptance criterion. Run grep proofs: no src/lib/-sourced *Async import anywhere in src/cli or src/dashboard; no *Async Promise wrapper with an Effect sibling remains in src/lib/; no dead Effect.runPromise bridge remains. Run the full quality gates and spot-check representative CLI commands and dashboard endpoints for behavior parity. Record checkpoint-client.ts as the only intentional residual (out of scope, follow-up issue)."
+        },
+        "subItems": [
+          {
+            "id": "w2c-verify.ac1",
+            "title": "grep -rE \"Async\" src/cli src/dashboard shows zero src/lib/-sourced *Async imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2c-verify.ac2",
+            "title": "No *Async Promise wrapper with an Effect sibling remains in src/lib/; no dead Effect.runPromise bridge remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2c-verify.ac3",
+            "title": "npm run typecheck, npm run lint and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2c-verify.ac4",
+            "title": "No behavior regression in CLI commands or dashboard endpoints; checkpoint-client.ts residual is documented with a follow-up issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1a-agents-siblings",
+        "to": "w1a-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-reviewdb-siblings",
+        "to": "w1a-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-dag-siblings",
+        "to": "w1a-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1b-cli-scope",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1b-cli-agent-status",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1b-cli-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-issues-workspaces",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-swarm",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-session",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-runtime",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-route-infra",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-svc-polling",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-svc-health",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-svc-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-svc-flywheel-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-toplevel-bootstrap",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-toplevel-ws",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1c-health-filtering",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-cloister-orchestration",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-cloister-review",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-cloister-merge-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-memory",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-agent-modules",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-runtimes",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-vbrief-internal",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-config-internal",
+        "type": "blocks"
+      },
+      {
+        "from": "w1a-gate",
+        "to": "w1d-misc",
+        "type": "blocks"
+      },
+      {
+        "from": "w1b-cli-scope",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1b-cli-agent-status",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1b-cli-flywheel",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-agents",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-issues-workspaces",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-swarm",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-session",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-runtime",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-route-infra",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-svc-polling",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-svc-health",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-svc-lifecycle",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-svc-flywheel-terminal",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-toplevel-bootstrap",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-toplevel-ws",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1c-health-filtering",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-cloister-orchestration",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-cloister-review",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-cloister-merge-flywheel",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-memory",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-lifecycle",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-agent-modules",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-runtimes",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-vbrief-internal",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-config-internal",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1d-misc",
+        "to": "w1e-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-tmux",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-cliproxy",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-config",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-config-yaml",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-cloister-config",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-review-status",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-review-status-db",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-vbrief-io",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-vbrief-continue-state",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-vbrief-dag",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-vbrief-index",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-work-agent-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "w1e-gate",
+        "to": "w2a-pan-dir",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-agents",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-tmux",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-cliproxy",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-config",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-config-yaml",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-cloister-config",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-review-status",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-review-status-db",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-vbrief-io",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-vbrief-continue-state",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-vbrief-dag",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-vbrief-index",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-work-agent-lifecycle",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2a-pan-dir",
+        "to": "w2b-canonicalize",
+        "type": "blocks"
+      },
+      {
+        "from": "w2b-canonicalize",
+        "to": "w2c-verify",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-22-PAN-1312-finish-the-effect-migration-migrate-all-callers-to-effect-siblings-then-delete-the-promise-variants-from-src-lib.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
