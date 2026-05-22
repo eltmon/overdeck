@@ -16,7 +16,9 @@ const mockResolveGitHubIssue = vi.fn();
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerType: mockResolveTrackerType,
+  resolveTrackerTypeSync: mockResolveTrackerType,
   resolveGitHubIssue: mockResolveGitHubIssue,
+  resolveGitHubIssueSync: mockResolveGitHubIssue,
 }));
 
 // ─── Mock issue-service-singleton (cache patching) ────────────────────────────
@@ -136,10 +138,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-inprogress');
@@ -149,10 +151,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'in_progress' }));
@@ -161,21 +163,21 @@ describe('IssueLifecycle — integration', () => {
     it('skips update when issue is already in target state', async () => {
       // Issue is already 'state-inprogress' — should skip the update
       mockLinearGetIssue.mockReturnValue(
-        (await Effect.runPromise(ok({
+        ok({
           id: 'uuid-1',
           identifier: 'MIN-1',
           team: { id: 'team-1', key: 'MIN' },
           state: { id: 'state-inprogress', type: 'started' },
-        }))),
+        }),
       );
 
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockLinearUpdateState).not.toHaveBeenCalled();
@@ -190,10 +192,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('org/repo#1', 'in_progress');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'in-progress');
@@ -206,10 +208,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('org/repo#1', 'canceled');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'wontfix');
@@ -222,10 +224,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'canceled');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-canceled');
@@ -238,10 +240,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.close('MIN-1');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-done');
@@ -251,10 +253,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.close('MIN-1');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'closed' }));
@@ -267,10 +269,10 @@ describe('IssueLifecycle — integration', () => {
       const layer = await makeTestLayer();
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.close('org/repo#42');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       await runEffect(program);
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('org', 'repo', 42, 'in-review');
@@ -324,10 +326,10 @@ describe('IssueLifecycle — integration', () => {
         Layer.provide(rallyLayer),
       );
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const lifecycle = yield* IssueLifecycle;
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
-      }).pipe(Effect.provide(layer))));
+      }).pipe(Effect.provide(layer));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');

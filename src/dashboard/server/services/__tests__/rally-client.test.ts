@@ -78,10 +78,10 @@ describe('RallyClient Effect service', () => {
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getIssue('US1234');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
@@ -93,10 +93,10 @@ describe('RallyClient Effect service', () => {
     it('returns normalized issue data', async () => {
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getIssue('US1234');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const issue = await runEffect(program);
       expect(issue.ref).toBe('US1234');
@@ -110,10 +110,10 @@ describe('RallyClient Effect service', () => {
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getIssue('US9999');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
@@ -124,10 +124,10 @@ describe('RallyClient Effect service', () => {
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getIssue('US1234');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
@@ -144,10 +144,10 @@ describe('RallyClient Effect service', () => {
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getChildIssues('F123');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const children = await runEffect(program);
       expect(children).toHaveLength(2);
@@ -162,10 +162,10 @@ describe('RallyClient Effect service', () => {
 
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         return yield* client.getChildIssues('F123');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
@@ -176,10 +176,10 @@ describe('RallyClient Effect service', () => {
     it('calls transitionIssue with normalized state', async () => {
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         yield* client.updateState('US1234', 'closed');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       await runEffect(program);
       expect(mockTransitionIssue).toHaveBeenCalledWith('US1234', 'closed');
@@ -190,10 +190,10 @@ describe('RallyClient Effect service', () => {
     it('delegates to RallyTracker.addComment', async () => {
       const { RallyClient, RallyClientLive } = await import('../rally-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* RallyClient;
         yield* client.addComment('US1234', 'PR merged!');
-      }).pipe(Effect.provide(RallyClientLive))));
+      }).pipe(Effect.provide(RallyClientLive));
 
       await runEffect(program);
       expect(mockAddComment).toHaveBeenCalledWith('US1234', 'PR merged!');

@@ -241,10 +241,10 @@ describe('scanner', () => {
 
     // Production wraps opts.parseJsonl via Effect.runPromise, so the mock must
     // return an Effect, not a Promise (PAN-1249 jsonl-async migration).
-    const parser = (await Effect.runPromise(vi.fn((filePath: string) => {
+    const parser = vi.fn((filePath: string) => {
       if (filePath === outside) return Effect.fail(new Error('outside file should not be parsed') as any);
       return parseSessionJsonl(filePath);
-    })));
+    });
 
     const result = await scan({
       mode: 'targeted',
@@ -254,8 +254,8 @@ describe('scanner', () => {
     });
 
     expect(result.inserted + result.updated).toBe(1);
-    (await Effect.runPromise(expect(parser))).toHaveBeenCalledTimes(1);
-    (await Effect.runPromise(expect(parser))).toHaveBeenCalledWith(target);
+    expect(parser).toHaveBeenCalledTimes(1);
+    expect(parser).toHaveBeenCalledWith(target);
   });
 
   it('uses a 20% tolerance when validating estimated scan cost', () => {

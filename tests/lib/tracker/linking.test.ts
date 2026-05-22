@@ -9,29 +9,6 @@ import {
   formatIssueRef,
 } from '../../../src/lib/tracker/linking.js';
 
-function isEffect(v: unknown): boolean {
-  if (!v || typeof v !== 'object') return false;
-  for (const key of Object.getOwnPropertyNames(v)) {
-    if (key.startsWith('~effect/Effect/')) return true;
-  }
-  return false;
-}
-function wrap<T extends object>(t: T): any {
-  return new Proxy(t, {
-    get(target, prop) {
-      const value = (target as any)[prop];
-      if (typeof value !== 'function') return value;
-      return (...args: any[]) => {
-        const result = value.apply(target, args);
-        if (isEffect(result)) {
-          return Effect.runPromise(result as any);
-        }
-        return result;
-      };
-    },
-  });
-}
-
 describe('parseIssueRef', () => {
   it('should parse GitHub-style refs', () => {
     expect(parseIssueRef('#42')).toEqual({ tracker: 'github', ref: '#42' });
@@ -83,7 +60,7 @@ describe('LinkManager', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-link-test-'));
-    manager = wrap(new LinkManager(join(tempDir, 'links.json')));
+    manager = new LinkManager(join(tempDir, 'links.json'));
   });
 
   afterEach(() => {
@@ -150,7 +127,7 @@ describe('LinkManager', () => {
         { ref: '#42', tracker: 'github' }
       ));
 
-      (await Effect.runPromise(expect(removed))).toBe(true);
+      expect(removed).toBe(true);
       expect((await Effect.runPromise(manager.getAllLinks())).length).toBe(0);
     });
 
@@ -160,7 +137,7 @@ describe('LinkManager', () => {
         { ref: '#999', tracker: 'github' }
       ));
 
-      (await Effect.runPromise(expect(removed))).toBe(false);
+      expect(removed).toBe(false);
     });
   });
 
@@ -195,12 +172,12 @@ describe('LinkManager', () => {
         { ref: '#42', tracker: 'github' }
       ));
 
-      (await Effect.runPromise(expect(await manager.findLinkedIssue('MIN-630', 'linear', 'github'))))inear', 'github'))).toBe('#42');
-      (await Effect.runPromise(expect(await manager.findLinkedIssue('#42', 'github', 'linear'))))ithub', 'linear'))).toBe('MIN-630');
+      expect(await Effect.runPromise(manager.findLinkedIssue('MIN-630', 'linear', 'github'))).toBe('#42');
+      expect(await Effect.runPromise(manager.findLinkedIssue('#42', 'github', 'linear'))).toBe('MIN-630');
     });
 
     it('should return null when no link exists', async () => {
-      (await Effect.runPromise(expect(await manager.findLinkedIssue('MIN-999', 'linear', 'github'))))inear', 'github'))).toBeNull();
+      expect(await Effect.runPromise(manager.findLinkedIssue('MIN-999', 'linear', 'github'))).toBeNull();
     });
   });
 
@@ -212,8 +189,8 @@ describe('LinkManager', () => {
       ));
 
       // Create new manager instance
-      const newManager: any = wrap(new LinkManager(join(tempDir, 'links.json')));
-      const links = await newManager.getAllLinks();
+      const newManager = new LinkManager(join(tempDir, 'links.json'));
+      const links = await Effect.runPromise(newManager.getAllLinks());
 
       expect(links.length).toBe(1);
       expect(links[0].sourceIssueRef).toBe('MIN-630');

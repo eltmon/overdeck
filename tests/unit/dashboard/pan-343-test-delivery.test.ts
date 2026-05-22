@@ -37,6 +37,7 @@ const mockResolveProjectFromIssue = vi.fn();
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -47,7 +48,9 @@ const mockSetReviewStatus = vi.fn();
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -172,7 +175,11 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     const notify = makeNotify();
 
     // The nested catch must prevent this from propagating
-    await (await Effect.runPromise(expect(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify))))SUE, WS, BRANCH, notify)))).resolves.toBeUndefined();
+    await expect(Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify))).resolves.toMatchObject({
+      delivered: false,
+      notified: false,
+      reason: 'spawn-failed',
+    });
     expect(notify).not.toHaveBeenCalled();
   });
 });

@@ -13,8 +13,10 @@ vi.mock('child_process', () => childProcessMocks);
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(() => null),
+  resolveProjectFromIssueSync: vi.fn(() => null),
   hasProjects: vi.fn(() => true),
   listProjects: vi.fn(() => []),
+  listProjectsSync: vi.fn(() => []),
 }));
 
 vi.mock('../../../../src/lib/remote/workspace-metadata.js', () => ({
@@ -24,6 +26,7 @@ vi.mock('../../../../src/lib/remote/workspace-metadata.js', () => ({
 
 vi.mock('../../../../src/lib/config.js', () => ({
   loadConfig: vi.fn(() => ({})),
+  loadConfigSync: vi.fn(() => ({})),
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({

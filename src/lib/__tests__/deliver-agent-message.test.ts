@@ -13,13 +13,18 @@ vi.mock('../tmux.js', () => ({
   createSession: vi.fn(),
   createSession: vi.fn(() => Effect.void),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSession: vi.fn(() => Effect.void),
+  sendKeys: vi.fn(() => Effect.void),
   sendKeysEffect: vi.fn(() => Effect.void),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
   sessionExists: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn(),
+  getAgentSessionsSync: vi.fn(),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
+  getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
   capturePane: vi.fn(),
   capturePane: vi.fn(() => Effect.succeed('')),
   listPaneValues: vi.fn(),
@@ -132,13 +137,13 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
     await deliverAgentMessage(agentId, 'hello', 'test');
-    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
-    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'hello');
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'hello');
   });
 
   it('state-file missing: delegates to sendKeysEffect (treat as flag-off)', async () => {
     await deliverAgentMessage('agent-no-state', 'hello', 'test');
-    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
   });
 
   it('flag-on, socket-success: posts to bridge and does NOT call sendKeysEffect', async () => {
@@ -150,7 +155,7 @@ describe('channel bridge delivery', () => {
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
       await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
-      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).not.toHaveBeenCalled();
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
       expect(parsed).toMatchObject({ content: 'channel hi', meta: { caller: 'caller-x' } });
@@ -165,8 +170,8 @@ describe('channel bridge delivery', () => {
     writeAgentState(agentId, { channelsEnabled: true });
     // Do NOT start a bridge — socket file does not exist.
     await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
-    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
-    (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'fallback hi');
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback hi');
   });
 
   it('flag-on, socket-timeout: falls back to sendKeysEffect', async () => {
@@ -178,7 +183,7 @@ describe('channel bridge delivery', () => {
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500 });
     try {
       await deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
-      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -191,8 +196,8 @@ describe('channel bridge delivery', () => {
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
       await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
-      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledTimes(1);
-      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).toHaveBeenCalledWith(agentId, 'fallback no token');
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback no token');
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -207,7 +212,7 @@ describe('channel bridge delivery', () => {
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
       await deliverAgentPermissionDecision(agentId, 'perm-123', 'deny');
-      (await Effect.runPromise(expect(vi.mocked(sendKeys))))mise(vi.mocked(sendKeys)))).not.toHaveBeenCalled();
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
       expect(parsed).toEqual({

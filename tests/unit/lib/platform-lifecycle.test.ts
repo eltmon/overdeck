@@ -77,10 +77,9 @@ describe('restartDashboard — scope contract', () => {
     );
     const startHook = vi.fn().mockResolvedValue(undefined);
 
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
-    )))hTimeoutMs: 300 }))),
-    ).rejects.toBeInstanceOf(StageError);
+    )).rejects.toBeInstanceOf(StageError);
   });
 });
 
@@ -111,10 +110,9 @@ describe('restartCliproxy — scope contract', () => {
       isCliproxyRunning: vi.fn().mockReturnValue(false),
     };
 
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       restartCliproxy(cliproxy, { verifyTimeoutMs: 300 }),
-    )))yTimeoutMs: 300 }))),
-    ).rejects.toBeInstanceOf(StageError);
+    )).rejects.toBeInstanceOf(StageError);
   });
 });
 
@@ -134,10 +132,9 @@ describe('waitForDashboardHealth', () => {
         return { ok: true, status: 200 };
       }),
     );
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 }),
-    )))lIntervalMs: 50 }))),
-    ).resolves.toBeUndefined();
+    )).resolves.toBeUndefined();
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 

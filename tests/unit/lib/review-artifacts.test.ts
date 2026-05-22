@@ -31,7 +31,9 @@ vi.mock('../../../src/lib/merge-set.js', async (importOriginal) => {
   return {
     ...actual,
     ensureMergeSetForIssue: ensureMergeSetForIssueMock,
+    ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
     upsertMergeSet: upsertMergeSetMock,
+    upsertMergeSetSync: upsertMergeSetMock,
   };
 });
 

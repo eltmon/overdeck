@@ -13,6 +13,12 @@ vi.mock('../../../src/lib/config.js', () => ({
     trackers: { primary: 'linear' },
     dashboard: { port: 3001, api_port: 3002 },
   }),
+  loadConfigSync: vi.fn().mockReturnValue({
+    panopticon: { version: '1.0.0' },
+    sync: { backup_before_sync: true },
+    trackers: { primary: 'linear' },
+    dashboard: { port: 3001, api_port: 3002 },
+  }),
 }));
 
 vi.mock('fs', async (importOriginal) => {

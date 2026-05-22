@@ -19,11 +19,14 @@ vi.mock('../../../src/lib/database/index.js', () => ({
 const mockNotifyPipeline = vi.fn();
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: (...args: unknown[]) => mockNotifyPipeline(...args),
+  notifyPipelineSync: (...args: unknown[]) => mockNotifyPipeline(...args),
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 beforeEach(() => {

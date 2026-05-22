@@ -96,7 +96,7 @@ describe('git-utils', () => {
   describe('hasStaleLocks', () => {
     it('should return false when no locks exist', async () => {
       const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
-      (await Effect.runPromise(expect(result))).toBe(false);
+      expect(result).toBe(false);
     });
 
     it('should return true when stale locks exist', async () => {
@@ -105,7 +105,7 @@ describe('git-utils', () => {
       writeFileSync(lockFile, '');
 
       const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
-      (await Effect.runPromise(expect(result))).toBe(true);
+      expect(result).toBe(true);
 
       // Clean up
       rmSync(lockFile);

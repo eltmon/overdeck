@@ -108,7 +108,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush, MainDivergedError } = await import('../operations.js');
 
     // First push succeeds
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' })))) issueId: 'PAN-FIRST' }))))
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' })))
       .resolves.not.toThrow();
 
     // Now origin/main has advanced (hotfix landed)
@@ -121,8 +121,8 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     // Second push throws MainDivergedError
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' }))))issueId: 'PAN-SECOND' }))))
-      .rejects.toThrow(MainDivergedError);
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' })))
+      .rejects.toMatchObject({ cause: expect.any(MainDivergedError) });
   });
 
   it('Full flow: divergence → mark stuck → Deacon skips → restart persists → unstick clears', async () => {
@@ -140,8 +140,9 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     try {
       await Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' }));
     } catch (err) {
-      if (err instanceof MainDivergedError) {
-        divergedErr = err;
+      const cause = (err as { cause?: unknown }).cause;
+      if (cause instanceof MainDivergedError) {
+        divergedErr = cause;
       }
     }
 
@@ -196,7 +197,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush } = await import('../operations.js');
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' })))) { issueId: 'PAN-OPS' }))))
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' })))
       .rejects.toThrow();
 
     const allOps = listGitOperationsSync({ issueId: 'PAN-OPS' });

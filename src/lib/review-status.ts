@@ -420,7 +420,7 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDbSync(issueId) ?? null;
 }
 
-export async function setReviewStatusAsync(
+async function setReviewStatusPromise(
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
@@ -436,7 +436,7 @@ export async function setReviewStatusAsync(
   });
 }
 
-export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
+async function getReviewStatusPromise(issueId: string): Promise<ReviewStatus | null> {
   return Effect.runPromise(getReviewStatusFromDb(issueId));
 }
 
@@ -667,33 +667,33 @@ export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `setReviewStatusAsync`. */
+/** Effect variant of `setReviewStatusPromise`. */
 export const setReviewStatus = (
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
 ): Effect.Effect<ReviewStatus, ReviewStatusError> =>
   Effect.tryPromise({
-    try: () => setReviewStatusAsync(issueId, update, existing),
+    try: () => setReviewStatusPromise(issueId, update, existing),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'setReviewStatusAsync',
+        operation: 'setReviewStatusPromise',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
   });
 
-/** Effect variant of `getReviewStatusAsync`. */
+/** Effect variant of `getReviewStatusPromise`. */
 export const getReviewStatus = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
   Effect.tryPromise({
-    try: () => getReviewStatusAsync(issueId),
+    try: () => getReviewStatusPromise(issueId),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'getReviewStatusAsync',
+        operation: 'getReviewStatusPromise',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

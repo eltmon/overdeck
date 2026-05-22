@@ -6,6 +6,7 @@
  * workspace refresh path can reconcile stale merge state from GitHub.
  */
 
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetPullRequestState = vi.fn();
@@ -39,14 +40,22 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/github-app.js', () => ({
-  getPullRequestState: (...args: unknown[]) => mockGetPullRequestState(...args),
+  getPullRequestState: (...args: unknown[]) => {
+    try {
+      return Effect.succeed(mockGetPullRequestState(...args));
+    } catch (err) {
+      return Effect.fail(err);
+    }
+  },
   isGitHubAppConfigured: (...args: unknown[]) => mockIsGitHubAppConfigured(...args),
   reportCommitStatus: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   listProjects: vi.fn(() => []),
+  listProjectsSync: vi.fn(() => []),
   findProjectByTeam: vi.fn(),
   extractTeamPrefix: vi.fn(),
 }));
@@ -55,14 +64,17 @@ vi.mock('../../../../../src/lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
   };
 });
 vi.mock('../../../../../src/lib/agents.js', () => ({
   messageAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   transitionIssueToInReview: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   getAgentStateAsync: vi.fn(),
   spawnAgent: vi.fn(),
 }));
@@ -94,7 +106,15 @@ vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => 
 const reviewStatusStore = new Map<string, any>();
 vi.mock('../../../../../src/lib/review-status.js', () => ({
   getReviewStatus: vi.fn((issueId: string) => reviewStatusStore.get(issueId.toUpperCase()) ?? null),
+  getReviewStatusSync: vi.fn((issueId: string) => reviewStatusStore.get(issueId.toUpperCase()) ?? null),
   setReviewStatus: vi.fn((issueId: string, update: Record<string, unknown>) => {
+    const key = issueId.toUpperCase();
+    const previous = reviewStatusStore.get(key) ?? { issueId: key };
+    const next = { ...previous, ...update, issueId: key };
+    reviewStatusStore.set(key, next);
+    return next;
+  }),
+  setReviewStatusSync: vi.fn((issueId: string, update: Record<string, unknown>) => {
     const key = issueId.toUpperCase();
     const previous = reviewStatusStore.get(key) ?? { issueId: key };
     const next = { ...previous, ...update, issueId: key };

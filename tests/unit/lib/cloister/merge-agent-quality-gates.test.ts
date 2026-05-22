@@ -5,7 +5,9 @@ import { join } from 'path';
 // Mock dependencies before importing the module under test
 vi.mock('../../../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  loadProjectsConfigSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   findProjectByTeam: vi.fn(),
 }));
 
@@ -18,6 +20,7 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/activity-log.js', () => ({
@@ -37,7 +40,7 @@ const PASSING_GATE_RESULT = [{ name: 'lint', passed: true, required: true, outpu
 describe('runProjectQualityGates — polyrepo path filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRunQualityGates.mockResolvedValue(PASSING_GATE_RESULT as any);
+    mockRunQualityGates.mockReturnValue(Effect.succeed(PASSING_GATE_RESULT) as any);
   });
 
   it('runs all gates in monorepo context (repoRelPath is empty)', async () => {
@@ -57,7 +60,7 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
     // projectPath === project.path → monorepo
     const results = await runProjectQualityGates(PROJECT_PATH, 'pre_push');
 
-    (await Effect.runPromise(expect(mockRunQualityGates))).toHaveBeenCalledOnce();
+    expect(mockRunQualityGates).toHaveBeenCalledOnce();
     const [gatesArg] = mockRunQualityGates.mock.calls[0];
     expect(Object.keys(gatesArg)).toEqual(['lint', 'typecheck']);
     expect(results).toEqual(PASSING_GATE_RESULT);
@@ -80,7 +83,7 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
     // projectPath is the frontend sub-repo → repoRelPath = 'frontend'
     const results = await runProjectQualityGates(join(PROJECT_PATH, 'frontend'), 'pre_push');
 
-    (await Effect.runPromise(expect(mockRunQualityGates))).toHaveBeenCalledOnce();
+    expect(mockRunQualityGates).toHaveBeenCalledOnce();
     const [gatesArg] = mockRunQualityGates.mock.calls[0];
     expect(Object.keys(gatesArg)).toEqual(['fe-lint']);
     expect(results).toEqual(PASSING_GATE_RESULT);
@@ -108,7 +111,7 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
 
     const results = await runProjectQualityGates(join(PROJECT_PATH, 'frontend'), 'pre_push');
 
-    (await Effect.runPromise(expect(mockRunQualityGates))).toHaveBeenCalledOnce();
+    expect(mockRunQualityGates).toHaveBeenCalledOnce();
     const [gatesArg] = mockRunQualityGates.mock.calls[0];
     expect(Object.keys(gatesArg)).toEqual(['fe-lint']);
     expect(results).toEqual(PASSING_GATE_RESULT);
@@ -130,7 +133,7 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
     // Merging the backend repo — fe-lint should be skipped
     const results = await runProjectQualityGates(join(PROJECT_PATH, 'backend'), 'pre_push');
 
-    (await Effect.runPromise(expect(mockRunQualityGates))).not.toHaveBeenCalled();
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
     expect(results).toEqual([]);
   });
 
@@ -150,7 +153,7 @@ describe('runProjectQualityGates — polyrepo path filtering', () => {
     // Gate has no path → not applicable to any specific repo
     const results = await runProjectQualityGates(join(PROJECT_PATH, 'frontend'), 'pre_push');
 
-    (await Effect.runPromise(expect(mockRunQualityGates))).not.toHaveBeenCalled();
+    expect(mockRunQualityGates).not.toHaveBeenCalled();
     expect(results).toEqual([]);
   });
 });

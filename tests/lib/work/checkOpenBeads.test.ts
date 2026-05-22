@@ -53,7 +53,7 @@ describe('checkOpenBeads', () => {
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('returns failure lines when open beads exist', async () => {
@@ -114,7 +114,7 @@ describe('checkOpenBeads', () => {
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('returns empty array when bd CLI is not installed (exit 127)', async () => {
@@ -125,7 +125,7 @@ describe('checkOpenBeads', () => {
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('returns failure message when bd command fails with non-ENOENT error', async () => {

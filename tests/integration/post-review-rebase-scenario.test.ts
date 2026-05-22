@@ -60,19 +60,24 @@ const mockResolveProject = vi.fn();
 
 vi.mock('../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
 }));
 
 vi.mock('../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('../../src/dashboard/server/event-store.js', () => ({
   EventStoreService: {},
+  initEventStore: vi.fn(async () => ({ appendAsync: vi.fn().mockResolvedValue(undefined) })),
   getEventStore: () => ({
     append: vi.fn().mockResolvedValue(undefined),
     getSnapshot: vi.fn().mockResolvedValue({ events: [] }),
@@ -82,12 +87,14 @@ vi.mock('../../src/dashboard/server/event-store.js', () => ({
 
 vi.mock('../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
   sendKeysAsync: vi.fn(),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
   buildTmuxCommandString: vi.fn(),
   capturePaneAsync: vi.fn(),
   createSessionAsync: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSessionAsync: vi.fn(),
   listPaneValues: vi.fn(),
   listPaneValuesAsync: vi.fn().mockResolvedValue([]),
@@ -105,18 +112,21 @@ vi.mock('../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn().mockReturnValue(null),
+  getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: vi.fn().mockReturnValue(null),
+  getAgentStateSync: vi.fn().mockReturnValue(null),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
   transitionIssueToInReview: vi.fn(),
 }));
 
 vi.mock('../../src/lib/cloister/feedback-writer.js', () => ({
-  writeFeedbackFile: vi.fn(),
+  writeFeedbackFile: vi.fn(() => Effect.succeed({ feedbackPath: '/tmp/feedback.md' })),
 }));
 
 vi.mock('node:fs', async (importActual) => {
@@ -130,7 +140,7 @@ const mockSpawnReviewRoleForIssue = vi
   .mockResolvedValue({ success: true, message: 'spawned' });
 
 vi.mock('../../src/lib/cloister/review-agent.js', () => ({
-  spawnReviewRoleForIssue: (...args: unknown[]) => mockSpawnReviewRoleForIssue(...args),
+  spawnReviewRoleForIssue: (...args: unknown[]) => Effect.promise(() => mockSpawnReviewRoleForIssue(...args)),
 }));
 
 vi.mock('../../src/lib/cloister/review-verdict-feedback.js', () => ({
@@ -294,7 +304,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     await Effect.runPromise(captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1'));
 
     // Verify the checkpoint ref was created
-    (await Effect.runPromise(expect(await hasCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1'))))-1215', 'turn-1'))).toBe(true);
+    expect(await Effect.runPromise(hasCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-1'))).toBe(true);
 
     // List files in the checkpoint tree
     const ref = 'refs/pan/turn/agent-pan-1215/turn-1';

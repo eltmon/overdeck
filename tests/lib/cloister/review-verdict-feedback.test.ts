@@ -23,10 +23,12 @@ vi.mock('../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
 }));
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -38,11 +40,11 @@ describe('deliverReviewVerdictFeedback', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
     mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059' });
-    mockWriteFeedbackFile.mockResolvedValue({
+    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
-    });
+    }));
   });
 
   it('posts synthesis to the PR, writes feedback, and messages the work agent', async () => {

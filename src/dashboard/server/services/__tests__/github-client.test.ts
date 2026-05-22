@@ -52,10 +52,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.getIssue('owner', 'repo', 1);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
@@ -78,10 +78,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.getIssue('owner', 'repo', 42);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const issue = await runEffect(program);
       expect(issue.number).toBe(42);
@@ -95,10 +95,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.getIssue('owner', 'repo', 999);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
@@ -109,10 +109,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.getIssue('owner', 'repo', 1);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
@@ -125,10 +125,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.addLabel('owner', 'repo', 42, 'in-progress');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       await runEffect(program);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -147,10 +147,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.removeLabel('owner', 'repo', 42, 'in-progress');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       await runEffect(program);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -164,10 +164,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.removeLabel('owner', 'repo', 42, 'missing-label');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       // Should NOT throw
       await runEffect(program);
@@ -182,10 +182,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.ensureLabel('owner', 'repo', 'merged', '00c000');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const label = await runEffect(program);
       expect(label.name).toBe('merged');
@@ -198,10 +198,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         return yield* client.ensureLabel('owner', 'repo', 'merged');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       const label = await runEffect(program);
       expect(label.id).toBe(5);
@@ -215,10 +215,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.addComment('owner', 'repo', 42, 'hello');
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       await runEffect(program);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -237,10 +237,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.closeIssue('owner', 'repo', 42);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       await runEffect(program);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -257,10 +257,10 @@ describe('GitHubClient Effect service', () => {
 
       const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const client = yield* GitHubClient;
         yield* client.reopenIssue('owner', 'repo', 42);
-      }).pipe(Effect.provide(GitHubClientLive))));
+      }).pipe(Effect.provide(GitHubClientLive));
 
       await runEffect(program);
       expect(mockFetch).toHaveBeenCalledWith(

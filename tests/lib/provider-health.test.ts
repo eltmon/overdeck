@@ -31,7 +31,7 @@ describe('provider health endpoint construction', () => {
     const fetchMock = vi.fn(async () => new Response('{"content":[]}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await (await Effect.runPromise(expect(probeProvider(PROVIDERS.minimax, 'sk-minimax-test', 'minimax-m2.7'))))x-test', 'minimax-m2.7')))).resolves.toEqual({ ok: true });
+    await expect(Effect.runPromise(probeProvider(PROVIDERS.minimax, 'sk-minimax-test', 'minimax-m2.7'))).resolves.toEqual({ ok: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.minimax.io/anthropic/v1/messages',

@@ -4,34 +4,41 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(),
 }));
 
 vi.mock('../../../lib/stashes.js', () => ({
-  dropStash: vi.fn(async () => {}),
+  dropStash: vi.fn(() => Effect.void),
   isOlderThanDays: vi.fn(),
-  listStashes: vi.fn(async () => []),
+  listStashes: vi.fn(() => Effect.succeed([])),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null) }));
+vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), resolveProjectFromIssueSync: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), listProjectsSync: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null), getProjectSync: vi.fn(() => null) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
-vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logAgentLifecycle: vi.fn() }));
-vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn() }));
+vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logDeaconEventSync: vi.fn(), logAgentLifecycle: vi.fn() }));
+vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityEntrySync: vi.fn(), emitActivityTts: vi.fn(), emitActivityTtsSync: vi.fn() }));
 vi.mock('../../config.js', () => ({ loadConfig: vi.fn(() => ({ trackers: { primary: 'linear', linear: { type: 'linear', api_key_env: 'LINEAR_API_KEY' } } })) }));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../specialists.js', () => ({
@@ -41,6 +48,9 @@ vi.mock('../specialists.js', () => ({
 }));
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({
+    monitoring: {},
+  })),
+  loadCloisterConfigSync: vi.fn(() => ({
     monitoring: {},
   })),
 }));
@@ -69,11 +79,13 @@ vi.mock('../../../lib/tmux.js', async () => {
   capturePane: effectMock(''),
   createSession: effectMock(undefined),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
   listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
+  sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   isPaneDead: effectMock(false),
@@ -163,7 +175,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockGetReviewStatus.mockReturnValue(null as any);
     mockLoadCloisterConfig.mockReturnValue({ monitoring: {} } as any);
     mockFindWorkspacePath.mockReturnValue('/repo/workspaces/feature-pan-879');
-    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([]) as any);
     mockSessionExists.mockReturnValue(false);
   });
 
@@ -182,7 +194,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    (await Effect.runPromise(expect(mockDropStash))).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
     expect(execMock).toHaveBeenCalledWith(
       expect.stringContaining('git rev-list spawn-head..HEAD --count'),
       expect.anything(),
@@ -198,33 +210,33 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   it('drops old non-salvageable stashes but preserves salvageable ones', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    (await Effect.runPromise(mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'def456abc123def456abc123def456abc123def4', stackRef: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
       { ref: 'bogusbogusbogusbogusbogusbogusbogusbogus', kind: 'pre-spawn', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-spawn:PAN-879:2026-03-01T00:00:00Z' } as any,
       { ref: 'fedcba654321fedcba654321fedcba654321fedc', stackRef: 'stash@{2}', kind: 'salvageable', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'salvageable:PAN-879:2026-03-01T00:00:00Z:notes', shortDescription: 'notes' } as any,
-    ])));
+    ]) as any);
     mockIsOlderThanDays.mockImplementation((entry) => entry.kind === 'pre-merge' || entry.kind === 'pre-spawn');
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    (await Effect.runPromise(expect(mockDropStash))).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'def456abc123def456abc123def456abc123def4', 'stash@{1}');
-    (await Effect.runPromise(expect(mockDropStash))).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'bogusbogusbogusbogusbogusbogusbogusbogus', undefined);
-    (await Effect.runPromise(expect(mockDropStash))).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'fedcba654321fedcba654321fedcba654321fedc');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'def456abc123def456abc123def456abc123def4', 'stash@{1}');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'bogusbogusbogusbogusbogusbogusbogusbogus', undefined);
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'fedcba654321fedcba654321fedcba654321fedc');
     expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: def456abc123def456abc123def456abc123def4');
   });
 
   it('preserves pre-merge stashes for non-github issues that are merely closed', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    (await Effect.runPromise(mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: '9999999999999999999999999999999999999999', stackRef: 'stash@{3}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
-    ])));
+    ]) as any);
     mockGetProject.mockReturnValue({ tracker: 'linear' } as any);
     mockCreateTracker.mockReturnValue({ getIssue: vi.fn(async () => ({ state: 'closed' })) } as any);
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    (await Effect.runPromise(expect(mockDropStash))).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', '9999999999999999999999999999999999999999', 'stash@{3}');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', '9999999999999999999999999999999999999999', 'stash@{3}');
     expect(mockSetReviewStatus).not.toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
     expect(actions).not.toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
   });
@@ -232,15 +244,15 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   it('preserves pre-merge stashes for github issues that are merely closed', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    (await Effect.runPromise(mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', stackRef: 'stash@{4}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
-    ])));
+    ]) as any);
     mockGetProject.mockReturnValue({ tracker: 'github', github_repo: 'owner/repo' } as any);
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
     expect(mockCreateTracker).not.toHaveBeenCalled();
-    (await Effect.runPromise(expect(mockDropStash))).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'stash@{4}');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'stash@{4}');
     expect(mockSetReviewStatus).not.toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
     expect(actions).not.toContain('Dropped merged issue pre-merge stash for PAN-879: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   });
@@ -261,7 +273,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    (await Effect.runPromise(expect(mockDropStash))).not.toHaveBeenCalled();
+    expect(mockDropStash).not.toHaveBeenCalled();
     expect(mockSaveAgentState).not.toHaveBeenCalled();
     expect(state.preSpawnStashRef).toBe('abc123def456abc123def456abc123def456abcd');
     expect(state.preSpawnBaselineHead).toBe('spawn-head');
@@ -286,7 +298,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    (await Effect.runPromise(expect(mockDropStash))).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
     expect(mockSaveAgentState).toHaveBeenCalledWith(state);
     expect(state.preSpawnStashRef).toBeUndefined();
     expect(state.preSpawnStashMessage).toBeUndefined();
@@ -311,13 +323,13 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   });
 
   it('logs non-canonical stashes on startup without deleting them', async () => {
-    (await Effect.runPromise(mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'stash@{5}', kind: 'unknown', issueId: undefined, message: 'legacy stash name' } as any,
-    ])));
+    ]) as any);
 
     const actions = await logNonCanonicalStashesOnStartup();
 
-    (await Effect.runPromise(expect(mockDropStash))).not.toHaveBeenCalled();
+    expect(mockDropStash).not.toHaveBeenCalled();
     expect(actions[0]).toContain('Non-canonical stash in PAN-879');
     expect(actions[0]).toContain('audit recommended');
   });
@@ -326,21 +338,21 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 describe('cleanupOrphanedReviewSessions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([]) as any);
     mockSessionExists.mockReturnValue(false);
   });
 
   it('kills orphaned canonical reviewer sessions', async () => {
-    (await Effect.runPromise(mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'specialist-panopticon-PAN-879-review-correctness',
       'specialist-panopticon-PAN-879-review-synthesis',
-    ])));
+    ]) as any);
 
     const actions = await cleanupOrphanedReviewSessions();
 
-    (await Effect.runPromise(expect(mockKillSessionAsync))).toHaveBeenCalledTimes(2);
-    (await Effect.runPromise(expect(mockKillSessionAsync))).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
-    (await Effect.runPromise(expect(mockKillSessionAsync))).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
     expect(actions).toEqual([
       'Killed orphaned specialist-panopticon-PAN-879-review-correctness (synthesis agent-pan-879-review and work agent-pan-879 not running)',
       'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (synthesis agent-pan-879-review and work agent-pan-879 not running)',
@@ -348,29 +360,29 @@ describe('cleanupOrphanedReviewSessions', () => {
   });
 
   it('kills orphaned PAN-1059 convoy reviewer sessions', async () => {
-    (await Effect.runPromise(mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'agent-pan-879-review-security',
       'agent-pan-879-review-correctness',
       'agent-pan-879-review-performance',
       'agent-pan-879-review-requirements',
-    ])));
+    ]) as any);
 
     const actions = await cleanupOrphanedReviewSessions();
 
-    (await Effect.runPromise(expect(mockKillSessionAsync))).toHaveBeenCalledTimes(4);
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(4);
     expect(actions).toHaveLength(4);
     expect(actions[0]).toContain('agent-pan-879-review-security');
   });
 
   it('keeps canonical reviewer sessions when the work agent still exists', async () => {
-    (await Effect.runPromise(mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'specialist-panopticon-PAN-879-review-correctness',
-    ])));
+    ]) as any);
     mockSessionExists.mockImplementation((name: string) => name === 'agent-pan-879');
 
     const actions = await cleanupOrphanedReviewSessions();
 
-    (await Effect.runPromise(expect(mockKillSessionAsync))).not.toHaveBeenCalled();
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
     expect(actions).toEqual([]);
   });
 });
@@ -378,7 +390,7 @@ describe('cleanupOrphanedReviewSessions', () => {
 describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSessionExistsAsync.mockImplementation(async (name: string) => name === 'agent-pan-879-review');
+    mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
   });
 
   it('signals synthesis when a reviewer disappears before writing output', async () => {

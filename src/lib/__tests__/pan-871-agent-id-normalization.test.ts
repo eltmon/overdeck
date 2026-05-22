@@ -28,11 +28,14 @@ vi.mock('../tmux.js', () => ({
   createSession: vi.fn(),
   createSessionAsync: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSessionAsync: vi.fn(),
   sendKeysAsync: vi.fn(),
   sessionExists: vi.fn(() => true),
+  sessionExistsSync: vi.fn(() => true),
   sessionExistsAsync: vi.fn(async () => true),
   getAgentSessions: vi.fn(() => [{ name: 'agent-pan-871' }]),
+  getAgentSessionsSync: vi.fn(() => [{ name: 'agent-pan-871' }]),
   getAgentSessionsAsync: vi.fn(async () => [{ name: 'agent-pan-871' }]),
   capturePane: vi.fn(() => ''),
   capturePaneAsync: vi.fn(async () => ''),
@@ -44,6 +47,7 @@ vi.mock('../tmux.js', () => ({
 vi.mock('../hooks.js', () => ({
   initHook: vi.fn(),
   checkHook: vi.fn(),
+  checkHookSync: vi.fn(),
   generateFixedPointPrompt: vi.fn(() => ''),
 }));
 
@@ -53,15 +57,15 @@ vi.mock('../cv.js', () => ({
   getAgentCV: vi.fn(),
 }));
 
-vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})) }));
+vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})), loadCloisterConfigSync: vi.fn(() => ({})) }));
 vi.mock('../providers.js', () => ({ getProviderForModel: vi.fn(() => ({ name: 'anthropic', compatibility: 'direct' })), getProviderEnv: vi.fn(() => ({})), setupCredentialFileAuth: vi.fn(), clearCredentialFileAuth: vi.fn() }));
 vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
 vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));
-vi.mock('../cliproxy.js', () => ({ getCliproxyClientEnv: vi.fn(() => ({})) }));
+vi.mock('../cliproxy.js', () => ({ getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
 vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), createTracker: vi.fn() }));
-vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), getIssuePrefix: vi.fn() }));
+vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn() }));
 vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));

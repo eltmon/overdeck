@@ -256,7 +256,7 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
-    await (await Effect.runPromise(expect(stopWorkspaceDocker(workspaceDir, 'pan-1140'))))orkspaceDir, 'pan-1140')))).rejects.toThrow(
+    await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
       'declares COMPOSE_PROJECT_NAME=victim-project, expected panopticon-feature-pan-1140',
     );
     expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());

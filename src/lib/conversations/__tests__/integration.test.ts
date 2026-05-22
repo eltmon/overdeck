@@ -166,12 +166,12 @@ describe('Stage 1: scan', () => {
 
   it('re-scan of unchanged files skips them without reparsing', async () => {
     await scan({ mode: 'system', watchDirs: [] });
-    const parser = (await Effect.runPromise(vi.fn(parseSessionJsonl)));
+    const parser = vi.fn(parseSessionJsonl);
     const r2 = await scan({ mode: 'system', watchDirs: [], parseJsonl: parser });
 
     expect(r2.skipped).toBe(3);
     expect(r2.inserted + r2.updated).toBe(0);
-    (await Effect.runPromise(expect(parser))).not.toHaveBeenCalled();
+    expect(parser).not.toHaveBeenCalled();
   });
 
   it('links managed session_file rows to issue IDs', async () => {

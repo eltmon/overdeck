@@ -466,7 +466,7 @@ export async function fetchProjectSessionTree(
       .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
 
     const results = await Effect.runPromise(withConcurrencyLimit(
-      featureCandidates.map((c) => async () => {
+      featureCandidates.map((c) => Effect.promise(async () => {
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
@@ -484,7 +484,7 @@ export async function fetchProjectSessionTree(
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
           return null;
         }
-      }),
+      })),
       15,
     ));
 

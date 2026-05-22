@@ -33,10 +33,10 @@ async function runRoute(
 
 /** Replicate the exact handler logic from costs.ts for testability */
 function makeExperimentsHandler() {
-  return httpHandler(Effect.try({
+  return Effect.try({
     try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-  }));
+  });
 }
 
 afterEach(() => {
@@ -47,7 +47,7 @@ describe('GET /api/costs/experiments handler', () => {
   it('returns 200 with empty experiments array when no data', async () => {
     mockGetExperimentData.mockReturnValue([]);
 
-    const { status, body } = await runRoute((await Effect.runPromise(makeExperimentsHandler())));
+    const { status, body } = await runRoute(makeExperimentsHandler());
     expect(status).toBe(200);
     expect((body as { experiments: unknown[] }).experiments).toEqual([]);
   });
@@ -59,7 +59,7 @@ describe('GET /api/costs/experiments handler', () => {
     ];
     mockGetExperimentData.mockReturnValue(rows);
 
-    const { status, body } = await runRoute((await Effect.runPromise(makeExperimentsHandler())));
+    const { status, body } = await runRoute(makeExperimentsHandler());
     expect(status).toBe(200);
     const result = body as { experiments: typeof rows };
     expect(result.experiments).toHaveLength(2);
@@ -70,7 +70,7 @@ describe('GET /api/costs/experiments handler', () => {
   it('returns 500 when getCavemanExperimentData throws', async () => {
     mockGetExperimentData.mockImplementation(() => { throw new Error('DB failure'); });
 
-    const { status } = await runRoute((await Effect.runPromise(makeExperimentsHandler())));
+    const { status } = await runRoute(makeExperimentsHandler());
     expect(status).toBe(500);
   });
 });

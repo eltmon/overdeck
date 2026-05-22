@@ -23,6 +23,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     resolveProjectFromIssue: resolveProjectFromIssueMock,
+    resolveProjectFromIssueSync: resolveProjectFromIssueMock,
   };
 });
 
@@ -31,6 +32,7 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: resolveGitHubIssueMock,
+    resolveGitHubIssueSync: resolveGitHubIssueMock,
   };
 });
 
@@ -72,9 +74,9 @@ async function postCloseOut(issueId: string, headers: Record<string, string> = {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(eventStoreLayer))))t.provide(eventStoreLayer)),
+      ).pipe(Effect.provide(eventStoreLayer)),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;
@@ -93,9 +95,9 @@ async function postBulkCloseOut(headers: Record<string, string> = {}) {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(eventStoreLayer))))t.provide(eventStoreLayer)),
+      ).pipe(Effect.provide(eventStoreLayer)),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;

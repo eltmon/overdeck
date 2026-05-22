@@ -272,7 +272,7 @@ exit 0
       // Revert using ORIG_HEAD
       const success = await Effect.runPromise(autoRevertMerge(testDir));
 
-      (await Effect.runPromise(expect(success))).toBe(true);
+      expect(success).toBe(true);
 
       // Verify HEAD is back to first commit
       const { stdout: commit3 } = await execAsync('git rev-parse HEAD', { cwd: testDir });
@@ -287,7 +287,7 @@ exit 0
       // Non-git directory
       const success = await Effect.runPromise(autoRevertMerge(testDir));
 
-      (await Effect.runPromise(expect(success))).toBe(false);
+      expect(success).toBe(false);
     });
   });
 });

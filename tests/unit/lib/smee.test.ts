@@ -48,6 +48,7 @@ const mockLoadConfig = vi.fn(() => ({
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
+  loadConfigSync: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
 }));
 
 beforeEach(() => {

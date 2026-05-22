@@ -525,25 +525,13 @@ export const runMergeValidation = (
   Effect.promise(() => runMergeValidationPromise(context));
 
 /**
- * Effect variant of {@link autoRevertMerge}. Surfaces git failure through a
- * typed {@link GitError} channel instead of returning `false` silently.
+ * Effect variant of {@link autoRevertMerge}. The Promise implementation returns
+ * false for git failures, so the Effect preserves that public behavior.
  */
 export const autoRevertMerge = (
   projectPath: string,
-): Effect.Effect<void, GitError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const ok = await autoRevertMergePromise(projectPath);
-      if (!ok) throw new Error('autoRevertMerge returned false');
-    },
-    catch: (cause) =>
-      new GitError({
-        command: ['git', 'reset', '--hard', 'ORIG_HEAD'],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
-  });
+): Effect.Effect<boolean> =>
+  Effect.promise(() => autoRevertMergePromise(projectPath));
 
 /**
  * Effect variant of {@link runQualityGates}. Wraps the Promise implementation

@@ -20,6 +20,7 @@ vi.mock('../../src/lib/runtimes/index.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({
@@ -155,7 +156,7 @@ describe('session-rotation', () => {
       });
 
       const memory = await Effect.runPromise(buildMergeAgentMemory('/tmp/test'));
-      (await Effect.runPromise(expect(memory))).toBe('No merge history available.\n');
+      expect(memory).toBe('No merge history available.\n');
     });
 
     it('should build memory with merge commits', async () => {
@@ -179,18 +180,18 @@ describe('session-rotation', () => {
         recent_full: 2,
       }));
 
-      (await Effect.runPromise(expect(memory))).toContain('# Merge-Agent Session Memory');
-      (await Effect.runPromise(expect(memory))).toContain('abc123');
-      (await Effect.runPromise(expect(memory))).toContain('Merge feature/foo');
-      (await Effect.runPromise(expect(memory))).toContain('Files changed');
+      expect(memory).toContain('# Merge-Agent Session Memory');
+      expect(memory).toContain('abc123');
+      expect(memory).toContain('Merge feature/foo');
+      expect(memory).toContain('Files changed');
     });
 
     it('should handle empty merge history', async () => {
       mockExecSync.mockReturnValue('');
 
       const memory = await Effect.runPromise(buildMergeAgentMemory('/tmp/test'));
-      (await Effect.runPromise(expect(memory))).toContain('# Merge-Agent Session Memory');
-      (await Effect.runPromise(expect(memory))).toContain('Last 20 merges');
+      expect(memory).toContain('# Merge-Agent Session Memory');
+      expect(memory).toContain('Last 20 merges');
     });
 
     it('should use default tiers when not specified', async () => {
@@ -290,7 +291,7 @@ describe('session-rotation', () => {
 
       const result = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent'));
 
-      (await Effect.runPromise(expect(result))).toBeNull();
+      expect(result).toBeNull();
     });
 
     it('should rotate when needed', async () => {
@@ -308,7 +309,7 @@ describe('session-rotation', () => {
 
       const result = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', '/tmp/workspace'));
 
-      (await Effect.runPromise(expect(result))).not.toBeNull();
+      expect(result).not.toBeNull();
       expect(result?.success).toBe(true);
     });
   });

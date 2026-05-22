@@ -130,14 +130,14 @@ describe('inspect-checkpoints', () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
       const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      (await Effect.runPromise(expect(base))).toBe('abc123def456');
+      expect(base).toBe('abc123def456');
     });
 
     it('uses last checkpoint SHA when checkpoints exist', async () => {
       saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
 
       const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      (await Effect.runPromise(expect(base))).toBe('checkpoint-sha');
+      expect(base).toBe('checkpoint-sha');
     });
 
     it('falls back to main when merge-base fails', async () => {
@@ -146,7 +146,7 @@ describe('inspect-checkpoints', () => {
       });
 
       const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      (await Effect.runPromise(expect(base))).toBe('main');
+      expect(base).toBe('main');
     });
   });
 
@@ -155,7 +155,7 @@ describe('inspect-checkpoints', () => {
       execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
 
       const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
-      (await Effect.runPromise(expect(stats))).toContain('3 files changed');
+      expect(stats).toContain('3 files changed');
     });
 
     it('returns fallback message on error', async () => {
@@ -164,7 +164,7 @@ describe('inspect-checkpoints', () => {
       });
 
       const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
-      (await Effect.runPromise(expect(stats))).toBe('Unable to compute diff stats');
+      expect(stats).toBe('Unable to compute diff stats');
     });
   });
 
@@ -173,7 +173,7 @@ describe('inspect-checkpoints', () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
       const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
-      (await Effect.runPromise(expect(head))).toBe('abc123def456');
+      expect(head).toBe('abc123def456');
     });
 
     it('returns unknown on error', async () => {
@@ -182,7 +182,7 @@ describe('inspect-checkpoints', () => {
       });
 
       const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
-      (await Effect.runPromise(expect(head))).toBe('unknown');
+      expect(head).toBe('unknown');
     });
   });
 });

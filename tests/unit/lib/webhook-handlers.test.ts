@@ -19,10 +19,14 @@ const mockSetReviewStatus = vi.fn();
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: (...args: Parameters<typeof mockGetReviewStatus>) => mockGetReviewStatus(...args),
+  getReviewStatusSync: (...args: Parameters<typeof mockGetReviewStatus>) => mockGetReviewStatus(...args),
   setReviewStatus: (...args: Parameters<typeof mockSetReviewStatus>) => mockSetReviewStatus(...args),
+  setReviewStatusSync: (...args: Parameters<typeof mockSetReviewStatus>) => mockSetReviewStatus(...args),
   getReviewStatus: (...args: Parameters<typeof mockGetReviewStatus>) => Effect.sync(() => mockGetReviewStatus(...args)),
+  getReviewStatusSync: (...args: Parameters<typeof mockGetReviewStatus>) => Effect.sync(() => mockGetReviewStatus(...args)),
   // Strip the optional third arg (existing status) so test assertions stay clean.
   setReviewStatus: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
+  setReviewStatusSync: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
 }));
 
 // Mock tracker-config so isTrackedRepository passes in tests

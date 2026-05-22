@@ -35,7 +35,7 @@ import type { VBriefDocument, VBriefItemStatus } from './types.js';
  * Effect-based pan-dir `findSpecByIssue` requires async FileSystem operations
  * (`fs.readDirectory`, `fs.readFileString`) that cannot run under
  * `Effect.runSync` — so we keep a local sync mirror rather than break CLI
- * synchronous semantics. Dashboard server code uses `findPlanAsync`.
+ * synchronous semantics. Dashboard server code uses `findPlanPromise`.
  */
 function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
   const upperIssueId = issueId.toUpperCase();
@@ -170,7 +170,7 @@ export function findWorkspaceDraftPlanSync(workspacePath: string): string | null
   return path;
 }
 
-export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promise<string | null> {
+async function findWorkspaceDraftPlanPromise(workspacePath: string): Promise<string | null> {
   const path = workspaceDraftPath(workspacePath);
   try {
     await readFile(path, 'utf-8');
@@ -183,7 +183,7 @@ export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promis
   if (!issueId) return path;
 
   try {
-    const doc = await readPlanAsync(path);
+    const doc = await readPlanPromise(path);
     const planIssueId = doc.plan?.id;
     if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
   } catch {
@@ -201,7 +201,7 @@ export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promis
  * NOTE (PAN-1249): Now runs the underlying pan-dir spec resolution via
  * `Effect.runSync` since findSpecByIssue is Effect-based. The Effect uses
  * NodeFileSystem under the hood which means this synchronous call path
- * actually blocks on async I/O — prefer `findPlanAsync` from any
+ * actually blocks on async I/O — prefer `findPlanPromise` from any
  * dashboard server code. Kept sync to preserve the CLI call sites.
  */
 export function findPlanSync(workspacePath: string): string | null {
@@ -213,12 +213,12 @@ export function findPlanSync(workspacePath: string): string | null {
 }
 
 /** Async variant of findPlan — safe to call from dashboard server code. */
-export async function findPlanAsync(workspacePath: string): Promise<string | null> {
+async function findPlanPromise(workspacePath: string): Promise<string | null> {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = await findSpecByIssueAsyncLocal(projectRoot, issueId);
-  return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);
+  return entry ? entry.path : findWorkspaceDraftPlanPromise(workspacePath);
 }
 
 /**
@@ -258,7 +258,7 @@ export function readPlanSync(planPath: string): VBriefDocument {
 }
 
 /** Async variant of readPlan — safe to call from server-hot-path code. */
-export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
+async function readPlanPromise(planPath: string): Promise<VBriefDocument> {
   const raw = await readFile(planPath, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
     throw new VBriefMergeConflictError(planPath);
@@ -325,10 +325,10 @@ export function readWorkspacePlanSync(workspacePath: string): VBriefDocument | n
 }
 
 /** Async variant of readWorkspacePlan — safe for dashboard server code. */
-export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
-  const planPath = await findPlanAsync(workspacePath);
+async function readWorkspacePlanPromise(workspacePath: string): Promise<VBriefDocument | null> {
+  const planPath = await findPlanPromise(workspacePath);
   if (!planPath) return null;
-  const doc = await readPlanAsync(planPath);
+  const doc = await readPlanPromise(planPath);
 
   const continueState = await Effect.runPromise(
     readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null))),
@@ -357,8 +357,8 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
 }
 
-export function isPlanningProposedAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
-  return checkPlanStatusAsync(workspacePath, planningDir, status => status === 'proposed');
+export function isPlanningProposedPromise(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusPromise(workspacePath, planningDir, status => status === 'proposed');
 }
 
 /**
@@ -372,8 +372,8 @@ export function isPlanningCompleteSync(workspacePath: string, planningDir?: stri
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
 }
 
-export function isPlanningCompleteAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
-  return checkPlanStatusAsync(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
+export function isPlanningCompletePromise(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusPromise(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
 }
 
 function checkPlanStatus(
@@ -394,15 +394,15 @@ function checkPlanStatus(
   return false;
 }
 
-async function checkPlanStatusAsync(
+async function checkPlanStatusPromise(
   workspacePath: string,
   _planningDir: string | undefined,
   matchStatus: (status: string) => boolean,
 ): Promise<boolean> {
-  const planPath = await findPlanAsync(workspacePath);
+  const planPath = await findPlanPromise(workspacePath);
   if (!planPath) return false;
   try {
-    const doc = await readPlanAsync(planPath);
+    const doc = await readPlanPromise(planPath);
     const status = doc.plan?.status;
     if (status && matchStatus(status)) return true;
     if (status) return false;
@@ -498,7 +498,7 @@ export function updateSubItemStatus(
 // those. Migrate callers individually as they move into Effect.
 
 /**
- * Effect variant of readPlanAsync — failures surface as typed errors in the
+ * Effect variant of readPlanPromise — failures surface as typed errors in the
  * channel instead of thrown exceptions.
  */
 export const readPlan = (
@@ -560,7 +560,7 @@ export const findWorkspaceDraftPlan = (
   });
 
 /**
- * Effect variant of findPlanAsync. Returns null when the workspace has no
+ * Effect variant of findPlanPromise. Returns null when the workspace has no
  * resolvable plan — only IO/decoding failures surface as errors.
  */
 export const findPlan = (
@@ -578,7 +578,7 @@ export const findPlan = (
   });
 
 /**
- * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
+ * Effect variant of readWorkspacePlanPromise. Returns null when there's no plan
  * for the workspace; otherwise returns the merged document with statusOverrides
  * applied. IO/decoding failures surface as typed errors.
  */

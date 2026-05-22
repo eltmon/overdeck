@@ -86,7 +86,7 @@ describe('shadow-state', () => {
   describe('getShadowState', () => {
     it('should return null for non-existent shadow state', async () => {
       const state = await Effect.runPromise(getShadowState(getUniqueId('nonexistent')));
-      (await Effect.runPromise(expect(state))).toBeNull();
+      expect(state).toBeNull();
     });
 
     it('should return the shadow state for an existing issue', async () => {
@@ -94,7 +94,7 @@ describe('shadow-state', () => {
       await Effect.runPromise(createShadowState(id, 'open'));
       const state = await Effect.runPromise(getShadowState(id));
 
-      (await Effect.runPromise(expect(state))).not.toBeNull();
+      expect(state).not.toBeNull();
       expect(state?.issueId).toBe(id.toUpperCase());
     });
 
@@ -103,19 +103,19 @@ describe('shadow-state', () => {
       await Effect.runPromise(createShadowState(id, 'open'));
       const state = await Effect.runPromise(getShadowState(id.toLowerCase()));
 
-      (await Effect.runPromise(expect(state))).not.toBeNull();
+      expect(state).not.toBeNull();
     });
   });
 
   describe('isShadowed', () => {
     it('should return false for non-shadowed issues', async () => {
-      (await Effect.runPromise(expect(await isShadowed(getUniqueId('notshadowed')))))d('notshadowed')))).toBe(false);
+      expect(await Effect.runPromise(isShadowed(getUniqueId('notshadowed')))).toBe(false);
     });
 
     it('should return true for shadowed issues', async () => {
       const id = getUniqueId('shadowed');
       await Effect.runPromise(createShadowState(id, 'open'));
-      (await Effect.runPromise(expect(await isShadowed(id))))se(isShadowed(id))).toBe(true);
+      expect(await Effect.runPromise(isShadowed(id))).toBe(true);
     });
   });
 
@@ -181,25 +181,25 @@ describe('shadow-state', () => {
     it('should return false when shadow status matches tracker status', async () => {
       const id = getUniqueId('insync');
       await Effect.runPromise(createShadowState(id, 'open'));
-      (await Effect.runPromise(expect(await needsSync(id))))ise(needsSync(id))).toBe(false);
+      expect(await Effect.runPromise(needsSync(id))).toBe(false);
     });
 
     it('should return true when shadow status differs from tracker status', async () => {
       const id = getUniqueId('outsync');
       await Effect.runPromise(createShadowState(id, 'open'));
       await Effect.runPromise(updateShadowState(id, 'in_progress', 'test'));
-      (await Effect.runPromise(expect(await needsSync(id))))ise(needsSync(id))).toBe(true);
+      expect(await Effect.runPromise(needsSync(id))).toBe(true);
     });
 
     it('should return false for non-shadowed issues', async () => {
-      (await Effect.runPromise(expect(await needsSync(getUniqueId('notshadowed')))))d('notshadowed')))).toBe(false);
+      expect(await Effect.runPromise(needsSync(getUniqueId('notshadowed')))).toBe(false);
     });
   });
 
   describe('getUnsyncedHistory', () => {
     it('should return empty array for non-shadowed issue', async () => {
       const history = await Effect.runPromise(getUnsyncedHistory(getUniqueId('noexist')));
-      (await Effect.runPromise(expect(history))).toEqual([]);
+      expect(history).toEqual([]);
     });
 
     it('should return only unsynced entries', async () => {
@@ -250,7 +250,7 @@ describe('shadow-state', () => {
     it('should not count fresh issues as needing sync', async () => {
       const id = getUniqueId('nosync');
       await Effect.runPromise(createShadowState(id, 'open'));
-      (await Effect.runPromise(expect(await needsSync(id))))ise(needsSync(id))).toBe(false);
+      expect(await Effect.runPromise(needsSync(id))).toBe(false);
     });
 
     it('should count issues needing sync', async () => {
@@ -258,7 +258,7 @@ describe('shadow-state', () => {
       await Effect.runPromise(createShadowState(id, 'open'));
       await Effect.runPromise(updateShadowState(id, 'in_progress', 'test'));
 
-      (await Effect.runPromise(expect(await needsSync(id))))ise(needsSync(id))).toBe(true);
+      expect(await Effect.runPromise(needsSync(id))).toBe(true);
     });
   });
 
@@ -296,10 +296,9 @@ describe('shadow-state', () => {
     });
 
     it('should throw error for non-shadowed issue', async () => {
-      await (await Effect.runPromise(expect(
+      await expect(Effect.runPromise(
         updateTrackerStatusCache(getUniqueId('noexist'), 'open')
-      )))oexist'), 'open')))
-      ).rejects.toThrow('not in shadow mode');
+      )).rejects.toThrow('not in shadow mode');
     });
   });
 
@@ -307,12 +306,12 @@ describe('shadow-state', () => {
     it('should remove shadow state for an issue', async () => {
       const id = getUniqueId('remove');
       await Effect.runPromise(createShadowState(id, 'open'));
-      (await Effect.runPromise(expect(await isShadowed(id))))se(isShadowed(id))).toBe(true);
+      expect(await Effect.runPromise(isShadowed(id))).toBe(true);
 
       const result = removeShadowState(id);
 
       expect(result.success).toBe(true);
-      (await Effect.runPromise(expect(await isShadowed(id))))se(isShadowed(id))).toBe(false);
+      expect(await Effect.runPromise(isShadowed(id))).toBe(false);
     });
 
     it('should return error for non-existent issue', () => {

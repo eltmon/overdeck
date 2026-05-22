@@ -22,6 +22,7 @@ const mockSessionExistsEffect = vi.fn();
 const mockIsPaneDeadEffect = vi.fn();
 vi.mock('../../tmux.js', () => ({
   sessionExists: (...args: unknown[]) => mockSessionExistsEffect(...args),
+  sessionExistsSync: (...args: unknown[]) => mockSessionExistsEffect(...args),
   isPaneDead: (...args: unknown[]) => mockIsPaneDeadEffect(...args),
 }));
 
@@ -64,18 +65,18 @@ describe('waitForReviewerOutputs', () => {
     mockExistsSync.mockReturnValue(true);
     mockStat.mockResolvedValue({ mtimeMs: Date.now() - 10 * 60 * 1000 }); // old mtime → settled
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       pollIntervalMs: 100,
       staleAfterMs: 5 * 60 * 1000,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
 
-    (await Effect.runPromise(expect(results))).toHaveLength(4);
+    expect(results).toHaveLength(4);
     for (const r of results) {
       expect(r.status).toBe('done');
     }
@@ -85,14 +86,14 @@ describe('waitForReviewerOutputs', () => {
     mockExistsSync.mockReturnValue(false);
     mockIsPaneDeadEffect.mockReturnValue(Effect.succeed(true));
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       pollIntervalMs: 50,
       staleAfterMs: 5_000,
       timeoutMs: 500,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
@@ -108,14 +109,14 @@ describe('waitForReviewerOutputs', () => {
     mockStat.mockResolvedValue({ mtimeMs: oldMtime });
     mockIsPaneDeadEffect.mockReturnValue(Effect.succeed(true));
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       pollIntervalMs: 50,
       staleAfterMs: 5_000,
       timeoutMs: 500,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
@@ -139,14 +140,14 @@ describe('waitForReviewerOutputs', () => {
     });
     mockIsPaneDeadEffect.mockReturnValue(Effect.succeed(false)); // sessions still alive
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       pollIntervalMs: 100,
       staleAfterMs: 5 * 60 * 1000,
       timeoutMs: 60_000,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
@@ -170,14 +171,14 @@ describe('waitForReviewerOutputs', () => {
     });
     mockIsPaneDeadEffect.mockReturnValue(Effect.succeed(true));
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       pollIntervalMs: 50,
       staleAfterMs: 5 * 60 * 1000,
       timeoutMs: 500,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
@@ -194,19 +195,19 @@ describe('waitForReviewerOutputs', () => {
     mockExistsSync.mockReturnValue(true);
     mockStat.mockResolvedValue({ mtimeMs: Date.now() - 10 * 60 * 1000 });
 
-    const resultPromise = (await Effect.runPromise(waitForReviewerOutputs({
+    const resultPromise = Effect.runPromise(waitForReviewerOutputs({
       issueId: 'PAN-1059',
       runId: RUN_ID,
       workspace: WORKSPACE,
       subRoles: ['security', 'correctness'],
       pollIntervalMs: 50,
       staleAfterMs: 5 * 60 * 1000,
-    })));
+    }));
 
     await vi.runAllTimersAsync();
     const results = await resultPromise;
 
-    (await Effect.runPromise(expect(results))).toHaveLength(2);
+    expect(results).toHaveLength(2);
     expect(results.map(r => r.subRole)).toEqual(['security', 'correctness']);
   });
 });

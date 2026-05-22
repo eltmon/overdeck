@@ -40,7 +40,7 @@ describe('createPiFifo', () => {
 
   it('creates a fifo at ~/.panopticon/agents/<id>/rpc.in with mode 0600 (AC1)', async () => {
     const path = await Effect.runPromise(createPiFifo('agent-x', h.home))
-    (await Effect.runPromise(expect(path))).toBe(piFifoPaths('agent-x', h.home).fifoPath)
+    expect(path).toBe(piFifoPaths('agent-x', h.home).fifoPath)
     expect(isFifo(path)).toBe(true)
     const mode = statSync(path).mode & 0o777
     expect(mode).toBe(0o600)
@@ -51,7 +51,7 @@ describe('createPiFifo', () => {
     expect(isFifo(path)).toBe(true)
     // Recreate — should not throw and the result must still be a fifo.
     const path2 = await Effect.runPromise(createPiFifo('agent-x', h.home))
-    (await Effect.runPromise(expect(path2))).toBe(path)
+    expect(path2).toBe(path)
     expect(isFifo(path2)).toBe(true)
   })
 

@@ -2240,8 +2240,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     getProviderForModelSync(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
-    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
-    if (!(await isCliproxyRunningAsync())) {
+    const { isCliproxyRunning } = await import('./cliproxy.js');
+    if (!(await Effect.runPromise(isCliproxyRunning()))) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription role runs route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -2520,8 +2520,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     getProviderForModelSync(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
-    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
-    if (!(await isCliproxyRunningAsync())) {
+    const { isCliproxyRunning } = await import('./cliproxy.js');
+    if (!(await Effect.runPromise(isCliproxyRunning()))) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '

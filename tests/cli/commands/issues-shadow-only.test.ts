@@ -13,13 +13,14 @@ const { loadConfigMock, isShadowedMock, getPendingSyncCountMock, createTrackerMo
   vi.hoisted(() => ({
     loadConfigMock: vi.fn(),
     isShadowedMock: vi.fn(),
-    getPendingSyncCountMock: vi.fn().mockReturnValue(0),
+    getPendingSyncCountMock: vi.fn(),
     createTrackerMock: vi.fn(),
     loadProjectsConfigMock: vi.fn().mockReturnValue({ projects: {} }),
   }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: loadConfigMock,
+  loadConfigSync: loadConfigMock,
 }));
 vi.mock('../../../src/lib/shadow-state.js', () => ({
   isShadowed: isShadowedMock,
@@ -30,6 +31,7 @@ vi.mock('../../../src/lib/tracker/index.js', () => ({
 }));
 vi.mock('../../../src/lib/projects.js', () => ({
   loadProjectsConfig: loadProjectsConfigMock,
+  loadProjectsConfigSync: loadProjectsConfigMock,
 }));
 
 import { listCommand } from '../../../src/cli/commands/issues.js';
@@ -52,6 +54,7 @@ describe('listCommand --shadow-only', () => {
         github: { owner: 'eltmon', repo: 'test', token_env: 'GITHUB_TOKEN' },
       },
     });
+    getPendingSyncCountMock.mockReturnValue(Effect.succeed(0));
 
     const mockIssues = [
       { ref: 'PAN-1', title: 'Open issue', state: 'open', priority: 3 },
@@ -64,7 +67,7 @@ describe('listCommand --shadow-only', () => {
     });
 
     // PAN-2 is shadowed, PAN-1 is not
-    isShadowedMock.mockImplementation((ref: string) => ref === 'PAN-2');
+    isShadowedMock.mockImplementation((ref: string) => Effect.succeed(ref === 'PAN-2'));
   });
 
   afterEach(() => {
@@ -98,7 +101,7 @@ describe('listCommand --shadow-only', () => {
   });
 
   it('with --shadow-only and zero shadowed issues: prints "No shadowed issues found"', async () => {
-    isShadowedMock.mockReturnValue(false);
+    isShadowedMock.mockReturnValue(Effect.succeed(false));
 
     await listCommand({ shadowOnly: true });
 

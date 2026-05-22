@@ -9,9 +9,13 @@ const mocks = vi.hoisted(() => ({
   listSessionNames: vi.fn(),
   isPaneDead: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   listStashes: vi.fn(),
   dropStash: vi.fn(),
   createNamedStash: vi.fn(),
@@ -19,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   formatTier1Summary: vi.fn(),
   archiveFeedbackFiles: vi.fn(),
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -27,7 +32,9 @@ vi.mock('child_process', () => ({
 
 vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
+  saveAgentState: mocks.saveAgentStateEffect,
   saveAgentStateEffect: mocks.saveAgentStateEffect,
+  getAgentState: mocks.getAgentStateEffect,
   getAgentStateEffect: mocks.getAgentStateEffect,
   messageAgent: vi.fn(),
 }));
@@ -36,15 +43,19 @@ vi.mock('../../tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
   isPaneDead: mocks.isPaneDead,
   killSession: mocks.killSession,
+  killSessionSync: mocks.killSession,
 }));
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: mocks.emitActivityEntry,
+  emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatus: mocks.getReviewStatus,
+  getReviewStatusSync: mocks.getReviewStatus,
   setReviewStatus: mocks.setReviewStatus,
+  setReviewStatusSync: mocks.setReviewStatus,
 }));
 
 vi.mock('../../stashes.js', () => ({
@@ -57,6 +68,7 @@ vi.mock('../../stashes.js', () => ({
 
 vi.mock('../../config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
+  loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
 }));
 
@@ -102,8 +114,8 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.getAgentStateEffect.mockReturnValue(Effect.succeed({ hostOverride: true }));
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
-    mocks.listStashes.mockResolvedValue([]);
-    mocks.createNamedStash.mockResolvedValue(null);
+    mocks.listStashes.mockReturnValue(Effect.succeed([]));
+    mocks.createNamedStash.mockReturnValue(Effect.succeed(null));
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);

@@ -32,6 +32,7 @@ vi.mock('../../../../src/lib/webhook-handlers.js', () => ({
   handlePullRequestReviewThread: vi.fn(),
   handleStatus: vi.fn(),
   isTrackedRepository: vi.fn(() => true),
+  isTrackedRepositorySync: vi.fn(() => true),
 }));
 
 const mockExistsSync = existsSync as unknown as ReturnType<typeof vi.fn>;

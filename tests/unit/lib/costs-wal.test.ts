@@ -32,8 +32,11 @@ function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 
 // ============== wal.ts: resolveWalDir ==============
 
+const mockListProjects = vi.fn();
+
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: vi.fn(),
+  listProjects: mockListProjects,
+  listProjectsSync: mockListProjects,
 }));
 
 describe('resolveWalDir', () => {

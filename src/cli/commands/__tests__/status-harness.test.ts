@@ -4,15 +4,18 @@ import { Effect } from 'effect'
 // Stub the agents module so statusCommand sees our scripted agents.
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/nonexistent'),
 }))
 vi.mock('../../../lib/shadow-state.js', () => ({
-  isShadowed: vi.fn(async () => false),
-  getShadowState: vi.fn(async () => null),
+  isShadowed: vi.fn(() => Effect.succeed(false)),
+  getShadowState: vi.fn(() => Effect.succeed(null)),
 }))
 vi.mock('../../../lib/tldr-daemon.js', () => ({
   getTldrMetrics: vi.fn(() => ({ interceptions: 0, bypasses: 0, estimatedTokensSaved: 0 })),
+  getTldrMetricsSync: vi.fn(() => ({ interceptions: 0, bypasses: 0, estimatedTokensSaved: 0 })),
   getTldrDaemonService: vi.fn(),
+  getTldrDaemonServiceSync: vi.fn(),
 }))
 vi.mock('../../../lib/workspace/stack-health.js', () => ({
   collectDockerContainerLifecycleSnapshot: vi.fn(() => Effect.succeed([])),
@@ -23,7 +26,7 @@ vi.mock('../../../lib/workspace/stack-health.js', () => ({
   }),
 }))
 vi.mock('../../../lib/restart-status.js', () => ({
-  readRestartStatus: vi.fn(() => null),
+  readRestartStatus: vi.fn(() => Effect.succeed(null)),
 }))
 
 import { statusCommand } from '../status.js'
@@ -38,7 +41,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null)
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed(null))
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: true,
       reasons: [],
@@ -115,14 +118,14 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   it('prints the latest dashboard restart status', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       ts: new Date().toISOString(),
       trigger: 'pan reload',
       success: false,
       error: '[dashboard] health check failed',
       durationMs: 2400,
       attempts: 1,
-    })
+    }))
 
     await statusCommand({} as any)
 
@@ -134,7 +137,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   it('shows a prominent marker when the watchdog gave up', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       ts: new Date().toISOString(),
       trigger: 'watchdog',
       success: false,
@@ -142,7 +145,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       durationMs: 0,
       attempts: 3,
       gaveUp: true,
-    })
+    }))
 
     await statusCommand({} as any)
 

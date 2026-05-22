@@ -24,7 +24,7 @@ describe('restart status', () => {
   });
 
   it('returns null when the status file is missing', async () => {
-    (await Effect.runPromise(expect(await readRestartStatus())))adRestartStatus())).toBeNull();
+    expect(await Effect.runPromise(readRestartStatus())).toBeNull();
   });
 
   it('writes and reads the latest restart status', async () => {
@@ -38,7 +38,7 @@ describe('restart status', () => {
       gaveUp: true,
     }));
 
-    (await Effect.runPromise(expect(await readRestartStatus())))adRestartStatus())).toEqual({
+    expect(await Effect.runPromise(readRestartStatus())).toEqual({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,

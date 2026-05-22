@@ -51,24 +51,24 @@ afterEach(() => {
 describe('syncBeadStatusToVBrief', () => {
   it('returns null when no plan exists', async () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'Some task' }]);
-    (await Effect.runPromise(expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)))), WORKSPACE_PATH))).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when .beads/issues.jsonl does not exist', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Some task' }]));
-    (await Effect.runPromise(expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)))), WORKSPACE_PATH))).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when bead ID not found in issues.jsonl', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Some task' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'other-bead', title: 'PAN-388: Some task' }]);
-    (await Effect.runPromise(expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)))), WORKSPACE_PATH))).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when no matching vBRIEF item found', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Different title' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: No match here' }]);
-    (await Effect.runPromise(expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)))), WORKSPACE_PATH))).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('syncs status when bead title matches with plan prefix', async () => {
@@ -77,7 +77,7 @@ describe('syncBeadStatusToVBrief', () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: Wire the pipeline' }]);
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH));
-    (await Effect.runPromise(expect(result))).toBe('item-1');
+    expect(result).toBe('item-1');
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(updated.plan.items[0].status).toBe('completed');
@@ -88,7 +88,7 @@ describe('syncBeadStatusToVBrief', () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-lowercase-prefix', title: 'pan-388: Wire the pipeline' }]);
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-lowercase-prefix', WORKSPACE_PATH));
-    (await Effect.runPromise(expect(result))).toBe('item-lowercase-prefix');
+    expect(result).toBe('item-lowercase-prefix');
   });
 
   it('syncs status when bead title matches without plan prefix', async () => {
@@ -96,7 +96,7 @@ describe('syncBeadStatusToVBrief', () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-2', title: 'Wire the pipeline' }]);
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-2', WORKSPACE_PATH));
-    (await Effect.runPromise(expect(result))).toBe('item-2');
+    expect(result).toBe('item-2');
   });
 
   it('uses in_progress status when specified', async () => {
@@ -114,7 +114,7 @@ describe('syncBeadStatusToVBrief', () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-4', title: 'PAN-388: wire the pipeline' }]);
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-4', WORKSPACE_PATH));
-    (await Effect.runPromise(expect(result))).toBe('item-4');
+    expect(result).toBe('item-4');
   });
 
   it('handles malformed lines in issues.jsonl gracefully', async () => {
@@ -127,7 +127,7 @@ describe('syncBeadStatusToVBrief', () => {
     );
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH));
-    (await Effect.runPromise(expect(result))).toBe('item-1');
+    expect(result).toBe('item-1');
   });
 });
 

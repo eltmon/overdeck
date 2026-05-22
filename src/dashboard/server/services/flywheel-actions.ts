@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { Effect } from 'effect';
-import { loadConfigAsyncNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
+import { loadConfigNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/database/app-settings.js';
 import { sessionExists } from '../../../lib/tmux.js';
@@ -118,7 +118,7 @@ async function readGateSnapshot(): Promise<FlywheelGateSnapshot> {
 }
 
 async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
-  const { config } = await Effect.runPromise(loadConfigAsyncNoMigration());
+  const { config } = await Effect.runPromise(loadConfigNoMigration());
   const flywheel = config.roles?.flywheel;
   return {
     harness: flywheel?.harness ?? 'claude-code',

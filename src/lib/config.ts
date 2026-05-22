@@ -284,7 +284,7 @@ export function saveConfigSync(config: PanopticonConfig): void {
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-export async function loadConfigAsync(): Promise<PanopticonConfig> {
+async function loadConfigPromise(): Promise<PanopticonConfig> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
@@ -298,7 +298,7 @@ export async function loadConfigAsync(): Promise<PanopticonConfig> {
   }
 }
 
-export async function saveConfigAsync(config: PanopticonConfig): Promise<void> {
+async function saveConfigPromise(config: PanopticonConfig): Promise<void> {
   const content = stringify(config as any);
   await fs.writeFile(CONFIG_FILE, content, 'utf8');
 }
@@ -401,8 +401,8 @@ export function getConversationsConfigSync(): ConversationsConfig {
   return resolveConversationsConfig(loadConfigSync());
 }
 
-export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfigAsync());
+async function getConversationsConfigPromise(): Promise<ConversationsConfig> {
+  return resolveConversationsConfig(await loadConfigPromise());
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -413,7 +413,7 @@ export async function getConversationsConfigAsync(): Promise<ConversationsConfig
 /** Load config.toml (async; dashboard-safe). */
 export const loadConfig = (): Effect.Effect<PanopticonConfig, FsError> =>
   Effect.tryPromise({
-    try: () => loadConfigAsync(),
+    try: () => loadConfigPromise(),
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
   });
@@ -423,7 +423,7 @@ export const saveConfig = (
   config: PanopticonConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
-    try: () => saveConfigAsync(config),
+    try: () => saveConfigPromise(config),
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
   });
@@ -449,7 +449,7 @@ export const findDevrootForProject = (
 export const getConversationsConfig =
   (): Effect.Effect<ConversationsConfig, FsError> =>
     Effect.tryPromise({
-      try: () => getConversationsConfigAsync(),
+      try: () => getConversationsConfigPromise(),
       catch: (cause) =>
         new FsError({
           path: CONFIG_FILE,

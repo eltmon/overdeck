@@ -4,6 +4,7 @@ import type { ProjectConfig, ResolvedProject } from '../../src/lib/projects.js';
 const projectsMocks = vi.hoisted(() => ({
   getProject: vi.fn(),
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/projects.js', async () => {
@@ -11,7 +12,9 @@ vi.mock('../../src/lib/projects.js', async () => {
   return {
     ...actual,
     getProject: projectsMocks.getProject,
+    getProjectSync: projectsMocks.getProject,
     resolveProjectFromIssue: projectsMocks.resolveProjectFromIssue,
+    resolveProjectFromIssueSync: projectsMocks.resolveProjectFromIssueSync,
   };
 });
 
@@ -105,7 +108,7 @@ describe('project-repos', () => {
         repos: [{ name: 'api', path: 'api', remote: 'gitlab' }],
       },
     };
-    projectsMocks.resolveProjectFromIssue.mockReturnValue(resolvedProject);
+    projectsMocks.resolveProjectFromIssueSync.mockReturnValue(resolvedProject);
     projectsMocks.getProject.mockReturnValue(projectConfig);
 
     const repos = resolveProjectReposForIssueSync('MIN-632');

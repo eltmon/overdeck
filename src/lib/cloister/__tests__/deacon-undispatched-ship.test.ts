@@ -12,18 +12,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   saveSessionId: vi.fn(),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/tmux.js', async () => {
@@ -51,11 +58,13 @@ vi.mock('../../../lib/tmux.js', async () => {
   capturePane: effectMock(''),
   createSession: effectMock(undefined),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
   listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
+  sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   };
@@ -71,6 +80,7 @@ vi.mock('../specialists.js', () => ({
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({})),
+  loadCloisterConfigSync: vi.fn(() => ({})),
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -99,7 +109,7 @@ vi.mock('fs', async (importOriginal) => {
 // service.js — stub onIssueStateChange so the test asserts the dispatch
 // without spinning up the real scheduler.
 vi.mock('../service.js', () => ({
-  onIssueStateChange: vi.fn(async () => {}),
+  onIssueStateChange: vi.fn(() => Effect.succeed(undefined)),
 }));
 
 import { checkUndispatchedShip } from '../deacon.js';
@@ -131,7 +141,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledWith('PAN-977', 'shipping');
+    expect(mockOnIssueStateChange).toHaveBeenCalledWith('PAN-977', 'shipping');
     expect(actions).toHaveLength(1);
   });
 
@@ -149,7 +159,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
+    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -167,7 +177,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
 
     const actions = await checkUndispatchedShip();
 
-    (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
+    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -186,7 +196,7 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
       } as unknown as ReturnType<typeof loadReviewStatuses>);
 
       const actions = await checkUndispatchedShip();
-      (await Effect.runPromise(expect(mockOnIssueStateChange))).not.toHaveBeenCalled();
+      expect(mockOnIssueStateChange).not.toHaveBeenCalled();
       expect(actions).toHaveLength(0);
     }
   });
@@ -206,10 +216,10 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     } as unknown as ReturnType<typeof loadReviewStatuses>);
 
     await checkUndispatchedShip();
-    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledTimes(1);
+    expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
 
     // Immediate second patrol tick — cooldown must suppress the re-dispatch.
     await checkUndispatchedShip();
-    (await Effect.runPromise(expect(mockOnIssueStateChange))).toHaveBeenCalledTimes(1);
+    expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
   });
 });

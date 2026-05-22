@@ -42,6 +42,7 @@ vi.mock('child_process', async (importOriginal) => {
 
 vi.mock('../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
+  getVBriefACStatusSync: mockGetVBriefACStatus,
   syncBeadStatusToVBrief: mockSyncBeadStatusToVBrief,
 }));
 
@@ -77,7 +78,7 @@ describe('runPreflightChecks', () => {
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('aggregates failures from open beads AND uncommitted changes', async () => {
@@ -159,7 +160,7 @@ describe('runPreflightChecks', () => {
       cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
-    mockSyncBeadStatusToVBrief.mockReturnValue('item-1');
+    mockSyncBeadStatusToVBrief.mockReturnValue(Effect.succeed('item-1'));
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));
@@ -189,7 +190,7 @@ describe('runPreflightChecks', () => {
       cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
-    mockSyncBeadStatusToVBrief.mockReturnValue('item-stale');
+    mockSyncBeadStatusToVBrief.mockReturnValue(Effect.succeed('item-stale'));
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));

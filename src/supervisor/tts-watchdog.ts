@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 
-import { loadConfigAsyncNoMigration } from '../lib/config-yaml.js';
+import { loadConfigNoMigration } from '../lib/config-yaml.js';
 import { getTtsDaemonStatus, hasTtsDaemonState, isTtsDaemonManuallyStopped, startTtsDaemon } from '../lib/tts-daemon.js';
 import { parsePositiveIntEnv } from './watchdog.js';
 
@@ -103,7 +103,7 @@ export class TtsWatchdog {
     if (this.ticking) return;
     this.ticking = true;
     try {
-      const ttsConfig = (await Effect.runPromise(loadConfigAsyncNoMigration())).config.tts;
+      const ttsConfig = (await Effect.runPromise(loadConfigNoMigration())).config.tts;
       const manuallyStopped = await Effect.runPromise(isTtsDaemonManuallyStopped());
       this.active = !manuallyStopped && (ttsConfig.daemonAutoStart || await Effect.runPromise(hasTtsDaemonState()));
       if (!this.active) {

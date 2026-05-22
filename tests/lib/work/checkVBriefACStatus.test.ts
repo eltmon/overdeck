@@ -14,6 +14,7 @@ const mockSyncBeadStatusToVBrief = vi.fn();
 
 vi.mock('../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
+  getVBriefACStatusSync: mockGetVBriefACStatus,
   syncBeadStatusToVBrief: mockSyncBeadStatusToVBrief,
 }));
 

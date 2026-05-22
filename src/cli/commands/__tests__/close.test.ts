@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     execFile: vi.fn(),
     findProjectByTeam: vi.fn(() => null),
     resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+    resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
     createInterface: vi.fn(),
     existsSync: vi.fn(() => true),
     readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/panopticon-cli:PAN\n'),
@@ -39,7 +40,9 @@ vi.mock('../../../lib/lifecycle/index.js', () => ({
 vi.mock('../../../lib/projects.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/projects.js')>()),
   findProjectByTeam: mocks.findProjectByTeam,
+  findProjectByTeamSync: mocks.findProjectByTeam,
   resolveProjectFromIssue: mocks.resolveProjectFromIssue,
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssue,
 }));
 
 import { closeOutCommand } from '../close.js';
@@ -79,7 +82,7 @@ describe('closeOutCommand', () => {
     expect(output).toContain("Issue should normally be in 'verifying-on-main' before close-out.");
     expect(output).toContain("Warning: current canonical state is 'todo', not 'verifying_on_main'.");
     expect(mocks.createInterface).toHaveBeenCalledOnce();
-    (await Effect.runPromise(expect(mocks.closeOut))).toHaveBeenCalledWith({
+    expect(mocks.closeOut).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
       projectPath: '/repo',
       github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
@@ -90,6 +93,6 @@ describe('closeOutCommand', () => {
     await closeOutCommand('PAN-1190', { force: true });
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
-    (await Effect.runPromise(expect(mocks.closeOut))).toHaveBeenCalledOnce();
+    expect(mocks.closeOut).toHaveBeenCalledOnce();
   });
 });

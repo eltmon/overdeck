@@ -24,11 +24,14 @@ vi.mock('../../src/lib/database/index.js', () => ({
 
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 // PAN-946 regression: the reopen flow now resolves the project path so it can
@@ -42,6 +45,7 @@ vi.mock('../../src/lib/projects.js', async () => {
   return {
     ...actual,
     resolveProjectFromIssue: () => projectStub,
+    resolveProjectFromIssueSync: () => projectStub,
   };
 });
 

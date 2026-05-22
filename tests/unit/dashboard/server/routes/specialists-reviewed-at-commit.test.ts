@@ -61,25 +61,31 @@ const mockTreeShaByCommit = new Map<string, string>();
 const mockResolveProject = vi.fn();
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
 }));
 
 vi.mock('../../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
   sendKeysAsync: vi.fn(),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
   buildTmuxCommandString: vi.fn(),
   capturePaneAsync: vi.fn(),
   createSessionAsync: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSessionAsync: vi.fn(),
   listPaneValues: vi.fn(),
   listPaneValuesAsync: vi.fn(),
@@ -97,11 +103,14 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn().mockReturnValue(null),
+  getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
+  listRunningAgentsSync: vi.fn().mockResolvedValue([]),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: vi.fn().mockReturnValue(null),
+  getAgentStateSync: vi.fn().mockReturnValue(null),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
   transitionIssueToInReview: vi.fn(),

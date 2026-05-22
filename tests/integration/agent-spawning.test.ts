@@ -35,11 +35,11 @@ const piFifoMocks = vi.hoisted(() => ({
 
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
-  createPiFifo: vi.fn(async (agentId: string) => {
+  createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
     const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
     mkdirSync(dir, { recursive: true });
     return join(dir, 'rpc.in');
-  }),
+  })),
   piFifoPaths: (agentId: string) => {
     const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
     return {
@@ -49,6 +49,7 @@ vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
     };
   },
   writePiCommand: piFifoMocks.writePiCommand,
+  writePiCommandSync: piFifoMocks.writePiCommand,
 }));
 
 // Mock tmux module to avoid actual session creation
@@ -56,13 +57,20 @@ vi.mock('../../src/lib/tmux.js', () => ({
   createSession: vi.fn().mockResolvedValue(undefined),
   createSession: vi.fn(() => Effect.void),
   killSession: vi.fn().mockResolvedValue(undefined),
+  killSessionSync: vi.fn().mockResolvedValue(undefined),
   killSession: vi.fn(() => Effect.void),
+  killSessionSync: vi.fn(() => Effect.void),
+  sendKeys: vi.fn(() => Effect.void),
   sendKeysEffect: vi.fn(() => Effect.void),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExists: vi.fn(() => Effect.succeed(false)),
+  sessionExistsSync: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn().mockResolvedValue([]),
+  getAgentSessionsSync: vi.fn().mockResolvedValue([]),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
+  getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
   listPaneValues: vi.fn(() => Effect.succeed([])),
   setOption: vi.fn(() => Effect.void),
   capturePane: vi.fn().mockResolvedValue('Claude Code'),
@@ -71,7 +79,9 @@ vi.mock('../../src/lib/tmux.js', () => ({
 
 vi.mock('../../src/lib/hooks.js', () => ({
   initHook: vi.fn(),
+  initHookSync: vi.fn(),
   checkHook: vi.fn().mockReturnValue({ allowed: true, hasWork: false }),
+  checkHookSync: vi.fn().mockReturnValue({ allowed: true, hasWork: false }),
   generateFixedPointPrompt: vi.fn().mockReturnValue(''),
   checkAndSetupHooks: vi.fn(),
   writeTaskCache: vi.fn(),
@@ -79,8 +89,11 @@ vi.mock('../../src/lib/hooks.js', () => ({
 
 vi.mock('../../src/lib/cv.js', () => ({
   startWork: vi.fn(),
+  startWorkSync: vi.fn(),
   completeWork: vi.fn(),
+  completeWorkSync: vi.fn(),
   getAgentCV: vi.fn().mockReturnValue(null),
+  getAgentCVSync: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/lib/memory/injection.js', () => ({
@@ -96,8 +109,9 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/cliproxy.js')>();
   return {
     ...actual,
-    isCliproxyRunning: vi.fn().mockReturnValue(true),
-    isCliproxyRunningEffect: (await Effect.runPromise(vi.fn(() => Effect.succeed(true)))),
+    isCliproxyRunning: vi.fn().mockReturnValue(Effect.succeed(true)),
+    isCliproxyRunningSync: vi.fn().mockReturnValue(true),
+    isCliproxyRunningEffect: vi.fn(() => Effect.succeed(true)),
   };
 });
 
@@ -105,34 +119,36 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
 // resolveModel() and the role harness lookup find consistent values.
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
+  const loadedConfig = {
+    config: {
+      preset: 'balanced',
+      enabledProviders: new Set(['anthropic']),
+      apiKeys: {},
+      providerAuth: {},
+      providerPlan: {},
+      openrouterFavorites: [],
+      workhorses: { ...actual.DEFAULT_WORKHORSES },
+      roles: { ...actual.DEFAULT_ROLES },
+      overrides: {},
+      geminiThinkingLevel: 3,
+      trackerKeys: {},
+      tmux: { configMode: 'managed' },
+      conversations: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+      },
+      claude: { permissionMode: 'bypass' },
+      experimental: { claudeCodeChannels: false },
+      caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
+    } as NormalizedConfig,
+  };
   return {
     ...actual,
     isClaudeCodeChannelsEnabled: vi.fn().mockReturnValue(false),
-    loadConfig: vi.fn().mockReturnValue({
-      config: {
-        preset: 'balanced',
-        enabledProviders: new Set(['anthropic']),
-        apiKeys: {},
-        providerAuth: {},
-        providerPlan: {},
-        openrouterFavorites: [],
-        workhorses: { ...actual.DEFAULT_WORKHORSES },
-        roles: { ...actual.DEFAULT_ROLES },
-        overrides: {},
-        geminiThinkingLevel: 3,
-        trackerKeys: {},
-        tmux: { configMode: 'managed' },
-        conversations: {
-          compactionModel: 'claude-haiku-4-5',
-          manualCompactMode: 'claude-code',
-          richCompaction: true,
-          titleModel: 'claude-haiku-4-5',
-        },
-        claude: { permissionMode: 'bypass' },
-        experimental: { claudeCodeChannels: false },
-        caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
-      } as NormalizedConfig,
-    }),
+    loadConfig: vi.fn().mockReturnValue(loadedConfig),
+    loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
   };
 });
 
@@ -144,6 +160,7 @@ vi.mock('../../src/lib/harness-policy.js', async (importOriginal) => {
   return {
     ...actual,
     canUseHarness: vi.fn().mockReturnValue({ allowed: true }),
+    canUseHarnessSync: vi.fn().mockReturnValue({ allowed: true }),
   };
 });
 
@@ -151,7 +168,7 @@ vi.mock('../../src/lib/beads-query.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/beads-query.js')>();
   return {
     ...actual,
-    assertIssueHasBeads: vi.fn().mockResolvedValue(undefined),
+    assertIssueHasBeads: vi.fn(() => Effect.void),
   };
 });
 
@@ -167,11 +184,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     process.env.PANOPTICON_HOME = testPanopticonHome;
     vi.clearAllMocks();
     const { sessionExists } = await import('../../src/lib/tmux.js');
-    (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false))));
+    vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false));
     const cliproxy = await import('../../src/lib/cliproxy.js');
     vi.mocked(cliproxy.isCliproxyRunningSync).mockReturnValue(true);
     const beadsQuery = await import('../../src/lib/beads-query.js');
-    (await Effect.runPromise(vi.mocked(beadsQuery.assertIssueHasBeads)))uery.assertIssueHasBeads).mockResolvedValue(undefined)));
+    vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValue(Effect.void);
     piFifoMocks.writePiCommand.mockClear();
   });
 
@@ -240,9 +257,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('refuses to spawn before creating state when the issue has no beads', async () => {
       const beadsQuery = await import('../../src/lib/beads-query.js');
-      (await Effect.runPromise(vi.mocked(beadsQuery.assertIssueHasBeads)))uery.assertIssueHasBeads).mockRejectedValueOnce(
-        new Error('No beads tasks found for PAN-NOBEADS-1')
-      )));
+      vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValueOnce(
+        Effect.fail(new Error('No beads tasks found for PAN-NOBEADS-1'))
+      );
 
       await expect(spawnAgent({
         issueId: 'PAN-NOBEADS-1',
@@ -361,7 +378,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":2}');
       await Effect.runPromise(captureCheckpoint(workspace, 'agent-pan-ac28', 'turn-1'));
 
-      (await Effect.runPromise(expect(await hasCheckpoint(workspace, 'agent-pan-ac28', 'turn-1'))))-ac28', 'turn-1'))).toBe(true);
+      expect(await Effect.runPromise(hasCheckpoint(workspace, 'agent-pan-ac28', 'turn-1'))).toBe(true);
       const ref = 'refs/pan/turn/agent-pan-ac28/turn-1';
       const commit = execSync(`git rev-parse ${ref}`, { cwd: workspace, encoding: 'utf-8' }).trim();
       const files = execSync(`git ls-tree -r --name-only ${commit}`, { cwd: workspace, encoding: 'utf-8' })
@@ -396,8 +413,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
       const { setOption } = await import('../../src/lib/tmux.js');
-      (await Effect.runPromise(expect(setOption))).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
-      (await Effect.runPromise(expect(setOption))).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
+      expect(setOption).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
+      expect(setOption).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
     });
 
     it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
@@ -418,7 +435,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain("initial-prompt.md'");
       expect(launcher).not.toContain('prompt=$(cat');
       expect(launcher).not.toContain('"$prompt"');
-      (await Effect.runPromise(expect(tmux.sendKeys))).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalled();
     });
 
     it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
@@ -456,12 +473,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
-      (await Effect.runPromise(vi.mocked(tmux.createSession)))ocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
+      vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
-      }))));
-      (await Effect.runPromise(vi.mocked(tmux.capturePane))).mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('pi rpc mode'))));
+      }));
+      vi.mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: '/tmp/test-workspace',
@@ -474,13 +491,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         'agent-pan-pi-prompt-1-test',
         expect.objectContaining({ type: 'prompt', message: 'run the tests' }),
       );
-      (await Effect.runPromise(expect(tmux.capturePane))).not.toHaveBeenCalled();
-      (await Effect.runPromise(expect(tmux.sendKeys))).not.toHaveBeenCalled();
+      expect(tmux.capturePane).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalled();
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {
       const { sessionExists } = await import('../../src/lib/tmux.js');
-      (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true))));
+      vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true));
 
       await expect(
         spawnRun('PAN-DUP-1', 'review', { workspace: '/tmp/test-workspace' }),

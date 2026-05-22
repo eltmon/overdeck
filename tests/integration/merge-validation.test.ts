@@ -218,7 +218,7 @@ exit 1
       const revertSuccess = await Effect.runPromise(autoRevertMerge(testRepo));
 
       // Verify
-      (await Effect.runPromise(expect(revertSuccess))).toBe(true);
+      expect(revertSuccess).toBe(true);
 
       const { stdout: afterRevert } = await execAsync('git rev-parse HEAD', { cwd: testRepo });
       const revertedCommit = afterRevert.trim();

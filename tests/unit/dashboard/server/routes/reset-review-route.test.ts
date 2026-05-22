@@ -27,10 +27,13 @@ vi.mock('../../../../../src/lib/database/index.js', () => ({
 
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 vi.mock('../../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 // Stub modules imported at workspaces.ts module scope.
@@ -48,11 +51,15 @@ const { saveAgentRuntimeStateMock, getAgentRuntimeStateMock } = vi.hoisted(() =>
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
+  listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   saveAgentRuntimeState: saveAgentRuntimeStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
+  getAgentRuntimeStateSync: getAgentRuntimeStateMock,
   getAgentRuntimeStateAsync: vi.fn(),
   transitionIssueToInReview: vi.fn(),
   spawnAgent: vi.fn(),

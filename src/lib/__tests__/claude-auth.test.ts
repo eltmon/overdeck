@@ -8,7 +8,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { parseOAuthPayload } from '../claude-auth.js';
 import { ClaudeCredentialParseError } from '../errors.js';
 
-async function runEffect<A>(effect: Effect.Effect<A, never, never>): Promise<A> {
+async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
@@ -31,7 +31,7 @@ describe('parseOAuthPayload', () => {
         expiresAt: Date.now() + 3600_000,
       },
     });
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload(raw))));
+    const result = await runEffect(parseOAuthPayload(raw));
     expect(result.loggedIn).toBe(true);
     expect(result.expired).toBe(false);
     expect(result.subscriptionType).toBe('max');
@@ -44,7 +44,7 @@ describe('parseOAuthPayload', () => {
         subscriptionType: 'pro',
       },
     });
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload(raw))));
+    const result = await runEffect(parseOAuthPayload(raw));
     expect(result.loggedIn).toBe(false);
     expect(result.subscriptionType).toBeNull();
   });
@@ -57,7 +57,7 @@ describe('parseOAuthPayload', () => {
         expiresAt: Date.now() - 60_000, // expired 1 minute ago
       },
     });
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload(raw))));
+    const result = await runEffect(parseOAuthPayload(raw));
     expect(result.loggedIn).toBe(true); // still logged in — auto-refresh
     expect(result.expired).toBe(true);
     expect(result.subscriptionType).toBe('team');
@@ -65,7 +65,7 @@ describe('parseOAuthPayload', () => {
 
   it('handles missing claudeAiOauth gracefully', async () => {
     const raw = JSON.stringify({ someOtherKey: 'value' });
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload(raw))));
+    const result = await runEffect(parseOAuthPayload(raw));
     expect(result.loggedIn).toBe(false);
     expect(result.expired).toBe(false);
     expect(result.subscriptionType).toBeNull();
@@ -80,20 +80,20 @@ describe('parseOAuthPayload', () => {
         expiresAt: 'not-a-number',
       },
     });
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload(raw))));
+    const result = await runEffect(parseOAuthPayload(raw));
     expect(result.loggedIn).toBe(true);
     expect(result.subscriptionType).toBeNull();
     expect(result.expiresAt).toBeNull();
   });
 
   it('fails with ClaudeCredentialParseError on malformed JSON', async () => {
-    const err = await runEffectFail((await Effect.runPromise(parseOAuthPayload('not json'))));
+    const err = await runEffectFail(parseOAuthPayload('not json'));
     expect(err).toBeInstanceOf(ClaudeCredentialParseError);
     expect((err as ClaudeCredentialParseError)._tag).toBe('ClaudeCredentialParseError');
   });
 
   it('handles empty object', async () => {
-    const result = await runEffect((await Effect.runPromise(parseOAuthPayload('{}'))));
+    const result = await runEffect(parseOAuthPayload('{}'));
     expect(result.loggedIn).toBe(false);
   });
 });

@@ -63,7 +63,7 @@ describe('GET /api/show/:issueId/shadow', () => {
   it('404 path — getShadowState returns null when no file exists', async () => {
     const issueId = uniqueIssueId('NOEXIST');
     // Route decision: if (!shadowState) → 404
-    (await Effect.runPromise(expect(await getShadowState(issueId))))dowState(issueId))).toBeNull();
+    expect(await Effect.runPromise(getShadowState(issueId))).toBeNull();
   });
 
   it('200 path — getShadowState returns real state after createShadowState', async () => {
@@ -72,7 +72,7 @@ describe('GET /api/show/:issueId/shadow', () => {
 
     const result = await Effect.runPromise(getShadowState(issueId));
 
-    (await Effect.runPromise(expect(result))).not.toBeNull();
+    expect(result).not.toBeNull();
     expect(result?.issueId).toBe(issueId.toUpperCase());
     expect(result?.shadowStatus).toBe('in_progress');
     expect(result?.shadowedAt).toBe(created.shadowedAt);
@@ -87,7 +87,7 @@ describe('GET /api/show/:issueId/shadow', () => {
     const second = await Effect.runPromise(getShadowState(issueId));
 
     // Two independent reads of the same file must be consistent
-    (await Effect.runPromise(expect(second))).toEqual(first);
+    expect(second).toEqual(first);
     expect(second?.trackerStatus).toBe('in_review');
   });
 });
@@ -114,13 +114,13 @@ describe('GET /api/show/:issueId (summary)', () => {
     await Effect.runPromise(createShadowState(issueId, 'done', 'test'));
 
     const shadow = await Effect.runPromise(getShadowState(issueId));
-    (await Effect.runPromise(expect(shadow))).not.toBeNull();
+    expect(shadow).not.toBeNull();
     expect(shadow?.shadowStatus).toBe('done');
   });
 
   it('shadow field is null for unknown issue (and route must tolerate that)', async () => {
     const issueId = uniqueIssueId('SUMMARY-UNKNOWN');
-    (await Effect.runPromise(expect(await getShadowState(issueId))))dowState(issueId))).toBeNull();
+    expect(await Effect.runPromise(getShadowState(issueId))).toBeNull();
   });
 });
 

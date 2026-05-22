@@ -51,6 +51,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 
 vi.mock('../review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
   clearReviewStatus: mockClearReviewStatus,
 }));
 
@@ -67,6 +68,7 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: mockResolveGitHubIssue,
+    resolveGitHubIssueSync: mockResolveGitHubIssue,
   };
 });
 
@@ -130,9 +132,9 @@ async function postReopen(issueId: string) {
 
   const response = await Effect.runPromise(
     Effect.scoped(
-      (await Effect.runPromise(Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(routeServicesLayer(appendedEvents)))))icesLayer(appendedEvents))),
+      ).pipe(Effect.provide(routeServicesLayer(appendedEvents))),
     ),
   );
   const responseBody = response.body as { body?: Uint8Array } | null;

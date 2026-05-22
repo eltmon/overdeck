@@ -24,6 +24,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
 
 vi.mock('../../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
 }))
 
 vi.mock('node:fs/promises', () => ({

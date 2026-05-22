@@ -14,6 +14,7 @@ vi.mock('fs', async () => {
 // Mock projects module
 vi.mock('../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  loadProjectsConfigSync: vi.fn(),
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 

@@ -25,7 +25,7 @@ const baseConfig = {
 };
 
 beforeEach(() => {
-  mockReadVariant.mockResolvedValue('enabled');
+  mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
 });
 
 afterEach(() => {
@@ -36,49 +36,49 @@ describe('buildCavemanExports', () => {
   it('returns empty string for planning agents regardless of config', async () => {
     const result = await buildCavemanExports('/workspace', { ...baseConfig, enabled: true }, true);
     expect(result).toBe('');
-    (await Effect.runPromise(expect(mockReadVariant))).not.toHaveBeenCalled();
+    expect(mockReadVariant).not.toHaveBeenCalled();
   });
 
   it('returns empty string when config.enabled is false', async () => {
     const result = await buildCavemanExports('/workspace', { ...baseConfig, enabled: false }, false);
     expect(result).toBe('');
-    (await Effect.runPromise(expect(mockReadVariant))).not.toHaveBeenCalled();
+    expect(mockReadVariant).not.toHaveBeenCalled();
   });
 
   it('returns empty string when variant is "off"', async () => {
-    (await Effect.runPromise(mockReadVariant.mockResolvedValue('off')));
+    mockReadVariant.mockReturnValue(Effect.succeed('off'));
     const result = await buildCavemanExports('/workspace', baseConfig, false);
     expect(result).toBe('');
   });
 
   it('returns only PANOPTICON_CAVEMAN_VARIANT when variant is "disabled"', async () => {
-    (await Effect.runPromise(mockReadVariant.mockResolvedValue('disabled')));
+    mockReadVariant.mockReturnValue(Effect.succeed('disabled'));
     const result = await buildCavemanExports('/workspace', baseConfig, false);
     expect(result).toBe('export PANOPTICON_CAVEMAN_VARIANT="disabled"\n');
     expect(result).not.toContain('CAVEMAN_DEFAULT_MODE');
   });
 
   it('returns both CAVEMAN_DEFAULT_MODE and PANOPTICON_CAVEMAN_VARIANT when variant is "enabled"', async () => {
-    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
+    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
     const result = await buildCavemanExports('/workspace', baseConfig, false);
     expect(result).toContain('export CAVEMAN_DEFAULT_MODE="full"');
     expect(result).toContain('export PANOPTICON_CAVEMAN_VARIANT="enabled"');
   });
 
   it('returns empty string when variant is "enabled" but work mode is "off"', async () => {
-    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
+    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
     const result = await buildCavemanExports('/workspace', { ...baseConfig, modes: { ...baseConfig.modes, work: 'off' as const } }, false);
     expect(result).toBe('');
   });
 
   it('returns empty string when variant is "enabled" but work mode is "disabled"', async () => {
-    (await Effect.runPromise(mockReadVariant.mockResolvedValue('enabled')));
+    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
     const result = await buildCavemanExports('/workspace', { ...baseConfig, modes: { ...baseConfig.modes, work: 'disabled' as const } }, false);
     expect(result).toBe('');
   });
 
   it('calls readCavemanVariant with the workspace path', async () => {
     await buildCavemanExports('/my/workspace', baseConfig, false);
-    (await Effect.runPromise(expect(mockReadVariant))).toHaveBeenCalledWith('/my/workspace');
+    expect(mockReadVariant).toHaveBeenCalledWith('/my/workspace');
   });
 });

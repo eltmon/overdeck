@@ -28,13 +28,16 @@ function mockTrackerResponse(storyRef: string, parentRef: string, parentTitle?: 
   });
 }
 
+const mockConfig = {
+  trackers: {
+    primary: 'rally',
+    rally: { apiKeyEnv: 'RALLY_API_KEY' },
+  },
+};
+
 vi.mock('../../config.js', () => ({
-  loadConfig: vi.fn(() => ({
-    trackers: {
-      primary: 'rally',
-      rally: { apiKeyEnv: 'RALLY_API_KEY' },
-    },
-  })),
+  loadConfig: vi.fn(() => mockConfig),
+  loadConfigSync: vi.fn(() => mockConfig),
 }));
 
 describe('readFeatureContext', () => {

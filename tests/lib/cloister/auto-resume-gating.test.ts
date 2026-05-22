@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Effect } from 'effect';
 
 const BASE_TIME = new Date('2026-05-17T12:00:00.000Z');
 
@@ -47,7 +48,10 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/cloister/work-agent-prompt.js');
     vi.doUnmock('../../../src/lib/prd-draft.js');
     vi.doUnmock('../../../src/lib/config.js');
+    vi.doUnmock('../../../src/lib/tracker-utils.js');
+    vi.doUnmock('../../../src/lib/shadow-mode.js');
     vi.doUnmock('../../../src/lib/remote/index.js');
+    vi.doUnmock('../../../src/lib/remote/workspace-metadata.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -73,7 +77,8 @@ describe('auto-resume gates', () => {
       return {
         ...actual,
         resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
-        listRunningAgents: vi.fn().mockResolvedValue([]),
+        listRunningAgents: vi.fn(() => []),
+        listRunningAgentsSync: vi.fn(() => []),
       };
     });
     vi.doMock('../../../src/lib/review-status.js', () => ({
@@ -83,19 +88,30 @@ describe('auto-resume gates', () => {
         verificationStatus: 'passed',
         readyForMerge: false,
       }),
+      getReviewStatusSync: vi.fn().mockReturnValue({
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        readyForMerge: false,
+      }),
       loadReviewStatuses: vi.fn().mockReturnValue({}),
       setReviewStatus: vi.fn(),
+      setReviewStatusSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
-      getShadowState: vi.fn().mockResolvedValue(null),
+      getShadowState: vi.fn(() => Effect.succeed(null)),
     }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
+      emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
+      logDeaconEventSync: vi.fn(),
       logAgentLifecycle: vi.fn(),
+      logAgentLifecycleSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
@@ -114,11 +130,13 @@ describe('auto-resume gates', () => {
       createSessionAsync: vi.fn(),
       isPaneDeadAsync: vi.fn().mockResolvedValue(false),
       killSession: vi.fn(),
+      killSessionSync: vi.fn(),
       killSessionAsync: vi.fn().mockResolvedValue(undefined),
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-      sessionExists: vi.fn().mockReturnValue(false),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
       sendKeysAsync: vi.fn().mockResolvedValue(undefined),
     }));
@@ -167,17 +185,23 @@ describe('auto-resume gates', () => {
     vi.doMock('../../../src/lib/cloister/merge-agent.js', () => ({
       syncMainIntoWorkspace: vi.fn().mockResolvedValue({ success: true, alreadyUpToDate: true }),
     }));
+    const resolvedProject = {
+      projectKey: 'test',
+      projectName: 'Test',
+      projectPath: projectRoot,
+    };
+    const projects = [{ key: 'test', config: { name: 'Test', path: projectRoot, issue_prefix: 'PAN' } }];
     vi.doMock('../../../src/lib/projects.js', () => ({
-      resolveProjectFromIssue: vi.fn().mockReturnValue({
-        projectKey: 'test',
-        projectName: 'Test',
-        projectPath: projectRoot,
-      }),
+      resolveProjectFromIssue: vi.fn().mockReturnValue(resolvedProject),
+      resolveProjectFromIssueSync: vi.fn().mockReturnValue(resolvedProject),
       hasProjects: vi.fn().mockReturnValue(true),
-      listProjects: vi.fn().mockReturnValue([{ key: 'test', config: { name: 'Test', path: projectRoot, issue_prefix: 'PAN' } }]),
+      hasProjectsSync: vi.fn().mockReturnValue(true),
+      listProjects: vi.fn().mockReturnValue(projects),
+      listProjectsSync: vi.fn().mockReturnValue(projects),
     }));
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),
+      assertCanStartFreshSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/cloister/work-agent-prompt.js', () => ({
       buildWorkAgentPrompt: vi.fn().mockResolvedValue('prompt'),
@@ -186,11 +210,29 @@ describe('auto-resume gates', () => {
       readBeadsTasks: vi.fn().mockResolvedValue([]),
     }));
     vi.doMock('../../../src/lib/prd-draft.js', () => ({
-      hasPRDDraft: vi.fn().mockReturnValue(false),
+      hasPRDDraft: vi.fn(() => Effect.succeed(false)),
       getPRDDraftPath: vi.fn().mockReturnValue(null),
+      getPRDDraftPathSync: vi.fn().mockReturnValue(null),
     }));
     vi.doMock('../../../src/lib/config.js', () => ({
       loadConfig: vi.fn().mockReturnValue({ remote: { enabled: false } }),
+      loadConfigSync: vi.fn().mockReturnValue({ remote: { enabled: false } }),
+    }));
+    vi.doMock('../../../src/lib/tracker-utils.js', () => ({
+      isGitHubIssueSync: vi.fn().mockReturnValue(false),
+      resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: false }),
+    }));
+    vi.doMock('../../../src/lib/shadow-mode.js', () => ({
+      shouldSkipTrackerUpdate: vi.fn(() => Effect.succeed(false)),
+      getShadowModeStatus: vi.fn().mockReturnValue({ enabled: false }),
+    }));
+    vi.doMock('../../../src/lib/shadow-state.js', () => ({
+      createShadowState: vi.fn(() => Effect.succeed(undefined)),
+      updateShadowState: vi.fn(() => Effect.succeed(undefined)),
+    }));
+    vi.doMock('../../../src/lib/remote/workspace-metadata.js', () => ({
+      loadWorkspaceMetadataSync: vi.fn().mockReturnValue(null),
+      findRemoteWorkspaceMetadataSync: vi.fn().mockReturnValue(null),
     }));
     vi.doMock('../../../src/lib/remote/index.js', () => ({
       isRemoteAvailable: vi.fn().mockResolvedValue(false),

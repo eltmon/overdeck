@@ -7,10 +7,12 @@ vi.mock('../../agents.js', () => ({
 
 vi.mock('../../projects.js', () => ({
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/panopticon' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/panopticon' })),
 }));
 
 vi.mock('../../review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
 }));
 
 import { spawnRun } from '../../agents.js';

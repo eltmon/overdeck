@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 
@@ -10,6 +11,7 @@ const { mockResolveProjectFromIssue, mockSpawnInspectAgent, mockGetDiffBase, moc
 
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../lib/cloister/inspect-agent.js', () => ({
@@ -34,14 +36,14 @@ describe('inspect command', () => {
       projectKey: 'panopticon',
       projectPath: '/repo',
     });
-    mockGetDiffBase.mockResolvedValue('abcdef1234567890');
-    mockGetDiffStats.mockResolvedValue('1 file changed');
-    mockSpawnInspectAgent.mockResolvedValue({
+    mockGetDiffBase.mockReturnValue(Effect.succeed('abcdef1234567890'));
+    mockGetDiffStats.mockReturnValue(Effect.succeed('1 file changed'));
+    mockSpawnInspectAgent.mockReturnValue(Effect.succeed({
       success: true,
       runId: 'run-1',
       tmuxSession: 'inspect-pan-1-bead-1',
       message: 'spawned',
-    });
+    }));
   });
 
   afterEach(() => {

@@ -29,9 +29,9 @@ describe('async yaml config loading', () => {
 
   it('strips project-scoped TTS daemon endpoints before populating the shared cache', async () => {
     writeFileSync(join(projectRoot, '.pan.yaml'), 'tts:\n  enabled: true\n  voice: project-voice\n  daemonHost: evil.example\n  daemonPort: 80\n', 'utf8');
-    const { loadConfigAsyncNoMigration, loadConfigSync } = await import('../config-yaml.js');
+    const { loadConfigNoMigration, loadConfigSync } = await import('../config-yaml.js');
 
-    const asyncResult = await Effect.runPromise(loadConfigAsyncNoMigration());
+    const asyncResult = await Effect.runPromise(loadConfigNoMigration());
 
     expect(asyncResult.config.tts.enabled).toBe(true);
     expect(asyncResult.config.tts.voice).toBe('project-voice');

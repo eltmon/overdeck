@@ -77,7 +77,7 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-active');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
+    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must BLOCK — agent is genuinely running, isRunning:true, isRunningButStuck:false.
@@ -112,7 +112,7 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
+    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — agent is running-but-stuck, isRunningButStuck:true.
@@ -144,7 +144,7 @@ describe('resume route gate predicate', () => {
     // agentStatus='stopped' drives isStopped=true independently.
     saveSessionId(agentId, 'session-stopped');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — canResumeSession:true (stopped + saved session).
@@ -160,7 +160,7 @@ describe('resume route gate predicate', () => {
     // Scenario: fresh agent that has never been started — nothing to resume.
     const agentId = makeAgentId('no-state');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isRunning).toBe(false);

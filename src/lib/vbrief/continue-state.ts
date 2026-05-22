@@ -370,7 +370,7 @@ async function assertContinueWriterAsync(path: string, writerId: string): Promis
   activeContinueWriters.set(path, writerId);
 }
 
-export async function writeContinueStateAsync(
+async function writeContinueStatePromise(
   dir: string,
   issueId: string,
   stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
@@ -393,7 +393,7 @@ export async function writeContinueStateAsync(
       const now = new Date().toISOString();
       let state: ContinueState;
       if (typeof stateOrUpdater === 'function') {
-        const existing = await readContinueStateAsync(dir, issueId);
+        const existing = await readContinueStatePromise(dir, issueId);
         state = stateOrUpdater(existing);
       } else {
         state = stateOrUpdater;
@@ -427,7 +427,7 @@ export async function writeContinueStateAsync(
 /**
  * Async variant of `readContinueState`. Use this from dashboard server routes.
  */
-export async function readContinueStateAsync(dir: string, issueId: string): Promise<ContinueState | null> {
+async function readContinueStatePromise(dir: string, issueId: string): Promise<ContinueState | null> {
   const path = continueFilePath(dir, issueId);
   if (!existsSync(path)) return null;
   const raw = await readFile(path, 'utf-8');
@@ -543,24 +543,24 @@ const liftContinueError = (
     cause,
   });
 
-/** Effect variant of `writeContinueStateAsync`. */
+/** Effect variant of `writeContinueStatePromise`. */
 export const writeContinueState = (
   projectRoot: string,
   issueId: string,
   stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
 ): Effect.Effect<void, ContinueStateError> =>
   Effect.tryPromise({
-    try: () => writeContinueStateAsync(projectRoot, issueId, stateOrUpdater),
+    try: () => writeContinueStatePromise(projectRoot, issueId, stateOrUpdater),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'writeContinueState', cause),
   });
 
-/** Effect variant of `readContinueStateAsync`. */
+/** Effect variant of `readContinueStatePromise`. */
 export const readContinueState = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<ContinueState | null, ContinueStateError> =>
   Effect.tryPromise({
-    try: () => readContinueStateAsync(projectRoot, issueId),
+    try: () => readContinueStatePromise(projectRoot, issueId),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'readContinueState', cause),
   });
 

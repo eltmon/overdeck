@@ -81,7 +81,7 @@ describe('tts daemon lifecycle state', () => {
 
     const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
 
-    (await Effect.runPromise(expect(status))).toMatchObject({ ok: false, running: false, pid: null });
+    expect(status).toMatchObject({ ok: false, running: false, pid: null });
     expect(existsSync(QWEN_TTS_PID_PATH)).toBe(true);
     expect(existsSync(QWEN_TTS_STATE_PATH)).toBe(true);
   });
@@ -97,7 +97,7 @@ describe('tts daemon lifecycle state', () => {
 
     const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
 
-    (await Effect.runPromise(expect(status))).toMatchObject({ ok: true, running: true, managed: false, pid: 4321 });
+    expect(status).toMatchObject({ ok: true, running: true, managed: false, pid: 4321 });
   });
 
   it('preserves a live managed daemon that is still inside startup grace', async () => {
@@ -130,8 +130,8 @@ describe('tts daemon lifecycle state', () => {
       const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
       const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, timeoutMs: 0 }));
 
-      (await Effect.runPromise(expect(status))).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
-      (await Effect.runPromise(expect(result))).toMatchObject({ ok: false, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
+      expect(status).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
+      expect(result).toMatchObject({ ok: false, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
       expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
       expect(spawn).not.toHaveBeenCalled();
     } finally {
@@ -178,7 +178,7 @@ describe('tts daemon lifecycle state', () => {
     try {
       const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, waitForHealth: false }));
 
-      (await Effect.runPromise(expect(result))).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
+      expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
       expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
       expect(spawn).toHaveBeenCalled();
     } finally {
@@ -236,7 +236,7 @@ describe('tts daemon lifecycle state', () => {
     try {
       const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, waitForHealth: false }));
 
-      (await Effect.runPromise(expect(result))).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
+      expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
       expect(killSpy).toHaveBeenCalledWith(4242, 'SIGTERM');
       expect(spawn).toHaveBeenCalled();
     } finally {

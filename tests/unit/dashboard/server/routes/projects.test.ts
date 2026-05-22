@@ -5,7 +5,9 @@ import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
+  listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
@@ -14,6 +16,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
+  getAgentRuntimeState: vi.fn(),
   getAgentRuntimeStateEffect: vi.fn(),
 }));
 
@@ -23,6 +26,7 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
   getReviewStatus: vi.fn(() => null),
+  getReviewStatusSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
@@ -146,7 +150,7 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.sessions).toHaveLength(1);
     expect(tree.features[1]?.sessions).toHaveLength(1);
     expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
-    (await Effect.runPromise(expect(listSessionNames))).toHaveBeenCalledTimes(1);
+    expect(listSessionNames).toHaveBeenCalledTimes(1);
   });
 
   it('skips features with no agent dir and no planning dir', async () => {

@@ -52,21 +52,31 @@ vi.mock('child_process', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
+  getAgentStateSync: mockGetAgentState,
   saveAgentState: mockSaveAgentState,
+  saveAgentStateSync: mockSaveAgentState,
   saveAgentRuntimeState: mockSaveAgentRuntimeState,
+  saveAgentRuntimeStateSync: mockSaveAgentRuntimeState,
 }));
 
 vi.mock('../../../../src/lib/shadow-mode.js', () => ({
-  shouldSkipTrackerUpdate: mockShouldSkipTrackerUpdate,
+  shouldSkipTrackerUpdate: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockShouldSkipTrackerUpdate(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../../src/lib/shadow-state.js', () => ({
-  updateShadowState: mockUpdateShadowState,
+  updateShadowState: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockUpdateShadowState(...args)),
+    catch: (cause) => cause as any,
+  }),
   markAsSynced: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssue: mockEnsureMergeSetForIssue,
+  ensureMergeSetForIssueSync: mockEnsureMergeSetForIssue,
 }));
 
 vi.mock('../../../../src/lib/rebase-helper.js', () => ({
@@ -74,16 +84,22 @@ vi.mock('../../../../src/lib/rebase-helper.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/review-artifacts.js', () => ({
-  createReviewArtifactsForIssue: mockCreateReviewArtifactsForIssue,
+  createReviewArtifactsForIssue: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockCreateReviewArtifactsForIssue(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
+  setReviewStatusSync: mockSetReviewStatus,
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
 }));
 
 vi.mock('../../../../src/lib/config.js', () => ({
   getDashboardApiUrl: mockGetDashboardApiUrl,
+  getDashboardApiUrlSync: mockGetDashboardApiUrl,
 }));
 
 vi.mock('../../../../src/lib/shadow-utils.js', () => ({
@@ -92,7 +108,8 @@ vi.mock('../../../../src/lib/shadow-utils.js', () => ({
 
 vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
-  syncBeadStatusToVBrief: vi.fn().mockReturnValue(null),
+  getVBriefACStatusSync: mockGetVBriefACStatus,
+  syncBeadStatusToVBrief: vi.fn().mockReturnValue(Effect.succeed(null)),
 }));
 
 // Suppress ora spinner output in tests

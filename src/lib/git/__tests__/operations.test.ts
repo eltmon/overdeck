@@ -72,8 +72,8 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush, MainDivergedError } = await import('../operations.js');
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-653' })))) { issueId: 'PAN-653' }))))
-      .rejects.toThrow(MainDivergedError);
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-653' })))
+      .rejects.toMatchObject({ cause: expect.any(MainDivergedError) });
   });
 
   it('records a main_diverged event in git_operations on divergence (AC2)', async () => {
@@ -87,7 +87,7 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     const { gitPush } = await import('../operations.js');
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-DIV' })))) { issueId: 'PAN-DIV' }))))
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-DIV' })))
       .rejects.toThrow();
 
     const ops = listGitOperationsSync({ issueId: 'PAN-DIV', operation: 'main_diverged' });
@@ -109,7 +109,7 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     const { gitPush } = await import('../operations.js');
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OK' })))), { issueId: 'PAN-OK' }))))
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OK' })))
       .resolves.not.toThrow();
 
     const ops = listGitOperationsSync({ issueId: 'PAN-OK', operation: 'push' });
@@ -129,8 +129,8 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     const { gitPush } = await import('../operations.js');
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await (await Effect.runPromise(expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-NFF' })))) { issueId: 'PAN-NFF' }))))
-      .rejects.toThrow('non-fast-forward');
+    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-NFF' })))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('non-fast-forward') });
 
     const failures = listGitOperationsSync({ issueId: 'PAN-NFF', status: 'failure' });
     expect(failures.length).toBeGreaterThan(0);

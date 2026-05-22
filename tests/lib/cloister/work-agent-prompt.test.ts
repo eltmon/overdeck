@@ -21,6 +21,7 @@ vi.mock('fs', async (importOriginal) => {
 // Mock config and tracker modules
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: vi.fn(),
+  loadConfigSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/tracker/factory.js', () => ({

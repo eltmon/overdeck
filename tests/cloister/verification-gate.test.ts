@@ -79,56 +79,48 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('throws when isRemote is true but vmName is missing', async () => {
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: undefined })
-    )))mName: undefined })))
-    ).rejects.toThrow('Remote workspace requires vmName');
+    )).rejects.toThrow('Remote workspace requires vmName');
   });
 
   it('throws when vmName contains invalid characters', async () => {
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: 'vm; rm -rf /' })
-    ))): 'vm; rm -rf /' })))
-    ).rejects.toThrow('Invalid vmName for SSH');
+    )).rejects.toThrow('Invalid vmName for SSH');
   });
 
   it('throws when workspacePath contains unsafe characters for SSH', async () => {
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runQualityGates(DEFAULT_GATES, '/path/with spaces/workspace', 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
-    ))): 'my-vm',
-      })))
-    ).rejects.toThrow('Workspace path contains unsafe characters');
+    )).rejects.toThrow('Workspace path contains unsafe characters');
   });
 
   it('throws when gate.path produces an unsafe cwd for SSH', async () => {
     const gatesWithBadPath = {
       lint: { command: 'pnpm lint', path: 'frontend;rm -rf /' },
     };
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runQualityGates(gatesWithBadPath, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
-    ))): 'my-vm',
-      })))
-    ).rejects.toThrow('unsafe characters for SSH');
+    )).rejects.toThrow('unsafe characters for SSH');
   });
 
   it('throws when gate.command contains double quotes (SSH injection prevention)', async () => {
     const gatesWithQuotes = {
       lint: { command: 'echo "hello"' },
     };
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runQualityGates(gatesWithQuotes, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
       })
-    ))): 'my-vm',
-      })))
-    ).rejects.toThrow('double quotes which are unsafe in SSH context');
+    )).rejects.toThrow('double quotes which are unsafe in SSH context');
   });
 
   it('includes gate path subdirectory in SSH command', async () => {
@@ -168,7 +160,7 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
 
     expect(execMock).toHaveBeenCalledTimes(2);
-    (await Effect.runPromise(expect(results))).toHaveLength(2);
+    expect(results).toHaveLength(2);
     expect(results.every(r => r.passed)).toBe(true);
     expect(results.map(r => r.name)).toEqual(['typecheck', 'lint']);
   });
@@ -184,7 +176,7 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
 
     // Only typecheck ran — lint and test were not called
     expect(execMock).toHaveBeenCalledTimes(1);
-    (await Effect.runPromise(expect(results))).toHaveLength(1);
+    expect(results).toHaveLength(1);
     expect(results[0].name).toBe('typecheck');
     expect(results[0].passed).toBe(false);
   });

@@ -49,6 +49,28 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
       },
       migration: null,
     })),
+    loadConfigSync: vi.fn(() => ({
+      config: {
+        preset: 'balanced',
+        enabledProviders: new Set(['anthropic', 'openai']),
+        apiKeys: {
+          openai: 'sk-test-123',
+        },
+        overrides: {},
+        geminiThinkingLevel: 3,
+        tmux: {
+          configMode: 'managed',
+        },
+        conversations: {
+          compactionModel: 'claude-haiku-4-5',
+          manualCompactMode: 'claude-code',
+          richCompaction: false,
+        },
+        trackerKeys: {},
+        tts: makeTtsConfig(),
+      },
+      migration: null,
+    })),
     getGlobalConfigPath: vi.fn(() => '/test/config.yaml'),
     clearConfigCache: vi.fn(),
   };

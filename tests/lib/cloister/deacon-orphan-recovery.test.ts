@@ -36,6 +36,7 @@ vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args as []),
     setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   };
 });
 
@@ -50,7 +51,10 @@ const mockSpawnReviewRoleForIssue = vi.fn();
 vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
   // PAN-1048 R3/R4: deacon now spawns the review role primitive instead of
   // dispatching the legacy `pan review run` coordinator.
-  spawnReviewRoleForIssue: (...args: unknown[]) => mockSpawnReviewRoleForIssue(...args),
+  spawnReviewRoleForIssue: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockSpawnReviewRoleForIssue(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
@@ -65,6 +69,7 @@ const mockSessionExists = vi.fn();
 
 vi.mock('../../../src/lib/tmux.js', () => ({
   sessionExists: (...args: unknown[]) => mockSessionExists(...args),
+  sessionExistsSync: (...args: unknown[]) => mockSessionExists(...args),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -73,12 +78,16 @@ const mockGetAgentState = vi.fn();
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
+  listRunningAgentsSync: vi.fn().mockResolvedValue([]),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
+  getAgentStateSync: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   spawnRun: (...args: unknown[]) => mockSpawnRun(...args),
 }));
 
@@ -86,7 +95,9 @@ const mockResolveProjectFromIssue = vi.fn();
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
   findProjectByPath: vi.fn().mockReturnValue(null),
+  findProjectByPathSync: vi.fn().mockReturnValue(null),
 }));
 
 // ---------------------------------------------------------------------------

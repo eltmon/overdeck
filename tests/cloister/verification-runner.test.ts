@@ -61,7 +61,9 @@ vi.mock('fs', () => ({
 
 vi.mock('../../src/lib/review-status.js', () => ({
   getReviewStatus: getReviewStatusMock,
+  getReviewStatusSync: getReviewStatusMock,
   setReviewStatus: setReviewStatusMock,
+  setReviewStatusSync: setReviewStatusMock,
 }));
 
 vi.mock('../../src/lib/cloister/validation.js', () => ({
@@ -82,6 +84,7 @@ vi.mock('../../src/lib/agents.js', () => ({
 
 vi.mock('../../src/lib/projects.js', () => ({
   findProjectByPath: findProjectByPathMock,
+  findProjectByPathSync: findProjectByPathMock,
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -93,7 +96,8 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 vi.mock('../../src/lib/vbrief/beads.js', () => ({
-  getVBriefACStatus: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
+  getVBriefACStatus: vi.fn().mockReturnValue(Effect.succeed({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] })),
+  getVBriefACStatusSync: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
 }));
 
 // Import under test after mocks
@@ -129,8 +133,8 @@ describe('runVerificationForIssue', () => {
     execMock.mockReset();
     execMock.mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' });
     getReviewStatusMock.mockReturnValue(null); // no existing status → 0 cycles
-    runQualityGatesMock.mockResolvedValue(makePassedResults());
-    writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.pan/feedback/001-verification-failed.md' });
+    runQualityGatesMock.mockReturnValue(Effect.succeed(makePassedResults()));
+    writeFeedbackFileMock.mockReturnValue(Effect.succeed({ success: true, relativePath: '.pan/feedback/001-verification-failed.md' }));
     messageAgentMock.mockResolvedValue(undefined);
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
     existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));
@@ -253,7 +257,7 @@ describe('runVerificationForIssue', () => {
 
   describe('verification fails', () => {
     beforeEach(() => {
-      runQualityGatesMock.mockResolvedValue(makeFailedResults('lint'));
+      runQualityGatesMock.mockReturnValue(Effect.succeed(makeFailedResults('lint')));
     });
 
     it('returns failed with correct failedCheck and cycleCount', async () => {
@@ -312,10 +316,10 @@ describe('runVerificationForIssue', () => {
 
     it('treats first failed required gate as failedCheck', async () => {
       // Multiple gates: optional failure then required failure
-      runQualityGatesMock.mockResolvedValue([
+      runQualityGatesMock.mockReturnValue(Effect.succeed([
         { name: 'format', passed: false, required: false, output: 'style issues', durationMs: 50 },
         { name: 'typecheck', passed: false, required: true, output: 'type error', durationMs: 200 },
-      ]);
+      ]));
 
       const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
 
@@ -326,7 +330,7 @@ describe('runVerificationForIssue', () => {
     });
 
     it('continues and returns failed even if feedback writing throws', async () => {
-      writeFeedbackFileMock.mockRejectedValue(new Error('disk full'));
+      writeFeedbackFileMock.mockReturnValue(Effect.fail(new Error('disk full')));
 
       const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
 
@@ -336,7 +340,7 @@ describe('runVerificationForIssue', () => {
 
   describe('infrastructure error', () => {
     it('returns error outcome and sets verificationStatus:failed', async () => {
-      runQualityGatesMock.mockRejectedValue(new Error('exec failed'));
+      runQualityGatesMock.mockReturnValue(Effect.fail(new Error('exec failed')));
 
       const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
 
@@ -351,12 +355,11 @@ describe('runVerificationForIssue', () => {
     });
 
     it('does not throw — returns error outcome instead', async () => {
-      runQualityGatesMock.mockRejectedValue(new Error('unexpected'));
+      runQualityGatesMock.mockReturnValue(Effect.fail(new Error('unexpected')));
 
-      await (await Effect.runPromise(expect(
+      await expect(Effect.runPromise(
         runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test')
-      )))paceInfo, 'test')))
-      ).resolves.toMatchObject({ outcome: 'error' });
+      )).resolves.toMatchObject({ outcome: 'error' });
     });
   });
 

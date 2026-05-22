@@ -37,6 +37,12 @@ describe('AgentState role persistence', () => {
             roles: actual.DEFAULT_ROLES,
           },
         }),
+        loadConfigSync: () => ({
+          config: {
+            workhorses: actual.DEFAULT_WORKHORSES,
+            roles: actual.DEFAULT_ROLES,
+          },
+        }),
       };
     });
     const { determineModel } = await import('../agents.js');
@@ -182,25 +188,31 @@ describe('AgentState role persistence', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-cache-gate-'));
     const createSessionAsync = vi.fn();
     const emitActivityEntry = vi.fn();
+    const resolvedProject = {
+      projectKey: 'panopticon',
+      projectName: 'Panopticon',
+      projectPath: workspace,
+      linearTeam: 'PAN',
+    };
+    const projectConfig = { path: workspace, workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } };
     vi.doMock('../projects.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../projects.js')),
-      resolveProjectFromIssue: vi.fn(() => ({
-        projectKey: 'panopticon',
-        projectName: 'Panopticon',
-        projectPath: workspace,
-        linearTeam: 'PAN',
-      })),
-      getProject: vi.fn(() => ({ workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } })),
+      resolveProjectFromIssue: vi.fn(() => resolvedProject),
+      resolveProjectFromIssueSync: vi.fn(() => resolvedProject),
+      getProject: vi.fn(() => projectConfig),
+      getProjectSync: vi.fn(() => projectConfig),
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
-      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
     }));
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
     recordDockerContainerLifecycleSnapshot([{
@@ -242,13 +254,15 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
-      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
     }));
 
     const { spawnAgent } = await import('../agents.js');
@@ -287,17 +301,19 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
-      sessionExists: vi.fn(() => false),
-      createSession: (await Effect.runPromise(vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))))),
-      capturePane: (await Effect.runPromise(vi.fn(() => Effect.succeed('Claude Code')))),
-      setOption: (await Effect.runPromise(vi.fn(() => Effect.void))),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+      setOption: vi.fn(() => Effect.void),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({
       writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -355,6 +371,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
       killSession: vi.fn(),
+  killSessionSync: vi.fn(),
     }));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { warnOnBareNumericIssueIds } = await import('../agents.js');

@@ -14,6 +14,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
   activeRunId: null as string | null,
   sessionExists: false,
+  sessionExistsSync: false,
   stoppedAgents: [] as string[],
   pauseFlywheel: vi.fn(async () => {
     flywheelLifecycleMocks.paused = true;
@@ -55,7 +56,8 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
 vi.mock('../../../lib/tmux.js', async () => {
   const { Effect } = await import('effect');
   return {
-    sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)))),
+    sessionExists: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
   };
 });
 
@@ -65,25 +67,29 @@ vi.mock('../../../lib/agents.js', async () => {
     flywheelLifecycleMocks.stoppedAgents.push(agentId);
   }));
   return {
+    stopAgent: flywheelLifecycleMocks.stopAgentEffect,
     stopAgentEffect: flywheelLifecycleMocks.stopAgentEffect,
   };
 });
 
-vi.mock('../../../lib/config-yaml.js', () => ({
-  loadConfig: () => ({
-    config: {
-      roles: {
-        flywheel: {
-          harness: 'pi',
-          model: 'claude-sonnet-4-6',
-          effort: 'low',
-          maxAgents: 3,
-          scope: 'all-tracked-projects',
-        },
+const mockLoadConfig = vi.hoisted(() => () => ({
+  config: {
+    roles: {
+      flywheel: {
+        harness: 'pi',
+        model: 'claude-sonnet-4-6',
+        effort: 'low',
+        maxAgents: 3,
+        scope: 'all-tracked-projects',
       },
-      workhorses: {},
     },
-  }),
+    workhorses: {},
+  },
+}));
+
+vi.mock('../../../lib/config-yaml.js', () => ({
+  loadConfig: mockLoadConfig,
+  loadConfigSync: mockLoadConfig,
   resolveModel: () => 'claude-sonnet-4-6',
 }));
 

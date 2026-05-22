@@ -135,7 +135,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await (await Effect.runPromise(expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))))9:2026-04-27T14:15:16Z')))).resolves.toBeNull();
+    await expect(Effect.runPromise(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))).resolves.toBeNull();
   });
 
   it('returns the stable stash sha after successful stash creation', async () => {
@@ -145,7 +145,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await (await Effect.runPromise(expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))))9:2026-04-27T14:15:16Z')))).resolves.toBe('abc123def456abc123def456abc123def456abcd');
+    await expect(Effect.runPromise(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))).resolves.toBe('abc123def456abc123def456abc123def456abcd');
   });
 
   it('lists stashes with stable refs and stack refs', async () => {
@@ -161,7 +161,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await (await Effect.runPromise(expect(listStashes('/tmp/workspace'))))tashes('/tmp/workspace')))).resolves.toMatchObject([
+    await expect(Effect.runPromise(listStashes('/tmp/workspace'))).resolves.toMatchObject([
       {
         ref: 'abc123def456abc123def456abc123def456abcd',
         stackRef: 'stash@{1}',
@@ -193,7 +193,7 @@ describe('stashes', () => {
     await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
     await Effect.runPromise(applyStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
     await Effect.runPromise(popStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
-    await (await Effect.runPromise(expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes'))))79', 'UI Draft + notes')))).resolves.toBe('recovery/PAN-879-ui-draft-notes');
+    await expect(Effect.runPromise(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes'))).resolves.toBe('recovery/PAN-879-ui-draft-notes');
   });
 
   it('uses the provided stack ref to avoid rescanning the stash list', async () => {
@@ -218,10 +218,9 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}'),
-    )))tes', 'stash@{3}'))),
-    ).rejects.toThrow('Invalid issue ID format');
+    )).rejects.toMatchObject({ stderr: expect.stringContaining('Invalid issue ID format') });
   });
 
   it('identifies salvageable stash entries', () => {

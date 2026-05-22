@@ -37,6 +37,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   loadConfig: () => mockLoadConfig(),
+  loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),
   mergeConfigs: (...args: unknown[]) => mockMergeConfigs(...args),
@@ -56,6 +57,7 @@ vi.mock('../model-capabilities.js', () => ({
   },
   getModelCapability: vi.fn(),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
+  resolveModelIdSync: (modelId: string) => mockResolveModelId(modelId),
 }));
 
 
@@ -363,14 +365,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await (await Effect.runPromise(expect(saveSettingsApi({
+    await expect(Effect.runPromise(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
         daemonHost: '169.254.169.254',
       } as typeof settings.tts,
-    }))))eof settings.tts,
-    })))).rejects.toThrow('Unknown tts setting(s): daemonHost');
+    }))).rejects.toThrow('Unknown tts setting(s): daemonHost');
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });

@@ -61,7 +61,9 @@ vi.mock('../../../../../src/lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
+    resolveGitHubIssueSync: (...args: unknown[]) => mockResolveGitHubIssue(...args),
     resolveTrackerType: (...args: unknown[]) => mockResolveTrackerType(...args),
+    resolveTrackerTypeSync: (...args: unknown[]) => mockResolveTrackerType(...args),
   };
 });
 
@@ -73,6 +75,7 @@ vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => 
 // Stub modules imported at issues.ts module scope that are unused by this test.
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   extractTeamPrefix: vi.fn(),
   findProjectByTeam: vi.fn(),
 }));

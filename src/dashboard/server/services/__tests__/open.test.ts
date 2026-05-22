@@ -33,10 +33,10 @@ describe('PanOpen service', () => {
 
       const { PanOpen, PanOpenLive } = await import('../open.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const svc = yield* PanOpen;
         return yield* svc.getAvailableEditors();
-      }).pipe(Effect.provide(PanOpenLive))));
+      }).pipe(Effect.provide(PanOpenLive));
 
       const editors = await Effect.runPromise(program);
       expect(editors).toContain('cursor');
@@ -50,10 +50,10 @@ describe('PanOpen service', () => {
 
       const { PanOpen, PanOpenLive } = await import('../open.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const svc = yield* PanOpen;
         return yield* svc.getAvailableEditors();
-      }).pipe(Effect.provide(PanOpenLive))));
+      }).pipe(Effect.provide(PanOpenLive));
 
       const editors = await Effect.runPromise(program);
       expect(editors).toEqual([]);
@@ -66,10 +66,10 @@ describe('PanOpen service', () => {
 
       const { PanOpen, PanOpenLive } = await import('../open.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const svc = yield* PanOpen;
         return yield* svc.openInEditor({ cwd: '/tmp/workspace', editor: 'cursor' });
-      }).pipe(Effect.provide(PanOpenLive))));
+      }).pipe(Effect.provide(PanOpenLive));
 
       await Effect.runPromise(program);
 
@@ -85,10 +85,10 @@ describe('PanOpen service', () => {
 
       const { PanOpen, PanOpenLive } = await import('../open.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const svc = yield* PanOpen;
         return yield* svc.openInEditor({ cwd: '/tmp/workspace', editor: 'file-manager' });
-      }).pipe(Effect.provide(PanOpenLive))));
+      }).pipe(Effect.provide(PanOpenLive));
 
       await Effect.runPromise(program);
 
@@ -106,10 +106,10 @@ describe('PanOpen service', () => {
 
       const { PanOpen, PanOpenLive } = await import('../open.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const svc = yield* PanOpen;
         return yield* svc.openInEditor({ cwd: '/tmp/workspace', editor: 'nonexistent' as EditorId });
-      }).pipe(Effect.provide(PanOpenLive))));
+      }).pipe(Effect.provide(PanOpenLive));
 
       const exit = await Effect.runPromise(Effect.exit(program));
       expect(exit._tag).toBe('Failure');

@@ -445,13 +445,13 @@ export function loadCloisterConfigSync(): CloisterConfig {
   return applyEnvironmentOverrides(config);
 }
 
-export async function loadCloisterConfigAsync(): Promise<CloisterConfig> {
+async function loadCloisterConfigPromise(): Promise<CloisterConfig> {
   await mkdir(PANOPTICON_HOME, { recursive: true });
 
   let config = DEFAULT_CLOISTER_CONFIG;
 
   if (!(await fileExists(CLOISTER_CONFIG_FILE))) {
-    await saveCloisterConfigAsync(DEFAULT_CLOISTER_CONFIG);
+    await saveCloisterConfigPromise(DEFAULT_CLOISTER_CONFIG);
   } else {
     try {
       const content = await readFile(CLOISTER_CONFIG_FILE, 'utf-8');
@@ -467,7 +467,7 @@ export async function loadCloisterConfigAsync(): Promise<CloisterConfig> {
   return applyEnvironmentOverrides(config);
 }
 
-export async function saveCloisterConfigAsync(config: CloisterConfig): Promise<void> {
+async function saveCloisterConfigPromise(config: CloisterConfig): Promise<void> {
   await mkdir(PANOPTICON_HOME, { recursive: true });
 
   try {

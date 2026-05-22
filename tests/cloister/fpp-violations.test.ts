@@ -26,6 +26,7 @@ vi.mock('../../src/lib/cloister/health.js', () => ({
 
 vi.mock('../../src/lib/hooks.js', () => ({
   checkHook: vi.fn(),
+  checkHookSync: vi.fn(),
 }));
 
 vi.mock('fs', () => ({

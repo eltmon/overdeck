@@ -25,9 +25,11 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
     sessionExistsAsync: vi.fn().mockResolvedValue(false),
     killSessionAsync: vi.fn().mockResolvedValue(undefined),
     listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-    sessionExists: (await Effect.runPromise(vi.fn(() => Effect.succeed(false)))),
-    killSession: (await Effect.runPromise(vi.fn(() => Effect.succeed(undefined)))),
-    listSessionNames: (await Effect.runPromise(vi.fn(() => Effect.succeed([])))),
+    sessionExists: vi.fn(() => Effect.succeed(false)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(false)),
+    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSessionSync: vi.fn(() => Effect.succeed(undefined)),
+    listSessionNames: vi.fn(() => Effect.succeed([])),
   };
 });
 
@@ -76,7 +78,7 @@ describe('teardown-workspace', () => {
   });
 
   it('should kill tmux sessions when they exist', async () => {
-    (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true))));
+    vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true));
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
 
     const results = await teardownWorkspace({
@@ -90,7 +92,7 @@ describe('teardown-workspace', () => {
   });
 
   it('should skip tmux sessions when none exist', async () => {
-    (await Effect.runPromise(vi.mocked(sessionExists)))(vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false))));
+    vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false));
 
     const results = await teardownWorkspace({
       issueId: 'PAN-100',

@@ -56,7 +56,7 @@ describe('work-agent-lifecycle', () => {
     });
     saveSessionId(agentId, 'session-123');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.canResumeSession).toBe(true);
@@ -87,7 +87,7 @@ describe('work-agent-lifecycle', () => {
       lastActivity: new Date().toISOString(),
     });
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.canResumeSession).toBe(false);
@@ -118,7 +118,7 @@ describe('work-agent-lifecycle', () => {
     });
     saveSessionId(agentId, 'session-running');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.hasLiveTmuxSession).toBe(true);
@@ -162,7 +162,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // The session IS alive and the agent IS running — isRunning must stay true.
@@ -216,7 +216,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-suspended');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(true);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isRunning).toBe(true);
@@ -231,7 +231,7 @@ describe('work-agent-lifecycle', () => {
   it('allows fresh start when agent state is missing and no live session exists', () => {
     const agentId = getUniqueAgentId('missing-state');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.hasAgentState).toBe(false);
@@ -258,7 +258,7 @@ describe('work-agent-lifecycle', () => {
       startedAt: new Date().toISOString(),
     });
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isPlaceholder).toBe(true);
@@ -290,7 +290,7 @@ describe('work-agent-lifecycle', () => {
     });
     saveSessionId(agentId, 'session-ghost');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExists').mockReturnValue(false);
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.hasWorkspace).toBe(false);

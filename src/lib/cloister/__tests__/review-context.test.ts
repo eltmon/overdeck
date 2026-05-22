@@ -40,6 +40,7 @@ vi.mock('child_process', () => ({
 // ── vbrief / config mocks ──────────────────────────────────────────────────
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
+  findPlanSync: vi.fn(() => null),
   readPlanEffect: (...args: unknown[]) => mockReadPlanEffect(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
@@ -76,9 +77,9 @@ describe('buildReviewContext', () => {
   it('throws when workspace does not exist', async () => {
     mockExistsSync.mockReturnValue(false);
 
-    await (await Effect.runPromise(expect(buildReviewContext({ runId, issueId, workspace }))))d, issueId, workspace })))).rejects.toThrow(
-      'Workspace directory does not exist',
-    );
+    await expect(Effect.runPromise(buildReviewContext({ runId, issueId, workspace }))).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: expect.stringContaining('Workspace directory does not exist') }),
+    });
   });
 
   it('runs git commands and writes manifest to correct path', async () => {

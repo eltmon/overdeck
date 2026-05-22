@@ -72,7 +72,7 @@ describe('prd-draft', () => {
       const { hasPRDDraft } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
 
-      (await Effect.runPromise(expect(await hasPRDDraft('PAN-NONEXISTENT'))))PAN-NONEXISTENT'))).toBe(false);
+      expect(await Effect.runPromise(hasPRDDraft('PAN-NONEXISTENT'))).toBe(false);
     });
 
     it('should return true when draft exists', async () => {
@@ -81,7 +81,7 @@ describe('prd-draft', () => {
 
       await Effect.runPromise(writePRDDraft('PAN-123', '# Test PRD'));
 
-      (await Effect.runPromise(expect(await hasPRDDraft('PAN-123'))))DDraft('PAN-123'))).toBe(true);
+      expect(await Effect.runPromise(hasPRDDraft('PAN-123'))).toBe(true);
     });
   });
 
@@ -90,7 +90,7 @@ describe('prd-draft', () => {
       const { readPRDDraft } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
 
-      (await Effect.runPromise(expect(await readPRDDraft('PAN-NONEXISTENT'))))PAN-NONEXISTENT'))).toBeNull();
+      expect(await Effect.runPromise(readPRDDraft('PAN-NONEXISTENT'))).toBeNull();
     });
 
     it('should return content when draft exists', async () => {
@@ -100,7 +100,7 @@ describe('prd-draft', () => {
       const content = '# Test PRD\n\nThis is a test.';
       await Effect.runPromise(writePRDDraft('PAN-123', content));
 
-      (await Effect.runPromise(expect(await readPRDDraft('PAN-123'))))DDraft('PAN-123'))).toBe(content);
+      expect(await Effect.runPromise(readPRDDraft('PAN-123'))).toBe(content);
     });
   });
 
@@ -111,7 +111,7 @@ describe('prd-draft', () => {
 
       await Effect.runPromise(writePRDDraft('PAN-123', '# Test PRD'));
 
-      (await Effect.runPromise(expect(await hasPRDDraft('PAN-123'))))DDraft('PAN-123'))).toBe(true);
+      expect(await Effect.runPromise(hasPRDDraft('PAN-123'))).toBe(true);
     });
 
     it('should return the file path', async () => {
@@ -120,7 +120,7 @@ describe('prd-draft', () => {
 
       const path = await Effect.runPromise(writePRDDraft('PAN-123', '# Test PRD'));
 
-      (await Effect.runPromise(expect(path))).toContain('PAN-123.md');
+      expect(path).toContain('PAN-123.md');
     });
 
     it('should overwrite existing draft', async () => {
@@ -130,7 +130,7 @@ describe('prd-draft', () => {
       await Effect.runPromise(writePRDDraft('PAN-123', '# Original'));
       await Effect.runPromise(writePRDDraft('PAN-123', '# Updated'));
 
-      (await Effect.runPromise(expect(await readPRDDraft('PAN-123'))))DDraft('PAN-123'))).toBe('# Updated');
+      expect(await Effect.runPromise(readPRDDraft('PAN-123'))).toBe('# Updated');
     });
   });
 
@@ -139,7 +139,7 @@ describe('prd-draft', () => {
       const { listPRDDrafts } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
 
-      (await Effect.runPromise(expect(await listPRDDrafts())))e(listPRDDrafts())).toEqual([]);
+      expect(await Effect.runPromise(listPRDDrafts())).toEqual([]);
     });
 
     it('should return list of draft issue IDs', async () => {
@@ -150,9 +150,9 @@ describe('prd-draft', () => {
       await Effect.runPromise(writePRDDraft('PAN-456', '# Test 2'));
 
       const drafts = await Effect.runPromise(listPRDDrafts());
-      (await Effect.runPromise(expect(drafts))).toHaveLength(2);
-      (await Effect.runPromise(expect(drafts))).toContain('PAN-123');
-      (await Effect.runPromise(expect(drafts))).toContain('PAN-456');
+      expect(drafts).toHaveLength(2);
+      expect(drafts).toContain('PAN-123');
+      expect(drafts).toContain('PAN-456');
     });
   });
 
@@ -161,7 +161,7 @@ describe('prd-draft', () => {
       const { deletePRDDraft } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
 
-      (await Effect.runPromise(expect(await deletePRDDraft('PAN-NONEXISTENT'))))PAN-NONEXISTENT'))).toBe(false);
+      expect(await Effect.runPromise(deletePRDDraft('PAN-NONEXISTENT'))).toBe(false);
     });
 
     it('should delete existing draft and return true', async () => {
@@ -171,8 +171,8 @@ describe('prd-draft', () => {
       await Effect.runPromise(writePRDDraft('PAN-123', '# Test PRD'));
       const result = await Effect.runPromise(deletePRDDraft('PAN-123'));
 
-      (await Effect.runPromise(expect(result))).toBe(true);
-      (await Effect.runPromise(expect(await hasPRDDraft('PAN-123'))))DDraft('PAN-123'))).toBe(false);
+      expect(result).toBe(true);
+      expect(await Effect.runPromise(hasPRDDraft('PAN-123'))).toBe(false);
     });
 
     it('should move draft to deleted folder', async () => {

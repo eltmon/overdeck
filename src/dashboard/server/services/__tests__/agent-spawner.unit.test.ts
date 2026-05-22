@@ -27,6 +27,7 @@ const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
+  getAgentStateSync: mockGetAgentState,
   getAgentStateEffect: mockGetAgentStateEffect,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
@@ -51,8 +52,10 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
 
 // ─── Mock projects ────────────────────────────────────────────────────────────
 
+const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
-  resolveProjectFromIssue: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -92,10 +95,10 @@ describe('AgentSpawner — integration', () => {
     it('fails with AgentStartError for bare numeric issueId', async () => {
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         return yield* spawner.startWork('484', { workspacePath: WORKSPACE });
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('AgentStartError');
@@ -106,10 +109,10 @@ describe('AgentSpawner — integration', () => {
     it('spawns agent when all guards pass', async () => {
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         return yield* spawner.startWork('PAN-1', { workspacePath: WORKSPACE });
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       const result = await runEffect(program);
       expect(result.issueId).toBe('PAN-1');
@@ -120,10 +123,10 @@ describe('AgentSpawner — integration', () => {
       mockExistsSync.mockReturnValue(false);
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         return yield* spawner.startWork('PAN-1', { workspacePath: '/nonexistent' });
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('WorkspaceNotFound');
@@ -133,10 +136,10 @@ describe('AgentSpawner — integration', () => {
       mockGetAgentStateEffect.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         return yield* spawner.startWork('PAN-1', { workspacePath: WORKSPACE });
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('AgentAlreadyRunning');
@@ -148,10 +151,10 @@ describe('AgentSpawner — integration', () => {
       mockStopAgent.mockImplementation(() => { throw new Error('session not found'); });
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         yield* spawner.kill('pan-1');
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       // Should not throw
       await runEffect(program);
@@ -162,10 +165,10 @@ describe('AgentSpawner — integration', () => {
     it('delivers message to the agent', async () => {
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         yield* spawner.message('pan-1', 'hello');
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       await runEffect(program);
       expect(mockMessageAgent).toHaveBeenCalledWith('pan-1', 'hello');
@@ -176,10 +179,10 @@ describe('AgentSpawner — integration', () => {
     it('executes deepWipe lifecycle with correct options', async () => {
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
-      const program = (await Effect.runPromise(Effect.gen(function* () {
+      const program = Effect.gen(function* () {
         const spawner = yield* AgentSpawner;
         yield* spawner.deepWipe('PAN-1', { confirmed: true });
-      }).pipe(Effect.provide(AgentSpawnerLive))));
+      }).pipe(Effect.provide(AgentSpawnerLive));
 
       await runEffect(program);
       expect(mockDeepWipe).toHaveBeenCalledWith(

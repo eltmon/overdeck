@@ -265,7 +265,7 @@ describe('moveVBrief (with git staging)', () => {
   it('throws when issue has no vBRIEF', async () => {
     initGitRepo(TEST_DIR);
     ensureVBriefDirsSync(TEST_DIR);
-    await (await Effect.runPromise(expect(moveVBrief(TEST_DIR, 'PAN-999', 'active'))))IR, 'PAN-999', 'active')))).rejects.toThrow();
+    await expect(Effect.runPromise(moveVBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
   });
 });
 
@@ -592,10 +592,9 @@ describe('transitionVBriefOnMain', () => {
   it('throws when no vBRIEF exists for the issue', async () => {
     initGitRepo(TEST_DIR);
     ensureVBriefDirsSync(TEST_DIR);
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       transitionVBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 vBRIEF'),
-    )))e PAN-999 vBRIEF'))),
-    ).rejects.toThrow();
+    )).rejects.toThrow();
   });
 
   it('does NOT commit when projectRoot is not on main', async () => {

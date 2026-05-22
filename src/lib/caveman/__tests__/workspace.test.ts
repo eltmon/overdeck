@@ -72,7 +72,7 @@ describe('determineCavemanVariant', () => {
 
 describe('readCavemanVariant', () => {
   it('returns off when variant file does not exist', async () => {
-    (await Effect.runPromise(expect(await readCavemanVariant(workspaceDir))))ant(workspaceDir))).toBe('off');
+    expect(await Effect.runPromise(readCavemanVariant(workspaceDir))).toBe('off');
   });
 
   it.each<[CavemanVariant]>([['enabled'], ['disabled'], ['off']])(
@@ -80,14 +80,14 @@ describe('readCavemanVariant', () => {
     async (variant) => {
       mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
       writeFileSync(join(workspaceDir, '.claude', '.caveman-variant'), variant);
-      (await Effect.runPromise(expect(await readCavemanVariant(workspaceDir))))ant(workspaceDir))).toBe(variant);
+      expect(await Effect.runPromise(readCavemanVariant(workspaceDir))).toBe(variant);
     }
   );
 
   it('returns off for unrecognized content', async () => {
     mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
     writeFileSync(join(workspaceDir, '.claude', '.caveman-variant'), 'garbage-value\n');
-    (await Effect.runPromise(expect(await readCavemanVariant(workspaceDir))))ant(workspaceDir))).toBe('off');
+    expect(await Effect.runPromise(readCavemanVariant(workspaceDir))).toBe('off');
   });
 });
 

@@ -31,13 +31,22 @@ vi.mock('child_process', async () => {
 });
 
 // Mock specialist-logs module
+const mockListRunLogs = vi.fn();
+const mockGetRunLog = vi.fn();
+const mockCleanupOldLogs = vi.fn();
+const mockCleanupAllLogs = vi.fn();
+
 vi.mock('../../../../src/lib/cloister/specialist-logs.js', () => ({
-  listRunLogs: vi.fn(),
-  getRunLog: vi.fn(),
+  listRunLogs: mockListRunLogs,
+  listRunLogsSync: mockListRunLogs,
+  getRunLog: mockGetRunLog,
+  getRunLogSync: mockGetRunLog,
   parseLogMetadata: vi.fn(),
   getRunLogPath: vi.fn(),
-  cleanupOldLogs: vi.fn(),
-  cleanupAllLogs: vi.fn(),
+  cleanupOldLogs: mockCleanupOldLogs,
+  cleanupOldLogsSync: mockCleanupOldLogs,
+  cleanupAllLogs: mockCleanupAllLogs,
+  cleanupAllLogsSync: mockCleanupAllLogs,
 }));
 
 // Mock specialists module

@@ -138,7 +138,7 @@ export function resetVBriefIndex(): void {
   projectIndexCache.clear();
 }
 
-export interface FoundVBriefAsync {
+export interface FoundVBrief {
   path: string;
   lifecycleDir: VBriefLifecycleDir;
   issueId: string;
@@ -147,21 +147,21 @@ export interface FoundVBriefAsync {
   filename: string;
 }
 
-export async function findVBriefByIssueAsync(
+async function findVBriefByIssuePromise(
   projectRoot: string,
   issueId: string,
-): Promise<FoundVBriefAsync | null> {
+): Promise<FoundVBrief | null> {
   const upper = issueId.toUpperCase();
   const index = await getOrBuildIndex(projectRoot);
   return index.byIssue.get(upper) ?? null;
 }
 
-export async function listVBriefsAsync(projectRoot: string): Promise<FoundVBriefAsync[]> {
+async function listVBriefsPromise(projectRoot: string): Promise<FoundVBrief[]> {
   const index = await getOrBuildIndex(projectRoot);
   return [...index.entries];
 }
 
-export async function readVBriefDocumentAsync(path: string): Promise<VBriefDocument> {
+async function readVBriefDocumentPromise(path: string): Promise<VBriefDocument> {
   const raw = await readFile(path, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
     throw new VBriefMergeConflictError(path);
@@ -178,29 +178,29 @@ export async function readVBriefDocumentAsync(path: string): Promise<VBriefDocum
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Effect variant of findVBriefByIssueAsync. Returns null when no vBRIEF maps
+ * Effect variant of findVBriefByIssuePromise. Returns null when no vBRIEF maps
  * to the issue; only IO failures surface as typed errors.
  */
 export const findVBriefByIssue = (
   projectRoot: string,
   issueId: string,
-): Effect.Effect<FoundVBriefAsync | null, FsError> =>
+): Effect.Effect<FoundVBrief | null, FsError> =>
   Effect.tryPromise({
-    try: () => findVBriefByIssueAsync(projectRoot, issueId),
+    try: () => findVBriefByIssuePromise(projectRoot, issueId),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'findVBriefByIssue', cause }),
   });
 
-/** Effect variant of listVBriefsAsync. */
+/** Effect variant of listVBriefsPromise. */
 export const listVBriefs = (
   projectRoot: string,
-): Effect.Effect<FoundVBriefAsync[], FsError> =>
+): Effect.Effect<FoundVBrief[], FsError> =>
   Effect.tryPromise({
-    try: () => listVBriefsAsync(projectRoot),
+    try: () => listVBriefsPromise(projectRoot),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'listVBriefs', cause }),
   });
 
 /**
- * Effect variant of readVBriefDocumentAsync. Returns typed errors for merge
+ * Effect variant of readVBriefDocumentPromise. Returns typed errors for merge
  * conflict markers and invalid spec shape.
  */
 export const readVBriefDocument = (

@@ -10,18 +10,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock all external dependencies before importing the module under test
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   saveSessionId: vi.fn(),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/tmux.js', async () => {
@@ -49,12 +56,15 @@ vi.mock('../../../lib/tmux.js', async () => {
   capturePane: effectMock(''),
   createSession: effectMock(undefined),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
   listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
+  sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
+  sendKeys: effectMock(undefined),
   sendKeysEffect: effectMock(undefined),
   };
 });
@@ -69,6 +79,7 @@ vi.mock('../specialists.js', () => ({
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({})),
+  loadCloisterConfigSync: vi.fn(() => ({})),
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -194,7 +205,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
 
     // No poke or respawn actions should have been taken
     expect(actions).toHaveLength(0);
-    (await Effect.runPromise(expect(mockSendKeysAsync))).not.toHaveBeenCalled();
+    expect(mockSendKeysAsync).not.toHaveBeenCalled();
   });
 
   it('still pokes non-stuck workspace in stuck resolution state', async () => {
@@ -230,7 +241,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
     await patrolWorkAgentResolutions();
 
     // sendKeysEffect should have been called for the poke
-    (await Effect.runPromise(expect(mockSendKeysAsync))).toHaveBeenCalledOnce();
+    expect(mockSendKeysAsync).toHaveBeenCalledOnce();
   });
 
   it('skips done auto-complete for a stuck workspace', async () => {

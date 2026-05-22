@@ -16,20 +16,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/agent-dir'),
   spawnAgent: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentRuntimeState: vi.fn(() => null),
+  getAgentRuntimeStateSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   sendKeys: vi.fn(),
   sendKeysAsync: vi.fn(),
   getAgentSessions: vi.fn(() => []),
+  getAgentSessionsSync: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/lib/cost-parsers/jsonl-parser.js', () => ({
@@ -40,6 +47,7 @@ vi.mock('../../../src/lib/cost-parsers/jsonl-parser.js', () => ({
 
 vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({ monitoring: { check_interval: 60000 } })),
+  loadCloisterConfigSync: vi.fn(() => ({ monitoring: { check_interval: 60000 } })),
   DEFAULT_CLOISTER_CONFIG: { monitoring: { check_interval: 60000 } },
 }));
 

@@ -49,13 +49,17 @@ vi.mock('../../../lib/agents.js', async () => {
   return {
   getAgentDir: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   getAgentStateEffect: effectMock(null),
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   recordAgentFailureEffect: effectMock(null),
   resumeAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   saveAgentStateEffect: effectMock(undefined),
   saveSessionId: vi.fn(),
   };
@@ -64,7 +68,9 @@ vi.mock('../../../lib/agents.js', async () => {
 vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatus: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/stashes.js', () => ({
@@ -99,19 +105,23 @@ vi.mock('../../../lib/tmux.js', async () => {
   createSession: effectMock(undefined),
   isPaneDead: effectMock(false),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
   listSessionNames: effectMock([]),
   sendKeysEffect: effectMock(undefined),
   sessionExists: vi.fn(() => false),
+  sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
   };
 });
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
@@ -119,17 +129,22 @@ vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn
 vi.mock('../../lifecycle/workflows.js', async () => {
   // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
   const { Effect } = await import('effect');
-  return { closeOut: (await Effect.runPromise(vi.fn(() => Effect.succeed({ success: true, steps: [] })))) };
+  return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
 });
 vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({
   getProject: vi.fn(() => null),
   listProjects: vi.fn(() => []),
+  listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
 }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })) }));
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
+}));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../config.js', async () => {
   const { Effect } = await import('effect');
@@ -153,6 +168,7 @@ vi.mock('../config.js', async () => {
   };
   return {
   loadCloisterConfig: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
+  loadCloisterConfigSync: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
   loadCloisterConfigEffect: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
   };
 });
@@ -202,7 +218,7 @@ function mergedStatus(issueId: string, updatedAt = oldTimestamp) {
 describe('autoCloseOut', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({});
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 } as any);
@@ -212,14 +228,14 @@ describe('autoCloseOut', () => {
   });
 
   it('returns without side effects when automatic close-out is disabled', async () => {
-    (await Effect.runPromise(mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any)));
+    mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
 
     const actions = await autoCloseOut(now);
 
     expect(actions).toEqual([]);
     expect(execFileMock).not.toHaveBeenCalled();
-    (await Effect.runPromise(expect(mockCloseOut))).not.toHaveBeenCalled();
+    expect(mockCloseOut).not.toHaveBeenCalled();
     expect(mockEmitActivityEntry).not.toHaveBeenCalled();
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
@@ -229,7 +245,7 @@ describe('autoCloseOut', () => {
 
     const actions = await autoCloseOut(now);
 
-    (await Effect.runPromise(expect(mockCloseOut))).toHaveBeenCalledWith({
+    expect(mockCloseOut).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
       projectPath: '/repo',
       auto: true,
@@ -255,16 +271,16 @@ describe('autoCloseOut', () => {
     const actions = await autoCloseOut(now);
 
     expect(actions).toEqual([]);
-    (await Effect.runPromise(expect(mockCloseOut))).not.toHaveBeenCalled();
+    expect(mockCloseOut).not.toHaveBeenCalled();
   });
 
   it('records failure through review status and activity so retry backs off via updatedAt', async () => {
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
     // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
-    (await Effect.runPromise(mockCloseOut.mockReturnValue(Effect.succeed({
+    mockCloseOut.mockReturnValue(Effect.succeed({
       success: false,
       steps: [{ step: 'close-out:archive', success: false, skipped: false, error: 'archive failed' }],
-    }) as any)));
+    }) as any);
 
     const actions = await autoCloseOut(now);
 

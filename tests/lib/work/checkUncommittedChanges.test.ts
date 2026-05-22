@@ -52,7 +52,7 @@ describe('checkUncommittedChanges', () => {
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('monorepo: returns failure lines when there are uncommitted changes', async () => {
@@ -77,7 +77,7 @@ describe('checkUncommittedChanges', () => {
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   // ── Polyrepo (sub-dirs with .git) ─────────────────────────────────────────
@@ -95,7 +95,7 @@ describe('checkUncommittedChanges', () => {
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('polyrepo: reports dirty sub-repos individually', async () => {
@@ -132,7 +132,7 @@ describe('checkUncommittedChanges', () => {
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
     // Hidden dir is skipped — no failures
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('polyrepo: skips sub-dirs without .git', async () => {
@@ -144,6 +144,6 @@ describe('checkUncommittedChanges', () => {
 
     const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
     const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
-    (await Effect.runPromise(expect(result))).toEqual([]);
+    expect(result).toEqual([]);
   });
 });

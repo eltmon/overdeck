@@ -361,7 +361,11 @@ async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
     if (result.committed) details.push('Committed vBRIEF completion on main');
     return stepOk(step, details);
   } catch (err) {
-    const message = (err as Error).message;
+    const wrapped = err as { message?: string; cause?: unknown };
+    const causeMessage = wrapped.cause instanceof Error
+      ? wrapped.cause.message
+      : (typeof wrapped.cause === 'string' ? wrapped.cause : '');
+    const message = [wrapped.message, causeMessage].filter(Boolean).join(': ') || String(err);
     if (message.includes('No vBRIEF found')) {
       return stepSkipped(step, [`No vBRIEF found for ${ctx.issueId}`]);
     }

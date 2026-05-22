@@ -28,17 +28,21 @@ vi.mock('../../services/system-health-service.js', () => ({
 
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   // PAN-977: pollSwarmAutoAdvance enumerates active swarms via listProjects;
   // the tests stub it to an empty list and rely on the legacy sidecar fallback.
   listProjects: vi.fn(() => []),
+  listProjectsSync: vi.fn(() => []),
 }));
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
 }));
 
 // PAN-977: createSlotWorktree shells out to `git fetch`/`git worktree add`. The
@@ -79,8 +83,11 @@ vi.mock('node:child_process', async () => {
 
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
+  findPlanSync: vi.fn(),
   findPlanEffect: vi.fn(),
   readWorkspacePlan: vi.fn(),
+  readWorkspacePlanSync: vi.fn(),
+  readPlan: vi.fn(),
   readPlanEffect: vi.fn(),
   applyStatusOverrides: vi.fn((doc: any) => doc),
   VBriefMergeConflictError: class VBriefMergeConflictError extends Error {},
@@ -94,6 +101,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: vi.fn(),
   isPaneDead: vi.fn(),
   killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   listPaneValues: vi.fn(),
 }));
 
@@ -645,8 +653,8 @@ describe('swarm route helpers', () => {
     // The previous wave's slot agent has exited — pane is dead — so the slot-1
     // tmux session can be reaped and re-spawned for the next wave's item. PAN-977
     // forbids silently aliasing a *live* session for a different item.
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
@@ -712,7 +720,7 @@ describe('swarm route helpers', () => {
 
     // The slot-1 tmux pane has exited (the merged agent went away), so a
     // fresh dispatch on slot 1 for the next DAG item is allowed.
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
 
     // Simulate the steady-state where the initial dispatchSwarmWave already
     // registered this issue with the auto-advance poll loop.
@@ -767,9 +775,9 @@ describe('swarm route helpers', () => {
 
     // The slot's tmux pane has exited cleanly (exit 0) so refreshSwarmSlotStatuses
     // will flip the slot from 'running' to 'completed'.
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     __testInternals.addActiveSwarmIssueId('PAN-971');
@@ -814,8 +822,8 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:05:00Z',
     }, null, 2));
 
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
@@ -922,8 +930,8 @@ describe('swarm route helpers', () => {
     mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
     writeFileSync(swarmStatePath, JSON.stringify(baseSwarmState({ status: 'running' }), null, 2));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { HttpRouter } = await import('effect/unstable/http');
     const { __testInternals, swarmRouteLayer } = await import('../swarm.js');
@@ -1007,7 +1015,7 @@ describe('swarm route helpers', () => {
       autoAdvanceRetryAfter: '2026-05-07T00:10:00Z',
       lastAutoAdvanceError: 'slot failed',
     } as any);
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
 
     const recovered = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'retry');
 
@@ -1034,8 +1042,8 @@ describe('swarm route helpers', () => {
       message: 'Operator recovered slot 1 via retry (wave-0-item)',
     }));
 
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-2']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-2']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false));
     await __testInternals.pollSwarmAutoAdvance();
 
     const stillRunningState = (await __testInternals.loadSwarmState('PAN-971'))!;
@@ -1060,7 +1068,7 @@ describe('swarm route helpers', () => {
       lastAutoAdvanceError: 'slot failed',
       autoAdvanceFailureCount: 1,
     } as any);
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
 
     const recovered = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'drop');
 
@@ -1228,9 +1236,9 @@ describe('swarm route helpers', () => {
     }));
 
     // The slot-1 tmux session is still alive — pane has not yet torn down.
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['12345']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['12345']));
 
     const result = await __testInternals.dispatchSwarmWave({
       issueId: 'PAN-971',
@@ -1293,9 +1301,9 @@ describe('swarm route helpers', () => {
     }, null, 2));
 
     // The slot-1 tmux session is alive; slot-2 is free.
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['12345']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(false));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['12345']));
 
     const { __testInternals } = await import('../swarm.js');
     const result = await __testInternals.dispatchSwarmWave({
@@ -1314,7 +1322,7 @@ describe('swarm route helpers', () => {
   });
 
   it('passes confirmed host override into swarm slot spawns', async () => {
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
 
     const { __testInternals } = await import('../swarm.js');
     const result = await __testInternals.dispatchSwarmWave({
@@ -1378,9 +1386,9 @@ describe('swarm route helpers', () => {
   });
 
   it('treats dead tmux panes with exit code 0 as completed', async () => {
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     const refreshed = await __testInternals.refreshSwarmSlotStatuses({
@@ -1409,9 +1417,9 @@ describe('swarm route helpers', () => {
   });
 
   it('marks dead tmux panes with non-zero exit status as failed', async () => {
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['23']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['23']));
 
     const { __testInternals } = await import('../swarm.js');
     const refreshed = await __testInternals.refreshSwarmSlotStatuses({
@@ -1478,12 +1486,12 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:00:00Z',
     }, null, 2));
 
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1', 'agent-pan-972-1']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1', 'agent-pan-972-1']));
 
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
-    (await Effect.runPromise(expect(tmux.listSessionNames))).toHaveBeenCalledTimes(1);
+    expect(tmux.listSessionNames).toHaveBeenCalledTimes(1);
   });
 
   it('backs off auto-advance retries after repeated dispatch failures', async () => {
@@ -1560,8 +1568,8 @@ describe('swarm route helpers', () => {
     writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(sameWaveDoc, null, 2));
     // Default mock has slot-1 session present; mark it dead so the dispatcher
     // reaps it and reuses the slot id (PAN-977 no-alias-onto-live-session rule).
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     const initialDispatch = await __testInternals.dispatchSwarmWave({
@@ -1633,9 +1641,9 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:00:00Z',
     }, null, 2));
 
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']))));
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['7']))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed(['agent-pan-971-1']));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['7']));
 
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
@@ -1689,7 +1697,7 @@ describe('swarm route helpers', () => {
 
   it('returns an error instead of persisting an empty swarm wave when every slot fails to spawn', async () => {
     mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971-slot-1'), { recursive: true });
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
     vi.mocked(agents.spawnAgent).mockRejectedValue(new Error('spawn failed') as never);
 
     const { __testInternals } = await import('../swarm.js');
@@ -1718,7 +1726,7 @@ describe('swarm route helpers', () => {
 
   it('claims dispatched items in the workspace vBRIEF plan', async () => {
     mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971-slot-1'), { recursive: true });
-    (await Effect.runPromise(vi.mocked(tmux.listSessionNames)))ed(tmux.listSessionNames).mockReturnValue(Effect.succeed([]))));
+    vi.mocked(tmux.listSessionNames).mockReturnValue(Effect.succeed([]));
     const { __testInternals } = await import('../swarm.js');
     const result = await __testInternals.dispatchSwarmWave({
       issueId: 'PAN-971',
@@ -1746,8 +1754,8 @@ describe('swarm route helpers', () => {
     writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(overlapDoc, null, 2));
     // Pre-existing slot session is dead, so the dispatcher reaps it and re-uses
     // the slot id without violating PAN-977's no-alias-onto-live-session rule.
-    (await Effect.runPromise(vi.mocked(tmux.isPaneDead)))i.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true))));
-    (await Effect.runPromise(vi.mocked(tmux.listPaneValues)))cked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']))));
+    vi.mocked(tmux.isPaneDead).mockReturnValue(Effect.succeed(true));
+    vi.mocked(tmux.listPaneValues).mockReturnValue(Effect.succeed(['0']));
 
     const { __testInternals } = await import('../swarm.js');
     const result = await __testInternals.dispatchSwarmWave({

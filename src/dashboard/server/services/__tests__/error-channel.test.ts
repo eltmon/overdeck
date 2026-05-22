@@ -89,22 +89,22 @@ describe('Typed errors — structure', () => {
 
 describe('Typed errors — Effect channel propagation', () => {
   it('Effect.catchTag can catch TrackerNotConfigured by tag', async () => {
-    const program = (await Effect.runPromise(Effect.fail(new TrackerNotConfigured({ tracker: 'github' })).pipe(
+    const program = Effect.fail(new TrackerNotConfigured({ tracker: 'github' })).pipe(
       Effect.catchTag('TrackerNotConfigured', (err) =>
         Effect.succeed(`handled: ${err.tracker}`),
       ),
-    )));
+    );
 
     const result = await runEffect(program);
     expect(result).toBe('handled: github');
   });
 
   it('Effect.catchTag can catch WorkspaceNotFound by tag', async () => {
-    const program = (await Effect.runPromise(Effect.fail(new WorkspaceNotFound({ id: 'PAN-1' })).pipe(
+    const program = Effect.fail(new WorkspaceNotFound({ id: 'PAN-1' })).pipe(
       Effect.catchTag('WorkspaceNotFound', (err) =>
         Effect.succeed(`workspace missing: ${err.id}`),
       ),
-    )));
+    );
 
     const result = await runEffect(program);
     expect(result).toBe('workspace missing: PAN-1');
@@ -113,9 +113,9 @@ describe('Typed errors — Effect channel propagation', () => {
   it('Effect.catchTag lets non-matching errors pass through', async () => {
     const failed: Effect.Effect<never, IssueNotFound | TrackerNotConfigured> =
       Effect.fail(new IssueNotFound({ id: 'MIN-1' }));
-    const program = (await Effect.runPromise(failed.pipe(
+    const program = failed.pipe(
       Effect.catchTag('TrackerNotConfigured', () => Effect.succeed('should not match')),
-    )));
+    );
 
     const err = await runEffectFail(program);
     expect((err as any)._tag).toBe('IssueNotFound');
@@ -124,12 +124,12 @@ describe('Typed errors — Effect channel propagation', () => {
   it('Effect.catchTags catches multiple typed errors', async () => {
     const failed: Effect.Effect<never, RateLimited | TrackerApiError> =
       Effect.fail(new RateLimited({ retryAfter: 30 }));
-    const program = (await Effect.runPromise(failed.pipe(
+    const program = failed.pipe(
       Effect.catchTags({
         RateLimited: (err) => Effect.succeed(`rate limited: ${err.retryAfter}s`),
         TrackerApiError: () => Effect.succeed('api error'),
       }),
-    )));
+    );
 
     const result = await runEffect(program);
     expect(result).toBe('rate limited: 30s');
@@ -143,9 +143,9 @@ describe('Typed errors — Effect channel propagation', () => {
     const fail2 = Effect.fail(new IssueNotFound({ id: 'MIN-1' })) as Effect.Effect<never, Errors>;
 
     // Catch the first, let the second propagate
-    const combined = (await Effect.runPromise(fail1.pipe(
+    const combined = fail1.pipe(
       Effect.catchTag('TrackerNotConfigured', () => fail2),
-    )));
+    );
 
     const err = await runEffectFail(combined);
     expect((err as any)._tag).toBe('IssueNotFound');

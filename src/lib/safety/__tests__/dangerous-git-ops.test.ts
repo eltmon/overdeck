@@ -8,6 +8,7 @@ import {
   runGitClean,
   dryRunGitClean,
   runGitResetHard,
+  DangerousGitOpError,
   DangerousOpBlockedError,
 } from '../dangerous-git-ops.js';
 import { GIT_CLEAN_EXCLUDES, gitCleanExcludeFlags } from '../protected-paths.js';
@@ -61,15 +62,13 @@ describe('runGitClean', () => {
   });
 
   it('hard-fails with DangerousOpBlockedError when userInvoked is false', async () => {
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runGitClean({
         workspacePath: repo,
         userInvoked: false,
         reason: 'agent attempted auto-clean',
       }),
-    )))o-clean',
-      }))),
-    ).rejects.toBeInstanceOf(DangerousOpBlockedError);
+    )).rejects.toBeInstanceOf(DangerousGitOpError);
   });
 
   it('blocked error carries a structured payload for routes to surface', async () => {
@@ -81,8 +80,9 @@ describe('runGitClean', () => {
       }));
       expect.fail('should have thrown');
     } catch (err) {
-      expect(err).toBeInstanceOf(DangerousOpBlockedError);
-      const payload = (err as DangerousOpBlockedError).toJSON();
+      expect(err).toBeInstanceOf(DangerousGitOpError);
+      const blocked = (err as DangerousGitOpError).cause as DangerousOpBlockedError;
+      const payload = blocked.toJSON();
       expect(payload.code).toBe('DANGEROUS_OP_BLOCKED');
       expect(payload.operation).toBe('git_clean');
       expect(payload.reason).toContain('agent attempted auto-clean');
@@ -107,7 +107,7 @@ describe('runGitClean', () => {
 
   it('dry-run lists what would be deleted without touching anything', async () => {
     const out = await Effect.runPromise(dryRunGitClean({ workspacePath: repo }));
-    (await Effect.runPromise(expect(out))).toContain('untracked.txt');
+    expect(out).toContain('untracked.txt');
     expect(out.every(p => !p.includes('.env'))).toBe(true);
     expect(out.every(p => !p.includes('.devcontainer'))).toBe(true);
     // Filesystem unchanged.
@@ -134,18 +134,16 @@ describe('runGitResetHard', () => {
       ref: 'HEAD',
       reason: 'unit test',
     }));
-    (await Effect.runPromise(expect(result))).toBeDefined();
+    expect(result).toBeDefined();
   });
 
   it('rejects refs containing shell metacharacters', async () => {
-    await (await Effect.runPromise(expect(
+    await expect(Effect.runPromise(
       runGitResetHard({
         workspacePath: repo,
         ref: 'HEAD; rm -rf /',
         reason: 'unit test',
       }),
-    )))it test',
-      }))),
-    ).rejects.toThrow(/unsafe ref/i);
+    )).rejects.toMatchObject({ reason: expect.stringMatching(/unsafe ref/i) });
   });
 });

@@ -50,7 +50,7 @@ describe('buildConversationResponse', () => {
   });
 
   it('returns empty result when getAgentJsonlPath resolves null', async () => {
-    (await Effect.runPromise(mockGetAgentJsonlPath.mockResolvedValue(null)));
+    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(null));
 
     const result = await buildConversationResponse('agent-PAN-473');
 
@@ -59,7 +59,7 @@ describe('buildConversationResponse', () => {
   });
 
   it('returns empty result when the JSONL file does not exist on disk', async () => {
-    (await Effect.runPromise(mockGetAgentJsonlPath.mockResolvedValue('/some/path/session.jsonl')));
+    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed('/some/path/session.jsonl'));
     mockExistsSync.mockReturnValue(false);
 
     const result = await buildConversationResponse('agent-PAN-473');
@@ -70,7 +70,7 @@ describe('buildConversationResponse', () => {
 
   it('parses messages and forces streaming: false when file exists', async () => {
     const jsonlPath = '/some/path/session.jsonl';
-    (await Effect.runPromise(mockGetAgentJsonlPath.mockResolvedValue(jsonlPath)));
+    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(jsonlPath));
     mockExistsSync.mockReturnValue(true);
     mockParseConversationMessages.mockResolvedValue({
       messages: [{ role: 'user', content: 'hello' } as never],
@@ -95,7 +95,7 @@ describe('buildConversationResponse', () => {
 
   it('returns empty result and logs error when parseConversationMessages throws', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    (await Effect.runPromise(mockGetAgentJsonlPath.mockResolvedValue('/some/path/session.jsonl')));
+    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed('/some/path/session.jsonl'));
     mockExistsSync.mockReturnValue(true);
     mockParseConversationMessages.mockRejectedValue(new Error('corrupt JSONL'));
 

@@ -1968,7 +1968,7 @@ export function isClaudeCodeChannelsEnabled(): boolean {
  * merges with defaults, applies env fallbacks. Fails with ConfigParseError
  * for malformed YAML or ConfigError for other I/O failures.
  */
-export const loadConfigAsyncNoMigration = (): Effect.Effect<
+export const loadConfigNoMigration = (): Effect.Effect<
   ConfigLoadResult,
   ConfigError | ConfigParseError
 > =>
@@ -1986,7 +1986,7 @@ export const getConversationsConfig = (): Effect.Effect<
   ConfigError | ConfigParseError
 > =>
   Effect.gen(function* () {
-    const { config } = yield* loadConfigAsyncNoMigration();
+    const { config } = yield* loadConfigNoMigration();
     return resolveConversationWatchDirs({
       ...config.conversations,
       apiKeys: config.apiKeys,

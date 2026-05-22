@@ -197,34 +197,6 @@ export const getReviewStatusFromDb = (
     catch: (cause) => new DatabaseError({ operation: 'getReviewStatusFromDbEffect', cause }),
   });
 
-export function upsertReviewStatusAsync(status: ReviewStatus): Promise<void> {
-  const program = Effect.tryPromise({
-    try: () =>
-      new Promise<void>((resolve, reject) => {
-        setImmediate(() => {
-          try {
-            upsertReviewStatusSync(status);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      }),
-    catch: (cause) => new DatabaseError({ operation: 'upsertReviewStatusAsync', cause }),
-  });
-  return Effect.runPromise(program);
-}
-
-export function getReviewStatusFromDbAsync(issueId: string): Promise<ReviewStatus | null> {
-  const program = Effect.promise<ReviewStatus | null>(() =>
-    new Promise((resolve) => {
-      setImmediate(() => {
-        resolve(getReviewStatusFromDbSync(issueId));
-      });
-    }),
-  );
-  return Effect.runPromise(program);
-}
 
 // ============== Read operations ==============
 

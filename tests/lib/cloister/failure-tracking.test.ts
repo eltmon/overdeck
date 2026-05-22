@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,7 +77,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
       return {
         ...actual,
         resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
-        listRunningAgents: vi.fn().mockResolvedValue([]),
+        listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
+        listRunningAgentsSync: vi.fn(() => []),
       };
     });
     vi.doMock('../../../src/lib/review-status.js', () => ({
@@ -86,19 +89,31 @@ describe('agent failure tracking and auto-resume backoff', () => {
         verificationStatus: 'passed',
         readyForMerge: false,
       }),
+      getReviewStatusSync: vi.fn().mockReturnValue({
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        readyForMerge: false,
+      }),
       loadReviewStatuses: vi.fn().mockReturnValue({}),
       setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
+      setReviewStatusSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
-      getShadowState: vi.fn().mockResolvedValue(null),
+      getShadowState: vi.fn(() => Effect.succeed(null)),
     }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
+      logDeaconEventSync: vi.fn(),
       logAgentLifecycle: vi.fn(),
+      logAgentLifecycleSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
@@ -117,11 +132,13 @@ describe('agent failure tracking and auto-resume backoff', () => {
       createSessionAsync: vi.fn(),
       isPaneDeadAsync: vi.fn().mockResolvedValue(false),
       killSession: vi.fn(),
+  killSessionSync: vi.fn(),
       killSessionAsync: vi.fn().mockResolvedValue(undefined),
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
       sessionExists: vi.fn().mockReturnValue(false),
+      sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
       sendKeysAsync: vi.fn().mockResolvedValue(undefined),
     }));

@@ -55,8 +55,8 @@ describe('getWorkspaceGitInfo', () => {
       return {} as any;
     });
 
-    await (await Effect.runPromise(expect(getWorkspaceGitInfo('/not/a/repo'))))ceGitInfo('/not/a/repo')))).rejects.toThrow(
-      'getWorkspaceGitInfo failed for /not/a/repo'
-    );
+    await expect(Effect.runPromise(getWorkspaceGitInfo('/not/a/repo'))).rejects.toMatchObject({
+      stderr: expect.stringContaining('getWorkspaceGitInfo failed for /not/a/repo'),
+    });
   });
 });
