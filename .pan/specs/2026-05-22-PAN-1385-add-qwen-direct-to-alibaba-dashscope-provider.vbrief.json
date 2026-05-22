@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:32:32.712Z"
+    "updated": "2026-05-22T23:37:01.305Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:32:32.712Z",
+    "updated": "2026-05-22T23:37:01.305Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -421,7 +421,7 @@
       {
         "id": "frontend-label-maps",
         "title": "Add DashScope label + icon-color entries to cross-cutting frontend maps",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -437,7 +437,7 @@
           {
             "id": "frontend-label-maps.ac1",
             "title": "All five files (ModelPicker, PlanDialog, WorkhorsePanel, RolesPanel, ProviderIcons) have a `dashscope` entry.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -445,7 +445,7 @@
           {
             "id": "frontend-label-maps.ac2",
             "title": "Label string is exactly `'Alibaba DashScope'` in every file (consistency, matches PROVIDERS.dashscope.displayName).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -453,7 +453,7 @@
           {
             "id": "frontend-label-maps.ac3",
             "title": "Icon color in ProviderIcons.tsx is distinct from `nous` and from Anthropic/OpenAI brand colors.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

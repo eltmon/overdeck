@@ -28,6 +28,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
   kimi:      '#f59e0b',
   mimo:      '#14b8a6',
   nous:      '#8b5cf6',
+  dashscope: '#f97316',
   openrouter:'#8b5cf6',
 };
 

@@ -158,6 +158,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     zai: 'Z.AI',
     kimi: 'Kimi',
     nous: 'Nous Portal',
+    dashscope: 'Alibaba DashScope',
     openrouter: 'OpenRouter',
   };
 
