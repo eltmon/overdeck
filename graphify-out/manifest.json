@@ -1864,16 +1864,16 @@
     "hash": "830375906bcf28d3464e531dc45f1293"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/review-monitor.ts": {
-    "mtime": 1779435519.8490868,
-    "hash": "09f5ca973a0e9b9990ec540b8a6645c3"
+    "mtime": 1779439498.5126576,
+    "hash": "d6952856eee6115a181878b17f821c0d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/complexity.ts": {
     "mtime": 1779435519.8420866,
     "hash": "de0836b619d4769cc1e545725b06de28"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/review-agent.ts": {
-    "mtime": 1779435519.8490868,
-    "hash": "2e773ac85322f5189523ca80fe1afb49"
+    "mtime": 1779439498.5596592,
+    "hash": "955efe01614ab7342997687ebdfb6608"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/specialist-logs.ts": {
     "mtime": 1779435519.8510869,
@@ -1968,8 +1968,8 @@
     "hash": "5e4031125475e295cd5f9410da8ae536"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/review-context.ts": {
-    "mtime": 1779435519.8490868,
-    "hash": "3062906ae8763ef2952ab352f87a8fb4"
+    "mtime": 1779439298.3917782,
+    "hash": "e1cd3a87bbf077f0b222ff39304bc02a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/session-rotation.ts": {
     "mtime": 1779435519.850087,
@@ -2016,8 +2016,8 @@
     "hash": "7106d633502680ae607749bdd636995a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/inspect-agent.ts": {
-    "mtime": 1779435519.8450866,
-    "hash": "e73db0a7cd619a98ddd64b8ef1521327"
+    "mtime": 1779439286.0083535,
+    "hash": "73969939bf0a06f236c2fbd195a8da57"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/startup-recovery.test.ts": {
     "mtime": 1779435519.8420866,
@@ -2032,8 +2032,8 @@
     "hash": "f78ac855a3fffe403281c72c04d259fa"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/review-agent.test.ts": {
-    "mtime": 1779435519.8410866,
-    "hash": "3a6cdedfbb34f5d3447d195c63fc0d7a"
+    "mtime": 1779439354.64971,
+    "hash": "7a818ddb60f49fa6424d14e81021f234"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/specialists-caveman.test.ts": {
     "mtime": 1779435519.8420866,
@@ -2044,12 +2044,12 @@
     "hash": "fa931ee4f0c823c9cfb534b87a2f0f24"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/review-monitor.test.ts": {
-    "mtime": 1779435519.8410866,
-    "hash": "dc71232e3438aebf69f4e813f6dbb8cb"
+    "mtime": 1779439424.1330984,
+    "hash": "11c4cc28985b280e43b72ca0fee5e00d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/review-context.test.ts": {
-    "mtime": 1779435519.8410866,
-    "hash": "c760f56b3e2e58a14d91d3615e2a3134"
+    "mtime": 1779439383.5952237,
+    "hash": "dd630758f5184927d4be2583f662e389"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/cloister/__tests__/deacon-stuck-skip.test.ts": {
     "mtime": 1779435519.8406472,
