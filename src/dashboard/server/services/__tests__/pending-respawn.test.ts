@@ -1,26 +1,28 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock tmux.sessionExistsAsync — pending-respawn polls it. Each test resets
+// Mock tmux.sessionExistsAsyncEffect — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
 vi.mock('../../../../lib/tmux.js', () => ({
-  sessionExistsAsync: vi.fn(),
+  sessionExistsAsyncEffect: vi.fn(),
 }));
 
-import { sessionExistsAsync } from '../../../../lib/tmux.js';
+import { sessionExistsAsyncEffect } from '../../../../lib/tmux.js';
 import {
   isRespawnPending,
   markRespawnPending,
   waitForSessionRespawn,
 } from '../pending-respawn.js';
 
-const mockedSessionExistsAsync = vi.mocked(sessionExistsAsync);
+const mockedSessionExistsEffect = vi.mocked(sessionExistsAsyncEffect);
 
 describe('pending-respawn registry', () => {
   beforeEach(() => {
-    mockedSessionExistsAsync.mockReset();
+    mockedSessionExistsEffect.mockReset();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     // Defensive: nothing should be left marked between tests.
     expect(isRespawnPending('test-session')).toBe(false);
     expect(isRespawnPending('other-session')).toBe(false);
@@ -42,58 +44,62 @@ describe('pending-respawn registry', () => {
   });
 
   it('waitForSessionRespawn resolves true once the session appears', async () => {
-    mockedSessionExistsAsync
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
+    vi.useFakeTimers();
+    mockedSessionExistsEffect
+      .mockReturnValueOnce(Effect.succeed(false))
+      .mockReturnValueOnce(Effect.succeed(false))
+      .mockReturnValueOnce(Effect.succeed(true));
 
     const respawn = markRespawnPending('test-session');
-    const result = await waitForSessionRespawn('test-session', 5000);
-    expect(result).toBe(true);
+    const resultPromise = waitForSessionRespawn('test-session', 5000);
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(resultPromise).resolves.toBe(true);
     respawn.done();
   });
 
   it('bails early once the marker clears and the session still does not exist', async () => {
-    mockedSessionExistsAsync.mockResolvedValue(false);
-
+    vi.useFakeTimers();
+    let calls = 0;
     const respawn = markRespawnPending('test-session');
-    // Clear the marker after the first poll round so the next iteration
-    // takes the early-exit path. The bail check itself does one more
-    // sessionExistsAsync to handle "respawn just cleared and may have
-    // succeeded" — we want the final result here to be false (no session).
-    setTimeout(() => respawn.done(), 50);
+    mockedSessionExistsEffect.mockImplementation(() => Effect.sync(() => {
+      calls += 1;
+      if (calls === 2) respawn.done();
+      return false;
+    }));
 
-    const result = await waitForSessionRespawn('test-session', 5000);
-    expect(result).toBe(false);
-    // Bail path performs at least one initial check and one final check.
-    expect(mockedSessionExistsAsync.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const resultPromise = waitForSessionRespawn('test-session', 5000);
+    await vi.advanceTimersByTimeAsync(200);
+
+    await expect(resultPromise).resolves.toBe(false);
+    expect(mockedSessionExistsEffect.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 
   it('honors the timeout when the session never appears', async () => {
-    mockedSessionExistsAsync.mockResolvedValue(false);
+    vi.useFakeTimers();
+    mockedSessionExistsEffect.mockReturnValue(Effect.succeed(false));
     const respawn = markRespawnPending('test-session');
-    const start = Date.now();
-    const result = await waitForSessionRespawn('test-session', 300);
-    const elapsed = Date.now() - start;
-    expect(result).toBe(false);
-    expect(elapsed).toBeGreaterThanOrEqual(250);
-    expect(elapsed).toBeLessThan(1500);
+    const resultPromise = waitForSessionRespawn('test-session', 300);
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(resultPromise).resolves.toBe(false);
     respawn.done();
   });
 
   it('returns true immediately if the session already exists when called', async () => {
-    mockedSessionExistsAsync.mockResolvedValueOnce(true);
+    mockedSessionExistsEffect.mockReturnValueOnce(Effect.succeed(true));
     const respawn = markRespawnPending('test-session');
     const result = await waitForSessionRespawn('test-session', 5000);
     expect(result).toBe(true);
-    expect(mockedSessionExistsAsync).toHaveBeenCalledTimes(1);
+    expect(mockedSessionExistsEffect).toHaveBeenCalledTimes(1);
     respawn.done();
   });
 
-  it('checks sessionExistsAsync even when no marker is set', async () => {
-    mockedSessionExistsAsync.mockResolvedValueOnce(true);
+  it('checks sessionExistsAsyncEffect even when no marker is set', async () => {
+    mockedSessionExistsEffect.mockReturnValueOnce(Effect.succeed(true));
     const result = await waitForSessionRespawn('test-session', 5000);
     expect(result).toBe(true);
-    expect(mockedSessionExistsAsync).toHaveBeenCalledTimes(1);
+    expect(mockedSessionExistsEffect).toHaveBeenCalledTimes(1);
   });
 });
