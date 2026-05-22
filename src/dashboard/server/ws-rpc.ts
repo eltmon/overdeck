@@ -17,14 +17,14 @@ import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
 import { sessionFilePath } from '../../lib/paths.js';
-import { listSessionNamesAsyncEffect } from '../../lib/tmux.js';
-import { listProjects } from '../../lib/projects.js';
+import { listSessionNames } from '../../lib/tmux.js';
+import { listProjectsSync } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
 import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
-import { getConversationsConfigAsyncEffect } from '../../lib/config-yaml.js';
+import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
@@ -264,7 +264,7 @@ function reviewRoleSessionName(issueId: string): string {
 
 /** Compute issue ID prefixes that belong to a project. */
 function getProjectIssuePrefixes(projectKey: string): string[] {
-  const projects = listProjects();
+  const projects = listProjectsSync();
   const project = projects.find(p =>
     p.key === projectKey || (p.config as { name?: string }).name === projectKey
   );
@@ -390,7 +390,7 @@ function startSharedPresencePoller(): void {
 
   const tick = async () => {
     try {
-      const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+      const sessions = await Effect.runPromise(listSessionNames());
       const current = new Set(sessions.filter(s => s.trim()));
 
       for (const s of sharedPresencePoller.knownSessions) {
@@ -667,7 +667,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.scanConversations]: (input) =>
-        getConversationsConfigAsyncEffect().pipe(
+        getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {
             await Effect.runPromise(eventStore.appendAsync({
               type: 'scan.started',
@@ -720,7 +720,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.searchConversations]: (input) =>
-        getConversationsConfigAsyncEffect().pipe(
+        getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {
             const pagination = normalizeConversationPagination(input.limit, input.offset);
             const filter = { ...normalizeConversationFilter(input), ...pagination };
@@ -778,7 +778,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.enrichSessions]: (input) =>
-        getConversationsConfigAsyncEffect().pipe(
+        getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {
             try {
               const result = await runDashboardDbJob<{
@@ -826,7 +826,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.embedSessions]: (input) =>
-        getConversationsConfigAsyncEffect().pipe(
+        getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {
             const result = await runDashboardDbJob<{ embedded: number; skipped: number; errors: number }>('embedSessions', {
               sessionIds: input.ids,

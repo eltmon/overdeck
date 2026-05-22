@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { join } from 'path';
-import { getProject, resolveProjectFromIssue, type ProjectConfig, type ResolvedProject } from './projects.js';
+import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from './projects.js';
 import type { ForgeType } from './forge.js';
 import type { RepoConfig } from './workspace-config.js';
 
@@ -16,7 +16,7 @@ export interface ResolvedProjectRepo {
   required: boolean;
 }
 
-export function normalizeForge(value?: string | null): ForgeType | null {
+export function normalizeForgeSync(value?: string | null): ForgeType | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === 'github' || normalized.includes('github.com')) return 'github';
@@ -24,7 +24,7 @@ export function normalizeForge(value?: string | null): ForgeType | null {
   return null;
 }
 
-export function inferProjectForge(projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>): ForgeType | null {
+export function inferProjectForgeSync(projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>): ForgeType | null {
   if (projectConfig.github_repo && !projectConfig.gitlab_repo) return 'github';
   if (projectConfig.gitlab_repo && !projectConfig.github_repo) return 'gitlab';
   return null;
@@ -50,14 +50,14 @@ function getRepoTargetBranch(
 
 function getRepoForge(repo: Partial<RepoConfig> | undefined, projectConfig: ProjectConfig): ForgeType {
   return (
-    normalizeForge(repo?.forge) ||
-    normalizeForge(repo?.remote) ||
-    inferProjectForge(projectConfig) ||
+    normalizeForgeSync(repo?.forge) ||
+    normalizeForgeSync(repo?.remote) ||
+    inferProjectForgeSync(projectConfig) ||
     'github'
   );
 }
 
-export function resolveConfiguredRepos(
+export function resolveConfiguredReposSync(
   projectKey: string,
   projectPath: string,
   projectConfig: ProjectConfig,
@@ -70,7 +70,7 @@ export function resolveConfiguredRepos(
       projectPath,
       repoKey: projectKey,
       repoPath: projectPath,
-      forge: inferProjectForge(projectConfig) || 'github',
+      forge: inferProjectForgeSync(projectConfig) || 'github',
       sourceBranch: `feature/${issueId.toLowerCase()}`,
       targetBranch: projectConfig.workspace?.pr_target || projectConfig.workspace?.default_branch || 'main',
       mergeOrder: 0,
@@ -91,24 +91,24 @@ export function resolveConfiguredRepos(
   }));
 }
 
-export function resolveProjectReposForIssue(
+export function resolveProjectReposForIssueSync(
   issueId: string,
   labels: string[] = []
 ): ResolvedProjectRepo[] | null {
-  const resolvedProject = resolveProjectFromIssue(issueId, labels);
+  const resolvedProject = resolveProjectFromIssueSync(issueId, labels);
   if (!resolvedProject) return null;
 
-  return resolveProjectReposFromResolvedIssue(issueId, resolvedProject);
+  return resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject);
 }
 
-export function resolveProjectReposFromResolvedIssue(
+export function resolveProjectReposFromResolvedIssueSync(
   issueId: string,
   resolvedProject: ResolvedProject
 ): ResolvedProjectRepo[] | null {
-  const projectConfig = getProject(resolvedProject.projectKey);
+  const projectConfig = getProjectSync(resolvedProject.projectKey);
   if (!projectConfig) return null;
 
-  return resolveConfiguredRepos(
+  return resolveConfiguredReposSync(
     resolvedProject.projectKey,
     resolvedProject.projectPath,
     projectConfig,
@@ -120,36 +120,36 @@ export function resolveProjectReposFromResolvedIssue(
 // Pure-sync project/repo resolution — additive Effect.sync wrappers.
 
 /** Normalize a free-form forge string ("github.com", "Gitlab", etc.). Pure. */
-export const normalizeForgeEffect = (
+export const normalizeForge = (
   value?: string | null,
-): Effect.Effect<ForgeType | null> => Effect.sync(() => normalizeForge(value));
+): Effect.Effect<ForgeType | null> => Effect.sync(() => normalizeForgeSync(value));
 
 /** Infer the forge for a project from configured repo URLs. Pure. */
-export const inferProjectForgeEffect = (
+export const inferProjectForge = (
   projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>,
-): Effect.Effect<ForgeType | null> => Effect.sync(() => inferProjectForge(projectConfig));
+): Effect.Effect<ForgeType | null> => Effect.sync(() => inferProjectForgeSync(projectConfig));
 
 /** Expand configured repos for an issue into a flat list. Pure. */
-export const resolveConfiguredReposEffect = (
+export const resolveConfiguredRepos = (
   projectKey: string,
   projectPath: string,
   projectConfig: ProjectConfig,
   issueId: string,
 ): Effect.Effect<ResolvedProjectRepo[]> =>
   Effect.sync(() =>
-    resolveConfiguredRepos(projectKey, projectPath, projectConfig, issueId),
+    resolveConfiguredReposSync(projectKey, projectPath, projectConfig, issueId),
   );
 
 /** Resolve repos for an issue by id + labels. Pure. */
-export const resolveProjectReposForIssueEffect = (
+export const resolveProjectReposForIssue = (
   issueId: string,
   labels: string[] = [],
 ): Effect.Effect<ResolvedProjectRepo[] | null> =>
-  Effect.sync(() => resolveProjectReposForIssue(issueId, labels));
+  Effect.sync(() => resolveProjectReposForIssueSync(issueId, labels));
 
 /** Resolve repos from an already-resolved project. Pure. */
-export const resolveProjectReposFromResolvedIssueEffect = (
+export const resolveProjectReposFromResolvedIssue = (
   issueId: string,
   resolvedProject: ResolvedProject,
 ): Effect.Effect<ResolvedProjectRepo[] | null> =>
-  Effect.sync(() => resolveProjectReposFromResolvedIssue(issueId, resolvedProject));
+  Effect.sync(() => resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject));

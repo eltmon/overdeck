@@ -34,7 +34,7 @@ function getSummaryFile(agentId: string): string {
 /**
  * Append a work summary to SUMMARY.md
  */
-export function appendSummary(agentId: string, summary: SummaryEntry): void {
+export function appendSummarySync(agentId: string, summary: SummaryEntry): void {
   const dir = join(AGENTS_DIR, agentId);
   mkdirSync(dir, { recursive: true });
 
@@ -98,7 +98,7 @@ function getHistoryDir(agentId: string): string {
 /**
  * Log an action to queryable history
  */
-export function logHistory(
+export function logHistorySync(
   agentId: string,
   action: string,
   details?: Record<string, any>
@@ -120,7 +120,7 @@ export function logHistory(
 /**
  * Search history files for a pattern
  */
-export function searchHistory(agentId: string, pattern: string): string[] {
+export function searchHistorySync(agentId: string, pattern: string): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -147,7 +147,7 @@ export function searchHistory(agentId: string, pattern: string): string[] {
 /**
  * Get recent history entries
  */
-export function getRecentHistory(agentId: string, limit: number = 20): string[] {
+export function getRecentHistorySync(agentId: string, limit: number = 20): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -182,18 +182,18 @@ export interface ContextBudget {
 /**
  * Estimate token count (rough approximation: ~4 chars per token)
  */
-export function estimateTokens(text: string): number {
+export function estimateTokensSync(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
 /**
  * Check if context budget allows adding more content
  */
-export function checkContextBudget(
+export function checkContextBudgetSync(
   budget: ContextBudget,
   newContent: string
 ): { allowed: boolean; warning: boolean; remaining: number } {
-  const newTokens = estimateTokens(newContent);
+  const newTokens = estimateTokensSync(newContent);
   const totalUsed = budget.usedTokens + newTokens;
   const remaining = budget.maxTokens - totalUsed;
   const usageRatio = totalUsed / budget.maxTokens;
@@ -208,7 +208,7 @@ export function checkContextBudget(
 /**
  * Create a context budget for a session
  */
-export function createContextBudget(maxTokens: number = 100000): ContextBudget {
+export function createContextBudgetSync(maxTokens: number = 100000): ContextBudget {
   return {
     maxTokens,
     usedTokens: 0,
@@ -225,7 +225,7 @@ function getMaterializedDir(agentId: string): string {
 /**
  * Materialize tool output for later retrieval
  */
-export function materializeOutput(
+export function materializeOutputSync(
   agentId: string,
   toolName: string,
   output: string,
@@ -261,7 +261,7 @@ export function materializeOutput(
   writeFileSync(filepath, lines.join('\n'));
 
   // Log to history
-  logHistory(agentId, `materialized:${toolName}`, { file: filename });
+  logHistorySync(agentId, `materialized:${toolName}`, { file: filename });
 
   return filepath;
 }
@@ -269,7 +269,7 @@ export function materializeOutput(
 /**
  * List materialized outputs for an agent
  */
-export function listMaterialized(agentId: string): Array<{
+export function listMaterializedSync(agentId: string): Array<{
   tool: string;
   timestamp: number;
   file: string;
@@ -294,7 +294,7 @@ export function listMaterialized(agentId: string): Array<{
 /**
  * Read materialized output
  */
-export function readMaterialized(filepath: string): string | null {
+export function readMaterializedSync(filepath: string): string | null {
   if (!existsSync(filepath)) return null;
   return readFileSync(filepath, 'utf-8');
 }
@@ -304,70 +304,70 @@ export function readMaterialized(filepath: string): string | null {
 // for callers in Effect graphs. FsError surfaces only on write paths.
 
 /** Append a work-summary entry for an agent. */
-export const appendSummaryEffect = (
+export const appendSummary = (
   agentId: string,
   summary: SummaryEntry,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => appendSummary(agentId, summary),
+    try: () => appendSummarySync(agentId, summary),
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'append-summary', cause }),
   });
 
 /** Append a history entry for an agent. */
-export const logHistoryEffect = (
-  ...args: Parameters<typeof logHistory>
+export const logHistory = (
+  ...args: Parameters<typeof logHistorySync>
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => logHistory(...args),
+    try: () => logHistorySync(...args),
     catch: (cause) =>
       new FsError({ path: args[0], operation: 'log-history', cause }),
   });
 
 /** Search agent history for a regex pattern. Pure-ish (logs on error). */
-export const searchHistoryEffect = (
+export const searchHistory = (
   agentId: string,
   pattern: string,
-): Effect.Effect<string[]> => Effect.sync(() => searchHistory(agentId, pattern));
+): Effect.Effect<string[]> => Effect.sync(() => searchHistorySync(agentId, pattern));
 
 /** Return the most recent history entries for an agent. Pure-ish. */
-export const getRecentHistoryEffect = (
+export const getRecentHistory = (
   agentId: string,
   limit: number = 20,
-): Effect.Effect<string[]> => Effect.sync(() => getRecentHistory(agentId, limit));
+): Effect.Effect<string[]> => Effect.sync(() => getRecentHistorySync(agentId, limit));
 
 /** Estimate token count from text. Pure. */
-export const estimateTokensEffect = (text: string): Effect.Effect<number> =>
-  Effect.sync(() => estimateTokens(text));
+export const estimateTokens = (text: string): Effect.Effect<number> =>
+  Effect.sync(() => estimateTokensSync(text));
 
 /** Check a context budget against a token estimate. Pure. */
-export const checkContextBudgetEffect = (
-  ...args: Parameters<typeof checkContextBudget>
-): Effect.Effect<ReturnType<typeof checkContextBudget>> =>
-  Effect.sync(() => checkContextBudget(...args));
+export const checkContextBudget = (
+  ...args: Parameters<typeof checkContextBudgetSync>
+): Effect.Effect<ReturnType<typeof checkContextBudgetSync>> =>
+  Effect.sync(() => checkContextBudgetSync(...args));
 
 /** Construct a new context budget. Pure. */
-export const createContextBudgetEffect = (
+export const createContextBudget = (
   maxTokens: number = 100000,
-): Effect.Effect<ContextBudget> => Effect.sync(() => createContextBudget(maxTokens));
+): Effect.Effect<ContextBudget> => Effect.sync(() => createContextBudgetSync(maxTokens));
 
 /** Materialize agent output to a file (returns filepath). */
-export const materializeOutputEffect = (
-  ...args: Parameters<typeof materializeOutput>
-): Effect.Effect<ReturnType<typeof materializeOutput>, FsError> =>
+export const materializeOutput = (
+  ...args: Parameters<typeof materializeOutputSync>
+): Effect.Effect<ReturnType<typeof materializeOutputSync>, FsError> =>
   Effect.try({
-    try: () => materializeOutput(...args),
+    try: () => materializeOutputSync(...args),
     catch: (cause) =>
       new FsError({ path: args[0], operation: 'materialize-output', cause }),
   });
 
 /** Enumerate materialized files for an agent. Pure-ish. */
-export const listMaterializedEffect = (
+export const listMaterialized = (
   agentId: string,
-): Effect.Effect<ReturnType<typeof listMaterialized>> =>
-  Effect.sync(() => listMaterialized(agentId));
+): Effect.Effect<ReturnType<typeof listMaterializedSync>> =>
+  Effect.sync(() => listMaterializedSync(agentId));
 
 /** Read a materialized file's contents (null when missing). Pure-ish. */
-export const readMaterializedEffect = (
+export const readMaterialized = (
   filepath: string,
-): Effect.Effect<string | null> => Effect.sync(() => readMaterialized(filepath));
+): Effect.Effect<string | null> => Effect.sync(() => readMaterializedSync(filepath));

@@ -19,10 +19,10 @@ import {
   getHealthLabel,
   type AgentHealth,
 } from '../../../src/lib/cloister/health.js';
-import type { AgentRuntime, Heartbeat } from '../../../src/lib/runtimes/types.js';
+import type { AgentRuntimeSync, Heartbeat } from '../../../src/lib/runtimes/types.js';
 
 // Mock runtime for testing
-class MockRuntime implements AgentRuntime {
+class MockRuntime implements AgentRuntimeSync {
   readonly name = 'test' as const;
   private heartbeats: Map<string, Heartbeat> = new Map();
   private runningAgents: Set<string> = new Set();

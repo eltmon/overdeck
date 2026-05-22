@@ -224,8 +224,6 @@ export function findSpecByIssue(
   })
 }
 
-/** @deprecated use `findSpecByIssue` (now Effect-based and async). */
-export const findSpecByIssueAsync = findSpecByIssue
 
 export function buildPanSpecFilename(issueId: string, slug: string, createdDate?: Date | string): string {
   return generateVBriefFilename(issueId, slug, createdDate)

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     execFile: vi.fn(),
     findProjectByTeam: vi.fn(() => null),
     resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+    resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
     createInterface: vi.fn(),
     existsSync: vi.fn(() => true),
     readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/panopticon-cli:PAN\n'),
@@ -39,7 +40,9 @@ vi.mock('../../../lib/lifecycle/index.js', () => ({
 vi.mock('../../../lib/projects.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/projects.js')>()),
   findProjectByTeam: mocks.findProjectByTeam,
+  findProjectByTeamSync: mocks.findProjectByTeam,
   resolveProjectFromIssue: mocks.resolveProjectFromIssue,
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssue,
 }));
 
 import { closeOutCommand } from '../close.js';

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for checkOpenBeads pre-flight helper.
  *
@@ -51,7 +52,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-714');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
     expect(result).toEqual([]);
   });
 
@@ -65,7 +66,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-714');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
     expect(result.length).toBeGreaterThan(0);
     expect(result[0]).toMatch(/Open beads \(2\)/);
     expect(result[1]).toContain('bead-abc');
@@ -79,7 +80,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result[1]).toContain('My task');
   });
 
@@ -89,7 +90,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result[1]).toContain('untitled');
   });
 
@@ -101,7 +102,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    await checkOpenBeads('/fake/workspace', 'PAN-714');
+    await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
     expect(capturedArgs).toContain('pan-714');
   });
 
@@ -112,7 +113,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result).toEqual([]);
   });
 
@@ -123,7 +124,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result).toEqual([]);
   });
 
@@ -133,7 +134,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result.length).toBe(1);
     expect(result[0]).toMatch(/Open beads check failed/);
   });
@@ -144,7 +145,7 @@ describe('checkOpenBeads', () => {
     });
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await checkOpenBeads('/fake/workspace', 'PAN-1');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result.length).toBe(1);
     expect(result[0]).toMatch(/invalid output/);
   });

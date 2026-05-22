@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * PAN-653: Deacon must not poke or respawn workspaces marked stuck.
  *
@@ -9,18 +10,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock all external dependencies before importing the module under test
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   saveSessionId: vi.fn(),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/tmux.js', async () => {
@@ -45,15 +53,18 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSessionSync: vi.fn(),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExistsSync: vi.fn(() => false),
+  sessionExists: effectMock(false),
+  sendKeys: effectMock(undefined),
   sendKeysEffect: effectMock(undefined),
   };
 });
@@ -68,6 +79,7 @@ vi.mock('../specialists.js', () => ({
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({})),
+  loadCloisterConfigSync: vi.fn(() => ({})),
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -94,14 +106,14 @@ vi.mock('fs', async (importOriginal) => {
 
 import { existsSync, readFileSync } from 'fs';
 import { isSynthesisForActiveReviewRun, patrolWorkAgentResolutions } from '../deacon.js';
-import { listRunningAgents, getAgentRuntimeState } from '../../../lib/agents.js';
-import { getReviewStatus } from '../../../lib/review-status.js';
-import { sendKeysEffect } from '../../../lib/tmux.js';
+import { listRunningAgentsSync, getAgentRuntimeStateSync } from '../../../lib/agents.js';
+import { getReviewStatusSync } from '../../../lib/review-status.js';
+import { sendKeys } from '../../../lib/tmux.js';
 
-const mockListRunningAgents = vi.mocked(listRunningAgents);
-const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeState);
-const mockGetReviewStatus = vi.mocked(getReviewStatus);
-const mockSendKeysAsync = vi.mocked(sendKeysEffect);
+const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
+const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeStateSync);
+const mockGetReviewStatus = vi.mocked(getReviewStatusSync);
+const mockSendKeysAsync = vi.mocked(sendKeys);
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 
@@ -168,7 +180,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
         workspace: '/tmp/workspace',
         startedAt: new Date().toISOString(),
       },
-    ] as ReturnType<typeof listRunningAgents>);
+    ] as ReturnType<typeof listRunningAgentsSync>);
 
     mockGetAgentRuntimeState.mockReturnValue({
       resolution: 'stuck',
@@ -176,7 +188,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
       resolutionUpdatedAt: new Date().toISOString(),
       state: 'active',
       lastActivity: new Date().toISOString(),
-    } as ReturnType<typeof getAgentRuntimeState>);
+    } as ReturnType<typeof getAgentRuntimeStateSync>);
 
     // Workspace is marked stuck — Deacon must skip it
     mockGetReviewStatus.mockReturnValue({
@@ -206,7 +218,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
         workspace: '/tmp/workspace',
         startedAt: new Date().toISOString(),
       },
-    ] as ReturnType<typeof listRunningAgents>);
+    ] as ReturnType<typeof listRunningAgentsSync>);
 
     mockGetAgentRuntimeState.mockReturnValue({
       resolution: 'stuck',
@@ -214,7 +226,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
       resolutionUpdatedAt: new Date().toISOString(),
       state: 'active',
       lastActivity: new Date().toISOString(),
-    } as ReturnType<typeof getAgentRuntimeState>);
+    } as ReturnType<typeof getAgentRuntimeStateSync>);
 
     // Workspace is NOT stuck — Deacon should poke normally
     mockGetReviewStatus.mockReturnValue({
@@ -242,7 +254,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
         workspace: '/tmp/workspace',
         startedAt: new Date().toISOString(),
       },
-    ] as ReturnType<typeof listRunningAgents>);
+    ] as ReturnType<typeof listRunningAgentsSync>);
 
     mockGetAgentRuntimeState.mockReturnValue({
       resolution: 'done',
@@ -250,7 +262,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
       resolutionUpdatedAt: new Date().toISOString(),
       state: 'active',
       lastActivity: new Date().toISOString(),
-    } as ReturnType<typeof getAgentRuntimeState>);
+    } as ReturnType<typeof getAgentRuntimeStateSync>);
 
     mockGetReviewStatus.mockReturnValue({
       issueId: 'PAN-653',

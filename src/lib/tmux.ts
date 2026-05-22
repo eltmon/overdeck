@@ -7,8 +7,8 @@ import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
-import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
-import { buildChildEnv } from './child-env.js';
+import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
+import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
@@ -86,7 +86,7 @@ function reloadManagedTmuxConfigSync(): void {
     // the tmux server doesn't inherit stale provider config. Without this,
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
-    const cleanEnv = buildChildEnv();
+    const cleanEnv = buildChildEnvSync();
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -97,7 +97,7 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    const cleanEnv = buildChildEnv();
+    const cleanEnv = buildChildEnvSync();
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -120,22 +120,13 @@ async function ensureManagedTmuxConfigAsync(): Promise<void> {
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   await reloadManagedTmuxConfigAsync();
   tmuxContextPrepared = true;
-}
-
-/**
- * Explicit one-shot init for the managed tmux context. Call awaited from the
- * dashboard server entry point before `server.listen` so that no request path
- * ever pays the prep cost (file write + tmux start-server + source-file).
- *
- * In `inherit-user` mode this is a no-op. Safe to call multiple times.
- */
-export async function ensureManagedTmuxContextOnce(): Promise<void> {
+}async function ensureManagedTmuxContextOncePromise(): Promise<void> {
   const mode = getTmuxConfigMode();
   await ensureTmuxContextPreparedAsync(mode);
 }
 
 export function getTmuxConfigMode(): TmuxConfigMode {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   return config.tmux.configMode;
 }
 
@@ -262,7 +253,7 @@ export interface TmuxSession {
   windows: number;
 }
 
-export function listSessions(): TmuxSession[] {
+export function listSessionsSync(): TmuxSession[] {
   try {
     const output = tmuxExecSync(
       ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
@@ -283,61 +274,12 @@ export function listSessions(): TmuxSession[] {
   }
 }
 
-export async function listSessionsAsync(): Promise<TmuxSession[]> {
-  try {
-    const { stdout } = await tmuxExecAsync(
-      ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
-      { encoding: 'utf8' },
-    );
-    const text = String(stdout);
-    return text.trim().split('\n').filter(Boolean).map((line: string) => {
-      const [name, created, attached, windows] = line.split('|');
-      return {
-        name,
-        created: new Date(parseInt(created) * 1000),
-        attached: attached === '1',
-        windows: parseInt(windows),
-      };
-    });
-  } catch {
-    return [];
-  }
+
+export function listSessionNamesSync(): string[] {
+  return listSessionsSync().map((session) => session.name);
 }
 
-export function listSessionNames(): string[] {
-  return listSessions().map((session) => session.name);
-}
 
-export async function listSessionNamesAsync(): Promise<string[]> {
-  try {
-    const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
-    const text = String(stdout);
-    return text.split('\n').map((line: string) => line.trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Query the current window dimensions for a session. Returns null if the
- * session does not exist, tmux fails, or the response is malformed.
- */
-export async function getWindowDimensionsAsync(sessionName: string): Promise<{ cols: number; rows: number } | null> {
-  try {
-    const { stdout } = await tmuxExecAsync(
-      ['display-message', '-p', '-t', sessionName, '#{window_width},#{window_height}'],
-      { encoding: 'utf-8' },
-    );
-    const parts = String(stdout).trim().split(',');
-    if (parts.length !== 2) return null;
-    const cols = parseInt(parts[0]!, 10);
-    const rows = parseInt(parts[1]!, 10);
-    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return null;
-    return { cols, rows };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * tmux target-session syntax: a bare name is matched as a *prefix* against
@@ -364,15 +306,15 @@ export function exactSession(name: string): string {
  *
  * Regression history: PAN-977's exact-match commit routed capture-pane and
  * list-panes through exactSession() (`=name`), which silently broke every
- * capturePaneAsync() call — they all started returning '' — taking down
- * dialog dismissal, waitForClaudeReady, paste verification, and health checks.
+ * pane capture — calls started returning '' — taking down dialog dismissal,
+ * waitForClaudeReady, paste verification, and health checks.
  */
 export function exactPaneTarget(name: string): string {
   if (name.startsWith('=')) return name.endsWith(':') ? name : `${name}:`;
   return `=${name}:`;
 }
 
-export function sessionExists(name: string): boolean {
+export function sessionExistsSync(name: string): boolean {
   try {
     tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
     return true;
@@ -381,20 +323,12 @@ export function sessionExists(name: string): boolean {
   }
 }
 
-export async function sessionExistsAsync(name: string): Promise<boolean> {
-  try {
-    await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
- * @deprecated Legacy sync function — blocks the event loop. Use `createSessionAsync` instead.
+ * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
  * Kept for CLI-only callers. Never call from server-reachable code.
  */
-export function createSession(
+export function createSessionSync(
   name: string,
   cwd: string,
   initialCommand?: string,
@@ -421,34 +355,13 @@ export function createSession(
   tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
 }
 
-export async function createSessionAsync(
-  name: string,
-  cwd: string,
-  initialCommand?: string,
-  options?: { env?: Record<string, string>; width?: number; height?: number }
-): Promise<void> {
-  await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
-}
 
-export function killSession(name: string): void {
+export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
   tmuxExecSync(['kill-session', '-t', exactSession(name)]);
 }
 
-export async function killSessionAsync(name: string): Promise<void> {
-  await tmuxExecAsync(['kill-session', '-t', exactSession(name)], { encoding: 'utf-8' });
-}
-
-export async function setOptionAsync(target: string, option: string, value: string): Promise<void> {
-  await tmuxExecAsync(['set-option', '-t', target, option, value], { encoding: 'utf-8' });
-}
-
-export async function resizeWindowAsync(target: string, cols: number, rows: number): Promise<void> {
-  await tmuxExecAsync(['resize-window', '-t', target, '-x', String(cols), '-y', String(rows)], {
-    encoding: 'utf-8',
-  });
-}
 
 /**
  * Error raised when message delivery to a tmux session fails verification.
@@ -464,131 +377,13 @@ export class MessageDeliveryFailed extends Error {
   }
 }
 
-/**
- * Send a raw keystroke to a tmux session — no load-buffer, no Enter.
- * Used for Ink TUI interactions (e.g. plan approval digit selection)
- * where the application consumes single keystrokes directly.
- */
-export async function sendRawKeystrokeAsync(sessionName: string, key: string, caller?: string): Promise<void> {
-  validateSessionName(sessionName);
-  logSendKeys(sessionName, key, caller ?? 'raw-keystroke');
-  await tmuxExecAsync(['send-keys', '-t', sessionName, key], { encoding: 'utf-8' });
-}
 
-/**
- * Send keys to a tmux session (async, non-blocking).
- * Uses load-buffer + paste-buffer with capture-pane verification.
- * MUST be used from the dashboard server and any async context.
- */
-export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
-  validateSessionName(sessionName);
-  logSendKeys(sessionName, keys, caller);
-
-  const sendId = randomUUID();
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
-  const bufferName = `pan-${sendId}`;
-
-  try {
-    await writeFile(tmpFile, keys, 'utf-8');
-    await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
-
-    // Verify paste arrived: poll capture-pane until the last non-empty line of
-    // the pasted text is visible. Using the last line instead of the first
-    // because large messages scroll the first line out of the capture window.
-    //
-    // Cold-start panes (Claude TUI booting, MCP servers loading, hooks firing)
-    // commonly take 4-8s to render the first frame, so the previous 3s budget
-    // false-negatived constantly. Bumped to 8s and added one paste-buffer retry
-    // before falling back to "send Enter anyway" — without retry, a missed
-    // paste sent Enter against an empty input box, the agent received nothing,
-    // and the orchestrator counted that as delivered (silent message loss).
-    const lines = keys.split('\n');
-    const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
-    const VERIFY_TIMEOUT_MS = 8_000;
-    const VERIFY_INTERVAL_MS = 50;
-    const PASTE_MAX_ATTEMPTS = 2;
-    let pasteVerified = false;
-
-    if (verifyLine.length >= 3) {
-      attemptLoop: for (let attempt = 1; attempt <= PASTE_MAX_ATTEMPTS; attempt++) {
-        const verifyStart = Date.now();
-        const deadline = verifyStart + VERIFY_TIMEOUT_MS;
-        while (Date.now() < deadline) {
-          const pane = await capturePaneAsync(sessionName, 10);
-          if (pane.includes(verifyLine.slice(0, 40))) {
-            pasteVerified = true;
-            // Ensure a minimum paste-to-Enter delay so Claude Code's TUI finishes
-            // processing the bracketed paste before Enter arrives. (PAN-699 follow-up)
-            const elapsed = Date.now() - verifyStart;
-            const minDelay = 600;
-            if (elapsed < minDelay) {
-              await new Promise(r => setTimeout(r, minDelay - elapsed));
-            }
-            break attemptLoop;
-          }
-          await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
-        }
-
-        if (attempt < PASTE_MAX_ATTEMPTS) {
-          // Before re-pasting, do one final check with a much larger capture
-          // window. The poll above uses a 10-line window; a long pasted message
-          // can scroll verifyLine out of it, false-negativing a paste that
-          // actually landed. Re-pasting on a false negative DUPLICATES the text
-          // in the input box — the root cause of "PI Harness sends messages
-          // twice" (the doubled text shows up inside a single message).
-          const wideCheck = await capturePaneAsync(sessionName, 200);
-          if (wideCheck.includes(verifyLine.slice(0, 40))) {
-            pasteVerified = true;
-            break attemptLoop;
-          }
-          console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
-          await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
-        }
-      }
-    } else {
-      // Very short text — use the old delay-based approach
-      const delayMs = Math.max(600, Math.min(3000, keys.split('\n').length * 15 + Math.floor(keys.length / 1000) * 50));
-      await new Promise(r => setTimeout(r, delayMs));
-      pasteVerified = true;
-    }
-
-    await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
-
-    if (!pasteVerified) {
-      const snapshot = await capturePaneAsync(sessionName, 30);
-      console.warn(`[tmux] Paste verification failed for ${sessionName} after ${PASTE_MAX_ATTEMPTS} attempts × ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
-    }
-
-    // Send Enter — even if verification failed, the buffer was pasted; leaving
-    // orphaned text in the input is worse than a possibly-redundant Enter.
-    await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    logSendKeys(sessionName, pasteVerified ? '[Enter sent]' : '[Enter sent (unverified paste)]', caller);
-
-    // Verify Enter submitted: poll until the pasted text is no longer in the
-    // input region (last 3 lines of the pane). This confirms the message was
-    // submitted rather than just sitting in the input box.
-    if (verifyLine.length >= 3) {
-      const SUBMIT_TIMEOUT_MS = 2_000;
-      const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
-      while (Date.now() < submitDeadline) {
-        const pane = await capturePaneAsync(sessionName, 5);
-        if (!pane.includes(verifyLine.slice(0, 40))) {
-          break; // Text moved out of input — submitted
-        }
-        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
-      }
-    }
-  } finally {
-    await unlink(tmpFile).catch(() => {});
-  }
-}
 
 /**
  * Send keys to a tmux session (sync, blocks event loop).
  * Only use from CLI commands — NEVER from the dashboard server.
  */
-export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+export function sendKeysSync(sessionName: string, keys: string, caller?: string): void {
   validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
@@ -607,7 +402,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
   }
 }
 
-export function capturePane(sessionName: string, lines: number = 50): string {
+export function capturePaneSync(sessionName: string, lines: number = 50): string {
   try {
     return tmuxExecSync(['capture-pane', '-t', exactPaneTarget(sessionName), '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
@@ -617,11 +412,7 @@ export function capturePane(sessionName: string, lines: number = 50): string {
   }
 }
 
-/**
- * Capture tmux pane output (async, non-blocking).
- * MUST be used from the dashboard server and any async context.
- */
-export async function capturePaneAsync(
+async function capturePaneText(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -639,7 +430,7 @@ export async function capturePaneAsync(
   }
 }
 
-export function listPaneValues(target: string, format: string): string[] {
+export function listPaneValuesSync(target: string, format: string): string[] {
   try {
     const output = tmuxExecSync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -648,7 +439,7 @@ export function listPaneValues(target: string, format: string): string[] {
   }
 }
 
-export async function listPaneValuesAsync(target: string, format: string): Promise<string[]> {
+async function listPaneValuesText(target: string, format: string): Promise<string[]> {
   try {
     const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
@@ -657,19 +448,6 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
   }
 }
 
-/**
- * Check whether any pane in a tmux session is dead (process exited).
- * Returns true if the session exists and at least one pane is dead.
- * Returns false if the session doesn't exist or all panes are alive.
- */
-export async function isPaneDeadAsync(sessionName: string): Promise<boolean> {
-  try {
-    const values = await listPaneValuesAsync(sessionName, '#{pane_dead}');
-    return values.some(v => v === '1');
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Categorizes an API failure surfaced inside an interactive Claude Code pane.
@@ -728,7 +506,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
  * those. We normalize a copy to a single-spaced string for matching, then
  * preserve the original for the `raw` diagnostics field.
  */
-export function detectTerminalApiError(paneOutput: string): TerminalApiError | null {
+export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError | null {
   if (!paneOutput) return null;
   const normalized = paneOutput.replace(/\s+/g, ' ');
   for (const entry of TERMINAL_API_ERROR_PATTERNS) {
@@ -747,21 +525,15 @@ export function detectTerminalApiError(paneOutput: string): TerminalApiError | n
     }
   }
   return null;
-}
-
-/**
- * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
- * Polls tmux output until the prompt appears or timeout is reached.
- */
-export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
+}async function waitForClaudePromptPromise(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
   let consecutivePromptPolls = 0;
 
   while (Date.now() - start < timeoutMs) {
-    if (!await sessionExistsAsync(sessionName)) return false;
+    if (!await Effect.runPromise(sessionExists(sessionName))) return false;
 
-    const output = await capturePaneAsync(sessionName, 10);
+    const output = await Effect.runPromise(capturePane(sessionName, 10));
     const lines = output.split('\n').filter(l => l.trim());
     // Use lines.some() instead of lastLine — the status bar/footer is often the
     // last line, so checking only lastLine misses the prompt. (feature/pan-704)
@@ -769,7 +541,7 @@ export async function waitForClaudePrompt(sessionName: string, timeoutMs: number
 
     if (hasPromptLine) {
       consecutivePromptPolls += 1;
-      if (consecutivePromptPolls >= 2 && await sessionExistsAsync(sessionName)) {
+      if (consecutivePromptPolls >= 2 && await Effect.runPromise(sessionExists(sessionName))) {
         return true;
       }
     } else {
@@ -812,7 +584,7 @@ export async function confirmDelivery(
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
-    const after = await capturePaneAsync(sessionName, 50);
+    const after = await Effect.runPromise(capturePane(sessionName, 50));
     const afterText = after.trimEnd();
     if (afterText === beforeText) continue;
 
@@ -827,24 +599,12 @@ export async function confirmDelivery(
   return false;
 }
 
-export function getAgentSessions(): TmuxSession[] {
-  return listSessions().filter(s => s.name.startsWith('agent-'));
+export function getAgentSessionsSync(): TmuxSession[] {
+  return listSessionsSync().filter(s => s.name.startsWith('agent-'));
 }
 
-export async function getAgentSessionsAsync(): Promise<TmuxSession[]> {
-  return (await listSessionsAsync()).filter(s => s.name.startsWith('agent-'));
-}
-
-export async function getReviewSessionsAsync(): Promise<TmuxSession[]> {
-  return (await listSessionsAsync()).filter(s => /^review-/.test(s.name));
-}
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// New tmux interactions in Effect-native code paths should use the variants
-// below. The Promise-returning helpers above are preserved so existing
-// non-Effect callers keep working — but per .claude/rules/prefer-async.md and
-// .claude/rules/async-tmux.md, *new* code should not add to the sync surface.
 
 const toTmuxError = (op: string, cause: unknown): TmuxError =>
   new TmuxError({
@@ -854,161 +614,273 @@ const toTmuxError = (op: string, cause: unknown): TmuxError =>
   });
 
 /** Prepare the managed tmux config + server (idempotent). */
-export const ensureManagedTmuxContextOnceEffect = (): Effect.Effect<void, TmuxError> =>
+export const ensureManagedTmuxContextOnce = (): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => ensureManagedTmuxContextOnce(),
+    try: () => ensureManagedTmuxContextOncePromise(),
     catch: (cause) => toTmuxError('ensureManagedTmuxContext', cause),
   });
 
-/** Async enumeration of tmux sessions on the managed socket. */
-export const listSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+export const listSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   Effect.tryPromise({
-    try: () => listSessionsAsync(),
+    try: async () => {
+      try {
+        const { stdout } = await tmuxExecAsync(
+          ['list-sessions', '-F', '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}'],
+          { encoding: 'utf8' },
+        );
+        return String(stdout).trim().split('\n').filter(Boolean).map((line: string) => {
+          const [name, created, attached, windows] = line.split('|');
+          return {
+            name,
+            created: new Date(parseInt(created) * 1000),
+            attached: attached === '1',
+            windows: parseInt(windows),
+          };
+        });
+      } catch {
+        return [];
+      }
+    },
     catch: (cause) => toTmuxError('list-sessions', cause),
   });
 
-/** Async enumeration of session names on the managed socket. */
-export const listSessionNamesAsyncEffect = (): Effect.Effect<readonly string[], TmuxError> =>
+export const listSessionNames = (): Effect.Effect<readonly string[], TmuxError> =>
   Effect.tryPromise({
-    try: () => listSessionNamesAsync(),
+    try: async () => {
+      try {
+        const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
+        return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
+      } catch {
+        return [];
+      }
+    },
     catch: (cause) => toTmuxError('list-session-names', cause),
   });
 
-/** Read the current window dimensions for a session (null if not found). */
-export const getWindowDimensionsAsyncEffect = (
+export const getWindowDimensions = (
   sessionName: string,
 ): Effect.Effect<{ cols: number; rows: number } | null, TmuxError> =>
   Effect.tryPromise({
-    try: () => getWindowDimensionsAsync(sessionName),
+    try: async () => {
+      try {
+        const { stdout } = await tmuxExecAsync(
+          ['display-message', '-p', '-t', sessionName, '#{window_width},#{window_height}'],
+          { encoding: 'utf-8' },
+        );
+        const parts = String(stdout).trim().split(',');
+        if (parts.length !== 2) return null;
+        const cols = parseInt(parts[0]!, 10);
+        const rows = parseInt(parts[1]!, 10);
+        if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return null;
+        return { cols, rows };
+      } catch {
+        return null;
+      }
+    },
     catch: (cause) => toTmuxError('window-dimensions', cause),
   });
 
-/** True if a tmux session with the supplied name exists. */
-export const sessionExistsAsyncEffect = (
+export const sessionExists = (
   name: string,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.tryPromise({
-    try: () => sessionExistsAsync(name),
+    try: async () => {
+      try {
+        await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
     catch: (cause) => toTmuxError('session-exists', cause),
   });
 
-/** Create a detached tmux session via the async path. */
-export const createSessionAsyncEffect = (
-  ...args: Parameters<typeof createSessionAsync>
+export const createSession = (
+  name: string,
+  cwd: string,
+  initialCommand?: string,
+  options?: { env?: Record<string, string>; width?: number; height?: number },
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => createSessionAsync(...args),
+    try: () => tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' }).then(() => undefined),
     catch: (cause) => toTmuxError('create-session', cause),
   });
 
-/** Kill a tmux session by name (async). */
-export const killSessionAsyncEffect = (name: string): Effect.Effect<void, TmuxError> =>
+export const killSession = (name: string): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => killSessionAsync(name),
+    try: () => tmuxExecAsync(['kill-session', '-t', exactSession(name)], { encoding: 'utf-8' }).then(() => undefined),
     catch: (cause) => toTmuxError('kill-session', cause),
   });
 
-/** Set an option on a target (session or pane). */
-export const setOptionAsyncEffect = (
+export const setOption = (
   target: string,
   option: string,
   value: string,
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => setOptionAsync(target, option, value),
+    try: () => tmuxExecAsync(['set-option', '-t', target, option, value], { encoding: 'utf-8' }).then(() => undefined),
     catch: (cause) => toTmuxError('set-option', cause),
   });
 
-/** Resize the window for a target session. */
-export const resizeWindowAsyncEffect = (
+export const resizeWindow = (
   target: string,
   cols: number,
   rows: number,
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => resizeWindowAsync(target, cols, rows),
+    try: () => tmuxExecAsync(['resize-window', '-t', target, '-x', String(cols), '-y', String(rows)], { encoding: 'utf-8' }).then(() => undefined),
     catch: (cause) => toTmuxError('resize-window', cause),
   });
 
-/** Send a single raw keystroke (e.g. C-m) to a session. */
-export const sendRawKeystrokeAsyncEffect = (
+export const sendRawKeystroke = (
   sessionName: string,
   key: string,
   caller?: string,
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => sendRawKeystrokeAsync(sessionName, key, caller),
+    try: async () => {
+      validateSessionName(sessionName);
+      logSendKeys(sessionName, key, caller ?? 'raw-keystroke');
+      await tmuxExecAsync(['send-keys', '-t', sessionName, key], { encoding: 'utf-8' });
+    },
     catch: (cause) => toTmuxError('send-raw-key', cause),
   });
 
-/**
- * Effect-native send-keys (the additive variant the rule set asks for).
- * Uses the load-buffer + paste-buffer + 300ms + C-m pattern under the hood.
- */
-export const sendKeysEffect = (
+export const sendKeys = (
   sessionName: string,
   keys: string,
   caller?: string,
-): Effect.Effect<void, TmuxError> =>
+): Effect.Effect<void, TmuxError | MessageDeliveryFailed> =>
   Effect.tryPromise({
-    try: () => sendKeysAsync(sessionName, keys, caller),
-    catch: (cause) => toTmuxError('send-keys', cause),
+    try: async () => {
+      validateSessionName(sessionName);
+      logSendKeys(sessionName, keys, caller);
+
+      const sendId = randomUUID();
+      const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+      const bufferName = `pan-${sendId}`;
+
+      try {
+        await writeFile(tmpFile, keys, 'utf-8');
+        await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
+        await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
+
+        const lines = keys.split('\n');
+        const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+        const VERIFY_TIMEOUT_MS = 8_000;
+        const VERIFY_INTERVAL_MS = 50;
+        const PASTE_MAX_ATTEMPTS = 2;
+        let pasteVerified = false;
+
+        if (verifyLine.length >= 3) {
+          attemptLoop: for (let attempt = 1; attempt <= PASTE_MAX_ATTEMPTS; attempt++) {
+            const verifyStart = Date.now();
+            const deadline = verifyStart + VERIFY_TIMEOUT_MS;
+            while (Date.now() < deadline) {
+              const pane = await capturePaneText(sessionName, 10);
+              if (pane.includes(verifyLine.slice(0, 40))) {
+                pasteVerified = true;
+                const elapsed = Date.now() - verifyStart;
+                const minDelay = 600;
+                if (elapsed < minDelay) {
+                  await new Promise(r => setTimeout(r, minDelay - elapsed));
+                }
+                break attemptLoop;
+              }
+              await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+            }
+
+            if (attempt < PASTE_MAX_ATTEMPTS) {
+              const wideCheck = await capturePaneText(sessionName, 200);
+              if (wideCheck.includes(verifyLine.slice(0, 40))) {
+                pasteVerified = true;
+                break attemptLoop;
+              }
+              console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
+              await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
+            }
+          }
+        } else {
+          const delayMs = Math.max(600, Math.min(3000, keys.split('\n').length * 15 + Math.floor(keys.length / 1000) * 50));
+          await new Promise(r => setTimeout(r, delayMs));
+          pasteVerified = true;
+        }
+
+        await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
+
+        if (!pasteVerified) {
+          const snapshot = await capturePaneText(sessionName, 30);
+          console.warn(`[tmux] Paste verification failed for ${sessionName} after ${PASTE_MAX_ATTEMPTS} attempts × ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
+        }
+
+        await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+        logSendKeys(sessionName, pasteVerified ? '[Enter sent]' : '[Enter sent (unverified paste)]', caller);
+
+        if (verifyLine.length >= 3) {
+          const SUBMIT_TIMEOUT_MS = 2_000;
+          const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+          while (Date.now() < submitDeadline) {
+            const pane = await capturePaneText(sessionName, 5);
+            if (!pane.includes(verifyLine.slice(0, 40))) {
+              break;
+            }
+            await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+          }
+        }
+      } finally {
+        await unlink(tmpFile).catch(() => {});
+      }
+    },
+    catch: (cause) => cause instanceof MessageDeliveryFailed ? cause : toTmuxError('send-keys', cause),
   });
 
-/** Capture pane output (async). */
-export const capturePaneAsyncEffect = (
-  ...args: Parameters<typeof capturePaneAsync>
+export const capturePane = (
+  sessionName: string,
+  lines: number = 50,
+  options?: { escapeSequences?: boolean },
 ): Effect.Effect<string, TmuxError> =>
   Effect.tryPromise({
-    try: () => capturePaneAsync(...args),
+    try: () => capturePaneText(sessionName, lines, options),
     catch: (cause) => toTmuxError('capture-pane', cause),
   });
 
-/** Read a formatted list-panes value (async). */
-export const listPaneValuesAsyncEffect = (
+export const listPaneValues = (
   target: string,
   format: string,
 ): Effect.Effect<readonly string[], TmuxError> =>
   Effect.tryPromise({
-    try: () => listPaneValuesAsync(target, format),
+    try: () => listPaneValuesText(target, format),
     catch: (cause) => toTmuxError('list-pane-values', cause),
   });
 
-/** True if the named session's pane is dead (process exited). */
-export const isPaneDeadAsyncEffect = (
+export const isPaneDead = (
   sessionName: string,
 ): Effect.Effect<boolean, TmuxError> =>
-  Effect.tryPromise({
-    try: () => isPaneDeadAsync(sessionName),
-    catch: (cause) => toTmuxError('is-pane-dead', cause),
-  });
+  Effect.gen(function* () {
+    const values = yield* listPaneValues(sessionName, '#{pane_dead}');
+    return values.some(v => v === '1');
+  }).pipe(Effect.catch(() => Effect.succeed(false)));
 
-/** Heuristic terminal-API error detection from a pane snapshot. Pure. */
-export const detectTerminalApiErrorEffect = (
+export const detectTerminalApiError = (
   paneOutput: string,
 ): Effect.Effect<TerminalApiError | null> =>
-  Effect.sync(() => detectTerminalApiError(paneOutput));
+  Effect.sync(() => detectTerminalApiErrorSync(paneOutput));
 
-/** Wait for the Claude prompt to appear in the supplied session. */
-export const waitForClaudePromptEffect = (
+export const waitForClaudePrompt = (
   sessionName: string,
   timeoutMs: number = 15000,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.tryPromise({
-    try: () => waitForClaudePrompt(sessionName, timeoutMs),
+    try: () => waitForClaudePromptPromise(sessionName, timeoutMs),
     catch: (cause) => toTmuxError('wait-claude-prompt', cause),
   });
 
-/** Async list of agent-* tmux sessions. */
-export const getAgentSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  Effect.tryPromise({
-    try: () => getAgentSessionsAsync(),
-    catch: (cause) => toTmuxError('agent-sessions', cause),
-  });
+export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  listSessions().pipe(
+    Effect.map((sessions) => sessions.filter(s => s.name.startsWith('agent-'))),
+  );
 
-/** Async list of review-* tmux sessions. */
-export const getReviewSessionsAsyncEffect = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  Effect.tryPromise({
-    try: () => getReviewSessionsAsync(),
-    catch: (cause) => toTmuxError('review-sessions', cause),
-  });
+export const getReviewSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
+  listSessions().pipe(
+    Effect.map((sessions) => sessions.filter(s => /^review-/.test(s.name))),
+  );

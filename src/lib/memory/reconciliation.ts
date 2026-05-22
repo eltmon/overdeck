@@ -2,8 +2,8 @@ import { stat } from 'node:fs/promises';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { Effect } from 'effect';
 import {
-  getAgentRuntimeStateEffect,
-  getAgentStateEffect,
+  getAgentRuntimeState,
+  getAgentState,
   type AgentRuntimeState,
   type AgentState,
 } from '../agents.js';
@@ -127,11 +127,11 @@ async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs:
 }
 
 function getAgentStateFromEffect(agentId: string): Promise<AgentState | null> {
-  return Effect.runPromise(getAgentStateEffect(agentId));
+  return Effect.runPromise(getAgentState(agentId));
 }
 
 function getAgentRuntimeStateFromEffect(agentId: string): Promise<AgentRuntimeState | null> {
-  return Effect.runPromise(getAgentRuntimeStateEffect(agentId));
+  return Effect.runPromise(getAgentRuntimeState(agentId));
 }
 
 function emptyResult(): MemoryReconciliationResult {

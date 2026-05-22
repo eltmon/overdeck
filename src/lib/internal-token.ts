@@ -40,7 +40,7 @@ function tokenFilePath(): string {
  * is present. Callers (CLI senders) should treat null as "no dashboard available
  * to authenticate against" and skip the cross-process forward.
  */
-export function getInternalToken(): string | null {
+export function getInternalTokenSync(): string | null {
   if (cachedToken !== undefined) return cachedToken;
 
   const fromEnv = process.env.PANOPTICON_INTERNAL_TOKEN;
@@ -72,10 +72,10 @@ export function getInternalToken(): string | null {
  * to call on every server startup.
  *
  * Called from the dashboard server's main.ts so that CLI senders started
- * afterwards can read the same value via {@link getInternalToken}.
+ * afterwards can read the same value via {@link getInternalTokenSync}.
  */
-export function ensureInternalToken(): string {
-  const existing = getInternalToken();
+export function ensureInternalTokenSync(): string {
+  const existing = getInternalTokenSync();
   if (existing) return existing;
 
   const home = getPanopticonHome();
@@ -111,16 +111,16 @@ export function _resetInternalTokenCacheForTests(): void {
  * null; never fails — read errors collapse to null like the underlying
  * function. Wrapped to compose with Effect call sites.
  */
-export const getInternalTokenEffect = (): Effect.Effect<string | null, never> =>
-  Effect.sync(() => getInternalToken());
+export const getInternalToken = (): Effect.Effect<string | null, never> =>
+  Effect.sync(() => getInternalTokenSync());
 
 /**
  * Effect-native variant of ensureInternalToken. Fails with FsError if the
  * panopticon home directory or token file cannot be written.
  */
-export const ensureInternalTokenEffect = (): Effect.Effect<string, FsError> =>
+export const ensureInternalToken = (): Effect.Effect<string, FsError> =>
   Effect.try({
-    try: () => ensureInternalToken(),
+    try: () => ensureInternalTokenSync(),
     catch: (cause) =>
       new FsError({ path: tokenFilePath(), operation: 'ensureInternalToken', cause }),
   });

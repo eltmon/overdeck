@@ -20,16 +20,16 @@ import ora from 'ora';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { createInterface } from 'readline/promises';
-import { getDashboardApiUrl } from '../../lib/config.js';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
-import { resolveBareNumericId } from '../../lib/issue-id.js';
-import { readWorkspacePlan } from '../../lib/vbrief/io.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { groupItemsByWave, getDispatchableItems, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 import { runTaskCommand } from '../../lib/vbrief/dag-cli.js';
-import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../lib/internal-token.js';
-import { normalizeModelOverride } from '../../lib/model-validation.js';
+import { INTERNAL_TOKEN_HEADER, ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 
-const DASHBOARD_URL = getDashboardApiUrl();
+const DASHBOARD_URL = getDashboardApiUrlSync();
 
 function difficultyColor(d?: string): string {
   switch (d) {
@@ -158,7 +158,7 @@ export async function swarmCommand(
   id: string,
   options: SwarmCommandOptions,
 ): Promise<void> {
-  const resolved = resolveBareNumericId(id);
+  const resolved = resolveBareNumericIdSync(id);
   if (!resolved) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
@@ -172,7 +172,7 @@ export async function swarmCommand(
   parseFiniteInteger(options.maxSlots, '--max-slots');
   parseFiniteInteger(options.sequence, '--sequence');
   try {
-    const model = normalizeModelOverride(options.model);
+    const model = normalizeModelOverrideSync(options.model);
     if (model) options.model = model;
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
@@ -208,7 +208,7 @@ export async function swarmCommand(
 
     // PAN-977 blocker #3: POST /api/swarm is privileged. Send the internal
     // token so the dashboard auth gate accepts the request.
-    const internalToken = ensureInternalToken();
+    const internalToken = ensureInternalTokenSync();
     const response = await fetch(`${DASHBOARD_URL}/api/swarm`, {
       method: 'POST',
       headers: {
@@ -274,7 +274,7 @@ export async function recoverSwarmCommand(
   slotIdInput: string,
   options: SwarmRecoverCommandOptions,
 ): Promise<void> {
-  const issueId = resolveBareNumericId(issueIdInput);
+  const issueId = resolveBareNumericIdSync(issueIdInput);
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${issueIdInput}"`));
     process.exit(1);
@@ -297,7 +297,7 @@ export async function recoverSwarmCommand(
   const action = options.action;
   const spinner = ora(`Recovering slot ${slotId} of ${issueId} via ${action}...`).start();
   try {
-    const internalToken = ensureInternalToken();
+    const internalToken = ensureInternalTokenSync();
     const response = await fetch(`${DASHBOARD_URL}/api/swarm/${issueId}/slot/${slotId}/recover`, {
       method: 'POST',
       headers: {
@@ -320,7 +320,7 @@ export async function recoverSwarmCommand(
 }
 
 async function dryRun(issueId: string): Promise<void> {
-  const project = resolveProjectFromIssue(issueId);
+  const project = resolveProjectFromIssueSync(issueId);
   if (!project) {
     console.error(chalk.red(`Could not resolve project for ${issueId}`));
     process.exit(1);
@@ -332,7 +332,7 @@ async function dryRun(issueId: string): Promise<void> {
     process.exit(1);
   }
 
-  const doc = readWorkspacePlan(workspacePath);
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) {
     console.error(chalk.red(`No vBRIEF plan found in workspace for ${issueId}`));
     process.exit(1);
@@ -356,7 +356,7 @@ async function taskOperation(
   issueId: string,
   options: { task?: string; item?: string; reason?: string; sequence?: string },
 ): Promise<void> {
-  const project = resolveProjectFromIssue(issueId);
+  const project = resolveProjectFromIssueSync(issueId);
   if (!project) {
     console.error(chalk.red(`Could not resolve project for ${issueId}`));
     process.exit(1);
@@ -390,10 +390,10 @@ async function taskOperation(
 }
 
 export async function printActiveSliceForIssue(issueId: string, itemId?: string): Promise<void> {
-  const project = resolveProjectFromIssue(issueId);
+  const project = resolveProjectFromIssueSync(issueId);
   if (!project) throw new Error(`Could not resolve project for ${issueId}`);
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const doc = readWorkspacePlan(workspacePath);
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) throw new Error(`No vBRIEF plan found in workspace for ${issueId}`);
   const target = itemId ? doc.plan.items.find(i => i.id === itemId) : undefined;
   const item = target ?? doc.plan.items.find(i => i.status !== 'completed' && i.status !== 'cancelled' && i.status !== 'blocked');

@@ -6,9 +6,9 @@
  */
 
 import chalk from 'chalk';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 
-const DASHBOARD_URL = getDashboardApiUrl();
+const DASHBOARD_URL = getDashboardApiUrlSync();
 
 export async function abortReviewCommand(id: string): Promise<void> {
   const issueId = id.toUpperCase();

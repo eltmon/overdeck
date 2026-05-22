@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
-import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
+import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -54,13 +54,13 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import {
-  resolveProjectFromIssue,
-  getProject,
-  listProjects,
-  findProjectByTeam,
+  resolveProjectFromIssueSync,
+  getProjectSync,
+  listProjectsSync,
+  findProjectByTeamSync,
   extractTeamPrefix,
 } from '../../../lib/projects.js';
-import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import {
@@ -68,52 +68,52 @@ import {
   markPendingFeedbackDelivered,
 } from '../pending-feedback.js';
 import {
-  getReviewStatus,
-  setReviewStatus as setReviewStatusBase,
+  getReviewStatusSync,
+  setReviewStatusSync as setReviewStatusBase,
   markWorkspaceStuck,
   setDeaconIgnored,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
-import { listGitOperations } from '../../../lib/git-activity.js';
+import { listGitOperationsSync } from '../../../lib/git-activity.js';
 import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
-  computeQueuePositionFromStatus,
-  findPositionInQueue,
+  computeQueuePositionFromStatusSync,
+  findPositionInQueueSync,
 } from '../../../lib/queue-position.js';
 import {
   messageAgent,
   saveAgentRuntimeState,
-  getAgentRuntimeState,
+  getAgentRuntimeStateSync,
   transitionIssueToInReview,
+  getAgentStateSync,
   getAgentState,
-  getAgentStateEffect,
   spawnAgent,
   spawnRun,
 } from '../../../lib/agents.js';
-import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
-import { getCostsForIssue } from '../../../lib/costs/index.js';
+import { getActiveSessionModelSync } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlanEffect, readPlanEffect, isPlanningCompleteEffect } from '../../../lib/vbrief/io.js';
+import { findPlan, readPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
-import { findVBriefByIssueEffect, readVBriefDocumentEffect } from '../../../lib/vbrief/vbrief-index.js';
+import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { capturePaneAsyncEffect, listSessionNamesAsyncEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
+import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
-import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
+import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
-import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
-import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
-import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
+import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
+import { loadWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
-import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateSync } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
@@ -182,7 +182,7 @@ function setCachedProbe(key: string, result: { healthy: boolean; reason?: string
 }
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
-  const parsed = parseIssueId(rawIssueId);
+  const parsed = parseIssueIdSync(rawIssueId);
   if (!parsed) {
     throw new Error('Invalid issue ID');
   }
@@ -204,8 +204,8 @@ async function readWorkspacePlanningMarkdown(
   issueId: string,
   fileName: 'INFERENCE.md',
 ): Promise<{ issueId: string; body: string }> {
-  const parsed = parseIssueId(issueId);
-  const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
+  const parsed = parseIssueIdSync(issueId);
+  const issuePrefix = parsed?.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
@@ -267,18 +267,18 @@ async function ensureWorkAgentReadyForMerge(
   rebaseMsg: string,
 ): Promise<{ recovered: boolean; agentId: string; detail: string }> {
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const lifecycle = getWorkAgentLifecycleState(agentId);
+  const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
   if (lifecycle.hasLiveTmuxSession) {
     await messageAgent(agentId, rebaseMsg);
     return { recovered: true, agentId, detail: 'Work agent already running; sent merge preparation request.' };
   }
 
-  const agentState = await Effect.runPromise(getAgentStateEffect(agentId));
+  const agentState = await Effect.runPromise(getAgentState(agentId));
   if (agentState) {
     try {
       await messageAgent(agentId, rebaseMsg);
-      const updatedLifecycle = getWorkAgentLifecycleState(agentId);
+      const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);
       return {
         recovered: true,
         agentId,
@@ -420,7 +420,7 @@ function clearPendingOperation(issueId: string): void {
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
   if (issuePrefix) {
     const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssue(issueId);
+    const resolved = resolveProjectFromIssueSync(issueId);
     if (resolved) return resolved.projectPath;
 
     const config = getGitHubConfig();
@@ -500,7 +500,7 @@ function resolveWorkspacePath(issueId: string): string | null {
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
   try {
-    const meta = loadWorkspaceMetadata(issueId);
+    const meta = loadWorkspaceMetadataSync(issueId);
     if (meta?.location) return meta.location as 'local' | 'remote';
   } catch { /* non-fatal */ }
   return undefined;
@@ -528,7 +528,7 @@ export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<R
     const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
     if (!isGitHubAppConfigured()) return false;
 
-    const prState = await getPullRequestState(prRef.owner, prRef.repo, prRef.number);
+    const prState = await Effect.runPromise(getPullRequestState(prRef.owner, prRef.repo, prRef.number));
     console.log(`[merge] reconcileGitHubMergeStatus: ${issueId} PR #${prRef.number} merged=${prState.merged} state=${prState.state}`);
     if (!prState.merged) return false;
 
@@ -556,7 +556,7 @@ interface WorkspaceInfo {
 
 function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   try {
-    const meta = loadWorkspaceMetadata(issueId);
+    const meta = loadWorkspaceMetadataSync(issueId);
     if (meta?.location === 'remote' && meta.vmName) {
       const metaRecord = meta as unknown as Record<string, unknown>;
       return {
@@ -569,14 +569,14 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
     }
   } catch { /* non-fatal */ }
 
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
   // Scan all configured projects. Priority: numeric-suffix form (feature-1034) before
   // full lowercased form (feature-pan-1034). The numeric-suffix is the canonical naming
   // for git worktrees; the full lowercased form is the legacy fallback.
-  for (const { config } of listProjects()) {
+  for (const { config } of listProjectsSync()) {
     if (!config.path) continue;
     for (const candidate of [`feature-${numericSuffix}`, `feature-${issueLower}`]) {
       const p = join(config.path, 'workspaces', candidate);
@@ -1002,12 +1002,12 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumber(issueId) ?? issueId}`);
+  lines.push(`Closes #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = await Effect.runPromise(findPlanEffect(workspacePath));
+    const planPath = await Effect.runPromise(findPlan(workspacePath));
     if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
@@ -1028,7 +1028,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Beads task summary from live Dolt database via bd CLI
   try {
-    let beads = await queryBeadsForIssue(workspacePath, issueId);
+    let beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
     if (beads.length === 0) {
       // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
       beads = await readBeadsFromJsonl(workspacePath, issueId);
@@ -1291,7 +1291,7 @@ export async function pushApproveMain(
   projectPath: string,
 ): Promise<ApprovePushResult> {
   try {
-    await gitPush(projectPath, 'origin', 'main', { issueId });
+    await Effect.runPromise(gitPush(projectPath, 'origin', 'main', { issueId }));
     return { pushed: true };
   } catch (pushErr: unknown) {
     if (pushErr instanceof MainDivergedError) {
@@ -1341,7 +1341,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       .filter(Boolean)))
       .slice(0, 100);
 
-    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueId(issueId) }));
+    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueIdSync(issueId) }));
     const invalid = parsedIds.find(({ parsed }) => !parsed);
     if (invalid) {
       return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
@@ -1351,7 +1351,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       const normalizedIssueId = parsed!.raw.toUpperCase();
       const workspaceMetadata = (() => {
         try {
-          return loadWorkspaceMetadata(normalizedIssueId);
+          return loadWorkspaceMetadataSync(normalizedIssueId);
         } catch {
           return null;
         }
@@ -1364,7 +1364,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
         };
       }
 
-      const resolved = resolveProjectFromIssue(normalizedIssueId);
+      const resolved = resolveProjectFromIssueSync(normalizedIssueId);
       if (!resolved) {
         return {
           kind: 'response' as const,
@@ -1373,7 +1373,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
         };
       }
 
-      const projectConfig = getProject(resolved.projectKey);
+      const projectConfig = getProjectSync(resolved.projectKey);
       if (!projectConfig) {
         return {
           kind: 'response' as const,
@@ -1444,10 +1444,10 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -1501,7 +1501,7 @@ const getWorkspaceRoute = HttpRouter.add(
           });
         }
 
-        const projectConfig = findProjectByTeam(issuePrefix);
+        const projectConfig = findProjectByTeamSync(issuePrefix);
         const dnsDomain = projectConfig?.workspace?.dns?.domain || 'localhost';
         const featureFolder = `feature-${issueLower}`;
 
@@ -1585,8 +1585,8 @@ const getWorkspaceRoute = HttpRouter.add(
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
         ]));
-        const sessionNames = yield* listSessionNamesAsyncEffect();
-        const paneOutput = yield* capturePaneAsyncEffect(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
+        const sessionNames = yield* listSessionNames();
+        const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 
         let hasAgent = false;
         let agentSessionId: string | null = null;
@@ -1604,13 +1604,13 @@ const getWorkspaceRoute = HttpRouter.add(
           ) || paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
           agentModel = modelMatch ? modelMatch[1] : undefined;
 
-          const fullModel = getActiveSessionModel(workspacePath);
+          const fullModel = getActiveSessionModelSync(workspacePath);
           if (fullModel) agentModelFull = fullModel;
         }
 
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
-        const reviewStatus = getReviewStatus(issueId);
+        const reviewStatus = getReviewStatusSync(issueId);
 
         if (
           pendingOperation?.type === 'merge' &&
@@ -1625,12 +1625,12 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
-        const planPath = yield* findPlanEffect(workspacePath);
+        const planPath = yield* findPlan(workspacePath);
         const hasPlan = planPath !== null;
-        const planningComplete = hasPlan ? yield* isPlanningCompleteEffect(workspacePath) : false;
+        const planningComplete = hasPlan ? yield* isPlanningComplete(workspacePath) : false;
         const hasBeads = planningComplete;
 
-        const issueData = getCostsForIssue(issueId);
+        const issueData = getCostsForIssueSync(issueId);
         const agents = yield* Effect.promise(() => getCachedRunningAgents());
         const resolvedCost = resolveIssueHeadlineCost({
           issueId: issueId,
@@ -1733,7 +1733,7 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
@@ -1757,12 +1757,12 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const parsed = parseIssueId(issueId);
-    const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
+    const parsed = parseIssueIdSync(issueId);
+    const issuePrefix = parsed?.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
@@ -1781,7 +1781,7 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -1807,23 +1807,23 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
 
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
-    const found = yield* findVBriefByIssueEffect(projectPath, issueId);
+    const found = yield* findVBriefByIssue(projectPath, issueId);
     if (found) {
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
-        doc: yield* readVBriefDocumentEffect(found.path),
+        doc: yield* readVBriefDocument(found.path),
       };
     }
 
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = yield* findPlanEffect(workspacePath);
+    const planPath = yield* findPlan(workspacePath);
     if (!planPath) return null;
     return {
       path: planPath,
       lifecycleDir: 'workspace',
-      doc: yield* readPlanEffect(planPath),
+      doc: yield* readPlan(planPath),
     };
   });
 }
@@ -1834,10 +1834,10 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const location = yield* resolvePlanLocation(projectPath, issueId);
@@ -1863,7 +1863,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -1873,7 +1873,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
@@ -1909,7 +1909,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const workspacePath = resolveWorkspacePath(issueId);
@@ -1945,7 +1945,7 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
@@ -1982,7 +1982,7 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
@@ -2011,10 +2011,10 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -2186,13 +2186,13 @@ const postWorkspaceCleanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -2272,10 +2272,10 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -2353,7 +2353,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           cwd: workspaceDir,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
+          env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
         });
 
         devUp.stdout?.on('data', (data) => {
@@ -2404,10 +2404,10 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -2462,7 +2462,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
     // Repair .env if needed
     const envFilePath = join(workspacePath, '.env');
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
 
     if (projectConfig?.workspace?.ports && projectConfig?.workspace?.env?.template) {
       const featureFolder = `feature-${issueLower}`;
@@ -2598,7 +2598,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       cwd: workspacePath,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
+      env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
     });
 
     child.stdout?.on('data', (data) => {
@@ -2715,7 +2715,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const containerName = params['containerName'] ?? '';
@@ -2729,7 +2729,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     }
 
     const teamPrefix = extractTeamPrefix(issueId);
-    const containerProjectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+    const containerProjectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
     const projectPaths = containerProjectConfig
       ? [
           join(
@@ -2738,7 +2738,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
             `feature-${issueId.toLowerCase()}`
           ),
         ]
-      : listProjects().map(p =>
+      : listProjectsSync().map(p =>
           join(p.config.path, 'workspaces', `feature-${issueId.toLowerCase()}`)
         );
 
@@ -2773,10 +2773,10 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     // Self-heal: if .devcontainer/ is missing for start/restart, re-render
     // from the project template so docker compose can operate on containers.
     if (!composeFile && ['start', 'restart'].includes(action)) {
-      const { ensureDevcontainer } = yield* Effect.promise(() =>
+      const { ensureDevcontainerSync } = yield* Effect.promise(() =>
         import('../../../lib/workspace/ensure-devcontainer.js')
       );
-      const ensure = ensureDevcontainer({ workspacePath, issueId });
+      const ensure = ensureDevcontainerSync({ workspacePath, issueId });
       if (ensure.rendered) {
         console.log(`[container-control] Re-rendered ${DEVCONTAINER_DIRNAME}/ from project template`);
       }
@@ -2841,7 +2841,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       ['start', 'restart'].includes(action)
     ) {
       const tPrefix = extractTeamPrefix(issueId);
-      const pConfig = tPrefix ? findProjectByTeam(tPrefix) : null;
+      const pConfig = tPrefix ? findProjectByTeamSync(tPrefix) : null;
       if (
         pConfig?.workspace?.database?.migrations?.type === 'flyway' &&
         projectName
@@ -2910,11 +2910,11 @@ const postWorkspaceMemorySummaryRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const result = yield* Effect.promise(() => generateDailySummary({
       projectId: basename(projectPath),
@@ -2932,12 +2932,12 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
 
     if (!projectConfig) {
       return jsonResponse(
@@ -3087,11 +3087,11 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const status = getReviewStatus(issueId);
+    const status = getReviewStatusSync(issueId);
     const base: ReviewStatus = status || {
       issueId,
       reviewStatus: 'pending',
@@ -3101,14 +3101,14 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       updatedAt: new Date().toISOString(),
     };
 
-    let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
+    let { queuePosition, activeSpecialist } = computeQueuePositionFromStatusSync(status);
 
     // Discover active parallel review sessions for this issue
     let reviewCoordinatorSessionName: string | undefined;
     let reviewSessionNames: string[] | undefined;
     let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
     try {
-      const allSessions = yield* listSessionNamesAsyncEffect();
+      const allSessions = yield* listSessionNames();
       const enriched = enrichReviewStatusFromSessions(issueId, base, allSessions);
       reviewCoordinatorSessionName = enriched.reviewCoordinatorSessionName;
       reviewSessionNames = enriched.reviewSessionNames;
@@ -3118,13 +3118,13 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     // Only the merge queue is persistent — check it when no active phase is detected
     if (queuePosition === null) {
       try {
-        const resolved = resolveProjectFromIssue(issueId);
+        const resolved = resolveProjectFromIssueSync(issueId);
         if (resolved) {
           const { getQueueForProject } = yield* Effect.promise(() =>
             import('../../../lib/database/merge-queue-db.js')
           );
           const mergeQueue = getQueueForProject(resolved.projectKey);
-          const mergePos = findPositionInQueue(issueId, mergeQueue.map(e => ({
+          const mergePos = findPositionInQueueSync(issueId, mergeQueue.map(e => ({
             id: String(e.id),
             type: 'task' as const,
             priority: 'normal' as const,
@@ -3155,7 +3155,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -3200,7 +3200,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const { getTmuxSessionName } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    const resolvedProject = resolveProjectFromIssue(issueId);
+    const resolvedProject = resolveProjectFromIssueSync(issueId);
     const projectKey = resolvedProject?.projectKey;
 
     if (reviewStatus && ['passed', 'blocked', 'failed'].includes(reviewStatus)) {
@@ -3338,9 +3338,9 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         // commit. Mirrors what verification-runner does at the pre-review gate.
         yield* Effect.promise(async () => {
           try {
-            const { resolveProjectFromIssue, getProject } = await import('../../../lib/projects.js');
-            const project = resolveProjectFromIssue(issueId);
-            const projectCfg = project ? getProject(project.projectKey) : null;
+            const { resolveProjectFromIssueSync, getProjectSync } = await import('../../../lib/projects.js');
+            const project = resolveProjectFromIssueSync(issueId);
+            const projectCfg = project ? getProjectSync(project.projectKey) : null;
             const repo = projectCfg?.github_repo;
             if (!repo || !repo.includes('/')) return;
             const [owner, name] = repo.split('/');
@@ -3385,7 +3385,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -3397,7 +3397,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as any)?.force === true;
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
@@ -3409,7 +3409,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       ? workspaceInfo.remotePath!
       : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
-    const existingStatus = getReviewStatus(issueId);
+    const existingStatus = getReviewStatusSync(issueId);
 
     if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus || '')) {
       const infraFailurePatterns = [
@@ -3513,7 +3513,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            if (!workspaceInfo.isRemote) {
 	              try {
 	                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-	                const commits = await getWorkspaceGitInfo(workspacePath);
+	                const commits = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
 	                setReviewStatus(issueId, {
 	                  lastReviewCommits: {
 	                    ahead: 0,
@@ -3529,7 +3529,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            let reviewTargetBranch: string | undefined;
 	            try {
 	              const { createReviewArtifactsForIssue } = await import('../../../lib/review-artifacts.js');
-	              const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
+	              const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
 	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
 	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.mergeStatus !== 'skipped')?.targetBranch;
 	              if (primaryArtifact?.artifactUrl) {
@@ -3543,19 +3543,19 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            }
 
             try {
-              eventStore.append({
+              (await Effect.runPromise(eventStore.append({
                 type: 'pipeline.verification-started',
                 timestamp: new Date().toISOString(),
                 payload: { issueId },
-              } as any);
+              } as any)));
             } catch { /* non-fatal */ }
 
-            const verifyOutcome = await runVerificationForIssue(
+            const verifyOutcome = await Effect.runPromise(runVerificationForIssue(
               issueId,
               workspacePath,
               workspaceInfo,
               'review'
-            );
+            ));
             if (verifyOutcome.outcome === 'failed') {
               completePendingOperation(
                 issueId,
@@ -3566,11 +3566,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
               });
               try {
-                eventStore.append({
+                (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
                   timestamp: new Date().toISOString(),
                   payload: { issueId, failedCheck: verifyOutcome.failedCheck },
-                } as any);
+                } as any)));
               } catch { /* non-fatal */ }
               return;
             }
@@ -3584,11 +3584,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewNotes: `Verification error: ${verifyOutcome.message}`,
               });
               try {
-                eventStore.append({
+                (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
                   timestamp: new Date().toISOString(),
                   payload: { issueId, message: verifyOutcome.message },
-                } as any);
+                } as any)));
               } catch { /* non-fatal */ }
               return;
             }
@@ -3600,14 +3600,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             // pipeline event) but the review itself is no longer a detached
             // `pan review run` coordinator process.
             const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
-            const prUrl = getReviewStatus(issueId)?.prUrl;
-            const reviewResult = await spawnReviewRoleForIssue({
+            const prUrl = getReviewStatusSync(issueId)?.prUrl;
+            const reviewResult = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
               branch: branchName,
               workspace: workspacePath,
               prUrl,
               force: forceReview,
-            });
+            }));
 
             if (!reviewResult.success) {
               console.warn(
@@ -3626,11 +3626,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             setReviewStatus(issueId, { reviewStatus: 'reviewing' });
             completePendingOperation(issueId, null);
             try {
-              eventStore.append({
+              (await Effect.runPromise(eventStore.append({
                 type: 'pipeline.review-started',
                 timestamp: new Date().toISOString(),
                 payload: { issueId },
-              } as any);
+              } as any)));
             } catch { /* non-fatal */ }
           } catch (error: any) {
             console.error(`[review] Error starting review:`, error);
@@ -3656,14 +3656,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
     const eventStore = yield* EventStoreService;
 
-    const existingStatus = getReviewStatus(issueId);
+    const existingStatus = getReviewStatusSync(issueId);
 
     if (existingStatus?.mergeStatus === 'merged') {
       console.log(`[request-review] Rejecting ${issueId}: already merged`);
@@ -3677,7 +3677,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (existingStatus?.reviewStatus === 'passed') {
       if (shouldTreatAsRerun(existingStatus)) {
         const issueLowerRerun = issueId.toLowerCase();
-        const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
+        const issuePrefixRerun = extractPrefixSync(issueId) ?? issueId.split('-')[0];
         const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
         const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
         const workspacePathRerun = wsInfoRerun.isRemote
@@ -3737,15 +3737,15 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
             }
 
-            const prUrl = getReviewStatus(issueId)?.prUrl;
+            const prUrl = getReviewStatusSync(issueId)?.prUrl;
             const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
-            const result = await spawnReviewRoleForIssue({
+            const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
               workspace: workspacePathRerun,
               branch: branchNameRerun,
               prUrl,
               force: true,
-            });
+            }));
 
             if (result.success) {
               // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
@@ -3779,7 +3779,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         setReviewStatus(issueId, { testStatus: 'pending' });
 
         try {
-          const resolved = resolveProjectFromIssue(issueId);
+          const resolved = resolveProjectFromIssueSync(issueId);
           if (!resolved) {
             console.error(
               `[request-review] No project configured for ${issueId} — cannot spawn test role`
@@ -3857,7 +3857,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
@@ -3955,7 +3955,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     );
 
     try {
-      const resolved = resolveProjectFromIssue(issueId);
+      const resolved = resolveProjectFromIssueSync(issueId);
 
       if (!resolved) {
         return jsonResponse(
@@ -3970,12 +3970,12 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       const result = yield* Effect.promise(async () => {
         const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
-        return spawnReviewRoleForIssue({
+        return (await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace: workspacePath,
           branch: branchName,
           force: true,
-        });
+        })));
       });
 
       if (result.success) {
@@ -4076,7 +4076,7 @@ export function processResetReviewPipeline(
   }
 
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const priorRuntime = getAgentRuntimeState(agentId);
+  const priorRuntime = getAgentRuntimeStateSync(agentId);
 
   console.log(
     `[reset-review] Human-initiated pipeline reset for ${issueId} ` +
@@ -4132,7 +4132,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -4161,7 +4161,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       try {
         yield* Effect.promise(async () => {
           const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
-          const resolved = resolveProjectFromIssue(issueId);
+          const resolved = resolveProjectFromIssueSync(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             const issueLower = issueId.toLowerCase();
@@ -4172,12 +4172,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
 
-            const result = await spawnReviewRoleForIssue({
+            const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
               workspace: wsPath,
               branch: branchName,
-              prUrl: getReviewStatus(issueId)?.prUrl,
-            });
+              prUrl: getReviewStatusSync(issueId)?.prUrl,
+            }));
 
             if (result.success) {
               setReviewStatus(issueId, { reviewStatus: 'reviewing' });
@@ -4222,7 +4222,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!issueId) {
@@ -4234,13 +4234,13 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    const { resolveProjectFromIssue } = yield* Effect.promise(() =>
+    const { resolveProjectFromIssueSync } = yield* Effect.promise(() =>
       import('../../../lib/projects.js'),
     );
     const { killAllReviewerSessions } = yield* Effect.promise(() =>
       import('../../../lib/cloister/review-agent.js'),
     );
-    const resolved = resolveProjectFromIssue(issueId);
+    const resolved = resolveProjectFromIssueSync(issueId);
     const { killed, failed } = yield* Effect.promise(() =>
       killAllReviewerSessions(resolved?.projectKey, issueId),
     );
@@ -4301,7 +4301,7 @@ export type UnstickResult =
 export function processUnstickRequest(
   issueId: string,
   workspaceExists: boolean,
-  currentStatus: ReturnType<typeof getReviewStatus>,
+  currentStatus: ReturnType<typeof getReviewStatusSync>,
   gitSafeState: boolean,
 ): UnstickResult {
   if (!workspaceExists) {
@@ -4369,19 +4369,19 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const current = getReviewStatus(issueId);
+    const current = getReviewStatusSync(issueId);
 
     // Pre-verify git state before mutating stuck flag.
     // For main_diverged: check that local main is not ahead of origin/main.
     // PAN-794: review_infrastructure_failure is unrelated to git divergence —
     // skip the git safe-state check so operators can unstick review-infra
     // workspaces without touching the project's main branch.
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const skipGitCheck = current?.stuckReason === 'review_infrastructure_failure';
     const gitSafeState = skipGitCheck
@@ -4409,7 +4409,7 @@ const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!issueId) {
@@ -4428,7 +4428,7 @@ const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
       : undefined;
 
     setDeaconIgnored(issueId, body.ignored, reason);
-    const updated = getReviewStatus(issueId);
+    const updated = getReviewStatusSync(issueId);
     return jsonResponse({
       success: true,
       issueId,
@@ -4447,11 +4447,11 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -4549,7 +4549,7 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
 }
 
 async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
-  const reviewStatus = getReviewStatus(issueId);
+  const reviewStatus = getReviewStatusSync(issueId);
   if (!reviewStatus?.readyForMerge) {
     return {
       success: false,
@@ -4606,7 +4606,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     return { success: false, statusCode: 400, error: 'Already merged', mergeStatus: 'merged' };
   }
 
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
 
@@ -4661,9 +4661,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       console.log(
         `[merge] Remote workspace detected for ${issueId}, using review artifact merge...`
       );
-      const { getMergeSet, ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
+      const { getMergeSetSync, ensureMergeSetForIssueSync } = await import('../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
-      const remoteMergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+      const remoteMergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
       const remotePrimaryRepo = remoteMergeSet?.repos[0];
       const remoteTargetBranch = remotePrimaryRepo?.targetBranch || 'main';
       const remoteForge = remotePrimaryRepo?.forge || 'github';
@@ -4719,16 +4719,16 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 400, error: 'Workspace does not exist' };
     }
 
-    const projectConfig = findProjectByTeam(issuePrefix);
+    const projectConfig = findProjectByTeamSync(issuePrefix);
     const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
     if (isPolyrepo && projectConfig?.workspace?.repos) {
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
-      const { getMergeSet, ensureMergeSetForIssue, upsertMergeSet, withRepoState } = await import('../../../lib/merge-set.js');
+      const { getMergeSetSync, ensureMergeSetForIssueSync, upsertMergeSetSync, withRepoStateSync } = await import('../../../lib/merge-set.js');
       const { runQualityGates } = await import('../../../lib/cloister/validation.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
       const { messageAgent } = await import('../../../lib/agents.js');
-      let mergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+      let mergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
       if (!mergeSet) {
         const error = `No merge set found for ${issueId}`;
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
@@ -4748,7 +4748,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       }
 
       const agentId = `agent-${issueId.toLowerCase()}`;
-      if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
+      if (!await Effect.runPromise(sessionExists(agentId))) {
         const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
@@ -4760,7 +4760,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         status: 'merging',
         updatedAt: new Date().toISOString(),
       };
-      upsertMergeSet(mergeSet);
+      upsertMergeSetSync(mergeSet);
 
       const mergeResults: Array<{
         repo: string;
@@ -4783,9 +4783,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 10000 }
         );
         repoHeadsBefore.set(repo.repoKey, headBefore.trim());
-        mergeSet = withRepoState(mergeSet, repo.repoKey, { rebaseStatus: 'requested' });
+        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { rebaseStatus: 'requested' });
       }
-      upsertMergeSet(mergeSet);
+      upsertMergeSetSync(mergeSet);
 
       if (mergeResults.some(result => !result.success)) {
         const failedDetails = mergeResults.filter(r => !r.success).map(r => `${r.repo}: ${r.message}`).join('; ');
@@ -4821,29 +4821,29 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
             );
             if (headNow.trim() !== repoHeadsBefore.get(repo.repoKey)) {
               pushedRepos.add(repo.repoKey);
-              mergeSet = withRepoState(mergeSet, repo.repoKey, { rebaseStatus: 'passed' });
-              upsertMergeSet(mergeSet);
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { rebaseStatus: 'passed' });
+              upsertMergeSetSync(mergeSet);
             }
           } catch {
             // Retry until timeout or agent exit.
           }
         }
 
-        if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) break;
+        if (!await Effect.runPromise(sessionExists(agentId))) break;
       }
 
       if (pushedRepos.size !== activeRepos.length) {
         const remaining = activeRepos
           .filter(repo => !pushedRepos.has(repo.repoKey))
           .map(repo => repo.repoKey);
-        const agentRunning = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
+        const agentRunning = await Effect.runPromise(sessionExists(agentId));
         const error = !agentRunning
           ? `Work agent ${agentId} stopped before completing polyrepo rebases for ${remaining.join(', ')}`
           : `Work agent did not push rebased branches for ${remaining.join(', ')} within ${REBASE_TIMEOUT_MS / 60000} minutes`;
         for (const repoKey of remaining) {
-          mergeSet = withRepoState(mergeSet, repoKey, { rebaseStatus: 'failed' });
+          mergeSet = withRepoStateSync(mergeSet, repoKey, { rebaseStatus: 'failed' });
         }
-        upsertMergeSet(mergeSet);
+        upsertMergeSetSync(mergeSet);
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error };
@@ -4863,36 +4863,36 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           )
         );
 
-        mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'running' });
-        upsertMergeSet(mergeSet);
+        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'running' });
+        upsertMergeSetSync(mergeSet);
 
         if (Object.keys(gates).length === 0) {
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'skipped' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'skipped' });
+          upsertMergeSetSync(mergeSet);
           continue;
         }
 
-        const gateResults = await runQualityGates(gates, repoWorkspacePath, 'pre_push');
+        const gateResults = await Effect.runPromise(runQualityGates(gates, repoWorkspacePath, 'pre_push'));
         const failedGate = gateResults.find(result => !result.passed && result.required !== false);
         if (failedGate) {
           const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'failed' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'failed' });
+          upsertMergeSetSync(mergeSet);
           setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
           completePendingOperation(issueId, error);
           return { success: false, statusCode: 500, error };
         }
 
-        mergeSet = withRepoState(mergeSet, repo.repoKey, { verificationStatus: 'passed' });
-        upsertMergeSet(mergeSet);
+        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'passed' });
+        upsertMergeSetSync(mergeSet);
       }
 
       setReviewStatus(issueId, { mergeStatus: 'merging' });
       for (const repo of activeRepos) {
         const repoWorkspacePath = join(workspacePath, repo.repoKey);
         try {
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merging' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merging' });
+          upsertMergeSetSync(mergeSet);
           await getForgeAdapter(repo.forge).mergeReviewArtifact({
             forge: repo.forge,
             url: repo.artifactUrl,
@@ -4900,8 +4900,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
             cwd: repoWorkspacePath,
             method: 'squash',
           });
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          upsertMergeSetSync(mergeSet);
           mergeResults.push({
             repo: repo.repoKey,
             success: true,
@@ -4909,8 +4909,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           });
         } catch (mergeErr: any) {
           const error = mergeErr.message || 'Artifact merge failed';
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'failed' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'failed' });
+          upsertMergeSetSync(mergeSet);
           mergeResults.push({ repo: repo.repoKey, success: false, message: error });
           break;
         }
@@ -4927,7 +4927,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           status: 'failed',
           updatedAt: new Date().toISOString(),
         };
-        upsertMergeSet(mergeSet);
+        upsertMergeSetSync(mergeSet);
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error, repos: mergeResults };
@@ -4938,7 +4938,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         status: 'merged',
         updatedAt: new Date().toISOString(),
       };
-      upsertMergeSet(mergeSet);
+      upsertMergeSetSync(mergeSet);
       setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
       completePendingOperation(issueId, null);
 
@@ -4955,9 +4955,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     // Monorepo / single-repo merge: PR-based flow
-    const { getMergeSet, ensureMergeSetForIssue } = await import('../../../lib/merge-set.js');
+    const { getMergeSetSync, ensureMergeSetForIssueSync } = await import('../../../lib/merge-set.js');
     const { getForgeAdapter } = await import('../../../lib/forge.js');
-    const monorepoMergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
+    const monorepoMergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
     const primaryRepo = monorepoMergeSet?.repos[0];
     const targetBranch = primaryRepo?.targetBranch || 'main';
     const primaryForge = primaryRepo?.forge || 'github';
@@ -4991,7 +4991,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       try {
         const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
         if (isGitHubAppConfigured()) {
-          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+          const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
           if (prState.state !== 'OPEN' && !prState.merged) {
             const error = `PR #${githubPrRef.number} is ${prState.state} (not OPEN). Panopticon state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.`;
             console.error(`[merge] ${error}`);
@@ -5041,7 +5041,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
-    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExistsAsyncEffect(agentId)) ? 'running' : 'stopped'})...`);
+    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
@@ -5084,7 +5084,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
             }
           } catch { /* fetch failed, retry */ }
 
-          if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
+          if (!await Effect.runPromise(sessionExists(agentId))) {
             console.log(`[merge] Work agent ${agentId} stopped during rebase`);
             break;
           }
@@ -5092,7 +5092,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
         if (newHead) {
           rebaseResult = { success: true, newHead };
-        } else if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
+        } else if (!await Effect.runPromise(sessionExists(agentId))) {
           rebaseResult = {
             success: false,
             reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
@@ -5167,13 +5167,13 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const { runVerificationForIssue } = await import(
       '../../../lib/cloister/verification-runner.js'
     );
-    const verifyResult = await runVerificationForIssue(
+    const verifyResult = await Effect.runPromise(runVerificationForIssue(
       issueId,
       workspacePath,
       { isRemote: false },
       'merge-verify',
       { syncTargetBranch: false },
-    );
+    ));
 
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
@@ -5204,7 +5204,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     try {
       const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
       if (githubPrRef && isGitHubAppConfigured()) {
-        const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+        const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
         const sha = prState.headSha.trim();
         if (sha) {
           await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'panopticon/review', 'Review passed');
@@ -5234,7 +5234,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       try {
         const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
         if (githubPrRef && isGitHubAppConfigured()) {
-          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
+          const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
           artifactMerged = prState.merged;
           if (artifactMerged) {
             console.log(`[merge] Race-detected: PR #${githubPrRef.number} for ${issueId} was already merged despite thrown error; proceeding`);
@@ -5253,7 +5253,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           prMergeErr.message?.includes('ETIMEDOUT') ||
           prMergeErr.message?.includes('ECONNREFUSED');
         if (isTransient) {
-          const reconciled = await reconcileGitHubMergeStatus(issueId, getReviewStatus(issueId));
+          const reconciled = await reconcileGitHubMergeStatus(issueId, getReviewStatusSync(issueId));
           if (reconciled) {
             artifactMerged = true;
             console.log(`[merge] Reconciliation confirmed PR merged for ${issueId} after transient error; proceeding to success path`);
@@ -5311,7 +5311,7 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
@@ -5343,7 +5343,7 @@ const postForgeApproveRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
@@ -5351,10 +5351,10 @@ const postForgeApproveRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
+      const { getMergeSetSync, upsertMergeSetSync, withRepoArtifactUrlSync, withRepoStateSync } = await import('../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
 
-      let mergeSet = getMergeSet(issueId);
+      let mergeSet = getMergeSetSync(issueId);
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
@@ -5383,8 +5383,8 @@ const postForgeApproveRoute = HttpRouter.add(
             if (discovered?.url || discovered?.id) {
               artifactUrl = discovered.url;
               artifactId = discovered.id;
-              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
-              upsertMergeSet(mergeSet);
+              mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSetSync(mergeSet);
               console.log(`[forge-approve] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
             } else {
               results.push({ repoKey: repo.repoKey, approved: true });
@@ -5411,14 +5411,14 @@ const postForgeApproveRoute = HttpRouter.add(
 
       const approvedCount = results.filter(r => r.approved).length;
       if (approvedCount > 0) {
-        const { emitActivityEntry, emitActivityTts } = await import('../../../lib/activity-logger.js');
-        emitActivityEntry({
+        const { emitActivityEntrySync, emitActivityTtsSync } = await import('../../../lib/activity-logger.js');
+        emitActivityEntrySync({
           source: 'dashboard',
           level: 'success',
           message: `Merge approved for ${issueId}`,
           issueId,
         });
-        emitActivityTts({
+        emitActivityTtsSync({
           utterance: `Merge approved for ${issueId}`,
           priority: 1,
           issueId,
@@ -5447,7 +5447,7 @@ const postForgeMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
@@ -5455,10 +5455,10 @@ const postForgeMergeRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
+      const { getMergeSetSync, upsertMergeSetSync, withRepoArtifactUrlSync, withRepoStateSync } = await import('../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
 
-      let mergeSet = getMergeSet(issueId);
+      let mergeSet = getMergeSetSync(issueId);
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
@@ -5487,18 +5487,18 @@ const postForgeMergeRoute = HttpRouter.add(
             if (discovered?.url || discovered?.id) {
               artifactUrl = discovered.url;
               artifactId = discovered.id;
-              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
-              upsertMergeSet(mergeSet);
+              mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSetSync(mergeSet);
               console.log(`[forge-merge] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
             } else {
-              mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
-              upsertMergeSet(mergeSet);
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+              upsertMergeSetSync(mergeSet);
               results.push({ repoKey: repo.repoKey, merged: true });
               continue;
             }
           } catch {
-            mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
-            upsertMergeSet(mergeSet);
+            mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+            upsertMergeSetSync(mergeSet);
             results.push({ repoKey: repo.repoKey, merged: true });
             continue;
           }
@@ -5512,8 +5512,8 @@ const postForgeMergeRoute = HttpRouter.add(
             method: 'squash',
             cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
           });
-          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
-          upsertMergeSet(mergeSet);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          upsertMergeSetSync(mergeSet);
           results.push({ repoKey: repo.repoKey, merged: true });
         } catch (err: any) {
           results.push({ repoKey: repo.repoKey, merged: false, error: err.message });
@@ -5522,14 +5522,14 @@ const postForgeMergeRoute = HttpRouter.add(
 
       const mergedCount = results.filter(r => r.merged).length;
       if (mergedCount > 0) {
-        const { emitActivityEntry, emitActivityTts } = await import('../../../lib/activity-logger.js');
-        emitActivityEntry({
+        const { emitActivityEntrySync, emitActivityTtsSync } = await import('../../../lib/activity-logger.js');
+        emitActivityEntrySync({
           source: 'dashboard',
           level: 'success',
           message: `Merged ${issueId} on ${mergeSet.repos[0]?.forge ?? 'forge'}`,
           issueId,
         });
-        emitActivityTts({
+        emitActivityTtsSync({
           utterance: `${issueId} has been merged`,
           priority: 1,
           issueId,
@@ -5555,11 +5555,11 @@ const postWorkspaceApproveRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const existingStatus = getReviewStatus(issueId);
+    const existingStatus = getReviewStatusSync(issueId);
     if (
       existingStatus?.readyForMerge &&
       existingStatus.reviewStatus === 'passed' &&
@@ -5585,7 +5585,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+        const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const issueLower = issueId.toLowerCase();
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -5636,7 +5636,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         // recentPushWarning is included in the success response body below (line ~4146) so
         // the caller can surface it to the operator without a separate lookup.
         const recentCutoff = new Date(Date.now() - 30_000).toISOString();
-        const recentMainPushes = listGitOperations({ operation: 'push', since: recentCutoff })
+        const recentMainPushes = listGitOperationsSync({ operation: 'push', since: recentCutoff })
           .filter((op) => op.status === 'success' && op.branch === 'main' && op.issueId !== issueId);
         const recentPushWarning = recentMainPushes.length > 0
           ? `Another workspace pushed to main ${Math.round((Date.now() - new Date(recentMainPushes[0].ts).getTime()) / 1000)}s ago — divergence possible`
@@ -5697,12 +5697,12 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         let reviewResult: { success: boolean; message: string; error?: string };
         try {
           const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
-          reviewResult = await spawnReviewRoleForIssue({
+          reviewResult = await Effect.runPromise(spawnReviewRoleForIssue({
             issueId,
             workspace: workspacePath,
             branch: branchName,
-            prUrl: getReviewStatus(issueId)?.prUrl,
-          });
+            prUrl: getReviewStatusSync(issueId)?.prUrl,
+          }));
         } catch (err: any) {
           reviewResult = {
             success: false,
@@ -5843,7 +5843,7 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     clearPendingOperation(issueId);
@@ -5859,7 +5859,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -5879,7 +5879,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
           });
         }
 
-        const service = getTldrDaemonService(workspacePath, venvPath);
+        const service = getTldrDaemonServiceSync(workspacePath, venvPath);
         const status = await service.getStatus();
         const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
 
@@ -5905,11 +5905,11 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
@@ -5968,10 +5968,10 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
     // by default, so this stateful endpoint must be unreachable without the
     // server-issued token. Same token is read by CLI senders via getInternalToken().
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+    const { INTERNAL_TOKEN_HEADER, getInternalTokenSync } = yield* Effect.promise(() =>
       import('../../../lib/internal-token.js'),
     );
-    const expected = getInternalToken();
+    const expected = getInternalTokenSync();
     if (!expected) {
       return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
     }
@@ -5986,7 +5986,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
     const event = body as Record<string, unknown>;
     const type = event.type as string | undefined;
 
-    const { notifyPipeline } = yield* Effect.promise(() =>
+    const { notifyPipelineSync } = yield* Effect.promise(() =>
       import('../../../lib/pipeline-notifier.js'),
     );
 
@@ -5996,11 +5996,11 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId) {
           return jsonResponse({ ok: false, error: 'status_changed requires issueId' }, 400);
         }
-        const status = getReviewStatus(issueId);
+        const status = getReviewStatusSync(issueId);
         if (!status) {
           return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
         }
-        notifyPipeline({ type: 'status_changed', issueId, status });
+        notifyPipelineSync({ type: 'status_changed', issueId, status });
         return jsonResponse({ ok: true });
       }
       case 'review.approved':
@@ -6018,7 +6018,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !specialist) {
           return jsonResponse({ ok: false, error: 'task_queued requires issueId and specialist' }, 400);
         }
-        notifyPipeline({ type: 'task_queued', specialist, issueId });
+        notifyPipelineSync({ type: 'task_queued', specialist, issueId });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_started': {
@@ -6028,7 +6028,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role || !sessionName) {
           return jsonResponse({ ok: false, error: 'reviewer_started requires issueId, role, sessionName' }, 400);
         }
-        notifyPipeline({ type: 'reviewer_started', issueId, role, sessionName });
+        notifyPipelineSync({ type: 'reviewer_started', issueId, role, sessionName });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_completed': {
@@ -6037,7 +6037,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role) {
           return jsonResponse({ ok: false, error: 'reviewer_completed requires issueId, role' }, 400);
         }
-        notifyPipeline({ type: 'reviewer_completed', issueId, role });
+        notifyPipelineSync({ type: 'reviewer_completed', issueId, role });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_timed_out': {
@@ -6050,7 +6050,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role || !sessionName || attempt === undefined || maxRetries === undefined || willRetry === undefined) {
           return jsonResponse({ ok: false, error: 'reviewer_timed_out requires issueId, role, sessionName, attempt, maxRetries, willRetry' }, 400);
         }
-        notifyPipeline({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
+        notifyPipelineSync({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
         return jsonResponse({ ok: true });
       }
       case 'coordinator_started': {
@@ -6059,7 +6059,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !sessionName) {
           return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
         }
-        notifyPipeline({ type: 'coordinator_started', issueId, sessionName });
+        notifyPipelineSync({ type: 'coordinator_started', issueId, sessionName });
         return jsonResponse({ ok: true });
       }
       case 'coordinator_died': {
@@ -6069,7 +6069,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !sessionName || !reason) {
           return jsonResponse({ ok: false, error: 'coordinator_died requires issueId, sessionName, reason' }, 400);
         }
-        notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
+        notifyPipelineSync({ type: 'coordinator_died', issueId, sessionName, reason });
         return jsonResponse({ ok: true });
       }
       default:

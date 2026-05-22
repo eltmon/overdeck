@@ -24,7 +24,9 @@ const mockResolveProjectFromIssue = vi.fn();
 const mockLoadProjectsConfig = vi.fn();
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
   loadProjectsConfig: mockLoadProjectsConfig,
+  loadProjectsConfigSync: mockLoadProjectsConfig,
 }));
 
 // ─── Mock fs.existsSync ───────────────────────────────────────────────────────
@@ -66,14 +68,14 @@ describe('WorkspaceService — integration', () => {
     mockResolveProjectFromIssue.mockReturnValue(MOCK_PROJECT);
     mockLoadProjectsConfig.mockReturnValue({ projects: { myapp: MOCK_PROJECT } });
     mockExistsSync.mockReturnValue(false);
-    mockCreateWorkspace.mockResolvedValue({
+    mockCreateWorkspace.mockReturnValue(Effect.succeed({
       success: true,
       workspacePath: '/projects/myapp/workspaces/feature-pan-1',
       errors: [],
       steps: ['created'],
-    });
-    mockRemoveWorkspace.mockResolvedValue({ success: true, errors: [], steps: [] });
-    mockStopWorkspaceDocker.mockResolvedValue(undefined);
+    }));
+    mockRemoveWorkspace.mockReturnValue(Effect.succeed({ success: true, errors: [], steps: [] }));
+    mockStopWorkspaceDocker.mockReturnValue(Effect.void);
   });
 
   describe('create', () => {

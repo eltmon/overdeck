@@ -9,6 +9,7 @@ import {
   isGitHubAppConfigured,
   mergePullRequestWithApp,
   parsePullRequestRef,
+  type GitHubPullRequestState,
 } from './github-app.js';
 
 /** A forge (GitHub or GitLab) review-artifact operation failed. */
@@ -148,7 +149,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isTransientGitHubMergeState(state: Awaited<ReturnType<typeof getPullRequestState>>): boolean {
+function isTransientGitHubMergeState(state: GitHubPullRequestState): boolean {
   if (state.merged) return false;
   if (state.draft) return false;
   if (state.checksFailed) return false;
@@ -205,7 +206,7 @@ const githubForgeAdapter: ForgeAdapter = {
     console.log(`[forge] mergeReviewArtifact: GitHub App path for ${ref.owner}/${ref.repo}#${ref.number}, timeout=${GITHUB_MERGE_TIMEOUT_MS}ms`);
 
     while (Date.now() < deadline) {
-      const state = await getPullRequestState(ref.owner, ref.repo, ref.number);
+      const state = await Effect.runPromise(getPullRequestState(ref.owner, ref.repo, ref.number));
       console.log(`[forge] mergeReviewArtifact: PR #${ref.number} state=${state.state} merged=${state.merged} draft=${state.draft} checksFailed=${state.checksFailed}`);
 
       if (state.merged) return;
@@ -225,13 +226,13 @@ const githubForgeAdapter: ForgeAdapter = {
       }
 
       try {
-        const mergeResult = await mergePullRequestWithApp(
+        const mergeResult = await Effect.runPromise(mergePullRequestWithApp(
           ref.owner,
           ref.repo,
           ref.number,
           method,
           state.headSha || undefined,
-        );
+        ));
         console.log(`[forge] mergePullRequestWithApp: result merged=${mergeResult.merged} for ${ref.owner}/${ref.repo}#${ref.number}`);
         if (mergeResult.merged) return;
       } catch (err: any) {
@@ -359,7 +360,7 @@ const wrapForgeOp = <T>(
   });
 
 /** Effect-native createReviewArtifact bound to the adapter for {@link forge}. */
-export const createReviewArtifactEffect = (
+export const createReviewArtifact = (
   forge: ForgeType,
   input: CreateReviewArtifactInput,
 ): Effect.Effect<CreateReviewArtifactResult, ForgeError> =>
@@ -368,7 +369,7 @@ export const createReviewArtifactEffect = (
   );
 
 /** Effect-native mergeReviewArtifact bound to the adapter for {@link forge}. */
-export const mergeReviewArtifactEffect = (
+export const mergeReviewArtifact = (
   forge: ForgeType,
   input: MergeReviewArtifactInput,
 ): Effect.Effect<void, ForgeError> =>
@@ -377,7 +378,7 @@ export const mergeReviewArtifactEffect = (
   );
 
 /** Effect-native commentOnArtifact bound to the adapter for {@link forge}. */
-export const commentOnArtifactEffect = (
+export const commentOnArtifact = (
   forge: ForgeType,
   input: CommentOnArtifactInput,
 ): Effect.Effect<void, ForgeError> =>
@@ -386,7 +387,7 @@ export const commentOnArtifactEffect = (
   );
 
 /** Effect-native approveReviewArtifact bound to the adapter for {@link forge}. */
-export const approveReviewArtifactEffect = (
+export const approveReviewArtifact = (
   forge: ForgeType,
   input: ApproveReviewArtifactInput,
 ): Effect.Effect<void, ForgeError> =>
@@ -395,7 +396,7 @@ export const approveReviewArtifactEffect = (
   );
 
 /** Effect-native discoverArtifact bound to the adapter for {@link forge}. */
-export const discoverArtifactEffect = (
+export const discoverArtifact = (
   forge: ForgeType,
   input: DiscoverArtifactInput,
 ): Effect.Effect<CreateReviewArtifactResult | null, ForgeError> =>

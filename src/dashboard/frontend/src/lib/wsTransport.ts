@@ -150,7 +150,7 @@ export class WsTransport {
     if (this.disposed) throw new Error('WsTransport disposed')
     const client = await this.clientPromise
     await this.runtime.runPromise(
-      Stream.runForEach(connect(client), (value) =>
+      (await Effect.runPromise(Stream.runForEach(connect(client), (value) =>
         Effect.sync(() => {
           try {
             listener(value)
@@ -158,7 +158,7 @@ export class WsTransport {
             // Swallow listener errors — keep stream alive
           }
         }),
-      ),
+      ))),
     )
   }
 

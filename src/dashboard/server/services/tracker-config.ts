@@ -12,8 +12,8 @@ import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
-import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
-import { loadProjectsConfig, getIssuePrefix } from '../../../lib/projects.js';
+import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
+import { loadProjectsConfigSync, getIssuePrefix } from '../../../lib/projects.js';
 
 // ─── In-memory cache (populated at startup) ───────────────────────────────────
 let cachedEnvContent: string | null = null;
@@ -30,7 +30,7 @@ export async function initTrackerConfigCache(): Promise<void> {
   }
 
   try {
-    const projectsConfig = loadProjectsConfig();
+    const projectsConfig = loadProjectsConfigSync();
     cachedTrackedRepos = Object.values(projectsConfig.projects)
       .flatMap((project) => {
         if (!project.github_repo) return [];

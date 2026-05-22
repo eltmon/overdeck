@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, chmodSync } from 'fs';
 import { join, dirname } from 'path';
@@ -416,7 +417,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     const { setupCavemanHooks, setupCavemanCompressScripts } = await import('../../../lib/caveman/setup.js');
     const { Effect } = await import('effect');
     const cavemanOk = await Effect.runPromise(
-      Effect.match(setupCavemanHooks(), { onFailure: () => false, onSuccess: () => true }),
+      setupCavemanHooks().pipe(Effect.match({ onFailure: () => false, onSuccess: () => true })),
     );
     if (cavemanOk) {
       console.log(chalk.green('✓ Installed caveman hook files to ~/.panopticon/hooks/caveman/'));

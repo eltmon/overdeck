@@ -1,11 +1,12 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { existsSync, renameSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { findPlan, findWorkspaceDraftPlan, readPlan } from '../../lib/vbrief/io.js';
+import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
-import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
@@ -18,7 +19,7 @@ interface PlanFinalizeOptions {
 function findWorkspaceRoot(start: string): string | null {
   let dir = resolve(start);
   while (true) {
-    if (findPlan(dir)) return dir;
+    if (findPlanSync(dir)) return dir;
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -36,7 +37,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     process.exit(1);
   }
 
-  const planPath = findWorkspaceDraftPlan(workspacePath) ?? findPlan(workspacePath);
+  const planPath = findWorkspaceDraftPlanSync(workspacePath) ?? findPlanSync(workspacePath);
   if (!planPath) {
     const msg = `vBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
@@ -58,7 +59,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // vBRIEF before beads creation. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
-  const result = await createBeadsFromVBrief(workspacePath);
+  const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
 
   if (!result.success || result.created.length === 0) {
     const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
@@ -71,13 +72,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     process.exit(2);
   }
 
-  emitActivityEntry({
+  emitActivityEntrySync({
     source: 'plan',
     level: 'info',
     message: `${issueId} planning finalized — awaiting your approval`,
     issueId,
   });
-  emitActivityTts({
+  emitActivityTtsSync({
     utterance: `${issueId} planning is done, awaiting your approval`,
     priority: 1,
     issueId,
@@ -135,7 +136,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  */
 async function promotePlanning(issueId: string): Promise<{ success: boolean; message: string | null; error: string | null }> {
   try {
-    const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
+    const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
     let response: Response;
@@ -173,7 +174,7 @@ async function promotePlanning(issueId: string): Promise<{ success: boolean; mes
  * Exported for tests.
  */
 export function stampPlanForFinalization(planPath: string, issueId: string): string {
-  const doc: VBriefDocument = readPlan(planPath);
+  const doc: VBriefDocument = readPlanSync(planPath);
   const slugSource = doc.plan.title || doc.plan.id || issueId;
   const slug = slugify(slugSource);
 

@@ -16,7 +16,7 @@
 
 import { Effect } from 'effect';
 import type { ReviewStatus } from './review-status.js';
-import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'status_changed'; issueId: string; status: ReviewStatus }
@@ -32,11 +32,11 @@ export type PipelineEvent =
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;
 
-export function setPipelineHandler(fn: Handler): void {
+export function setPipelineHandlerSync(fn: Handler): void {
   handler = fn;
 }
 
-export function notifyPipeline(event: PipelineEvent): void {
+export function notifyPipelineSync(event: PipelineEvent): void {
   if (handler) {
     try {
       handler(event);
@@ -58,7 +58,7 @@ export function notifyPipeline(event: PipelineEvent): void {
 
   // Resolve shared secret (PAN-891). If the dashboard hasn't started in this
   // home (no token file, no env), skip the forward — DB write is durable.
-  const token = getInternalToken();
+  const token = getInternalTokenSync();
   if (!token) return;
 
   // PAN-915 — forward the full event. status_changed intentionally omits the
@@ -89,11 +89,11 @@ export function notifyPipeline(event: PipelineEvent): void {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of {@link setPipelineHandler}. */
-export const setPipelineHandlerEffect = (fn: Handler): Effect.Effect<void, never> =>
-  Effect.sync(() => setPipelineHandler(fn));
+/** Effect variant of {@link setPipelineHandlerSync}. */
+export const setPipelineHandler = (fn: Handler): Effect.Effect<void, never> =>
+  Effect.sync(() => setPipelineHandlerSync(fn));
 
-/** Effect variant of {@link notifyPipeline}. Fire-and-forget; never fails. */
-export const notifyPipelineEffect = (event: PipelineEvent): Effect.Effect<void, never> =>
-  Effect.sync(() => notifyPipeline(event));
+/** Effect variant of {@link notifyPipelineSync}. Fire-and-forget; never fails. */
+export const notifyPipeline = (event: PipelineEvent): Effect.Effect<void, never> =>
+  Effect.sync(() => notifyPipelineSync(event));
 

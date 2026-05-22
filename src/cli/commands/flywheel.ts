@@ -8,12 +8,12 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
 import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
-import { loadConfig, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
+import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
-import { stopAgentEffect } from '../../lib/agents.js';
+import { stopAgent } from '../../lib/agents.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
-import { sessionExistsAsyncEffect } from '../../lib/tmux.js';
-import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
+import { sessionExists } from '../../lib/tmux.js';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
@@ -137,7 +137,7 @@ function mb(bytes: number): number {
 }
 
 function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   const flywheel = config.roles?.flywheel;
   return {
     harness: flywheel?.harness ?? 'claude-code',
@@ -200,7 +200,7 @@ async function createInitialFlywheelStatus(
 }
 
 export async function postFlywheelStatus(status: FlywheelStatus, fetchImpl: typeof fetch = fetch): Promise<void> {
-  const internalToken = ensureInternalToken();
+  const internalToken = ensureInternalTokenSync();
   const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/status`, {
     method: 'POST',
     headers: {
@@ -497,7 +497,7 @@ export async function flywheelPauseCommand(): Promise<void> {
 
 export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
   const before = readFlywheelGateSnapshot();
-  if (!before.paused && await Effect.runPromise(sessionExistsAsyncEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
+  if (!before.paused && await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
     return { before, after: before, changed: false };
   }
   if (!before.activeRunId) throw new Error('No active flywheel run to resume');
@@ -633,7 +633,7 @@ export async function flywheelAbortCommand(): Promise<void> {
       console.log('No active flywheel run to abort.');
       return;
     }
-    await Effect.runPromise(stopAgentEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
     await abortFlywheelRun(candidate);
     console.log(`Aborted flywheel run ${candidate}.`);
   } catch (error) {

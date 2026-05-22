@@ -31,13 +31,22 @@ vi.mock('child_process', async () => {
 });
 
 // Mock specialist-logs module
+const mockListRunLogs = vi.fn();
+const mockGetRunLog = vi.fn();
+const mockCleanupOldLogs = vi.fn();
+const mockCleanupAllLogs = vi.fn();
+
 vi.mock('../../../../src/lib/cloister/specialist-logs.js', () => ({
-  listRunLogs: vi.fn(),
-  getRunLog: vi.fn(),
+  listRunLogs: mockListRunLogs,
+  listRunLogsSync: mockListRunLogs,
+  getRunLog: mockGetRunLog,
+  getRunLogSync: mockGetRunLog,
   parseLogMetadata: vi.fn(),
   getRunLogPath: vi.fn(),
-  cleanupOldLogs: vi.fn(),
-  cleanupAllLogs: vi.fn(),
+  cleanupOldLogs: mockCleanupOldLogs,
+  cleanupOldLogsSync: mockCleanupOldLogs,
+  cleanupAllLogs: mockCleanupAllLogs,
+  cleanupAllLogsSync: mockCleanupAllLogs,
 }));
 
 // Mock specialists module
@@ -72,8 +81,8 @@ describe('specialist logs CLI commands', () => {
 
   describe('listLogsCommand', () => {
     it('should list runs with status emojis', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockReturnValue([
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockReturnValue([
         {
           runId: '2024-01-01T12-00-00-TEST-1',
           filePath: '/path/to/log',
@@ -95,15 +104,15 @@ describe('specialist logs CLI commands', () => {
 
       await listLogsCommand('testproject', 'review-agent', {});
 
-      expect(listRunLogs).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 10 });
+      expect(listRunLogsSync).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 10 });
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Recent runs'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('TEST-1'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('✅'));
     });
 
     it('should show message when no runs found', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockReturnValue([]);
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockReturnValue([]);
 
       await listLogsCommand('testproject', 'review-agent', {});
 
@@ -111,7 +120,7 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should output JSON when --json flag is set', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
       const mockRuns = [
         {
           runId: '2024-01-01T12-00-00-TEST-1',
@@ -128,7 +137,7 @@ describe('specialist logs CLI commands', () => {
           createdAt: new Date('2024-01-01T12:00:00Z'),
         },
       ];
-      vi.mocked(listRunLogs).mockReturnValue(mockRuns);
+      vi.mocked(listRunLogsSync).mockReturnValue(mockRuns);
 
       await listLogsCommand('testproject', 'review-agent', { json: true });
 
@@ -136,17 +145,17 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should use custom limit if provided', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockReturnValue([]);
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockReturnValue([]);
 
       await listLogsCommand('testproject', 'review-agent', { limit: '5' });
 
-      expect(listRunLogs).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 5 });
+      expect(listRunLogsSync).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 5 });
     });
 
     it('should handle errors and exit', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockImplementation(() => {
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockImplementation(() => {
         throw new Error('Test error');
       });
 
@@ -160,8 +169,8 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should show all status types with correct emojis', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockReturnValue([
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockReturnValue([
         {
           runId: 'run1',
           filePath: '/path/to/log1',
@@ -217,9 +226,9 @@ describe('specialist logs CLI commands', () => {
 
   describe('viewLogCommand', () => {
     it('should display log content when less is not available', { timeout: 30000 }, async () => {
-      const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      const { getRunLogSync, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
       const testContent = '# Test Log\n\nLog content here';
-      vi.mocked(getRunLog).mockReturnValue(testContent);
+      vi.mocked(getRunLogSync).mockReturnValue(testContent);
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
@@ -234,8 +243,8 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should use less for viewing when available', { timeout: 30000 }, async () => {
-      const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(getRunLog).mockReturnValue('test content');
+      const { getRunLogSync, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(getRunLogSync).mockReturnValue('test content');
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
@@ -253,7 +262,7 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should output JSON when --json flag is set', async () => {
-      const { getRunLog, parseLogMetadata } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      const { getRunLogSync, parseLogMetadata } = await import('../../../../src/lib/cloister/specialist-logs.js');
       const testContent = '# Test Log';
       const testMetadata = {
         runId: 'run-id',
@@ -264,7 +273,7 @@ describe('specialist logs CLI commands', () => {
         status: 'passed' as const,
       };
 
-      vi.mocked(getRunLog).mockReturnValue(testContent);
+      vi.mocked(getRunLogSync).mockReturnValue(testContent);
       vi.mocked(parseLogMetadata).mockReturnValue(testMetadata);
 
       await viewLogCommand('testproject', 'review-agent', 'run-id', { json: true });
@@ -275,8 +284,8 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should exit with error when log not found', async () => {
-      const { getRunLog } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(getRunLog).mockReturnValue(null);
+      const { getRunLogSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(getRunLogSync).mockReturnValue(null);
 
       await expect(viewLogCommand('testproject', 'review-agent', 'nonexistent', {})).rejects.toThrow(
         'process.exit'
@@ -363,12 +372,12 @@ describe('specialist logs CLI commands', () => {
 
   describe('cleanupLogsCommand', () => {
     it('should clean up logs for single project with --force', async () => {
-      const { cleanupOldLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(cleanupOldLogs).mockReturnValue(5);
+      const { cleanupOldLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(cleanupOldLogsSync).mockReturnValue(5);
 
       await cleanupLogsCommand('testproject', 'review-agent', { force: true });
 
-      expect(cleanupOldLogs).toHaveBeenCalledWith('testproject', 'review-agent', {
+      expect(cleanupOldLogsSync).toHaveBeenCalledWith('testproject', 'review-agent', {
         maxDays: 30,
         maxRuns: 100,
       });
@@ -383,8 +392,8 @@ describe('specialist logs CLI commands', () => {
     });
 
     it('should clean up all logs with --all --force', async () => {
-      const { cleanupAllLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(cleanupAllLogs).mockReturnValue({
+      const { cleanupAllLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(cleanupAllLogsSync).mockReturnValue({
         totalDeleted: 15,
         byProject: {
           project1: {
@@ -396,7 +405,7 @@ describe('specialist logs CLI commands', () => {
 
       await cleanupLogsCommand('--all', undefined, { force: true } as any);
 
-      expect(cleanupAllLogs).toHaveBeenCalled();
+      expect(cleanupAllLogsSync).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('deleted 15 old logs'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('project1/review-agent: 10'));
     });
@@ -418,17 +427,17 @@ describe('specialist logs CLI commands', () => {
 
   describe('logsCommand', () => {
     it('should route to listLogsCommand for project + type', async () => {
-      const { listRunLogs } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(listRunLogs).mockReturnValue([]);
+      const { listRunLogsSync } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(listRunLogsSync).mockReturnValue([]);
 
       await logsCommand('testproject', 'review-agent', {}, {});
 
-      expect(listRunLogs).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 10 });
+      expect(listRunLogsSync).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 10 });
     });
 
     it('should route to viewLogCommand for project + type + runId', { timeout: 30000 }, async () => {
-      const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
-      vi.mocked(getRunLog).mockReturnValue('log content');
+      const { getRunLogSync, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
+      vi.mocked(getRunLogSync).mockReturnValue('log content');
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
@@ -439,7 +448,7 @@ describe('specialist logs CLI commands', () => {
 
       await logsCommand('testproject', 'review-agent', 'run-id', {});
 
-      expect(getRunLog).toHaveBeenCalledWith('testproject', 'review-agent', 'run-id');
+      expect(getRunLogSync).toHaveBeenCalledWith('testproject', 'review-agent', 'run-id');
     });
 
     it('should route to tailLogCommand for --tail mode', async () => {

@@ -8,9 +8,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { migrateAllSessions } from '../migration.js';
-import { readEvents, eventsFileExists, getLastEventMetadata } from '../events.js';
-import { loadCache, rebuildCache } from '../aggregator.js';
+import { migrateAllSessionsSync } from '../migration.js';
+import { readEventsSync, eventsFileExists, getLastEventMetadataSync } from '../events.js';
+import { loadCacheSync, rebuildCacheSync } from '../aggregator.js';
 
 // Test directory setup
 const TEST_ROOT = join(tmpdir(), `panopticon-test-${Date.now()}`);
@@ -44,7 +44,7 @@ afterEach(() => {
 describe('Migration Safety Tests', () => {
   describe('Empty State Migration', () => {
     it('should handle empty state gracefully (no agents)', () => {
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.agentsProcessed).toBe(0);
       expect(stats.sessionFilesProcessed).toBe(0);
@@ -63,7 +63,7 @@ describe('Migration Safety Tests', () => {
         JSON.stringify({ issueId: 'TEST-1' })
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.agentsProcessed).toBe(0);
       expect(stats.warnings.length).toBeGreaterThan(0);
@@ -82,7 +82,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.warnings.length).toBeGreaterThan(0);
       expect(stats.warnings.some(w => w.message.includes('No session directory found'))).toBe(true);
@@ -98,7 +98,7 @@ describe('Migration Safety Tests', () => {
         'invalid json {{'
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.errors.length).toBeGreaterThan(0);
       expect(stats.errors[0].error).toContain('parse');
@@ -124,7 +124,7 @@ describe('Migration Safety Tests', () => {
         'valid json\n{"invalid": json}\n{"usage": {"input_tokens": 100}}\n'
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       // Should continue despite corrupted lines
       expect(stats.sessionFilesProcessed).toBe(1);
@@ -178,7 +178,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.sessionFilesProcessed).toBe(1);
       expect(stats.subagentFilesProcessed).toBe(1);
@@ -211,9 +211,9 @@ describe('Migration Safety Tests', () => {
       );
 
       // First migration
-      const stats1 = migrateAllSessions();
-      const events1 = readEvents();
-      const cache1 = rebuildCache();
+      const stats1 = migrateAllSessionsSync();
+      const events1 = readEventsSync();
+      const cache1 = rebuildCacheSync();
 
       // Clear events file for second run
       const eventsFile = join(TEST_COSTS_DIR, 'events.jsonl');
@@ -222,9 +222,9 @@ describe('Migration Safety Tests', () => {
       }
 
       // Second migration
-      const stats2 = migrateAllSessions();
-      const events2 = readEvents();
-      const cache2 = rebuildCache();
+      const stats2 = migrateAllSessionsSync();
+      const events2 = readEventsSync();
+      const cache2 = rebuildCacheSync();
 
       // Should produce identical results
       expect(stats1.eventsCreated).toBe(stats2.eventsCreated);
@@ -281,7 +281,7 @@ describe('Migration Safety Tests', () => {
       );
 
       // Run migration again (should add new events without duplicating)
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       // Should have processed the agent
       expect(stats.agentsProcessed).toBe(1);
@@ -327,7 +327,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const stats = migrateAllSessions();
+      const stats = migrateAllSessionsSync();
 
       expect(stats.eventsCreated).toBe(1);
       // Verify cost is calculated correctly (allow small floating point difference)

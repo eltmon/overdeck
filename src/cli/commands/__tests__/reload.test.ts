@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ vi.mock('../../../lib/restart-lock.js', () => ({
 
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
   readPlatformConfig: mocks.readPlatformConfig,
+  readPlatformConfigSync: mocks.readPlatformConfig,
   restartDashboard: mocks.restartDashboard,
   stopDashboard: mocks.stopDashboard,
   StageError: class StageError extends Error {
@@ -66,8 +68,8 @@ describe('reloadCommand', () => {
     process.exitCode = undefined;
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.acquireRestartLock.mockReturnValue({ release: vi.fn() });
-    mocks.readRestartLockHolder.mockReturnValue(null);
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed({ release: vi.fn(() => Promise.resolve()) }));
+    mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
@@ -75,7 +77,8 @@ describe('reloadCommand', () => {
       traefikDomain: 'pan.localhost',
       traefikDir: '/tmp/traefik',
     });
-    mocks.restartDashboard.mockResolvedValue(undefined);
+    mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
+    mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
   });
 

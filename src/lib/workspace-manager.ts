@@ -14,13 +14,13 @@ import {
   ProjectConfig,
   WorkspaceConfig,
   TemplatePlaceholders,
-  replacePlaceholders,
-  getDefaultWorkspaceConfig,
+  replacePlaceholdersSync,
+  getDefaultWorkspaceConfigSync,
 } from './workspace-config.js';
 import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
-import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from './skills-merge.js';
+import { mergeSkillsIntoWorkspaceSync, mergePanSkillsIntoWorkspaceSync } from './skills-merge.js';
 import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
@@ -51,7 +51,7 @@ export interface PanMigrationResult {
  * - Only migrates the specific runtime subdirs (events, prompts, legacy output).
  *   .pan/skills/ is not migrated here since it may not have existed before.
  */
-export function migratePanopticonToPan(projectPath: string): PanMigrationResult {
+export function migratePanopticonToPanSync(projectPath: string): PanMigrationResult {
   const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
 
   // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths.
@@ -118,7 +118,7 @@ export function migratePanopticonToPan(projectPath: string): PanMigrationResult 
  *
  * Safe to call multiple times — merges rather than overwrites.
  */
-export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copied: string[]; errors: string[] } {
+export function copyPanopticonSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
   const result = { copied: [] as string[], errors: [] as string[] };
   const panopticonDir = join(workspacePath, '.panopticon');
   const claudeDir = join(workspacePath, '.claude');
@@ -239,7 +239,7 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
  */
-export function ensurePanGitignore(projectPath: string): void {
+export function ensurePanGitignoreSync(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
   const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.claude/skills/'];
 
@@ -292,14 +292,14 @@ export interface WorkspaceCreateResult {
 //   - any future caller (e.g. `pan workspace re-render`)
 // Re-export under the legacy local name to keep diffs in this file small.
 import {
-  createWorkspacePlaceholders as createPlaceholders,
-  sanitizeComposeFile,
-  renderDevcontainer,
+  createWorkspacePlaceholdersSync as createPlaceholders,
+  sanitizeComposeFileSync,
+  renderDevcontainerSync,
   DEVCONTAINER_DIRNAME,
 } from './workspace/devcontainer-renderer.js';
 // `processTemplates` is still imported for the agent-template flow further
 // below; it lives in the same renderer module.
-import { processTemplates } from './workspace/devcontainer-renderer.js';
+import { processTemplatesSync } from './workspace/devcontainer-renderer.js';
 
 /**
  * Validate feature name (alphanumeric and hyphens only)
@@ -526,7 +526,7 @@ function copyProjectTemplateDirs(
           const ext = extname(entry.name).toLowerCase();
           if (placeholders && TEXT_EXTENSIONS.has(ext)) {
             const content = readFileSync(srcEntry, 'utf-8');
-            writeFileSync(destEntry, replacePlaceholders(content, placeholders));
+            writeFileSync(destEntry, replacePlaceholdersSync(content, placeholders));
           } else {
             copyFileSync(srcEntry, destEntry);
           }
@@ -541,12 +541,7 @@ function copyProjectTemplateDirs(
   }
 
   return steps;
-}
-
-/**
- * Create a workspace
- */
-export async function createWorkspace(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
+}async function createWorkspacePromise(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
     onProgress?.({ label, detail, status });
@@ -572,7 +567,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     return result;
   }
 
-  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfig();
+  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfigSync();
   const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
   const featureFolder = `feature-${featureName}`;
   const workspacePath = join(workspacesDir, featureFolder);
@@ -705,7 +700,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Ensure runtime-only Panopticon and Claude Code sync paths are in the project's .gitignore
   try {
-    ensurePanGitignore(projectConfig.path);
+    ensurePanGitignoreSync(projectConfig.path);
     result.steps.push('Verified runtime-only Panopticon and Claude Code sync paths are in .gitignore');
   } catch (gitignoreErr: any) {
     // Non-fatal — log but don't block workspace creation
@@ -719,7 +714,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const composeFiles = readdirSync(devcontainerDir)
       .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
     for (const composeFile of composeFiles) {
-      sanitizeComposeFile(join(devcontainerDir, composeFile));
+      sanitizeComposeFileSync(join(devcontainerDir, composeFile));
     }
     if (composeFiles.length > 0) {
       result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
@@ -822,8 +817,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       }
 
       // Start TLDR daemon for this workspace
-      const { getTldrDaemonService } = await import('./tldr-daemon.js');
-      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      const { getTldrDaemonServiceSync } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
       await tldrService.start(true);
       result.steps.push('Started TLDR daemon');
 
@@ -850,7 +845,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (workspaceConfig.dns) {
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
-      const hostname = replacePlaceholders(entryPattern, placeholders);
+      const hostname = replacePlaceholdersSync(entryPattern, placeholders);
 
       if (addDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Added DNS entry: ${hostname} (${dnsMethod})`);
@@ -883,14 +878,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Install base Panopticon skills/agents/rules from cache
   progress('Installing skills & templates', 'Panopticon skills, agents, rules');
-  const mergeResult = mergeSkillsIntoWorkspace(workspacePath);
+  const mergeResult = mergeSkillsIntoWorkspaceSync(workspacePath);
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
     result.steps.push(`Installed ${mergeTotal} Panopticon files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
   }
 
   // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
-  const panMergeResult = mergePanSkillsIntoWorkspace(projectConfig.path, workspacePath);
+  const panMergeResult = mergePanSkillsIntoWorkspaceSync(projectConfig.path, workspacePath);
   if (panMergeResult.added.length > 0) {
     result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
@@ -900,7 +895,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
     // Process template files
-    const templateSteps = processTemplates(
+    const templateSteps = processTemplatesSync(
       templateDir,
       workspacePath,
       placeholders,
@@ -918,7 +913,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Generate .env file
   if (workspaceConfig.env?.template) {
-    const envContent = replacePlaceholders(workspaceConfig.env.template, placeholders);
+    const envContent = replacePlaceholdersSync(workspaceConfig.env.template, placeholders);
     writeFileSync(join(workspacePath, '.env'), envContent);
     result.steps.push('Created .env file');
   }
@@ -930,7 +925,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {
     try {
-      const renderResult = renderDevcontainer({
+      const renderResult = renderDevcontainerSync({
         workspacePath,
         projectConfig,
         featureName,
@@ -950,7 +945,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Set up Cloudflare tunnel for external access (before Docker so containers can use tunnel URLs)
   if (workspaceConfig.tunnel) {
-    const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
+    const tunnelResult = await Effect.runPromise(addTunnelIngress(workspaceConfig.tunnel, placeholders));
     result.steps.push(...tunnelResult.steps);
     if (!tunnelResult.success) {
       result.errors.push('Tunnel setup had failures (see steps for details)');
@@ -959,7 +954,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
   if (workspaceConfig.hume) {
-    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
+    const humeResult = await Effect.runPromise(createHumeConfig(workspaceConfig.hume, placeholders));
     result.steps.push(...humeResult.steps);
     if (humeResult.configId) {
       writeFileSync(
@@ -1031,7 +1026,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
   try {
-    preTrustDirectory(workspacePath);
+    preTrustDirectorySync(workspacePath);
     result.steps.push('Pre-trusted workspace in Claude Code');
   } catch {
     // Non-fatal — agent can still work, user will just see trust prompt
@@ -1039,12 +1034,12 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Inject caveman hooks into workspace .claude/settings.json (if enabled in config)
   try {
-    const { loadConfig: loadYamlConfig } = await import('./config-yaml.js');
+    const { loadConfigSync: loadYamlConfig } = await import('./config-yaml.js');
     const { determineCavemanVariant, injectCavemanSettings } = await import('./caveman/workspace.js');
     const yamlConfig = loadYamlConfig();
     const cavemanConfig = yamlConfig.config.caveman;
     const variant = determineCavemanVariant(cavemanConfig);
-    await injectCavemanSettings(workspacePath, variant);
+    await Effect.runPromise(injectCavemanSettings(workspacePath, variant));
     if (variant === 'enabled') {
       result.steps.push('Injected caveman compression hooks into .claude/settings.json');
     } else if (variant === 'disabled') {
@@ -1058,7 +1053,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // Copy Panopticon global settings into workspace so agents testing Panopticon
   // itself have the same projects, model assignments, and hooks.
   try {
-    const settingsResult = copyPanopticonSettingsToWorkspace(workspacePath);
+    const settingsResult = copyPanopticonSettingsToWorkspaceSync(workspacePath);
     if (settingsResult.copied.length > 0) {
       result.steps.push(`Copied Panopticon settings into workspace (${settingsResult.copied.length} file(s))`);
     }
@@ -1102,7 +1097,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
  * Claude Code binary — strings(claude.exe) confirms it as the persistence
  * key checked by both the bypass-mode dialog and the headless --bg gate.
  */
-export function preTrustDirectory(dirPath: string): void {
+export function preTrustDirectorySync(dirPath: string): void {
   const claudeJsonPath = join(homedir(), '.claude.json');
   if (!existsSync(claudeJsonPath)) return;
 
@@ -1152,13 +1147,7 @@ export interface AddReposToWorkspaceResult {
   success: boolean;
   errors: string[];
   steps: string[];
-}
-
-/**
- * Add repositories to an existing progressive polyrepo workspace.
- * Used when an agent needs repos beyond the initial always_include set.
- */
-export async function addReposToWorkspace(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
+}async function addReposToWorkspacePromise(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
   const { projectConfig, featureName, repoNames, dryRun } = options;
   const result: AddReposToWorkspaceResult = {
     success: true,
@@ -1258,14 +1247,7 @@ export interface DockerCleanupResult {
   containersFound: boolean;
   /** Human-readable log of cleanup steps taken */
   steps: string[];
-}
-
-/**
- * Return container IDs (running or stopped) whose
- * `com.docker.compose.project.config_files` label references a path inside
- * the workspace's `.devcontainer/` directory.
- */
-export async function getContainersReferencingWorkspacePath(
+}async function getContainersReferencingWorkspacePathPromise(
   workspacePath: string,
 ): Promise<string[]> {
   try {
@@ -1287,19 +1269,7 @@ export async function getContainersReferencingWorkspacePath(
   } catch {
     return [];
   }
-}
-
-/**
- * Stop Docker containers and clean up Docker-created files for a workspace.
- *
- * Extracted as a standalone function so it can be used by:
- * - removeWorkspace() during normal workspace removal
- * - deep-wipe endpoint for complete issue cleanup
- * - workspace-migrate for pre-migration cleanup
- *
- * Failures are logged but never thrown — callers should not fail if Docker is unavailable.
- */
-export async function stopWorkspaceDocker(
+}async function stopWorkspaceDockerPromise(
   workspacePath: string,
   featureName: string,
 ): Promise<DockerCleanupResult> {
@@ -1376,7 +1346,7 @@ export async function stopWorkspaceDocker(
   } else {
     // No compose files on disk — check if containers still reference the missing path.
     // This can happen when .devcontainer/ was deleted after containers were created.
-    const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+    const orphanedContainers = await Effect.runPromise(getContainersReferencingWorkspacePath(workspacePath));
     if (orphanedContainers.length > 0) {
       result.containersFound = true;
       try {
@@ -1413,12 +1383,7 @@ export async function stopWorkspaceDocker(
   }
 
   return result;
-}
-
-/**
- * Remove a workspace
- */
-export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<WorkspaceRemoveResult> {
+}async function removeWorkspacePromise(options: WorkspaceRemoveOptions): Promise<WorkspaceRemoveResult> {
   const { projectConfig, featureName, dryRun } = options;
   const result: WorkspaceRemoveResult = {
     success: true,
@@ -1426,7 +1391,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     steps: [],
   };
 
-  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfig();
+  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfigSync();
   const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
   const featureFolder = `feature-${featureName}`;
   const workspacePath = join(workspacesDir, featureFolder);
@@ -1446,8 +1411,8 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   const venvPath = join(workspacePath, '.venv');
   if (existsSync(venvPath)) {
     try {
-      const { getTldrDaemonService } = await import('./tldr-daemon.js');
-      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      const { getTldrDaemonServiceSync } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
       await tldrService.stop();
       result.steps.push('Stopped TLDR daemon');
     } catch (error: any) {
@@ -1457,7 +1422,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   }
 
   // Stop Docker containers and clean up Docker-created files
-  const dockerResult = await stopWorkspaceDocker(workspacePath, featureName);
+  const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, featureName));
   result.steps.push(...dockerResult.steps);
 
   // Remove worktrees
@@ -1505,7 +1470,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
 
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
-      const hostname = replacePlaceholders(entryPattern, placeholders);
+      const hostname = replacePlaceholdersSync(entryPattern, placeholders);
       if (removeDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Removed DNS entry: ${hostname}`);
       }
@@ -1515,14 +1480,14 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   // Remove Cloudflare tunnel entries
   if (workspaceConfig.tunnel) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
-    const tunnelResult = await removeTunnelIngress(workspaceConfig.tunnel, placeholders);
+    const tunnelResult = await Effect.runPromise(removeTunnelIngress(workspaceConfig.tunnel, placeholders));
     result.steps.push(...tunnelResult.steps);
   }
 
   // Remove Hume EVI config
   if (workspaceConfig.hume) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
-    const humeResult = await deleteHumeConfig(workspaceConfig.hume, placeholders);
+    const humeResult = await Effect.runPromise(deleteHumeConfig(workspaceConfig.hume, placeholders));
     result.steps.push(...humeResult.steps);
   }
 
@@ -1537,7 +1502,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   }
 
   // Guard: never delete workspace while containers still reference its compose path
-  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+  const orphanedContainers = await Effect.runPromise(getContainersReferencingWorkspacePath(workspacePath));
   if (orphanedContainers.length > 0) {
     result.errors.push(
       `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +
@@ -1576,84 +1541,84 @@ const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
   });
 
 /** Migrate any pre-PAN-967 .panopticon/* subdirs to the .pan/ layout. */
-export const migratePanopticonToPanEffect = (
+export const migratePanopticonToPan = (
   projectPath: string,
 ): Effect.Effect<PanMigrationResult, FsError> =>
   Effect.try({
-    try: () => migratePanopticonToPan(projectPath),
+    try: () => migratePanopticonToPanSync(projectPath),
     catch: (cause) => toWmFsError('migratePanopticonToPan', projectPath, cause),
   });
 
 /** Mirror ~/.claude settings/agents into the workspace's .claude/ dir. */
-export const copyPanopticonSettingsToWorkspaceEffect = (
+export const copyPanopticonSettingsToWorkspace = (
   workspacePath: string,
 ): Effect.Effect<{ copied: string[]; errors: string[] }, FsError> =>
   Effect.try({
-    try: () => copyPanopticonSettingsToWorkspace(workspacePath),
+    try: () => copyPanopticonSettingsToWorkspaceSync(workspacePath),
     catch: (cause) =>
       toWmFsError('copyPanopticonSettingsToWorkspace', workspacePath, cause),
   });
 
 /** Ensure the project gitignore covers `.pan/continue.json` (PAN-1124). */
-export const ensurePanGitignoreEffect = (
+export const ensurePanGitignore = (
   projectPath: string,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => ensurePanGitignore(projectPath),
+    try: () => ensurePanGitignoreSync(projectPath),
     catch: (cause) => toWmFsError('ensurePanGitignore', projectPath, cause),
   });
 
 /** Create a new workspace (git worktree + scaffolding). */
-export const createWorkspaceEffect = (
+export const createWorkspace = (
   options: WorkspaceCreateOptions,
 ): Effect.Effect<WorkspaceCreateResult, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => createWorkspace(options),
+    try: () => createWorkspacePromise(options),
     catch: (cause) => toWmProcessError('createWorkspace', cause),
   });
 
 /** Mark a directory as pre-trusted for Claude Code (idempotent). */
-export const preTrustDirectoryEffect = (
+export const preTrustDirectory = (
   dirPath: string,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => preTrustDirectory(dirPath),
+    try: () => preTrustDirectorySync(dirPath),
     catch: (cause) => toWmFsError('preTrustDirectory', dirPath, cause),
   });
 
 /** Add additional repos (worktrees / symlinks) to an existing workspace. */
-export const addReposToWorkspaceEffect = (
+export const addReposToWorkspace = (
   options: AddReposToWorkspaceOptions,
 ): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => addReposToWorkspace(options),
+    try: () => addReposToWorkspacePromise(options),
     catch: (cause) => toWmProcessError('addReposToWorkspace', cause),
   });
 
 /** Enumerate Docker containers whose compose files live under a workspace. */
-export const getContainersReferencingWorkspacePathEffect = (
-  ...args: Parameters<typeof getContainersReferencingWorkspacePath>
-): Effect.Effect<Awaited<ReturnType<typeof getContainersReferencingWorkspacePath>>, ProcessSpawnError> =>
+export const getContainersReferencingWorkspacePath = (
+  ...args: Parameters<typeof getContainersReferencingWorkspacePathPromise>
+): Effect.Effect<Awaited<ReturnType<typeof getContainersReferencingWorkspacePathPromise>>, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => getContainersReferencingWorkspacePath(...args),
+    try: () => getContainersReferencingWorkspacePathPromise(...args),
     catch: (cause) =>
       toWmProcessError('getContainersReferencingWorkspacePath', cause),
   });
 
 /** Stop every Docker resource associated with the supplied workspace. */
-export const stopWorkspaceDockerEffect = (
-  ...args: Parameters<typeof stopWorkspaceDocker>
+export const stopWorkspaceDocker = (
+  ...args: Parameters<typeof stopWorkspaceDockerPromise>
 ): Effect.Effect<DockerCleanupResult, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => stopWorkspaceDocker(...args),
+    try: () => stopWorkspaceDockerPromise(...args),
     catch: (cause) => toWmProcessError('stopWorkspaceDocker', cause),
   });
 
 /** Remove a workspace (worktrees, branches, Docker, DNS, tunnel ingress). */
-export const removeWorkspaceEffect = (
+export const removeWorkspace = (
   options: WorkspaceRemoveOptions,
 ): Effect.Effect<WorkspaceRemoveResult, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => removeWorkspace(options),
+    try: () => removeWorkspacePromise(options),
     catch: (cause) => toWmProcessError('removeWorkspace', cause),
   });

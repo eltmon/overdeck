@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   VBRIEF_LIFECYCLE_DIRS,
-  ensureVBriefDirs,
+  ensureVBriefDirsSync,
   generateVBriefFilename,
   parseVBriefFilename,
   resolveVBriefDir,
@@ -90,14 +90,14 @@ describe('resolveVBriefDir', () => {
 
 describe('ensureVBriefDirs', () => {
   it('creates ./vbrief/{proposed,active,completed,cancelled}/ and returns root', () => {
-    const root = ensureVBriefDirs(TEST_DIR);
+    const root = ensureVBriefDirsSync(TEST_DIR);
     expect(root).toBe(join(TEST_DIR, 'vbrief'));
     for (const dir of VBRIEF_LIFECYCLE_DIRS) {
       expect(existsSync(join(root, dir))).toBe(true);
     }
   });
   it('is idempotent', () => {
-    ensureVBriefDirs(TEST_DIR);
-    expect(() => ensureVBriefDirs(TEST_DIR)).not.toThrow();
+    ensureVBriefDirsSync(TEST_DIR);
+    expect(() => ensureVBriefDirsSync(TEST_DIR)).not.toThrow();
   });
 });

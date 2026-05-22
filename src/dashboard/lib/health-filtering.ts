@@ -6,20 +6,20 @@
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { Effect } from 'effect';
-import { loadCloisterConfigEffect } from '../../lib/cloister/config.js';
-import { capturePaneAsyncEffect, sessionExistsAsyncEffect } from '../../lib/tmux.js';
+import { loadCloisterConfig } from '../../lib/cloister/config.js';
+import { capturePane, sessionExists } from '../../lib/tmux.js';
 
 /**
  * Check if agent tmux session is alive
  */
 export const checkAgentHealthEffect = (agentId: string) =>
   Effect.gen(function* () {
-    const alive = yield* sessionExistsAsyncEffect(agentId);
+    const alive = yield* sessionExists(agentId);
     if (!alive) {
       return { alive: false };
     }
 
-    const stdout = yield* capturePaneAsyncEffect(agentId, 5);
+    const stdout = yield* capturePane(agentId, 5);
 
     return { alive: true, lastOutput: stdout.trim() };
   }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
@@ -85,7 +85,7 @@ export const determineHealthStatusEffect = (
     const alive = liveSessions.has(agentId);
 
     if (!alive) {
-      const cloisterConfig = yield* loadCloisterConfigEffect();
+      const cloisterConfig = yield* loadCloisterConfig();
       const stalenessHours = cloisterConfig.retention?.health_staleness_hours ?? 24;
       const STALE_THRESHOLD_MS = stalenessHours * 60 * 60 * 1000;
       if (lastActivity) {

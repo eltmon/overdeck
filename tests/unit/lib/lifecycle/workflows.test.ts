@@ -35,9 +35,11 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
     sessionExistsAsync: vi.fn().mockResolvedValue(false),
     killSessionAsync: vi.fn().mockResolvedValue(undefined),
     listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
-    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    sessionExists: vi.fn(() => Effect.succeed(false)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(false)),
+    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSessionSync: vi.fn(() => Effect.succeed(undefined)),
+    listSessionNames: vi.fn(() => Effect.succeed([])),
   };
 });
 

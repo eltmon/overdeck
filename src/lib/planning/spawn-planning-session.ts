@@ -17,20 +17,20 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
+import { extractTeamPrefix, findProjectByTeamSync, findProjectByPathSync } from '../projects.js';
 import {
-  sessionExistsAsyncEffect,
-  createSessionAsyncEffect,
-  killSessionAsyncEffect,
-  setOptionAsyncEffect,
+  sessionExists,
+  createSession,
+  killSession,
+  setOption,
   buildTmuxCommandString,
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
-import { loadConfig, resolveModel } from '../config-yaml.js';
-import { canUseHarness } from '../harness-policy.js';
-import { generateLauncherScript } from '../launcher-generator.js';
+import { loadConfigSync, resolveModel } from '../config-yaml.js';
+import { canUseHarnessSync } from '../harness-policy.js';
+import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
 
@@ -132,9 +132,9 @@ export interface SpawnPlanningResult {
 
 async function ensureTmuxRunning(): Promise<void> {
   try {
-    const exists = await Effect.runPromise(sessionExistsAsyncEffect('panopticon-init'));
+    const exists = await Effect.runPromise(sessionExists('panopticon-init'));
     if (!exists) {
-      await Effect.runPromise(createSessionAsyncEffect('panopticon-init', homedir(), undefined));
+      await Effect.runPromise(createSession('panopticon-init', homedir(), undefined));
       console.log('Started tmux server');
     }
   } catch (startErr) {
@@ -213,7 +213,7 @@ ${specContent}
 
   // Check for polyrepo structure
   const teamPrefix = extractTeamPrefix(issue.identifier);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   let projectStructureSection = '';
   if (projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos) {
     const repos = projectConfig.workspace.repos;
@@ -278,7 +278,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
-  return Effect.runSync(renderPrompt({
+  return await Effect.runPromise(renderPrompt({
     name: 'planning',
     vars: {
       ISSUE_ID: issue.identifier,
@@ -359,11 +359,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     if (!workspaceCreated) {
       try {
-        const projectConfig = findProjectByPath(projectPath) || findProjectByTeam(extractTeamPrefix(issue.identifier) || '');
+        const projectConfig = findProjectByPathSync(projectPath) || findProjectByTeamSync(extractTeamPrefix(issue.identifier) || '');
         if (projectConfig?.workspace) {
           // Use library directly for real-time progress streaming
           console.log(`[start-planning] Creating workspace via library for ${issue.identifier}, projectConfig=${projectConfig.name}`);
-          const wsResult = await createWorkspace({
+          const wsResult = await Effect.runPromise(createWorkspace({
             projectConfig,
             featureName: issueLower,
             startDocker,
@@ -372,7 +372,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
               // Forward workspace sub-step progress as step 1 sub-step events
               progress(1, event.label, event.detail, event.status);
             },
-          });
+          }));
           console.log(`[start-planning] Workspace result: success=${wsResult.success}, steps=${wsResult.steps.length}, errors=${wsResult.errors.length}`);
           if (wsResult.errors.length > 0) {
             console.error(`[start-planning] Workspace errors:`, wsResult.errors);
@@ -416,7 +416,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(2, 'Preparing planning environment', '.pan/ workspace artifacts');
 
     // Kill existing planning session if any
-    await Effect.runPromise(killSessionAsyncEffect(sessionName)).catch(() => {});
+    await Effect.runPromise(killSession(sessionName)).catch(() => {});
 
     const workspacePanPaths = await Effect.runPromise(ensureWorkspacePanDir(workspacePath));
     await Promise.all(
@@ -460,13 +460,13 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       settingsModel = 'claude-opus-4-7'; // unused — modelOverride wins
       modelSource = 'modelOverride';
     } else {
-      settingsModel = resolveModel('plan', undefined, loadConfig().config);
+      settingsModel = resolveModel('plan', undefined, loadConfigSync().config);
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
     const planningModel = modelOverride || settingsModel;
     const requestedHarness = opts.harness ?? 'claude-code';
-    const harnessDecision = canUseHarness(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
+    const harnessDecision = canUseHarnessSync(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
     const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
@@ -543,7 +543,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     await writeFile(promptFile, initMessage);
     await writeFile(
       launcherScript,
-      generateLauncherScript({
+      generateLauncherScriptSync({
         role: 'plan',
         workingDir: workspacePath,
         setTerminalEnv: true,
@@ -566,7 +566,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
     await ensureTmuxRunning();
-    await Effect.runPromise(createSessionAsyncEffect(sessionName, workspacePath, `bash '${launcherScript}'`, {
+    await Effect.runPromise(createSession(sessionName, workspacePath, `bash '${launcherScript}'`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
@@ -575,8 +575,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
-    await Effect.runPromise(setOptionAsyncEffect(sessionName, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOptionAsyncEffect(sessionName, 'remain-on-exit', 'on'));
+    await Effect.runPromise(setOption(sessionName, 'destroy-unattached', 'off'));
+    await Effect.runPromise(setOption(sessionName, 'remain-on-exit', 'on'));
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the

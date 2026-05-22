@@ -7,8 +7,8 @@
  */
 
 import { Effect } from 'effect';
-import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
-import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import { getProviderEnvSync, getProviderForModelSync, type ProviderConfig } from './providers.js';
+import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import type { ModelId } from './settings.js';
 
@@ -68,13 +68,7 @@ export function buildAnthropicMessagesUrl(baseUrl: string): string {
   return normalized.endsWith('/v1')
     ? `${normalized}/messages`
     : `${normalized}/v1/messages`;
-}
-
-/**
- * Probe a direct provider's API to verify it can serve requests.
- * Returns cached results within the TTL window.
- */
-export async function probeProvider(
+}async function probeProviderPromise(
   provider: ProviderConfig,
   apiKey: string,
   model: string,
@@ -94,7 +88,7 @@ export async function probeProvider(
 /**
  * Clear cached probe result for a provider (e.g. after key change).
  */
-export function invalidateProbeCache(provider?: string): void {
+export function invalidateProbeCacheSync(provider?: string): void {
   if (provider) {
     for (const k of cache.keys()) {
       if (k.startsWith(`${provider}:`)) cache.delete(k);
@@ -114,7 +108,7 @@ async function doProbe(
   // on the first spawn after every dashboard restart and surfaces a spurious
   // "Cannot reach Nous Portal: fetch failed" toast.
   if (provider.name === 'nous') {
-    await ensureOpenAICompatibleProxyRunning();
+    await Effect.runPromise(ensureOpenAICompatibleProxyRunning());
     // Use GET /v1/models instead of POST /v1/messages. The only Nous model
     // (qwen/qwen3.6-plus) is a reasoning model that ignores max_tokens for
     // its reasoning phase and routinely takes >8s to answer a one-character
@@ -123,7 +117,7 @@ async function doProbe(
     return probeModelsEndpoint(provider, apiKey);
   }
 
-  const providerEnv = getProviderEnv(provider, apiKey);
+  const providerEnv = getProviderEnvSync(provider, apiKey);
   const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
@@ -226,20 +220,11 @@ export function formatProbeError(provider: ProviderConfig, model: string, result
     default:
       return `${prefix}: pre-flight check failed — ${result.message}`;
   }
-}
-
-/**
- * Pre-flight validation for a model before agent spawn.
- * Throws with a descriptive message if the provider is unhealthy.
- * Skips probing for Anthropic and providers with separate local sidecar checks.
- *
- * If apiKey is not provided, resolves it from config.yaml.
- */
-export async function validateProviderHealth(
+}async function validateProviderHealthPromise(
   model: string,
   apiKey?: string,
 ): Promise<void> {
-  const provider = getProviderForModel(model as ModelId);
+  const provider = getProviderForModelSync(model as ModelId);
 
   // Skip: Anthropic native and OpenAI subscription routing have their own checks.
   if (provider.name === 'anthropic' || provider.name === 'openai') {
@@ -249,7 +234,7 @@ export async function validateProviderHealth(
   const key = apiKey ?? resolveApiKey(provider);
   if (!key) return; // No key configured — let downstream handle the "no key" error
 
-  const result = await probeProvider(provider, key, model);
+  const result = await Effect.runPromise(probeProvider(provider, key, model));
   if (!result.ok) {
     throw new ProviderHealthError(provider, model, result);
   }
@@ -281,25 +266,25 @@ export class ProviderHealthError extends Error {
  * (including error classifications) are carried in the success channel as
  * `ProbeResult`.
  */
-export const probeProviderEffect = (
+export const probeProvider = (
   provider: ProviderConfig,
   apiKey: string,
   model: string,
 ): Effect.Effect<ProbeResult, never> =>
-  Effect.promise(() => probeProvider(provider, apiKey, model));
+  Effect.promise(() => probeProviderPromise(provider, apiKey, model));
 
 /** Effect variant of {@link validateProviderHealth}. */
-export const validateProviderHealthEffect = (
+export const validateProviderHealth = (
   model: string,
   apiKey?: string,
 ): Effect.Effect<void, ProviderHealthError> =>
   Effect.tryPromise({
-    try: () => validateProviderHealth(model, apiKey),
+    try: () => validateProviderHealthPromise(model, apiKey),
     catch: (cause) => {
       if (cause instanceof ProviderHealthError) return cause;
       // Should never happen — validateProviderHealth only throws ProviderHealthError.
       // Re-wrap defensively so the typed error channel stays narrow.
-      const provider = getProviderForModel(model as ModelId);
+      const provider = getProviderForModelSync(model as ModelId);
       return new ProviderHealthError(provider, model, {
         ok: false,
         kind: 'unknown',
@@ -308,6 +293,6 @@ export const validateProviderHealthEffect = (
     },
   });
 
-/** Effect variant of {@link invalidateProbeCache}. Pure cache mutation; cannot fail. */
-export const invalidateProbeCacheEffect = (provider?: string): Effect.Effect<void, never> =>
-  Effect.sync(() => invalidateProbeCache(provider));
+/** Effect variant of {@link invalidateProbeCacheSync}. Pure cache mutation; cannot fail. */
+export const invalidateProbeCache = (provider?: string): Effect.Effect<void, never> =>
+  Effect.sync(() => invalidateProbeCacheSync(provider));

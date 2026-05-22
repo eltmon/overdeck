@@ -14,19 +14,19 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
-import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
+import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
+import { extractPrefixSync } from '../../../lib/issue-id.js';
+import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
+import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
-import { getReviewStatus } from '../review-status.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
@@ -155,7 +155,7 @@ async function collectSessionTreeNodes(
   context: SessionTreeContext,
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -190,13 +190,13 @@ async function collectSessionTreeNodes(
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
-      const rtState = await Effect.runPromise(getAgentRuntimeStateEffect(checkId));
+      const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
         : context.tmuxSessionNames.has(checkId)
-          ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+          ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
@@ -254,12 +254,12 @@ async function collectSessionTreeNodes(
     }
   }
 
-  const centralStatus = getReviewStatus(issueId.toUpperCase());
+  const centralStatus = getReviewStatusSync(issueId.toUpperCase());
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
     const latestReview = reviewEntries[reviewEntries.length - 1];
     if (latestReview) {
-      const resolvedProject = resolveProjectFromIssue(issueId);
+      const resolvedProject = resolveProjectFromIssueSync(issueId);
       const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
       const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
       // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
@@ -428,7 +428,7 @@ export async function fetchProjectSessionTree(
   projectKey: string,
   sharedContext?: ActivityContext,
 ): Promise<unknown | null> {
-  const projects = listProjects();
+  const projects = listProjectsSync();
   const project = projects.find(p =>
     p.key === projectKey || (p.config as { name?: string }).name === projectKey
   );
@@ -440,7 +440,7 @@ export async function fetchProjectSessionTree(
 
   // Reuse shared request-scoped data when provided; otherwise fetch lazily.
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
-    ?? new Set((await Effect.runPromise(listSessionNamesAsyncEffect()).catch(() => [] as string[])).filter(s => s.trim()));
+    ?? new Set((await Effect.runPromise(listSessionNames()).catch(() => [] as string[])).filter(s => s.trim()));
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
@@ -465,8 +465,8 @@ export async function fetchProjectSessionTree(
       }))
       .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
 
-    const results = await withConcurrencyLimit(
-      featureCandidates.map((c) => async () => {
+    const results = await Effect.runPromise(withConcurrencyLimit(
+      featureCandidates.map((c) => Effect.promise(async () => {
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
@@ -484,9 +484,9 @@ export async function fetchProjectSessionTree(
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
           return null;
         }
-      }),
+      })),
       15,
-    );
+    ));
 
     features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }
@@ -517,7 +517,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
     const results = yield* Effect.tryPromise({
       try: async () => {
-        const allSessionsArr = await Effect.runPromise(listSessionNamesAsyncEffect()).catch(() => [] as string[]);
+        const allSessionsArr = await Effect.runPromise(listSessionNames()).catch(() => [] as string[]);
         const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
 
         const issueTitles = await buildIssueTitleMap();

@@ -83,19 +83,7 @@ function findGitLockFiles(repoPath: string): string[] {
   }
 
   return lockFiles;
-}
-
-/**
- * Check for and clean up stale git lock files
- *
- * A lock file is considered stale if:
- * 1. It exists
- * 2. No git processes are currently running
- *
- * @param repoPath - Path to the git repository
- * @returns Object with cleanup results
- */
-export async function cleanupStaleLocks(repoPath: string): Promise<{
+}async function cleanupStaleLocksPromise(repoPath: string): Promise<{
   found: string[];
   removed: string[];
   errors: Array<{ file: string; error: string }>;
@@ -149,19 +137,7 @@ export interface WorkspaceCommitInfo {
   HEAD: string;
   /** Current branch name (e.g. "feature/pan-342") */
   branch: string;
-}
-
-/**
- * Get the current HEAD commit SHA and branch name for a workspace.
- *
- * Note: the return value includes `branch` (a name, not a hash) alongside `HEAD` (a SHA).
- * The function name reflects its primary use-case of snapshotting commit state for review.
- *
- * @param workspacePath - Path to the git workspace
- * @returns WorkspaceCommitInfo with HEAD SHA and branch name
- * @throws Error if git commands fail (e.g. path is not a git repository)
- */
-export async function getWorkspaceGitInfo(workspacePath: string): Promise<WorkspaceCommitInfo> {
+}async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
   try {
     const [headResult, branchResult] = await Promise.all([
       execAsync('git rev-parse HEAD', { cwd: workspacePath }),
@@ -175,15 +151,7 @@ export async function getWorkspaceGitInfo(workspacePath: string): Promise<Worksp
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
   }
-}
-
-/**
- * Check if a repository has stale lock files
- *
- * @param repoPath - Path to the git repository
- * @returns True if stale locks exist
- */
-export async function hasStaleLocks(repoPath: string): Promise<boolean> {
+}async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
   const lockFiles = findGitLockFiles(repoPath);
   if (lockFiles.length === 0) {
     return false;
@@ -201,7 +169,7 @@ export async function hasStaleLocks(repoPath: string): Promise<boolean> {
  * throws unexpectedly (e.g. permission denied at unlink); per-file errors
  * are reported in the `errors` payload like the original.
  */
-export const cleanupStaleLocksEffect = (
+export const cleanupStaleLocks = (
   repoPath: string,
 ): Effect.Effect<
   {
@@ -212,7 +180,7 @@ export const cleanupStaleLocksEffect = (
   FsError
 > =>
   Effect.tryPromise({
-    try: () => cleanupStaleLocks(repoPath),
+    try: () => cleanupStaleLocksPromise(repoPath),
     catch: (cause) =>
       new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
   });
@@ -222,11 +190,11 @@ export const cleanupStaleLocksEffect = (
  * name. Fails with GitError if rev-parse exits non-zero (e.g. path is not a
  * git repository).
  */
-export const getWorkspaceGitInfoEffect = (
+export const getWorkspaceGitInfo = (
   workspacePath: string,
 ): Effect.Effect<WorkspaceCommitInfo, GitError> =>
   Effect.tryPromise({
-    try: () => getWorkspaceGitInfo(workspacePath),
+    try: () => getWorkspaceGitInfoPromise(workspacePath),
     catch: (cause) =>
       new GitError({
         command: ['rev-parse', 'HEAD'],
@@ -240,7 +208,7 @@ export const getWorkspaceGitInfoEffect = (
  * Effect-native hasStaleLocks — predicate variant. Never fails; defers to
  * the Promise implementation which already swallows errors conservatively.
  */
-export const hasStaleLocksEffect = (
+export const hasStaleLocks = (
   repoPath: string,
 ): Effect.Effect<boolean, never> =>
-  Effect.promise(() => hasStaleLocks(repoPath));
+  Effect.promise(() => hasStaleLocksPromise(repoPath));

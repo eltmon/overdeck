@@ -20,15 +20,15 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { FsError } from './errors.js'
-import { getAgentRuntimeStateEffect, getAgentDir } from './agents.js'
+import { getAgentRuntimeState, getAgentDir } from './agents.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
   type AwaitingInputDetection,
 } from './agent-input-detection.js'
-import { resolveProjectFromIssue } from './projects.js'
+import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
-import { extractPrefix } from './issue-id.js'
+import { extractPrefixSync } from './issue-id.js'
 
 const execAsync = promisify(exec)
 
@@ -76,7 +76,7 @@ export async function getActiveSessionPath(projectDir: string): Promise<string |
 
 function getProjectPathByPrefix(issuePrefix: string): string {
   const issueId = `${issuePrefix}-1`
-  const resolved = resolveProjectFromIssue(issueId)
+  const resolved = resolveProjectFromIssueSync(issueId)
   if (resolved) return resolved.projectPath
   const config = getGitHubConfig()
   if (config) {
@@ -95,9 +95,7 @@ function getProjectPathByPrefix(issuePrefix: string): string {
     }
   }
   return join(homedir(), 'Projects')
-}
-
-export async function getAgentWorkspace(agentId: string): Promise<string | null> {
+}async function getAgentWorkspacePromise(agentId: string): Promise<string | null> {
   const stateFile = join(getAgentDir(agentId), 'state.json')
   if (existsSync(stateFile)) {
     try {
@@ -114,7 +112,7 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
     if (trimmed && existsSync(trimmed)) return trimmed
   } catch {}
   const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
-  const prefix = extractPrefix(issueId)
+  const prefix = extractPrefixSync(issueId)
   if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
@@ -124,10 +122,8 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
   } catch {
     return null
   }
-}
-
-export async function getAgentJsonlPath(agentId: string): Promise<string | null> {
-  const workspace = await getAgentWorkspace(agentId)
+}async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
+  const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
   return await getActiveSessionPath(projectDir)
@@ -159,16 +155,7 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
   } catch {
     return ''
   }
-}
-
-/**
- * Parse pending questions from a JSONL file.
- *
- * Optimization: only reads the last 512KB of the file. Pending questions
- * are always recent events — reading the entire multi-megabyte file on
- * every poll was a major source of dashboard lag.
- */
-export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
+}async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
   if (!existsSync(jsonlPath)) return []
   try {
     // Only read the last 512KB — pending questions are always recent.
@@ -201,40 +188,21 @@ export async function getPendingQuestions(jsonlPath: string): Promise<PendingQue
   } catch {
     return []
   }
-}
-
-export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
-  const jsonlPath = await getAgentJsonlPath(agentId)
+}async function getAgentPendingQuestionsPromise(agentId: string): Promise<PendingQuestion[]> {
+  const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
   if (!jsonlPath) return []
-  return getPendingQuestions(jsonlPath)
+  return [...(await Effect.runPromise(getPendingQuestions(jsonlPath)))]
 }
 
-/**
- * Get the mtime (ms since epoch) of the agent's active JSONL session file.
- * Returns null if the file doesn't exist or the path can't be resolved.
- * Used by AgentEnrichmentService to skip JSONL scans when the file is unchanged.
- */
-export async function getAgentJsonlMtime(agentId: string): Promise<number | null> {
-  const jsonlPath = await getAgentJsonlPath(agentId)
+async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null> {
+  const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
   if (!jsonlPath || !existsSync(jsonlPath)) return null
   try {
     return (await stat(jsonlPath)).mtime.getTime()
   } catch {
     return null
   }
-}
-
-// ─── Enrichment computation ───────────────────────────────────────────────────
-
-/**
- * Compute the full enrichment snapshot for a single agent.
- *
- * @param agentId - Agent session name (e.g. 'agent-pan-440', 'planning-pan-440')
- * @param startedAt - ISO timestamp when the agent started (filters stale questions)
- * @param hasActiveSpecialist - Whether the agent's issue has an active specialist running
- * @param skipJsonlScan - Skip JSONL file scan (use when mtime is unchanged); still reads runtime state
- */
-export async function computeAgentEnrichment(
+}async function computeAgentEnrichmentPromise(
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
@@ -259,13 +227,13 @@ export async function computeAgentEnrichment(
       : (isPlanning ? 'plan' : undefined)
 
   // Get runtime state for resolution + explicit waiting signals.
-  const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId))
+  const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId))
 
   // Get pending questions, filtered by agent start time.
   // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).
   let pendingQuestions: PendingQuestion[] = []
   if (!skipJsonlScan) {
-    pendingQuestions = await getAgentPendingQuestions(agentId)
+    pendingQuestions = [...await Effect.runPromise(getAgentPendingQuestions(agentId))]
     if (pendingQuestions.length > 0 && startedAt) {
       const agentStartTime = new Date(startedAt).getTime()
       pendingQuestions = pendingQuestions.filter(q => {
@@ -297,7 +265,7 @@ export async function computeAgentEnrichment(
     : null
 
   const paneDetection = !questionDetection && !runtimeDetection
-    ? await detectAwaitingInputForAgent(agentId, { isPlanning })
+    ? await Effect.runPromise(detectAwaitingInputForAgent(agentId, { isPlanning }))
     : null
 
   const fallbackDetection: AwaitingInputDetection | null = runtimeState?.resolution === 'needs_input'
@@ -327,14 +295,14 @@ export async function computeAgentEnrichment(
  * Effect-native variant of computeAgentEnrichment. Fails with FsError if any
  * underlying filesystem read fails outside the swallowed branches.
  */
-export const computeAgentEnrichmentEffect = (
+export const computeAgentEnrichment = (
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
   skipJsonlScan?: boolean,
 ): Effect.Effect<AgentEnrichment, FsError> =>
   Effect.tryPromise({
-    try: () => computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, skipJsonlScan),
+    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, skipJsonlScan),
     catch: (cause) =>
       new FsError({
         path: getAgentDir(agentId),
@@ -344,31 +312,31 @@ export const computeAgentEnrichmentEffect = (
   })
 
 /** Effect-native: resolve the workspace path for an agent (null on failure). */
-export const getAgentWorkspaceEffect = (
+export const getAgentWorkspace = (
   agentId: string,
 ): Effect.Effect<string | null> =>
-  Effect.promise(() => getAgentWorkspace(agentId))
+  Effect.promise(() => getAgentWorkspacePromise(agentId))
 
 /** Effect-native: resolve the active JSONL session path for an agent (null on failure). */
-export const getAgentJsonlPathEffect = (
+export const getAgentJsonlPath = (
   agentId: string,
 ): Effect.Effect<string | null> =>
-  Effect.promise(() => getAgentJsonlPath(agentId))
+  Effect.promise(() => getAgentJsonlPathPromise(agentId))
 
 /** Effect-native: get the mtime of the agent's active JSONL session file. */
-export const getAgentJsonlMtimeEffect = (
+export const getAgentJsonlMtime = (
   agentId: string,
 ): Effect.Effect<number | null> =>
-  Effect.promise(() => getAgentJsonlMtime(agentId))
+  Effect.promise(() => getAgentJsonlMtimePromise(agentId))
 
 /** Effect-native: parse pending questions from a JSONL file. */
-export const getPendingQuestionsEffect = (
+export const getPendingQuestions = (
   jsonlPath: string,
 ): Effect.Effect<readonly PendingQuestion[]> =>
-  Effect.promise(() => getPendingQuestions(jsonlPath))
+  Effect.promise(() => getPendingQuestionsPromise(jsonlPath))
 
 /** Effect-native: get pending questions for an agent by id. */
-export const getAgentPendingQuestionsEffect = (
+export const getAgentPendingQuestions = (
   agentId: string,
 ): Effect.Effect<readonly PendingQuestion[]> =>
-  Effect.promise(() => getAgentPendingQuestions(agentId))
+  Effect.promise(() => getAgentPendingQuestionsPromise(agentId))

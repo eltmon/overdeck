@@ -3,9 +3,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  startSmeeProcess,
-  stopSmeeProcess,
-  isSmeeProcessRunning,
+  startSmeeProcessSync,
+  stopSmeeProcessSync,
+  isSmeeProcessRunningSync,
 } from '../../../src/lib/smee.js';
 
 // ─── Mock state ──────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ const mockLoadConfig = vi.fn(() => ({
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
+  loadConfigSync: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
 }));
 
 beforeEach(() => {
@@ -80,7 +81,7 @@ describe('startSmeeProcess', () => {
       throw new Error('ESRCH');
     });
 
-    startSmeeProcess();
+    startSmeeProcessSync();
 
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     expect(mockSpawn).toHaveBeenCalledWith(
@@ -110,7 +111,7 @@ describe('startSmeeProcess', () => {
     mockExistsSync.mockReturnValue(false);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    startSmeeProcess();
+    startSmeeProcessSync();
 
     expect(mockSpawn).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
@@ -123,7 +124,7 @@ describe('startSmeeProcess', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined);
 
-    startSmeeProcess();
+    startSmeeProcessSync();
 
     expect(mockSpawn).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('[smee] Process already running');
@@ -141,7 +142,7 @@ describe('startSmeeProcess', () => {
       throw new Error('ESRCH');
     });
 
-    startSmeeProcess();
+    startSmeeProcessSync();
 
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     expect(mockWriteFileSync).not.toHaveBeenCalled();
@@ -158,7 +159,7 @@ describe('stopSmeeProcess', () => {
     mockReadFileSync.mockReturnValue('12345');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    stopSmeeProcess();
+    stopSmeeProcessSync();
 
     expect(mockUnlinkSync).toHaveBeenCalledWith(
       expect.stringContaining('smee.pid'),
@@ -171,7 +172,7 @@ describe('stopSmeeProcess', () => {
     mockExistsSync.mockReturnValue(false);
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    stopSmeeProcess();
+    stopSmeeProcessSync();
 
     expect(mockUnlinkSync).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('[smee] Process stopped');
@@ -183,7 +184,7 @@ describe('isSmeeProcessRunning', () => {
   it('returns true when pidfile exists and process is alive', () => {
     const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined);
 
-    expect(isSmeeProcessRunning()).toBe(true);
+    expect(isSmeeProcessRunningSync()).toBe(true);
 
     killSpy.mockRestore();
   });
@@ -191,7 +192,7 @@ describe('isSmeeProcessRunning', () => {
   it('returns false when pidfile is missing', () => {
     mockExistsSync.mockReturnValue(false);
 
-    expect(isSmeeProcessRunning()).toBe(false);
+    expect(isSmeeProcessRunningSync()).toBe(false);
   });
 
   it('returns false and cleans up stale pidfile when process is dead', () => {
@@ -200,7 +201,7 @@ describe('isSmeeProcessRunning', () => {
       throw new Error('ESRCH');
     });
 
-    expect(isSmeeProcessRunning()).toBe(false);
+    expect(isSmeeProcessRunningSync()).toBe(false);
     expect(mockUnlinkSync).toHaveBeenCalledWith(
       expect.stringContaining('smee.pid'),
     );

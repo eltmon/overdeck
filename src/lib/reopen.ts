@@ -8,11 +8,11 @@
  */
 
 import {
-  getReviewStatus,
-  setReviewStatus,
+  getReviewStatusSync,
+  setReviewStatusSync,
 } from './review-status.js';
 import { Data, Effect } from 'effect';
-import { resolveProjectFromIssue } from './projects.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 
 export interface ReopenResult {
@@ -29,21 +29,7 @@ export interface ReopenResult {
 export interface ReopenOptions {
   reason?: string;
   trackerContext?: string;
-}
-
-/**
- * Reset workspace state for a reopened issue.
- *
- * - Resets specialist states (review/test/merge → pending) via setReviewStatus
- * - Removes the issue from all specialist queues
- * - Appends a `reason: 'resume'` entry to the scope vBRIEF's continue file
- *
- * @param issueId - Issue identifier (e.g., "PAN-256")
- * @param workspacePath - Absolute path to workspace directory (kept for callers
- *   that derive it locally; reopen no longer uses workspace files directly).
- * @param options - Optional reason and tracker context
- */
-export async function reopenWorkspaceState(
+}async function reopenWorkspaceStatePromise(
   issueId: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   workspacePath: string,
@@ -61,7 +47,7 @@ export async function reopenWorkspaceState(
 
   // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
   // setReviewStatus() reads only this issue's row and upserts only this issue's row.
-  const existing = getReviewStatus(issueId);
+  const existing = getReviewStatusSync(issueId);
 
   if (existing) {
     result.previousReviewStatus = existing.reviewStatus;
@@ -69,7 +55,7 @@ export async function reopenWorkspaceState(
     result.previousMergeStatus = existing.mergeStatus ?? null;
   }
 
-  setReviewStatus(issueId, {
+  setReviewStatusSync(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
     mergeStatus: 'pending',
@@ -90,7 +76,7 @@ export async function reopenWorkspaceState(
   result.specialistStatesReset = true;
 
   // 2. Append a reopen breadcrumb to the scope vBRIEF's continue file.
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved) {
     try {
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
@@ -131,13 +117,13 @@ export class ReopenError extends Data.TaggedError('ReopenError')<{
 }> {}
 
 /** Effect variant of `reopenWorkspaceState`. */
-export const reopenWorkspaceStateEffect = (
+export const reopenWorkspaceState = (
   issueId: string,
   workspacePath: string,
   options: ReopenOptions = {},
 ): Effect.Effect<ReopenResult, ReopenError> =>
   Effect.tryPromise({
-    try: () => reopenWorkspaceState(issueId, workspacePath, options),
+    try: () => reopenWorkspaceStatePromise(issueId, workspacePath, options),
     catch: (cause) =>
       new ReopenError({
         issueId,

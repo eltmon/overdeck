@@ -7,7 +7,7 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
-import { loadConfig } from '../../../lib/config.js';
+import { loadConfigSync } from '../../../lib/config.js';
 import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
 
 interface ResourcesOptions {
@@ -26,7 +26,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
   const spinner = ora('Gathering resource usage...').start();
 
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
 
     if (!config.remote?.enabled) {
       spinner.warn('Remote workspaces not enabled');

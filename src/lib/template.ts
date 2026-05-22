@@ -27,7 +27,7 @@ function loadSection(path: string, variables: TemplateVariables): string {
   return result;
 }
 
-export function generateClaudeMd(
+export function generateClaudeMdSync(
   projectPath: string,
   variables: TemplateVariables
 ): string {
@@ -80,12 +80,12 @@ This workspace was created by Panopticon. Use \`bd\` commands to track your work
  * Generate the workspace CLAUDE.md content. Effect-native. Fails with FsError
  * if any template section cannot be read.
  */
-export const generateClaudeMdEffect = (
+export const generateClaudeMd = (
   projectPath: string,
   variables: TemplateVariables,
 ): Effect.Effect<string, FsError> =>
   Effect.try({
-    try: () => generateClaudeMd(projectPath, variables),
+    try: () => generateClaudeMdSync(projectPath, variables),
     catch: (cause) =>
       new FsError({ path: projectPath, operation: 'generateClaudeMd', cause }),
   });

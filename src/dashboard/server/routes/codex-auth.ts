@@ -7,9 +7,9 @@ import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
-import { bridgeCodexAuthToCliproxyEffect, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
-import { createSessionAsyncEffect, sessionExistsAsyncEffect, listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
-import { getDashboardApiUrl } from '../../../lib/config.js';
+import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
+import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
+import { getDashboardApiUrlSync } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
@@ -76,7 +76,7 @@ export function consumeReauthTerminalToken(sessionName: string, token: string | 
 
 function buildTerminalCookie(sessionName: string, terminalToken: string): string {
   const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
-  const secure = getDashboardApiUrl().startsWith('https://') ? '; Secure' : '';
+  const secure = getDashboardApiUrlSync().startsWith('https://') ? '; Secure' : '';
   return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secure}`;
 }
 
@@ -111,7 +111,7 @@ const getCodexAuthRoute = HttpRouter.add(
 
 async function getExistingLiveReauthSession(): Promise<{ sessionName: string; session: ReauthSession } | null> {
   cleanupExpiredReauthSessions();
-  const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+  const sessions = await Effect.runPromise(listSessionNames());
   for (const [sessionName, session] of reauthSessions.entries()) {
     if (sessions.includes(sessionName)) return { sessionName, session };
   }
@@ -142,7 +142,7 @@ const postCodexReauthRoute = HttpRouter.add(
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
       const command = headless ? 'codex login --device-auth' : 'codex login';
 
-      yield* createSessionAsyncEffect(sessionName, homedir(), command, {
+      yield* createSession(sessionName, homedir(), command, {
         env: { PATH: process.env.PATH || '' },
       });
 
@@ -174,13 +174,13 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         return jsonResponse({ completed: true, success: false, error: 'Re-auth session expired or invalid' });
       }
 
-      const exists = yield* sessionExistsAsyncEffect(sessionName);
+      const exists = yield* sessionExists(sessionName);
       if (exists) {
         return jsonResponse({ completed: false });
       }
 
       const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
-      const bridged = yield* bridgeCodexAuthToCliproxyEffect();
+      const bridged = yield* bridgeCodexAuthToCliproxy();
       const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
       const refreshedCredential = bridged && (
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||

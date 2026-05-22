@@ -1,36 +1,44 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
   listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(),
 }));
 
 vi.mock('../../../lib/stashes.js', () => ({
-  dropStash: vi.fn(async () => {}),
+  dropStash: vi.fn(() => Effect.void),
   isOlderThanDays: vi.fn(),
-  listStashes: vi.fn(async () => []),
+  listStashes: vi.fn(() => Effect.succeed([])),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null) }));
+vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), resolveProjectFromIssueSync: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), listProjectsSync: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null), getProjectSync: vi.fn(() => null) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
-vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logAgentLifecycle: vi.fn() }));
-vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn() }));
+vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logDeaconEventSync: vi.fn(), logAgentLifecycle: vi.fn() }));
+vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityEntrySync: vi.fn(), emitActivityTts: vi.fn(), emitActivityTtsSync: vi.fn() }));
 vi.mock('../../config.js', () => ({ loadConfig: vi.fn(() => ({ trackers: { primary: 'linear', linear: { type: 'linear', api_key_env: 'LINEAR_API_KEY' } } })) }));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../specialists.js', () => ({
@@ -40,6 +48,9 @@ vi.mock('../specialists.js', () => ({
 }));
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({
+    monitoring: {},
+  })),
+  loadCloisterConfigSync: vi.fn(() => ({
     monitoring: {},
   })),
 }));
@@ -65,17 +76,19 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSessionSync: vi.fn(),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExistsSync: vi.fn(() => false),
+  sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
-  isPaneDeadAsyncEffect: effectMock(false),
+  isPaneDead: effectMock(false),
   };
 });
 vi.mock('../../paths.js', () => ({
@@ -108,32 +121,32 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
-import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
+import { listRunningAgentsSync, getAgentStateSync, saveAgentStateSync } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
-import { resolveProjectFromIssue, getProject } from '../../projects.js';
+import { resolveProjectFromIssueSync, getProjectSync } from '../../projects.js';
 import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
-import { getReviewStatus, setReviewStatus } from '../../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
-import { loadCloisterConfig } from '../config.js';
-import { listSessionNamesAsyncEffect, killSessionAsyncEffect, sessionExists, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
+import { loadCloisterConfigSync } from '../config.js';
+import { listSessionNames, killSession, sessionExistsSync, sessionExists } from '../../../lib/tmux.js';
 
-const mockListRunningAgents = vi.mocked(listRunningAgents);
-const mockGetAgentState = vi.mocked(getAgentState);
-const mockSaveAgentState = vi.mocked(saveAgentState);
-const mockListSessionNamesAsync = vi.mocked(listSessionNamesAsyncEffect);
-const mockKillSessionAsync = vi.mocked(killSessionAsyncEffect);
-const mockSessionExists = vi.mocked(sessionExists);
-const mockSessionExistsAsync = vi.mocked(sessionExistsAsyncEffect);
+const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
+const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockSaveAgentState = vi.mocked(saveAgentStateSync);
+const mockListSessionNamesAsync = vi.mocked(listSessionNames);
+const mockKillSessionAsync = vi.mocked(killSession);
+const mockSessionExists = vi.mocked(sessionExistsSync);
+const mockSessionExistsAsync = vi.mocked(sessionExists);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
-const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
-const mockGetProject = vi.mocked(getProject);
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssueSync);
+const mockGetProject = vi.mocked(getProjectSync);
 const mockFindWorkspacePath = vi.mocked(findWorkspacePath);
-const mockGetReviewStatus = vi.mocked(getReviewStatus);
-const mockSetReviewStatus = vi.mocked(setReviewStatus);
+const mockGetReviewStatus = vi.mocked(getReviewStatusSync);
+const mockSetReviewStatus = vi.mocked(setReviewStatusSync);
 const mockCreateTracker = vi.mocked(createTracker);
-const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigSync);
 
 function installExecMock(resultsByCommand: Record<string, string | Error>) {
   execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
@@ -162,7 +175,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockGetReviewStatus.mockReturnValue(null as any);
     mockLoadCloisterConfig.mockReturnValue({ monitoring: {} } as any);
     mockFindWorkspacePath.mockReturnValue('/repo/workspaces/feature-pan-879');
-    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([]) as any);
     mockSessionExists.mockReturnValue(false);
   });
 
@@ -197,11 +210,11 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   it('drops old non-salvageable stashes but preserves salvageable ones', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'def456abc123def456abc123def456abc123def4', stackRef: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
       { ref: 'bogusbogusbogusbogusbogusbogusbogusbogus', kind: 'pre-spawn', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-spawn:PAN-879:2026-03-01T00:00:00Z' } as any,
       { ref: 'fedcba654321fedcba654321fedcba654321fedc', stackRef: 'stash@{2}', kind: 'salvageable', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'salvageable:PAN-879:2026-03-01T00:00:00Z:notes', shortDescription: 'notes' } as any,
-    ]);
+    ]) as any);
     mockIsOlderThanDays.mockImplementation((entry) => entry.kind === 'pre-merge' || entry.kind === 'pre-spawn');
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
@@ -215,9 +228,9 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   it('preserves pre-merge stashes for non-github issues that are merely closed', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: '9999999999999999999999999999999999999999', stackRef: 'stash@{3}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
-    ]);
+    ]) as any);
     mockGetProject.mockReturnValue({ tracker: 'linear' } as any);
     mockCreateTracker.mockReturnValue({ getIssue: vi.fn(async () => ({ state: 'closed' })) } as any);
 
@@ -231,9 +244,9 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   it('preserves pre-merge stashes for github issues that are merely closed', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
-    mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', stackRef: 'stash@{4}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
-    ]);
+    ]) as any);
     mockGetProject.mockReturnValue({ tracker: 'github', github_repo: 'owner/repo' } as any);
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
@@ -310,9 +323,9 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   });
 
   it('logs non-canonical stashes on startup without deleting them', async () => {
-    mockListStashes.mockResolvedValue([
+    mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'stash@{5}', kind: 'unknown', issueId: undefined, message: 'legacy stash name' } as any,
-    ]);
+    ]) as any);
 
     const actions = await logNonCanonicalStashesOnStartup();
 
@@ -325,15 +338,15 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 describe('cleanupOrphanedReviewSessions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([]) as any);
     mockSessionExists.mockReturnValue(false);
   });
 
   it('kills orphaned canonical reviewer sessions', async () => {
-    mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'specialist-panopticon-PAN-879-review-correctness',
       'specialist-panopticon-PAN-879-review-synthesis',
-    ]);
+    ]) as any);
 
     const actions = await cleanupOrphanedReviewSessions();
 
@@ -347,12 +360,12 @@ describe('cleanupOrphanedReviewSessions', () => {
   });
 
   it('kills orphaned PAN-1059 convoy reviewer sessions', async () => {
-    mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'agent-pan-879-review-security',
       'agent-pan-879-review-correctness',
       'agent-pan-879-review-performance',
       'agent-pan-879-review-requirements',
-    ]);
+    ]) as any);
 
     const actions = await cleanupOrphanedReviewSessions();
 
@@ -362,9 +375,9 @@ describe('cleanupOrphanedReviewSessions', () => {
   });
 
   it('keeps canonical reviewer sessions when the work agent still exists', async () => {
-    mockListSessionNamesAsync.mockResolvedValue([
+    mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
       'specialist-panopticon-PAN-879-review-correctness',
-    ]);
+    ]) as any);
     mockSessionExists.mockImplementation((name: string) => name === 'agent-pan-879');
 
     const actions = await cleanupOrphanedReviewSessions();
@@ -377,7 +390,7 @@ describe('cleanupOrphanedReviewSessions', () => {
 describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSessionExistsAsync.mockImplementation(async (name: string) => name === 'agent-pan-879-review');
+    mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
   });
 
   it('signals synthesis when a reviewer disappears before writing output', async () => {
@@ -385,7 +398,7 @@ describe('monitorReviewConvoySignals', () => {
     const agents = await import('../../../lib/agents.js');
     vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
     vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
-    vi.mocked(agents.getAgentState).mockReturnValue({
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
       id: 'agent-pan-879-review-security',
       issueId: 'PAN-879',
       workspace: '/workspace',
@@ -405,7 +418,7 @@ describe('monitorReviewConvoySignals', () => {
       'agent-pan-879-review',
       'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
     );
-    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+    expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',
     }));
     expect(actions).toEqual([
@@ -420,7 +433,7 @@ describe('monitorReviewConvoySignals', () => {
     vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
     vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
     vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-12T00:00:00.000Z') } as any);
-    vi.mocked(agents.getAgentState).mockReturnValue({
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
       id: 'agent-pan-879-review-security',
       issueId: 'PAN-879',
       workspace: '/workspace',
@@ -440,10 +453,10 @@ describe('monitorReviewConvoySignals', () => {
       'agent-pan-879-review',
       'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
     );
-    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+    expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',
     }));
-    expect(agents.saveAgentState).not.toHaveBeenCalledWith(expect.objectContaining({
+    expect(agents.saveAgentStateSync).not.toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'ready',
     }));
   });
@@ -455,7 +468,7 @@ describe('monitorReviewConvoySignals', () => {
     vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
     vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
     vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
-    vi.mocked(agents.getAgentState).mockReturnValue({
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
       id: 'agent-pan-879-review-security',
       issueId: 'PAN-879',
       workspace: '/workspace',
@@ -475,7 +488,7 @@ describe('monitorReviewConvoySignals', () => {
       'agent-pan-879-review',
       `REVIEWER_READY security ${outputPath}`,
     );
-    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+    expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'ready',
     }));
     expect(actions).toEqual([

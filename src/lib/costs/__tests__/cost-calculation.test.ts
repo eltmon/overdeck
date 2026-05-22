@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateCost, getPricing, TokenUsage, ModelPricing } from '../../cost.js';
+import { calculateCostSync, getPricingSync, TokenUsage, ModelPricing } from '../../cost.js';
 
 describe('Cost Calculation Accuracy', () => {
   describe('Anthropic Models', () => {
     it('should calculate claude-sonnet-4 costs correctly', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -21,7 +21,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Sonnet-4: input $3/MTok, output $15/MTok, cache read $0.30/MTok, cache write $3.75/MTok (5m)
       // (10000/1M)*3 + (5000/1M)*15 + (2000/1M)*0.30 + (1000/1M)*3.75
@@ -30,7 +30,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should calculate claude-opus-4 costs correctly', () => {
-      const pricing = getPricing('anthropic', 'claude-opus-4');
+      const pricing = getPricingSync('anthropic', 'claude-opus-4');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -40,7 +40,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Opus-4: input $15/MTok, output $75/MTok
       // (10000/1M)*15 + (5000/1M)*75 = 0.15 + 0.375 = 0.525
@@ -48,7 +48,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should calculate claude-haiku-4-5 costs correctly', () => {
-      const pricing = getPricing('anthropic', 'claude-haiku-4-5');
+      const pricing = getPricingSync('anthropic', 'claude-haiku-4-5');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -59,7 +59,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Haiku-4.5: input $1/MTok, output $5/MTok, cache read $0.10/MTok, cache write $1.25/MTok (5m)
       // (100000/1M)*1 + (50000/1M)*5 + (10000/1M)*0.10 + (5000/1M)*1.25
@@ -70,7 +70,7 @@ describe('Cost Calculation Accuracy', () => {
 
   describe('Cache TTL Pricing', () => {
     it('should use correct pricing for 5-minute cache', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 0,
@@ -80,7 +80,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Sonnet-4 5m cache write: $3.75/MTok
       // (10000/1M)*3.75 = 0.0375
@@ -88,7 +88,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should use correct pricing for 1-hour cache', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 0,
@@ -98,7 +98,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '1h'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Sonnet-4 1h cache write: $6/MTok
       // (10000/1M)*6 = 0.06
@@ -106,7 +106,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should default to 5-minute cache if TTL not specified', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 0,
@@ -116,7 +116,7 @@ describe('Cost Calculation Accuracy', () => {
         // No cacheTTL specified - should default to '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Should use 5m pricing
       expect(cost).toBeCloseTo(0.0375, 6);
@@ -125,7 +125,7 @@ describe('Cost Calculation Accuracy', () => {
 
   describe('Long-Context Pricing', () => {
     it('should apply long-context multiplier for Sonnet-4 with >200K input tokens', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 250000,
@@ -134,7 +134,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Long-context: input 2x ($6/MTok), output 1.5x ($22.50/MTok)
       // (250000/1M)*6 + (50000/1M)*22.50 = 1.5 + 1.125 = 2.625
@@ -142,7 +142,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should include cache tokens in long-context threshold calculation', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       // Total input = 150K + 40K + 20K = 210K > 200K threshold
       const usage: TokenUsage = {
@@ -153,7 +153,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Should apply long-context multiplier
       // Input: (150000/1M)*6 = 0.9
@@ -165,7 +165,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should NOT apply long-context multiplier below 200K threshold', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 150000,
@@ -174,7 +174,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Standard pricing: input $3/MTok, output $15/MTok
       // (150000/1M)*3 + (50000/1M)*15 = 0.45 + 0.75 = 1.2
@@ -182,8 +182,8 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should NOT apply long-context multiplier to Opus or Haiku', () => {
-      const opusPricing = getPricing('anthropic', 'claude-opus-4');
-      const haikuPricing = getPricing('anthropic', 'claude-haiku-4-5');
+      const opusPricing = getPricingSync('anthropic', 'claude-opus-4');
+      const haikuPricing = getPricingSync('anthropic', 'claude-haiku-4-5');
 
       const usage: TokenUsage = {
         inputTokens: 250000,
@@ -192,8 +192,8 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const opusCost = calculateCost(usage, opusPricing!);
-      const haikuCost = calculateCost(usage, haikuPricing!);
+      const opusCost = calculateCostSync(usage, opusPricing!);
+      const haikuCost = calculateCostSync(usage, haikuPricing!);
 
       // Opus: (250000/1M)*15 + (50000/1M)*75 = 3.75 + 3.75 = 7.5
       expect(opusCost).toBeCloseTo(7.5, 6);
@@ -205,26 +205,26 @@ describe('Cost Calculation Accuracy', () => {
 
   describe('Model Name Matching', () => {
     it('should match exact model names', () => {
-      expect(getPricing('anthropic', 'claude-sonnet-4')).toBeDefined();
-      expect(getPricing('anthropic', 'claude-opus-4')).toBeDefined();
-      expect(getPricing('anthropic', 'claude-haiku-4-5')).toBeDefined();
+      expect(getPricingSync('anthropic', 'claude-sonnet-4')).toBeDefined();
+      expect(getPricingSync('anthropic', 'claude-opus-4')).toBeDefined();
+      expect(getPricingSync('anthropic', 'claude-haiku-4-5')).toBeDefined();
     });
 
     it('should match model names with date suffixes', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4-20250101');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4-20250101');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-sonnet-4');
     });
 
     it('should return null for unknown models', () => {
-      expect(getPricing('anthropic', 'unknown-model')).toBeNull();
-      expect(getPricing('openai', 'claude-sonnet-4')).toBeNull();
+      expect(getPricingSync('anthropic', 'unknown-model')).toBeNull();
+      expect(getPricingSync('openai', 'claude-sonnet-4')).toBeNull();
     });
   });
 
   describe('Floating Point Precision', () => {
     it('should round to 6 decimal places', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 333,
@@ -234,14 +234,14 @@ describe('Cost Calculation Accuracy', () => {
         cacheTTL: '5m'
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Cost should be rounded to 6 decimals
       expect(cost.toString().split('.')[1]?.length).toBeLessThanOrEqual(6);
     });
 
     it('should handle very small costs without underflow', () => {
-      const pricing = getPricing('anthropic', 'claude-haiku-4-5');
+      const pricing = getPricingSync('anthropic', 'claude-haiku-4-5');
 
       const usage: TokenUsage = {
         inputTokens: 1,
@@ -250,14 +250,14 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       expect(cost).toBeGreaterThan(0);
       expect(cost).toBeCloseTo(0.000006, 6); // $0.000001 + $0.000005
     });
 
     it('should handle very large costs without overflow', () => {
-      const pricing = getPricing('anthropic', 'claude-opus-4');
+      const pricing = getPricingSync('anthropic', 'claude-opus-4');
 
       const usage: TokenUsage = {
         inputTokens: 10000000, // 10M tokens
@@ -266,7 +266,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // (10M/1M)*15 + (5M/1M)*75 = 150 + 375 = 525
       expect(cost).toBeCloseTo(525, 6);
@@ -276,7 +276,7 @@ describe('Cost Calculation Accuracy', () => {
 
   describe('Edge Cases', () => {
     it('should handle zero tokens', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 0,
@@ -285,13 +285,13 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       expect(cost).toBe(0);
     });
 
     it('should handle missing cache tokens (undefined)', () => {
-      const pricing = getPricing('anthropic', 'claude-sonnet-4');
+      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
 
       const usage: TokenUsage = {
         inputTokens: 1000,
@@ -299,7 +299,7 @@ describe('Cost Calculation Accuracy', () => {
         // No cache tokens specified
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Should calculate without errors
       expect(cost).toBeGreaterThan(0);
@@ -309,7 +309,7 @@ describe('Cost Calculation Accuracy', () => {
     it('should handle models without cache pricing', () => {
       // gpt-5.2 has no cache pricing in our table — used here to verify the
       // calculator correctly skips cache tokens when no cache rate exists.
-      const pricing = getPricing('openai', 'gpt-5.2');
+      const pricing = getPricingSync('openai', 'gpt-5.2');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -319,7 +319,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 50
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Should only calculate input/output, ignore cache tokens
       // (1000/1M)*1.25 + (500/1M)*10 = 0.00125 + 0.005 = 0.00625
@@ -329,18 +329,18 @@ describe('Cost Calculation Accuracy', () => {
 
   describe('Multi-Provider Support', () => {
     it('should have pricing for OpenAI models', () => {
-      expect(getPricing('openai', 'gpt-5.4')).toBeDefined();
-      expect(getPricing('openai', 'gpt-5.4-mini')).toBeDefined();
-      expect(getPricing('openai', 'o3')).toBeDefined();
+      expect(getPricingSync('openai', 'gpt-5.4')).toBeDefined();
+      expect(getPricingSync('openai', 'gpt-5.4-mini')).toBeDefined();
+      expect(getPricingSync('openai', 'o3')).toBeDefined();
     });
 
     it('should have pricing for Google models', () => {
-      expect(getPricing('google', 'gemini-3.1-pro-preview')).toBeDefined();
-      expect(getPricing('google', 'gemini-3-flash-preview')).toBeDefined();
+      expect(getPricingSync('google', 'gemini-3.1-pro-preview')).toBeDefined();
+      expect(getPricingSync('google', 'gemini-3-flash-preview')).toBeDefined();
     });
 
     it('should calculate OpenAI costs correctly', () => {
-      const pricing = getPricing('openai', 'gpt-5.4');
+      const pricing = getPricingSync('openai', 'gpt-5.4');
 
       const usage: TokenUsage = {
         inputTokens: 10000,
@@ -349,7 +349,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // GPT-5.4: input $2.50/MTok, output $15/MTok
       // (10000/1M)*2.5 + (5000/1M)*15 = 0.025 + 0.075 = 0.1
@@ -357,7 +357,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should calculate Google costs correctly', () => {
-      const pricing = getPricing('google', 'gemini-3.1-pro-preview');
+      const pricing = getPricingSync('google', 'gemini-3.1-pro-preview');
 
       const usage: TokenUsage = {
         inputTokens: 10000,
@@ -366,7 +366,7 @@ describe('Cost Calculation Accuracy', () => {
         cacheWriteTokens: 0
       };
 
-      const cost = calculateCost(usage, pricing!);
+      const cost = calculateCostSync(usage, pricing!);
 
       // Gemini 3.1 Pro: input $2/MTok, output $12/MTok
       // (10000/1M)*2 + (5000/1M)*12 = 0.02 + 0.06 = 0.08

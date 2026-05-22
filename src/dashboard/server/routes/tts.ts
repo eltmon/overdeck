@@ -40,7 +40,7 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
   };
 
   if (!options.fetch) {
-    const status = await getTtsDaemonStatus(config);
+    const status = await Effect.runPromise(getTtsDaemonStatus(config));
     return { ...status, ttsEnabled: runtimeConfig.enabled };
   }
 
@@ -164,7 +164,7 @@ export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
 
 export async function listTtsVoices(store: TtsVoiceStore = {}): Promise<PublicTtsVoice[]> {
   const loadVoices = store.loadVoices ?? loadStoredVoices;
-  const voices = await loadVoices();
+  const voices = await Effect.runPromise(loadVoices());
   return voices.map(toPublicVoice);
 }
 
@@ -251,23 +251,23 @@ export function parseExtractEmbeddingInput(body: unknown): ExtractEmbeddingInput
 
 export async function createTtsVoice(input: CreateTtsVoiceInput, store: TtsVoiceStore = {}): Promise<TtsVoice> {
   const addVoice = store.addVoice ?? addStoredVoice;
-  return addVoice(input);
+  return (await Effect.runPromise(addVoice(input)));
 }
 
 export async function removeTtsVoice(id: string, store: TtsVoiceStore = {}): Promise<boolean> {
   const deleteVoice = store.deleteVoice ?? deleteStoredVoice;
-  return deleteVoice(id);
+  return (await Effect.runPromise(deleteVoice(id)));
 }
 
 export async function clearTtsVoices(store: TtsVoiceStore = {}): Promise<number> {
   const clearVoices = store.clearVoices ?? clearStoredVoices;
-  return clearVoices();
+  return (await Effect.runPromise(clearVoices()));
 }
 
 export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps = {}): Promise<SpeakTtsResponse> {
   const result = deps.resolveAndSpeak
     ? await deps.resolveAndSpeak(input)
-    : await resolveAndSpeak(input, { config: getTtsRuntimeConfig() });
+    : await Effect.runPromise(resolveAndSpeak(input, { config: getTtsRuntimeConfig() }));
   if (result === 'daemon-unavailable') {
     return {
       status: 503,
@@ -282,7 +282,7 @@ export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps
 }
 
 export async function startTtsDaemonFromDashboard(): Promise<TtsDaemonStartResult> {
-  return startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 });
+  return (await Effect.runPromise(startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 })));
 }
 
 export async function extractTtsEmbedding(
@@ -303,7 +303,7 @@ export async function extractTtsEmbedding(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${host}:${port}/extract-embedding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...await Effect.runPromise(getTtsDaemonAuthHeaders()) },
       body: JSON.stringify(input),
       signal: controller.signal,
     });

@@ -16,17 +16,23 @@ const mockGetDashboardApiUrl = vi.fn(() => 'http://localhost:3011');
 vi.mock('../../../../src/lib/config.js', () => ({
   getDashboardApiUrl: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>
     mockGetDashboardApiUrl(...args),
+  getDashboardApiUrlSync: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>
+    mockGetDashboardApiUrl(...args),
 }));
 
 const mockIsSmeeProcessRunning = vi.fn();
 vi.mock('../../../../src/lib/smee.js', () => ({
   isSmeeProcessRunning: (...args: Parameters<typeof mockIsSmeeProcessRunning>) =>
     mockIsSmeeProcessRunning(...args),
+  isSmeeProcessRunningSync: (...args: Parameters<typeof mockIsSmeeProcessRunning>) =>
+    mockIsSmeeProcessRunning(...args),
 }));
 
 const mockIsCliproxyRunning = vi.fn();
 vi.mock('../../../../src/lib/cliproxy.js', () => ({
   isCliproxyRunning: (...args: Parameters<typeof mockIsCliproxyRunning>) =>
+    mockIsCliproxyRunning(...args),
+  isCliproxyRunningSync: (...args: Parameters<typeof mockIsCliproxyRunning>) =>
     mockIsCliproxyRunning(...args),
 }));
 

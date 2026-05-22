@@ -7,6 +7,7 @@
  * so the output stays ≤ 25 lines.
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
@@ -44,9 +45,11 @@ vi.mock('../../../src/lib/health.js', () => ({
 }));
 vi.mock('../../../src/lib/cv.js', () => ({
   getAgentCV: getAgentCVMock,
+  getAgentCVSync: getAgentCVMock,
 }));
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: getAgentRuntimeStateMock,
+  getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
 
 import { showCommand } from '../../../src/cli/commands/show.js';
@@ -56,8 +59,8 @@ describe('showCommand', () => {
     vi.clearAllMocks();
     // Reasonable defaults for the compact-default-path tests; individual tests
     // can override via mockReturnValue / mockResolvedValue.
-    getShadowStateMock.mockResolvedValue(null);
-    pingAgentMock.mockResolvedValue({
+    getShadowStateMock.mockReturnValue(Effect.succeed(null));
+    pingAgentMock.mockReturnValue(Effect.succeed({
       agentId: 'agent-pan-6',
       status: 'healthy',
       consecutiveFailures: 0,
@@ -65,7 +68,7 @@ describe('showCommand', () => {
       recoveryCount: 0,
       inCooldown: false,
       lastActivity: new Date().toISOString(),
-    });
+    }));
     getAgentCVMock.mockReturnValue({
       agentId: 'agent-pan-6',
       createdAt: new Date().toISOString(),
@@ -148,14 +151,14 @@ describe('showCommand', () => {
       // Populate every field so the summary is in its longest form — shadow
       // present + healthy + stats + 3 recent work entries.
       const now = new Date().toISOString();
-      getShadowStateMock.mockResolvedValue({
+      getShadowStateMock.mockReturnValue(Effect.succeed({
         issueId: 'PAN-6',
         shadowStatus: 'in_progress',
         trackerStatus: 'open',
         trackerStatusUpdatedAt: now,
         shadowedAt: now,
         history: [],
-      });
+      }));
       getAgentCVMock.mockReturnValue({
         agentId: 'agent-pan-6',
         createdAt: now,
@@ -204,7 +207,7 @@ describe('showCommand', () => {
 
     it('shows in-progress work with started time instead of never and uses lastActivity instead of lastPing', async () => {
       const now = new Date().toISOString();
-      pingAgentMock.mockResolvedValue({
+      pingAgentMock.mockReturnValue(Effect.succeed({
         agentId: 'agent-pan-446',
         status: 'warning',
         consecutiveFailures: 0,
@@ -213,7 +216,7 @@ describe('showCommand', () => {
         inCooldown: false,
         lastPing: new Date(Date.now() + 60_000).toISOString(),
         lastActivity: '2026-04-18T19:32:09-04:00',
-      });
+      }));
       getAgentRuntimeStateMock.mockReturnValue({
         state: 'waiting-on-human',
         lastActivity: '2026-04-18T19:32:09-04:00',

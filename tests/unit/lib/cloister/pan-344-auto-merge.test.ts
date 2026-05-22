@@ -88,16 +88,21 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockReturnValue([]),
+  listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
   sendKeysAsync: vi.fn(),
 }));
 

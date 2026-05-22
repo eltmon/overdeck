@@ -30,10 +30,10 @@ import { Effect } from 'effect';
 import { stepOk, stepSkipped, stepFailed } from '../lifecycle/types.js';
 import type { StepResult } from '../lifecycle/types.js';
 import {
-  renderDevcontainer,
+  renderDevcontainerSync,
   type DevcontainerRenderResult,
 } from './devcontainer-renderer.js';
-import { getProject, resolveProjectFromIssue } from '../projects.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export interface EnsureDevcontainerInput {
   /** Absolute workspace path. e.g. `/home/x/Projects/myn/workspaces/feature-min-846`. */
@@ -61,7 +61,7 @@ export interface EnsureDevcontainerResult {
  * callers want to keep going (e.g. `pan workspace up`) and surface the error
  * in the dashboard rather than crash the whole flow.
  */
-export function ensureDevcontainer(
+export function ensureDevcontainerSync(
   input: EnsureDevcontainerInput,
 ): EnsureDevcontainerResult {
   const stepName = 'ensure:devcontainer';
@@ -81,8 +81,8 @@ export function ensureDevcontainer(
     };
   }
 
-  const resolvedProject = resolveProjectFromIssue(input.issueId);
-  const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
+  const resolvedProject = resolveProjectFromIssueSync(input.issueId);
+  const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
   if (!projectConfig) {
     return {
       step: stepFailed(
@@ -108,7 +108,7 @@ export function ensureDevcontainer(
   const featureName = pathLeaf(input.workspacePath).replace(/^feature-/, '');
 
   try {
-    const renderDetail = renderDevcontainer({
+    const renderDetail = renderDevcontainerSync({
       workspacePath: input.workspacePath,
       projectConfig,
       featureName,
@@ -145,7 +145,7 @@ function pathLeaf(p: string): string {
 // composable inside Effect graphs.
 
 /** Idempotently render `<workspace>/.devcontainer/` (Effect variant). */
-export const ensureDevcontainerEffect = (
+export const ensureDevcontainer = (
   input: EnsureDevcontainerInput,
 ): Effect.Effect<EnsureDevcontainerResult> =>
-  Effect.sync(() => ensureDevcontainer(input));
+  Effect.sync(() => ensureDevcontainerSync(input));

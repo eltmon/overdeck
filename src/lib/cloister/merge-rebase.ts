@@ -25,22 +25,7 @@ export interface RebaseResult {
   conflictFiles?: string[];
   reason?: string;
   newHead?: string;
-}
-
-/**
- * Rebase a feature branch onto a base branch in-process.
- * Returns immediately with a typed result — no specialist, no polling.
- *
- * Steps:
- * 1. Fetch latest base branch
- * 2. Check if rebase is needed (commits behind)
- * 3. Remove .planning/ artifacts (always conflict during rebase)
- * 4. Rebase onto base branch
- * 5. Push with --force-with-lease
- *
- * On conflict: aborts rebase and returns conflict file list.
- */
-export async function rebaseFeatureBranch(
+}async function rebaseFeatureBranchPromise(
   workspacePath: string,
   featureBranch: string,
   baseBranch: string,
@@ -147,14 +132,14 @@ export async function rebaseFeatureBranch(
  *
  * On success resolves to the same `RebaseResult` shape.
  */
-export function rebaseFeatureBranchEffect(
+export function rebaseFeatureBranch(
   workspacePath: string,
   featureBranch: string,
   baseBranch: string,
   issueId: string,
 ): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
   const wrapped: Effect.Effect<RebaseResult, GitError> = Effect.tryPromise({
-    try: () => rebaseFeatureBranch(workspacePath, featureBranch, baseBranch, issueId),
+    try: () => rebaseFeatureBranchPromise(workspacePath, featureBranch, baseBranch, issueId),
     catch: (cause) =>
       new GitError({
         command: ['git', 'rebase', baseBranch],

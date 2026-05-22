@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { capturePaneAsyncEffect, killSessionAsyncEffect, listSessionNamesAsyncEffect, sendKeysEffect, sessionExistsAsyncEffect } from '../tmux.js';
-import { emitActivityEntry, emitActivityTts, emitDashboardLifecycle } from '../activity-logger.js';
+import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
+import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -19,16 +19,16 @@ const __dirname = dirname(__filename);
 import {
   PANOPTICON_HOME,
 } from '../paths.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
-import { loadProjectsConfig } from '../projects.js';
+import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck, setReviewStatus } from '../review-status.js';
-import { appendGitOperation, type GitOperationType } from '../git-activity.js';
+import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -117,8 +117,8 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
     console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
 
     // Get TLDR daemon service
-    const { getTldrDaemonService } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonService(projectPath, venvPath);
+    const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonServiceSync(projectPath, venvPath);
 
     // Check if daemon is running
     const status = await tldrService.getStatus();
@@ -158,10 +158,10 @@ const _postMergeInFlight = new Map<string, Promise<void>>();
 
 async function dropLingeringPreMergeStashes(issueId: string, projectPath: string): Promise<void> {
   try {
-    const stashes = await listStashes(projectPath);
+    const stashes = await Effect.runPromise(listStashes(projectPath));
     const preMergeStashes = stashes.filter((entry) => entry.kind === 'pre-merge' && entry.issueId === issueId.toUpperCase());
     for (const stash of preMergeStashes) {
-      await dropStash(projectPath, stash.ref);
+      await Effect.runPromise(dropStash(projectPath, stash.ref));
       console.log(`[merge-agent] ✓ Dropped lingering pre-merge stash ${stash.ref}`);
     }
   } catch (error: any) {
@@ -201,7 +201,7 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
   // for "still has unmerged changes" just because the branch retains its
   // own commits (PAN-1024 hit this 2026-05-09: merge succeeded on GitHub
   // but post-merge lifecycle was refused, leaving labels + workspace stale).
-  const ghResolved = resolveGitHubIssue(issueId);
+  const ghResolved = resolveGitHubIssueSync(issueId);
   if (ghResolved.isGitHub) {
     const { owner, repo } = ghResolved;
     const { stdout } = await execAsync(
@@ -278,8 +278,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     let deliveryError: string | null = null;
     let deliveryStatus: number | null = null;
     try {
-      const { INTERNAL_TOKEN_HEADER, ensureInternalToken } = await import('../internal-token.js');
-      const token = ensureInternalToken();
+      const { INTERNAL_TOKEN_HEADER, ensureInternalTokenSync } = await import('../internal-token.js');
+      const token = ensureInternalTokenSync();
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -320,7 +320,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
           queuedAt: new Date().toISOString(),
         }, null, 2), 'utf-8');
         try {
-          emitActivityEntry({
+          emitActivityEntrySync({
             source: 'ship',
             level: 'warn',
             issueId,
@@ -358,7 +358,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // Set mergeStatus='merged' after verifying the branch or PR actually landed.
     try {
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
       console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
     } catch (err: any) {
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
@@ -422,7 +422,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     // verifying-on-main is applied next and takes precedence in canonical state mapping.
     try {
       const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
-      const ghResolved = resolveGitHubIssue(issueId);
+      const ghResolved = resolveGitHubIssueSync(issueId);
       const labelCtx = ghResolved.isGitHub
         ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
         : { issueId, projectPath };
@@ -446,7 +446,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
       try {
-        setReviewStatus(issueId, {
+        setReviewStatusSync(issueId, {
           mergeStatus: 'failed',
           readyForMerge: false,
           mergeNotes: `Post-merge verifying_on_main transition failed: ${message}`,
@@ -474,17 +474,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
-      const { setAgentPausedEffect } = await import('../agents.js');
-      const { killSessionAsyncEffect, sessionExistsAsyncEffect } = await import('../tmux.js');
+      const { setAgentPaused } = await import('../agents.js');
+      const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-        const paused = await Effect.runPromise(setAgentPausedEffect(agentId, reason, true));
+        const paused = await Effect.runPromise(setAgentPaused(agentId, reason, true));
         if (paused) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
         }
-        if (await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
-          await Effect.runPromise(killSessionAsyncEffect(agentId));
+        if (await Effect.runPromise(sessionExists(agentId))) {
+          await Effect.runPromise(killSession(agentId));
           console.log(`[merge-agent] ✓ Killed ${agentId} tmux session to free resources`);
           logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
         }
@@ -500,11 +500,11 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     // path so we don't depend on caller-supplied config.
     try {
       const { killAllReviewerSessions } = await import('./review-agent.js');
-      const { resolveProjectFromIssue } = await import('../projects.js');
-      const resolved = resolveProjectFromIssue(issueId);
+      const { resolveProjectFromIssueSync } = await import('../projects.js');
+      const resolved = resolveProjectFromIssueSync(issueId);
       const projectKey = resolved?.projectKey;
       if (projectKey) {
-        const { killed } = await killAllReviewerSessions(projectKey, issueId);
+        const { killed } = await Effect.runPromise(killAllReviewerSessions(projectKey, issueId));
         if (killed.length > 0) {
           console.log(`[merge-agent] ✓ Killed ${killed.length} canonical reviewer session(s) for ${issueId}`);
           logActivity('reviewer_sessions_killed', `Killed ${killed.length} reviewer session(s) for ${issueId} on merge`);
@@ -542,7 +542,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       const issueLower = issueId.toLowerCase();
       const workspacePath = findWorkspacePath(projectPath, issueLower);
       if (workspacePath) {
-        const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
+        const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
         if (dockerResult.containersFound) {
           console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
           logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
@@ -630,10 +630,10 @@ function isPostMergeRoleSession(sessionName: string, issueLower: string): boolea
 async function killPostMergeRoleSessions(issueId: string): Promise<void> {
   try {
     const issueLower = issueId.toLowerCase();
-    const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+    const sessions = await Effect.runPromise(listSessionNames());
     const targets = sessions.filter((session) => isPostMergeRoleSession(session, issueLower));
     for (const session of targets) {
-      await Effect.runPromise(killSessionAsyncEffect(session));
+      await Effect.runPromise(killSession(session));
     }
     if (targets.length > 0) {
       console.log(`[merge-agent] ✓ Killed ${targets.length} review/test/ship session(s) for ${issueId}`);
@@ -854,7 +854,7 @@ function logMergeHistory(context: MergeConflictContext, result: MergeResult, ses
  * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
 function logActivity(action: string, details: string, issueId?: string): void {
-  emitActivityEntry({
+  emitActivityEntrySync({
     source: 'ship',
     level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
     message: details,
@@ -881,7 +881,7 @@ function announceMerge(
       ? 'Merge completed'
       : 'Merge failed';
   const tail = extra ? `. ${extra}` : '';
-  emitActivityEntry({
+  emitActivityEntrySync({
     source: 'ship',
     level: status === 'failed' ? 'error' : 'success',
     message: `${prefix} for ${issueId}${tail}`,
@@ -893,7 +893,7 @@ function announceMerge(
     : status === 'completed'
       ? `${issueId} merged to main`
       : `Merge failed for ${issueId}`;
-  emitActivityTts({
+  emitActivityTtsSync({
     utterance: ttsUtterance,
     priority: status === 'failed' ? 0 : 1,
     issueId,
@@ -907,7 +907,7 @@ function announceMerge(
  */
 async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
-    return await Effect.runPromise(capturePaneAsyncEffect(sessionName));
+    return await Effect.runPromise(capturePane(sessionName));
   } catch {
     return '';
   }
@@ -947,7 +947,7 @@ export function scanGitPatterns(
     for (const { re, operation, level } of GIT_PATTERNS) {
       if (re.test(trimmed)) {
         seenLineHashes.add(hash);
-        appendGitOperation({
+        appendGitOperationSync({
           operation,
           branch,
           issueId,
@@ -955,7 +955,7 @@ export function scanGitPatterns(
           error: level !== 'info' ? trimmed.slice(0, 200) : undefined,
           ts,
         });
-        emitActivityEntry({
+        emitActivityEntrySync({
           source: 'ship',
           level,
           message: `[git] ${trimmed.slice(0, 100)}`,
@@ -971,7 +971,7 @@ export function scanGitPatterns(
  * Check if specialist-merge-agent tmux session is running (async)
  */
 async function isMergeAgentRunning(): Promise<boolean> {
-  return Effect.runPromise(sessionExistsAsyncEffect('specialist-merge-agent'));
+  return Effect.runPromise(sessionExists('specialist-merge-agent'));
 }
 
 /**
@@ -983,13 +983,13 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 
   try {
     // Check if session exists
-    if (!await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) {
+    if (!await Effect.runPromise(sessionExists(sessionName))) {
       console.log(`[merge-agent] Could not send message to ${sessionName} (session does not exist)`);
       return false;
     }
 
     // Send the message using centralized sendKeys
-    await Effect.runPromise(sendKeysEffect(sessionName, message));
+    await Effect.runPromise(sendKeys(sessionName, message));
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);
     logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
@@ -1001,7 +1001,7 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 }
 
 function defaultWorkspaceForIssue(issueId: string): string | undefined {
-  const project = resolveProjectFromIssue(issueId);
+  const project = resolveProjectFromIssueSync(issueId);
   if (!project?.projectPath) return undefined;
   return join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
 }
@@ -1145,7 +1145,7 @@ export async function spawnMergeAgentForBranches(
   logActivity('ship_start', `Starting ship role for ${sourceBranch} -> ${targetBranch}`);
 
   try {
-    const lockCleanup = await cleanupStaleLocks(projectPath);
+    const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
     if (lockCleanup.errors.some(e => e.error.includes('Git processes are running'))) {
       const message = 'Git processes are still running - cannot safely start ship role';
       console.error(`[ship-role] ${message}`);
@@ -1315,7 +1315,7 @@ async function salvageStrandedMerge(
     logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
 
     try {
-      await gitPush(projectPath, 'origin', targetBranch, { issueId });
+      await Effect.runPromise(gitPush(projectPath, 'origin', targetBranch, { issueId }));
     } catch (pushErr: unknown) {
       if (pushErr instanceof MainDivergedError) {
         // origin has advanced past our local ancestor — a hotfix landed.
@@ -1394,7 +1394,7 @@ export async function syncMainIntoWorkspace(
   // auto-commit below would then propagate that deletion onto the feature
   // branch. Restore the tracked export first so the auto-commit only sees
   // intentional changes.
-  await restoreTrackedBeadsExport(projectPath);
+  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
 
   // Pre-flight: auto-commit uncommitted changes before merge
   try {
@@ -1436,7 +1436,7 @@ export async function syncMainIntoWorkspace(
 
   // Clean up stale git lock files
   try {
-    const lockCleanup = await cleanupStaleLocks(projectPath);
+    const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
     if (lockCleanup.found.length > 0) {
       console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
       if (lockCleanup.removed.length > 0) {
@@ -1553,7 +1553,7 @@ export async function runProjectQualityGates(
   phase: 'pre_push' | 'post_push'
 ): Promise<import('./validation.js').QualityGateResult[]> {
   try {
-    const config = loadProjectsConfig();
+    const config = loadProjectsConfigSync();
     // Find the project whose path matches
     const project = Object.values(config.projects).find(p => projectPath.startsWith(p.path));
     if (!project?.quality_gates || Object.keys(project.quality_gates).length === 0) {
@@ -1590,7 +1590,7 @@ export async function runProjectQualityGates(
     }
 
     console.log(`[merge-agent] Running ${phase} quality gates for project "${project.name}"`);
-    return await runQualityGates(gatesToRun, projectPath, phase);
+    return await Effect.runPromise(runQualityGates(gatesToRun, projectPath, phase));
   } catch (error: any) {
     console.error(`[merge-agent] Failed to load quality gates: ${error.message}`);
     return [];

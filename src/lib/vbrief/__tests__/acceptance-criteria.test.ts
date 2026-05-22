@@ -3,10 +3,10 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  extractAcceptanceCriteria,
+  extractAcceptanceCriteriaSync,
   extractACFromDocument,
   formatAcceptanceCriteria,
-  checkAllCriteriaCompleted,
+  checkAllCriteriaCompletedSync,
 } from '../acceptance-criteria.js';
 import type { VBriefDocument } from '../types.js';
 
@@ -63,13 +63,13 @@ afterEach(() => {
 
 describe('extractAcceptanceCriteria', () => {
   it('returns empty array when no plan exists', () => {
-    expect(extractAcceptanceCriteria(WORKSPACE_PATH)).toEqual([]);
+    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
   });
 
   it('returns empty array when plan has no subItems', () => {
     const doc = makePlanWithAC([{ id: 'item-1', title: 'Task 1' }]);
     writePlan(doc);
-    expect(extractAcceptanceCriteria(WORKSPACE_PATH)).toEqual([]);
+    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
   });
 
   it('extracts AC subItems with parent context', () => {
@@ -83,7 +83,7 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteria(WORKSPACE_PATH);
+    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
       itemId: 'item-1',
@@ -105,7 +105,7 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteria(WORKSPACE_PATH);
+    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe('AC item');
   });
@@ -127,7 +127,7 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteria(WORKSPACE_PATH);
+    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
     expect(result).toHaveLength(1);
     expect(result[0].itemId).toBe('active-item');
   });
@@ -147,7 +147,7 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteria(WORKSPACE_PATH);
+    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
     expect(result).toHaveLength(2);
     expect(result[0].itemTitle).toBe('First task');
     expect(result[1].itemTitle).toBe('Second task');
@@ -203,7 +203,7 @@ describe('formatAcceptanceCriteria', () => {
 
 describe('checkAllCriteriaCompleted', () => {
   it('returns allCompleted=true when no plan exists (legacy compat)', () => {
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(true);
     expect(result.incomplete).toEqual([]);
   });
@@ -219,7 +219,7 @@ describe('checkAllCriteriaCompleted', () => {
     }]);
     writePlan(doc);
 
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(true);
     expect(result.incomplete).toEqual([]);
   });
@@ -235,7 +235,7 @@ describe('checkAllCriteriaCompleted', () => {
     }]);
     writePlan(doc);
 
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(false);
     expect(result.incomplete).toHaveLength(1);
     expect(result.incomplete[0].title).toBe('Not done');
@@ -252,7 +252,7 @@ describe('checkAllCriteriaCompleted', () => {
     }]);
     writePlan(doc);
 
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(true);
   });
 
@@ -268,7 +268,7 @@ describe('checkAllCriteriaCompleted', () => {
     }]);
     writePlan(doc);
 
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(true);
     expect(result.incomplete).toEqual([]);
   });
@@ -277,7 +277,7 @@ describe('checkAllCriteriaCompleted', () => {
     const doc = makePlanWithAC([{ id: 'item-1', title: 'Task' }]);
     writePlan(doc);
 
-    const result = checkAllCriteriaCompleted(WORKSPACE_PATH);
+    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
     expect(result.allCompleted).toBe(true);
   });
 });

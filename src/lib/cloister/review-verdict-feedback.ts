@@ -7,8 +7,8 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { messageAgent } from '../agents.js';
-import { resolveProjectFromIssue } from '../projects.js';
-import { getReviewStatus } from '../review-status.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 
@@ -81,16 +81,14 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
     { encoding: 'utf-8' },
   );
   return true;
-}
-
-export async function deliverReviewVerdictFeedback(
+}async function deliverReviewVerdictFeedbackPromise(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
-  const existingStatus = getReviewStatus(issueId);
+  const existingStatus = getReviewStatusSync(issueId);
   const synthesis = workspacePath && existsSync(workspacePath)
     ? await findLatestSynthesis(workspacePath)
     : null;
@@ -109,14 +107,14 @@ export async function deliverReviewVerdictFeedback(
     console.warn(`[review-verdict-feedback] Failed to post PR comment for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const fileResult = await writeFeedbackFile({
+  const fileResult = await Effect.runPromise(writeFeedbackFile({
     issueId,
     workspacePath,
     specialist: 'review-agent',
     outcome: opts.verdict === 'blocked' ? 'changes-requested' : 'failed',
     summary: `Review ${opts.verdict.toUpperCase()}: ${(opts.notes ?? synthesis?.body ?? '').slice(0, 80)}`,
     markdownBody,
-  });
+  }));
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
@@ -150,7 +148,7 @@ export async function deliverReviewVerdictFeedback(
  * decide what surfaced. The single non-recoverable boundary — feedback file
  * write — keeps its existing error reporting through {@link writeFeedbackFile}.
  */
-export const deliverReviewVerdictFeedbackEffect = (
+export const deliverReviewVerdictFeedback = (
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Effect.Effect<DeliverReviewVerdictFeedbackResult> =>
-  Effect.promise(() => deliverReviewVerdictFeedback(opts));
+  Effect.promise(() => deliverReviewVerdictFeedbackPromise(opts));

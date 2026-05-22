@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Data, Effect } from 'effect';
-import { getAgentState, getAgentStateEffect, getAgentRuntimeState, getAgentRuntimeStateEffect, getLatestSessionId, getLatestSessionIdEffect, normalizeAgentId } from './agents.js';
-import { sessionExists, sessionExistsAsyncEffect } from './tmux.js';
+import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
+import { sessionExistsSync, sessionExists } from './tmux.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
 export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
@@ -36,7 +36,7 @@ export interface WorkAgentLifecycleState {
   reason?: string;
 }
 
-async function pathExistsAsync(path: string): Promise<boolean> {
+async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
@@ -45,13 +45,13 @@ async function pathExistsAsync(path: string): Promise<boolean> {
   }
 }
 
-export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLifecycleState {
+export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgentLifecycleState {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = getAgentState(agentId);
-  const runtimeState = getAgentRuntimeState(agentId);
+  const agentState = getAgentStateSync(agentId);
+  const runtimeState = getAgentRuntimeStateSync(agentId);
   const hasAgentState = !!agentState;
-  const hasSavedSession = !!getLatestSessionId(agentId);
-  const hasLiveTmuxSession = sessionExists(agentId);
+  const hasSavedSession = !!getLatestSessionIdSync(agentId);
+  const hasLiveTmuxSession = sessionExistsSync(agentId);
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
@@ -128,14 +128,14 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
   };
 }
 
-export async function getWorkAgentLifecycleStateAsync(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
+async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = await Effect.runPromise(getAgentStateEffect(agentId));
-  const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId));
+  const agentState = await Effect.runPromise(getAgentState(agentId));
+  const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
   const hasAgentState = !!agentState;
-  const hasSavedSession = !!(await Effect.runPromise(getLatestSessionIdEffect(agentId)));
-  const hasLiveTmuxSession = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
-  const hasWorkspace = !!agentState?.workspace && await pathExistsAsync(agentState.workspace);
+  const hasSavedSession = !!(await Effect.runPromise(getLatestSessionId(agentId)));
+  const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
+  const hasWorkspace = !!agentState?.workspace && await pathExists(agentState.workspace);
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
@@ -208,19 +208,19 @@ interface StartFreshOptions {
   allowPausedForce?: boolean;
 }
 
-export function assertCanStartFresh(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
-  const lifecycle = getWorkAgentLifecycleState(agentOrIssueId);
+export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
+  const lifecycle = getWorkAgentLifecycleStateSync(agentOrIssueId);
   const pausedForceOverride = options.allowPausedForce === true
     && lifecycle.requiresSessionResetBeforeFreshStart
-    && getAgentState(lifecycle.agentId)?.paused === true;
+    && getAgentStateSync(lifecycle.agentId)?.paused === true;
   if (!lifecycle.canStartFresh && !pausedForceOverride) {
     throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);
   }
   return lifecycle;
 }
 
-export function assertCanResumeSession(agentOrIssueId: string): WorkAgentLifecycleState {
-  const lifecycle = getWorkAgentLifecycleState(agentOrIssueId);
+export function assertCanResumeSessionSync(agentOrIssueId: string): WorkAgentLifecycleState {
+  const lifecycle = getWorkAgentLifecycleStateSync(agentOrIssueId);
   if (!lifecycle.canResumeSession && !lifecycle.isRunningButStuck) {
     throw new Error(lifecycle.reason || `Cannot resume session for ${lifecycle.agentId}`);
   }
@@ -238,25 +238,18 @@ export class WorkAgentLifecycleViolation extends Data.TaggedError('WorkAgentLife
   readonly reason: string;
 }> {}
 
-/** Pure snapshot of the work-agent lifecycle state for an agent or issue. */
-export const getWorkAgentLifecycleStateEffect = (
+export const getWorkAgentLifecycleState = (
   agentOrIssueId: string,
 ): Effect.Effect<WorkAgentLifecycleState> =>
-  Effect.sync(() => getWorkAgentLifecycleState(agentOrIssueId));
-
-/** Async-FS snapshot of the work-agent lifecycle state. */
-export const getWorkAgentLifecycleStateAsyncEffect = (
-  agentOrIssueId: string,
-): Effect.Effect<WorkAgentLifecycleState> =>
-  Effect.promise(() => getWorkAgentLifecycleStateAsync(agentOrIssueId));
+  Effect.promise(() => getWorkAgentLifecycleStateSnapshot(agentOrIssueId));
 
 /** Assert the agent can start fresh; lifts the synchronous throw to a typed error. */
-export const assertCanStartFreshEffect = (
+export const assertCanStartFresh = (
   agentOrIssueId: string,
   options: { allowPausedForce?: boolean } = {},
 ): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
   Effect.try({
-    try: () => assertCanStartFresh(agentOrIssueId, options),
+    try: () => assertCanStartFreshSync(agentOrIssueId, options),
     catch: (cause) =>
       new WorkAgentLifecycleViolation({
         agentId: agentOrIssueId,
@@ -265,11 +258,11 @@ export const assertCanStartFreshEffect = (
   });
 
 /** Assert the agent can resume; lifts the synchronous throw to a typed error. */
-export const assertCanResumeSessionEffect = (
+export const assertCanResumeSession = (
   agentOrIssueId: string,
 ): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
   Effect.try({
-    try: () => assertCanResumeSession(agentOrIssueId),
+    try: () => assertCanResumeSessionSync(agentOrIssueId),
     catch: (cause) =>
       new WorkAgentLifecycleViolation({
         agentId: agentOrIssueId,

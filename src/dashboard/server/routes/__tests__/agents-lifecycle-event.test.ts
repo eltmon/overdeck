@@ -25,12 +25,15 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/agents.js', () => ({
+  getAgentState: vi.fn(),
   getAgentStateEffect: vi.fn(),
+  stopAgent: vi.fn(),
   stopAgentEffect: vi.fn(),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
 }));
 
 vi.mock('../origin-validation.js', () => ({
@@ -40,10 +43,10 @@ vi.mock('../origin-validation.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { createAgentStopHandler } from '../agents.js';
-import { getAgentStateEffect, stopAgentEffect } from '../../../../lib/agents.js';
+import { getAgentState, stopAgent } from '../../../../lib/agents.js';
 
-const mockGetAgentStateEffect = vi.mocked(getAgentStateEffect);
-const mockStopAgentEffect = vi.mocked(stopAgentEffect);
+const mockGetAgentStateEffect = vi.mocked(getAgentState);
+const mockStopAgentEffect = vi.mocked(stopAgent);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

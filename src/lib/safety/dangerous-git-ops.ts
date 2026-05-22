@@ -71,20 +71,7 @@ function dangerBanner(operation: DangerousOp, cwd: string, reason: string): void
   console.warn(`   cwd:    ${cwd}`);
   console.warn(`   reason: ${reason}`);
   console.warn(bar + '\n');
-}
-
-/**
- * Run `git clean -fd` against a workspace.
- *
- * HARD-FAILS unless `userInvoked` is true. The only legitimate caller is
- * `pan workspace deep-clean <id>` after an interactive confirmation from the
- * user at a TTY. Every other call site is a bug.
- *
- * Even when userInvoked, the protected paths from `protected-paths.ts` are
- * always excluded. Callers may pass additional `extraExcludes` but cannot
- * shorten the canonical list.
- */
-export async function runGitClean(opts: {
+}async function runGitCleanPromise(opts: {
   workspacePath: string;
   /** Must be `true` and the caller must have just confirmed at a TTY. */
   userInvoked: boolean;
@@ -114,13 +101,7 @@ export async function runGitClean(opts: {
     encoding: 'utf-8',
     timeout: opts.timeoutMs ?? 30_000,
   });
-}
-
-/**
- * `git clean -fd --dry-run` — used by `pan workspace deep-clean` to show the
- * user what would be deleted before they confirm. Always safe.
- */
-export async function dryRunGitClean(opts: {
+}async function dryRunGitCleanPromise(opts: {
   workspacePath: string;
   extraExcludes?: readonly string[];
 }): Promise<string[]> {
@@ -134,18 +115,7 @@ export async function dryRunGitClean(opts: {
     .split('\n')
     .map(l => l.replace(/^Would remove\s+/, '').trim())
     .filter(Boolean);
-}
-
-/**
- * `git reset --hard <commit>` — tracked-changes only. Untracked files survive,
- * so this is much less dangerous than `git clean`. We still route through the
- * chokepoint for log visibility and to enforce a justification field.
- *
- * Allowed callers (see usages in repo): rollback after validation failure,
- * back out an orphan merge commit, restart-from-plan to a known planning
- * commit. No userInvoked gate.
- */
-export async function runGitResetHard(opts: {
+}async function runGitResetHardPromise(opts: {
   workspacePath: string;
   /** What to reset to (e.g. "ORIG_HEAD", "HEAD~1", a SHA). */
   ref: string;
@@ -159,15 +129,7 @@ export async function runGitResetHard(opts: {
     encoding: 'utf-8',
     timeout: opts.timeoutMs ?? 15_000,
   });
-}
-
-/**
- * `git checkout <ref> -- .` — overwrites tracked files in the worktree.
- * Untracked files survive but tracked uncommitted edits are lost.
- *
- * No userInvoked gate, but the banner makes the call site loud.
- */
-export async function runGitCheckoutOverwrite(opts: {
+}async function runGitCheckoutOverwritePromise(opts: {
   workspacePath: string;
   /** Ref to read files from (e.g. "main", "HEAD"). */
   ref: string;
@@ -215,7 +177,7 @@ export class DangerousGitOpError extends Data.TaggedError('DangerousGitOpError')
 }> {}
 
 /** Effect variant of `runGitClean`. Fails with DangerousGitOpError on block or shell failure. */
-export const runGitCleanEffect = (opts: {
+export const runGitClean = (opts: {
   workspacePath: string;
   userInvoked: boolean;
   reason: string;
@@ -223,7 +185,7 @@ export const runGitCleanEffect = (opts: {
   timeoutMs?: number;
 }): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
   Effect.tryPromise({
-    try: () => runGitClean(opts),
+    try: () => runGitCleanPromise(opts),
     catch: (cause) => {
       if (cause instanceof DangerousOpBlockedError) {
         return new DangerousGitOpError({
@@ -242,12 +204,12 @@ export const runGitCleanEffect = (opts: {
   });
 
 /** Effect variant of `dryRunGitClean`. */
-export const dryRunGitCleanEffect = (opts: {
+export const dryRunGitClean = (opts: {
   workspacePath: string;
   extraExcludes?: readonly string[];
 }): Effect.Effect<string[], DangerousGitOpError> =>
   Effect.tryPromise({
-    try: () => dryRunGitClean(opts),
+    try: () => dryRunGitCleanPromise(opts),
     catch: (cause) =>
       new DangerousGitOpError({
         operation: 'git_clean',
@@ -257,14 +219,14 @@ export const dryRunGitCleanEffect = (opts: {
   });
 
 /** Effect variant of `runGitResetHard`. */
-export const runGitResetHardEffect = (opts: {
+export const runGitResetHard = (opts: {
   workspacePath: string;
   ref: string;
   reason: string;
   timeoutMs?: number;
 }): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
   Effect.tryPromise({
-    try: () => runGitResetHard(opts),
+    try: () => runGitResetHardPromise(opts),
     catch: (cause) =>
       new DangerousGitOpError({
         operation: 'git_reset_hard',
@@ -274,14 +236,14 @@ export const runGitResetHardEffect = (opts: {
   });
 
 /** Effect variant of `runGitCheckoutOverwrite`. */
-export const runGitCheckoutOverwriteEffect = (opts: {
+export const runGitCheckoutOverwrite = (opts: {
   workspacePath: string;
   ref: string;
   reason: string;
   timeoutMs?: number;
 }): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
   Effect.tryPromise({
-    try: () => runGitCheckoutOverwrite(opts),
+    try: () => runGitCheckoutOverwritePromise(opts),
     catch: (cause) =>
       new DangerousGitOpError({
         operation: 'git_checkout_overwrite',

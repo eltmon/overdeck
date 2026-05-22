@@ -207,13 +207,13 @@ describe('Stage 2: enrich after scan', () => {
     const sessions = findDiscoveredSessions({});
     const myapp = sessions.find((s) => s.jsonlPath.includes('myapp'))!;
 
-    const result = await enrichSession({
+    const result = await Effect.runPromise(enrichSession({
       sessionId: myapp.id,
       jsonlPath: myapp.jsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApi,
-    });
+    }));
 
     expect(result.error).toBeUndefined();
 
@@ -229,13 +229,13 @@ describe('Stage 2: enrich after scan', () => {
     const sessions = findDiscoveredSessions({});
     const myapp = sessions.find((s) => s.jsonlPath.includes('myapp'))!;
 
-    await enrichSession({
+    await Effect.runPromise(enrichSession({
       sessionId: myapp.id,
       jsonlPath: myapp.jsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApi,
-    });
+    }));
 
     const stats = getDiscoveredStats();
     expect(stats.total).toBe(3);
@@ -264,13 +264,13 @@ describe('Stage 3: embed after enrich', () => {
     const sessions = findDiscoveredSessions({});
     const myapp = sessions.find((s) => s.jsonlPath.includes('myapp'))!;
 
-    await enrichSession({
+    await Effect.runPromise(enrichSession({
       sessionId: myapp.id,
       jsonlPath: myapp.jsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApi,
-    });
+    }));
 
     const embedResult = await embedSessions({
       model: 'text-embedding-3-small',
@@ -345,13 +345,13 @@ describe('Stage 4: search after enrichment', () => {
     const myapp = sessions.find((s) => s.jsonlPath.includes('myapp'))!;
 
     // Enrich to populate FTS
-    await enrichSession({
+    await Effect.runPromise(enrichSession({
       sessionId: myapp.id,
       jsonlPath: myapp.jsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApi,
-    });
+    }));
 
     // FTS5 MATCH search
     const ftsResults = searchFts('jwt', 10);

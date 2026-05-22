@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for conversations route helpers.
  *
@@ -350,7 +351,7 @@ describe('conversations route — DB integration', () => {
       effort: 'medium',
     });
 
-    const result = await createSummaryFork(conv, { localSummaryOnly: true });
+    const result = await Effect.runPromise(createSummaryFork(conv, { localSummaryOnly: true }));
 
     expect(result.conversation.name).not.toBe('source-conv');
     expect(result.conversation.title).toBe('Summary Fork: Original conversation');

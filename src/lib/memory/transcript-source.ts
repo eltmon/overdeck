@@ -3,8 +3,8 @@ import { basename, dirname, sep } from 'node:path';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { Effect } from 'effect';
 import {
-  getAgentRuntimeStateEffect,
-  listRunningAgentsEffect,
+  getAgentRuntimeState,
+  listRunningAgents,
   type AgentState,
 } from '../agents.js';
 import { sessionFilePath } from '../paths.js';
@@ -157,11 +157,11 @@ export async function getActiveTranscriptEntries(
 }
 
 function listRunningAgentsFromEffect(): Promise<RunningAgent[]> {
-  return Effect.runPromise(listRunningAgentsEffect());
+  return Effect.runPromise(listRunningAgents());
 }
 
 function getAgentRuntimeStateFromEffect(agentId: string): Promise<{ claudeSessionId?: string } | null> {
-  return Effect.runPromise(getAgentRuntimeStateEffect(agentId));
+  return Effect.runPromise(getAgentRuntimeState(agentId));
 }
 
 function isClaudeCodeSubagentSession(_sessionId: string, _agent: RunningAgent, transcriptPath: string): boolean {

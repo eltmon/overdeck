@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for src/lib/platform-lifecycle.ts.
  *
@@ -43,7 +44,7 @@ describe('restartDashboard — scope contract', () => {
 
   it('invokes the caller-provided start hook exactly once', async () => {
     const startHook = vi.fn().mockResolvedValue(undefined);
-    await restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 });
+    await Effect.runPromise(restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 }));
     expect(startHook).toHaveBeenCalledTimes(1);
   });
 
@@ -58,7 +59,7 @@ describe('restartDashboard — scope contract', () => {
     };
     const startHook = vi.fn().mockResolvedValue(undefined);
 
-    await restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 });
+    await Effect.runPromise(restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 }));
 
     // We never passed cliproxySpies to the function, so none of its methods
     // should have been called. The assertion doubles as documentation: the
@@ -76,9 +77,9 @@ describe('restartDashboard — scope contract', () => {
     );
     const startHook = vi.fn().mockResolvedValue(undefined);
 
-    await expect(
+    await expect(Effect.runPromise(
       restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
-    ).rejects.toBeInstanceOf(StageError);
+    )).rejects.toBeInstanceOf(StageError);
   });
 });
 
@@ -90,7 +91,7 @@ describe('restartCliproxy — scope contract', () => {
       isCliproxyRunning: vi.fn().mockReturnValue(true),
     };
 
-    await restartCliproxy(cliproxy, { verifyTimeoutMs: 1000 });
+    await Effect.runPromise(restartCliproxy(cliproxy, { verifyTimeoutMs: 1000 }));
 
     expect(cliproxy.stopCliproxy).toHaveBeenCalledTimes(1);
     expect(cliproxy.startCliproxy).toHaveBeenCalledTimes(1);
@@ -109,9 +110,9 @@ describe('restartCliproxy — scope contract', () => {
       isCliproxyRunning: vi.fn().mockReturnValue(false),
     };
 
-    await expect(
+    await expect(Effect.runPromise(
       restartCliproxy(cliproxy, { verifyTimeoutMs: 300 }),
-    ).rejects.toBeInstanceOf(StageError);
+    )).rejects.toBeInstanceOf(StageError);
   });
 });
 
@@ -131,9 +132,9 @@ describe('waitForDashboardHealth', () => {
         return { ok: true, status: 200 };
       }),
     );
-    await expect(
+    await expect(Effect.runPromise(
       waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 }),
-    ).resolves.toBeUndefined();
+    )).resolves.toBeUndefined();
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 
@@ -143,7 +144,7 @@ describe('waitForDashboardHealth', () => {
       vi.fn().mockRejectedValue(new Error('nope')),
     );
     try {
-      await waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 });
+      await Effect.runPromise(waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 }));
       throw new Error('should not reach here');
     } catch (err) {
       expect(err).toBeInstanceOf(StageError);

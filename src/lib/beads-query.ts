@@ -51,14 +51,7 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
   } catch {
     return [];
   }
-}
-
-/**
- * Query beads for an issue from the live Dolt database via `bd list`.
- * Falls back to `.beads/issues.jsonl` when bd is unavailable.
- * Returns an empty array on any failure (bd not installed, Dolt down, no beads).
- */
-export async function queryBeadsForIssue(
+}async function queryBeadsForIssuePromise(
   workspacePath: string,
   issueId: string
 ): Promise<BeadEntry[]> {
@@ -73,23 +66,15 @@ export async function queryBeadsForIssue(
   } catch {
     return await readBeadsFromJsonl(workspacePath, issueId);
   }
-}
-
-export async function assertIssueHasBeads(workspacePath: string, issueId: string): Promise<void> {
-  const beads = await queryBeadsForIssue(workspacePath, issueId);
+}async function assertIssueHasBeadsPromise(workspacePath: string, issueId: string): Promise<void> {
+  const beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
   if (beads.length === 0) {
     const label = issueId.toLowerCase();
     throw new Error(
       `No beads tasks found for ${issueId}. Planning must create beads labeled "${label}" before a work agent can start.`
     );
   }
-}
-
-/**
- * Look up a single bead by ID from the live Dolt database via `bd show`.
- * Returns null on any failure.
- */
-export async function queryBeadById(
+}async function queryBeadByIdPromise(
   workspacePath: string,
   beadId: string
 ): Promise<BeadEntry | null> {
@@ -113,22 +98,22 @@ export async function queryBeadById(
  * Query beads for an issue. Effect-native. Never fails — returns [] on any error
  * (matches the existing Promise contract where bd-down or missing-JSONL is benign).
  */
-export const queryBeadsForIssueEffect = (
+export const queryBeadsForIssue = (
   workspacePath: string,
   issueId: string,
 ): Effect.Effect<readonly BeadEntry[]> =>
-  Effect.promise(() => queryBeadsForIssue(workspacePath, issueId));
+  Effect.promise(() => queryBeadsForIssuePromise(workspacePath, issueId));
 
 /**
  * Assert the issue has beads. Effect-native. Fails with BeadsMissingError if
  * no beads are found.
  */
-export const assertIssueHasBeadsEffect = (
+export const assertIssueHasBeads = (
   workspacePath: string,
   issueId: string,
 ): Effect.Effect<void, BeadsMissingError> =>
   Effect.gen(function* () {
-    const beads = yield* queryBeadsForIssueEffect(workspacePath, issueId);
+    const beads = yield* queryBeadsForIssue(workspacePath, issueId);
     if (beads.length === 0) {
       return yield* Effect.fail(new BeadsMissingError({ issueId, workspacePath }));
     }
@@ -138,8 +123,8 @@ export const assertIssueHasBeadsEffect = (
  * Look up a single bead by ID. Effect-native. Never fails — returns null on any
  * error.
  */
-export const queryBeadByIdEffect = (
+export const queryBeadById = (
   workspacePath: string,
   beadId: string,
 ): Effect.Effect<BeadEntry | null> =>
-  Effect.promise(() => queryBeadById(workspacePath, beadId));
+  Effect.promise(() => queryBeadByIdPromise(workspacePath, beadId));

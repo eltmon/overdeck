@@ -18,17 +18,17 @@ import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
-import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
-import { ensureInternalToken } from '../../lib/internal-token.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
+import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
+import { ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore, initEventStore } from './event-store.js';
-import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
-import { getAgentStateEffect, type AgentState } from '../../lib/agents.js';
+import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
@@ -49,7 +49,7 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
 // Generates and persists a random token at <PANOPTICON_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
-ensureInternalToken();
+ensureInternalTokenSync();
 
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
@@ -94,7 +94,7 @@ console.log('[panopticon] AgentOutputService started');
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
 // This handler converts those into domain events so the frontend Zustand store updates.
-setPipelineHandler((event) => {
+setPipelineHandlerSync((event) => {
   switch (event.type) {
     case 'status_changed': {
       // Enrich async — fire-and-forget so the notifier stays sync.
@@ -103,7 +103,7 @@ setPipelineHandler((event) => {
       // needed for the TerminalTabs UI, not for DB state transitions.
       void (async () => {
         try {
-          const enriched = await enrichReviewStatus(event.issueId, event.status);
+          const enriched = await Effect.runPromise(enrichReviewStatus(event.issueId, event.status));
           const es = getEventStore();
           es.append({
             type: 'review.status_changed',
@@ -275,7 +275,7 @@ setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
       const es = getEventStore();
-      const state = await Effect.runPromise(getAgentStateEffect(agentId));
+      const state = await Effect.runPromise(getAgentState(agentId));
       if (state) {
         es.append({
           type: 'agent.heartbeat_dead',
@@ -316,11 +316,11 @@ console.log('[panopticon] Agent stopped/status notifiers → domain events wired
 // Wire deacon merge-ready reminder → domain events so the frontend re-reads the
 // Awaiting Merge list when deacon fires its 1h staleness reminder.
 setMergeReadyNotifier((issueId) => {
-  const status = getReviewStatus(issueId);
+  const status = getReviewStatusSync(issueId);
   if (!status) return;
   void (async () => {
     try {
-      const enriched = await enrichReviewStatus(issueId, status);
+      const enriched = await Effect.runPromise(enrichReviewStatus(issueId, status));
       const es = getEventStore();
       es.append({
         type: 'review.status_changed',
@@ -384,12 +384,12 @@ console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
-    emitActivityEntry({
+    emitActivityEntrySync({
       source: 'dashboard',
       level: 'info',
       message: 'Dashboard stopping',
     });
-    emitActivityTts({
+    emitActivityTtsSync({
       utterance: 'Dashboard stopping',
       priority: 2,
       source: 'dashboard',
@@ -416,11 +416,11 @@ process.once('SIGHUP', () => handleShutdownSignal('SIGHUP'));
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
-emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
+emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
 // Mark any in-progress forks as failed — they were interrupted by the restart.
 { const n = clearStuckForks(); if (n) {
   console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`);
-  emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
+  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
 } }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
@@ -434,7 +434,7 @@ try {
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
-    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
   }
   await resumeQueuedMerges();
 } catch (err: any) {
@@ -456,7 +456,7 @@ if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
     .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
     .then((findings) => {
       if (findings.length > 0) {
-        emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
+        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
       }
     })
     .catch((err: any) => {
@@ -476,14 +476,14 @@ if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
 // the UI once the workspace backlog is cleaned up.
 if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
   console.log('[panopticon] Cloister auto-start SKIPPED (PANOPTICON_DISABLE_DEACON=1)');
-  emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
+  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
-    emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
   console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
 
 /**

@@ -111,11 +111,11 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
  * Returns default settings if file doesn't exist or is invalid
  * Also loads API keys from environment variables as fallback
  */
-export function loadSettings(): SettingsConfig {
+export function loadSettingsSync(): SettingsConfig {
   let settings: SettingsConfig;
 
   if (!existsSync(SETTINGS_FILE)) {
-    settings = getDefaultSettings();
+    settings = getDefaultSettingsSync();
   } else {
     try {
       const content = readFileSync(SETTINGS_FILE, 'utf8');
@@ -123,7 +123,7 @@ export function loadSettings(): SettingsConfig {
       settings = deepMerge(DEFAULT_SETTINGS, parsed);
     } catch (error) {
       console.error('Warning: Failed to parse settings.json, using defaults');
-      settings = getDefaultSettings();
+      settings = getDefaultSettingsSync();
     }
   }
 
@@ -151,7 +151,7 @@ export function loadSettings(): SettingsConfig {
  * Save settings to ~/.panopticon/settings.json
  * Writes with pretty formatting (2-space indent)
  */
-export function saveSettings(settings: SettingsConfig): void {
+export function saveSettingsSync(settings: SettingsConfig): void {
   const content = JSON.stringify(settings, null, 2);
   writeFileSync(SETTINGS_FILE, content, 'utf8');
 }
@@ -160,7 +160,7 @@ export function saveSettings(settings: SettingsConfig): void {
  * Validate settings structure and model IDs
  * Returns error message if invalid, null if valid
  */
-export function validateSettings(settings: SettingsConfig): string | null {
+export function validateSettingsSync(settings: SettingsConfig): string | null {
   // Validate models structure
   if (!settings.models) {
     return 'Missing models configuration';
@@ -198,7 +198,7 @@ export function validateSettings(settings: SettingsConfig): string | null {
 /**
  * Get a deep copy of the default settings
  */
-export function getDefaultSettings(): SettingsConfig {
+export function getDefaultSettingsSync(): SettingsConfig {
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
@@ -206,7 +206,7 @@ export function getDefaultSettings(): SettingsConfig {
  * Get available models for a provider based on configured API keys
  * Returns empty array if provider API key is not configured
  */
-export function getAvailableModels(settings: SettingsConfig): {
+export function getAvailableModelsSync(settings: SettingsConfig): {
   anthropic: AnthropicModel[];
   openai: OpenAIModel[];
   google: GoogleModel[];
@@ -260,7 +260,7 @@ export function getAvailableModels(settings: SettingsConfig): {
  * Check if a model ID is an Anthropic model
  * Anthropic models can be run directly with `claude` CLI
  */
-export function isAnthropicModel(modelId: ModelId | string): boolean {
+export function isAnthropicModelSync(modelId: ModelId | string): boolean {
   return modelId.startsWith('claude-');
 }
 
@@ -268,7 +268,7 @@ export function isAnthropicModel(modelId: ModelId | string): boolean {
  * Get the Claude CLI model flag for an Anthropic model
  * Maps our model IDs to Claude's expected format
  */
-export function getClaudeModelFlag(modelId: ModelId | string): string {
+export function getClaudeModelFlagSync(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
     'claude-opus-4-6': 'opus',
     'claude-sonnet-4-6': 'sonnet',
@@ -283,11 +283,11 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
  * Always uses 'claude' CLI — non-Anthropic models work via ANTHROPIC_BASE_URL env var
  * pointing to their Anthropic-compatible endpoint.
  */
-export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
-  if (isAnthropicModel(modelId)) {
+export function getAgentCommandSync(modelId: ModelId | string): { command: string; args: string[] } {
+  if (isAnthropicModelSync(modelId)) {
     return {
       command: 'claude',
-      args: ['--model', getClaudeModelFlag(modelId)],
+      args: ['--model', getClaudeModelFlagSync(modelId)],
     };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.
@@ -302,46 +302,46 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
 // Sync FS wrappers (CLI-only by design); pure helpers stay Effect.sync.
 
 /** Load settings.json (returns defaults if missing). Pure-ish (logs on parse error). */
-export const loadSettingsEffect = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => loadSettings());
+export const loadSettings = (): Effect.Effect<SettingsConfig> =>
+  Effect.sync(() => loadSettingsSync());
 
 /** Persist settings.json; surfaces FsError on failure. */
-export const saveSettingsEffect = (
+export const saveSettings = (
   settings: SettingsConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => saveSettings(settings),
+    try: () => saveSettingsSync(settings),
     catch: (cause) =>
       new FsError({ path: SETTINGS_FILE, operation: 'save-settings', cause }),
   });
 
 /** Validate a settings object; returns null when valid, error message otherwise. Pure. */
-export const validateSettingsEffect = (
+export const validateSettings = (
   settings: SettingsConfig,
-): Effect.Effect<string | null> => Effect.sync(() => validateSettings(settings));
+): Effect.Effect<string | null> => Effect.sync(() => validateSettingsSync(settings));
 
 /** Default settings template. Pure. */
-export const getDefaultSettingsEffect = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => getDefaultSettings());
+export const getDefaultSettings = (): Effect.Effect<SettingsConfig> =>
+  Effect.sync(() => getDefaultSettingsSync());
 
 /** Compute the available-model breakdown for a settings object. Pure. */
-export const getAvailableModelsEffect = (
+export const getAvailableModels = (
   settings: SettingsConfig,
-): Effect.Effect<ReturnType<typeof getAvailableModels>> =>
-  Effect.sync(() => getAvailableModels(settings));
+): Effect.Effect<ReturnType<typeof getAvailableModelsSync>> =>
+  Effect.sync(() => getAvailableModelsSync(settings));
 
 /** True if the model id maps to an Anthropic model. Pure. */
-export const isAnthropicModelEffect = (
+export const isAnthropicModel = (
   modelId: ModelId | string,
-): Effect.Effect<boolean> => Effect.sync(() => isAnthropicModel(modelId));
+): Effect.Effect<boolean> => Effect.sync(() => isAnthropicModelSync(modelId));
 
 /** Resolve the `--model` flag value for `claude` CLI. Pure. */
-export const getClaudeModelFlagEffect = (
+export const getClaudeModelFlag = (
   modelId: ModelId | string,
-): Effect.Effect<string> => Effect.sync(() => getClaudeModelFlag(modelId));
+): Effect.Effect<string> => Effect.sync(() => getClaudeModelFlagSync(modelId));
 
 /** Resolve the full spawn command + args for a model. Pure. */
-export const getAgentCommandEffect = (
+export const getAgentCommand = (
   modelId: ModelId | string,
 ): Effect.Effect<{ command: string; args: string[] }> =>
-  Effect.sync(() => getAgentCommand(modelId));
+  Effect.sync(() => getAgentCommandSync(modelId));

@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
 import type { SettingsConfig, ModelId } from './settings.js';
-import { loadConfig, resolveModel } from './config-yaml.js';
+import { loadConfigSync, resolveModel } from './config-yaml.js';
 
 // claude-code-router config directory
 const ROUTER_CONFIG_DIR = join(homedir(), '.claude-code-router');
@@ -113,7 +113,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
  * role primitive owns model resolution; emitted router keys are role-based.
  */
 export function generateRouterConfigFromWorkTypes(): RouterConfig {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   const apiKeys = config.apiKeys;
   const enabledProviders = config.enabledProviders;
 
@@ -164,7 +164,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
 /**
  * Write router config to ~/.claude-code-router/config.json
  */
-export function writeRouterConfig(config: RouterConfig): void {
+export function writeRouterConfigSync(config: RouterConfig): void {
   // Ensure directory exists
   if (!existsSync(ROUTER_CONFIG_DIR)) {
     mkdirSync(ROUTER_CONFIG_DIR, { recursive: true });
@@ -186,7 +186,7 @@ export function getRouterConfigPath(): string {
 
 /** Effect variant of `writeRouterConfig`. Uses fs/promises so it's safe in
  *  dashboard-server-reachable code paths (no event-loop blocking). */
-export const writeRouterConfigEffect = (
+export const writeRouterConfig = (
   config: RouterConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.gen(function* () {

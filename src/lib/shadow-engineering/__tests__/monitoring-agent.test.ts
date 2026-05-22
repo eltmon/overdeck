@@ -4,8 +4,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   generateBasicInference,
-  updateInferenceDocument,
-  readInferenceDocument,
+  updateInferenceDocumentSync,
+  readInferenceDocumentSync,
   generateMonitoringPrompt,
 } from '../monitoring-agent.js';
 import { PAN_DIRNAME } from '../../pan-dir/index.js';
@@ -93,7 +93,7 @@ describe('Monitoring Agent', () => {
 
   describe('updateInferenceDocument', () => {
     it('should write INFERENCE.md to .pan directory', () => {
-      updateInferenceDocument(workspacePath, '# Test Inference');
+      updateInferenceDocumentSync(workspacePath, '# Test Inference');
 
       const filePath = join(panDir, 'INFERENCE.md');
       expect(existsSync(filePath)).toBe(true);
@@ -102,7 +102,7 @@ describe('Monitoring Agent', () => {
 
     it('should create .pan directory if it does not exist', () => {
       const newWorkspace = join(testDir, 'new-workspace');
-      updateInferenceDocument(newWorkspace, '# New Inference');
+      updateInferenceDocumentSync(newWorkspace, '# New Inference');
 
       const filePath = join(newWorkspace, PAN_DIRNAME, 'INFERENCE.md');
       expect(existsSync(filePath)).toBe(true);
@@ -111,14 +111,14 @@ describe('Monitoring Agent', () => {
 
   describe('readInferenceDocument', () => {
     it('should return null when INFERENCE.md does not exist', () => {
-      const result = readInferenceDocument(join(testDir, 'nonexistent'));
+      const result = readInferenceDocumentSync(join(testDir, 'nonexistent'));
       expect(result).toBeNull();
     });
 
     it('should return content when INFERENCE.md exists', () => {
       writeFileSync(join(panDir, 'INFERENCE.md'), '# Existing Inference', 'utf-8');
 
-      const result = readInferenceDocument(workspacePath);
+      const result = readInferenceDocumentSync(workspacePath);
       expect(result).toBe('# Existing Inference');
     });
   });

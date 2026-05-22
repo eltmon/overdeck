@@ -1,11 +1,11 @@
 import chalk from 'chalk';
-import { clearAgentPaused, getAgentState } from '../../lib/agents.js';
-import { resolveIssueId } from '../../lib/issue-id.js';
+import { clearAgentPausedSync, getAgentStateSync } from '../../lib/agents.js';
+import { resolveIssueIdSync } from '../../lib/issue-id.js';
 
 export async function unpauseCommand(id: string): Promise<void> {
-  const issueId = resolveIssueId(id);
+  const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const state = getAgentState(agentId);
+  const state = getAgentStateSync(agentId);
 
   if (!state) {
     console.error(chalk.red(`Agent ${agentId} not found.`));
@@ -14,7 +14,7 @@ export async function unpauseCommand(id: string): Promise<void> {
 
   try {
     const wasPaused = state.paused === true;
-    clearAgentPaused(agentId);
+    clearAgentPausedSync(agentId);
 
     if (wasPaused) {
       console.log(chalk.green(`Unpaused agent: ${agentId}`));

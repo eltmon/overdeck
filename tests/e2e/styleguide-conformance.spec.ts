@@ -233,7 +233,7 @@ describe('styleguide rendered surface conformance', () => {
     await board.context.close();
 
     const commandDeck = await openRoute('/command-deck');
-    await commandDeck.page.locator('[data-component="project-node"][data-project-name="Panopticon"]').click();
+    await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
     await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count()).toBe(1);
     await expect.poll(() => commandDeck.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await commandDeck.context.close();

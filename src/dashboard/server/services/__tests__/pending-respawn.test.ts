@@ -1,20 +1,21 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock tmux.sessionExistsAsyncEffect — pending-respawn polls it. Each test resets
+// Mock tmux.sessionExists — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
 vi.mock('../../../../lib/tmux.js', () => ({
-  sessionExistsAsyncEffect: vi.fn(),
+  sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
 }));
 
-import { sessionExistsAsyncEffect } from '../../../../lib/tmux.js';
+import { sessionExists } from '../../../../lib/tmux.js';
 import {
   isRespawnPending,
   markRespawnPending,
   waitForSessionRespawn,
 } from '../pending-respawn.js';
 
-const mockedSessionExistsEffect = vi.mocked(sessionExistsAsyncEffect);
+const mockedSessionExistsEffect = vi.mocked(sessionExists);
 
 describe('pending-respawn registry', () => {
   beforeEach(() => {
@@ -96,7 +97,7 @@ describe('pending-respawn registry', () => {
     respawn.done();
   });
 
-  it('checks sessionExistsAsyncEffect even when no marker is set', async () => {
+  it('checks sessionExists even when no marker is set', async () => {
     mockedSessionExistsEffect.mockReturnValueOnce(Effect.succeed(true));
     const result = await waitForSessionRespawn('test-session', 5000);
     expect(result).toBe(true);

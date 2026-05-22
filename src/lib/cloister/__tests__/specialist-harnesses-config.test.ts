@@ -21,7 +21,7 @@ vi.mock('../../paths.js', () => ({
 
 const TEST_HOME = '/tmp/pan-test-specialist-harnesses-config'
 
-import { loadCloisterConfig, saveCloisterConfig, type CloisterConfig } from '../config.js'
+import { loadCloisterConfigSync, saveCloisterConfigSync, type CloisterConfig } from '../config.js'
 
 describe('cloister specialist_harnesses config (PAN-636)', () => {
   beforeEach(() => {
@@ -33,13 +33,13 @@ describe('cloister specialist_harnesses config (PAN-636)', () => {
   })
 
   it('defaults specialist_harnesses to an empty block (every role => claude-code on read) (AC1, AC2)', () => {
-    const cfg = loadCloisterConfig()
+    const cfg = loadCloisterConfigSync()
     expect(cfg.model_selection.specialist_harnesses).toBeDefined()
     expect(cfg.model_selection.specialist_harnesses).toEqual({})
   })
 
   it('round-trips specialist_harnesses through saveCloisterConfig + loadCloisterConfig (AC3)', () => {
-    const cfg = loadCloisterConfig()
+    const cfg = loadCloisterConfigSync()
     const updated: CloisterConfig = {
       ...cfg,
       model_selection: {
@@ -50,8 +50,8 @@ describe('cloister specialist_harnesses config (PAN-636)', () => {
         },
       },
     }
-    saveCloisterConfig(updated)
-    const reloaded = loadCloisterConfig()
+    saveCloisterConfigSync(updated)
+    const reloaded = loadCloisterConfigSync()
     expect(reloaded.model_selection.specialist_harnesses).toEqual({
       review_agent: 'pi',
       test_agent: 'claude-code',
@@ -64,7 +64,7 @@ describe('cloister specialist_harnesses config (PAN-636)', () => {
       join(TEST_HOME, 'cloister.toml'),
       `[model_selection]\ndefault_model = "sonnet"\n[model_selection.complexity_routing]\ntrivial = "haiku"\nsimple = "haiku"\nmedium = "sonnet"\ncomplex = "sonnet"\nexpert = "opus"\n`,
     )
-    const cfg = loadCloisterConfig()
+    const cfg = loadCloisterConfigSync()
     expect(cfg.model_selection.default_model).toBe('sonnet')
     // Default fills in via deepMerge — the absent key turns into the default empty block.
     expect(cfg.model_selection.specialist_harnesses).toEqual({})

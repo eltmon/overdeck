@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -6,12 +7,14 @@ import type { VBriefDocument } from '../../../src/lib/vbrief/types.js';
 import type { ContinueState } from '../../../src/lib/vbrief/continue-state.js';
 
 vi.mock('../../../src/lib/beads-query.js', () => ({
-  queryBeadsForIssue: vi.fn().mockResolvedValue([]),
+  queryBeadsForIssue: vi.fn(() => Effect.succeed([])),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: vi.fn(() => ({ trackers: undefined })),
+  loadConfigSync: vi.fn(() => ({ trackers: undefined })),
   getDashboardApiUrl: vi.fn(() => 'http://localhost:3011'),
+  getDashboardApiUrlSync: vi.fn(() => 'http://localhost:3011'),
 }));
 
 import { buildWorkAgentPrompt } from '../../../src/lib/cloister/work-agent-prompt.js';

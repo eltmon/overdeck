@@ -7,7 +7,7 @@
 
 import { Effect } from 'effect';
 import { ConfigError, FsError } from './errors.js';
-import { listProjects, resolveProjectFromIssue } from './projects.js';
+import { listProjectsSync, resolveProjectFromIssueSync } from './projects.js';
 import {
   deleteIssueDraft,
   getIssueDraftInfo,
@@ -19,12 +19,12 @@ import {
 } from './pan-dir/index.js';
 
 function resolveDraftProjectRoot(issueId: string): string {
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved?.projectPath) {
     return resolved.projectPath;
   }
 
-  const projects = listProjects();
+  const projects = listProjectsSync();
   if (projects.length === 1 && projects[0]?.config.path) {
     return projects[0].config.path;
   }
@@ -32,23 +32,15 @@ function resolveDraftProjectRoot(issueId: string): string {
   throw new Error(`Could not resolve project path for ${issueId}. Add the project to projects.yaml first.`);
 }
 
-export function getPRDDraftPath(issueId: string): string {
+export function getPRDDraftPathSync(issueId: string): string {
   return getIssueDraftPath(resolveDraftProjectRoot(issueId), issueId);
-}
-
-export function hasPRDDraft(issueId: string): Promise<boolean> {
+}function hasPRDDraftPromise(issueId: string): Promise<boolean> {
   return Effect.runPromise(hasIssueDraft(resolveDraftProjectRoot(issueId), issueId));
-}
-
-export function readPRDDraft(issueId: string): Promise<string | null> {
+}function readPRDDraftPromise(issueId: string): Promise<string | null> {
   return Effect.runPromise(readIssueDraft(resolveDraftProjectRoot(issueId), issueId));
-}
-
-export function writePRDDraft(issueId: string, content: string): Promise<string> {
+}function writePRDDraftPromise(issueId: string, content: string): Promise<string> {
   return Effect.runPromise(writeIssueDraft(resolveDraftProjectRoot(issueId), issueId, content));
-}
-
-export function listPRDDrafts(issueIdOrProjectPath?: string): Promise<string[]> {
+}function listPRDDraftsPromise(issueIdOrProjectPath?: string): Promise<string[]> {
   if (issueIdOrProjectPath) {
     const projectPath = issueIdOrProjectPath.includes('/')
       ? issueIdOrProjectPath
@@ -56,19 +48,15 @@ export function listPRDDrafts(issueIdOrProjectPath?: string): Promise<string[]> 
     return Effect.runPromise(listIssueDrafts(projectPath));
   }
 
-  const projects = listProjects();
+  const projects = listProjectsSync();
   if (projects.length === 1 && projects[0]?.config.path) {
     return Effect.runPromise(listIssueDrafts(projects[0].config.path));
   }
 
   return Promise.resolve([]);
-}
-
-export function deletePRDDraft(issueId: string): Promise<boolean> {
+}function deletePRDDraftPromise(issueId: string): Promise<boolean> {
   return Effect.runPromise(deleteIssueDraft(resolveDraftProjectRoot(issueId), issueId));
-}
-
-export function getPRDDraftInfo(issueId: string): Promise<{
+}function getPRDDraftInfoPromise(issueId: string): Promise<{
   exists: boolean;
   path?: string;
   size?: number;
@@ -88,32 +76,32 @@ const wrapConfigErr = (op: string) => (cause: unknown): ConfigError =>
     cause,
   });
 
-/** Effect variant of {@link getPRDDraftPath}. */
-export const getPRDDraftPathEffect = (issueId: string): Effect.Effect<string, ConfigError> =>
-  Effect.try({ try: () => getPRDDraftPath(issueId), catch: wrapConfigErr('getPRDDraftPath') });
+/** Effect variant of {@link getPRDDraftPathSync}. */
+export const getPRDDraftPath = (issueId: string): Effect.Effect<string, ConfigError> =>
+  Effect.try({ try: () => getPRDDraftPathSync(issueId), catch: wrapConfigErr('getPRDDraftPath') });
 
 /** Effect variant of {@link hasPRDDraft}. */
-export const hasPRDDraftEffect = (issueId: string): Effect.Effect<boolean, ConfigError> =>
-  Effect.tryPromise({ try: () => hasPRDDraft(issueId), catch: wrapConfigErr('hasPRDDraft') });
+export const hasPRDDraft = (issueId: string): Effect.Effect<boolean, ConfigError> =>
+  Effect.tryPromise({ try: () => hasPRDDraftPromise(issueId), catch: wrapConfigErr('hasPRDDraft') });
 
 /** Effect variant of {@link readPRDDraft}. */
-export const readPRDDraftEffect = (issueId: string): Effect.Effect<string | null, ConfigError | FsError> =>
-  Effect.tryPromise({ try: () => readPRDDraft(issueId), catch: wrapConfigErr('readPRDDraft') });
+export const readPRDDraft = (issueId: string): Effect.Effect<string | null, ConfigError | FsError> =>
+  Effect.tryPromise({ try: () => readPRDDraftPromise(issueId), catch: wrapConfigErr('readPRDDraft') });
 
 /** Effect variant of {@link writePRDDraft}. */
-export const writePRDDraftEffect = (issueId: string, content: string): Effect.Effect<string, ConfigError | FsError> =>
-  Effect.tryPromise({ try: () => writePRDDraft(issueId, content), catch: wrapConfigErr('writePRDDraft') });
+export const writePRDDraft = (issueId: string, content: string): Effect.Effect<string, ConfigError | FsError> =>
+  Effect.tryPromise({ try: () => writePRDDraftPromise(issueId, content), catch: wrapConfigErr('writePRDDraft') });
 
 /** Effect variant of {@link listPRDDrafts}. */
-export const listPRDDraftsEffect = (issueIdOrProjectPath?: string): Effect.Effect<string[], ConfigError> =>
-  Effect.tryPromise({ try: () => listPRDDrafts(issueIdOrProjectPath), catch: wrapConfigErr('listPRDDrafts') });
+export const listPRDDrafts = (issueIdOrProjectPath?: string): Effect.Effect<string[], ConfigError> =>
+  Effect.tryPromise({ try: () => listPRDDraftsPromise(issueIdOrProjectPath), catch: wrapConfigErr('listPRDDrafts') });
 
 /** Effect variant of {@link deletePRDDraft}. */
-export const deletePRDDraftEffect = (issueId: string): Effect.Effect<boolean, ConfigError | FsError> =>
-  Effect.tryPromise({ try: () => deletePRDDraft(issueId), catch: wrapConfigErr('deletePRDDraft') });
+export const deletePRDDraft = (issueId: string): Effect.Effect<boolean, ConfigError | FsError> =>
+  Effect.tryPromise({ try: () => deletePRDDraftPromise(issueId), catch: wrapConfigErr('deletePRDDraft') });
 
 /** Effect variant of {@link getPRDDraftInfo}. */
-export const getPRDDraftInfoEffect = (
+export const getPRDDraftInfo = (
   issueId: string,
 ): Effect.Effect<{ exists: boolean; path?: string; size?: number; modified?: Date }, ConfigError> =>
-  Effect.tryPromise({ try: () => getPRDDraftInfo(issueId), catch: wrapConfigErr('getPRDDraftInfo') });
+  Effect.tryPromise({ try: () => getPRDDraftInfoPromise(issueId), catch: wrapConfigErr('getPRDDraftInfo') });

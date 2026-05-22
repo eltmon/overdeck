@@ -27,10 +27,10 @@ export async function listLogsCommand(
   options: LogsOptions
 ): Promise<void> {
   try {
-    const { listRunLogs } = await import('../../../lib/cloister/specialist-logs.js');
+    const { listRunLogsSync } = await import('../../../lib/cloister/specialist-logs.js');
 
     const limit = options.limit ? parseInt(options.limit) : 10;
-    const runs = listRunLogs(project, type, { limit });
+    const runs = listRunLogsSync(project, type, { limit });
 
     if (options.json) {
       console.log(JSON.stringify(runs, null, 2));
@@ -88,9 +88,9 @@ export async function viewLogCommand(
   options: LogsOptions
 ): Promise<void> {
   try {
-    const { getRunLog, parseLogMetadata, getRunLogPath } = await import('../../../lib/cloister/specialist-logs.js');
+    const { getRunLogSync, parseLogMetadata, getRunLogPath } = await import('../../../lib/cloister/specialist-logs.js');
 
-    const content = getRunLog(project, type, runId);
+    const content = getRunLogSync(project, type, runId);
 
     if (!content) {
       console.error(`❌ Run log not found: ${runId}`);
@@ -230,10 +230,10 @@ export async function cleanupLogsCommand(
         process.exit(1);
       }
 
-      const { cleanupAllLogs } = await import('../../../lib/cloister/specialist-logs.js');
+      const { cleanupAllLogsSync } = await import('../../../lib/cloister/specialist-logs.js');
       console.log('🧹 Cleaning up old logs for all projects...\n');
 
-      const results = cleanupAllLogs();
+      const results = cleanupAllLogsSync();
 
       console.log(`\n✅ Cleanup complete: deleted ${results.totalDeleted} old logs\n`);
 
@@ -263,14 +263,14 @@ export async function cleanupLogsCommand(
       process.exit(1);
     }
 
-    const { cleanupOldLogs } = await import('../../../lib/cloister/specialist-logs.js');
+    const { cleanupOldLogsSync } = await import('../../../lib/cloister/specialist-logs.js');
     const { getSpecialistRetention } = await import('../../../lib/projects.js');
 
     const retention = getSpecialistRetention(projectOrAll);
     console.log(`🧹 Cleaning up old logs for ${projectOrAll}/${type}...`);
     console.log(`   Retention: ${retention.max_days} days or ${retention.max_runs} runs\n`);
 
-    const deleted = cleanupOldLogs(projectOrAll, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
+    const deleted = cleanupOldLogsSync(projectOrAll, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
     console.log(`✅ Deleted ${deleted} old logs\n`);
   } catch (error: any) {

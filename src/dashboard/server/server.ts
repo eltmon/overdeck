@@ -63,7 +63,7 @@ import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
-import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -365,12 +365,12 @@ export const makeServerLayer = Layer.unwrap(
         yield* Effect.sync(() => {
           console.log(`[panopticon] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['PANOPTICON_MODE'] === 'production' ? 'production mode' : 'development mode';
-          emitActivityEntry({
+          emitActivityEntrySync({
             source: 'dashboard',
             level: 'success',
             message: `Dashboard started in ${mode}`,
           });
-          emitActivityTts({
+          emitActivityTtsSync({
             utterance: `Dashboard started in ${mode}`,
             priority: 2,
             source: 'dashboard',

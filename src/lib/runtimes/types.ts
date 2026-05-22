@@ -112,7 +112,7 @@ export interface Agent {
  * Claude Code implements this interface
  * to provide Cloister with health monitoring capabilities.
  */
-export interface AgentRuntime {
+export interface AgentRuntimeSync {
   /**
    * Runtime identifier
    */
@@ -228,9 +228,9 @@ export interface AgentRuntime {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// Additive Effect-channel companion interface for AgentRuntime. The legacy
-// sync/promise AgentRuntime shape above is preserved; Effect callers can use
-// the *Effect interface to compose typed pipelines.
+// Effect-channel runtime interface. The legacy sync/promise AgentRuntimeSync
+// shape above is preserved for the existing registry while new callers compose
+// through the canonical Effect API.
 
 import type { Effect } from 'effect';
 import type {
@@ -248,12 +248,10 @@ export type AgentRuntimeError =
   | FsError;
 
 /**
- * Effect-channel variant of {@link AgentRuntime}. Methods that previously
- * returned `void | Promise<void>` or `boolean | Promise<boolean>` return an
- * Effect with a typed failure channel. Pure-sync introspection methods stay
- * sync because they read in-memory state.
+ * Runtime interface whose side-effecting methods return typed Effects. Pure-sync
+ * introspection methods stay sync because they read in-memory state.
  */
-export interface AgentRuntimeEffect {
+export interface AgentRuntime {
   readonly name: RuntimeName;
   getSessionPath(agentId: string): string | null;
   getLastActivity(agentId: string): Date | null;
@@ -274,22 +272,22 @@ export interface RuntimeRegistry {
   /**
    * Register a runtime
    */
-  register(runtime: AgentRuntime): void;
+  register(runtime: AgentRuntimeSync): void;
 
   /**
    * Get a runtime by name
    */
-  get(name: RuntimeName): AgentRuntime | undefined;
+  get(name: RuntimeName): AgentRuntimeSync | undefined;
 
   /**
    * Get all registered runtimes
    */
-  getAll(): AgentRuntime[];
+  getAll(): AgentRuntimeSync[];
 
   /**
    * Get the runtime for a specific agent
    *
    * Looks up the agent's state file to determine which runtime it's using.
    */
-  getRuntimeForAgent(agentId: string): AgentRuntime | null;
+  getRuntimeForAgent(agentId: string): AgentRuntimeSync | null;
 }

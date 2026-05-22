@@ -1,11 +1,12 @@
+import { Effect } from 'effect';
 import chalk from 'chalk';
-import { stopAgent, getAgentState } from '../../lib/agents.js';
-import { sessionExists } from '../../lib/tmux.js';
+import { stopAgentSync, getAgentStateSync } from '../../lib/agents.js';
+import { sessionExistsSync } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
-import { resolveIssueId } from '../../lib/issue-id.js';
+import { resolveIssueIdSync } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 
 interface KillOptions {
@@ -14,12 +15,12 @@ interface KillOptions {
 
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID
-  const issueId = resolveIssueId(id);
+  const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
   // Check if exists
-  const state = getAgentState(agentId) as any;
-  const isRunning = sessionExists(agentId);
+  const state = getAgentStateSync(agentId) as any;
+  const isRunning = sessionExistsSync(agentId);
 
   if (!state && !isRunning) {
     console.log(chalk.yellow(`Agent ${agentId} not found.`));
@@ -36,7 +37,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
         console.log(chalk.green(`Killed remote agent: ${agentId}`));
 
         // Update local state file
-        stopAgent(agentId);
+        stopAgentSync(agentId);
         return;
       } else {
         console.log(chalk.yellow(`Remote not available: ${availability.reason}`));
@@ -54,7 +55,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   }
 
   try {
-    stopAgent(agentId);
+    stopAgentSync(agentId);
     console.log(chalk.green(`Killed agent: ${agentId}`));
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
@@ -72,11 +73,11 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   if (state?.issueId) {
     try {
       const issueLower = state.issueId.toLowerCase();
-      const project = resolveProjectFromIssue(state.issueId);
+      const project = resolveProjectFromIssueSync(state.issueId);
       const projectPath = project?.projectPath ?? process.cwd();
       const workspacePath = findWorkspacePath(projectPath, issueLower);
       if (workspacePath) {
-        const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
+        const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
         if (dockerResult.containersFound) {
           console.log(chalk.gray(`Stopped Docker stack: ${dockerResult.steps.join('; ')}`));
         }

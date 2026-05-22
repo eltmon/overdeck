@@ -36,7 +36,7 @@ export type FileStatus =
 /**
  * Compute SHA-256 hash of a file, prefixed with "sha256:".
  */
-export function hashFile(filePath: string): string {
+export function hashFileSync(filePath: string): string {
   const content = readFileSync(filePath);
   const hex = createHash('sha256').update(content).digest('hex');
   return `sha256:${hex}`;
@@ -56,7 +56,7 @@ export function createEmptyManifest(): Manifest {
 /**
  * Read a manifest from disk. Returns empty manifest if file doesn't exist or is invalid.
  */
-export function readManifest(manifestPath: string): Manifest {
+export function readManifestSync(manifestPath: string): Manifest {
   if (!existsSync(manifestPath)) {
     return createEmptyManifest();
   }
@@ -75,7 +75,7 @@ export function readManifest(manifestPath: string): Manifest {
 /**
  * Write a manifest to disk (creates parent directories if needed).
  */
-export function writeManifest(manifestPath: string, manifest: Manifest): void {
+export function writeManifestSync(manifestPath: string, manifest: Manifest): void {
   mkdirSync(join(manifestPath, '..'), { recursive: true });
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
 }
@@ -124,7 +124,7 @@ export function compareFileToManifest(
     return { action: 'user-owned' };
   }
 
-  const currentHash = hashFile(targetFile);
+  const currentHash = hashFileSync(targetFile);
   if (currentHash === entry.hash) {
     return { action: 'update', currentHash };
   }
@@ -140,7 +140,7 @@ export function compareFileToManifest(
  * @param prefix - Prefix for relative paths (e.g., "skills/" or "agents/")
  * @returns Array of { absolutePath, relativePath } for each file found
  */
-export function collectSourceFiles(
+export function collectSourceFilesSync(
   sourceDir: string,
   prefix: string,
 ): Array<{ absolutePath: string; relativePath: string }> {
@@ -187,9 +187,9 @@ export function buildManifestFromDirectory(
 
   for (const category of categories) {
     const categoryDir = join(baseDir, category);
-    const files = collectSourceFiles(categoryDir, `${category}/`);
+    const files = collectSourceFilesSync(categoryDir, `${category}/`);
     for (const file of files) {
-      const hash = hashFile(file.absolutePath);
+      const hash = hashFileSync(file.absolutePath);
       setManifestEntry(manifest, file.relativePath, hash, source);
     }
   }
@@ -199,8 +199,8 @@ export function buildManifestFromDirectory(
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of {@link hashFile}. */
-export const hashFileEffect = (filePath: string): Effect.Effect<string, FsError> =>
+/** Effect variant of {@link hashFileSync}. */
+export const hashFile = (filePath: string): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: async () => {
       const content = await readFile(filePath);
@@ -210,8 +210,8 @@ export const hashFileEffect = (filePath: string): Effect.Effect<string, FsError>
     catch: (cause) => new FsError({ path: filePath, operation: 'hashFile', cause }),
   });
 
-/** Effect variant of {@link readManifest}. Returns an empty manifest on any read/parse failure. */
-export const readManifestEffect = (manifestPath: string): Effect.Effect<Manifest, never> =>
+/** Effect variant of {@link readManifestSync}. Returns an empty manifest on any read/parse failure. */
+export const readManifest = (manifestPath: string): Effect.Effect<Manifest, never> =>
   Effect.tryPromise({
     try: () => readFile(manifestPath, 'utf-8'),
     catch: () => null,
@@ -230,8 +230,8 @@ export const readManifestEffect = (manifestPath: string): Effect.Effect<Manifest
     }),
   );
 
-/** Effect variant of {@link writeManifest}. */
-export const writeManifestEffect = (manifestPath: string, manifest: Manifest): Effect.Effect<void, FsError> =>
+/** Effect variant of {@link writeManifestSync}. */
+export const writeManifest = (manifestPath: string, manifest: Manifest): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: async () => {
       await mkdir(join(manifestPath, '..'), { recursive: true });
@@ -240,8 +240,8 @@ export const writeManifestEffect = (manifestPath: string, manifest: Manifest): E
     catch: (cause) => new FsError({ path: manifestPath, operation: 'writeManifest', cause }),
   });
 
-/** Effect variant of {@link collectSourceFiles}. */
-export const collectSourceFilesEffect = (
+/** Effect variant of {@link collectSourceFilesSync}. */
+export const collectSourceFiles = (
   sourceDir: string,
   prefix: string,
 ): Effect.Effect<Array<{ absolutePath: string; relativePath: string }>, FsError> =>

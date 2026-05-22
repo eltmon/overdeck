@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Cost CLI Commands
  *
@@ -7,18 +8,18 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  readTodayCosts,
-  getDailySummary,
-  getWeeklySummary,
-  getMonthlySummary,
-  generateReport,
-  formatCost,
-  createBudget,
-  getAllBudgets,
-  checkBudget,
-  deleteBudget,
-  readIssueCosts,
-  summarizeCosts,
+  readTodayCostsSync,
+  getDailySummarySync,
+  getWeeklySummarySync,
+  getMonthlySummarySync,
+  generateReportSync,
+  formatCostSync,
+  createBudgetSync,
+  getAllBudgetsSync,
+  checkBudgetSync,
+  deleteBudgetSync,
+  readIssueCostsSync,
+  summarizeCostsSync,
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 import { getCostForIssueFromDb, type IssueAggregate } from '../../lib/database/cost-events-db.js';
@@ -29,7 +30,7 @@ import { getCostForIssueFromDb, type IssueAggregate } from '../../lib/database/c
 export async function runCostSync(): Promise<void> {
   try {
     console.log(chalk.bold('Syncing cost events from project WAL files...'));
-    const result = await syncWalFromAllProjects();
+    const result = await Effect.runPromise(syncWalFromAllProjects());
 
     if (result.filesScanned === 0) {
       console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
@@ -66,7 +67,7 @@ export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggreg
   const lines = [
     chalk.bold(`Costs for ${issueId.toUpperCase()}`),
     '',
-    `Total Cost: ${chalk.green(formatCost(aggregate.totalCost))}`,
+    `Total Cost: ${chalk.green(formatCostSync(aggregate.totalCost))}`,
     `API Calls: ${Object.values(aggregate.stages).reduce((sum, stage) => sum + stage.calls, 0)}`,
     `Tokens: ${(
       aggregate.inputTokens
@@ -80,7 +81,7 @@ export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggreg
   if (Object.keys(aggregate.models).length > 0) {
     lines.push(chalk.bold('By Model'));
     for (const [model, stats] of Object.entries(aggregate.models)) {
-      lines.push(`  ${model}: ${formatCost(stats.cost)}`);
+      lines.push(`  ${model}: ${formatCostSync(stats.cost)}`);
     }
     lines.push('');
   }
@@ -91,7 +92,7 @@ export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggreg
     lines.push(chalk.bold('By Review Role'));
     for (const [stage, stats] of reviewStages) {
       const label = stage === 'review' ? 'synthesis' : stage.slice('review.'.length);
-      lines.push(`  ${label}: ${formatCost(stats.cost)} (${stats.calls} call${stats.calls === 1 ? '' : 's'})`);
+      lines.push(`  ${label}: ${formatCostSync(stats.cost)} (${stats.calls} call${stats.calls === 1 ? '' : 's'})`);
     }
     lines.push('');
   }
@@ -110,11 +111,11 @@ export function createCostCommand(): Command {
     .option('-d, --detail', 'Show individual entries')
     .action((options) => {
       try {
-        const summary = getDailySummary();
+        const summary = getDailySummarySync();
 
         console.log(chalk.bold('Today\'s Cost Summary'));
         console.log();
-        console.log(`Total Cost: ${chalk.green(formatCost(summary.totalCost))}`);
+        console.log(`Total Cost: ${chalk.green(formatCostSync(summary.totalCost))}`);
         console.log(`API Calls: ${summary.entryCount}`);
         console.log(`Tokens: ${summary.totalTokens.total.toLocaleString()}`);
         console.log(`  Input: ${summary.totalTokens.input.toLocaleString()}`);
@@ -124,7 +125,7 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byProvider).length > 0) {
           console.log(chalk.bold('By Provider'));
           for (const [provider, cost] of Object.entries(summary.byProvider)) {
-            console.log(`  ${provider}: ${formatCost(cost)}`);
+            console.log(`  ${provider}: ${formatCostSync(cost)}`);
           }
           console.log();
         }
@@ -132,18 +133,18 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byModel).length > 0) {
           console.log(chalk.bold('By Model'));
           for (const [model, cost] of Object.entries(summary.byModel)) {
-            console.log(`  ${model}: ${formatCost(cost)}`);
+            console.log(`  ${model}: ${formatCostSync(cost)}`);
           }
           console.log();
         }
 
         if (options.detail) {
-          const entries = readTodayCosts();
+          const entries = readTodayCostsSync();
           if (entries.length > 0) {
             console.log(chalk.bold('Entries'));
             for (const entry of entries.slice(-10)) {
               const time = new Date(entry.timestamp).toLocaleTimeString();
-              console.log(`  ${chalk.dim(time)} ${entry.model} ${formatCost(entry.cost)} ${entry.operation}`);
+              console.log(`  ${chalk.dim(time)} ${entry.model} ${formatCostSync(entry.cost)} ${entry.operation}`);
             }
             if (entries.length > 10) {
               console.log(chalk.dim(`  ... and ${entries.length - 10} more`));
@@ -162,12 +163,12 @@ export function createCostCommand(): Command {
     .description('Show weekly cost summary')
     .action(() => {
       try {
-        const summary = getWeeklySummary();
+        const summary = getWeeklySummarySync();
 
         console.log(chalk.bold('Weekly Cost Summary'));
         console.log(chalk.dim(`${summary.period.start} to ${summary.period.end}`));
         console.log();
-        console.log(`Total Cost: ${chalk.green(formatCost(summary.totalCost))}`);
+        console.log(`Total Cost: ${chalk.green(formatCostSync(summary.totalCost))}`);
         console.log(`API Calls: ${summary.entryCount}`);
         console.log(`Tokens: ${summary.totalTokens.total.toLocaleString()}`);
         console.log();
@@ -175,7 +176,7 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byProvider).length > 0) {
           console.log(chalk.bold('By Provider'));
           for (const [provider, cost] of Object.entries(summary.byProvider)) {
-            console.log(`  ${provider}: ${formatCost(cost)}`);
+            console.log(`  ${provider}: ${formatCostSync(cost)}`);
           }
           console.log();
         }
@@ -186,7 +187,7 @@ export function createCostCommand(): Command {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5);
           for (const [issue, cost] of sorted) {
-            console.log(`  ${issue}: ${formatCost(cost)}`);
+            console.log(`  ${issue}: ${formatCostSync(cost)}`);
           }
         }
       } catch (error: unknown) {
@@ -201,12 +202,12 @@ export function createCostCommand(): Command {
     .description('Show monthly cost summary')
     .action(() => {
       try {
-        const summary = getMonthlySummary();
+        const summary = getMonthlySummarySync();
 
         console.log(chalk.bold('Monthly Cost Summary'));
         console.log(chalk.dim(`${summary.period.start} to ${summary.period.end}`));
         console.log();
-        console.log(`Total Cost: ${chalk.green(formatCost(summary.totalCost))}`);
+        console.log(`Total Cost: ${chalk.green(formatCostSync(summary.totalCost))}`);
         console.log(`API Calls: ${summary.entryCount}`);
         console.log(`Tokens: ${summary.totalTokens.total.toLocaleString()}`);
         console.log();
@@ -214,7 +215,7 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byProvider).length > 0) {
           console.log(chalk.bold('By Provider'));
           for (const [provider, cost] of Object.entries(summary.byProvider)) {
-            console.log(`  ${provider}: ${formatCost(cost)}`);
+            console.log(`  ${provider}: ${formatCostSync(cost)}`);
           }
           console.log();
         }
@@ -222,7 +223,7 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byModel).length > 0) {
           console.log(chalk.bold('By Model'));
           for (const [model, cost] of Object.entries(summary.byModel)) {
-            console.log(`  ${model}: ${formatCost(cost)}`);
+            console.log(`  ${model}: ${formatCostSync(cost)}`);
           }
           console.log();
         }
@@ -233,7 +234,7 @@ export function createCostCommand(): Command {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 10);
           for (const [issue, cost] of sorted) {
-            console.log(`  ${issue}: ${formatCost(cost)}`);
+            console.log(`  ${issue}: ${formatCostSync(cost)}`);
           }
         }
       } catch (error: unknown) {
@@ -257,7 +258,7 @@ export function createCostCommand(): Command {
           return d.toISOString().split('T')[0];
         })();
 
-        const report = generateReport(start, end);
+        const report = generateReportSync(start, end);
         console.log(report);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
@@ -280,18 +281,18 @@ export function createCostCommand(): Command {
           return;
         }
 
-        const entries = readIssueCosts(issueId, parseInt(options.days, 10));
+        const entries = readIssueCostsSync(issueId, parseInt(options.days, 10));
 
         if (entries.length === 0) {
           console.log(chalk.dim('No costs found for issue:'), issueId);
           return;
         }
 
-        const summary = summarizeCosts(entries);
+        const summary = summarizeCostsSync(entries);
 
         console.log(chalk.bold(`Costs for ${issueId}`));
         console.log();
-        console.log(`Total Cost: ${chalk.green(formatCost(summary.totalCost))}`);
+        console.log(`Total Cost: ${chalk.green(formatCostSync(summary.totalCost))}`);
         console.log(`API Calls: ${summary.entryCount}`);
         console.log(`Tokens: ${summary.totalTokens.total.toLocaleString()}`);
         console.log();
@@ -299,7 +300,7 @@ export function createCostCommand(): Command {
         if (Object.keys(summary.byModel).length > 0) {
           console.log(chalk.bold('By Model'));
           for (const [model, cost] of Object.entries(summary.byModel)) {
-            console.log(`  ${model}: ${formatCost(cost)}`);
+            console.log(`  ${model}: ${formatCostSync(cost)}`);
           }
         }
       } catch (error: unknown) {
@@ -322,7 +323,7 @@ export function createCostCommand(): Command {
     .option('-a, --alert <threshold>', 'Alert threshold (0-1)', '0.8')
     .action((name: string, options) => {
       try {
-        const newBudget = createBudget({
+        const newBudget = createBudgetSync({
           name,
           type: options.type as any,
           limit: parseFloat(options.limit),
@@ -335,7 +336,7 @@ export function createCostCommand(): Command {
         console.log(`  ID: ${chalk.cyan(newBudget.id)}`);
         console.log(`  Name: ${newBudget.name}`);
         console.log(`  Type: ${newBudget.type}`);
-        console.log(`  Limit: ${formatCost(newBudget.limit)}`);
+        console.log(`  Limit: ${formatCostSync(newBudget.limit)}`);
         console.log(`  Alert at: ${(newBudget.alertThreshold * 100).toFixed(0)}%`);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
@@ -349,7 +350,7 @@ export function createCostCommand(): Command {
     .description('List all budgets')
     .action(() => {
       try {
-        const budgets = getAllBudgets();
+        const budgets = getAllBudgetsSync();
 
         if (budgets.length === 0) {
           console.log(chalk.dim('No budgets configured'));
@@ -361,7 +362,7 @@ export function createCostCommand(): Command {
         console.log();
 
         for (const b of budgets) {
-          const status = checkBudget(b.id);
+          const status = checkBudgetSync(b.id);
           const percentStr = `${(status.percentUsed * 100).toFixed(0)}%`;
 
           let statusColor = chalk.green;
@@ -373,9 +374,9 @@ export function createCostCommand(): Command {
 
           console.log(`${b.enabled ? '●' : '○'} ${chalk.cyan(b.id)} ${b.name}`);
           console.log(`  Type: ${b.type}`);
-          console.log(`  Limit: ${formatCost(b.limit)}`);
-          console.log(`  Spent: ${statusColor(formatCost(b.spent))} (${statusColor(percentStr)})`);
-          console.log(`  Remaining: ${formatCost(status.remaining)}`);
+          console.log(`  Limit: ${formatCostSync(b.limit)}`);
+          console.log(`  Spent: ${statusColor(formatCostSync(b.spent))} (${statusColor(percentStr)})`);
+          console.log(`  Remaining: ${formatCostSync(status.remaining)}`);
           console.log();
         }
       } catch (error: unknown) {
@@ -390,7 +391,7 @@ export function createCostCommand(): Command {
     .description('Check budget status')
     .action((id: string) => {
       try {
-        const status = checkBudget(id);
+        const status = checkBudgetSync(id);
 
         if (!status.budget) {
           console.log(chalk.red('Budget not found:'), id);
@@ -413,9 +414,9 @@ export function createCostCommand(): Command {
         console.log(chalk.bold(b.name));
         console.log();
         console.log(`Status: ${statusColor(statusText)}`);
-        console.log(`Limit: ${formatCost(b.limit)}`);
-        console.log(`Spent: ${statusColor(formatCost(b.spent))} (${statusColor(percentStr)})`);
-        console.log(`Remaining: ${formatCost(status.remaining)}`);
+        console.log(`Limit: ${formatCostSync(b.limit)}`);
+        console.log(`Spent: ${statusColor(formatCostSync(b.spent))} (${statusColor(percentStr)})`);
+        console.log(`Remaining: ${formatCostSync(status.remaining)}`);
         console.log(`Alert Threshold: ${(b.alertThreshold * 100).toFixed(0)}%`);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
@@ -429,7 +430,7 @@ export function createCostCommand(): Command {
     .description('Delete a budget')
     .action((id: string) => {
       try {
-        const success = deleteBudget(id);
+        const success = deleteBudgetSync(id);
 
         if (success) {
           console.log(chalk.green('✓ Budget deleted'));

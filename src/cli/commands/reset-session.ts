@@ -1,22 +1,22 @@
 import chalk from 'chalk';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { getAgentState, getAgentDir, getLatestSessionId } from '../../lib/agents.js';
-import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
-import { resolveIssueId } from '../../lib/issue-id.js';
+import { getAgentStateSync, getAgentDir, getLatestSessionIdSync } from '../../lib/agents.js';
+import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { resolveIssueIdSync } from '../../lib/issue-id.js';
 
 export async function resetSessionCommand(id: string): Promise<void> {
   // Support "agent-xxx" prefix, or just the issue ID
-  const issueId = resolveIssueId(id);
+  const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
-  const state = getAgentState(agentId);
+  const state = getAgentStateSync(agentId);
   if (!state) {
     console.log(chalk.red(`Agent ${agentId} not found.`));
     process.exit(1);
   }
 
-  const lifecycle = getWorkAgentLifecycleState(agentId);
+  const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
   // Refuse if running
   if (lifecycle.hasLiveTmuxSession) {
@@ -24,7 +24,7 @@ export async function resetSessionCommand(id: string): Promise<void> {
     process.exit(1);
   }
 
-  const previousSessionId = getLatestSessionId(agentId);
+  const previousSessionId = getLatestSessionIdSync(agentId);
   if (!previousSessionId) {
     console.log(chalk.yellow(`Agent ${agentId} has no saved session to reset.`));
     return;

@@ -4,6 +4,7 @@
  *   2. isRunning called with await and mergeProjectKey
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── child_process mock (must be hoisted) ──────────────────────────────────────
@@ -49,12 +50,13 @@ vi.mock('child_process', () => {
 
 // ── Other dependency mocks ────────────────────────────────────────────────────
 vi.mock('../../../../src/lib/git-utils.js', () => ({
-  cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
+  cleanupStaleLocks: vi.fn().mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] })),
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
 }));
 
@@ -66,6 +68,7 @@ vi.mock('../../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -81,7 +84,9 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+  resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
+  loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
 
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
@@ -208,8 +213,8 @@ describe('spawnMergeAgentForBranches — isRunning called correctly', () => {
   });
 
   it('isRunning receives mergeProjectKey from resolveProjectFromIssue', async () => {
-    const { resolveProjectFromIssue } = await import('../../../../src/lib/projects.js');
-    const mockResolve = vi.mocked(resolveProjectFromIssue);
+    const { resolveProjectFromIssueSync } = await import('../../../../src/lib/projects.js');
+    const mockResolve = vi.mocked(resolveProjectFromIssueSync);
 
     // When resolveProjectFromIssue returns a project, mergeProjectKey should be passed
     mockResolve.mockReturnValueOnce({ projectKey: 'myproject', path: PROJECT_PATH } as any);

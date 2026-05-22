@@ -15,7 +15,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { DEFAULT_CLOISTER_CONFIG, loadCloisterConfig } from '../config.js';
+import { DEFAULT_CLOISTER_CONFIG, loadCloisterConfigSync } from '../config.js';
 
 describe('loadCloisterConfig', () => {
   it('defines conservative close-out defaults', () => {
@@ -34,7 +34,7 @@ describe('loadCloisterConfig', () => {
   it('accepts PAN_STASH_JANITOR_CYCLES=0 as a valid override', () => {
     process.env.PAN_STASH_JANITOR_CYCLES = '0';
 
-    const config = loadCloisterConfig();
+    const config = loadCloisterConfigSync();
 
     expect(config.monitoring.stash_janitor_every_cycles).toBe(0);
   });

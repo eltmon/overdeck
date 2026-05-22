@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync, mkdtempSync } from 'fs';
@@ -32,20 +33,23 @@ vi.mock('child_process', async () => {
 });
 
 // Mock projects module
+const mockGetProject = vi.hoisted(() => vi.fn((projectKey: string) => {
+  if (projectKey === 'testproject') {
+    return {
+      key: 'testproject',
+      name: 'Test Project',
+      specialists: {
+        context_runs: 3,
+        digest_model: 'claude-sonnet-4-5',
+      },
+    };
+  }
+  return null;
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
-  getProject: vi.fn((projectKey: string) => {
-    if (projectKey === 'testproject') {
-      return {
-        key: 'testproject',
-        name: 'Test Project',
-        specialists: {
-          context_runs: 3,
-          digest_model: 'claude-sonnet-4-5',
-        },
-      };
-    }
-    return null;
-  }),
+  getProject: mockGetProject,
+  getProjectSync: mockGetProject,
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', async () => {
@@ -53,6 +57,7 @@ vi.mock('../../../src/lib/config-yaml.js', async () => {
   return {
     ...actual,
     loadConfig: vi.fn(() => ({ config: { roles: actual.DEFAULT_ROLES, workhorses: actual.DEFAULT_WORKHORSES } })),
+    loadConfigSync: vi.fn(() => ({ config: { roles: actual.DEFAULT_ROLES, workhorses: actual.DEFAULT_WORKHORSES } })),
   };
 });
 
@@ -217,7 +222,7 @@ describe('specialist-context', () => {
     it('should return null if no recent runs and not forced', async () => {
       vi.spyOn(specialistLogs, 'getRecentRunLogs').mockReturnValue([]);
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
       expect(digest).toBeNull();
     });
 
@@ -232,7 +237,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent', { force: true });
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent', { force: true }));
       expect(digest).toBeTruthy();
       expect(digest).toContain('Generated Digest');
     });
@@ -246,7 +251,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
 
       expect(digest).toBeTruthy();
       expect(digest).toContain('Test Digest');
@@ -269,7 +274,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      await generateContextDigest('testproject', 'review-agent', { runCount: 10 });
+      await Effect.runPromise(generateContextDigest('testproject', 'review-agent', { runCount: 10 }));
 
       expect(mockGetRecentRuns).toHaveBeenCalledWith('testproject', 'review-agent', 10);
     });
@@ -283,7 +288,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      await generateContextDigest('testproject', 'review-agent', { model: 'claude-opus-4-6' });
+      await Effect.runPromise(generateContextDigest('testproject', 'review-agent', { model: 'claude-opus-4-6' }));
 
       expect(mockExec).toHaveBeenCalledWith(
         expect.stringContaining('--model claude-opus-4-6'),
@@ -301,7 +306,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
       expect(digest).toBeNull();
     });
 
@@ -314,7 +319,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
       expect(digest).toBeNull();
     });
 
@@ -330,7 +335,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      await generateContextDigest('testproject', 'review-agent');
+      await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
 
       expect(existsSync(contextDir)).toBe(true);
     });
@@ -346,7 +351,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
       expect(digest).toBe('digest');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[claude-invoke] STDERR purpose=specialist-digest')
@@ -366,7 +371,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await generateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(generateContextDigest('testproject', 'review-agent'));
       expect(digest).toBe('digest');
       expect(consoleErrorSpy).not.toHaveBeenCalled();
 
@@ -386,7 +391,7 @@ describe('specialist-context', () => {
         return {} as any;
       });
 
-      const digest = await regenerateContextDigest('testproject', 'review-agent');
+      const digest = await Effect.runPromise(regenerateContextDigest('testproject', 'review-agent'));
       expect(digest).toBe('regenerated digest');
     });
   });

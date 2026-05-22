@@ -27,6 +27,7 @@ const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
+  getAgentStateSync: mockGetAgentState,
   getAgentStateEffect: mockGetAgentStateEffect,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
@@ -51,8 +52,10 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
 
 // ─── Mock projects ────────────────────────────────────────────────────────────
 
+const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
-  resolveProjectFromIssue: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,7 +81,7 @@ describe('AgentSpawner — integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
-    mockGetAgentState.mockReturnValue(null);
+    mockGetAgentState.mockReturnValue(Effect.succeed(null));
     mockGetAgentStateEffect.mockReturnValue(Effect.succeed(null));
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
@@ -130,7 +133,7 @@ describe('AgentSpawner — integration', () => {
     });
 
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
-      mockGetAgentStateEffect.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
+      mockGetAgentState.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
       const program = Effect.gen(function* () {

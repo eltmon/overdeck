@@ -5,15 +5,18 @@ import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
+  listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
-  listSessionNamesAsyncEffect: vi.fn(),
-  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+  listSessionNames: vi.fn(),
+  capturePane: vi.fn(() => Effect.succeed('')),
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
+  getAgentRuntimeState: vi.fn(),
   getAgentRuntimeStateEffect: vi.fn(),
 }));
 
@@ -23,6 +26,7 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
   getReviewStatus: vi.fn(() => null),
+  getReviewStatusSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
@@ -59,9 +63,9 @@ vi.mock('node:fs/promises', async () => {
 });
 
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
-import { listProjects } from '../../../../../src/lib/projects.js';
-import { listSessionNamesAsyncEffect } from '../../../../../src/lib/tmux.js';
-import { getAgentRuntimeStateEffect } from '../../../../../src/lib/agents.js';
+import { listProjectsSync } from '../../../../../src/lib/projects.js';
+import { listSessionNames } from '../../../../../src/lib/tmux.js';
+import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -79,11 +83,11 @@ describe('fetchProjectSessionTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
-    mockFindSpecByIssue.mockReturnValue(null);
+    mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
   });
 
   it('returns null for unknown project key', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       { key: 'panopticon-cli', config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli' } },
     ]);
 
@@ -92,10 +96,10 @@ describe('fetchProjectSessionTree', () => {
   });
 
   it('returns empty features array when workspaces directory does not exist', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       { key: 'panopticon-cli', config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli' } },
     ]);
-    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
@@ -104,14 +108,14 @@ describe('fetchProjectSessionTree', () => {
   });
 
   it('aggregates sessions for active feature workspaces', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       {
         key: 'panopticon-cli',
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
-    (getAgentRuntimeStateEffect as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
@@ -146,17 +150,17 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.sessions).toHaveLength(1);
     expect(tree.features[1]?.sessions).toHaveLength(1);
     expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
-    expect(listSessionNamesAsyncEffect).toHaveBeenCalledTimes(1);
+    expect(listSessionNames).toHaveBeenCalledTimes(1);
   });
 
   it('skips features with no agent dir and no planning dir', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       {
         key: 'panopticon-cli',
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set(['/tmp/panopticon-cli/workspaces']));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-999', isDirectory: () => true },
@@ -168,13 +172,13 @@ describe('fetchProjectSessionTree', () => {
   });
 
   it('matches project by config name when key differs from name', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       {
         key: 'panopticon-cli',
         config: { name: 'Panopticon CLI', path: '/tmp/panopticon-cli' },
       },
     ]);
-    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
@@ -183,13 +187,13 @@ describe('fetchProjectSessionTree', () => {
   });
 
   it('resolves feature title from main-side .pan/specs/ via findSpecByIssue', async () => {
-    (listProjects as any).mockReturnValue([
+    (listProjectsSync as any).mockReturnValue([
       {
         key: 'panopticon-cli',
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan',

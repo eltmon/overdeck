@@ -9,7 +9,7 @@ import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
 import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
 
@@ -35,7 +35,7 @@ export interface WriteFeedbackResult {
  * Resolve workspace path from an issue ID.
  */
 function resolveWorkspacePath(issueId: string): string | null {
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return null;
 
   const wsPath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
@@ -60,14 +60,7 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
   } catch {
     return 1;
   }
-}
-
-/**
- * Clear existing feedback files from a previous review cycle.
- *
- * Deletes all NNN-*.md files in workspace `.pan/feedback/`.
- */
-export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
+}async function clearFeedbackFilesPromise(workspacePath: string): Promise<void> {
   const { feedbackDir } = getWorkspacePanPaths(workspacePath);
 
   // Also clear the continue file's feedback[] (Layer 1+).
@@ -106,18 +99,11 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
  * @deprecated Alias kept for backward compatibility with in-flight code paths.
  * Prefer `clearFeedbackFiles` directly.
  */
-export const archiveFeedbackFiles = clearFeedbackFiles;
-
-/**
- * Write specialist feedback to the scope vBRIEF continue file and record a
- * sessionHistory breadcrumb. The primary data store is the continue file
- * (Layer 3+) with workspace mirrors in `.pan/feedback/`.
- */
-export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
+async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
   const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
 
-  const resolved = resolveProjectFromIssue(opts.issueId);
+  const resolved = resolveProjectFromIssueSync(opts.issueId);
   if (!resolved) {
     return { success: false, error: `Project not found for ${opts.issueId}` };
   }
@@ -208,9 +194,9 @@ export class FeedbackWriteError extends Data.TaggedError('FeedbackWriteError')<{
 }> {}
 
 /** Effect variant of `clearFeedbackFiles`. */
-export const clearFeedbackFilesEffect = (workspacePath: string): Effect.Effect<void, FeedbackWriteError> =>
+export const clearFeedbackFiles = (workspacePath: string): Effect.Effect<void, FeedbackWriteError> =>
   Effect.tryPromise({
-    try: () => clearFeedbackFiles(workspacePath),
+    try: () => clearFeedbackFilesPromise(workspacePath),
     catch: (cause) =>
       new FeedbackWriteError({
         issueId: workspacePath,
@@ -220,12 +206,14 @@ export const clearFeedbackFilesEffect = (workspacePath: string): Effect.Effect<v
       }),
   });
 
+export const archiveFeedbackFiles = clearFeedbackFiles;
+
 /** Effect variant of `writeFeedbackFile`. */
-export const writeFeedbackFileEffect = (
+export const writeFeedbackFile = (
   opts: WriteFeedbackOptions,
 ): Effect.Effect<WriteFeedbackResult, FeedbackWriteError> =>
   Effect.tryPromise({
-    try: () => writeFeedbackFile(opts),
+    try: () => writeFeedbackFilePromise(opts),
     catch: (cause) =>
       new FeedbackWriteError({
         issueId: opts.issueId,

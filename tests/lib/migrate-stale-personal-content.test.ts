@@ -22,6 +22,7 @@ const mockGetDevrootPath = vi.fn<[], string | null>();
 vi.mock('../../src/lib/config.js', () => ({
   getDevrootPath: () => mockGetDevrootPath(),
   loadConfig: vi.fn(),
+  loadConfigSync: vi.fn(),
   saveConfig: vi.fn(),
   getConfig: vi.fn().mockReturnValue({}),
 }));
@@ -67,7 +68,7 @@ describe('migrateStalePersonalContent', () => {
     mockHomedirFn = () => fakeHome;
 
     const mod = await import('../../src/lib/sync.js');
-    migrateStalePersonalContent = mod.migrateStalePersonalContent;
+    migrateStalePersonalContent = mod.migrateStalePersonalContentSync;
   });
 
   afterEach(() => {

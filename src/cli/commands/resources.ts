@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { readlinkSync } from 'fs';
-import { listSessions } from '../../lib/tmux.js';
+import { listSessionsSync } from '../../lib/tmux.js';
 import { listActiveConversations } from '../../lib/database/conversations-db.js';
 
 interface ResourcesOptions {
@@ -148,7 +148,7 @@ function detectRole(parentCmd: string, cwd: string): string {
 }
 
 function categorizeProcesses(processes: ClaudeProcess[]): void {
-  const tmuxSessions = listSessions();
+  const tmuxSessions = listSessionsSync();
   const conversations = listActiveConversations();
   const convTmuxNames = new Set(conversations.map(c => c.tmuxSession));
 

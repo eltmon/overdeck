@@ -11,8 +11,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  computeQueuePositionFromStatus,
-  findPositionInQueue,
+  computeQueuePositionFromStatusSync,
+  findPositionInQueueSync,
   SPECIALIST_ACTIVE_POSITION,
 } from '../../../src/lib/queue-position.js';
 import type { HookItem } from '../../../src/lib/hooks.js';
@@ -38,7 +38,7 @@ function makeItem(issueId: string, idx = 0): HookItem {
 
 describe('computeQueuePositionFromStatus', () => {
   it('returns active position when reviewStatus is reviewing', () => {
-    const result = computeQueuePositionFromStatus({
+    const result = computeQueuePositionFromStatusSync({
       reviewStatus: 'reviewing',
       testStatus: 'pending',
     });
@@ -47,7 +47,7 @@ describe('computeQueuePositionFromStatus', () => {
   });
 
   it('returns active position when testStatus is testing', () => {
-    const result = computeQueuePositionFromStatus({
+    const result = computeQueuePositionFromStatusSync({
       reviewStatus: 'passed',
       testStatus: 'testing',
     });
@@ -56,7 +56,7 @@ describe('computeQueuePositionFromStatus', () => {
   });
 
   it('returns active position when mergeStatus is merging', () => {
-    const result = computeQueuePositionFromStatus({
+    const result = computeQueuePositionFromStatusSync({
       reviewStatus: 'passed',
       testStatus: 'passed',
       mergeStatus: 'merging',
@@ -66,7 +66,7 @@ describe('computeQueuePositionFromStatus', () => {
   });
 
   it('returns null when all statuses are idle/done', () => {
-    const result = computeQueuePositionFromStatus({
+    const result = computeQueuePositionFromStatusSync({
       reviewStatus: 'pending',
       testStatus: 'pending',
     });
@@ -75,13 +75,13 @@ describe('computeQueuePositionFromStatus', () => {
   });
 
   it('returns null for null status', () => {
-    const result = computeQueuePositionFromStatus(null);
+    const result = computeQueuePositionFromStatusSync(null);
     expect(result.queuePosition).toBeNull();
     expect(result.activeSpecialist).toBeNull();
   });
 
   it('reviewing takes precedence when both reviewing and testing are set', () => {
-    const result = computeQueuePositionFromStatus({
+    const result = computeQueuePositionFromStatusSync({
       reviewStatus: 'reviewing',
       testStatus: 'testing',
     });
@@ -100,27 +100,27 @@ describe('findPositionInQueue', () => {
       makeItem('PAN-200', 1),
       makeItem('PAN-366', 2),
     ];
-    expect(findPositionInQueue('PAN-366', items)).toBe(3);
+    expect(findPositionInQueueSync('PAN-366', items)).toBe(3);
   });
 
   it('returns 1 when issueId is first in queue', () => {
     const items: HookItem[] = [makeItem('PAN-366'), makeItem('PAN-200')];
-    expect(findPositionInQueue('PAN-366', items)).toBe(1);
+    expect(findPositionInQueueSync('PAN-366', items)).toBe(1);
   });
 
   it('returns -1 when issueId is not in queue', () => {
     const items: HookItem[] = [makeItem('PAN-100'), makeItem('PAN-200')];
-    expect(findPositionInQueue('PAN-366', items)).toBe(-1);
+    expect(findPositionInQueueSync('PAN-366', items)).toBe(-1);
   });
 
   it('is case-insensitive', () => {
     const items: HookItem[] = [makeItem('pan-366')];
-    expect(findPositionInQueue('PAN-366', items)).toBe(1);
-    expect(findPositionInQueue('pan-366', items)).toBe(1);
+    expect(findPositionInQueueSync('PAN-366', items)).toBe(1);
+    expect(findPositionInQueueSync('pan-366', items)).toBe(1);
   });
 
   it('returns -1 for empty queue', () => {
-    expect(findPositionInQueue('PAN-366', [])).toBe(-1);
+    expect(findPositionInQueueSync('PAN-366', [])).toBe(-1);
   });
 
   it('handles items with no issueId in payload', () => {
@@ -128,6 +128,6 @@ describe('findPositionInQueue', () => {
       { id: 'x', type: 'task', priority: 'normal', source: 'test', payload: {}, createdAt: '' },
       makeItem('PAN-366'),
     ];
-    expect(findPositionInQueue('PAN-366', items)).toBe(2);
+    expect(findPositionInQueueSync('PAN-366', items)).toBe(2);
   });
 });

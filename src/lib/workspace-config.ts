@@ -287,7 +287,7 @@ export interface TemplatePlaceholders {
 /**
  * Replace template placeholders in a string
  */
-export function replacePlaceholders(template: string, placeholders: TemplatePlaceholders): string {
+export function replacePlaceholdersSync(template: string, placeholders: TemplatePlaceholders): string {
   let result = template;
   for (const [key, value] of Object.entries(placeholders)) {
     result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
@@ -298,7 +298,7 @@ export function replacePlaceholders(template: string, placeholders: TemplatePlac
 /**
  * Get default workspace config for a monorepo project
  */
-export function getDefaultWorkspaceConfig(): WorkspaceConfig {
+export function getDefaultWorkspaceConfigSync(): WorkspaceConfig {
   return {
     type: 'monorepo',
     workspaces_dir: 'workspaces',
@@ -388,7 +388,7 @@ export const SERVICE_TEMPLATES: Record<string, Partial<ServiceConfig>> = {
 /**
  * Get service config from template with overrides
  */
-export function getServiceFromTemplate(
+export function getServiceFromTemplateSync(
   templateName: string,
   overrides: Partial<ServiceConfig>
 ): ServiceConfig {
@@ -409,18 +409,18 @@ export function getServiceFromTemplate(
 import { Effect } from 'effect';
 
 /** Substitute {{KEY}} placeholders. Pure. */
-export const replacePlaceholdersEffect = (
+export const replacePlaceholders = (
   template: string,
   placeholders: TemplatePlaceholders,
-): Effect.Effect<string> => Effect.sync(() => replacePlaceholders(template, placeholders));
+): Effect.Effect<string> => Effect.sync(() => replacePlaceholdersSync(template, placeholders));
 
 /** Workspace defaults (ports, services, DNS). Pure. */
-export const getDefaultWorkspaceConfigEffect = (): Effect.Effect<WorkspaceConfig> =>
-  Effect.sync(() => getDefaultWorkspaceConfig());
+export const getDefaultWorkspaceConfig = (): Effect.Effect<WorkspaceConfig> =>
+  Effect.sync(() => getDefaultWorkspaceConfigSync());
 
 /** Merge a service template with overrides. Pure. */
-export const getServiceFromTemplateEffect = (
+export const getServiceFromTemplate = (
   templateName: string,
   overrides: Partial<ServiceConfig>,
 ): Effect.Effect<ServiceConfig> =>
-  Effect.sync(() => getServiceFromTemplate(templateName, overrides));
+  Effect.sync(() => getServiceFromTemplateSync(templateName, overrides));

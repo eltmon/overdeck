@@ -21,7 +21,7 @@ import { execSync } from 'child_process';
 import {
   spawnAgent,
   spawnRun,
-  getAgentState,
+  getAgentStateSync,
   type SpawnOptions,
   getAgentDir,
 } from '../../src/lib/agents.js';
@@ -35,11 +35,11 @@ const piFifoMocks = vi.hoisted(() => ({
 
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
-  createPiFifo: vi.fn(async (agentId: string) => {
+  createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
     const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
     mkdirSync(dir, { recursive: true });
     return join(dir, 'rpc.in');
-  }),
+  })),
   piFifoPaths: (agentId: string) => {
     const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
     return {
@@ -49,29 +49,39 @@ vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
     };
   },
   writePiCommand: piFifoMocks.writePiCommand,
+  writePiCommandSync: piFifoMocks.writePiCommand,
 }));
 
 // Mock tmux module to avoid actual session creation
 vi.mock('../../src/lib/tmux.js', () => ({
   createSession: vi.fn().mockResolvedValue(undefined),
-  createSessionAsyncEffect: vi.fn(() => Effect.void),
+  createSession: vi.fn(() => Effect.void),
   killSession: vi.fn().mockResolvedValue(undefined),
-  killSessionAsyncEffect: vi.fn(() => Effect.void),
+  killSessionSync: vi.fn().mockResolvedValue(undefined),
+  killSession: vi.fn(() => Effect.void),
+  killSessionSync: vi.fn(() => Effect.void),
+  sendKeys: vi.fn(() => Effect.void),
   sendKeysEffect: vi.fn(() => Effect.void),
-  sendRawKeystrokeAsyncEffect: vi.fn(() => Effect.void),
+  sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn().mockReturnValue(false),
-  sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
+  sessionExists: vi.fn(() => Effect.succeed(false)),
+  sessionExistsSync: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn().mockResolvedValue([]),
-  getAgentSessionsAsyncEffect: vi.fn(() => Effect.succeed([])),
-  listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
-  setOptionAsyncEffect: vi.fn(() => Effect.void),
+  getAgentSessionsSync: vi.fn().mockResolvedValue([]),
+  getAgentSessions: vi.fn(() => Effect.succeed([])),
+  getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
+  listPaneValues: vi.fn(() => Effect.succeed([])),
+  setOption: vi.fn(() => Effect.void),
   capturePane: vi.fn().mockResolvedValue('Claude Code'),
-  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('Claude Code')),
+  capturePane: vi.fn(() => Effect.succeed('Claude Code')),
 }));
 
 vi.mock('../../src/lib/hooks.js', () => ({
   initHook: vi.fn(),
+  initHookSync: vi.fn(),
   checkHook: vi.fn().mockReturnValue({ allowed: true, hasWork: false }),
+  checkHookSync: vi.fn().mockReturnValue({ allowed: true, hasWork: false }),
   generateFixedPointPrompt: vi.fn().mockReturnValue(''),
   checkAndSetupHooks: vi.fn(),
   writeTaskCache: vi.fn(),
@@ -79,8 +89,11 @@ vi.mock('../../src/lib/hooks.js', () => ({
 
 vi.mock('../../src/lib/cv.js', () => ({
   startWork: vi.fn(),
+  startWorkSync: vi.fn(),
   completeWork: vi.fn(),
+  completeWorkSync: vi.fn(),
   getAgentCV: vi.fn().mockReturnValue(null),
+  getAgentCVSync: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/lib/memory/injection.js', () => ({
@@ -96,7 +109,8 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/cliproxy.js')>();
   return {
     ...actual,
-    isCliproxyRunning: vi.fn().mockReturnValue(true),
+    isCliproxyRunning: vi.fn().mockReturnValue(Effect.succeed(true)),
+    isCliproxyRunningSync: vi.fn().mockReturnValue(true),
     isCliproxyRunningEffect: vi.fn(() => Effect.succeed(true)),
   };
 });
@@ -105,34 +119,36 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
 // resolveModel() and the role harness lookup find consistent values.
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
+  const loadedConfig = {
+    config: {
+      preset: 'balanced',
+      enabledProviders: new Set(['anthropic']),
+      apiKeys: {},
+      providerAuth: {},
+      providerPlan: {},
+      openrouterFavorites: [],
+      workhorses: { ...actual.DEFAULT_WORKHORSES },
+      roles: { ...actual.DEFAULT_ROLES },
+      overrides: {},
+      geminiThinkingLevel: 3,
+      trackerKeys: {},
+      tmux: { configMode: 'managed' },
+      conversations: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+      },
+      claude: { permissionMode: 'bypass' },
+      experimental: { claudeCodeChannels: false },
+      caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
+    } as NormalizedConfig,
+  };
   return {
     ...actual,
     isClaudeCodeChannelsEnabled: vi.fn().mockReturnValue(false),
-    loadConfig: vi.fn().mockReturnValue({
-      config: {
-        preset: 'balanced',
-        enabledProviders: new Set(['anthropic']),
-        apiKeys: {},
-        providerAuth: {},
-        providerPlan: {},
-        openrouterFavorites: [],
-        workhorses: { ...actual.DEFAULT_WORKHORSES },
-        roles: { ...actual.DEFAULT_ROLES },
-        overrides: {},
-        geminiThinkingLevel: 3,
-        trackerKeys: {},
-        tmux: { configMode: 'managed' },
-        conversations: {
-          compactionModel: 'claude-haiku-4-5',
-          manualCompactMode: 'claude-code',
-          richCompaction: true,
-          titleModel: 'claude-haiku-4-5',
-        },
-        claude: { permissionMode: 'bypass' },
-        experimental: { claudeCodeChannels: false },
-        caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
-      } as NormalizedConfig,
-    }),
+    loadConfig: vi.fn().mockReturnValue(loadedConfig),
+    loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
   };
 });
 
@@ -144,6 +160,7 @@ vi.mock('../../src/lib/harness-policy.js', async (importOriginal) => {
   return {
     ...actual,
     canUseHarness: vi.fn().mockReturnValue({ allowed: true }),
+    canUseHarnessSync: vi.fn().mockReturnValue({ allowed: true }),
   };
 });
 
@@ -151,7 +168,7 @@ vi.mock('../../src/lib/beads-query.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/beads-query.js')>();
   return {
     ...actual,
-    assertIssueHasBeads: vi.fn().mockResolvedValue(undefined),
+    assertIssueHasBeads: vi.fn(() => Effect.void),
   };
 });
 
@@ -166,12 +183,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testAgentsDir, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     vi.clearAllMocks();
-    const { sessionExistsAsyncEffect } = await import('../../src/lib/tmux.js');
-    vi.mocked(sessionExistsAsyncEffect).mockReturnValue(Effect.succeed(false));
+    const { sessionExists } = await import('../../src/lib/tmux.js');
+    vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false));
     const cliproxy = await import('../../src/lib/cliproxy.js');
-    vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
+    vi.mocked(cliproxy.isCliproxyRunningSync).mockReturnValue(true);
     const beadsQuery = await import('../../src/lib/beads-query.js');
-    vi.mocked(beadsQuery.assertIssueHasBeads).mockResolvedValue(undefined);
+    vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValue(Effect.void);
     piFifoMocks.writePiCommand.mockClear();
   });
 
@@ -215,7 +232,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const agentDir = getAgentDir('agent-pan-test-2');
       expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
 
-      const reloaded = getAgentState('agent-pan-test-2');
+      const reloaded = getAgentStateSync('agent-pan-test-2');
       expect(reloaded?.issueId).toBe('PAN-TEST-2');
       expect(reloaded?.role).toBe('work');
       // Persisted contract: harness lives on AgentState (PAN-1048 R2),
@@ -240,8 +257,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('refuses to spawn before creating state when the issue has no beads', async () => {
       const beadsQuery = await import('../../src/lib/beads-query.js');
-      vi.mocked(beadsQuery.assertIssueHasBeads).mockRejectedValueOnce(
-        new Error('No beads tasks found for PAN-NOBEADS-1')
+      vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValueOnce(
+        Effect.fail(new Error('No beads tasks found for PAN-NOBEADS-1'))
       );
 
       await expect(spawnAgent({
@@ -250,7 +267,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         role: 'work',
       })).rejects.toThrow(/No beads tasks found/);
 
-      expect(getAgentState('agent-pan-nobeads-1')).toBeNull();
+      expect(getAgentStateSync('agent-pan-nobeads-1')).toBeNull();
     });
 
     // ─── PAN-1215 cleanup block ─────────────────────────────────────────────────
@@ -359,9 +376,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       // Modify the now-untracked file and capture a checkpoint
       writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":2}');
-      await captureCheckpoint(workspace, 'agent-pan-ac28', 'turn-1');
+      await Effect.runPromise(captureCheckpoint(workspace, 'agent-pan-ac28', 'turn-1'));
 
-      expect(await hasCheckpoint(workspace, 'agent-pan-ac28', 'turn-1')).toBe(true);
+      expect(await Effect.runPromise(hasCheckpoint(workspace, 'agent-pan-ac28', 'turn-1'))).toBe(true);
       const ref = 'refs/pan/turn/agent-pan-ac28/turn-1';
       const commit = execSync(`git rev-parse ${ref}`, { cwd: workspace, encoding: 'utf-8' }).trim();
       const files = execSync(`git ls-tree -r --name-only ${commit}`, { cwd: workspace, encoding: 'utf-8' })
@@ -395,9 +412,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // DEFAULT_ROLES carries no per-role harness override → must default to
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
-      const { setOptionAsyncEffect } = await import('../../src/lib/tmux.js');
-      expect(setOptionAsyncEffect).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
-      expect(setOptionAsyncEffect).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
+      const { setOption } = await import('../../src/lib/tmux.js');
+      expect(setOption).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
+      expect(setOption).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
     });
 
     it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
@@ -418,7 +435,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain("initial-prompt.md'");
       expect(launcher).not.toContain('prompt=$(cat');
       expect(launcher).not.toContain('"$prompt"');
-      expect(tmux.sendKeysEffect).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalled();
     });
 
     it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
@@ -449,19 +466,19 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain(`rm -f '${join(agentDir, 'reviewer-launcher.pid')}'`);
 
       // Synthesis wiring is persisted on AgentState too (Deacon backup path).
-      const state = getAgentState('agent-pan-subsignal-1-review-correctness');
+      const state = getAgentStateSync('agent-pan-subsignal-1-review-correctness');
       expect(state?.reviewSynthesisAgentId).toBe('agent-pan-subsignal-1-review');
       expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
     });
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
-      vi.mocked(tmux.createSessionAsyncEffect).mockImplementationOnce((agentId: string) => Effect.sync(() => {
+      vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
       }));
-      vi.mocked(tmux.capturePaneAsyncEffect).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
+      vi.mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: '/tmp/test-workspace',
@@ -474,13 +491,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         'agent-pan-pi-prompt-1-test',
         expect.objectContaining({ type: 'prompt', message: 'run the tests' }),
       );
-      expect(tmux.capturePaneAsyncEffect).not.toHaveBeenCalled();
-      expect(tmux.sendKeysEffect).not.toHaveBeenCalled();
+      expect(tmux.capturePane).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalled();
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {
-      const { sessionExistsAsyncEffect } = await import('../../src/lib/tmux.js');
-      vi.mocked(sessionExistsAsyncEffect).mockReturnValue(Effect.succeed(true));
+      const { sessionExists } = await import('../../src/lib/tmux.js');
+      vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true));
 
       await expect(
         spawnRun('PAN-DUP-1', 'review', { workspace: '/tmp/test-workspace' }),
@@ -497,7 +514,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     // to claude-code when the gate denies the combination.
     it('downgrades pi → claude-code for spawnRun review when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
-      vi.mocked(harnessPolicy.canUseHarness).mockReturnValueOnce({
+      vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
@@ -508,12 +525,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       });
 
       expect(state.harness).toBe('claude-code');
-      expect(harnessPolicy.canUseHarness).toHaveBeenCalled();
+      expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
     it('downgrades pi → claude-code for spawnAgent work when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
-      vi.mocked(harnessPolicy.canUseHarness).mockReturnValueOnce({
+      vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
@@ -526,7 +543,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       });
 
       expect(state.harness).toBe('claude-code');
-      expect(harnessPolicy.canUseHarness).toHaveBeenCalled();
+      expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
     // Positive case (canUseHarness allows pi → state.harness stays 'pi') is

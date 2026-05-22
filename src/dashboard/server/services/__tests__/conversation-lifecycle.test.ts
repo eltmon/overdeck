@@ -26,7 +26,7 @@ vi.mock('../conversation-attachments.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
-  listSessionNamesAsyncEffect: mockListSessionNamesEffect,
+  listSessionNames: mockListSessionNamesEffect,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned

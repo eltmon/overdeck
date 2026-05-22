@@ -13,6 +13,18 @@ vi.mock('../config.js', () => ({
       },
     },
   })),
+  loadCloisterConfigSync: vi.fn(() => ({
+    model_selection: {
+      default_model: 'sonnet',
+      complexity_routing: { trivial: 'haiku', simple: 'haiku', medium: 'sonnet', complex: 'sonnet', expert: 'opus' },
+      specialist_models: {},
+      specialist_harnesses: {
+        review_agent: 'pi',
+        merge_agent: 'claude-code',
+        // test_agent intentionally absent — falls back to default.
+      },
+    },
+  })),
 }))
 
 import { ModelRouter, getSpecialistHarness, resetGlobalRouter } from '../router.js'

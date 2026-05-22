@@ -48,7 +48,7 @@ function statusRoot(projectPath: string, status: Exclude<PrdStatus, 'draft'>): s
  * Canonical lowercase subdirectory path. Always use this for NEW writes.
  * Does not check existence — callers create the directory as needed.
  */
-export function canonicalPrdSubdir(
+export function canonicalPrdSubdirSync(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -60,7 +60,7 @@ export function canonicalPrdSubdir(
  * Find an existing PRD for an issue under a single lifecycle status.
  * Checks all four legacy/buggy formats, preferring canonical.
  */
-export function findPrdAtStatus(
+export function findPrdAtStatusSync(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -82,7 +82,7 @@ export function findPrdAtStatus(
   return null;
 }
 
-export function findDraftPrd(projectPath: string, issueId: string): PrdLocation | null {
+export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocation | null {
   const path = getIssueDraftPath(projectPath, issueId)
   if (!existsSync(path)) return null
   return {
@@ -96,15 +96,15 @@ export function findDraftPrd(projectPath: string, issueId: string): PrdLocation 
  * Find a PRD across all lifecycle statuses, in priority order:
  * active → completed → planned → draft. Returns the first match or null.
  */
-export function findPrdAnywhere(
+export function findPrdAnywhereSync(
   projectPath: string,
   issueId: string,
 ): PrdLocation | null {
   for (const status of ['active', 'completed', 'planned'] as const) {
-    const loc = findPrdAtStatus(projectPath, issueId, status);
+    const loc = findPrdAtStatusSync(projectPath, issueId, status);
     if (loc) return loc;
   }
-  return findDraftPrd(projectPath, issueId)
+  return findDraftPrdSync(projectPath, issueId)
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -112,32 +112,32 @@ export function findPrdAnywhere(
 // All helpers in this module are pure path computation + existsSync stat — no
 // real I/O failure modes. Effect.sync wrappers preserve the synchronous nature.
 
-/** Effect variant of {@link canonicalPrdSubdir}. */
-export const canonicalPrdSubdirEffect = (
+/** Effect variant of {@link canonicalPrdSubdirSync}. */
+export const canonicalPrdSubdir = (
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
 ): Effect.Effect<string, never> =>
-  Effect.sync(() => canonicalPrdSubdir(projectPath, issueId, status));
+  Effect.sync(() => canonicalPrdSubdirSync(projectPath, issueId, status));
 
-/** Effect variant of {@link findPrdAtStatus}. */
-export const findPrdAtStatusEffect = (
+/** Effect variant of {@link findPrdAtStatusSync}. */
+export const findPrdAtStatus = (
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
 ): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAtStatus(projectPath, issueId, status));
+  Effect.sync(() => findPrdAtStatusSync(projectPath, issueId, status));
 
-/** Effect variant of {@link findDraftPrd}. */
-export const findDraftPrdEffect = (
+/** Effect variant of {@link findDraftPrdSync}. */
+export const findDraftPrd = (
   projectPath: string,
   issueId: string,
 ): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findDraftPrd(projectPath, issueId));
+  Effect.sync(() => findDraftPrdSync(projectPath, issueId));
 
-/** Effect variant of {@link findPrdAnywhere}. */
-export const findPrdAnywhereEffect = (
+/** Effect variant of {@link findPrdAnywhereSync}. */
+export const findPrdAnywhere = (
   projectPath: string,
   issueId: string,
 ): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAnywhere(projectPath, issueId));
+  Effect.sync(() => findPrdAnywhereSync(projectPath, issueId));

@@ -8,7 +8,7 @@ export class ModelValidationError extends Data.TaggedError('ModelValidationError
   readonly message: string;
 }> {}
 
-export function normalizeModelOverride(value: unknown): string | undefined {
+export function normalizeModelOverrideSync(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string') {
     throw new Error('model must be a string.');
@@ -21,16 +21,16 @@ export function normalizeModelOverride(value: unknown): string | undefined {
   return trimmed;
 }
 
-export function requireModelOverride(value: unknown): string {
-  const model = normalizeModelOverride(value);
+export function requireModelOverrideSync(value: unknown): string {
+  const model = normalizeModelOverrideSync(value);
   if (!model) {
     throw new Error('model is required');
   }
   return model;
 }
 
-export function shellQuoteModelId(model: string): string {
-  const normalized = requireModelOverride(model);
+export function shellQuoteModelIdSync(model: string): string {
+  const normalized = requireModelOverrideSync(model);
   return `'${normalized.replace(/'/g, `'\\''`)}'`;
 }
 
@@ -42,14 +42,14 @@ const wrapValidation = (value: unknown) => (cause: unknown): ModelValidationErro
     message: cause instanceof Error ? cause.message : String(cause),
   });
 
-/** Effect variant of {@link normalizeModelOverride}. */
-export const normalizeModelOverrideEffect = (value: unknown): Effect.Effect<string | undefined, ModelValidationError> =>
-  Effect.try({ try: () => normalizeModelOverride(value), catch: wrapValidation(value) });
+/** Effect variant of {@link normalizeModelOverrideSync}. */
+export const normalizeModelOverride = (value: unknown): Effect.Effect<string | undefined, ModelValidationError> =>
+  Effect.try({ try: () => normalizeModelOverrideSync(value), catch: wrapValidation(value) });
 
-/** Effect variant of {@link requireModelOverride}. */
-export const requireModelOverrideEffect = (value: unknown): Effect.Effect<string, ModelValidationError> =>
-  Effect.try({ try: () => requireModelOverride(value), catch: wrapValidation(value) });
+/** Effect variant of {@link requireModelOverrideSync}. */
+export const requireModelOverride = (value: unknown): Effect.Effect<string, ModelValidationError> =>
+  Effect.try({ try: () => requireModelOverrideSync(value), catch: wrapValidation(value) });
 
-/** Effect variant of {@link shellQuoteModelId}. */
-export const shellQuoteModelIdEffect = (model: string): Effect.Effect<string, ModelValidationError> =>
-  Effect.try({ try: () => shellQuoteModelId(model), catch: wrapValidation(model) });
+/** Effect variant of {@link shellQuoteModelIdSync}. */
+export const shellQuoteModelId = (model: string): Effect.Effect<string, ModelValidationError> =>
+  Effect.try({ try: () => shellQuoteModelIdSync(model), catch: wrapValidation(model) });

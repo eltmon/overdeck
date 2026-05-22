@@ -7,11 +7,11 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
-import { loadConfig } from '../../lib/config.js';
+import { loadConfigSync } from '../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
 import { isShadowed, getPendingSyncCount } from '../../lib/shadow-state.js';
-import { loadProjectsConfig } from '../../lib/projects.js';
+import { loadProjectsConfigSync } from '../../lib/projects.js';
 
 interface ListOptions {
   all?: boolean;
@@ -40,7 +40,7 @@ const STATE_COLORS: Record<string, (s: string) => string> = {
  * Get tracker config by type from panopticon config
  */
 function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
-  const config = loadConfig();
+  const config = loadConfigSync();
   const trackerConfig = config.trackers[trackerType];
 
   if (trackerConfig) {
@@ -61,7 +61,7 @@ function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
   // Auto-derive from projects.yaml for GitHub/GitLab
   if (trackerType === 'github') {
     try {
-      const { projects } = loadProjectsConfig();
+      const { projects } = loadProjectsConfigSync();
       for (const [, project] of Object.entries(projects)) {
         if (project.github_repo) {
           const [owner, repo] = project.github_repo.split('/');
@@ -85,7 +85,7 @@ function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
  * Get all configured trackers
  */
 function getConfiguredTrackers(): TrackerType[] {
-  const config = loadConfig();
+  const config = loadConfigSync();
   const trackers: TrackerType[] = [];
 
   if (config.trackers.linear) trackers.push('linear');
@@ -96,7 +96,7 @@ function getConfiguredTrackers(): TrackerType[] {
   // Auto-detect from projects.yaml if not explicitly configured
   if (!trackers.includes('github') || !trackers.includes('gitlab')) {
     try {
-      const { projects } = loadProjectsConfig();
+      const { projects } = loadProjectsConfigSync();
       for (const [, project] of Object.entries(projects)) {
         if (project.github_repo && !trackers.includes('github')) trackers.push('github');
         if (project.gitlab_repo && !trackers.includes('gitlab')) trackers.push('gitlab');
@@ -118,7 +118,9 @@ async function displayIssues(issues: Issue[], trackerName: string): Promise<void
 
   // Pre-compute shadowed refs in one batch so the render loop stays sync.
   const shadowedRefs = new Set<string>();
-  const shadowChecks = await Promise.all(issues.map(async i => [i.ref, await isShadowed(i.ref)] as const));
+  const shadowChecks = await Promise.all(
+    issues.map(async i => [i.ref, await Effect.runPromise(isShadowed(i.ref))] as const),
+  );
   for (const [ref, shadowed] of shadowChecks) if (shadowed) shadowedRefs.add(ref);
 
   // Group by state
@@ -155,7 +157,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
   const spinner = ora('Fetching issues...').start();
 
   try {
-    const config = loadConfig();
+    const config = loadConfigSync();
     const trackersToQuery: TrackerType[] = [];
 
     // Determine which trackers to query
@@ -229,7 +231,9 @@ export async function listCommand(options: ListOptions): Promise<void> {
       // Render only the shadow-only subset — the full list is suppressed.
       const filteredIssues = await Promise.all(
         allIssues.map(async ({ tracker, issues }) => {
-          const shadowChecks = await Promise.all(issues.map(i => isShadowed(i.ref)));
+          const shadowChecks = await Promise.all(
+            issues.map(i => Effect.runPromise(isShadowed(i.ref))),
+          );
           return { tracker, issues: issues.filter((_, idx) => shadowChecks[idx]) };
         })
       );
@@ -261,7 +265,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     }
 
     // Show shadow mode info
-    const pendingSync = await getPendingSyncCount();
+    const pendingSync = await Effect.runPromise(getPendingSyncCount());
     if (pendingSync > 0) {
       console.log(chalk.cyan(`👻 ${pendingSync} shadowed issue(s) pending sync`));
     }

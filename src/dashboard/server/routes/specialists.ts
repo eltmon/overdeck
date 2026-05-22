@@ -1,7 +1,7 @@
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
-import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -51,11 +51,11 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { getAgentCommand } from '../../../lib/settings.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { getAgentCommandSync } from '../../../lib/settings.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
-  getReviewStatus,
-  setReviewStatus as setReviewStatusBase,
+  getReviewStatusSync,
+  setReviewStatusSync as setReviewStatusBase,
   loadReviewStatuses,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
@@ -64,15 +64,15 @@ import {
   messageAgent,
   transitionIssueToInProgress,
 } from '../../../lib/agents.js';
-import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
+import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { queryBeadById } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
-import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
+import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
+import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
-import { killSessionAsyncEffect } from '../../../lib/tmux.js';
+import { extractPrefixSync } from '../../../lib/issue-id.js';
+import { killSession } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -127,7 +127,7 @@ function firePostMergeLifecycle(issueId: string): void {
     return;
   }
 
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPathForIssue(issuePrefix);
 
   _postMergeInFlight.add(issueId);
@@ -146,7 +146,7 @@ function firePostMergeLifecycle(issueId: string): void {
 
 function getProjectPathForIssue(issuePrefix: string): string {
   const issueId = `${issuePrefix}-1`;
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved) return resolved.projectPath;
   return join(homedir(), 'Projects');
 }
@@ -184,7 +184,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       isRunning,
       getTmuxSessionName,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const { clearHook } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
+    const { clearHookSync } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
 
     const specialists = getAllSpecialists();
     const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
@@ -195,14 +195,14 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
 
       if (yield* Effect.promise(() => isRunning(name))) {
         const tmuxSession = getTmuxSessionName(name);
-        const killResult = yield* killSessionAsyncEffect(tmuxSession).pipe(
+        const killResult = yield* killSession(tmuxSession).pipe(
           Effect.as(true),
           Effect.catch(() => Effect.succeed(false)),
         );
         killed = killResult;
       }
 
-      clearHook(name);
+      clearHookSync(name);
       results.push({ name, killed, sessionCleared: false, queueCleared: true });
     }
 
@@ -346,7 +346,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       try {
         const { getTmuxSessionName, updateRunMetadata, makeSpecialistRegistryKey } =
           await import('../../../lib/cloister/specialists.js');
-        const project = resolveProjectFromIssue(normalizedIssueId);
+        const project = resolveProjectFromIssueSync(normalizedIssueId);
         const projectKey = project?.projectKey;
         const tmuxSession = projectKey
           ? getTmuxSessionName(`${specialist}-agent` as SpecialistAgentName, projectKey, normalizedIssueId)
@@ -360,7 +360,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         // PAN-846: Kill the specialist tmux session so it doesn't leak RAM.
         // The session has completed its work; next dispatch spawns fresh.
         try {
-          await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
+          await Effect.runPromise(killSession(tmuxSession));
           console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
         } catch (err) {
           console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
@@ -380,12 +380,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../lib/cloister/specialist-handoff-logger.js');
-        const updated = await updateSpecialistHandoffStatus(
+        const updated = await Effect.runPromise(updateSpecialistHandoffStatus(
           normalizedIssueId,
           `${specialist}-agent`,
           status === 'passed' ? 'completed' : 'failed',
           status === 'passed' ? 'success' : 'failure',
-        );
+        ));
         if (updated) {
           console.log(`[specialists/done] Updated handoff log: ${specialist}-agent ${normalizedIssueId} → ${status}`);
         }
@@ -399,7 +399,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     if (specialist === 'review' && status === 'passed') {
       yield* Effect.promise(async () => {
         try {
-          const project = resolveProjectFromIssue(normalizedIssueId);
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
             const workspacePath = join(
               project.projectPath,
@@ -408,7 +408,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             );
             if (existsSync(workspacePath)) {
               const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-              const { HEAD } = await getWorkspaceGitInfo(workspacePath);
+              const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
               setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: HEAD });
               console.log(`[specialists/done] Snapshotted reviewedAtCommit=${HEAD.substring(0, 8)} for ${normalizedIssueId}`);
             }
@@ -428,7 +428,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
           const beadId = beadMatch?.[1] || 'unknown';
           // Resolve project to get workspace path
-          const project = resolveProjectFromIssue(normalizedIssueId);
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
             const workspacePath = join(
               project.projectPath,
@@ -436,22 +436,22 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
+              (await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath)));
 
               // Sync bead completion to vBRIEF plan
               try {
-                const beadData = await queryBeadById(workspacePath, beadId);
-                const updatedItemId = await syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
+                const beadData = await Effect.runPromise(queryBeadById(workspacePath, beadId));
+                const updatedItemId = await Effect.runPromise(syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title));
                 if (updatedItemId) {
                   // Check which tasks are now unblocked and wake the work agent
                   try {
-                    const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
+                    const unblockedItems = getUnblockedItemsSync(workspacePath, updatedItemId);
                     if (unblockedItems.length > 0) {
                       console.log(
                         `[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`,
                       );
                       const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-                      const doc = readWorkspacePlan(workspacePath);
+                      const doc = readWorkspacePlanSync(workspacePath);
                       const unblockedTitles = unblockedItems
                         .map((id) => {
                           const it = doc?.plan.items.find((i) => i.id === id);
@@ -489,7 +489,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     if (specialist === 'test' && status === 'passed') {
       yield* Effect.promise(async () => {
         try {
-          const project = resolveProjectFromIssue(normalizedIssueId);
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
             const workspacePath = join(
               project.projectPath,
@@ -528,7 +528,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // (inspect failures don't change Linear status — they're mid-implementation gates).
     if (status === 'failed' && specialist !== 'inspect') {
       try {
-        const project = resolveProjectFromIssue(normalizedIssueId);
+        const project = resolveProjectFromIssueSync(normalizedIssueId);
         if (project) {
           const workspacePath = join(
             project.projectPath,
@@ -584,10 +584,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-            const { sessionExistsAsyncEffect } = await import('../../../lib/tmux.js');
-            const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
+            const { sessionExists } = await import('../../../lib/tmux.js');
+            const { messageAgent, spawnAgent, getAgentStateSync } = await import('../../../lib/agents.js');
 
-            if (await Effect.runPromise(sessionExistsAsyncEffect(workAgentId))) {
+            if (await Effect.runPromise(sessionExists(workAgentId))) {
               // Agent is running — send rebase instructions directly
               const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);
@@ -606,20 +606,20 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     if (specialist === 'review' && (status === 'failed' || status === 'blocked')) {
       yield* Effect.promise(async () => {
         try {
-          const project = resolveProjectFromIssue(normalizedIssueId);
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
           const workspacePath = project
             ? join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`)
             : undefined;
           const { deliverReviewVerdictFeedback } = await import(
             '../../../lib/cloister/review-verdict-feedback.js'
           );
-          const result = await deliverReviewVerdictFeedback({
+          const result = await Effect.runPromise(deliverReviewVerdictFeedback({
             issueId: normalizedIssueId,
             verdict: status === 'failed' ? 'failed' : 'blocked',
             notes,
             workspacePath,
             prUrl: updatedStatus.prUrl,
-          });
+          }));
           console.log(
             `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
               ` (feedback=${result.feedbackPath ?? 'none'}, synthesis=${result.synthesisPath ?? 'none'}, prComment=${result.prCommentPosted})`,
@@ -666,8 +666,8 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
   httpHandler(Effect.gen(function* () {
-    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
-    const results = cleanupAllLogs();
+    const { cleanupAllLogsSync } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const results = cleanupAllLogsSync();
 
     return jsonResponse({
       success: true,
@@ -866,7 +866,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     });
 
     // Update review/test status based on specialist type
-    const existingStatus = getReviewStatus(issueId);
+    const existingStatus = getReviewStatusSync(issueId);
 
     if (name === 'review-agent') {
       const alreadyReported =
@@ -988,7 +988,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     const tmuxSession = getRunMetadata(project, registryKey).tmuxSession
       ?? getTmuxSessionName(type, project, issueId);
 
-    yield* Effect.promise(() => Effect.runPromise(killSessionAsyncEffect(tmuxSession)).catch(() => {}));
+    yield* Effect.promise(() => Effect.runPromise(killSession(tmuxSession)).catch(() => {}));
     // Leave Claude JSONL/session artifacts intact; only reset Panopticon runtime state.
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
@@ -1040,8 +1040,8 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       if (offsetParam) offset = parseInt(offsetParam, 10);
     }
 
-    const { listRunLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
-    const runs = listRunLogs(project, type, { limit, offset });
+    const { listRunLogsSync } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const runs = listRunLogsSync(project, type, { limit, offset });
     return jsonResponse(runs);
   })),
 );
@@ -1151,9 +1151,9 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    const { getRunLog, parseLogMetadata } =
+    const { getRunLogSync, parseLogMetadata } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
-    const content = getRunLog(project, type, runId);
+    const content = getRunLogSync(project, type, runId);
 
     if (!content) {
       return jsonResponse({ error: 'Run log not found' }, { status: 404 });
@@ -1429,11 +1429,11 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    const { cleanupOldLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const { cleanupOldLogsSync } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
     const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../lib/projects.js'));
 
     const retention = getSpecialistRetention(project);
-    const deleted = cleanupOldLogs(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
+    const deleted = cleanupOldLogsSync(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
     return jsonResponse({
       success: true,
@@ -1480,7 +1480,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const killResult = yield* Effect.promise(() => killAllReviewerSessions(project, issueId));
 
     // Resolve workspace info for re-dispatch
-    const projectConfig = resolveProjectFromIssue(issueId);
+    const projectConfig = resolveProjectFromIssueSync(issueId);
     if (!projectConfig) {
       return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
     }
@@ -1503,7 +1503,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { spawnReviewRoleForIssue } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
     );
-    const prUrl = getReviewStatus(issueId)?.prUrl;
+    const prUrl = getReviewStatusSync(issueId)?.prUrl;
     const result = yield* Effect.promise(() => spawnReviewRoleForIssue({
       issueId,
       workspace: workspacePath,
@@ -1558,10 +1558,10 @@ const getModelsResolveRoute = HttpRouter.add(
   'GET',
   '/api/models/resolve',
   httpHandler(Effect.gen(function* () {
-    const { loadConfig, resolveModel } = yield* Effect.promise(
+    const { loadConfigSync, resolveModel } = yield* Effect.promise(
       () => import('../../../lib/config-yaml.js'),
     );
-    const config = loadConfig().config;
+    const config = loadConfigSync().config;
 
     const routes = [
       { key: 'role:plan', role: 'plan' },

@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { setReviewStatusAsyncEffect, getReviewStatusAsyncEffect, type BlockerReason, type ReviewStatus } from './review-status.js';
+import { setReviewStatus, getReviewStatus, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 
@@ -68,7 +68,7 @@ function getTrackedRepos(): Set<string> {
   return cachedTrackedRepos;
 }
 
-export function isTrackedRepository(fullName: string | undefined): boolean {
+export function isTrackedRepositorySync(fullName: string | undefined): boolean {
   if (!fullName) return false;
   return getTrackedRepos().has(fullName.toLowerCase());
 }
@@ -86,7 +86,7 @@ async function loadAndValidateStatus(
   prNumber?: number,
   headSha?: string,
 ): Promise<ReviewStatus | null> {
-  const status = await Effect.runPromise(getReviewStatusAsyncEffect(issueId));
+  const status = await Effect.runPromise(getReviewStatus(issueId));
   if (!status) return null;
 
   // If no PR identity is stored yet, allow the event (identity will be populated lazily).
@@ -203,7 +203,7 @@ async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumb
       { encoding: 'utf-8', timeout: 15000 },
     );
     const [mergeable, mergeableState, draft] = JSON.parse(stdout) as [boolean | null, string | null, boolean];
-    const status = await Effect.runPromise(getReviewStatusAsyncEffect(issueId));
+    const status = await Effect.runPromise(getReviewStatus(issueId));
     if (!status) return;
 
     const update: Partial<ReviewStatus> = {};
@@ -249,17 +249,13 @@ async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumb
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+      await Effect.runPromise(setReviewStatus(issueId, update, status));
     }
   } catch (err) {
     console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
   }
-}
-
-// ─── check_suite / check_run ─────────────────────────────────────────────────
-
-export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
   if (!suite.pull_requests || suite.pull_requests.length === 0) return;
@@ -287,13 +283,11 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+      await Effect.runPromise(setReviewStatus(issueId, update, status));
     }
   }
-}
-
-export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
   if (!run.pull_requests || run.pull_requests.length === 0) return;
@@ -321,15 +315,11 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
     if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+      await Effect.runPromise(setReviewStatus(issueId, update, status));
     }
   }
-}
-
-// ─── pull_request ────────────────────────────────────────────────────────────
-
-export async function handlePullRequest(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -401,14 +391,10 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+    await Effect.runPromise(setReviewStatus(issueId, update, status));
   }
-}
-
-// ─── pull_request_review ─────────────────────────────────────────────────────
-
-export async function handlePullRequestReview(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
   if (!pr || !review) return;
@@ -439,14 +425,10 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+    await Effect.runPromise(setReviewStatus(issueId, update, status));
   }
-}
-
-// ─── pull_request_review_thread ──────────────────────────────────────────────
-
-export async function handlePullRequestReviewThread(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const thread = payload.thread;
   if (!pr || !thread) return;
@@ -507,14 +489,10 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
   if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+    await Effect.runPromise(setReviewStatus(issueId, update, status));
   }
-}
-
-// ─── status ──────────────────────────────────────────────────────────────────
-
-export async function handleStatus(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepository(payload.repository?.full_name)) return;
+}async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
   if (!state || !branches || branches.length === 0) return;
@@ -545,7 +523,7 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
       // to construct a prUrl, and the SHA alone isn't enough to bind identity.
 
       if (Object.keys(update).length > 0) {
-        await Effect.runPromise(setReviewStatusAsyncEffect(issueId, update, status));
+        await Effect.runPromise(setReviewStatus(issueId, update, status));
       }
 
       // Keep scanning in case the payload includes multiple feature branches.
@@ -565,61 +543,61 @@ const toGhError = (op: string, cause: unknown): GitHubApiError =>
   });
 
 /** Effect: handle a `check_suite` GitHub webhook payload. */
-export const handleCheckSuiteEffect = (
+export const handleCheckSuite = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handleCheckSuite(payload),
+    try: () => handleCheckSuitePromise(payload),
     catch: (cause) => toGhError('handleCheckSuite', cause),
   });
 
 /** Effect: handle a `check_run` GitHub webhook payload. */
-export const handleCheckRunEffect = (
+export const handleCheckRun = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handleCheckRun(payload),
+    try: () => handleCheckRunPromise(payload),
     catch: (cause) => toGhError('handleCheckRun', cause),
   });
 
 /** Effect: handle a `pull_request` GitHub webhook payload. */
-export const handlePullRequestEffect = (
+export const handlePullRequest = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handlePullRequest(payload),
+    try: () => handlePullRequestPromise(payload),
     catch: (cause) => toGhError('handlePullRequest', cause),
   });
 
 /** Effect: handle a `pull_request_review` GitHub webhook payload. */
-export const handlePullRequestReviewEffect = (
+export const handlePullRequestReview = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handlePullRequestReview(payload),
+    try: () => handlePullRequestReviewPromise(payload),
     catch: (cause) => toGhError('handlePullRequestReview', cause),
   });
 
 /** Effect: handle a `pull_request_review_thread` GitHub webhook payload. */
-export const handlePullRequestReviewThreadEffect = (
+export const handlePullRequestReviewThread = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handlePullRequestReviewThread(payload),
+    try: () => handlePullRequestReviewThreadPromise(payload),
     catch: (cause) => toGhError('handlePullRequestReviewThread', cause),
   });
 
 /** Effect: handle a `status` GitHub webhook payload. */
-export const handleStatusEffect = (
+export const handleStatus = (
   payload: WebhookPayload,
 ): Effect.Effect<void, GitHubApiError> =>
   Effect.tryPromise({
-    try: () => handleStatus(payload),
+    try: () => handleStatusPromise(payload),
     catch: (cause) => toGhError('handleStatus', cause),
   });
 
 /** True if the repo is in the cached tracked-repos allowlist. Pure. */
-export const isTrackedRepositoryEffect = (
+export const isTrackedRepository = (
   fullName: string | undefined,
 ): Effect.Effect<boolean> =>
-  Effect.sync(() => isTrackedRepository(fullName));
+  Effect.sync(() => isTrackedRepositorySync(fullName));

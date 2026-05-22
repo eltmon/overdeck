@@ -18,8 +18,8 @@ import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
-import { generateLauncherScript } from '../launcher-generator.js';
-import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
+import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
@@ -177,7 +177,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
-    const launcherContent = generateLauncherScript({
+    const launcherContent = generateLauncherScriptSync({
       role: 'work',
       spawnMode: 'remote',
       workingDir: '/workspace',
@@ -185,7 +185,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       setRemotePath: true,
       promptFile,
       baseCommand: 'claude',
-      permissionFlags: getClaudePermissionFlags(),
+      permissionFlags: getClaudePermissionFlagsSync(),
       model,
     });
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
@@ -193,7 +193,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `claude ${getClaudePermissionFlagsString()} --model ${model}`;
+    claudeCmd = `claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);

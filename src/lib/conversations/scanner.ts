@@ -26,9 +26,9 @@ import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
 import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
-import { buildCorrelationMap } from './correlator.js';
-import { getModelCapability } from '../model-capabilities.js';
-import { resolveModelId } from '../model-capabilities.js';
+import { buildCorrelationMapSync } from './correlator.js';
+import { getModelCapabilitySync } from '../model-capabilities.js';
+import { resolveModelIdSync } from '../model-capabilities.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,7 +187,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
   // 3. Build correlation map (Panopticon-managed detection)
   const allPaths = filteredFiles.map((f) => f.jsonlPath);
-  const correlationMap = buildCorrelationMap(allPaths);
+  const correlationMap = buildCorrelationMapSync(allPaths);
 
   // 4. Determine parallelism from system-probe
   const caps = await Effect.runPromise(getSystemCapabilities(opts.maxParallel));
@@ -361,8 +361,8 @@ function estimateCost(
 ): number {
   if (!primaryModel) return 0;
   try {
-    const modelId = resolveModelId(primaryModel);
-    const cap = getModelCapability(modelId);
+    const modelId = resolveModelIdSync(primaryModel);
+    const cap = getModelCapabilitySync(modelId);
     // costPer1MTokens is an average blended rate
     return (cap.costPer1MTokens / 1_000_000) * (tokenInput + tokenOutput);
   } catch {

@@ -23,6 +23,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,10 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/git/operations.js', () => ({
-  gitPush: (...args: unknown[]) => mockGitPush(...args),
+  gitPush: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockGitPush(...args)),
+    catch: (cause) => cause as any,
+  }),
   MainDivergedError: MainDivergedErrorClass,
   gitFetch: vi.fn(),
   gitForcePush: vi.fn(),
@@ -88,11 +92,15 @@ vi.mock('../../../../../src/lib/projects.js', () => ({ resolveProjectFromIssue: 
 vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterService: vi.fn() }));
 vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
+  listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   transitionIssueToInReview: vi.fn(),
 }));
 vi.mock('../../../../../src/lib/database/index.js', () => ({

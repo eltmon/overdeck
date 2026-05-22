@@ -20,6 +20,10 @@ vi.mock('../../agents.js', async () => {
   const { Effect } = await import('effect');
   return {
     spawnRun: mocks.spawnRun,
+    stopAgent: (...args: unknown[]) => {
+      mocks.stopAgentEffect(...args);
+      return Effect.void;
+    },
     stopAgentEffect: (...args: unknown[]) => {
       mocks.stopAgentEffect(...args);
       return Effect.void;

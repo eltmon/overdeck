@@ -21,6 +21,7 @@ vi.mock('fs', async (importOriginal) => {
 // Mock config and tracker modules
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: vi.fn(),
+  loadConfigSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/tracker/factory.js', () => ({
@@ -28,13 +29,13 @@ vi.mock('../../../src/lib/tracker/factory.js', () => ({
 }));
 
 import { getTrackerContext } from '../../../src/lib/cloister/work-agent-prompt.js';
-import { loadConfig } from '../../../src/lib/config.js';
+import { loadConfigSync } from '../../../src/lib/config.js';
 import { createTrackerFromConfig } from '../../../src/lib/tracker/factory.js';
 import { NotImplementedError } from '../../../src/lib/tracker/interface.js';
 
 const mockExistsSync = vi.mocked(fs.existsSync);
 const mockStatSync = vi.mocked(fs.statSync);
-const mockLoadConfig = vi.mocked(loadConfig);
+const mockLoadConfig = vi.mocked(loadConfigSync);
 const mockCreateTrackerFromConfig = vi.mocked(createTrackerFromConfig);
 
 const STATE_MTIME = new Date('2025-01-10T00:00:00Z');

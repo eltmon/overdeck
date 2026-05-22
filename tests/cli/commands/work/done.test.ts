@@ -52,21 +52,31 @@ vi.mock('child_process', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
+  getAgentStateSync: mockGetAgentState,
   saveAgentState: mockSaveAgentState,
+  saveAgentStateSync: mockSaveAgentState,
   saveAgentRuntimeState: mockSaveAgentRuntimeState,
+  saveAgentRuntimeStateSync: mockSaveAgentRuntimeState,
 }));
 
 vi.mock('../../../../src/lib/shadow-mode.js', () => ({
-  shouldSkipTrackerUpdate: mockShouldSkipTrackerUpdate,
+  shouldSkipTrackerUpdate: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockShouldSkipTrackerUpdate(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../../src/lib/shadow-state.js', () => ({
-  updateShadowState: mockUpdateShadowState,
+  updateShadowState: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockUpdateShadowState(...args)),
+    catch: (cause) => cause as any,
+  }),
   markAsSynced: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssue: mockEnsureMergeSetForIssue,
+  ensureMergeSetForIssueSync: mockEnsureMergeSetForIssue,
 }));
 
 vi.mock('../../../../src/lib/rebase-helper.js', () => ({
@@ -74,16 +84,22 @@ vi.mock('../../../../src/lib/rebase-helper.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/review-artifacts.js', () => ({
-  createReviewArtifactsForIssue: mockCreateReviewArtifactsForIssue,
+  createReviewArtifactsForIssue: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockCreateReviewArtifactsForIssue(...args)),
+    catch: (cause) => cause as any,
+  }),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
+  setReviewStatusSync: mockSetReviewStatus,
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
 }));
 
 vi.mock('../../../../src/lib/config.js', () => ({
   getDashboardApiUrl: mockGetDashboardApiUrl,
+  getDashboardApiUrlSync: mockGetDashboardApiUrl,
 }));
 
 vi.mock('../../../../src/lib/shadow-utils.js', () => ({
@@ -92,7 +108,8 @@ vi.mock('../../../../src/lib/shadow-utils.js', () => ({
 
 vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
-  syncBeadStatusToVBrief: vi.fn().mockReturnValue(null),
+  getVBriefACStatusSync: mockGetVBriefACStatus,
+  syncBeadStatusToVBrief: vi.fn().mockReturnValue(Effect.succeed(null)),
 }));
 
 // Suppress ora spinner output in tests
@@ -124,28 +141,28 @@ function makeAgentState(workspace: string) {
 
 describe('resolveIssueId normalization', () => {
   it('converts agent-pan-714 to PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('agent-pan-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('agent-pan-714')).toBe('PAN-714');
   });
 
   it('converts pan-714 (lowercase) to PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('pan-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('pan-714')).toBe('PAN-714');
   });
 
   it('preserves already-normalized PAN-714', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('PAN-714')).toBe('PAN-714');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('PAN-714')).toBe('PAN-714');
   });
 
   it('strips agent- prefix case-insensitively', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('AGENT-MIN-42')).toBe('MIN-42');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('AGENT-MIN-42')).toBe('MIN-42');
   });
 
   it('uppercases the result regardless of input case', async () => {
-    const { resolveIssueId } = await import('../../../../src/lib/issue-id.js');
-    expect(resolveIssueId('min-42')).toBe('MIN-42');
+    const { resolveIssueIdSync } = await import('../../../../src/lib/issue-id.js');
+    expect(resolveIssueIdSync('min-42')).toBe('MIN-42');
   });
 });
 

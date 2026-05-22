@@ -8,7 +8,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { parseOAuthPayload } from '../claude-auth.js';
 import { ClaudeCredentialParseError } from '../errors.js';
 
-async function runEffect<A>(effect: Effect.Effect<A, never, never>): Promise<A> {
+async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);

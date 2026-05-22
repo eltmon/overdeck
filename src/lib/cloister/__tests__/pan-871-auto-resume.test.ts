@@ -22,27 +22,41 @@ vi.mock('../../../lib/agents.js', async () => {
   };
   return {
   getAgentRuntimeState: vi.fn(() => null),
+  getAgentRuntimeStateSync: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentDir: vi.fn((agentId: string) => `/tmp/test-agents/${agentId}`),
-  getAgentState: vi.fn(),
+  getAgentState: effectMock(null),
+  getAgentStateSync: vi.fn(),
   getAgentStateEffect: effectMock(null),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
+  recordAgentFailure: effectMock(null),
   recordAgentFailureEffect: effectMock(null),
   };
 });
 
 vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
-vi.mock('../../../lib/shadow-state.js', () => ({
-  getShadowState: vi.fn(async () => null),
-}));
+vi.mock('../../../lib/shadow-state.js', async () => {
+  const { Effect } = await import('effect');
+  const getShadowState: any = vi.fn(() => Effect.succeed(null));
+  getShadowState.mockResolvedValue = (value: unknown) => getShadowState.mockReturnValue(Effect.succeed(value));
+  getShadowState.mockResolvedValueOnce = (value: unknown) => getShadowState.mockReturnValueOnce(Effect.succeed(value));
+  getShadowState.mockRejectedValue = (error: unknown) => getShadowState.mockReturnValue(Effect.fail(error));
+  getShadowState.mockRejectedValueOnce = (error: unknown) => getShadowState.mockReturnValueOnce(Effect.fail(error));
+  return { getShadowState };
+});
 
 vi.mock('../../../lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: vi.fn(),
@@ -58,16 +72,21 @@ vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
 
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
 }));
 
 vi.mock('../../../lib/persistent-logger.js', () => ({
   logDeaconEvent: vi.fn(),
+  logDeaconEventSync: vi.fn(),
   logAgentLifecycle: vi.fn(),
+  logAgentLifecycleSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../specialists.js', () => ({
@@ -98,21 +117,24 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSessionSync: vi.fn(),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExistsSync: vi.fn(() => false),
+  sessionExists: effectMock(false),
   sendKeysEffect: effectMock(undefined),
   };
 });
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({ patrolIntervalMs: 60000 })),
+  loadCloisterConfigSync: vi.fn(() => ({ patrolIntervalMs: 60000 })),
 }));
 
 vi.mock('../../../lib/paths.js', () => ({
@@ -134,14 +156,14 @@ vi.mock('fs', () => ({
 }));
 
 import { autoResumeStoppedWorkAgents } from '../deacon.js';
-import { getAgentState, getAgentStateEffect, resumeAgent } from '../../../lib/agents.js';
-import { getReviewStatus } from '../../../lib/review-status.js';
+import { getAgentStateSync, getAgentState, resumeAgent } from '../../../lib/agents.js';
+import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
 
-const mockGetAgentState = getAgentState as any;
-const mockGetAgentStateAsync = getAgentStateEffect as any;
+const mockGetAgentState = getAgentStateSync as any;
+const mockGetAgentStateAsync = getAgentState as any;
 const mockResumeAgent = resumeAgent as any;
-const mockGetReviewStatus = getReviewStatus as any;
+const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
 
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {

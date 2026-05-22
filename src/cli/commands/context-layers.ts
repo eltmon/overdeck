@@ -27,9 +27,9 @@ import {
   validateTemplate,
   migrateDevroot,
 } from '../../lib/context-layers/index.js';
-import { syncContextLayers } from '../../lib/sync.js';
+import { syncContextLayersSync } from '../../lib/sync.js';
 import { isDevMode } from '../../lib/paths.js';
-import { findProjectByPath, registerProject } from '../../lib/projects.js';
+import { findProjectByPathSync, registerProjectSync } from '../../lib/projects.js';
 
 type LayerName = 'global' | 'project' | 'workspace';
 
@@ -42,7 +42,7 @@ interface ContextOptions {
 
 /** Resolve the registered project whose tree contains `cwd`, or null. */
 function resolveProjectRoot(cwd: string): string | null {
-  const project = findProjectByPath(cwd);
+  const project = findProjectByPathSync(cwd);
   return project ? project.path : null;
 }
 
@@ -135,7 +135,7 @@ export async function contextEditCommand(options: ContextOptions = {}): Promise<
 // ─── pan context sync ─────────────────────────────────────────────────────
 
 export async function contextSyncCommand(): Promise<void> {
-  const result = syncContextLayers();
+  const result = syncContextLayersSync();
   if (result.globalStubCreated) {
     console.log(chalk.cyan('Seeded ~/.panopticon/context/global.md with a starter template.'));
   }
@@ -231,7 +231,7 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
     const interactive = Boolean(process.stdin.isTTY) && !options.yes;
     for (const path of result.discoveredProjects) {
       const key = path.split('/').filter(Boolean).pop()!.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      if (findProjectByPath(path)) {
+      if (findProjectByPathSync(path)) {
         console.log(chalk.dim(`  • ${path} (already registered)`));
         continue;
       }
@@ -243,7 +243,7 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
         register = ans.register;
       }
       if (register) {
-        registerProject(key, { name: key, path });
+        registerProjectSync(key, { name: key, path });
         ensureProjectLayer(path);
         console.log(chalk.green(`  ✓ registered ${key} → ${path}`));
       } else if (!interactive) {

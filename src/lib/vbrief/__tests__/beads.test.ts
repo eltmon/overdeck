@@ -1,9 +1,10 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { syncBeadStatusToVBrief, getVBriefACStatus } from '../beads.js';
-import { readWorkspacePlan } from '../io.js';
+import { syncBeadStatusToVBrief, getVBriefACStatusSync } from '../beads.js';
+import { readWorkspacePlanSync } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -50,24 +51,24 @@ afterEach(() => {
 describe('syncBeadStatusToVBrief', () => {
   it('returns null when no plan exists', async () => {
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'Some task' }]);
-    expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when .beads/issues.jsonl does not exist', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Some task' }]));
-    expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when bead ID not found in issues.jsonl', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Some task' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'other-bead', title: 'PAN-388: Some task' }]);
-    expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('returns null when no matching vBRIEF item found', async () => {
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Different title' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: No match here' }]);
-    expect(await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH)).toBeNull();
+    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
   it('syncs status when bead title matches with plan prefix', async () => {
@@ -75,10 +76,10 @@ describe('syncBeadStatusToVBrief', () => {
     writePlan(doc);
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: Wire the pipeline' }]);
 
-    const result = await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH);
+    const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH));
     expect(result).toBe('item-1');
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(updated.plan.items[0].status).toBe('completed');
   });
 
@@ -86,7 +87,7 @@ describe('syncBeadStatusToVBrief', () => {
     writePlan(makePlanDoc([{ id: 'item-lowercase-prefix', title: 'Wire the pipeline' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-lowercase-prefix', title: 'pan-388: Wire the pipeline' }]);
 
-    const result = await syncBeadStatusToVBrief('bead-lowercase-prefix', WORKSPACE_PATH);
+    const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-lowercase-prefix', WORKSPACE_PATH));
     expect(result).toBe('item-lowercase-prefix');
   });
 
@@ -94,7 +95,7 @@ describe('syncBeadStatusToVBrief', () => {
     writePlan(makePlanDoc([{ id: 'item-2', title: 'Wire the pipeline' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-2', title: 'Wire the pipeline' }]);
 
-    const result = await syncBeadStatusToVBrief('bead-2', WORKSPACE_PATH);
+    const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-2', WORKSPACE_PATH));
     expect(result).toBe('item-2');
   });
 
@@ -102,9 +103,9 @@ describe('syncBeadStatusToVBrief', () => {
     writePlan(makePlanDoc([{ id: 'item-3', title: 'Start work' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-3', title: 'PAN-388: Start work' }]);
 
-    await syncBeadStatusToVBrief('bead-3', WORKSPACE_PATH, 'in_progress');
+    await Effect.runPromise(syncBeadStatusToVBrief('bead-3', WORKSPACE_PATH, 'in_progress'));
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(updated.plan.items[0].status).toBe('in_progress');
   });
 
@@ -112,7 +113,7 @@ describe('syncBeadStatusToVBrief', () => {
     writePlan(makePlanDoc([{ id: 'item-4', title: 'Wire The Pipeline' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-4', title: 'PAN-388: wire the pipeline' }]);
 
-    const result = await syncBeadStatusToVBrief('bead-4', WORKSPACE_PATH);
+    const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-4', WORKSPACE_PATH));
     expect(result).toBe('item-4');
   });
 
@@ -125,7 +126,7 @@ describe('syncBeadStatusToVBrief', () => {
       JSON.stringify({ id: 'bead-1', title: 'PAN-388: Good task', status: 'open' }) + '\n',
     );
 
-    const result = await syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH);
+    const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH));
     expect(result).toBe('item-1');
   });
 });
@@ -182,12 +183,12 @@ describe('getVBriefACStatus', () => {
   });
 
   it('returns null when no plan exists', () => {
-    expect(getVBriefACStatus(AC_WORKSPACE_PATH)).toBeNull();
+    expect(getVBriefACStatusSync(AC_WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns null when plan has no AC subItems', () => {
     writeACPlan(makePlanWithAC([{ id: 'item-1', title: 'Task' }]));
-    expect(getVBriefACStatus(AC_WORKSPACE_PATH)).toBeNull();
+    expect(getVBriefACStatusSync(AC_WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns structured status for items with AC', () => {
@@ -201,7 +202,7 @@ describe('getVBriefACStatus', () => {
     }]);
     writeACPlan(doc);
 
-    const result = getVBriefACStatus(AC_WORKSPACE_PATH)!;
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
     expect(result).not.toBeNull();
     expect(result.allCompleted).toBe(false);
     expect(result.totalCompleted).toBe(1);
@@ -224,7 +225,7 @@ describe('getVBriefACStatus', () => {
     }]);
     writeACPlan(doc);
 
-    const result = getVBriefACStatus(AC_WORKSPACE_PATH)!;
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
     expect(result.allCompleted).toBe(true);
     expect(result.totalPending).toBe(0);
   });
@@ -240,7 +241,7 @@ describe('getVBriefACStatus', () => {
     }]);
     writeACPlan(doc);
 
-    const result = getVBriefACStatus(AC_WORKSPACE_PATH)!;
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
     expect(result.allCompleted).toBe(true);
   });
 
@@ -259,7 +260,7 @@ describe('getVBriefACStatus', () => {
     ]);
     writeACPlan(doc);
 
-    const result = getVBriefACStatus(AC_WORKSPACE_PATH)!;
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
     expect(result.allCompleted).toBe(false);
     expect(result.items).toHaveLength(2);
     expect(result.totalCompleted).toBe(1);
