@@ -28,6 +28,7 @@ import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { getReviewRestartRequest } from '../../lib/restartRouting';
 import { WS_METHODS } from '@panctl/contracts';
 import type { ProjectSessionTree, SessionNode, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
@@ -951,34 +952,16 @@ export function CommandDeck({
           tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
         )?.[0];
 
-      if (sessionType === 'review') {
-        // Restart all reviewers — kill coordinator + all 5, then re-dispatch.
-        // Guard here so review sessions never fall through to the work-agent restart path.
-        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
-        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/review/restart`, {
+      const reviewRestartRequest = getReviewRestartRequest({ projectKey, issueId, sessionType, role, model });
+      if (reviewRestartRequest) {
+        const res = await fetch(reviewRestartRequest.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model }),
+          body: JSON.stringify(reviewRestartRequest.body),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Failed to restart review');
-        toast.success('Review restarted');
-        await refreshDashboardState(queryClient);
-        return;
-      }
-
-      if (sessionType === 'reviewer' && role) {
-        // Restart single reviewer role.
-        // Guard here so reviewer sessions never fall through to the work-agent restart path.
-        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
-        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/reviewer/${encodeURIComponent(role)}/restart`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `Failed to restart ${role} reviewer`);
-        toast.success(`${role} reviewer restarted`);
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        if (!res.ok) throw new Error(data.error || reviewRestartRequest.errorMessage);
+        toast.success(reviewRestartRequest.successMessage);
         await refreshDashboardState(queryClient);
         return;
       }
