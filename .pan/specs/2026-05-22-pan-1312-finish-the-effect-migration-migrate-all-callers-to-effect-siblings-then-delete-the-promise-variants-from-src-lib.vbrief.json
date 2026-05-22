@@ -4,17 +4,17 @@
     "created": "2026-05-22T03:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1312: Finish the Effect migration — migrate all callers to *Effect siblings, then delete the Promise variants from src/lib/",
-    "updated": "2026-05-22T10:57:32.753Z"
+    "updated": "2026-05-22T20:32:03.006Z"
   },
   "plan": {
     "id": "pan-1312",
     "title": "Finish the Effect migration — migrate all callers to *Effect siblings, then delete the Promise variants from src/lib/",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7a4c1e92-3b6d-4f81-a0e5-2c9d8b1f64a3",
     "author": "agent:claude-opus-4-7",
-    "sequence": 126,
+    "sequence": 299,
     "created": "2026-05-22T03:25:00.000Z",
-    "updated": "2026-05-22T10:57:32.753Z",
+    "updated": "2026-05-22T20:32:03.006Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1312",
@@ -121,14 +121,16 @@
       {
         "id": "w1a-reviewdb-siblings",
         "title": "Wave 1a — create Effect siblings for src/lib/database/review-status-db.ts *Async functions",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 dispatched",
+          "statusUpdatedAt": "2026-05-22T12:17:25.210Z"
         },
         "narrative": {
           "Action": "src/lib/database/review-status-db.ts exports upsertReviewStatusAsync and getReviewStatusFromDbAsync with no Effect sibling. Create upsertReviewStatusEffect and getReviewStatusFromDbEffect — behaviorally identical, typed errors (DatabaseError), additive. Do not change the *Async functions."
@@ -239,14 +241,16 @@
       {
         "id": "w1b-cli-scope",
         "title": "Wave 1b — migrate src/cli/commands/scope.ts off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 dispatched",
+          "statusUpdatedAt": "2026-05-22T12:17:25.298Z"
         },
         "narrative": {
           "Action": "scope.ts imports listVBriefsAsync and readVBriefDocumentAsync from lib/vbrief/vbrief-index. Convert the collectLifecycleRows / list-command body to consume listVBriefsEffect and readVBriefDocumentEffect via an Effect.gen pipeline, run it with a single Effect.runPromise at the command-handler boundary, and map typed failures to the existing console output and process.exit codes. Additive — the *Async exports stay."
@@ -273,14 +277,16 @@
       {
         "id": "w1b-cli-agent-status",
         "title": "Wave 1b — migrate src/cli/commands/agent-status.ts off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 dispatched",
+          "statusUpdatedAt": "2026-05-22T12:17:25.151Z"
         },
         "narrative": {
           "Action": "agent-status.ts imports listRunningAgentsAsync (lib/agents), listSessionsAsync and capturePaneAsync (lib/tmux). Migrate to the Effect siblings (listRunningAgentsEffect from Wave 1a, listSessionsAsyncEffect, capturePaneAsyncEffect), composing them in an Effect pipeline run via a single Effect.runPromise at the handler boundary. Preserve the current output."
@@ -307,14 +313,16 @@
       {
         "id": "w1b-cli-flywheel",
         "title": "Wave 1b — migrate src/cli/commands/flywheel.ts and its test off *Async",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 dispatched",
+          "statusUpdatedAt": "2026-05-22T12:17:49.429Z"
         },
         "narrative": {
           "Action": "flywheel.ts imports stopAgentAsync (lib/agents) and sessionExistsAsync (lib/tmux). Migrate to stopAgentEffect (Wave 1a) and sessionExistsAsyncEffect, run via Effect.runPromise at the handler boundary. Update the colocated test src/cli/commands/__tests__/flywheel.test.ts to match (update any *Async mocks/spies to the Effect siblings)."
@@ -341,7 +349,7 @@
       {
         "id": "w1c-route-agents",
         "title": "Wave 1c — migrate src/dashboard/server/routes/agents.ts off *Async",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
@@ -349,8 +357,8 @@
           "issueLabel": "pan-1312",
           "requiresInspection": false,
           "inspectionDepth": "fast",
-          "statusReason": "Spawn failed for slot 8; releasing claim for retry",
-          "statusUpdatedAt": "2026-05-22T10:48:43.126Z"
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T12:21:48.870Z"
         },
         "narrative": {
           "Action": "routes/agents.ts imports findPlanAsync/readPlanAsync (vbrief/io), getWorkAgentLifecycleStateAsync (work-agent-lifecycle) and several tmux *Async (capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync). The handlers are already Effect.gen — replace each *Async call with its Effect sibling (yield* the sibling directly) and remove the surrounding Effect.tryPromise wrapper. Migrate the colocated test routes/__tests__/agents-lifecycle-event.test.ts (update *Async mocks)."
@@ -359,20 +367,23 @@
           {
             "id": "w1c-route-agents.ac1",
             "title": "routes/agents.ts and routes/__tests__/agents-lifecycle-event.test.ts import no *Async variant from src/lib/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T12:21:48.870Z"
           },
           {
             "id": "w1c-route-agents.ac2",
             "title": "agents route endpoints behave identically; the test passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T12:21:48.870Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T12:21:48.870Z"
       },
       {
         "id": "w1c-route-issues-workspaces",
@@ -1071,7 +1082,7 @@
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "statusReason": "Swarm slot 4 merged into feature branch",
-          "statusUpdatedAt": "2026-05-22T10:57:32.753Z"
+          "statusUpdatedAt": "2026-05-22T20:28:23.364Z"
         },
         "narrative": {
           "Action": "Migrate every *Async import from src/lib/ in src/lib/runtimes/claude-code.ts and pi.ts (and runtimes __tests__) onto the Effect siblings. Update test mocks."
@@ -1084,7 +1095,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-22T10:57:32.753Z"
+            "completed": "2026-05-22T20:28:23.364Z"
           },
           {
             "id": "w1d-runtimes.ac2",
@@ -1093,10 +1104,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-22T10:57:32.753Z"
+            "completed": "2026-05-22T20:28:23.364Z"
           }
         ],
-        "completed": "2026-05-22T10:57:32.753Z"
+        "completed": "2026-05-22T20:28:23.364Z"
       },
       {
         "id": "w1d-vbrief-internal",
@@ -1260,14 +1271,16 @@
       {
         "id": "w2a-agents",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/agents.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:07:34.838Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/agents.ts that now has an Effect sibling (getAgentStateAsync, saveAgentStateAsync, setAgentPausedAsync, clearAgentPausedAsync, clearAgentTroubledAsync, recordAgentFailureAsync, getAgentRuntimeStateAsync, listRunningAgentsAsync, stopAgentAsync). Delete any internal Effect.runPromise bridge that existed only to span the Promise↔Effect boundary. After Wave 1 nothing imports these, so this only edits agents.ts."
@@ -1276,32 +1289,37 @@
           {
             "id": "w2a-agents.ac1",
             "title": "src/lib/agents.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:07:34.838Z"
           },
           {
             "id": "w2a-agents.ac2",
             "title": "no dead Effect.runPromise bridge remains in agents.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:07:34.838Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:07:34.838Z"
       },
       {
         "id": "w2a-tmux",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/tmux.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:08:08.676Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/tmux.ts that has an Effect sibling (listSessionsAsync, listSessionNamesAsync, sessionExistsAsync, createSessionAsync, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, capturePaneAsync, listPaneValuesAsync, isPaneDeadAsync, getWindowDimensionsAsync, setOptionAsync, resizeWindowAsync, getAgentSessionsAsync, getReviewSessionsAsync, etc.). Delete dead Effect.runPromise bridges."
@@ -1310,32 +1328,37 @@
           {
             "id": "w2a-tmux.ac1",
             "title": "src/lib/tmux.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:08.676Z"
           },
           {
             "id": "w2a-tmux.ac2",
             "title": "no dead Effect.runPromise bridge remains in tmux.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:08.676Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:08:08.676Z"
       },
       {
         "id": "w2a-cliproxy",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/cliproxy.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:08:08.727Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/cliproxy.ts that has an Effect sibling (bridgeCodexAuthToCliproxyAsync, bridgeGeminiAuthToCliproxyAsync, installCliproxyAsync, isCliproxyRunningAsync, checkCliproxyPortAsync, startCliproxyAsync, stopCliproxyAsync, restartCliproxyAsync). Delete dead Effect.runPromise bridges."
@@ -1344,32 +1367,37 @@
           {
             "id": "w2a-cliproxy.ac1",
             "title": "src/lib/cliproxy.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:08.727Z"
           },
           {
             "id": "w2a-cliproxy.ac2",
             "title": "no dead Effect.runPromise bridge remains in cliproxy.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:08.727Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:08:08.727Z"
       },
       {
         "id": "w2a-config",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/config.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:27:15.730Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/config.ts that has an Effect sibling (loadConfigAsync, saveConfigAsync, getConversationsConfigAsync). Delete dead Effect.runPromise bridges. Be careful with the two Effect-suffix styles present (loadConfigEffect and loadConfigAsyncEffect) — canonicalization is Wave 2b's job; here only delete the *Async Promise wrappers."
@@ -1378,32 +1406,37 @@
           {
             "id": "w2a-config.ac1",
             "title": "src/lib/config.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:27:15.730Z"
           },
           {
             "id": "w2a-config.ac2",
             "title": "no dead Effect.runPromise bridge remains in config.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:27:15.730Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:27:15.730Z"
       },
       {
         "id": "w2a-config-yaml",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/config-yaml.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 5 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:29:58.758Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/config-yaml.ts that has an Effect sibling (loadConfigAsync, loadConfigAsyncNoMigration, loadYamlFileAsync, loadGlobalConfigAsync, loadProjectConfigAsync, getConversationsConfigAsync, updateConversationsConfigAsync). Delete dead Effect.runPromise bridges."
@@ -1412,32 +1445,37 @@
           {
             "id": "w2a-config-yaml.ac1",
             "title": "src/lib/config-yaml.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:29:58.758Z"
           },
           {
             "id": "w2a-config-yaml.ac2",
             "title": "no dead Effect.runPromise bridge remains in config-yaml.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:29:58.758Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:29:58.758Z"
       },
       {
         "id": "w2a-cloister-config",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/cloister/config.ts",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 6 dispatched",
+          "statusUpdatedAt": "2026-05-22T13:06:40.754Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/cloister/config.ts that has an Effect sibling (loadCloisterConfigAsync, saveCloisterConfigAsync, updateCloisterConfigAsync). Delete dead Effect.runPromise bridges."
@@ -1464,14 +1502,16 @@
       {
         "id": "w2a-review-status",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/review-status.ts",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 dispatched",
+          "statusUpdatedAt": "2026-05-22T13:06:40.659Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/review-status.ts that has an Effect sibling (setReviewStatusAsync, getReviewStatusAsync — siblings are setReviewStatusAsyncEffect / getReviewStatusAsyncEffect). Delete dead Effect.runPromise bridges. Leave the sync setReviewStatus fire-and-forget path intact."
@@ -1498,14 +1538,16 @@
       {
         "id": "w2a-review-status-db",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/database/review-status-db.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 6 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:29:04.739Z"
         },
         "narrative": {
           "Action": "Delete upsertReviewStatusAsync and getReviewStatusFromDbAsync from src/lib/database/review-status-db.ts (their Effect siblings were created in Wave 1a). Delete dead Effect.runPromise bridges."
@@ -1514,32 +1556,37 @@
           {
             "id": "w2a-review-status-db.ac1",
             "title": "src/lib/database/review-status-db.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:29:04.739Z"
           },
           {
             "id": "w2a-review-status-db.ac2",
             "title": "no dead Effect.runPromise bridge remains in review-status-db.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:29:04.739Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:29:04.739Z"
       },
       {
         "id": "w2a-vbrief-io",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/io.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 9 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:08:14.198Z"
         },
         "narrative": {
           "Action": "Delete every *Async export in src/lib/vbrief/io.ts that has an Effect sibling (findWorkspaceDraftPlanAsync, findPlanAsync, readPlanAsync, readWorkspacePlanAsync, isPlanningProposedAsync, isPlanningCompleteAsync, checkPlanStatusAsync). Delete dead Effect.runPromise bridges. The sync variants (readPlan, findPlan, readWorkspacePlan, isPlanningProposed, ...) stay for now — they are canonicalized in Wave 2b."
@@ -1548,32 +1595,37 @@
           {
             "id": "w2a-vbrief-io.ac1",
             "title": "src/lib/vbrief/io.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:14.198Z"
           },
           {
             "id": "w2a-vbrief-io.ac2",
             "title": "no dead Effect.runPromise bridge remains in vbrief/io.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:14.198Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:08:14.198Z"
       },
       {
         "id": "w2a-vbrief-continue-state",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/continue-state.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 5 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:08:55.936Z"
         },
         "narrative": {
           "Action": "Delete writeContinueStateAsync and readContinueStateAsync from src/lib/vbrief/continue-state.ts (siblings: writeContinueStateEffect / readContinueStateEffect). Delete dead Effect.runPromise bridges."
@@ -1582,32 +1634,37 @@
           {
             "id": "w2a-vbrief-continue-state.ac1",
             "title": "src/lib/vbrief/continue-state.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:55.936Z"
           },
           {
             "id": "w2a-vbrief-continue-state.ac2",
             "title": "no dead Effect.runPromise bridge remains in continue-state.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:08:55.936Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:08:55.936Z"
       },
       {
         "id": "w2a-vbrief-dag",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/dag.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:37:58.848Z"
         },
         "narrative": {
           "Action": "Delete the *Async writer-lock helpers from src/lib/vbrief/dag.ts (writePlanFileAtomicAsync, applyTaskOperationToPlanFileAsync, removeStaleLockAsync, writePipelineMirrorToPlanFileAsync, readPlanFileAsync, assertSingleWriterAsync, releasePlanWriterAsync — their Effect siblings were created in Wave 1a). Delete dead Effect.runPromise bridges. Run the dag-writer-lock tests to confirm the lock invariant still holds."
@@ -1616,32 +1673,37 @@
           {
             "id": "w2a-vbrief-dag.ac1",
             "title": "src/lib/vbrief/dag.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:37:58.848Z"
           },
           {
             "id": "w2a-vbrief-dag.ac2",
             "title": "no dead Effect.runPromise bridge remains in dag.ts; dag-writer-lock tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:37:58.848Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:37:58.848Z"
       },
       {
         "id": "w2a-vbrief-index",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/vbrief/vbrief-index.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:32:59.358Z"
         },
         "narrative": {
           "Action": "Delete findVBriefByIssueAsync, listVBriefsAsync and readVBriefDocumentAsync from src/lib/vbrief/vbrief-index.ts (siblings: findVBriefByIssueEffect / listVBriefsEffect / readVBriefDocumentEffect). Delete dead Effect.runPromise bridges."
@@ -1650,32 +1712,37 @@
           {
             "id": "w2a-vbrief-index.ac1",
             "title": "src/lib/vbrief/vbrief-index.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:32:59.358Z"
           },
           {
             "id": "w2a-vbrief-index.ac2",
             "title": "no dead Effect.runPromise bridge remains in vbrief-index.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:32:59.358Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:32:59.358Z"
       },
       {
         "id": "w2a-work-agent-lifecycle",
         "title": "Wave 2a — delete *Async exports and dead bridges from src/lib/work-agent-lifecycle.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T13:28:06.151Z"
         },
         "narrative": {
           "Action": "Delete getWorkAgentLifecycleStateAsync from src/lib/work-agent-lifecycle.ts (siblings: getWorkAgentLifecycleStateEffect / getWorkAgentLifecycleStateAsyncEffect). Delete dead Effect.runPromise bridges."
@@ -1684,32 +1751,37 @@
           {
             "id": "w2a-work-agent-lifecycle.ac1",
             "title": "src/lib/work-agent-lifecycle.ts exports no *Async function that has an Effect sibling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:28:06.151Z"
           },
           {
             "id": "w2a-work-agent-lifecycle.ac2",
             "title": "no dead Effect.runPromise bridge remains in work-agent-lifecycle.ts; npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T13:28:06.151Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T13:28:06.151Z"
       },
       {
         "id": "w2a-pan-dir",
         "title": "Wave 2a — delete deprecated *Async aliases from src/lib/pan-dir/",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "trivial",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T18:03:21.717Z"
         },
         "narrative": {
           "Action": "src/lib/pan-dir/specs.ts and pan-dir/continue.ts expose *Async only as deprecated aliases to already-Effect-returning plain-named functions (findSpecByIssueAsync = findSpecByIssue, readWorkspaceContinueAsync = readWorkspaceContinue, writeWorkspaceContinueAsync = writeWorkspaceContinue). Delete those alias export lines."
@@ -1718,20 +1790,23 @@
           {
             "id": "w2a-pan-dir.ac1",
             "title": "src/lib/pan-dir/specs.ts and continue.ts export no *Async alias",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T18:03:21.717Z"
           },
           {
             "id": "w2a-pan-dir.ac2",
             "title": "npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T18:03:21.717Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T18:03:21.717Z"
       },
       {
         "id": "w2b-canonicalize",
@@ -1778,14 +1853,16 @@
       {
         "id": "w2c-verify",
         "title": "Wave 2c — final verification: migration complete, no regression",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T03:25:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1312",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 merged into feature branch",
+          "statusUpdatedAt": "2026-05-22T14:24:04.978Z"
         },
         "narrative": {
           "Action": "Confirm every PAN-1312 acceptance criterion. Run grep proofs: no src/lib/-sourced *Async import anywhere in src/cli or src/dashboard; no *Async Promise wrapper with an Effect sibling remains in src/lib/; no dead Effect.runPromise bridge remains. Run the full quality gates and spot-check representative CLI commands and dashboard endpoints for behavior parity. Record checkpoint-client.ts as the only intentional residual (out of scope, follow-up issue)."
@@ -1794,36 +1871,41 @@
           {
             "id": "w2c-verify.ac1",
             "title": "grep -rE \"Async\" src/cli src/dashboard shows zero src/lib/-sourced *Async imports",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T14:24:04.978Z"
           },
           {
             "id": "w2c-verify.ac2",
             "title": "No *Async Promise wrapper with an Effect sibling remains in src/lib/; no dead Effect.runPromise bridge remains",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T14:24:04.978Z"
           },
           {
             "id": "w2c-verify.ac3",
             "title": "npm run typecheck, npm run lint and npm test all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T14:24:04.978Z"
           },
           {
             "id": "w2c-verify.ac4",
             "title": "No behavior regression in CLI commands or dashboard endpoints; checkpoint-client.ts residual is documented with a follow-up issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-22T14:24:04.978Z"
           }
-        ]
+        ],
+        "completed": "2026-05-22T14:24:04.978Z"
       }
     ],
     "edges": [
@@ -2249,8 +2331,67 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-22-PAN-1312-finish-the-effect-migration-migrate-all-callers-to-effect-siblings-then-delete-the-promise-variants-from-src-lib.vbrief.json"
+      "canonicalFilename": "2026-05-22-PAN-1312-finish-the-effect-migration-migrate-all-callers-to-effect-siblings-then-delete-the-promise-variants-from-src-lib.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1312",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-22T20:00:36.532Z",
+        "work": {
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T20:00:36.532Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "blocked",
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "notes": "Wave 2 deletion/canonicalization is absent; PR only delivers the migration half",
+          "history": [
+            {
+              "status": "blocked",
+              "at": "2026-05-22T20:00:36.532Z",
+              "notes": "Wave 2 deletion/canonicalization is absent; PR only delivers the migration half"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-22T20:00:36.532Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-22T20:00:36.532Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-22T20:00:36.532Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1380"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

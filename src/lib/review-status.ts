@@ -20,15 +20,9 @@ import {
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
-async function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): Promise<void> {
+function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
-    const { initEventStore } = await import('../dashboard/server/event-store.js');
-    const store = await initEventStore();
-    await store.appendAsync({
-      type,
-      timestamp: new Date().toISOString(),
-      payload: { issueId },
-    } as any);
+    notifyPipeline({ type, issueId });
   } catch (error) {
     console.warn(`[review-status] Failed to emit ${type} for ${issueId}:`, error);
   }

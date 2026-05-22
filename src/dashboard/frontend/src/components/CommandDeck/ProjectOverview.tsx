@@ -68,6 +68,7 @@ function reviewStatusForClassifier(
 
 function featureState(feature: ProjectFeature): CanonicalState | undefined {
   const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
+  if (raw.includes('verifying')) return 'verifying_on_main';
   if (raw.includes('review')) return 'in_review';
   if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
   if (raw.includes('done') || raw.includes('complete')) return 'done';

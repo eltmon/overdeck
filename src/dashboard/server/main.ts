@@ -117,6 +117,21 @@ setPipelineHandler((event) => {
       return;
     }
 
+    case 'review.approved':
+    case 'test.passed': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: event.type,
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId },
+        } as any);
+      } catch (err) {
+        console.error(`[pipeline] Failed to append ${event.type} event:`, err);
+      }
+      return;
+    }
+
     // PAN-915 — task_queued surfaces "review-agent dispatched" before the
     // first SQLite mutation lands. Maps to pipeline.review-started so the
     // kanban card flips to "review in progress" immediately.

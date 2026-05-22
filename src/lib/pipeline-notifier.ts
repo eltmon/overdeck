@@ -20,6 +20,8 @@ import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'status_changed'; issueId: string; status: ReviewStatus }
+  | { type: 'review.approved'; issueId: string }
+  | { type: 'test.passed'; issueId: string }
   | { type: 'task_queued'; specialist: string; issueId: string }
   | { type: 'reviewer_started'; issueId: string; role: string; sessionName: string }
   | { type: 'reviewer_completed'; issueId: string; role: string }

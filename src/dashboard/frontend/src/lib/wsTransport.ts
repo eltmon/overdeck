@@ -53,6 +53,7 @@ function consumeDashboardBootstrapToken(): string | null {
   if (!hash) return null
   const params = new URLSearchParams(hash)
   const token = params.get('panopticon_token') ?? params.get('token')
+  if (!token) return null
   params.delete('panopticon_token')
   params.delete('token')
   const nextHash = params.toString()
