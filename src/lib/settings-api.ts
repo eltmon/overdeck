@@ -11,6 +11,7 @@ import { Data, Effect } from 'effect';
 import {
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
+  PARENT_MODEL_REF,
   loadConfig,
   getGlobalConfigPath,
   clearConfigCache,
@@ -321,9 +322,17 @@ function validateModelRef(
   errors: string[],
   warnings: string[],
   allowWorkhorseRef: boolean,
+  allowParentRef = false,
 ): void {
   if (typeof ref !== 'string' || ref.trim() === '') {
     errors.push(`${fieldPath} must be a non-empty model reference`);
+    return;
+  }
+
+  if (ref === PARENT_MODEL_REF) {
+    if (!allowParentRef) {
+      errors.push(`${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
+    }
     return;
   }
 
@@ -432,6 +441,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
                 effectiveWorkhorses,
                 errors,
                 warnings,
+                true,
                 true,
               );
             }
