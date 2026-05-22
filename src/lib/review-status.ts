@@ -16,8 +16,6 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
-  upsertReviewStatusAsync as dbUpsertAsync,
-  getReviewStatusFromDbAsync,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -421,26 +419,6 @@ export function getReviewStatus(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDb(issueId) ?? null;
 }
 
-export async function setReviewStatusAsync(
-  issueId: string,
-  update: Partial<ReviewStatus>,
-  existing?: ReviewStatus,
-): Promise<ReviewStatus> {
-  return new Promise((resolve, reject) => {
-    setImmediate(() => {
-      try {
-        resolve(setReviewStatus(issueId, update, existing));
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-}
-
-export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
-  return getReviewStatusFromDbAsync(issueId);
-}
-
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
  * Pending merge operations are in-memory only — they don't survive a restart.
@@ -668,33 +646,33 @@ export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `setReviewStatusAsync`. */
+/** Effect variant of `setReviewStatus`. */
 export const setReviewStatusAsyncEffect = (
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
 ): Effect.Effect<ReviewStatus, ReviewStatusError> =>
-  Effect.tryPromise({
-    try: () => setReviewStatusAsync(issueId, update, existing),
+  Effect.try({
+    try: () => setReviewStatus(issueId, update, existing),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'setReviewStatusAsync',
+        operation: 'setReviewStatus',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
   });
 
-/** Effect variant of `getReviewStatusAsync`. */
+/** Effect variant of `getReviewStatus`. */
 export const getReviewStatusAsyncEffect = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
-  Effect.tryPromise({
-    try: () => getReviewStatusAsync(issueId),
+  Effect.try({
+    try: () => getReviewStatus(issueId),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'getReviewStatusAsync',
+        operation: 'getReviewStatus',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
