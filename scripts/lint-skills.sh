@@ -16,7 +16,8 @@ from pathlib import Path
 
 ROOT = Path.cwd()
 DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
-SKILLS = ROOT / "skills"
+# PAN-1201: bundled skills live under sync-sources/.
+SKILLS = ROOT / "sync-sources" / "skills"
 LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
 LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}

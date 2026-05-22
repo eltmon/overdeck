@@ -15,9 +15,9 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, openSync, readSync,
 import { execFileSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
-import { calculateCost, getPricing, AIProvider } from '../src/lib/cost.js';
-import { appendCostEvent } from '../src/lib/costs/events.js';
-import { captureTldrMetrics, type TldrSessionMetrics } from '../src/lib/tldr-daemon.js';
+import { calculateCost, getPricing, AIProvider } from '../../src/lib/cost.js';
+import { appendCostEvent } from '../../src/lib/costs/events.js';
+import { captureTldrMetrics, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
 
 // ============== Types ==============
 

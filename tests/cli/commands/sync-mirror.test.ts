@@ -1,6 +1,9 @@
 /**
- * Command-level regression test: syncCommand invokes mirrorProjectSkills
- * against getDevrootPath() so project-skill mirroring works from any cwd.
+ * Command-level regression test for `pan sync` (PAN-1201 layered model).
+ *
+ * `pan sync` no longer distributes through `<devroot>/.claude/`. It mirrors a
+ * project's own skills/ tree from the current working directory, and renders
+ * the layered context into harness CLAUDE.md files via syncContextLayers().
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,28 +11,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Module-level mocks (hoisted before imports) ────────────────────────────
 
 const mockMirrorProjectSkills = vi.fn().mockReturnValue({ added: [], updated: [], removed: [] });
-const mockGetDevrootPath = vi.fn().mockReturnValue(null);
+const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
-const mockPlanSync = vi.fn().mockReturnValue({ toAdd: [], toUpdate: [], toRemove: [], errors: [] });
-const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], skipped: [], conflicts: [], diffs: [], errors: [] });
+const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
+const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], skipped: [], conflicts: [], diffs: [] });
+const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [] });
 const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0 }, agents: { copied: 0 }, rules: { copied: 0 } });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
-const mockPlanHooksSync = vi.fn().mockReturnValue({ toInstall: [], toUpdate: [], toRemove: [] });
+const mockPlanHooksSync = vi.fn().mockReturnValue([]);
 const mockSyncHooks = vi.fn().mockReturnValue({ synced: [], errors: [] });
 const mockSyncStatusline = vi.fn().mockReturnValue({ synced: [], errors: [] });
 const mockListProjects = vi.fn().mockReturnValue([]);
 const mockCleanupLegacyRuntimeSymlinks = vi.fn().mockReturnValue({ cleaned: [], total: 0 });
 const mockMigrateSyncTargets = vi.fn().mockReturnValue({ migrated: [], skipped: [] });
-const mockMigratePanopticonToPan = vi.fn().mockResolvedValue(undefined);
-const mockRunMultiToolSync = vi.fn().mockResolvedValue({ results: [] });
+const mockMigratePanopticonToPan = vi.fn().mockReturnValue({ migrated: [], skipped: [], errors: [] });
+const mockRunMultiToolSync = vi.fn().mockReturnValue([]);
 const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
-const mockEnsurePlaywrightIsolation = vi.fn().mockResolvedValue(undefined);
-const mockCreateBackup = vi.fn().mockResolvedValue(undefined);
+const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
+const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
+const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
+const mockCleanupAgentDirectories = vi.fn().mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
   executeSync: mockExecuteSync,
+  syncContextLayers: mockSyncContextLayers,
   refreshCache: mockRefreshCache,
   migrateStalePersonalContent: mockMigrateStalePersonalContent,
   removeLegacySkills070: mockRemoveLegacySkills070,
@@ -37,14 +44,12 @@ vi.mock('../../../src/lib/sync.js', () => ({
   syncHooks: mockSyncHooks,
   syncStatusline: mockSyncStatusline,
   mirrorProjectSkills: mockMirrorProjectSkills,
-  // Pi harness skills mirror — added in PAN-636 workspace-63b. The mock
-  // returns 'skipped' so this suite does not interact with ~/.pi at all.
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: mockLoadConfig,
-  getDevrootPath: mockGetDevrootPath,
+  checkDevrootDeprecation: mockCheckDevrootDeprecation,
   getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
@@ -68,14 +73,20 @@ vi.mock('../../../src/lib/multi-tool-sync.js', () => ({
 
 vi.mock('../../../src/lib/claude-mcp.js', () => ({
   ensurePlaywrightIsolation: mockEnsurePlaywrightIsolation,
+  ensureExcalidrawMcp: mockEnsureExcalidrawMcp,
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
   createBackup: mockCreateBackup,
 }));
 
+vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
+  cleanupAgentDirectories: mockCleanupAgentDirectories,
+}));
+
 vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_TARGET: { skills: '/tmp/skills', commands: '/tmp/commands', agents: '/tmp/agents' },
+  SYNC_SOURCES: { gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
   SKILLS_DIR: '/tmp/pan-skills',
   isDevMode: vi.fn().mockReturnValue(false),
   AGENTS_DIR: '/tmp/agents',
@@ -94,71 +105,72 @@ vi.mock('child_process', async (importOriginal) => {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
-describe('syncCommand — mirrorProjectSkills integration', () => {
+describe('syncCommand — layered sync (PAN-1201)', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     mockMirrorProjectSkills.mockReturnValue({ added: [], updated: [], removed: [] });
-    mockGetDevrootPath.mockReturnValue(null);
+    mockCheckDevrootDeprecation.mockReturnValue(null);
     mockLoadConfig.mockReturnValue({ sync: {} });
     mockListProjects.mockReturnValue([]);
-    mockPlanSync.mockReturnValue({ toAdd: [], toUpdate: [], toRemove: [], errors: [] });
+    mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
+    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [] });
+    mockCleanupAgentDirectories.mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
   });
 
-  it('calls mirrorProjectSkills with devroot when getDevrootPath returns a path', async () => {
-    mockGetDevrootPath.mockReturnValue('/home/user/projects/panopticon-cli');
-
+  it('mirrors project skills from the current working directory', async () => {
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
-
-    expect(mockMirrorProjectSkills).toHaveBeenCalledWith('/home/user/projects/panopticon-cli');
-  });
-
-  it('calls mirrorProjectSkills with process.cwd() when no devroot is configured', async () => {
-    mockGetDevrootPath.mockReturnValue(null);
-
-    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
-    await syncCommand({});
-
     expect(mockMirrorProjectSkills).toHaveBeenCalledWith(process.cwd());
   });
 
-  it('logs skill mirror results when files are added or updated', async () => {
-    mockGetDevrootPath.mockReturnValue('/home/user/projects/panopticon-cli');
-    mockMirrorProjectSkills.mockReturnValue({
-      added: ['new-skill'],
-      updated: ['existing-skill'],
-      removed: [],
-    });
+  it('renders the layered context into harness CLAUDE.md files', async () => {
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+    expect(mockSyncContextLayers).toHaveBeenCalledTimes(1);
+  });
 
+  it('prints the devroot deprecation warning when sync.devroot is still set', async () => {
+    mockCheckDevrootDeprecation.mockReturnValue('[WARN] sync.devroot is deprecated');
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
 
-    const mirrorLog = consoleSpy.mock.calls.find(([msg]) =>
-      typeof msg === 'string' && msg.includes('Skills mirror')
+    const warned = consoleSpy.mock.calls.some(
+      ([msg]) => typeof msg === 'string' && msg.includes('sync.devroot is deprecated'),
+    );
+    expect(warned).toBe(true);
+    consoleSpy.mockRestore();
+  });
+
+  it('logs skill mirror results when files are added or updated', async () => {
+    mockMirrorProjectSkills.mockReturnValue({ added: ['new-skill'], updated: ['existing-skill'], removed: [] });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    const mirrorLog = consoleSpy.mock.calls.find(
+      ([msg]) => typeof msg === 'string' && msg.includes('Skills mirror'),
     );
     expect(mirrorLog).toBeDefined();
     expect(mirrorLog![0]).toContain('1 added');
     expect(mirrorLog![0]).toContain('1 updated');
-
     consoleSpy.mockRestore();
   });
 
-  it('does not log when mirrorProjectSkills returns no changes', async () => {
-    mockGetDevrootPath.mockReturnValue(null);
+  it('does not log a skill mirror line when there are no changes', async () => {
     mockMirrorProjectSkills.mockReturnValue({ added: [], updated: [], removed: [] });
-
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
 
-    const mirrorLog = consoleSpy.mock.calls.find(([msg]) =>
-      typeof msg === 'string' && msg.includes('Skills mirror')
+    const mirrorLog = consoleSpy.mock.calls.find(
+      ([msg]) => typeof msg === 'string' && msg.includes('Skills mirror'),
     );
     expect(mirrorLog).toBeUndefined();
-
     consoleSpy.mockRestore();
   });
 });

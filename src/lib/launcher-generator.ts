@@ -53,6 +53,15 @@ export interface LauncherConfig {
   promptInline?: string;
 
   /**
+   * PAN-1201: absolute path to the workspace's assembled context bundle
+   * (`<workspace>/.pan/context/workspace.md`). When set on a Claude Code
+   * launcher the generator appends `--append-system-prompt-file <path>` so
+   * the agent's system prompt carries the layered workspace context. Ignored
+   * for Pi launchers — the Pi extension loads workspace.md at session_start.
+   */
+  appendSystemPromptFile?: string;
+
+  /**
    * Review sub-role launcher contract (PAN-977). When set, the launcher does
    * NOT `exec` claude — it runs `timeout <N> claude --print ... < prompt` as a
    * child process, then deterministically signals the synthesis agent based on
@@ -453,6 +462,11 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
   cmd += buildChannelsArgs(config);
+
+  // PAN-1201: fold the layered workspace context bundle into the system prompt.
+  if (config.appendSystemPromptFile) {
+    cmd += ` --append-system-prompt-file ${shellQuote(config.appendSystemPromptFile)}`;
+  }
 
   // Append session args
   if (config.resumeSessionId) {

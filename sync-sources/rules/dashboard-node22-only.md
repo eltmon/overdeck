@@ -1,3 +1,6 @@
+---
+scope: dev
+---
 ## Dashboard Server: Node 22 Only — NEVER Bun
 
 `pan up` starts `dist/dashboard/server.js` under Node 22. Do NOT change this to `bun run`.

@@ -11,7 +11,7 @@ import { promisify } from "util";
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Pipeable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Pipeable.js
 /**
 * @since 2.0.0
 */
@@ -55,7 +55,7 @@ const pipeArguments = (self, args) => {
 	}
 };
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Function.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Function.js
 /**
 * Creates a function that can be used in a data-last (aka `pipe`able) or
 * data-first style.
@@ -230,7 +230,7 @@ const constUndefined = /* @__PURE__ */ constant(void 0);
 */
 const constVoid = constUndefined;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/equal.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/equal.js
 /** @internal */
 const getAllObjectKeys = (obj) => {
 	const keys = new Set(Reflect.ownKeys(obj));
@@ -249,7 +249,7 @@ const getAllObjectKeys = (obj) => {
 /** @internal */
 const byReferenceInstances = /* @__PURE__ */ new WeakSet();
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Predicate.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Predicate.js
 /**
 * Predicate and Refinement helpers for runtime checks, filtering, and type narrowing.
 * This module provides small, pure functions you can combine to decide whether a
@@ -407,7 +407,7 @@ const hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(
 */
 const isTagged = /* @__PURE__ */ dual(2, (self, tag) => hasProperty(self, "_tag") && self["_tag"] === tag);
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Hash.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Hash.js
 /**
 * This module provides utilities for hashing values in TypeScript.
 *
@@ -756,7 +756,7 @@ function withVisitedTracking$1(obj, fn) {
 	return result;
 }
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Equal.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Equal.js
 /**
 * The unique string identifier for the {@link Equal} interface.
 *
@@ -991,14 +991,14 @@ const isEqual = (u) => hasProperty(u, symbol);
 */
 const asEquivalence = () => equals;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/array.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/array.js
 /**
 * @since 2.0.0
 */
 /** @internal */
 const isArrayNonEmpty = (self) => self.length > 0;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Redactable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Redactable.js
 /**
 * Symbol used to identify objects that implement the {@link Redactable}
 * protocol.
@@ -1096,7 +1096,7 @@ const emptyContext$1 = {
 	}
 };
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Formatter.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Formatter.js
 /**
 * Utilities for converting arbitrary JavaScript values into human-readable
 * strings, with support for circular references, redaction, and common JS
@@ -1344,7 +1344,7 @@ function safeToString(input) {
 	}
 }
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Inspectable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Inspectable.js
 /**
 * Symbol used by Node.js for custom object inspection.
 *
@@ -1393,7 +1393,7 @@ const toJson = (input) => {
 	return redact(input);
 };
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Utils.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Utils.js
 /**
 * An `IterableIterator` that yields its wrapped value exactly once.
 *
@@ -1471,7 +1471,7 @@ const forced = { [InternalTypeId]: (body) => {
 /** @internal */
 const internalCall = /* @__PURE__ */ standard[InternalTypeId](() => (/* @__PURE__ */ new Error()).stack)?.includes(InternalTypeId) === true ? standard[InternalTypeId] : forced[InternalTypeId];
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/core.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/core.js
 /** @internal */
 const EffectTypeId = `~effect/Effect`;
 /** @internal */
@@ -1815,7 +1815,7 @@ const TaggedError$1 = (tag) => {
 };
 TaggedError$1("NoSuchElementError");
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/result.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/result.js
 const TypeId$1 = "~effect/data/Result";
 const CommonProto = {
 	[TypeId$1]: {
@@ -1891,7 +1891,7 @@ const succeed$3 = (success) => {
 	return a;
 };
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Result.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Result.js
 /**
 * Creates a `Result` holding a `Success` value.
 *
@@ -1981,7 +1981,7 @@ const fail$1 = fail$2;
 */
 const isFailure = isFailure$1;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Array.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Array.js
 /**
 * Utilities for working with immutable arrays (and non-empty arrays) in a
 * functional style. All functions treat arrays as immutable — they return new
@@ -2274,7 +2274,7 @@ const dedupeWith = /* @__PURE__ */ dual(2, (self, isEquivalent) => {
 	return [];
 });
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Context.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Context.js
 /**
 * @since 4.0.0
 * @category Type Identifiers
@@ -2600,7 +2600,7 @@ const withMapUnsafe = (self, f) => {
 */
 const Reference = Service;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Scheduler.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Scheduler.js
 /**
 * @since 2.0.0
 */
@@ -2737,7 +2737,7 @@ const MaxOpsBeforeYield = /* @__PURE__ */ Reference("effect/Scheduler/MaxOpsBefo
 */
 const PreventSchedulerYield = /* @__PURE__ */ Reference("effect/Scheduler/PreventSchedulerYield", { defaultValue: () => false });
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Tracer.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Tracer.js
 /**
 * @since 2.0.0
 */
@@ -2760,11 +2760,11 @@ Service()(ParentSpanKey);
 */
 const TracerKey = "effect/Tracer";
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/metric.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/metric.js
 /** @internal */
 const FiberRuntimeMetricsKey = "effect/observability/Metric/FiberRuntimeMetricsKey";
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/references.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/references.js
 /** @internal */
 const CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStackFrame", { defaultValue: constUndefined });
 /** @internal */
@@ -2772,7 +2772,7 @@ const CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogL
 /** @internal */
 const MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", { defaultValue: () => "Info" });
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/effect.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/effect.js
 /** @internal */
 var Interrupt = class extends ReasonBase {
 	fiberId;
@@ -3188,7 +3188,7 @@ hasProcessStdout || "Deno" in globalThis;
 */
 const TaggedError = TaggedError$1;
 //#endregion
-//#region ../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Effect.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Effect.js
 /**
 * Creates an `Effect` that always succeeds with a given value.
 *
@@ -3318,7 +3318,7 @@ const catchTag = catchTag$1;
 const runSync = runSync$1;
 Service()("effect/Effect/Transaction");
 //#endregion
-//#region ../src/lib/paths.ts
+//#region ../../src/lib/paths.ts
 const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), ".panopticon");
 /** Get PANOPTICON_HOME dynamically (reads env var on each call, useful for testing) */
 function getPanopticonHome() {
@@ -3354,13 +3354,21 @@ function resolvePackageRootForDir(dir) {
 	if (dir.includes(nestedDistSegment)) return dir.slice(0, dir.indexOf(nestedDistSegment));
 	return dir.endsWith(`${sep}lib`) ? dirname(dirname(dir)) : dirname(dir);
 }
-const packageRoot = resolvePackageRootForDir(currentDir);
-join(join(packageRoot, "templates"), "traefik");
-join(packageRoot, "scripts");
-join(packageRoot, "skills");
-join(packageRoot, "dev-skills");
-join(packageRoot, "agents");
-join(packageRoot, "rules");
+/**
+* Root of Panopticon's own bundled sync sources (PAN-1201).
+*
+* Everything `pan sync` distributes from the package itself lives under this
+* single explicit top-level directory — skills, dev-skills, agents, rules,
+* hook scripts, and workspace templates. A glance at the repo root shows
+* exactly what sync distributes.
+*
+* This replaces the scattered SOURCE_*_DIR constants that previously pointed
+* at sprawled top-level dirs. That sprawl let the stale top-level `rules/`
+* silently rot while the maintained rules accumulated elsewhere (#1359):
+* nothing in the repo layout signalled which dirs were sync sources.
+*/
+const SYNC_SOURCES_ROOT = join(resolvePackageRootForDir(currentDir), "sync-sources");
+join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
 join(PANOPTICON_HOME, "agent-definitions");
 join(PANOPTICON_HOME, "rules");
 join(PANOPTICON_HOME, ".manifest.json");
@@ -3402,7 +3410,7 @@ TaggedError("ClaudeCredentialParseError");
 TaggedError("ProcessSpawnError");
 TaggedError("ProcessTimeoutError");
 //#endregion
-//#region ../src/lib/cost.ts
+//#region ../../src/lib/cost.ts
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
@@ -4657,7 +4665,7 @@ function runMigrations(db) {
 	db.pragma(`user_version = 40`);
 }
 //#endregion
-//#region ../src/lib/database/index.ts
+//#region ../../src/lib/database/index.ts
 /**
 * PAN-1249: Local typed error for SQLite failures against panopticon.db.
 * Used by callers that want to surface DB faults instead of swallowing them.
@@ -4730,7 +4738,7 @@ function getDatabase() {
 	return _db;
 }
 //#endregion
-//#region ../src/lib/database/cost-events-db.ts
+//#region ../../src/lib/database/cost-events-db.ts
 /**
 * Cost Events SQLite Storage
 *
@@ -4794,7 +4802,7 @@ function insertCostEvent(event, sourceFile) {
 	})));
 }
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
 var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
 	const ALIAS = Symbol.for("yaml.alias");
 	const DOC = Symbol.for("yaml.document");
@@ -4844,7 +4852,7 @@ var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.isSeq = isSeq;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/visit.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/visit.js
 var require_visit = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	const BREAK = Symbol("break visit");
@@ -5034,7 +5042,7 @@ var require_visit = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.visitAsync = visitAsync;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/directives.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/directives.js
 var require_directives = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var visit = require_visit();
@@ -5199,7 +5207,7 @@ var require_directives = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Directives = Directives;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/anchors.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/anchors.js
 var require_anchors = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var visit = require_visit();
@@ -5266,7 +5274,7 @@ var require_anchors = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.findNewAnchor = findNewAnchor;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/applyReviver.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/applyReviver.js
 var require_applyReviver = /* @__PURE__ */ __commonJSMin(((exports) => {
 	/**
 	* Applies the JSON.parse reviver algorithm as defined in the ECMA-262 spec,
@@ -5306,7 +5314,7 @@ var require_applyReviver = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.applyReviver = applyReviver;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/toJS.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/toJS.js
 var require_toJS = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	/**
@@ -5343,7 +5351,7 @@ var require_toJS = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.toJS = toJS;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Node.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Node.js
 var require_Node = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var applyReviver = require_applyReviver();
 	var identity = require_identity();
@@ -5377,7 +5385,7 @@ var require_Node = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.NodeBase = NodeBase;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Alias.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Alias.js
 var require_Alias = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var anchors = require_anchors();
 	var visit = require_visit();
@@ -5471,7 +5479,7 @@ var require_Alias = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Alias = Alias;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Scalar.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Scalar.js
 var require_Scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Node = require_Node();
@@ -5498,7 +5506,7 @@ var require_Scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.isScalarValue = isScalarValue;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/createNode.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/createNode.js
 var require_createNode = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Alias = require_Alias();
 	var identity = require_identity();
@@ -5561,7 +5569,7 @@ var require_createNode = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.createNode = createNode;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Collection.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Collection.js
 var require_Collection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var createNode = require_createNode();
 	var identity = require_identity();
@@ -5682,7 +5690,7 @@ var require_Collection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.isEmptyPath = isEmptyPath;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyComment.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyComment.js
 var require_stringifyComment = /* @__PURE__ */ __commonJSMin(((exports) => {
 	/**
 	* Stringifies a comment.
@@ -5702,7 +5710,7 @@ var require_stringifyComment = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyComment = stringifyComment;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/foldFlowLines.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/foldFlowLines.js
 var require_foldFlowLines = /* @__PURE__ */ __commonJSMin(((exports) => {
 	const FOLD_FLOW = "flow";
 	const FOLD_BLOCK = "block";
@@ -5818,7 +5826,7 @@ var require_foldFlowLines = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.foldFlowLines = foldFlowLines;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyString.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyString.js
 var require_stringifyString = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	var foldFlowLines = require_foldFlowLines();
@@ -6042,7 +6050,7 @@ var require_stringifyString = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyString = stringifyString;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringify.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringify.js
 var require_stringify = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var anchors = require_anchors();
 	var identity = require_identity();
@@ -6150,7 +6158,7 @@ var require_stringify = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringify = stringify;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyPair.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyPair.js
 var require_stringifyPair = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Scalar = require_Scalar();
@@ -6247,7 +6255,7 @@ var require_stringifyPair = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyPair = stringifyPair;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/log.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/log.js
 var require_log = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var node_process$2 = __require("process");
 	function debug(logLevel, ...messages) {
@@ -6261,7 +6269,7 @@ var require_log = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.warn = warn;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/merge.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/merge.js
 var require_merge = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Scalar = require_Scalar();
@@ -6304,7 +6312,7 @@ var require_merge = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.merge = merge;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/addPairToJSMap.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/addPairToJSMap.js
 var require_addPairToJSMap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var log = require_log();
 	var merge = require_merge();
@@ -6355,7 +6363,7 @@ var require_addPairToJSMap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.addPairToJSMap = addPairToJSMap;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Pair.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/Pair.js
 var require_Pair = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var createNode = require_createNode();
 	var stringifyPair = require_stringifyPair();
@@ -6388,7 +6396,7 @@ var require_Pair = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.createPair = createPair;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyCollection.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyCollection.js
 var require_stringifyCollection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var stringify = require_stringify();
@@ -6506,7 +6514,7 @@ var require_stringifyCollection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyCollection = stringifyCollection;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/YAMLMap.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/YAMLMap.js
 var require_YAMLMap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var stringifyCollection = require_stringifyCollection();
 	var addPairToJSMap = require_addPairToJSMap();
@@ -6615,7 +6623,7 @@ var require_YAMLMap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.findPair = findPair;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/map.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/map.js
 var require_map = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var YAMLMap = require_YAMLMap();
@@ -6632,7 +6640,7 @@ var require_map = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/YAMLSeq.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/YAMLSeq.js
 var require_YAMLSeq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var createNode = require_createNode();
 	var stringifyCollection = require_stringifyCollection();
@@ -6738,7 +6746,7 @@ var require_YAMLSeq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.YAMLSeq = YAMLSeq;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/seq.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/seq.js
 var require_seq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var YAMLSeq = require_YAMLSeq();
@@ -6755,7 +6763,7 @@ var require_seq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/string.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/string.js
 var require_string = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var stringifyString = require_stringifyString();
 	exports.string = {
@@ -6770,7 +6778,7 @@ var require_string = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/null.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/common/null.js
 var require_null = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	const nullTag = {
@@ -6785,7 +6793,7 @@ var require_null = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.nullTag = nullTag;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/bool.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/bool.js
 var require_bool$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	const boolTag = {
@@ -6804,7 +6812,7 @@ var require_bool$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.boolTag = boolTag;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyNumber.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyNumber.js
 var require_stringifyNumber = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function stringifyNumber({ format, minFractionDigits, tag, value }) {
 		if (typeof value === "bigint") return String(value);
@@ -6825,7 +6833,7 @@ var require_stringifyNumber = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyNumber = stringifyNumber;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/float.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/float.js
 var require_float$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	var stringifyNumber = require_stringifyNumber();
@@ -6866,7 +6874,7 @@ var require_float$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.floatNaN = floatNaN;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/int.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/int.js
 var require_int$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var stringifyNumber = require_stringifyNumber();
 	const intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
@@ -6907,7 +6915,7 @@ var require_int$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.intOct = intOct;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/schema.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/core/schema.js
 var require_schema$2 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var map = require_map();
 	var _null = require_null();
@@ -6931,7 +6939,7 @@ var require_schema$2 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	];
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/json/schema.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/json/schema.js
 var require_schema$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	var map = require_map();
@@ -6993,7 +7001,7 @@ var require_schema$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
 	});
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/binary.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/binary.js
 var require_binary = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var node_buffer = __require("buffer");
 	var Scalar = require_Scalar();
@@ -7049,7 +7057,7 @@ var require_binary = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/pairs.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/pairs.js
 var require_pairs = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Pair = require_Pair();
@@ -7109,7 +7117,7 @@ var require_pairs = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolvePairs = resolvePairs;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/omap.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/omap.js
 var require_omap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var toJS = require_toJS();
@@ -7172,7 +7180,7 @@ var require_omap = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.omap = omap;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/bool.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/bool.js
 var require_bool = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	function boolStringify({ value, source }, ctx) {
@@ -7199,7 +7207,7 @@ var require_bool = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.trueTag = trueTag;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/float.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/float.js
 var require_float = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	var stringifyNumber = require_stringifyNumber();
@@ -7243,7 +7251,7 @@ var require_float = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.floatNaN = floatNaN;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/int.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/int.js
 var require_int = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var stringifyNumber = require_stringifyNumber();
 	const intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
@@ -7318,7 +7326,7 @@ var require_int = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.intOct = intOct;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/set.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/set.js
 var require_set = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Pair = require_Pair();
@@ -7386,7 +7394,7 @@ var require_set = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.set = set;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/timestamp.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/timestamp.js
 var require_timestamp = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var stringifyNumber = require_stringifyNumber();
 	/** Internal types handle bigint as number, because TS can't figure it out. */
@@ -7469,7 +7477,7 @@ var require_timestamp = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.timestamp = timestamp;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/schema.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/yaml-1.1/schema.js
 var require_schema = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var map = require_map();
 	var _null = require_null();
@@ -7509,7 +7517,7 @@ var require_schema = /* @__PURE__ */ __commonJSMin(((exports) => {
 	];
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/tags.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/tags.js
 var require_tags = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var map = require_map();
 	var _null = require_null();
@@ -7593,7 +7601,7 @@ var require_tags = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.getTags = getTags;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/Schema.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/schema/Schema.js
 var require_Schema = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var map = require_map();
@@ -7621,7 +7629,7 @@ var require_Schema = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyDocument.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/stringify/stringifyDocument.js
 var require_stringifyDocument = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var stringify = require_stringify();
@@ -7682,7 +7690,7 @@ var require_stringifyDocument = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringifyDocument = stringifyDocument;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/Document.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/doc/Document.js
 var require_Document = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Alias = require_Alias();
 	var Collection = require_Collection();
@@ -7963,7 +7971,7 @@ var require_Document = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Document = Document;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/errors.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/errors.js
 var require_errors = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var YAMLError = class extends Error {
 		constructor(name, pos, code, message) {
@@ -8016,7 +8024,7 @@ var require_errors = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.prettifyError = prettifyError;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-props.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-props.js
 var require_resolve_props = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function resolveProps(tokens, { flow, indicator, next, offset, onError, parentIndent, startOnNewline }) {
 		let spaceBefore = false;
@@ -8123,7 +8131,7 @@ var require_resolve_props = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveProps = resolveProps;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-contains-newline.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-contains-newline.js
 var require_util_contains_newline = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function containsNewline(key) {
 		if (!key) return null;
@@ -8152,7 +8160,7 @@ var require_util_contains_newline = /* @__PURE__ */ __commonJSMin(((exports) => 
 	exports.containsNewline = containsNewline;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-flow-indent-check.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-flow-indent-check.js
 var require_util_flow_indent_check = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var utilContainsNewline = require_util_contains_newline();
 	function flowIndentCheck(indent, fc, onError) {
@@ -8164,7 +8172,7 @@ var require_util_flow_indent_check = /* @__PURE__ */ __commonJSMin(((exports) =>
 	exports.flowIndentCheck = flowIndentCheck;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-map-includes.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-map-includes.js
 var require_util_map_includes = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	function mapIncludes(ctx, items, search) {
@@ -8176,7 +8184,7 @@ var require_util_map_includes = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.mapIncludes = mapIncludes;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-map.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-map.js
 var require_resolve_block_map = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Pair = require_Pair();
 	var YAMLMap = require_YAMLMap();
@@ -8260,7 +8268,7 @@ var require_resolve_block_map = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveBlockMap = resolveBlockMap;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-seq.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-seq.js
 var require_resolve_block_seq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var YAMLSeq = require_YAMLSeq();
 	var resolveProps = require_resolve_props();
@@ -8302,7 +8310,7 @@ var require_resolve_block_seq = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveBlockSeq = resolveBlockSeq;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-end.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-end.js
 var require_resolve_end = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function resolveEnd(end, offset, reqSpace, onError) {
 		let comment = "";
@@ -8340,7 +8348,7 @@ var require_resolve_end = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveEnd = resolveEnd;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-flow-collection.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-flow-collection.js
 var require_resolve_flow_collection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Pair = require_Pair();
@@ -8495,7 +8503,7 @@ var require_resolve_flow_collection = /* @__PURE__ */ __commonJSMin(((exports) =
 	exports.resolveFlowCollection = resolveFlowCollection;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-collection.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-collection.js
 var require_compose_collection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Scalar = require_Scalar();
@@ -8547,7 +8555,7 @@ var require_compose_collection = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.composeCollection = composeCollection;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-scalar.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-block-scalar.js
 var require_resolve_block_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	function resolveBlockScalar(ctx, scalar, onError) {
@@ -8723,7 +8731,7 @@ var require_resolve_block_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveBlockScalar = resolveBlockScalar;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-flow-scalar.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/resolve-flow-scalar.js
 var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Scalar = require_Scalar();
 	var resolveEnd = require_resolve_end();
@@ -8928,7 +8936,7 @@ var require_resolve_flow_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.resolveFlowScalar = resolveFlowScalar;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-scalar.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-scalar.js
 var require_compose_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var identity = require_identity();
 	var Scalar = require_Scalar();
@@ -8987,7 +8995,7 @@ var require_compose_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.composeScalar = composeScalar;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-empty-scalar-position.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/util-empty-scalar-position.js
 var require_util_empty_scalar_position = /* @__PURE__ */ __commonJSMin(((exports) => {
 	function emptyScalarPosition(offset, before, pos) {
 		if (before) {
@@ -9014,7 +9022,7 @@ var require_util_empty_scalar_position = /* @__PURE__ */ __commonJSMin(((exports
 	exports.emptyScalarPosition = emptyScalarPosition;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-node.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-node.js
 var require_compose_node = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Alias = require_Alias();
 	var identity = require_identity();
@@ -9103,7 +9111,7 @@ var require_compose_node = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.composeNode = composeNode;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-doc.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/compose-doc.js
 var require_compose_doc = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var Document = require_Document();
 	var composeNode = require_compose_node();
@@ -9145,7 +9153,7 @@ var require_compose_doc = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.composeDoc = composeDoc;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/composer.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/compose/composer.js
 var require_composer = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var node_process$1 = __require("process");
 	var directives = require_directives();
@@ -9343,7 +9351,7 @@ var require_composer = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Composer = Composer;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-scalar.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-scalar.js
 var require_cst_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var resolveBlockScalar = require_resolve_block_scalar();
 	var resolveFlowScalar = require_resolve_flow_scalar();
@@ -9610,7 +9618,7 @@ var require_cst_scalar = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.setScalarValue = setScalarValue;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-stringify.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-stringify.js
 var require_cst_stringify = /* @__PURE__ */ __commonJSMin(((exports) => {
 	/**
 	* Stringify a CST document, token, or collection item
@@ -9661,7 +9669,7 @@ var require_cst_stringify = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringify = stringify;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-visit.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst-visit.js
 var require_cst_visit = /* @__PURE__ */ __commonJSMin(((exports) => {
 	const BREAK = Symbol("break visit");
 	const SKIP = Symbol("skip children");
@@ -9752,7 +9760,7 @@ var require_cst_visit = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.visit = visit;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/cst.js
 var require_cst = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var cstScalar = require_cst_scalar();
 	var cstStringify = require_cst_stringify();
@@ -9831,7 +9839,7 @@ var require_cst = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.tokenType = tokenType;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/lexer.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/lexer.js
 var require_lexer = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var cst = require_cst();
 	function isEmpty(ch) {
@@ -10362,7 +10370,7 @@ var require_lexer = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Lexer = Lexer;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/line-counter.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/line-counter.js
 var require_line_counter = /* @__PURE__ */ __commonJSMin(((exports) => {
 	/**
 	* Tracks newlines during parsing in order to provide an efficient API for
@@ -10409,7 +10417,7 @@ var require_line_counter = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.LineCounter = LineCounter;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/parser.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/parse/parser.js
 var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var node_process = __require("process");
 	var cst = require_cst();
@@ -11272,7 +11280,7 @@ var require_parser = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.Parser = Parser;
 }));
 //#endregion
-//#region ../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/public-api.js
+//#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/public-api.js
 var require_public_api = /* @__PURE__ */ __commonJSMin(((exports) => {
 	var composer = require_composer();
 	var Document = require_Document();
@@ -11359,7 +11367,7 @@ var require_public_api = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.stringify = stringify;
 }));
 //#endregion
-//#region ../src/lib/issue-id.ts
+//#region ../../src/lib/issue-id.ts
 var import_dist = (/* @__PURE__ */ __commonJSMin(((exports) => {
 	var composer = require_composer();
 	var Document = require_Document();
@@ -11455,7 +11463,7 @@ function extractPrefix(issueId) {
 	return parseIssueId(issueId)?.prefix ?? null;
 }
 //#endregion
-//#region ../src/lib/projects.ts
+//#region ../../src/lib/projects.ts
 /**
 * Project Registry - Multi-project support for Panopticon
 *
@@ -11490,7 +11498,7 @@ function listProjects() {
 	}));
 }
 //#endregion
-//#region ../src/lib/costs/wal.ts
+//#region ../../src/lib/costs/wal.ts
 /**
 * Per-project WAL Writer
 *
@@ -11536,7 +11544,7 @@ function appendToWal(event) {
 	}
 }
 //#endregion
-//#region ../src/lib/costs/events.ts
+//#region ../../src/lib/costs/events.ts
 /**
 * Event Log Management for Cost Tracking
 *
@@ -11587,7 +11595,7 @@ function appendCostEvent(event) {
 	}
 }
 //#endregion
-//#region ../src/lib/tldr-daemon.ts
+//#region ../../src/lib/tldr-daemon.ts
 /**
 * TLDR Daemon Service
 *
