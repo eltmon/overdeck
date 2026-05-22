@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlanAsync } from './vbrief/io.js';
+import { findPlanEffect } from './vbrief/io.js';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileAsync } from './vbrief/dag.js';
@@ -633,7 +633,7 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
       if (!existsSync(workStateFile)) return;
       const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
       if (!workState.workspace) return;
-      const planPath = await findPlanAsync(workState.workspace);
+      const planPath = await Effect.runPromise(findPlanEffect(workState.workspace));
       if (!planPath) {
         console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
         return;

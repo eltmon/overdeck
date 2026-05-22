@@ -21,7 +21,7 @@ import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { readWorkspaceContinue } from '../pan-dir/continue.js';
 import type { WorkspaceContinueState } from '../pan-dir/types.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
@@ -35,7 +35,7 @@ import type { VBriefDocument, VBriefItemStatus } from './types.js';
  * Effect-based pan-dir `findSpecByIssue` requires async FileSystem operations
  * (`fs.readDirectory`, `fs.readFileString`) that cannot run under
  * `Effect.runSync` — so we keep a local sync mirror rather than break CLI
- * synchronous semantics. Dashboard server code uses `findPlanAsync`.
+ * synchronous semantics. Dashboard server code uses `findPlanEffect`.
  */
 function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
   const upperIssueId = issueId.toUpperCase();
@@ -170,29 +170,6 @@ export function findWorkspaceDraftPlan(workspacePath: string): string | null {
   return path;
 }
 
-export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promise<string | null> {
-  const path = workspaceDraftPath(workspacePath);
-  try {
-    await readFile(path, 'utf-8');
-  } catch (error: any) {
-    if (error?.code === 'ENOENT') return null;
-    throw error;
-  }
-
-  const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (!issueId) return path;
-
-  try {
-    const doc = await readPlanAsync(path);
-    const planIssueId = doc.plan?.id;
-    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
-  } catch {
-    return path;
-  }
-
-  return path;
-}
-
 /**
  * Returns the path to this workspace's vBRIEF source. The canonical main-side
  * spec wins after promotion; before first promotion, the workspace draft is the
@@ -201,7 +178,7 @@ export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promis
  * NOTE (PAN-1249): Now runs the underlying pan-dir spec resolution via
  * `Effect.runSync` since findSpecByIssue is Effect-based. The Effect uses
  * NodeFileSystem under the hood which means this synchronous call path
- * actually blocks on async I/O — prefer `findPlanAsync` from any
+ * actually blocks on async I/O — prefer `findPlanEffect` from any
  * dashboard server code. Kept sync to preserve the CLI call sites.
  */
 export function findPlan(workspacePath: string): string | null {
@@ -210,15 +187,6 @@ export function findPlan(workspacePath: string): string | null {
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssueSync(projectRoot, issueId);
   return entry ? entry.path : findWorkspaceDraftPlan(workspacePath);
-}
-
-/** Async variant of findPlan — safe to call from dashboard server code. */
-export async function findPlanAsync(workspacePath: string): Promise<string | null> {
-  const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (!issueId) return null;
-  const projectRoot = projectRootFromWorkspace(workspacePath);
-  const entry = await findSpecByIssueAsyncLocal(projectRoot, issueId);
-  return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);
 }
 
 /**
@@ -250,23 +218,6 @@ export function readPlan(planPath: string): VBriefDocument {
   }
 
   // Non-spec format — reject with helpful error
-  throw new Error(
-    `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-    `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
-    `See docs/VBRIEF.md for the correct format.`
-  );
-}
-
-/** Async variant of readPlan — safe to call from server-hot-path code. */
-export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
-  const raw = await readFile(planPath, 'utf-8');
-  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-    throw new VBriefMergeConflictError(planPath);
-  }
-  const parsed = JSON.parse(raw);
-  if (parsed.vBRIEFInfo && parsed.plan) {
-    return parsed as VBriefDocument;
-  }
   throw new Error(
     `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
     `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
@@ -324,21 +275,6 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
   return doc;
 }
 
-/** Async variant of readWorkspacePlan — safe for dashboard server code. */
-export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
-  const planPath = await findPlanAsync(workspacePath);
-  if (!planPath) return null;
-  const doc = await readPlanAsync(planPath);
-
-  const continueState = await Effect.runPromise(
-    readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null))),
-  );
-  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
-    return applyStatusOverrides(doc, continueState.statusOverrides);
-  }
-  return doc;
-}
-
 /**
  * vBRIEF lifecycle statuses that mean "planning has finished" — i.e., the
  * agent can pick up work or the plan is done. Excludes 'draft' (still being
@@ -357,10 +293,6 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
 }
 
-export function isPlanningProposedAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
-  return checkPlanStatusAsync(workspacePath, planningDir, status => status === 'proposed');
-}
-
 /**
  * Check whether planning has finished for this workspace — i.e., beads have
  * been generated and the agent can (or already did) start work.
@@ -372,10 +304,6 @@ export function isPlanningComplete(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
 }
 
-export function isPlanningCompleteAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
-  return checkPlanStatusAsync(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
-}
-
 function checkPlanStatus(
   workspacePath: string,
   _planningDir: string | undefined,
@@ -385,24 +313,6 @@ function checkPlanStatus(
   if (!planPath) return false;
   try {
     const doc = readPlan(planPath);
-    const status = doc.plan?.status;
-    if (status && matchStatus(status)) return true;
-    if (status) return false;
-  } catch {
-    // Corrupt / unreadable plan
-  }
-  return false;
-}
-
-async function checkPlanStatusAsync(
-  workspacePath: string,
-  _planningDir: string | undefined,
-  matchStatus: (status: string) => boolean,
-): Promise<boolean> {
-  const planPath = await findPlanAsync(workspacePath);
-  if (!planPath) return false;
-  try {
-    const doc = await readPlanAsync(planPath);
     const status = doc.plan?.status;
     if (status && matchStatus(status)) return true;
     if (status) return false;
@@ -492,13 +402,12 @@ export function updateSubItemStatus(
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// These wrap the existing async APIs in Effect with typed error channels so
-// callers can compose vBRIEF reads with other Effect-native code. They do NOT
-// replace the sync/Promise variants — CLI and legacy callers continue to use
-// those. Migrate callers individually as they move into Effect.
+// These provide Effect APIs with typed error channels so callers can compose
+// vBRIEF reads with other Effect-native code. The sync variants stay until the
+// canonical naming pass.
 
 /**
- * Effect variant of readPlanAsync — failures surface as typed errors in the
+ * Effect variant of readPlan — failures surface as typed errors in the
  * channel instead of thrown exceptions.
  */
 export const readPlanEffect = (
@@ -560,7 +469,7 @@ export const findWorkspaceDraftPlanEffect = (
   });
 
 /**
- * Effect variant of findPlanAsync. Returns null when the workspace has no
+ * Effect variant of findPlan. Returns null when the workspace has no
  * resolvable plan — only IO/decoding failures surface as errors.
  */
 export const findPlanEffect = (
@@ -578,7 +487,7 @@ export const findPlanEffect = (
   });
 
 /**
- * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
+ * Effect variant of readWorkspacePlan. Returns null when there's no plan
  * for the workspace; otherwise returns the merged document with statusOverrides
  * applied. IO/decoding failures surface as typed errors.
  */
