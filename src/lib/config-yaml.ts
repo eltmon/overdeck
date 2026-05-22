@@ -621,6 +621,16 @@ export async function getConversationsConfigAsync(): Promise<RuntimeConversation
   });
 }
 
+export const getConversationsConfigAsyncEffect = (): Effect.Effect<RuntimeConversationsConfig, ConfigError> =>
+  Effect.tryPromise({
+    try: () => getConversationsConfigAsync(),
+    catch: (cause) =>
+      new ConfigError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
 export async function updateConversationsConfigAsync(updates: ConversationsConfig): Promise<void> {
   await loadConfigAsyncNoMigration();
   let existingContent = '{}\n';
