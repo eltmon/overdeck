@@ -1,9 +1,11 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearRunningAgentsCache, getCachedRunningAgents } from '../running-agents-cache.js';
-import type { listRunningAgentsAsync } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents.js';
 
-type ListAgentsFn = typeof listRunningAgentsAsync;
+type RunningAgent = AgentState & { tmuxActive: boolean };
+type ListAgentsFn = () => Effect.Effect<RunningAgent[], unknown>;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -18,15 +20,15 @@ afterEach(() => {
 
 describe('running-agents-cache', () => {
   it('reuses the global cached agents list within the ttl', async () => {
-    const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' }];
-    const secondAgents = [{ id: 'agent-2', issueId: 'PAN-999' }];
+    const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' } as RunningAgent];
+    const secondAgents = [{ id: 'agent-2', issueId: 'PAN-999' } as RunningAgent];
     const listAgents = vi
-      .fn<() => Promise<Array<{ id: string; issueId: string }>>>()
-      .mockResolvedValueOnce(firstAgents)
-      .mockResolvedValueOnce(secondAgents);
+      .fn<ListAgentsFn>()
+      .mockReturnValueOnce(Effect.succeed(firstAgents))
+      .mockReturnValueOnce(Effect.succeed(secondAgents));
 
-    const first = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
-    const second = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    const first = await getCachedRunningAgents(listAgents);
+    const second = await getCachedRunningAgents(listAgents);
 
     expect(first).toBe(firstAgents);
     expect(second).toBe(firstAgents);
@@ -34,35 +36,33 @@ describe('running-agents-cache', () => {
   });
 
   it('refreshes the cache after the ttl expires', async () => {
-    const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' }];
-    const secondAgents = [{ id: 'agent-2', issueId: 'PAN-895' }];
+    const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' } as RunningAgent];
+    const secondAgents = [{ id: 'agent-2', issueId: 'PAN-895' } as RunningAgent];
     const listAgents = vi
-      .fn<() => Promise<Array<{ id: string; issueId: string }>>>()
-      .mockResolvedValueOnce(firstAgents)
-      .mockResolvedValueOnce(secondAgents);
+      .fn<ListAgentsFn>()
+      .mockReturnValueOnce(Effect.succeed(firstAgents))
+      .mockReturnValueOnce(Effect.succeed(secondAgents));
 
-    await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    await getCachedRunningAgents(listAgents);
     await vi.advanceTimersByTimeAsync(3_001);
-    const refreshed = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    const refreshed = await getCachedRunningAgents(listAgents);
 
     expect(refreshed).toBe(secondAgents);
     expect(listAgents).toHaveBeenCalledTimes(2);
   });
 
   it('coalesces concurrent cache misses into one list call', async () => {
-    let resolveAgents: ((value: Array<{ id: string; issueId: string }>) => void) | undefined;
-    const listAgents = vi.fn(
-      () => new Promise<Array<{ id: string; issueId: string }>>((resolve) => {
-        resolveAgents = resolve;
-      }),
-    );
+    let resolveAgents: ((value: RunningAgent[]) => void) | undefined;
+    const listAgents = vi.fn<ListAgentsFn>(() => Effect.promise(() => new Promise<RunningAgent[]>((resolve) => {
+      resolveAgents = resolve;
+    })));
 
-    const firstPromise = getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
-    const secondPromise = getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
+    const firstPromise = getCachedRunningAgents(listAgents);
+    const secondPromise = getCachedRunningAgents(listAgents);
 
     expect(listAgents).toHaveBeenCalledTimes(1);
 
-    resolveAgents?.([{ id: 'agent-1', issueId: 'PAN-895' }]);
+    resolveAgents?.([{ id: 'agent-1', issueId: 'PAN-895' } as RunningAgent]);
 
     const [first, second] = await Promise.all([firstPromise, secondPromise]);
     expect(first).toEqual([{ id: 'agent-1', issueId: 'PAN-895' }]);

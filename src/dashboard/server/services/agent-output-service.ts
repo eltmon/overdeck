@@ -10,16 +10,19 @@
  * server code was emitting the events.
  */
 
-import { listRunningAgentsAsync } from '../../../lib/agents.js'
-import { capturePaneAsync } from '../../../lib/tmux.js'
+import { listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js'
+import { capturePaneAsyncEffect } from '../../../lib/tmux.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentOutputReceivedEvent } from '@panctl/contracts'
+import { Effect } from 'effect'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type RunningAgent = AgentState & { tmuxActive: boolean }
 
 interface AgentOutputServiceState {
   timer: ReturnType<typeof setInterval> | null
@@ -64,9 +67,9 @@ export function diffLines(previous: string[], current: string[]): string[] {
 // ─── Poller ───────────────────────────────────────────────────────────────────
 
 export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
-  let runningAgents: Awaited<ReturnType<typeof listRunningAgentsAsync>>
+  let runningAgents: RunningAgent[]
   try {
-    runningAgents = await listRunningAgentsAsync()
+    runningAgents = await Effect.runPromise(listRunningAgentsEffect())
   } catch {
     return
   }
@@ -90,10 +93,12 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
           const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
           stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
         } else {
-          stdout = await capturePaneAsync(agentId, 50)
+          stdout = await Effect.runPromise(capturePaneAsyncEffect(agentId, 50))
         }
       } catch {
-        stdout = await capturePaneAsync(agentId, 50).catch(() => '')
+        stdout = await Effect.runPromise(
+          capturePaneAsyncEffect(agentId, 50).pipe(Effect.catchAll(() => Effect.succeed(''))),
+        )
       }
 
       if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {

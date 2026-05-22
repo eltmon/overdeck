@@ -1,14 +1,18 @@
-import { listRunningAgentsAsync } from '../../../lib/agents.js';
+import { Effect } from 'effect';
+import { listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js';
+
+type RunningAgent = AgentState & { tmuxActive: boolean };
+type ListRunningAgentsEffect = () => Effect.Effect<RunningAgent[], unknown>;
 
 const RUNNING_AGENTS_CACHE_TTL_MS = 3_000;
 const GLOBAL_RUNNING_AGENTS_CACHE_KEY = '__all_agents__';
 
 const runningAgentsCache = new Map<string, {
   timestamp: number;
-  agents: Awaited<ReturnType<typeof listRunningAgentsAsync>>;
+  agents: RunningAgent[];
 }>();
 let inflightRunningAgents:
-  | Promise<Awaited<ReturnType<typeof listRunningAgentsAsync>>>
+  | Promise<RunningAgent[]>
   | null = null;
 
 function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
@@ -21,8 +25,8 @@ function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, tt
 }
 
 export async function getCachedRunningAgents(
-  listAgents: typeof listRunningAgentsAsync = listRunningAgentsAsync,
-): Promise<Awaited<ReturnType<typeof listRunningAgentsAsync>>> {
+  listAgents: ListRunningAgentsEffect = listRunningAgentsEffect,
+): Promise<RunningAgent[]> {
   sweepExpired(runningAgentsCache, RUNNING_AGENTS_CACHE_TTL_MS);
   const cached = runningAgentsCache.get(GLOBAL_RUNNING_AGENTS_CACHE_KEY);
   if (cached && cached.timestamp > Date.now() - RUNNING_AGENTS_CACHE_TTL_MS) {
@@ -30,7 +34,7 @@ export async function getCachedRunningAgents(
   }
 
   if (!inflightRunningAgents) {
-    inflightRunningAgents = listAgents().then((agents) => {
+    inflightRunningAgents = Effect.runPromise(listAgents()).then((agents) => {
       runningAgentsCache.set(GLOBAL_RUNNING_AGENTS_CACHE_KEY, {
         timestamp: Date.now(),
         agents,
