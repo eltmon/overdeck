@@ -232,8 +232,7 @@ export const waitForReviewerOutputsEffect = (
         }
 
         const dead = yield* isPaneDeadAsyncEffect(s.sessionId).pipe(
-          Effect.map((value): boolean | null => value),
-          Effect.catch(() => Effect.succeed(null)),
+          Effect.catch(() => Effect.succeed(null as boolean | null)),
         );
 
         if (dead === true) {
