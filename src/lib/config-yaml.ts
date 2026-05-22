@@ -152,6 +152,7 @@ export interface NormalizedTtsDaemonConfig {
 
 export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 export type ModelRef = string;
+export const PARENT_MODEL_REF = 'parent';
 
 /**
  * Canonical workhorse slot list. Anything outside this set is rejected by
@@ -1064,6 +1065,9 @@ export function derefWorkhorse(
   config: Pick<NormalizedConfig, 'workhorses'>,
   fieldPath = 'model',
 ): ModelId {
+  if (ref === PARENT_MODEL_REF) {
+    throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
+  }
   if (!isWorkhorseRef(ref)) return resolveModelId(ref) as ModelId;
 
   const slot = workhorseSlotFromRef(ref) as WorkhorseSlot;
@@ -1083,7 +1087,8 @@ export function resolveModel(
   config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
 ): ModelId {
   const roleConfig = config.roles?.[role];
-  const subModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
+  const rawSubModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
+  const subModel = rawSubModel === PARENT_MODEL_REF ? undefined : rawSubModel;
   const roleModel = roleConfig?.model;
   const ref = subModel ?? roleModel ?? DEFAULT_MODEL_REFS[role];
   const fieldPath = subModel
@@ -1155,6 +1160,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
 
 function validateRoleModelRefs(config: NormalizedConfig): void {
   for (const [slot, ref] of Object.entries(config.workhorses ?? {}) as Array<[WorkhorseSlot, ModelRef]>) {
+    if (ref === PARENT_MODEL_REF) {
+      throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
+    }
     if (isWorkhorseRef(ref)) {
       throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
     }
@@ -1167,7 +1175,7 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
       derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
     }
     for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
-      if (subConfig.model) {
+      if (subConfig.model && subConfig.model !== PARENT_MODEL_REF) {
         derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
       }
     }
