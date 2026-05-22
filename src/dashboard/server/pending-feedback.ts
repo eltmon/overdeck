@@ -9,7 +9,8 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { messageAgent, getAgentStateAsync } from '../../lib/agents.js';
+import { Effect } from 'effect';
+import { messageAgent, getAgentStateEffect, type AgentState } from '../../lib/agents.js';
 import { getReviewStatus, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { emitActivityEntry } from '../../lib/activity-logger.js';
@@ -106,7 +107,7 @@ export async function processPendingFeedbackDeliveries(options?: {
   staleThresholdMs?: number;
   now?: number;
   _deliver?: (agentId: string, message: string) => Promise<void>;
-  _getAgentState?: typeof getAgentStateAsync;
+  _getAgentState?: (agentId: string) => Promise<AgentState | null>;
   _loadStatuses?: typeof loadReviewStatuses;
   _getStatus?: typeof getReviewStatus;
 }): Promise<void> {
@@ -114,7 +115,7 @@ export async function processPendingFeedbackDeliveries(options?: {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? getAgentStateAsync;
+  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentStateEffect(agentId)));
   const loadStatuses = options?._loadStatuses ?? loadReviewStatuses;
   const getStatus = options?._getStatus ?? getReviewStatus;
 
