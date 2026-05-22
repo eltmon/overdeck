@@ -1,0 +1,256 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-22T20:33:14.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1381: Dashboard: review/test/ship specialist agents have no 'Restart' context-menu action (and Start can't override model)",
+    "updated": "2026-05-22T20:35:40.935Z"
+  },
+  "plan": {
+    "id": "pan-1381",
+    "title": "Dashboard: review/test/ship specialist agents have no 'Restart' context-menu action (and Start can't override model)",
+    "status": "proposed",
+    "uid": "13b7ee49-eb68-4103-b114-4e6422ee4b0a",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-22T20:33:14.000Z",
+    "updated": "2026-05-22T20:35:40.935Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1381",
+        "label": "PAN-1381",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "specialist-agents",
+      "review-pipeline",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Operators cannot reliably restart a review/test/ship specialist agent from the dashboard. The SessionNode right-click menu does expose a restart submenu with a model picker (added 2026-05-03, commit 50d690377), but for non-work specialists it mis-routes. A sub-reviewer node's restart POSTs the retired /api/specialists/:project/:issueId/reviewer/:role/restart route, which returns HTTP 410 ('per-reviewer restart route retired', commit cfd48b808 / PAN-1048). A test or ship node has no dedicated branch in handleRestartSession and falls through to the work-agent restart path, whose start-fresh branch POSTs /api/agents — an endpoint that only spawns role: 'work' — so restarting a stopped test/ship agent spawns a work agent. For a non-live sub-reviewer the submenu trigger is even labelled 'Start' rather than 'Restart'. The net operator experience matches the issue report: no working Restart for specialists, and model overrides that never take effect.",
+      "Proposal": "Fix the routing in handleRestartSession (CommandDeck/index.tsx) and the label in SessionNode.tsx, with no backend changes. (1) A reviewer-node restart routes to POST /api/specialists/:project/:issueId/review/restart — the whole review convoy — because per-axis restart is architecturally retired. (2) A test/ship/merge-node restart routes to the generic, role-agnostic POST /api/agents/:id/restart (restartAgent()), with graceful:false and the optional model override. (3) The restart submenu label reads 'Restart review' for reviewer nodes. The per-session-type endpoint decision is extracted into a pure, unit-tested helper so the otherwise-untestable inline handler is covered. All target endpoints already accept a { model } override, so the model picker works end to end."
+    },
+    "autoDecisions": [
+      {
+        "summary": "A reviewer-node restart maps to the whole review-convoy restart, not a per-axis restart.",
+        "rationale": "Per-reviewer tmux sessions were removed in PAN-1048 (commit cfd48b808); the /reviewer/:role/restart route is retired and returns 410. The review role runs the four code-review-* axes as Agent-tool sub-agents inside a single review-role run, so one axis cannot be restarted or re-modeled independently. Restarting the whole convoy via /review/restart is the only honest equivalent."
+      },
+      {
+        "summary": "test/ship/merge restart routes through the generic POST /api/agents/:id/restart endpoint.",
+        "rationale": "restartAgent() is role-agnostic — it re-launches any agent from its saved state.json with an optional model override — so no new backend route is needed. graceful:false (quick restart) is chosen because test/ship agents have no in-flight work to checkpoint into continue.json."
+      },
+      {
+        "summary": "No backend changes; the retired /reviewer/:role/restart 410 route is left in place.",
+        "rationale": "Every endpoint the fix needs (/review/restart, /api/agents/:id/restart) already accepts a model override. The 410 route is intentionally retained as a defensive guard against stale clients re-establishing legacy machinery, per its own source comment."
+      },
+      {
+        "summary": "Per-axis model override (restart only one reviewer on a cheaper model) is documented as out of scope.",
+        "rationale": "The dashboard cannot set a different model for just one convoy axis without editing roles.review.sub.<subRole>.model config; sub-reviewer Agent-tool sub-agents inherit the review run's model. The issue describes per-axis override as 'ideally', not a hard requirement; the reviewer-node model override applies to the whole review run."
+      },
+      {
+        "summary": "Restart routing is extracted into a pure, unit-testable helper module.",
+        "rationale": "handleRestartSession is an inline useCallback inside CommandDeck/index.tsx and is not unit-testable on its own. A pure helper that maps session type + role to a restart request descriptor lets Vitest verify the routing, satisfying the npm test quality gate."
+      }
+    ],
+    "items": [
+      {
+        "id": "reviewer-restart",
+        "title": "Route reviewer-node Restart to the review-convoy restart endpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T20:33:14.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1381",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Fix the reviewer (sub-reviewer) context-menu Restart so it routes to the full review-convoy restart endpoint instead of the retired per-reviewer route. In src/dashboard/frontend/src/components/CommandDeck/index.tsx, the handleRestartSession branch for sessionType === 'reviewer' currently POSTs /api/specialists/:project/:issueId/reviewer/:role/restart, which returns HTTP 410 ('per-reviewer restart route retired'). Route it instead to POST /api/specialists/:project/:issueId/review/restart (the same endpoint the review coordinator node uses), passing the optional { model } override in the body. Extract the per-session-type restart-endpoint decision into a new pure helper module (src/dashboard/frontend/src/lib/restartRouting.ts) so it is unit-testable, and route the review and reviewer branches through it. Add a Vitest unit-test file for the helper."
+        },
+        "subItems": [
+          {
+            "id": "reviewer-restart.ac1",
+            "title": "Choosing restart on a sub-reviewer node sends POST /api/specialists/:project/:issueId/review/restart and never calls the retired /reviewer/:role/restart route.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-restart.ac2",
+            "title": "The model selected in the restart submenu is sent as { model } in the request body; choosing 'Default' sends a body with no model field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-restart.ac3",
+            "title": "On a 2xx response the toast reports the review was restarted; on a non-2xx response the endpoint's error message is surfaced in an error toast.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-restart.ac4",
+            "title": "A new pure helper module (restartRouting.ts) maps session type 'review' and 'reviewer' (with role) to a restart request descriptor and is covered by unit tests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewer-restart.ac5",
+            "title": "npm run typecheck, npm run lint, and the frontend npm test suite all pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-restart",
+        "title": "Route test/ship/merge-node Restart to the generic agent restart endpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T20:33:14.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1381",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add test/ship/merge handling to the dashboard context-menu restart so these specialist agents restart through the generic, role-agnostic agent restart endpoint. In handleRestartSession (src/dashboard/frontend/src/components/CommandDeck/index.tsx), add a branch for sessionType of 'test', 'ship', or 'merge' that POSTs /api/agents/:id/restart with body { model, graceful: false }, using the node's sessionId as :id. Remove the fall-through to the work-agent path for these session types — that path's start-fresh branch POSTs /api/agents, which only accepts role: 'work', so it spawned a work agent when restarting a stopped test/ship agent. Extend the restartRouting.ts helper introduced by the reviewer-restart bead with the test/ship/merge mapping (and confirm the 'work' default still uses the existing resume path), and add unit-test coverage for the new cases."
+        },
+        "subItems": [
+          {
+            "id": "specialist-restart.ac1",
+            "title": "Choosing restart on a test or ship node sends POST /api/agents/<sessionId>/restart with graceful: false in the body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-restart.ac2",
+            "title": "The selected model is forwarded as { model }; choosing 'Default' sends no model field and the agent keeps its current model.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-restart.ac3",
+            "title": "Restarting a test/ship/merge node never issues a POST /api/agents request and never spawns a work agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-restart.ac4",
+            "title": "A 404 from /api/agents/:id/restart (agent state missing) is surfaced as a clear error toast with no silent fall-through.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-restart.ac5",
+            "title": "The restartRouting.ts helper covers 'test', 'ship', 'merge', and 'work' session types and the new cases are unit-tested.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-restart.ac6",
+            "title": "npm run typecheck, npm run lint, and the frontend npm test suite all pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-labels",
+        "title": "Honest restart-submenu labels per specialist session type",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T20:33:14.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1381",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Make the restart context-menu label honest per session type in src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx. The restartLabel expression is currently `session.type === 'review' ? 'Restart all' : !isLive ? 'Start' : undefined`, so a non-live sub-reviewer's submenu trigger reads 'Start' even though the action restarts the whole review convoy. Add a reviewer case that always reads 'Restart review' regardless of live state, keep 'Restart all' for review, and leave test/ship on the existing `!isLive ? 'Start' : undefined` (which renders as 'Restart' when live) — accurate once the routing beads land. Update any SessionNode/CommandDeck tests that assert the old labels."
+        },
+        "subItems": [
+          {
+            "id": "restart-labels.ac1",
+            "title": "A reviewer node's restart submenu trigger reads 'Restart review' whether or not the node is live.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-labels.ac2",
+            "title": "A review coordinator node's restart submenu trigger still reads 'Restart all'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-labels.ac3",
+            "title": "A test or ship node's restart submenu trigger reads 'Start' when the node has ended and 'Restart' when it is live.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-labels.ac4",
+            "title": "Any SessionNode/CommandDeck tests asserting the previous labels are updated; npm run typecheck, npm run lint, and frontend npm test pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reviewer-restart",
+        "to": "specialist-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "reviewer-restart",
+        "to": "restart-labels",
+        "type": "informs"
+      },
+      {
+        "from": "specialist-restart",
+        "to": "restart-labels",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-22-PAN-1381-dashboard-review-test-ship-specialist-agents-have-no-restart-context-menu-action-and-start-can-t-override-model.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
