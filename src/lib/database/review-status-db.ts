@@ -13,7 +13,7 @@ import { normalizeReviewStatus } from '../review-status-normalize.js';
 
 /**
  * PAN-1249: Local typed error for SQLite failures against review_status.
- * Used by the *Async wrappers; sync functions still throw at the boundary.
+ * Sync functions still throw at the boundary.
  * Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 export class DatabaseError extends Data.TaggedError('DatabaseError')<{
@@ -151,16 +151,12 @@ export function deleteReviewStatus(issueId: string): void {
   db.prepare('DELETE FROM review_status WHERE issue_id = ?').run(issueId);
 }
 
-// ============== Async wrappers (dashboard-reachable code) ==============
+// ============== Effect wrappers (dashboard-reachable code) ==============
 // better-sqlite3 is synchronous. These wrappers defer execution via
 // setImmediate so the Node event loop can process other I/O (HTTP,
 // WebSocket, terminal) between SQLite operations. This satisfies the
 // "No Blocking Calls" dashboard rule (PAN-70 / PAN-446) for the
 // webhook ingestion path.
-//
-// PAN-1249: internally implemented with Effect.async/Effect.try so the
-// failure mode is typed (DatabaseError). The Promise return type is kept
-// to satisfy existing callers in src/lib/review-status.ts.
 
 export const upsertReviewStatusEffect = (
   status: ReviewStatus,
@@ -196,35 +192,6 @@ export const getReviewStatusFromDbEffect = (
       }),
     catch: (cause) => new DatabaseError({ operation: 'getReviewStatusFromDbEffect', cause }),
   });
-
-export function upsertReviewStatusAsync(status: ReviewStatus): Promise<void> {
-  const program = Effect.tryPromise({
-    try: () =>
-      new Promise<void>((resolve, reject) => {
-        setImmediate(() => {
-          try {
-            upsertReviewStatus(status);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      }),
-    catch: (cause) => new DatabaseError({ operation: 'upsertReviewStatusAsync', cause }),
-  });
-  return Effect.runPromise(program);
-}
-
-export function getReviewStatusFromDbAsync(issueId: string): Promise<ReviewStatus | null> {
-  const program = Effect.promise<ReviewStatus | null>(() =>
-    new Promise((resolve) => {
-      setImmediate(() => {
-        resolve(getReviewStatusFromDb(issueId));
-      });
-    }),
-  );
-  return Effect.runPromise(program);
-}
 
 // ============== Read operations ==============
 
