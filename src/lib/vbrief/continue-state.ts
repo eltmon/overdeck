@@ -358,77 +358,8 @@ export function clearFeedback(projectRoot: string, issueId: string): ContinueSta
   return next;
 }
 
-/**
- * Async variant of `writeContinueState`. Use this from dashboard server routes
- * (sync FS calls block the event loop).
- */
-async function assertContinueWriterAsync(path: string, writerId: string): Promise<void> {
-  const owner = activeContinueWriters.get(path);
-  if (owner && owner !== writerId) {
-    throw new Error(`Continue-state writer conflict for ${path}: ${owner} already owns the write`);
-  }
-  activeContinueWriters.set(path, writerId);
-}
-
-export async function writeContinueStateAsync(
-  dir: string,
-  issueId: string,
-  stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
-): Promise<void> {
-  const path = continueFilePath(dir, issueId);
-
-  // Serialize concurrent writes for the same path so read-modify-write sequences
-  // in the same process don't race and drop mutations (PAN-977 review blocker).
-  // When an updater callback is passed, we read the latest on-disk state AFTER
-  // awaiting any prior pending write so the mutation merges against the most
-  // recently committed document rather than a stale snapshot.
-  const previous = pendingContinueWrites.get(path);
-  const current = (async () => {
-    if (previous) {
-      await previous.catch(() => {});
-    }
-    const writerId = `continue-async-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
-    await assertContinueWriterAsync(path, writerId);
-    try {
-      const now = new Date().toISOString();
-      let state: ContinueState;
-      if (typeof stateOrUpdater === 'function') {
-        const existing = await readContinueStateAsync(dir, issueId);
-        state = stateOrUpdater(existing);
-      } else {
-        state = stateOrUpdater;
-      }
-      const next: ContinueState = {
-        ...state,
-        issueId: issueId.toUpperCase(),
-        version: '1',
-        created: state.created || now,
-        updated: now,
-      };
-      await mkdir(getContinuesDir(dir), { recursive: true });
-      const tmp = uniqueTmpPath(path);
-      await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
-      await rename(tmp, path);
-    } finally {
-      releaseContinueWriter(path, writerId);
-    }
-  })();
-
-  pendingContinueWrites.set(path, current);
-  try {
-    await current;
-  } finally {
-    if (pendingContinueWrites.get(path) === current) {
-      pendingContinueWrites.delete(path);
-    }
-  }
-}
-
-/**
- * Async variant of `readContinueState`. Use this from dashboard server routes.
- */
-export async function readContinueStateAsync(dir: string, issueId: string): Promise<ContinueState | null> {
-  const path = continueFilePath(dir, issueId);
+async function readContinueStateFromDisk(projectRoot: string, issueId: string): Promise<ContinueState | null> {
+  const path = continueFilePath(projectRoot, issueId);
   if (!existsSync(path)) return null;
   const raw = await readFile(path, 'utf-8');
   let parsed: unknown;
@@ -512,13 +443,6 @@ function validateSwarmRuntime(value: unknown, path: string): asserts value is Sw
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Wraps the existing async continue-state APIs in typed Effect channels.
-// `*Async` variants own the real fs/promises I/O and the in-process writer
-// serialization, so the Effect wrappers simply lift their failures into a
-// tagged error. Sync APIs (`writeContinueState`, `readContinueState`,
-// `appendSessionEntry`, `appendFeedbackEntry`, `clearFeedback`) remain
-// available for CLI callers.
 
 /** Tagged error for continue-state Effect variants. */
 export class ContinueStateError extends Data.TaggedError('ContinueStateError')<{
@@ -543,24 +467,60 @@ const liftContinueError = (
     cause,
   });
 
-/** Effect variant of `writeContinueStateAsync`. */
 export const writeContinueStateEffect = (
   projectRoot: string,
   issueId: string,
   stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
 ): Effect.Effect<void, ContinueStateError> =>
   Effect.tryPromise({
-    try: () => writeContinueStateAsync(projectRoot, issueId, stateOrUpdater),
+    try: async () => {
+      const path = continueFilePath(projectRoot, issueId);
+      const previous = pendingContinueWrites.get(path);
+      const current = (async () => {
+        if (previous) {
+          await previous.catch(() => {});
+        }
+        const writerId = `continue-effect-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
+        assertContinueWriter(path, writerId);
+        try {
+          const now = new Date().toISOString();
+          const state = typeof stateOrUpdater === 'function'
+            ? stateOrUpdater(await readContinueStateFromDisk(projectRoot, issueId))
+            : stateOrUpdater;
+          const next: ContinueState = {
+            ...state,
+            issueId: issueId.toUpperCase(),
+            version: '1',
+            created: state.created || now,
+            updated: now,
+          };
+          await mkdir(getContinuesDir(projectRoot), { recursive: true });
+          const tmp = uniqueTmpPath(path);
+          await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
+          await rename(tmp, path);
+        } finally {
+          releaseContinueWriter(path, writerId);
+        }
+      })();
+
+      pendingContinueWrites.set(path, current);
+      try {
+        await current;
+      } finally {
+        if (pendingContinueWrites.get(path) === current) {
+          pendingContinueWrites.delete(path);
+        }
+      }
+    },
     catch: (cause) => liftContinueError(projectRoot, issueId, 'writeContinueState', cause),
   });
 
-/** Effect variant of `readContinueStateAsync`. */
 export const readContinueStateEffect = (
   projectRoot: string,
   issueId: string,
 ): Effect.Effect<ContinueState | null, ContinueStateError> =>
   Effect.tryPromise({
-    try: () => readContinueStateAsync(projectRoot, issueId),
+    try: () => readContinueStateFromDisk(projectRoot, issueId),
     catch: (cause) => liftContinueError(projectRoot, issueId, 'readContinueState', cause),
   });
 
