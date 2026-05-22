@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1312",
   "created": "2026-05-22T03:27:22.833Z",
-  "updated": "2026-05-22T13:14:00.000Z",
+  "updated": "2026-05-22T13:24:00.000Z",
   "gitState": {
     "branch": "feature/pan-1312",
     "dirty": false
@@ -10,8 +10,8 @@
   "decisions": [],
   "hazards": [],
   "resumePoint": {
-    "description": "Wave 2a agents deletion complete: src/lib/agents.ts no longer exports the in-scope *Async bridge functions and typecheck passes. Continue Wave 2a deletion beads in vBRIEF order.",
-    "beadId": "workspace-m9sw",
+    "description": "Wave 2a tmux deletion complete: src/lib/tmux.ts no longer exports in-scope *Async bridge functions and typecheck passes. Continue remaining Wave 2a deletion beads in vBRIEF order.",
+    "beadId": "workspace-egas",
     "filesToRead": [
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
@@ -29,6 +29,12 @@
       "timestamp": "2026-05-22T13:14:00.000Z",
       "reason": "bead-complete",
       "note": "Completed workspace-m9sw: deleted the now-unused src/lib/agents.ts *Async bridge exports, switched remaining same-file callers to Effect siblings, and verified npm run typecheck passes.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-22T13:24:00.000Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-egas: deleted the src/lib/tmux.ts *Async bridge exports, moved their behavior into Effect helpers, and verified npm run typecheck passes.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -444,7 +450,7 @@
       }
     },
     "createdAt": "2026-05-22T03:27:22.833Z",
-    "updatedAt": "2026-05-22T13:10:57.500Z"
+    "updatedAt": "2026-05-22T13:16:00.928Z"
   },
   "feedback": [],
   "statusOverrides": {
@@ -456,6 +462,11 @@
     "w2a-agents.ac1": "completed",
     "w2a-agents.ac2": "completed",
     "w2a-agents.w2a-agents.ac1": "completed",
-    "w2a-agents.w2a-agents.ac2": "completed"
+    "w2a-agents.w2a-agents.ac2": "completed",
+    "w2a-tmux": "completed",
+    "w2a-tmux.ac1": "completed",
+    "w2a-tmux.ac2": "completed",
+    "w2a-tmux.w2a-tmux.ac1": "completed",
+    "w2a-tmux.w2a-tmux.ac2": "completed"
   }
 }
