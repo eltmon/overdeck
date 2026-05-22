@@ -27,7 +27,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, getModelCapability, hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 
 /**
  * Deprecation warning in API format
@@ -358,7 +358,7 @@ function validateModelRef(
   }
 
   const resolved = resolveModelId(ref);
-  if (!MODEL_CAPABILITIES[resolved]) {
+  if (!hasModelCapability(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }

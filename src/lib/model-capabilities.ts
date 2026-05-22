@@ -18,7 +18,7 @@
  */
 
 import { Effect } from 'effect';
-import { ModelId } from './settings.js';
+import { DashScopeModel, ModelId } from './settings.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
@@ -86,6 +86,8 @@ export type SkillDimension =
 /**
  * Capability profile for a single model
  */
+type CapabilityModelId = Exclude<ModelId, DashScopeModel>;
+
 export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
@@ -115,7 +117,7 @@ export interface ModelCapability {
  *
  * These are baseline scores - run Kimi 2.5 research to refine.
  */
-export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
+export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -788,14 +790,22 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
  * Get capability profile for a model
  */
 export function getModelCapability(model: ModelId): ModelCapability {
-  return MODEL_CAPABILITIES[model];
+  const capability = MODEL_CAPABILITIES[model as CapabilityModelId];
+  if (!capability) {
+    throw new Error(`No capability profile registered for model: ${model}`);
+  }
+  return capability;
+}
+
+export function hasModelCapability(model: ModelId): boolean {
+  return model in MODEL_CAPABILITIES;
 }
 
 /**
  * Get all models sorted by a specific skill (descending)
  */
 export function getModelsBySkill(skill: SkillDimension): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as ModelId[]).sort(
+  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
     (a, b) => MODEL_CAPABILITIES[b].skills[skill] - MODEL_CAPABILITIES[a].skills[skill]
   );
 }
@@ -806,7 +816,7 @@ export function getModelsBySkill(skill: SkillDimension): ModelId[] {
 export function getModelsForProvider(
   provider: ModelCapability['provider']
 ): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as ModelId[]).filter(
+  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).filter(
     (model) => MODEL_CAPABILITIES[model].provider === provider
   );
 }
@@ -815,7 +825,7 @@ export function getModelsForProvider(
  * Get cheapest models (sorted by cost ascending)
  */
 export function getCheapestModels(): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as ModelId[]).sort(
+  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
     (a, b) => MODEL_CAPABILITIES[a].costPer1MTokens - MODEL_CAPABILITIES[b].costPer1MTokens
   );
 }
@@ -825,7 +835,7 @@ export function getCheapestModels(): ModelId[] {
  * Higher = better value (skill score / cost)
  */
 export function getValueScore(model: ModelId, skill: SkillDimension): number {
-  const cap = MODEL_CAPABILITIES[model];
+  const cap = getModelCapability(model);
   return cap.skills[skill] / Math.log10(cap.costPer1MTokens + 1);
 }
 
