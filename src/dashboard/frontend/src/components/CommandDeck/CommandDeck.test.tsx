@@ -99,6 +99,9 @@ vi.mock('./ConversationList', () => ({
       <button data-testid="conv-test" onClick={() => props.onSelectConversation?.('test-conv')}>
         test-conv
       </button>
+      <button data-testid="conv-unscoped" onClick={() => props.onSelectConversation?.('unscoped-conv')}>
+        unscoped-conv
+      </button>
     </div>
   ),
 }));
@@ -225,6 +228,12 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
               id: 1,
               name: 'test-conv',
               cwd: '/path/to/test-project',
+            },
+            {
+              // Unscoped: cwd is not under any registered project path.
+              id: 2,
+              name: 'unscoped-conv',
+              cwd: '/tmp/scratch',
             },
           ],
         };
@@ -490,6 +499,26 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
 
     // ConversationPanel should render inside the lens
     expect(lens.querySelector('[data-testid="conversation-panel"]')).toBeInTheDocument();
+  });
+
+  it('opens an unscoped conversation after a tree issue was selected (PAN-1332)', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node');
+
+    // Step 1: select an issue in the project tree — pins the lens to that issue.
+    fireEvent.click(screen.getByTestId('feature-PAN-821'));
+    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
+
+    // Step 2: click an unscoped conversation in the sidebar.
+    fireEvent.click(await screen.findByTestId('conv-unscoped'));
+
+    // The conversation must take over the right pane. Before the fix the stale
+    // selectedFeature kept rightPaneProject non-null, so the lens stayed and the
+    // unscoped conversation (which only renders when rightPaneProject is null)
+    // never appeared.
+    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('command-deck-right-pane-tabs')).not.toBeInTheDocument();
   });
 
   it('renders ZoneA action strip inside the lens when a feature is selected', async () => {
