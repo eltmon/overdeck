@@ -2,26 +2,90 @@
   "version": "1",
   "issueId": "PAN-1312",
   "created": "2026-05-22T02:57:57.504Z",
-  "updated": "2026-05-22T03:25:00.000Z",
-  "gitState": { "branch": "feature/pan-1312", "sha": "c2305893a", "dirty": true },
+  "updated": "2026-05-22T11:50:19.120Z",
+  "gitState": {
+    "branch": "feature/pan-1312",
+    "sha": "c2305893a",
+    "dirty": true
+  },
   "decisions": [
-    { "id": "D1", "summary": "Scope widened — agents.ts, database/review-status-db.ts and vbrief/dag.ts export *Async functions with NO *Effect sibling (verified: agents.ts has zero *Effect exports). PAN-1249 left these modules unmigrated. Wave 1a creates the missing Effect siblings before any caller can migrate.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D2", "summary": "Wave 1 migrates ALL callers — src/cli/, src/dashboard/ AND ~60 src/lib/-internal caller files — additively onto Effect siblings. The issue's Wave 1 table listed only cli + dashboard, but the deletion acceptance criterion cannot be met until lib-internal callers also stop importing *Async.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D3", "summary": "Wave 2 is split: 2a deletes *Async exports + dead Effect.runPromise bridges per module in parallel (safe — Wave 1 already migrated every caller, so deletion is pure dead-export removal touching only the module's own file); 2b canonicalizes naming as ONE final atomic repo-wide sweep because renaming exported symbols cross-couples all importers and cannot be parallelized per-module.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D4", "summary": "src/lib/memory/checkpoint-client.ts *Async functions (claimTranscriptRangeAsync, commitTranscriptRangeAsync, releaseTranscriptRangeAsync, getTranscriptCheckpointAsync, listTranscriptCheckpointsAsync) are OUT OF SCOPE — they have no *Effect sibling and no sync variant, so they are not part of the sync/*Async/*Effect collision the issue targets, and the deletion AC is explicitly scoped to *Async 'that have an *Effect sibling'. They have no cli/dashboard importers. A follow-up issue should Effect-migrate the checkpoint client separately.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D5", "summary": "CLI migration is scoped to the three files that import *Async from src/lib/ (scope.ts, agent-status.ts, flywheel.ts). Each migrated command handler runs its Effect via a single Effect.runPromise at the handler boundary and maps typed failures to the existing exit-code/stderr behavior. No wholesale CLI-architecture rewrite — a single top-level commander-boundary runPromise across all ~80 commands is NOT required by the acceptance criteria and would risk repo-wide regression.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D6", "summary": "Canonicalization rule (Wave 2b): the *Effect / *AsyncEffect export becomes the unsuffixed canonical name; a sync variant survives only where a call site genuinely requires synchronous execution, renamed with an explicit *Sync suffix. After Wave 2 src/lib/ exposes Effect-native functions under plain names plus a minimal set of *Sync escape hatches.", "recordedAt": "2026-05-22T03:25:00.000Z" },
-    { "id": "D7", "summary": "New Effect siblings (Wave 1a) use typed errors consistent with src/lib/errors.ts and the existing *Effect implementations in the same modules. existsSync fast stat checks remain acceptable per CLAUDE.md's no-blocking-calls rule; data-reading FS calls must be async.", "recordedAt": "2026-05-22T03:25:00.000Z" }
+    {
+      "id": "D1",
+      "summary": "Scope widened — agents.ts, database/review-status-db.ts and vbrief/dag.ts export *Async functions with NO *Effect sibling (verified: agents.ts has zero *Effect exports). PAN-1249 left these modules unmigrated. Wave 1a creates the missing Effect siblings before any caller can migrate.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Wave 1 migrates ALL callers — src/cli/, src/dashboard/ AND ~60 src/lib/-internal caller files — additively onto Effect siblings. The issue's Wave 1 table listed only cli + dashboard, but the deletion acceptance criterion cannot be met until lib-internal callers also stop importing *Async.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Wave 2 is split: 2a deletes *Async exports + dead Effect.runPromise bridges per module in parallel (safe — Wave 1 already migrated every caller, so deletion is pure dead-export removal touching only the module's own file); 2b canonicalizes naming as ONE final atomic repo-wide sweep because renaming exported symbols cross-couples all importers and cannot be parallelized per-module.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "src/lib/memory/checkpoint-client.ts *Async functions (claimTranscriptRangeAsync, commitTranscriptRangeAsync, releaseTranscriptRangeAsync, getTranscriptCheckpointAsync, listTranscriptCheckpointsAsync) are OUT OF SCOPE — they have no *Effect sibling and no sync variant, so they are not part of the sync/*Async/*Effect collision the issue targets, and the deletion AC is explicitly scoped to *Async 'that have an *Effect sibling'. They have no cli/dashboard importers. A follow-up issue should Effect-migrate the checkpoint client separately.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "CLI migration is scoped to the three files that import *Async from src/lib/ (scope.ts, agent-status.ts, flywheel.ts). Each migrated command handler runs its Effect via a single Effect.runPromise at the handler boundary and maps typed failures to the existing exit-code/stderr behavior. No wholesale CLI-architecture rewrite — a single top-level commander-boundary runPromise across all ~80 commands is NOT required by the acceptance criteria and would risk repo-wide regression.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Canonicalization rule (Wave 2b): the *Effect / *AsyncEffect export becomes the unsuffixed canonical name; a sync variant survives only where a call site genuinely requires synchronous execution, renamed with an explicit *Sync suffix. After Wave 2 src/lib/ exposes Effect-native functions under plain names plus a minimal set of *Sync escape hatches.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "New Effect siblings (Wave 1a) use typed errors consistent with src/lib/errors.ts and the existing *Effect implementations in the same modules. existsSync fast stat checks remain acceptable per CLAUDE.md's no-blocking-calls rule; data-reading FS calls must be async.",
+      "recordedAt": "2026-05-22T03:25:00.000Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "Effect sibling naming is INCONSISTENT across src/lib/: vbrief/io.ts uses readPlanEffect, tmux.ts uses capturePaneAsyncEffect / sessionExistsAsyncEffect, config.ts uses loadConfigAsyncEffect, and pan-dir/specs.ts + pan-dir/continue.ts have NO suffixed sibling — their plain-named functions (findSpecByIssue, readWorkspaceContinue) ARE already Effect-returning with a deprecated *Async alias.", "mitigation": "Each work agent must grep the actual exported symbol for every *Async it migrates — never assume the sibling is <base>Effect. Verify the signature and error channel before rewriting the call site." },
-    { "id": "H2", "summary": "~60 src/lib/-internal files (including ~15 test files under __tests__) call *Async variants. The *Async exports cannot be deleted until every one of these is migrated. Test files frequently vi.mock the *Async functions.", "mitigation": "Wave 1d migrates lib-internal callers cluster-by-cluster. Test mocks/spies must be updated to the Effect sibling — Effect functions mock differently than Promise functions; update test setup, not just imports." },
-    { "id": "H3", "summary": "Wave 2b canonicalization renames exported symbols repo-wide. Running it per-module in parallel causes import-rename conflicts between modules that import each other.", "mitigation": "Wave 2b is a single bead, gated on ALL Wave 2a deletion beads, executed as one coordinated repo-wide rename pass." },
-    { "id": "H4", "summary": "vbrief/dag.ts async helpers (writePlanFileAtomicAsync, applyTaskOperationToPlanFileAsync, removeStaleLockAsync, assertSingleWriterAsync) back the single-writer plan-file lock — a PAN concurrency invariant.", "mitigation": "Wave 1a dag-sibling creation and the dag migration/deletion beads must preserve writer-lock acquisition, stale-lock recovery, and atomic-write semantics exactly. Run the vbrief dag-writer-lock tests." },
-    { "id": "H5", "summary": "src/lib/agents.ts deliverAgentMessage / deliverAgentPermissionDecision are the Channels delivery primitive; both call getAgentStateAsync and own the automatic tmux fallback policy.", "mitigation": "Migrating their getAgentStateAsync usage must preserve the eligibility check and tmux fallback on every failure mode. Do not change delivery behavior." },
-    { "id": "H6", "summary": "CLAUDE.md's Channels section says routes/conversations.ts and routes/misc.ts 'intentionally stay on sendKeysAsync'. That refers to the DELIVERY MECHANISM (tmux send-keys vs the channels bridge), not the Promise-vs-Effect typing.", "mitigation": "PAN-1312 still migrates those files' tmux *Async calls to the *Effect sibling (sendKeysEffect etc.) — same tmux send-keys delivery, just Effect-typed. It must NOT switch them to the channels bridge." },
-    { "id": "H7", "summary": "Dashboard server code must never introduce blocking *Sync FS calls (CLAUDE.md no-blocking-calls rule, PAN-70/PAN-446).", "mitigation": "Migrated Effect code uses async I/O exclusively; existsSync stat checks are tolerated. Wave 2b's *Sync escape hatches must not leak into src/dashboard/server/ call paths." },
-    { "id": "H8", "summary": "Acceptance criterion 'no behavior regression' — CLI commands and dashboard endpoints must behave identically after migration.", "mitigation": "Effect siblings must preserve exact return values and error semantics (surfaced as typed errors). CLI exit codes and HTTP status/response shapes must be unchanged. The Wave 1e gate and Wave 2c verification run full typecheck/lint/test." }
+    {
+      "id": "H1",
+      "summary": "Effect sibling naming is INCONSISTENT across src/lib/: vbrief/io.ts uses readPlanEffect, tmux.ts uses capturePaneAsyncEffect / sessionExistsAsyncEffect, config.ts uses loadConfigAsyncEffect, and pan-dir/specs.ts + pan-dir/continue.ts have NO suffixed sibling — their plain-named functions (findSpecByIssue, readWorkspaceContinue) ARE already Effect-returning with a deprecated *Async alias.",
+      "mitigation": "Each work agent must grep the actual exported symbol for every *Async it migrates — never assume the sibling is <base>Effect. Verify the signature and error channel before rewriting the call site."
+    },
+    {
+      "id": "H2",
+      "summary": "~60 src/lib/-internal files (including ~15 test files under __tests__) call *Async variants. The *Async exports cannot be deleted until every one of these is migrated. Test files frequently vi.mock the *Async functions.",
+      "mitigation": "Wave 1d migrates lib-internal callers cluster-by-cluster. Test mocks/spies must be updated to the Effect sibling — Effect functions mock differently than Promise functions; update test setup, not just imports."
+    },
+    {
+      "id": "H3",
+      "summary": "Wave 2b canonicalization renames exported symbols repo-wide. Running it per-module in parallel causes import-rename conflicts between modules that import each other.",
+      "mitigation": "Wave 2b is a single bead, gated on ALL Wave 2a deletion beads, executed as one coordinated repo-wide rename pass."
+    },
+    {
+      "id": "H4",
+      "summary": "vbrief/dag.ts async helpers (writePlanFileAtomicAsync, applyTaskOperationToPlanFileAsync, removeStaleLockAsync, assertSingleWriterAsync) back the single-writer plan-file lock — a PAN concurrency invariant.",
+      "mitigation": "Wave 1a dag-sibling creation and the dag migration/deletion beads must preserve writer-lock acquisition, stale-lock recovery, and atomic-write semantics exactly. Run the vbrief dag-writer-lock tests."
+    },
+    {
+      "id": "H5",
+      "summary": "src/lib/agents.ts deliverAgentMessage / deliverAgentPermissionDecision are the Channels delivery primitive; both call getAgentStateAsync and own the automatic tmux fallback policy.",
+      "mitigation": "Migrating their getAgentStateAsync usage must preserve the eligibility check and tmux fallback on every failure mode. Do not change delivery behavior."
+    },
+    {
+      "id": "H6",
+      "summary": "CLAUDE.md's Channels section says routes/conversations.ts and routes/misc.ts 'intentionally stay on sendKeysAsync'. That refers to the DELIVERY MECHANISM (tmux send-keys vs the channels bridge), not the Promise-vs-Effect typing.",
+      "mitigation": "PAN-1312 still migrates those files' tmux *Async calls to the *Effect sibling (sendKeysEffect etc.) — same tmux send-keys delivery, just Effect-typed. It must NOT switch them to the channels bridge."
+    },
+    {
+      "id": "H7",
+      "summary": "Dashboard server code must never introduce blocking *Sync FS calls (CLAUDE.md no-blocking-calls rule, PAN-70/PAN-446).",
+      "mitigation": "Migrated Effect code uses async I/O exclusively; existsSync stat checks are tolerated. Wave 2b's *Sync escape hatches must not leak into src/dashboard/server/ call paths."
+    },
+    {
+      "id": "H8",
+      "summary": "Acceptance criterion 'no behavior regression' — CLI commands and dashboard endpoints must behave identically after migration.",
+      "mitigation": "Effect siblings must preserve exact return values and error semantics (surfaced as typed errors). CLI exit codes and HTTP status/response shapes must be unchanged. The Wave 1e gate and Wave 2c verification run full typecheck/lint/test."
+    }
   ],
   "resumePoint": null,
   "beadsMapping": {},
@@ -40,5 +104,10 @@
     }
   ],
   "agentModel": "agent:claude-opus-4-7",
-  "feedback": []
+  "feedback": [],
+  "statusOverrides": {
+    "w1d-runtimes": "completed",
+    "w1d-runtimes.w1d-runtimes.ac1": "completed",
+    "w1d-runtimes.w1d-runtimes.ac2": "completed"
+  }
 }
