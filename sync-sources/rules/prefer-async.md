@@ -1,4 +1,5 @@
 ---
+scope: dev
 paths:
   - "src/lib/tmux.ts"
 ---

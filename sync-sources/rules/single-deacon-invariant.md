@@ -1,3 +1,6 @@
+---
+scope: dev
+---
 ## Single Deacon Invariant — Never Mount `~/.panopticon` Into Workspace Containers
 
 Only one Deacon may run at a time per `~/.panopticon` state directory. Mounting

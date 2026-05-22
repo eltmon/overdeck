@@ -1,4 +1,5 @@
 ---
+scope: universal
 paths:
   - "src/dashboard/**"
   - "src/lib/**"

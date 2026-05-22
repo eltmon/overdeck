@@ -1,3 +1,6 @@
+---
+scope: universal
+---
 ## Work Agents Run Through `pan` — Never the Claude Code `Agent` Tool
 
 Spawn work agents only through the Panopticon CLI — `pan start <id>`,

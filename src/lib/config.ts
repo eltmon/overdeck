@@ -147,10 +147,18 @@ export interface PanopticonConfig {
     backup_before_sync: boolean;
     auto_sync?: boolean;
     strategy?: 'symlink' | 'copy';
-    /** Parent directory where all projects live (e.g., ~/Projects).
-     *  Skills are placed at <devroot>/.claude/skills/ (project level).
-     *  Set to null or empty string to disable devroot skill placement. */
+    /**
+     * @deprecated PAN-1201 — the layered context model replaces devroot.
+     * `pan sync` no longer distributes anything via `<devroot>/.claude/`;
+     * a non-null value here only triggers a migration warning. Run
+     * `pan context migrate`, then set this to null to silence it. The field
+     * is removed in a future major.
+     */
     devroot?: string | null;
+  };
+  /** Layered context distribution (PAN-1201). All layers default to on. */
+  context?: {
+    layers?: { global?: boolean; project?: boolean; workspace?: boolean };
   };
   trackers: TrackersConfig;
   dashboard: {
@@ -176,7 +184,9 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     backup_before_sync: true,
     auto_sync: false,
     strategy: 'symlink',
-    devroot: '~/Projects',
+    // PAN-1201: devroot is deprecated; default off so fresh installs use the
+    // layered context model and never see the migration warning.
+    devroot: null,
   },
   trackers: {
     primary: 'linear',
@@ -327,6 +337,24 @@ export function getDevrootPath(): string | null {
   if (!existsSync(resolved)) return null;
 
   return resolved;
+}
+
+/**
+ * Build the deprecation warning for a still-configured `sync.devroot`
+ * (PAN-1201), or null when devroot is unset. `pan sync` prints this once per
+ * run so users with the old default migrate to the layered context model.
+ */
+export function checkDevrootDeprecation(): string | null {
+  const devroot = loadConfig().sync?.devroot;
+  if (!devroot) return null;
+  const oldLocation = `${devroot.replace(/\/+$/, '')}/.claude/`;
+  return [
+    '[WARN] sync.devroot is deprecated — the layered context model has replaced it.',
+    '       Run `pan context migrate` to move your content across.',
+    `       Old location: ${oldLocation}`,
+    '       New location: ~/.panopticon/context/global/',
+    '       Set sync.devroot to null in config to silence this warning after migrating.',
+  ].join('\n');
 }
 
 /**

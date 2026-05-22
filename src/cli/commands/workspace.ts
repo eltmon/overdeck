@@ -2,12 +2,13 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync, chmodSync, unlinkSync } from 'fs';
-import { join, basename, resolve } from 'path';
+import { join, basename, resolve, dirname } from 'path';
 import { createWorktree, removeWorktree, listWorktrees, type WorktreeInfo } from '../../lib/worktree.js';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME, PAN_CONTEXT_FILENAME, PAN_FEEDBACK_DIRNAME, PAN_SESSIONS_FILENAME } from '../../lib/pan-dir/index.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
+import { assembleWorkspaceContext, workspaceContextFile } from '../../lib/context-layers/index.js';
 import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
 import { listRunningAgents } from '../../lib/agents.js';
 import {
@@ -562,6 +563,24 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
 
     const claudeMd = generateClaudeMd(projectRoot, variables);
     writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
+
+    // PAN-1201: assemble the workspace context layer. The bundle composes the
+    // parent project's layer with issue metadata; PAN-1052 memory injection
+    // and live status are layered on at spawn time. Non-fatal on failure.
+    try {
+      const wsContext = assembleWorkspaceContext({
+        projectRoot,
+        harness: 'claude-code',
+        issueId: issueId.toUpperCase(),
+        workspacePath,
+        branch: branchName,
+      });
+      const wsContextFile = workspaceContextFile(workspacePath);
+      mkdirSync(dirname(wsContextFile), { recursive: true });
+      writeFileSync(wsContextFile, wsContext);
+    } catch (err) {
+      spinner.warn(`Could not assemble workspace context layer: ${(err as Error).message}`);
+    }
 
     // Merge skills, agents, and rules (unless disabled)
     let skillsResult = { added: [] as string[], updated: [] as string[], skipped: [] as string[], overlayed: [] as string[] };
