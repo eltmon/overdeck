@@ -12,7 +12,7 @@ import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeState } from './agents.js';
-import { capturePaneAsync, listSessionNamesAsync, sessionExistsAsync } from './tmux.js';
+import { capturePaneAsyncEffect, listSessionNamesAsyncEffect, sessionExistsAsyncEffect } from './tmux.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 export class HealthError extends Data.TaggedError('HealthError')<{
@@ -91,7 +91,7 @@ export function saveAgentHealth(health: AgentHealth): void {
  * Check if agent's tmux session is alive
  */
 export async function isAgentAlive(agentId: string): Promise<boolean> {
-  return sessionExistsAsync(agentId);
+  return Effect.runPromise(sessionExistsAsyncEffect(agentId));
 }
 
 /**
@@ -99,7 +99,7 @@ export async function isAgentAlive(agentId: string): Promise<boolean> {
  */
 export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
   try {
-    const output = await capturePaneAsync(agentId, lines);
+    const output = await Effect.runPromise(capturePaneAsyncEffect(agentId, lines));
     return output.trim();
   } catch {
     return null;
@@ -306,7 +306,7 @@ export async function runHealthCheck(
   // Get all agent sessions
   let sessions: string[] = [];
   try {
-    sessions = (await listSessionNamesAsync())
+    sessions = (await Effect.runPromise(listSessionNamesAsyncEffect()))
       .filter((s) => s.startsWith('agent-'));
   } catch {}
 

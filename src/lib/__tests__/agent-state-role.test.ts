@@ -194,8 +194,8 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsync: vi.fn(async () => false),
-      createSessionAsync,
+      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -242,8 +242,8 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsync: vi.fn(async () => false),
-      createSessionAsync,
+      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -287,10 +287,11 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsync: vi.fn(async () => false),
+      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
       sessionExists: vi.fn(() => false),
-      createSessionAsync,
-      capturePaneAsync: vi.fn(async () => 'Claude Code'),
+      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      capturePaneAsyncEffect: vi.fn(() => Effect.succeed('Claude Code')),
+      setOptionAsyncEffect: vi.fn(() => Effect.void),
     }));
     vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({

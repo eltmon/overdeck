@@ -19,7 +19,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from './prd-locations.js';
-import { killSessionAsync, sessionExists, listSessionNamesAsync } from './tmux.js';
+import { killSessionAsyncEffect, sessionExists, listSessionNamesAsyncEffect } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from './issue-id.js';
@@ -251,7 +251,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     for (const session of exactPatterns) {
       if (sessionExists(session)) {
         try {
-          await killSessionAsync(session);
+          await Effect.runPromise(killSessionAsyncEffect(session));
           cleaned = true;
         } catch { /* session may already be dead */ }
       }
@@ -259,12 +259,12 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
 
     // Review sessions use timestamped names: review-<issue>-<timestamp>-<role>
     try {
-      const allSessions = await listSessionNamesAsync();
+      const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
       const reviewRegex = new RegExp(`^review-${issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
       const reviewSessions = allSessions.filter(s => reviewRegex.test(s));
       for (const session of reviewSessions) {
         try {
-          await killSessionAsync(session);
+          await Effect.runPromise(killSessionAsyncEffect(session));
           cleaned = true;
         } catch { /* session may already be dead */ }
       }

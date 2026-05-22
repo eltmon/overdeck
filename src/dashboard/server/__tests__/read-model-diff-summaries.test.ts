@@ -278,7 +278,7 @@ describe('ReadModel checkpoint reconciliation', () => {
             computeAgentEnrichment: vi.fn().mockResolvedValue(undefined),
           }))
           vi.doMock('../../../lib/agents.js', () => ({
-            listRunningAgentsAsync: vi.fn().mockResolvedValue([
+            listRunningAgentsEffect: vi.fn(() => Effect.succeed([
               {
                 id: 'agent-reconcile',
                 issueId: 'PAN-1024',
@@ -295,7 +295,7 @@ describe('ReadModel checkpoint reconciliation', () => {
                 harness: 'claude-code',
                 role: 'work',
               },
-            ]),
+            ])),
             // PAN-1048 P2: now async.
             warnOnBareNumericIssueIds: vi.fn(async () => {}),
           }))

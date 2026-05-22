@@ -9,12 +9,12 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
-  listSessionNamesAsync: vi.fn(),
-  capturePaneAsync: vi.fn(async () => ''),
+  listSessionNamesAsyncEffect: vi.fn(),
+  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
-  getAgentRuntimeStateAsync: vi.fn(),
+  getAgentRuntimeStateEffect: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
@@ -60,8 +60,8 @@ vi.mock('node:fs/promises', async () => {
 
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjects } from '../../../../../src/lib/projects.js';
-import { listSessionNamesAsync } from '../../../../../src/lib/tmux.js';
-import { getAgentRuntimeStateAsync } from '../../../../../src/lib/agents.js';
+import { listSessionNamesAsyncEffect } from '../../../../../src/lib/tmux.js';
+import { getAgentRuntimeStateEffect } from '../../../../../src/lib/agents.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -95,7 +95,7 @@ describe('fetchProjectSessionTree', () => {
     (listProjects as any).mockReturnValue([
       { key: 'panopticon-cli', config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli' } },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue([]);
+    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
@@ -110,8 +110,8 @@ describe('fetchProjectSessionTree', () => {
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue(['agent-pan-539']);
-    (getAgentRuntimeStateAsync as any).mockResolvedValue({ state: 'active' });
+    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
+    (getAgentRuntimeStateEffect as any).mockReturnValue(Effect.succeed({ state: 'active' }));
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
@@ -146,7 +146,7 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.sessions).toHaveLength(1);
     expect(tree.features[1]?.sessions).toHaveLength(1);
     expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
-    expect(listSessionNamesAsync).toHaveBeenCalledTimes(1);
+    expect(listSessionNamesAsyncEffect).toHaveBeenCalledTimes(1);
   });
 
   it('skips features with no agent dir and no planning dir', async () => {
@@ -156,7 +156,7 @@ describe('fetchProjectSessionTree', () => {
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue([]);
+    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set(['/tmp/panopticon-cli/workspaces']));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-999', isDirectory: () => true },
@@ -174,7 +174,7 @@ describe('fetchProjectSessionTree', () => {
         config: { name: 'Panopticon CLI', path: '/tmp/panopticon-cli' },
       },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue([]);
+    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
@@ -189,7 +189,7 @@ describe('fetchProjectSessionTree', () => {
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue([]);
+    (listSessionNamesAsyncEffect as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan',

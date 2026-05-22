@@ -20,7 +20,7 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { FsError } from './errors.js'
-import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
+import { getAgentRuntimeStateEffect, getAgentDir } from './agents.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
@@ -259,7 +259,7 @@ export async function computeAgentEnrichment(
       : (isPlanning ? 'plan' : undefined)
 
   // Get runtime state for resolution + explicit waiting signals.
-  const runtimeState = await getAgentRuntimeStateAsync(agentId)
+  const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId))
 
   // Get pending questions, filtered by agent start time.
   // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).

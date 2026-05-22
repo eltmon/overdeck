@@ -19,10 +19,10 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import {
-  sessionExistsAsync,
-  createSessionAsync,
-  killSessionAsync,
-  setOptionAsync,
+  sessionExistsAsyncEffect,
+  createSessionAsyncEffect,
+  killSessionAsyncEffect,
+  setOptionAsyncEffect,
   buildTmuxCommandString,
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
@@ -132,9 +132,9 @@ export interface SpawnPlanningResult {
 
 async function ensureTmuxRunning(): Promise<void> {
   try {
-    const exists = await sessionExistsAsync('panopticon-init');
+    const exists = await Effect.runPromise(sessionExistsAsyncEffect('panopticon-init'));
     if (!exists) {
-      await createSessionAsync('panopticon-init', homedir(), undefined);
+      await Effect.runPromise(createSessionAsyncEffect('panopticon-init', homedir(), undefined));
       console.log('Started tmux server');
     }
   } catch (startErr) {
@@ -416,7 +416,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(2, 'Preparing planning environment', '.pan/ workspace artifacts');
 
     // Kill existing planning session if any
-    await killSessionAsync(sessionName).catch(() => {});
+    await Effect.runPromise(killSessionAsyncEffect(sessionName)).catch(() => {});
 
     const workspacePanPaths = await Effect.runPromise(ensureWorkspacePanDir(workspacePath));
     await Promise.all(
@@ -566,17 +566,17 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
     await ensureTmuxRunning();
-    await createSessionAsync(sessionName, workspacePath, `bash '${launcherScript}'`, {
+    await Effect.runPromise(createSessionAsyncEffect(sessionName, workspacePath, `bash '${launcherScript}'`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
       },
-    });
+    }));
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
-    await setOptionAsync(sessionName, 'destroy-unattached', 'off');
-    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+    await Effect.runPromise(setOptionAsyncEffect(sessionName, 'destroy-unattached', 'off'));
+    await Effect.runPromise(setOptionAsyncEffect(sessionName, 'remain-on-exit', 'on'));
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the

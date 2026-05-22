@@ -1,6 +1,7 @@
 /**
  * Tests for review-context.ts (PAN-1059)
  */
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 
@@ -23,6 +24,7 @@ vi.mock('fs', () => ({
 
 // ── child_process mock ─────────────────────────────────────────────────────
 const mockExecAsync = vi.fn();
+const mockReadPlanEffect = vi.fn();
 vi.mock('child_process', () => ({
   exec: vi.fn((cmd: string, opts: unknown, cb: unknown) => {
     // promisify calls exec(cmd, opts, callback)
@@ -38,9 +40,7 @@ vi.mock('child_process', () => ({
 // ── vbrief / config mocks ──────────────────────────────────────────────────
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
-  readPlanAsync: vi.fn(async () => {
-    throw new Error('no plan');
-  }),
+  readPlanEffect: (...args: unknown[]) => mockReadPlanEffect(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),
@@ -69,6 +69,7 @@ describe('buildReviewContext', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadPlanEffect.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
   });
 
@@ -168,6 +169,7 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadPlanEffect.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
     mockExecAsync.mockRejectedValue(new Error('no git'));
   });
