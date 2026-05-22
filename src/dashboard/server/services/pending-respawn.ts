@@ -12,7 +12,7 @@
  *
  * The terminal frontend (`XTerminal.tsx`) reconnects on close 1000 with
  * exponential backoff (1s, 2s, 4s, 8s, 16s). Every reconnect re-enters
- * `ws-terminal.ts`, which checks `listSessionNamesAsync()` upfront and
+ * `ws-terminal.ts`, which checks the tmux session list upfront and
  * `close(4404, 'session-not-found')` if the name isn't there yet.
  * 4404 is treated as fatal on the client (no retry — the session is
  * presumed gone), so the panel sticks on "Could not reconnect" even
@@ -26,7 +26,8 @@
  * `isRespawnPending()` is true.
  */
 
-import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { Effect } from 'effect';
+import { sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 
 const pendingRespawns = new Set<string>();
 
@@ -66,11 +67,11 @@ export async function waitForSessionRespawn(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await sessionExistsAsync(sessionName)) return true;
+    if (await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) return true;
     if (!pendingRespawns.has(sessionName)) {
-      return sessionExistsAsync(sessionName);
+      return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
     }
     await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  return sessionExistsAsync(sessionName);
+  return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
 }
