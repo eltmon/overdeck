@@ -17,7 +17,7 @@ import { stat } from 'fs/promises';
 import { join } from 'path';
 import { Effect, Schedule, Duration } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { sessionExistsAsync, isPaneDeadAsync } from '../tmux.js';
+import { sessionExistsAsyncEffect, isPaneDeadAsyncEffect } from '../tmux.js';
 
 export type ReviewSubRole = 'security' | 'correctness' | 'performance' | 'requirements';
 
@@ -119,7 +119,7 @@ export async function waitForReviewerOutputs(
 
       // Check if the tmux session is dead
       try {
-        const dead = await isPaneDeadAsync(s.sessionId);
+        const dead = await Effect.runPromise(isPaneDeadAsyncEffect(s.sessionId));
         if (dead) {
           s.settled = true;
           if (!existsSync(s.outputPath)) {
@@ -132,7 +132,7 @@ export async function waitForReviewerOutputs(
         }
       } catch {
         // Session may not exist
-        const exists = await sessionExistsAsync(s.sessionId);
+        const exists = await Effect.runPromise(sessionExistsAsyncEffect(s.sessionId));
         if (!exists) {
           s.settled = true;
           if (!existsSync(s.outputPath)) {
@@ -231,10 +231,10 @@ export const waitForReviewerOutputsEffect = (
           }
         }
 
-        const dead = yield* Effect.tryPromise({
-          try: () => isPaneDeadAsync(s.sessionId),
-          catch: () => null as boolean | null,
-        }).pipe(Effect.orElseSucceed(() => null));
+        const dead = yield* isPaneDeadAsyncEffect(s.sessionId).pipe(
+          Effect.map((value): boolean | null => value),
+          Effect.catch(() => Effect.succeed(null)),
+        );
 
         if (dead === true) {
           s.settled = true;
@@ -245,10 +245,9 @@ export const waitForReviewerOutputsEffect = (
           }
           continue;
         } else if (dead === null) {
-          const exists = yield* Effect.tryPromise({
-            try: () => sessionExistsAsync(s.sessionId),
-            catch: () => true,
-          }).pipe(Effect.orElseSucceed(() => true));
+          const exists = yield* sessionExistsAsyncEffect(s.sessionId).pipe(
+            Effect.catch(() => Effect.succeed(true)),
+          );
           if (!exists) {
             s.settled = true;
             if (!existsSync(s.outputPath)) s.stalledAt = now;
