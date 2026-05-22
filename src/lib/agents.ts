@@ -22,7 +22,7 @@ import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getClaudeAuthStatus } from './claude-auth.js';
-import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
+import { bridgeGeminiAuthToCliproxyEffect, getCliproxyClientEnv } from './cliproxy.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
@@ -376,7 +376,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
     }
 
-    if (!await bridgeGeminiAuthToCliproxyAsync(apiKey)) {
+    if (!await Effect.runPromise(bridgeGeminiAuthToCliproxyEffect(apiKey))) {
       throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
     }
 
@@ -2343,8 +2343,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
-    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
-    if (!(await isCliproxyRunningAsync())) {
+    const { isCliproxyRunningEffect } = await import('./cliproxy.js');
+    if (!(await Effect.runPromise(isCliproxyRunningEffect()))) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription role runs route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -2623,8 +2623,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
-    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
-    if (!(await isCliproxyRunningAsync())) {
+    const { isCliproxyRunningEffect } = await import('./cliproxy.js');
+    if (!(await Effect.runPromise(isCliproxyRunningEffect()))) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '

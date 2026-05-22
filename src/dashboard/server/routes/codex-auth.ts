@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
-import { bridgeCodexAuthToCliproxyAsync, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
+import { bridgeCodexAuthToCliproxyEffect, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { getDashboardApiUrl } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
@@ -182,7 +182,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       }
 
       const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
-      const bridged = yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
+      const bridged = yield* bridgeCodexAuthToCliproxyEffect();
       const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
       const refreshedCredential = bridged && (
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
