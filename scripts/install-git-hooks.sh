@@ -8,7 +8,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOOKS_DIR="$SCRIPT_DIR/git-hooks"
+# PAN-1201: git hooks live under sync-sources/hooks/git-hooks/.
+HOOKS_DIR="$(dirname "$SCRIPT_DIR")/sync-sources/hooks/git-hooks"
 TARGET_DIR="${1:-.}"
 
 if [ ! -d "$TARGET_DIR" ]; then

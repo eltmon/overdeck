@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = join(__dirname, 'synced-skills.txt');
-const SKILLS_SOURCE_DIR = join(__dirname, '../../skills');
+const SKILLS_SOURCE_DIR = join(__dirname, '../../sync-sources/skills');
 
 function captureSkillSet(): string {
   const entries = readdirSync(SKILLS_SOURCE_DIR, { withFileTypes: true });

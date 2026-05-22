@@ -53,8 +53,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "templates",
-    "skills",
+    "sync-sources",
     "scripts",
     "roles",
     "README.md",
@@ -72,7 +71,7 @@
     "build:pi-extension": "npm --prefix ./packages/pi-extension run build",
     "build:cli": "node scripts/build-cli.mjs",
     "build:contracts": "node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build",
-    "build:scripts": "cd scripts && tsdown",
+    "build:scripts": "cd sync-sources/hooks && tsdown",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
     "build:dashboard:frontend": "npm --prefix ./src/dashboard/frontend run build",
     "build:dashboard:server": "npm run build:contracts && npm --prefix ./src/dashboard/server run build && node scripts/fs-helper.mjs copy-ext .md src/lib/cloister/prompts dist/dashboard/prompts",

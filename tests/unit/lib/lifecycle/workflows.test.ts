@@ -29,11 +29,17 @@ vi.mock('util', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../src/lib/tmux.js', () => ({
-  sessionExistsAsync: vi.fn().mockResolvedValue(false),
-  killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-}));
+vi.mock('../../../../src/lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    sessionExistsAsync: vi.fn().mockResolvedValue(false),
+    killSessionAsync: vi.fn().mockResolvedValue(undefined),
+    listSessionNamesAsync: vi.fn().mockResolvedValue([]),
+    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
+    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
+    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+  };
+});
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();

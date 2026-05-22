@@ -14,7 +14,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { findPlan, readPlanAsync } from '../vbrief/io.js';
+import { findPlan, readPlanEffect } from '../vbrief/io.js';
 import { findVBriefByIssue } from '../vbrief/lifecycle-io.js';
 import { getDevrootPath } from '../config.js';
 import { FsError } from '../errors.js';
@@ -191,7 +191,7 @@ async function extractAcceptanceCriteria(workspace: string, issueId: string): Pr
   const planPath = findPlan(workspace);
   if (planPath) {
     try {
-      const doc = await readPlanAsync(planPath);
+      const doc = await Effect.runPromise(readPlanEffect(planPath));
       return flattenAC(doc);
     } catch {
       // Fall through to lifecycle lookup

@@ -12,6 +12,7 @@
  *      that include phase, workType, or agentType.
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -53,18 +54,19 @@ vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
 // Mock tmux module to avoid actual session creation
 vi.mock('../../src/lib/tmux.js', () => ({
   createSession: vi.fn().mockResolvedValue(undefined),
-  createSessionAsync: vi.fn().mockResolvedValue(undefined),
+  createSessionAsyncEffect: vi.fn(() => Effect.void),
   killSession: vi.fn().mockResolvedValue(undefined),
-  killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  sendKeys: vi.fn().mockResolvedValue(undefined),
-  sendKeysAsync: vi.fn().mockResolvedValue(undefined),
+  killSessionAsyncEffect: vi.fn(() => Effect.void),
+  sendKeysEffect: vi.fn(() => Effect.void),
+  sendRawKeystrokeAsyncEffect: vi.fn(() => Effect.void),
   sessionExists: vi.fn().mockReturnValue(false),
-  sessionExistsAsync: vi.fn().mockResolvedValue(false),
+  sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn().mockResolvedValue([]),
-  listPaneValuesAsync: vi.fn().mockResolvedValue([]),
-  setOptionAsync: vi.fn().mockResolvedValue(undefined),
+  getAgentSessionsAsyncEffect: vi.fn(() => Effect.succeed([])),
+  listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
+  setOptionAsyncEffect: vi.fn(() => Effect.void),
   capturePane: vi.fn().mockResolvedValue('Claude Code'),
-  capturePaneAsync: vi.fn().mockResolvedValue('Claude Code'),
+  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('Claude Code')),
 }));
 
 vi.mock('../../src/lib/hooks.js', () => ({
@@ -95,7 +97,7 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   return {
     ...actual,
     isCliproxyRunning: vi.fn().mockReturnValue(true),
-    isCliproxyRunningAsync: vi.fn().mockResolvedValue(true),
+    isCliproxyRunningEffect: vi.fn(() => Effect.succeed(true)),
   };
 });
 
@@ -164,8 +166,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testAgentsDir, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     vi.clearAllMocks();
-    const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
-    vi.mocked(sessionExistsAsync).mockResolvedValue(false);
+    const { sessionExistsAsyncEffect } = await import('../../src/lib/tmux.js');
+    vi.mocked(sessionExistsAsyncEffect).mockReturnValue(Effect.succeed(false));
     const cliproxy = await import('../../src/lib/cliproxy.js');
     vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
     const beadsQuery = await import('../../src/lib/beads-query.js');
@@ -393,9 +395,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // DEFAULT_ROLES carries no per-role harness override → must default to
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
-      const { setOptionAsync } = await import('../../src/lib/tmux.js');
-      expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
-      expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
+      const { setOptionAsyncEffect } = await import('../../src/lib/tmux.js');
+      expect(setOptionAsyncEffect).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
+      expect(setOptionAsyncEffect).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
     });
 
     it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
@@ -416,7 +418,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain("initial-prompt.md'");
       expect(launcher).not.toContain('prompt=$(cat');
       expect(launcher).not.toContain('"$prompt"');
-      expect(tmux.sendKeysAsync).not.toHaveBeenCalled();
+      expect(tmux.sendKeysEffect).not.toHaveBeenCalled();
     });
 
     it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
@@ -454,12 +456,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
-      vi.mocked(tmux.createSessionAsync).mockImplementationOnce(async (agentId: string) => {
+      vi.mocked(tmux.createSessionAsyncEffect).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
-      });
-      vi.mocked(tmux.capturePaneAsync).mockResolvedValueOnce('pi rpc mode');
+      }));
+      vi.mocked(tmux.capturePaneAsyncEffect).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: '/tmp/test-workspace',
@@ -472,13 +474,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         'agent-pan-pi-prompt-1-test',
         expect.objectContaining({ type: 'prompt', message: 'run the tests' }),
       );
-      expect(tmux.capturePaneAsync).not.toHaveBeenCalled();
-      expect(tmux.sendKeysAsync).not.toHaveBeenCalled();
+      expect(tmux.capturePaneAsyncEffect).not.toHaveBeenCalled();
+      expect(tmux.sendKeysEffect).not.toHaveBeenCalled();
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {
-      const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
-      vi.mocked(sessionExistsAsync).mockResolvedValue(true);
+      const { sessionExistsAsyncEffect } = await import('../../src/lib/tmux.js');
+      vi.mocked(sessionExistsAsyncEffect).mockReturnValue(Effect.succeed(true));
 
       await expect(
         spawnRun('PAN-DUP-1', 'review', { workspace: '/tmp/test-workspace' }),

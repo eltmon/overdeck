@@ -123,7 +123,7 @@ const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
 export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
-import { loadCloisterConfig, loadCloisterConfigAsync } from './config.js';
+import { loadCloisterConfig, loadCloisterConfigEffect } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -145,10 +145,10 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, getAgentStateAsync, saveAgentState, saveAgentStateAsync, resumeAgent, recordAgentFailureAsync, type AgentState } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, getAgentStateEffect, saveAgentState, saveAgentStateEffect, resumeAgent, recordAgentFailureEffect, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
-import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { buildTmuxCommandString, capturePaneAsyncEffect, createSessionAsyncEffect, isPaneDeadAsyncEffect, killSession, killSessionAsyncEffect, listPaneValues, listPaneValuesAsyncEffect, listSessionNamesAsyncEffect, sessionExists, sessionExistsAsyncEffect, sendKeysEffect } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
@@ -536,7 +536,7 @@ export async function forceKillSpecialist(
 
   try {
     // Kill the tmux session (non-blocking)
-    await killSessionAsync(tmuxSession);
+    await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
 
     // Update state
     healthState.lastForceKillTime = new Date().toISOString();
@@ -703,10 +703,7 @@ const ACTIVE_STATUS_PATTERNS = [
  * thin `Effect.runPromise` wrapper.
  */
 const isAgentActiveInTmuxEffect = (sessionName: string): Effect.Effect<boolean, never> =>
-  Effect.tryPromise({
-    try: () => capturePaneAsync(sessionName, 5),
-    catch: () => 'capture-failed' as const,
-  }).pipe(
+  capturePaneAsyncEffect(sessionName, 5).pipe(
     Effect.map((stdout) => {
       if (!stdout.trim()) return false;
 
@@ -842,7 +839,7 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
     // Capture tmux output to check for stuck thinking
     let tmuxOutput: string;
     try {
-      tmuxOutput = await capturePaneAsync(agent.id, 10);
+      tmuxOutput = await Effect.runPromise(capturePaneAsyncEffect(agent.id, 10));
     } catch {
       continue;
     }
@@ -917,17 +914,17 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
         }
 
         // Kill the stuck tmux session
-        await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
+        await Effect.runPromise(killSessionAsyncEffect(agent.id)).catch(() => { /* no stale session */ });
 
         // Small delay to let tmux clean up
         await new Promise(r => setTimeout(r, 1000));
 
         // Respawn in a new tmux session with the same launcher
         // Kill stale session first to prevent "duplicate session" error (PAN-430)
-        await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
-        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`, {
+        await Effect.runPromise(killSessionAsyncEffect(agent.id)).catch(() => { /* no stale session */ });
+        await Effect.runPromise(createSessionAsyncEffect(agent.id, workspace, `bash ${launcherPath}`, {
           env: BLANKED_PROVIDER_ENV,
-        });
+        }));
 
         // Reset recovery state since we respawned fresh
         stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
@@ -997,9 +994,9 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
   // Check all tmux sessions — not just listRunningAgents() — because
   // specialist sessions aren't always in the agents registry.
-  let sessionNames: string[];
+  let sessionNames: readonly string[];
   try {
-    sessionNames = await listSessionNamesAsync();
+    sessionNames = await Effect.runPromise(listSessionNamesAsyncEffect());
   } catch {
     return actions;
   }
@@ -1016,7 +1013,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
     let tmuxOutput: string;
     try {
-      tmuxOutput = await capturePaneAsync(sessionName, 100);
+      tmuxOutput = await Effect.runPromise(capturePaneAsyncEffect(sessionName, 100));
     } catch {
       continue;
     }
@@ -1042,7 +1039,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
     try {
       const continueMsg = 'You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped.';
-      await sendKeysAsync(sessionName, continueMsg);
+      await Effect.runPromise(sendKeysEffect(sessionName, continueMsg));
       apiErrorRecoveryState.set(sessionName, { lastAttempt: now });
       actions.push(`API error recovery: nudged ${sessionName} to retry`);
     } catch (err) {
@@ -1096,7 +1093,7 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
       try {
         // Check if tmux session is active — never clean up running agents
         try {
-          const exists = await sessionExistsAsync(dir.name);
+          const exists = await Effect.runPromise(sessionExistsAsyncEffect(dir.name));
           if (exists) {
             continue; // Session exists, skip
           }
@@ -1210,7 +1207,7 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
     // Gate 1: work agent tmux session active? If yes, feedback may be current.
     const agentSession = `agent-${issueLower}`;
     try {
-      if (await sessionExistsAsync(agentSession)) continue;
+      if (await Effect.runPromise(sessionExistsAsyncEffect(agentSession))) continue;
     } catch {
       // Treat lookup error as "session might exist" — skip out of caution.
       continue;
@@ -1339,7 +1336,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
 
     // Both gates passed — session is an orphan, kill it
     try {
-      await killSessionAsync(sessionName);
+      await Effect.runPromise(killSessionAsyncEffect(sessionName));
       const ageMin = Math.round((now - createdMs) / 60000);
       const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
       actions.push(msg);
@@ -1530,8 +1527,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     // helper that scanned for review-coordinator-* / review-<id>-<role>
     // sessions spawned by dispatchParallelReview (now retired).
     try {
-      const { listRunningAgentsAsync } = await import('../agents.js');
-      const agents = await listRunningAgentsAsync();
+      const { listRunningAgentsEffect } = await import('../agents.js');
+      const agents = await Effect.runPromise(listRunningAgentsEffect());
       for (const agent of agents) {
         if (agent.status === 'stopped' || agent.status === 'error') continue;
         const issueId = (agent.issueId ?? '').trim().toUpperCase();
@@ -2059,8 +2056,8 @@ export async function checkStuckReviewing(): Promise<string[]> {
     // Detect active review runs: agent-<id>-review (synthesis) and
     // agent-<id>-review-<subRole> (PAN-1059 convoy).
     try {
-      const { listRunningAgentsAsync } = await import('../agents.js');
-      const agents = await listRunningAgentsAsync();
+      const { listRunningAgentsEffect } = await import('../agents.js');
+      const agents = await Effect.runPromise(listRunningAgentsEffect());
       for (const agent of agents) {
         if (agent.status === 'stopped' || agent.status === 'error') continue;
         const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
@@ -2201,7 +2198,7 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
 
       const reviewSession = `agent-${issueId.toLowerCase()}-review`;
       const sessionAlive = sessionExists(reviewSession);
-      const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
+      const paneDead = sessionAlive ? await Effect.runPromise(isPaneDeadAsyncEffect(reviewSession)).catch(() => true) : true;
       const activeReviewState = sessionAlive && !paneDead ? getAgentState(reviewSession) : null;
       if (activeReviewState?.reviewRunId && latestDir !== join(reviewBaseDir, activeReviewState.reviewRunId)) {
         continue;
@@ -2818,7 +2815,7 @@ export async function detectMergedSwarmSlots(): Promise<string[]> {
   try {
     const { parseSlotBranch, postMergeLifecycle } = await import('./merge-agent.js');
     const { resolveGitHubIssue } = await import('../tracker-utils.js');
-    const { readContinueStateAsync } = await import('../vbrief/continue-state.js');
+    const { readContinueStateEffect } = await import('../vbrief/continue-state.js');
 
     const now = Date.now();
     // Drop cooldown entries that can no longer suppress anything, so the map
@@ -2833,7 +2830,7 @@ export async function detectMergedSwarmSlots(): Promise<string[]> {
 
       let runtime;
       try {
-        const cont = await readContinueStateAsync(workspacePath, issueId);
+        const cont = await Effect.runPromise(readContinueStateEffect(workspacePath, issueId));
         runtime = cont?.swarmRuntime;
       } catch {
         continue; // unreadable / malformed continue file — skip this workspace
@@ -3163,7 +3160,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
               const ciMsg = ciPath
                 ? `CI checks are failing on the PR after 5 retries.\n\nMUST READ: ${ciPath}\n\nFix the failures, commit, then run: pan done ${issueId}`
                 : `CI checks are failing on the PR after 5 retries. Fix the failures, commit, then run: pan done ${issueId}`;
-              await sendKeysAsync(agentSession, ciMsg);
+              await Effect.runPromise(sendKeysEffect(agentSession, ciMsg));
             }
             ciEntry.count++; // increment past 5 so this block only fires once
             ciRetryMap.set(issueId, ciEntry);
@@ -3203,7 +3200,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
           const ciMsg2 = ciPath2
             ? `CI checks failed on the PR for ${issueId}. This may be transient.\n\nMUST READ: ${ciPath2}\n\nFix any failures, commit, then run: pan done ${issueId}`
             : `CI checks failed on the PR for ${issueId}. This may be transient. Fix any failures, commit, then run: pan done ${issueId}`;
-          await sendKeysAsync(agentSessionCi, ciMsg2);
+          await Effect.runPromise(sendKeysEffect(agentSessionCi, ciMsg2));
         }
         actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
         continue;
@@ -3229,9 +3226,9 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
           }).catch((err: Error) => console.error(`[deacon] Failed to write timeout feedback for ${issueIdForFb}:`, err.message));
           const agentSession = `agent-${issueIdForFb.toLowerCase()}`;
           if (sessionExists(agentSession)) {
-            await sendKeysAsync(agentSession,
+            await Effect.runPromise(sendKeysEffect(agentSession,
               `Merge timed out — the rebased branch was not pushed in time. Please rebase onto the target branch, resolve any conflicts, push with --force-with-lease, then run "pan done ${issueIdForFb}". After pushing, the merge will proceed automatically.`
-            );
+            ));
           }
           timeoutNudgeCooldowns.set(issueIdForFb, now);
           actions.push(`Timeout failure for ${issueIdForFb} — wrote feedback, nudged work agent`);
@@ -3471,7 +3468,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
               ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
               : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
-        await sendKeysAsync(agentSessionName, nudgeMessage);
+        await Effect.runPromise(sendKeysEffect(agentSessionName, nudgeMessage));
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
         console.log(`[deacon] Sent dead-end recovery nudge to ${agentSessionName}`);
       } catch (error: unknown) {
@@ -3813,7 +3810,7 @@ function recordAutoCloseOutFailure(issueId: string, message: string): void {
 }
 
 export async function autoCloseOut(now = new Date()): Promise<string[]> {
-  const closeOutConfig = (await loadCloisterConfigAsync()).close_out;
+  const closeOutConfig = (await Effect.runPromise(loadCloisterConfigEffect())).close_out;
   if (closeOutConfig?.auto !== true) return [];
 
   // Evict stale cache entries before each patrol cycle
@@ -4019,7 +4016,7 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       try {
         const nudgeMessage = `You appear to have stopped working without calling \`pan done\`. If your implementation is complete, run this now:\n\npan done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
-        await sendKeysAsync(agent.id, nudgeMessage);
+        await Effect.runPromise(sendKeysEffect(agent.id, nudgeMessage));
         actions.push(`First-completion nudge: ${agent.id} (idle ${idleMinutes}m)`);
         console.log(`[deacon] Sent first-completion nudge to ${agent.id}`);
       } catch (error: unknown) {
@@ -4138,7 +4135,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
         try {
           const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan done ${issueId} -c "Implementation complete"`;
-          await sendKeysAsync(agent.id, pokeMsg);
+          await Effect.runPromise(sendKeysEffect(agent.id, pokeMsg));
           stuckPokeState.set(agent.id, { lastPoke: now, pokes: pokeState.pokes + 1 });
           actions.push(`Deacon poked stuck agent ${agent.id} (${issueId}) [${pokeState.pokes + 1}/${STUCK_POKE_MAX}]`);
           addLog('action', `Poked stuck agent ${issueId} (poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX})`, undefined);
@@ -4185,11 +4182,11 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
     // 1. Collect tmux pane PIDs for agent sessions in this workspace
     const protectedPids = new Set<string>([String(process.pid)]);
     try {
-      const sessions = await listSessionNamesAsync();
+      const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
       const agentSessions = sessions.filter(s => s.startsWith('agent-') || s.startsWith('planning-'));
       for (const session of agentSessions) {
         try {
-          const pid = (await listPaneValuesAsync(session, '#{pane_pid}'))[0]?.trim();
+          const pid = (await Effect.runPromise(listPaneValuesAsyncEffect(session, '#{pane_pid}')))[0]?.trim();
           if (pid && /^\d+$/.test(pid)) {
             // Add the pane PID and all its descendants to protected list
             protectedPids.add(pid);
@@ -4299,7 +4296,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       const agentId = `agent-${issueLower}`;
 
       // Only restart if the agent is active (has a tmux session)
-      const agentRunning = await sessionExistsAsync(agentId);
+      const agentRunning = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
       if (!agentRunning) {
         // Agent not running — skip restart
         continue;
@@ -4330,11 +4327,11 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
             actions.push(msg);
             // PAN-464: Alert agent that the container gave up — manual intervention required
             try {
-              await sendKeysAsync(
+              await Effect.runPromise(sendKeysEffect(
                 agentId,
                 `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.pan.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
                 'deacon:container-gave-up',
-              );
+              ));
             } catch {
               // Agent may not be interactive (e.g., waiting for input) — non-fatal
             }
@@ -4378,11 +4375,11 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
         actions.push(msg);
         // PAN-464: Alert agent that its container crashed and was restarted
         try {
-          await sendKeysAsync(
+          await Effect.runPromise(sendKeysEffect(
             agentId,
             `ℹ️  Deacon: container "${name}" crashed and was auto-restarted (attempt ${count}/${CONTAINER_RESTART_MAX_COUNT}). The UAT environment should recover in ~30s. No action needed unless this keeps happening.`,
             'deacon:container-restarted',
-          );
+          ));
         } catch {
           // Agent may not be interactive — non-fatal
         }
@@ -4390,11 +4387,11 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
         console.warn(`[deacon] Failed to restart ${name}: ${restartErr.message}`);
         // PAN-464: Alert agent that restart failed
         try {
-          await sendKeysAsync(
+          await Effect.runPromise(sendKeysEffect(
             agentId,
             `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.pan.localhost is likely broken.`,
             'deacon:container-restart-failed',
-          );
+          ));
         } catch {
           // Non-fatal
         }
@@ -4794,7 +4791,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         addLog('warn', `Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing`, state.patrolCycle);
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
-          await killSessionAsync(projSpec.tmuxSession);
+          await Effect.runPromise(killSessionAsyncEffect(projSpec.tmuxSession));
           // Preserve Claude JSONL/session artifacts; only reset Panopticon runtime state.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
@@ -4817,7 +4814,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         const msg = `Killed lingering idle specialist ${projSpec.specialistType} (${projSpec.projectKey}) — idle ${ageMin}min`;
         console.log(`[deacon] ${msg}`);
         try {
-          await killSessionAsync(projSpec.tmuxSession);
+          await Effect.runPromise(killSessionAsyncEffect(projSpec.tmuxSession));
           actions.push(msg);
           addLog('action', msg, state.patrolCycle);
         } catch {
@@ -4932,7 +4929,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     // Capture recent output and scan for signature corruption
     let output: string;
     try {
-      output = await capturePaneAsync(agentId, 100);
+      output = await Effect.runPromise(capturePaneAsyncEffect(agentId, 100));
     } catch {
       continue;
     }
@@ -4947,7 +4944,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
 
     // Kill the tmux session
     try {
-      await killSessionAsync(agentId);
+      await Effect.runPromise(killSessionAsyncEffect(agentId));
     } catch { /* non-fatal */ }
 
     // Delete session.id so resumeAgent won't --resume the corrupted session
@@ -5064,10 +5061,10 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         // Claude exits. Check if the pane's process is actually dead.
         if (dir.startsWith('planning-')) {
           try {
-            const result = (await listPaneValuesAsync(dir, '#{pane_dead}'))[0]?.trim() ?? '';
+            const result = (await Effect.runPromise(listPaneValuesAsyncEffect(dir, '#{pane_dead}')))[0]?.trim() ?? '';
             if (result !== '1') continue; // pane is alive — truly still running
             // Pane is dead — kill the zombie tmux session and fall through to recovery
-            try { await killSessionAsync(dir); } catch { /* ignore */ }
+            try { await Effect.runPromise(killSessionAsyncEffect(dir)); } catch { /* ignore */ }
             logDeaconEvent(`recoverOrphanedAgents: killed dead planning pane ${dir}`);
           } catch {
             continue; // can't check — assume alive
@@ -5095,9 +5092,9 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       const oldStatus = state.status;
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
-      await saveAgentStateAsync(state);
+      await Effect.runPromise(saveAgentStateEffect(state));
       if (state.stoppedByUser !== true) {
-        const failedState = await recordAgentFailureAsync(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`);
+        const failedState = await Effect.runPromise(recordAgentFailureEffect(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
         if (failedState) {
           notifyAgentStatusChanged(failedState, oldStatus);
           orphanFailureRecordedForAutoResume.add(dir);
@@ -5137,7 +5134,7 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
   const actions: string[] = [];
   let planningSessions: string[];
   try {
-    planningSessions = (await listSessionNamesAsync())
+    planningSessions = (await Effect.runPromise(listSessionNamesAsyncEffect()))
       .filter(s => s.startsWith('planning-'));
   } catch {
     return actions;
@@ -5154,7 +5151,7 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
     }
 
     try {
-      await killSessionAsync(planningSession).catch(() => {});
+      await Effect.runPromise(killSessionAsyncEffect(planningSession)).catch(() => {});
     } catch { /* non-fatal */ }
 
     // Mark planning agent state as stopped so the UI doesn't show a "running" pill.
@@ -5238,7 +5235,7 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     const deadlineMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
 
     // The synthesis agent must be alive to receive any signal.
-    const synthesisAlive = await sessionExistsAsync(state.reviewSynthesisAgentId);
+    const synthesisAlive = await Effect.runPromise(sessionExistsAsyncEffect(state.reviewSynthesisAgentId));
     if (!synthesisAlive) continue;
 
     // PAN-977: the review sub-role launcher is HUP-immune and intentionally
@@ -5350,7 +5347,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
-    const allSessions = await listSessionNamesAsync();
+    const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
     const convoyReviewSessions = allSessions.filter(s => /^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(s));
     const legacyReviewSessions = allSessions.filter(s => /^review-/.test(s));
     const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s));
@@ -5402,7 +5399,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
     }
 
     try {
-      await killSessionAsync(reviewSession).catch(() => {});
+      await Effect.runPromise(killSessionAsyncEffect(reviewSession)).catch(() => {});
     } catch (err: unknown) {
       const reason = err instanceof Error ? err.message : String(err);
       logDeaconEvent(`cleanupOrphanedReviewSessions: error killing ${reviewSession}: ${reason}`);
@@ -5462,7 +5459,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     if (state.role !== 'work') continue;
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
-    if (!await sessionExistsAsync(agentId)) continue;
+    if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) continue;
 
     // Authoritative idle signal — Stop hook fired and runtime mirror is idle.
     // Skips agents currently mid-thought (state='active') and ones we already
@@ -5692,7 +5689,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       const result = await resumeAgent(agentId);
       if (result.success) {
         resumed.push(agentId);
-        const resumedState = await getAgentStateAsync(agentId);
+        const resumedState = await Effect.runPromise(getAgentStateEffect(agentId));
         if (resumedState) {
           notifyAgentStatusChanged(resumedState, state.status);
         }
@@ -5721,7 +5718,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
         if (!orphanFailureRecordedForAutoResume.has(agentId)) {
-          const failedState = await recordAgentFailureAsync(agentId, msg);
+          const failedState = await Effect.runPromise(recordAgentFailureEffect(agentId, msg));
           if (failedState) {
             notifyAgentStatusChanged(failedState, state.status);
           }
@@ -5733,7 +5730,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!orphanFailureRecordedForAutoResume.has(agentId)) {
-        const failedState = await recordAgentFailureAsync(agentId, `Auto-resume error for ${agentId}: ${msg}`);
+        const failedState = await Effect.runPromise(recordAgentFailureEffect(agentId, `Auto-resume error for ${agentId}: ${msg}`));
         if (failedState) {
           notifyAgentStatusChanged(failedState, state.status);
         }

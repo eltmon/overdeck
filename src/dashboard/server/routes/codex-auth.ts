@@ -8,7 +8,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { bridgeCodexAuthToCliproxyEffect, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
-import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { createSessionAsyncEffect, sessionExistsAsyncEffect, listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
 import { getDashboardApiUrl } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
 
@@ -111,7 +111,7 @@ const getCodexAuthRoute = HttpRouter.add(
 
 async function getExistingLiveReauthSession(): Promise<{ sessionName: string; session: ReauthSession } | null> {
   cleanupExpiredReauthSessions();
-  const sessions = await listSessionNamesAsync();
+  const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
   for (const [sessionName, session] of reauthSessions.entries()) {
     if (sessions.includes(sessionName)) return { sessionName, session };
   }
@@ -142,11 +142,9 @@ const postCodexReauthRoute = HttpRouter.add(
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
       const command = headless ? 'codex login --device-auth' : 'codex login';
 
-      yield* Effect.promise(() =>
-        createSessionAsync(sessionName, homedir(), command, {
-          env: { PATH: process.env.PATH || '' },
-        }),
-      );
+      yield* createSessionAsyncEffect(sessionName, homedir(), command, {
+        env: { PATH: process.env.PATH || '' },
+      });
 
       return jsonResponse(
         { sessionName, statusToken, headless },
@@ -176,7 +174,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         return jsonResponse({ completed: true, success: false, error: 'Re-auth session expired or invalid' });
       }
 
-      const exists = yield* Effect.promise(() => sessionExistsAsync(sessionName));
+      const exists = yield* sessionExistsAsyncEffect(sessionName);
       if (exists) {
         return jsonResponse({ completed: false });
       }

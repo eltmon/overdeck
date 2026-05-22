@@ -16,7 +16,7 @@ import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
 import type { SpecialistAgentName } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
-import { killSessionAsync } from '../tmux.js';
+import { killSessionAsyncEffect } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -243,7 +243,7 @@ export async function rotateSpecialistSession(
     // Kill current session
     const tmuxSession = getTmuxSessionName(specialistName);
     try {
-      await killSessionAsync(tmuxSession);
+      await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
       console.log(`Killed session: ${tmuxSession}`);
     } catch (error) {
       // Session might already be dead

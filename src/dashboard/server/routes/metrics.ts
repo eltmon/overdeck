@@ -16,7 +16,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { listRunningAgentsAsync } from '../../../lib/agents.js';
+import { listRunningAgentsEffect } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 
 // ─── Cached review statuses ───────────────────────────────────────────────────
@@ -93,7 +93,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
     const topAgents = costSummary.topAgents.slice(0, 5);
     const topIssues = costSummary.topIssues.slice(0, 5);
 
-    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const runningAgents = yield* listRunningAgentsEffect();
     const stuckCount = computeStuckCount(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
@@ -143,7 +143,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
     const status = service.getStatus();
-    const runningAgents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const runningAgents = yield* listRunningAgentsEffect();
     const current = computeStuckCount(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),

@@ -9,9 +9,9 @@ import type { DashboardSnapshot } from '@panctl/contracts';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
-import { listRunningAgentsAsync, getAgentRuntimeStateAsync, type AgentState } from '../../../lib/agents.js';
+import { listRunningAgentsEffect, getAgentRuntimeStateEffect, type AgentState } from '../../../lib/agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { listPaneValuesAsync } from '../../../lib/tmux.js';
+import { listPaneValuesAsyncEffect } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { initEventStore } from '../event-store.js';
 
@@ -491,16 +491,16 @@ function evaluateSeverity(
 }
 
 async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
-  const agents = await listRunningAgentsAsync();
+  const agents = await Effect.runPromise(listRunningAgentsEffect());
   const activeAgents = agents.filter((agent) => agent.status !== 'stopped');
   const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
 
   return Promise.all(
     activeAgents.map(async (agent) => {
-      const runtimeState = await getAgentRuntimeStateAsync(agent.id).catch(() => null);
+      const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agent.id)).catch(() => null);
       // PAN-977 round-12 high-2: panePid cache field was removed from
       // AgentRuntimeState; always query tmux for the current pane PID.
-      const panePidValue = (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
+      const panePidValue = (await Effect.runPromise(listPaneValuesAsyncEffect(agent.id, '#{pane_pid}')))[0];
       const panePid = Number(panePidValue ?? '0');
       const descendants = Number.isFinite(panePid) && panePid > 0
         ? getDescendantPids(panePid, processTable)

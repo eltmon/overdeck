@@ -3,10 +3,10 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlanAsync } from './vbrief/io.js';
+import { findPlanEffect } from './vbrief/io.js';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
-import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileAsync } from './vbrief/dag.js';
+import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileEffect } from './vbrief/dag.js';
 import {
   upsertReviewStatus as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -16,8 +16,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
-  upsertReviewStatusAsync as dbUpsertAsync,
-  getReviewStatusFromDbAsync,
+  getReviewStatusFromDbEffect,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -438,7 +437,7 @@ export async function setReviewStatusAsync(
 }
 
 export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
-  return getReviewStatusFromDbAsync(issueId);
+  return Effect.runPromise(getReviewStatusFromDbEffect(issueId));
 }
 
 /**
@@ -633,16 +632,16 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
       if (!existsSync(workStateFile)) return;
       const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
       if (!workState.workspace) return;
-      const planPath = await findPlanAsync(workState.workspace);
+      const planPath = await Effect.runPromise(findPlanEffect(workState.workspace));
       if (!planPath) {
         console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
         return;
       }
-      const result = await writePipelineMirrorToPlanFileAsync(
+      const result = await Effect.runPromise(writePipelineMirrorToPlanFileEffect(
         planPath,
         buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
         `review-status-${process.pid}`,
-      );
+      ));
       if (!result) {
         console.warn(`[review-status] Failed to write pipeline mirror to ${planPath} for ${issueId}`);
       }

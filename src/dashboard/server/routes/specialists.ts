@@ -72,7 +72,7 @@ import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { createSessionAsync, killSessionAsync } from '../../../lib/tmux.js';
+import { killSessionAsyncEffect } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -195,8 +195,9 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
 
       if (yield* Effect.promise(() => isRunning(name))) {
         const tmuxSession = getTmuxSessionName(name);
-        const killResult = yield* Effect.promise(() =>
-          killSessionAsync(tmuxSession).then(() => true).catch(() => false),
+        const killResult = yield* killSessionAsyncEffect(tmuxSession).pipe(
+          Effect.as(true),
+          Effect.catch(() => Effect.succeed(false)),
         );
         killed = killResult;
       }
@@ -359,7 +360,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         // PAN-846: Kill the specialist tmux session so it doesn't leak RAM.
         // The session has completed its work; next dispatch spawns fresh.
         try {
-          await killSessionAsync(tmuxSession);
+          await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
           console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
         } catch (err) {
           console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
@@ -583,10 +584,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         yield* Effect.promise(async () => {
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-            const { sessionExistsAsync } = await import('../../../lib/tmux.js');
+            const { sessionExistsAsyncEffect } = await import('../../../lib/tmux.js');
             const { messageAgent, spawnAgent, getAgentState } = await import('../../../lib/agents.js');
 
-            if (await sessionExistsAsync(workAgentId)) {
+            if (await Effect.runPromise(sessionExistsAsyncEffect(workAgentId))) {
               // Agent is running — send rebase instructions directly
               const rebaseMsg = `MERGE CONFLICT: The merge-agent could not rebase your branch onto main due to conflicts. Please fix this now:\n\n1. git fetch origin main\n2. git rebase origin/main\n3. Resolve any conflicts (git add <file> && git rebase --continue)\n4. git push --force-with-lease\n5. Resubmit: curl -s -X POST http://localhost:3011/api/review/${normalizedIssueId}/request -H "Content-Type: application/json" -d "{}"\n\nConflict details: ${notes}`;
               await messageAgent(workAgentId, rebaseMsg);
@@ -987,7 +988,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     const tmuxSession = getRunMetadata(project, registryKey).tmuxSession
       ?? getTmuxSessionName(type, project, issueId);
 
-    yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
+    yield* Effect.promise(() => Effect.runPromise(killSessionAsyncEffect(tmuxSession)).catch(() => {}));
     // Leave Claude JSONL/session artifacts intact; only reset Panopticon runtime state.
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',

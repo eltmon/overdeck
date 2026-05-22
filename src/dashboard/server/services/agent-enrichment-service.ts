@@ -12,7 +12,8 @@
  * restored here via the event-driven projection pipeline.
  */
 
-import { listRunningAgentsAsync } from '../../../lib/agents.js'
+import { Effect } from 'effect'
+import { listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
@@ -21,6 +22,8 @@ import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChanged
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type RunningAgent = AgentState & { tmuxActive: boolean }
 
 interface EnrichmentServiceState {
   timer: ReturnType<typeof setInterval> | null
@@ -51,9 +54,9 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
 // ─── Poller ───────────────────────────────────────────────────────────────────
 
 async function pollOnce(state: EnrichmentServiceState): Promise<void> {
-  let runningAgents: Awaited<ReturnType<typeof listRunningAgentsAsync>>
+  let runningAgents: RunningAgent[]
   try {
-    runningAgents = await listRunningAgentsAsync()
+    runningAgents = await Effect.runPromise(listRunningAgentsEffect())
   } catch {
     return
   }

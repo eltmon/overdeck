@@ -87,7 +87,7 @@ import {
   getAgentRuntimeState,
   transitionIssueToInReview,
   getAgentState,
-  getAgentStateAsync,
+  getAgentStateEffect,
   spawnAgent,
   spawnRun,
 } from '../../../lib/agents.js';
@@ -95,13 +95,13 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlanAsync, readPlanAsync, isPlanningCompleteAsync } from '../../../lib/vbrief/io.js';
+import { findPlanEffect, readPlanEffect, isPlanningCompleteEffect } from '../../../lib/vbrief/io.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
-import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
+import { findVBriefByIssueEffect, readVBriefDocumentEffect } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { capturePaneAsyncEffect, listSessionNamesAsyncEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
@@ -274,7 +274,7 @@ async function ensureWorkAgentReadyForMerge(
     return { recovered: true, agentId, detail: 'Work agent already running; sent merge preparation request.' };
   }
 
-  const agentState = await getAgentStateAsync(agentId);
+  const agentState = await Effect.runPromise(getAgentStateEffect(agentId));
   if (agentState) {
     try {
       await messageAgent(agentId, rebaseMsg);
@@ -1007,7 +1007,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = await findPlanAsync(workspacePath);
+    const planPath = await Effect.runPromise(findPlanEffect(workspacePath));
     if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
@@ -1578,15 +1578,15 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, stackHealth, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
+        const [git, repoGit, containers, stackHealth, mrUrl] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           Effect.runPromise(getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true })),
           getMrUrlAsync(issueId, workspacePath),
-          listSessionNamesAsync(),
-          capturePaneAsync(agentSession, 50).catch(() => ''),
         ]));
+        const sessionNames = yield* listSessionNamesAsyncEffect();
+        const paneOutput = yield* capturePaneAsyncEffect(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
 
         let hasAgent = false;
         let agentSessionId: string | null = null;
@@ -1625,9 +1625,9 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
-        const planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
+        const planPath = yield* findPlanEffect(workspacePath);
         const hasPlan = planPath !== null;
-        const planningComplete = hasPlan ? yield* Effect.promise(() => isPlanningCompleteAsync(workspacePath)) : false;
+        const planningComplete = hasPlan ? yield* isPlanningCompleteEffect(workspacePath) : false;
         const hasBeads = planningComplete;
 
         const issueData = getCostsForIssue(issueId);
@@ -1805,24 +1805,25 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   }))
 );
 
-function resolvePlanLocation(projectPath: string, issueId: string): Promise<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null> {
-  return findVBriefByIssueAsync(projectPath, issueId).then(async found => {
+function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null, unknown> {
+  return Effect.gen(function* () {
+    const found = yield* findVBriefByIssueEffect(projectPath, issueId);
     if (found) {
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
-        doc: await readVBriefDocumentAsync(found.path),
+        doc: yield* readVBriefDocumentEffect(found.path),
       };
     }
 
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = await findPlanAsync(workspacePath);
+    const planPath = yield* findPlanEffect(workspacePath);
     if (!planPath) return null;
     return {
       path: planPath,
       lifecycleDir: 'workspace',
-      doc: await readPlanAsync(planPath),
+      doc: yield* readPlanEffect(planPath),
     };
   });
 }
@@ -1839,7 +1840,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
-    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
@@ -1874,7 +1875,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
@@ -3107,7 +3108,7 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     let reviewSessionNames: string[] | undefined;
     let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
     try {
-      const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+      const allSessions = yield* listSessionNamesAsyncEffect();
       const enriched = enrichReviewStatusFromSessions(issueId, base, allSessions);
       reviewCoordinatorSessionName = enriched.reviewCoordinatorSessionName;
       reviewSessionNames = enriched.reviewSessionNames;
@@ -4727,7 +4728,6 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       const { runQualityGates } = await import('../../../lib/cloister/validation.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
       const { messageAgent } = await import('../../../lib/agents.js');
-      const { sessionExistsAsync } = await import('../../../lib/tmux.js');
       let mergeSet = getMergeSet(issueId) || ensureMergeSetForIssue(issueId);
       if (!mergeSet) {
         const error = `No merge set found for ${issueId}`;
@@ -4748,7 +4748,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       }
 
       const agentId = `agent-${issueId.toLowerCase()}`;
-      if (!await sessionExistsAsync(agentId)) {
+      if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
         const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
         setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
         completePendingOperation(issueId, error);
@@ -4829,14 +4829,14 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           }
         }
 
-        if (!await sessionExistsAsync(agentId)) break;
+        if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) break;
       }
 
       if (pushedRepos.size !== activeRepos.length) {
         const remaining = activeRepos
           .filter(repo => !pushedRepos.has(repo.repoKey))
           .map(repo => repo.repoKey);
-        const agentRunning = await sessionExistsAsync(agentId);
+        const agentRunning = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
         const error = !agentRunning
           ? `Work agent ${agentId} stopped before completing polyrepo rebases for ${remaining.join(', ')}`
           : `Work agent did not push rebased branches for ${remaining.join(', ')} within ${REBASE_TIMEOUT_MS / 60000} minutes`;
@@ -5037,12 +5037,11 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const { postMergeLifecycle } = await import(
       '../../../lib/cloister/merge-agent.js'
     );
-    const { sessionExistsAsync } = await import('../../../lib/tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
-    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await sessionExistsAsync(agentId) ? 'running' : 'stopped'})...`);
+    console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExistsAsyncEffect(agentId)) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
@@ -5085,7 +5084,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
             }
           } catch { /* fetch failed, retry */ }
 
-          if (!await sessionExistsAsync(agentId)) {
+          if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
             console.log(`[merge] Work agent ${agentId} stopped during rebase`);
             break;
           }
@@ -5093,7 +5092,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
         if (newHead) {
           rebaseResult = { success: true, newHead };
-        } else if (!await sessionExistsAsync(agentId)) {
+        } else if (!await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
           rebaseResult = {
             success: false,
             reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,

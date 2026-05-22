@@ -18,6 +18,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { Effect } from 'effect';
 import type { AgentStatus, SessionNodePresence } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
@@ -26,7 +27,7 @@ import {
   type ReviewerRole,
 } from '../../../lib/cloister/specialists.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
-import { capturePaneAsync } from '../../../lib/tmux.js';
+import { capturePaneAsyncEffect } from '../../../lib/tmux.js';
 
 const CONVOY_REVIEWER_ROLES: readonly ReviewerRole[] = [
   'correctness',
@@ -47,7 +48,7 @@ const API_ERROR_PATTERNS = [
 
 async function detectApiError(sessionId: string): Promise<boolean> {
   try {
-    const pane = await capturePaneAsync(sessionId, 15);
+    const pane = await Effect.runPromise(capturePaneAsyncEffect(sessionId, 15));
     return API_ERROR_PATTERNS.some(p => p.test(pane));
   } catch {
     return false;

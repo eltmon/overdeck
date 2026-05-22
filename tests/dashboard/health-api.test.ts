@@ -7,6 +7,7 @@
  * see them as missing when checked on the managed socket (CI / managed mode).
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -19,8 +20,8 @@ const { activeSessions } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
-  sessionExistsAsync: vi.fn(async (name: string) => activeSessions.has(name)),
-  capturePaneAsync: vi.fn(async () => ''),
+  sessionExistsAsyncEffect: (name: string) => Effect.succeed(activeSessions.has(name)),
+  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
   getTmuxConfigMode: vi.fn(() => 'inherit-user'),
   getManagedTmuxSocketName: vi.fn(() => 'panopticon'),
   getManagedTmuxConfigPath: vi.fn(() => '/tmp/panopticon.tmux.conf'),

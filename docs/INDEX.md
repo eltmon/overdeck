@@ -29,6 +29,10 @@
 | [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: synthesis-as-review, convoy reviewers as harness-agnostic prompt templates inlined by the orchestrator, output-file contract, and verdict signaling |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
 | [SKILLS-INVENTORY.md](./SKILLS-INVENTORY.md) | Installed Claude Code skills inventory, including scope and one-line purpose for each skill |
+| [SKILLS-CONVENTION.md](./SKILLS-CONVENTION.md) | How Panopticon's `pan-*` skills relate to the `pan` CLI binary, the four skill shapes, and the linter that keeps them in sync |
+| [configuration/harnesses.mdx](../configuration/harnesses.mdx) | Operational guide for the two supported coding-agent harnesses (`claude-code`, `pi`): install, picker locations, ToS rules, troubleshooting. *Published — `docs/HARNESSES.md` is now a redirect stub.* |
+| [reference/harness-landscape.mdx](../reference/harness-landscape.mdx) | Planning survey of 13 coding-agent harnesses — extensibility mechanisms, skill/AGENTS.md/MCP support, headless interfaces, and harness-adoption implications |
+| [reference/template-conversations.mdx](../reference/template-conversations.mdx) | Proposal: loading curated skill bundles into a single conversation without touching the global `pan sync` skill set |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
