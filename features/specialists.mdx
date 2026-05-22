@@ -3,11 +3,17 @@ title: Specialist Agents
 description: Dedicated agents for review, testing, inspection, UAT, and merging — the pipeline that takes work from "done" to "merged"
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Specialist Agents
 
 Work agents write code. **Specialists** turn that code into something you can actually merge. They review, test, click through the UI, resolve conflicts, and hand off to each other automatically — you just click **Merge** at the end.
 
-![Panopticon kanban board with specialists running](/images/specialists/01-board-hero.png)
+<ThemedImage
+  light="/images/specialists/01-board-hero-light.png"
+  dark="/images/specialists/01-board-hero-dark.png"
+  alt="Panopticon kanban board with specialists running"
+/>
 
 ## Overview
 
@@ -31,7 +37,11 @@ Specialists are **per-project and ephemeral** — they spawn on-demand against a
 | **uat-agent** | Browser-based acceptance testing via Playwright | Auto after tests pass |
 | **merge-agent** | All merges + conflict resolution | Human clicks **Approve & Merge** |
 
-![Specialists dashboard showing Cloister Deacon and per-project specialists](/images/specialists/02-agents-page.png)
+<ThemedImage
+  light="/images/specialists/02-agents-page-light.png"
+  dark="/images/specialists/02-agents-page-dark.png"
+  alt="Specialists dashboard showing Cloister Deacon and per-project specialists"
+/>
 
 ## Review Pipeline Flow
 
@@ -71,7 +81,10 @@ Human clicks "Review"
 
 **inspect-agent** runs alongside this pipeline rather than inside it — every time any specialist reports `passed`, inspect verifies the state transition against the spec before the next stage runs.
 
-![Model + specialist handoffs tracked over time](/images/specialists/04-handoffs.png)
+<ThemedImage
+  light="/images/specialists/04-handoffs.png"
+  alt="Model + specialist handoffs tracked over time"
+/>
 
 ## Review Agent
 
@@ -184,7 +197,10 @@ The merge-agent handles **every** merge, not just conflicted ones. This is delib
 - When conflicts *do* occur, it already understands the codebase
 - Tests are always re-run post-merge, catching integration regressions
 
-![Inspector panel with merge-agent terminal streaming live](/images/specialists/08-inspector.png)
+<ThemedImage
+  light="/images/specialists/08-inspector.png"
+  alt="Inspector panel with merge-agent terminal streaming live"
+/>
 
 **Workflow:**
 1. Pull latest `main`
@@ -333,11 +349,19 @@ pan specialists clear-queue review-agent
 pan specialists logs myproject review-agent --tail
 ```
 
-![Project health panel with per-project specialist roll-up](/images/specialists/06-health.png)
+<ThemedImage
+  light="/images/specialists/06-health-light.png"
+  dark="/images/specialists/06-health-dark.png"
+  alt="Project health panel with per-project specialist roll-up"
+/>
 
 You can also watch handoffs and costs flow through the dashboard as they happen:
 
-![Cost tracking across models and specialists](/images/specialists/09-costs.png)
+<ThemedImage
+  light="/images/specialists/09-costs-light.png"
+  dark="/images/specialists/09-costs-dark.png"
+  alt="Cost tracking across models and specialists"
+/>
 
 ## Related Guides
 
