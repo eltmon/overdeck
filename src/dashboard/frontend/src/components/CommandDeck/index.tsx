@@ -6,6 +6,8 @@ import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
 import { ZoneA } from './ZoneA';
+import { ZoneB } from './ZoneB';
+import { ZoneCConversation } from './ZoneCConversation';
 import type { OverviewTab as ZoneCOverviewTab } from './ZoneCOverview';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
@@ -27,7 +29,7 @@ import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 import { WS_METHODS } from '@panctl/contracts';
-import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
+import type { ProjectSessionTree, SessionNode, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -272,6 +274,31 @@ function ProjectRightPaneTabs({
   // Resolve effective activeIssueId: controlled prop takes precedence
   const effectiveActiveIssueId = controlledActiveIssueId ?? activeIssueId;
 
+  // Per-issue session selection (PAN-830). When a session is selected for the
+  // active issue, the right pane shows the agent Conversation/Terminal view
+  // (ZoneB + SessionPanel) in place of the tab content — clicking any tab
+  // clears the selection and returns to the tab strip.
+  const selectSession = useCommandDeckSelection((s) => s.selectSession);
+  const selectedSessionByIssue = useCommandDeckSelection((s) => s.selectedSessionByIssue);
+  const selectedSessionId = effectiveActiveIssueId
+    ? selectedSessionByIssue[effectiveActiveIssueId] ?? null
+    : null;
+
+  const activeFeatureSessions = useMemo<readonly SessionNode[]>(() => {
+    if (!effectiveActiveIssueId) return [];
+    return features.find((feature) => feature.issueId === effectiveActiveIssueId)?.sessions ?? [];
+  }, [features, effectiveActiveIssueId]);
+
+  const selectedSession = useMemo<SessionNode | null>(() => {
+    if (!selectedSessionId) return null;
+    return activeFeatureSessions.find((session) => session.sessionId === selectedSessionId) ?? null;
+  }, [activeFeatureSessions, selectedSessionId]);
+
+  const reviewers = useMemo<readonly SessionNode[]>(() => {
+    if (selectedSession?.type !== 'review') return [];
+    return activeFeatureSessions.filter((session) => session.type === 'reviewer');
+  }, [activeFeatureSessions, selectedSession]);
+
   useEffect(() => {
     setActiveTab(readProjectTab(projectName));
     hasExplicitTabChoiceRef.current = localStorage.getItem(projectTabStorageKey(projectName)) !== null;
@@ -299,6 +326,8 @@ function ProjectRightPaneTabs({
   const selectTab = (tab: ProjectRightTab) => {
     hasExplicitTabChoiceRef.current = true;
     setActiveTab(tab);
+    // Clicking a tab exits the agent Conversation/Terminal view back to the strip.
+    if (effectiveActiveIssueId) selectSession(effectiveActiveIssueId, null);
     try { localStorage.setItem(projectTabStorageKey(projectName), tab); } catch { /* ignore */ }
   };
 
@@ -341,20 +370,23 @@ function ProjectRightPaneTabs({
         />
       )}
       <div className="flex h-[48px] shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-0" role="tablist" aria-label={`${projectName} right pane tabs`}>
-        {PROJECT_RIGHT_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === tab.id ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => selectTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {PROJECT_RIGHT_TABS.map((tab) => {
+          const tabSelected = !selectedSession && activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={tabSelected}
+              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${tabSelected ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => selectTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
-      {activeTab !== 'pipeline' && features.length > 0 && (
+      {activeTab !== 'pipeline' && features.length > 0 && !selectedSession && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">Issue</span>
           <select
@@ -377,6 +409,21 @@ function ProjectRightPaneTabs({
           </select>
         </div>
       )}
+      {selectedSession && effectiveActiveIssueId ? (
+        <div
+          className="flex min-h-0 flex-1 flex-col"
+          data-testid="command-deck-agent-view"
+          data-command-deck-agent-session={selectedSession.sessionId}
+        >
+          <ZoneB session={selectedSession} issueId={effectiveActiveIssueId} />
+          <ZoneCConversation
+            key={selectedSession.sessionId}
+            session={selectedSession}
+            issueId={effectiveActiveIssueId}
+            reviewers={reviewers}
+          />
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-auto" role="tabpanel" data-command-deck-project-tab={activeTab}>
         {activeTab === 'pipeline' && (
           <ProjectOverview
@@ -448,6 +495,7 @@ function ProjectRightPaneTabs({
         {activeTab === 'activity' && effectiveActiveIssueId && <ActivityTab issueId={effectiveActiveIssueId} />}
         {activeTab === 'settings' && effectiveActiveIssueId && <OverviewTab issueId={effectiveActiveIssueId} />}
       </div>
+      )}
     </div>
   );
 }

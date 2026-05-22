@@ -584,4 +584,36 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-review-specialist-dot-fail')).toHaveClass('bg-destructive');
     expect(screen.getByTestId('drawer-review-specialist-dot-idle')).toHaveClass('bg-muted-foreground');
   });
+
+  it('renders the Conversation tab with the no-agent empty state', () => {
+    window.history.replaceState(null, '', '/?issue=PAN-1&tab=conversation');
+
+    renderDrawer();
+
+    const panel = screen.getByTestId('drawer-tab-panel-conversation');
+    expect(panel).toBeInTheDocument();
+    expect(within(panel).getByText(/No agent session for this issue yet/)).toBeInTheDocument();
+  });
+
+  it('renders the Terminal tab with the no-agent empty state', () => {
+    window.history.replaceState(null, '', '/?issue=PAN-1&tab=terminal');
+
+    renderDrawer();
+
+    const panel = screen.getByTestId('drawer-tab-panel-terminal');
+    expect(panel).toBeInTheDocument();
+    expect(within(panel).getByText(/live terminal/)).toBeInTheDocument();
+  });
+
+  it('switches to the Conversation and Terminal tabs from the tab strip', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    fireEvent.click(screen.getByTestId('drawer-tab-conversation'));
+    expect(screen.getByTestId('drawer-tab-panel-conversation')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('drawer-tab-terminal'));
+    expect(screen.getByTestId('drawer-tab-panel-terminal')).toBeInTheDocument();
+  });
 });

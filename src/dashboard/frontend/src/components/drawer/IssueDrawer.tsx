@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
@@ -6,6 +6,7 @@ import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
+import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
@@ -106,7 +107,18 @@ export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue } = useDrawerData();
+  const { issue, agents } = useDrawerData();
+
+  // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
+  // survives a Conversation ⇄ Terminal tab switch; falls back to the default
+  // pick whenever the selection is cleared or no longer matches an agent.
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const effectiveAgentId = useMemo(() => {
+    if (selectedAgentId && agents.some((agent) => agent.id === selectedAgentId)) {
+      return selectedAgentId;
+    }
+    return pickDefaultDrawerAgent(agents)?.id ?? null;
+  }, [selectedAgentId, agents]);
 
   useEffect(() => {
     syncDrawerFromUrl();
@@ -196,7 +208,14 @@ export function IssueDrawer() {
         </header>
         <DrawerTabs />
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 overflow-auto px-[22px] py-[18px]">
+          <div
+            className={cn(
+              'flex min-w-0 flex-col',
+              drawer.tab === 'conversation' || drawer.tab === 'terminal'
+                ? 'min-h-0 p-[14px]'
+                : 'overflow-auto px-[22px] py-[18px]',
+            )}
+          >
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
@@ -213,6 +232,20 @@ export function IssueDrawer() {
               <DrawerPlanPanel issueId={drawer.issueId} />
             ) : drawer.tab === 'activity' ? (
               <DrawerActivityPanel />
+            ) : drawer.tab === 'conversation' ? (
+              <DrawerAgentSession
+                view="conversation"
+                agents={agents}
+                agentId={effectiveAgentId}
+                onSelectAgent={setSelectedAgentId}
+              />
+            ) : drawer.tab === 'terminal' ? (
+              <DrawerAgentSession
+                view="terminal"
+                agents={agents}
+                agentId={effectiveAgentId}
+                onSelectAgent={setSelectedAgentId}
+              />
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
