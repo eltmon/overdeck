@@ -42,7 +42,7 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
-import { sessionExistsAsync, killSessionAsync, createSessionAsync, listSessions } from '../tmux.js'
+import { createSessionAsyncEffect, killSessionAsyncEffect, listSessions, sessionExistsAsyncEffect } from '../tmux.js'
 import { parsePiSession } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScript } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifo, writePiCommand, piFifoPaths, PiNotReady } from './pi-fifo.js'
@@ -278,8 +278,8 @@ export class PiRuntime implements AgentRuntime {
 
     // Step 5: SIGKILL fallback via tmux kill-session.
     try {
-      if (await sessionExistsAsync(agentId)) {
-        await killSessionAsync(agentId)
+      if (await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
+        await Effect.runPromise(killSessionAsyncEffect(agentId))
       }
     } finally {
       cleanupPiTransientFiles(agentId)
@@ -339,9 +339,9 @@ export class PiRuntime implements AgentRuntime {
     writeFileSync(launcherPath, launcherScript)
     chmodSync(launcherPath, 0o755)
 
-    await createSessionAsync(agentId, config.workspace, `bash ${launcherPath}`, {
+    await Effect.runPromise(createSessionAsyncEffect(agentId, config.workspace, `bash ${launcherPath}`, {
       env: { PANOPTICON_AGENT_ID: agentId },
-    })
+    }))
 
     await waitForReady(agentId, SPAWN_READY_TIMEOUT_MS)
 
@@ -383,7 +383,7 @@ export class PiRuntime implements AgentRuntime {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await sessionExistsAsync(agentId)
+    return await Effect.runPromise(sessionExistsAsyncEffect(agentId))
   }
 }
 
@@ -492,7 +492,7 @@ export function createPiRuntimeEffect(): PiRuntimeEffect {
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await sessionExistsAsync(agentId))) return true
+    if (!(await Effect.runPromise(sessionExistsAsyncEffect(agentId)))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false
