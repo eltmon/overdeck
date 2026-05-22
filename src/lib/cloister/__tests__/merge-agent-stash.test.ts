@@ -9,8 +9,8 @@ const setReviewStatusMock = vi.hoisted(() => vi.fn());
 const resolveGitHubIssueMock = vi.hoisted(() => vi.fn(() => ({ isGitHub: false })));
 const tmuxMocks = vi.hoisted(() => ({
   killSession: vi.fn(),
-  killSessionAsync: vi.fn(async () => {}),
-  listSessionNamesAsync: vi.fn(async () => [] as string[]),
+  killSessionAsyncEffect: vi.fn(async () => {}),
+  listSessionNamesAsyncEffect: vi.fn(async () => [] as string[]),
   sessionExists: vi.fn(() => false),
 }));
 const closeIssueMock = vi.hoisted(() => vi.fn(async () => []));
@@ -33,22 +33,28 @@ vi.mock('../specialists.js', () => ({
 }));
 vi.mock('../review-agent.js', () => ({ killAllReviewerSessions: vi.fn(async () => ({ killed: [] })) }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn(), emitDashboardLifecycle: vi.fn() }));
-vi.mock('../../tmux.js', () => ({
-  capturePaneAsync: vi.fn(async () => ''),
-  listSessionNamesAsync: tmuxMocks.listSessionNamesAsync,
-  sendKeysAsync: vi.fn(async () => {}),
-  sessionExists: tmuxMocks.sessionExists,
-  sessionExistsAsync: vi.fn(async (name: string) => tmuxMocks.sessionExists(name)),
-  killSession: tmuxMocks.killSession,
-  killSessionAsync: tmuxMocks.killSessionAsync,
-}));
+vi.mock('../../tmux.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+    listSessionNamesAsyncEffect: () => Effect.promise(() => tmuxMocks.listSessionNamesAsyncEffect()),
+    sendKeysEffect: vi.fn(() => Effect.void),
+    sessionExists: tmuxMocks.sessionExists,
+    sessionExistsAsyncEffect: (name: string) => Effect.sync(() => tmuxMocks.sessionExists(name)),
+    killSession: tmuxMocks.killSession,
+    killSessionAsyncEffect: (name: string) => Effect.promise(() => tmuxMocks.killSessionAsyncEffect(name)),
+  };
+});
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/workspace' })), loadProjectsConfig: vi.fn(() => ({ projects: {} })) }));
-vi.mock('../../agents.js', () => ({
-  spawnRun: vi.fn(async () => ({ id: 'agent-pan-1-ship' })),
-  getAgentState: vi.fn(() => null),
-  setAgentPaused: setAgentPausedMock,
-  setAgentPausedAsync: vi.fn(async (...args: unknown[]) => setAgentPausedMock(...args)),
-}));
+vi.mock('../../agents.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    spawnRun: vi.fn(async () => ({ id: 'agent-pan-1-ship' })),
+    getAgentState: vi.fn(() => null),
+    setAgentPaused: setAgentPausedMock,
+    setAgentPausedEffect: (...args: unknown[]) => Effect.sync(() => setAgentPausedMock(...args)),
+  };
+});
 vi.mock('../validation.js', () => ({
   runMergeValidation: vi.fn(async () => ({ valid: true, skipped: true })),
   autoRevertMerge: vi.fn(async () => true),
@@ -106,7 +112,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
     resetPostMergeState('PAN-1');
     resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
     tmuxMocks.sessionExists.mockReturnValue(false);
-    tmuxMocks.listSessionNamesAsync.mockResolvedValue([]);
+    tmuxMocks.listSessionNamesAsyncEffect.mockResolvedValue([]);
     setAgentPausedMock.mockReturnValue(true);
     setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(((fn: TimerHandler) => {
       if (typeof fn === 'function') fn();
@@ -221,7 +227,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
     });
     expect(setAgentPausedMock).not.toHaveBeenCalled();
     expect(tmuxMocks.killSession).not.toHaveBeenCalled();
-    expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalled();
+    expect(tmuxMocks.killSessionAsyncEffect).not.toHaveBeenCalled();
   });
 
   it('performs a non-destructive verify-on-main handoff after merge', async () => {
@@ -250,7 +256,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
       resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
       tmuxMocks.sessionExists.mockReturnValue(true);
-      tmuxMocks.listSessionNamesAsync.mockResolvedValue([
+      tmuxMocks.listSessionNamesAsyncEffect.mockResolvedValue([
         'agent-pan-1-test',
         'agent-pan-1-ship',
         'agent-pan-1-review-synthesis',
@@ -272,13 +278,13 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
       expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('agent-pan-1');
       expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('planning-pan-1');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('planning-pan-1');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-test');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-ship');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
-      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
-      expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalledWith('unrelated-session');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('planning-pan-1');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-test');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-ship');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
+      expect(tmuxMocks.killSessionAsyncEffect).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
+      expect(tmuxMocks.killSessionAsyncEffect).not.toHaveBeenCalledWith('unrelated-session');
 
       const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
       expect(commands.some(command => command.includes('--add-label') && command.includes('verifying-on-main'))).toBe(true);

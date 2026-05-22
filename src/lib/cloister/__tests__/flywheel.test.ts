@@ -13,13 +13,19 @@ const mocks = vi.hoisted(() => ({
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
-  stopAgentAsync: vi.fn(async () => undefined),
+  stopAgentEffect: vi.fn(() => undefined),
 }));
 
-vi.mock('../../agents.js', () => ({
-  spawnRun: mocks.spawnRun,
-  stopAgentAsync: mocks.stopAgentAsync,
-}));
+vi.mock('../../agents.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    spawnRun: mocks.spawnRun,
+    stopAgentEffect: (...args: unknown[]) => {
+      mocks.stopAgentEffect(...args);
+      return Effect.void;
+    },
+  };
+});
 
 vi.mock('../../database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => mocks.activeRunId,
@@ -47,7 +53,7 @@ describe('flywheel lifecycle', () => {
     mocks.activeRunId = null;
     mocks.paused = false;
     mocks.spawnRun.mockClear();
-    mocks.stopAgentAsync.mockClear();
+    mocks.stopAgentEffect.mockClear();
   });
 
   it('spawns the flywheel orchestrator through the role-spawn path', async () => {
@@ -121,7 +127,7 @@ describe('flywheel lifecycle', () => {
 
     expect(mocks.paused).toBe(true);
     expect(mocks.activeRunId).toBe('RUN-9');
-    expect(mocks.stopAgentAsync).toHaveBeenCalledWith(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+    expect(mocks.stopAgentEffect).toHaveBeenCalledWith(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
 
     const resumed = await resumeFlywheel({ workspace: '/repo', env: cleanEnv });
 
