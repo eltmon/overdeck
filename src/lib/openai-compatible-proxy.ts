@@ -13,6 +13,7 @@ export class OpenAICompatibleProxyError extends Data.TaggedError('OpenAICompatib
 
 const UPSTREAMS: Record<string, string> = {
   nous: 'https://inference-api.nousresearch.com/v1',
+  dashscope: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
 };
 
 let server: http.Server | null = null;

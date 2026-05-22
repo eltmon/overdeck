@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:45:07.537Z"
+    "updated": "2026-05-22T23:47:28.315Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:45:07.537Z",
+    "updated": "2026-05-22T23:47:28.315Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -140,7 +140,7 @@
       {
         "id": "register-dashscope-proxy",
         "title": "Register `dashscope` upstream in the OpenAI-compatible proxy",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -156,7 +156,7 @@
           {
             "id": "register-dashscope-proxy.ac1",
             "title": "`UPSTREAMS.dashscope` resolves to exactly `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +164,7 @@
           {
             "id": "register-dashscope-proxy.ac2",
             "title": "An HTTP request to `http://127.0.0.1:12436/dashscope/v1/models` (with a stub key) reaches the proxy's provider-resolution path and does NOT return the 'Unknown provider' 404 branch (verified by unit test or curl after a fresh proxy boot).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
