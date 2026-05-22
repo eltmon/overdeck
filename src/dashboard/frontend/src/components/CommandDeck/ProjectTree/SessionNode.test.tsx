@@ -122,6 +122,7 @@ describe('SessionNode', () => {
       review: 'claude-sonnet-4-6',
       reviewer: 'claude-opus-4-7',
       test: 'claude-sonnet-4-6',
+      ship: 'claude-sonnet-4-6',
       merge: 'claude-sonnet-4-6',
       legacy: null,
     };
@@ -231,5 +232,99 @@ describe('SessionNode', () => {
       'title',
       'Session hit an error and has ended. Last heard: 5m ago.',
     );
+  });
+
+  it('labels reviewer restarts as review restarts for live and ended reviewer nodes', () => {
+    render(
+      <div>
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'reviewer-live',
+            type: 'reviewer',
+            role: 'correctness',
+            presence: 'active',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'reviewer-ended',
+            type: 'reviewer',
+            role: 'security',
+            presence: 'ended',
+            status: 'stopped',
+          })}
+        />
+      </div>,
+    );
+
+    expect(screen.getAllByText('Restart review (opus-4-7)')).toHaveLength(2);
+  });
+
+  it('keeps the review coordinator restart label as Restart all', () => {
+    render(
+      <SessionNode
+        issueId="PAN-1381"
+        onRestartSession={vi.fn()}
+        session={makeSession({
+          sessionId: 'review-1',
+          type: 'review',
+          presence: 'active',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Restart all (sonnet-4-6)')).toBeInTheDocument();
+  });
+
+  it('uses Start for ended test and ship nodes and Restart for live test and ship nodes', () => {
+    render(
+      <div>
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'test-ended',
+            type: 'test',
+            presence: 'ended',
+            status: 'stopped',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'ship-ended',
+            type: 'ship',
+            presence: 'ended',
+            status: 'stopped',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'test-live',
+            type: 'test',
+            presence: 'active',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-1381"
+          onRestartSession={vi.fn()}
+          session={makeSession({
+            sessionId: 'ship-live',
+            type: 'ship',
+            presence: 'active',
+          })}
+        />
+      </div>,
+    );
+
+    expect(screen.getAllByText('Start (sonnet-4-6)')).toHaveLength(2);
+    expect(screen.getAllByText('Restart (sonnet-4-6)')).toHaveLength(2);
   });
 });
