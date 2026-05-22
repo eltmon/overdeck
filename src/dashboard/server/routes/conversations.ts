@@ -65,16 +65,15 @@ import {
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
-  sendKeysAsync,
-  sendRawKeystrokeAsync,
+  sendRawKeystrokeAsyncEffect,
   MessageDeliveryFailed,
-  capturePaneAsync,
-  sessionExistsAsync,
-  killSessionAsync,
-  createSessionAsync,
-  setOptionAsync,
+  capturePaneAsyncEffect,
+  sessionExistsAsyncEffect,
+  killSessionAsyncEffect,
+  createSessionAsyncEffect,
+  setOptionAsyncEffect,
   waitForClaudePrompt,
-  listSessionNamesAsync,
+  listSessionNamesAsyncEffect,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -404,7 +403,7 @@ function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const output = await capturePaneAsync(tmuxSession, 200);
+    const output = await Effect.runPromise(capturePaneAsyncEffect(tmuxSession, 200));
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
@@ -456,7 +455,9 @@ function piProviderForModel(modelId: string): string | undefined {
 async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const snapshot = await capturePaneAsync(tmuxSession, 10).catch(() => '');
+    const snapshot = await Effect.runPromise(
+      capturePaneAsyncEffect(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+    );
     if (snapshot.trim().length > 0) {
       console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
       return true;
@@ -709,13 +710,13 @@ function sanitizeName(name: string): string {
 
 /** Check if a tmux session exists (async, non-blocking) */
 async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return sessionExistsAsync(sessionName);
+  return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
 }
 
 async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (await sessionExistsAsync(sessionName)) return;
+    if (await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) return;
     await new Promise(r => setTimeout(r, 250));
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
@@ -985,7 +986,7 @@ async function spawnConversationSession(
 
   // Kill any stale session with the same name
   try {
-    await killSessionAsync(tmuxSession);
+    await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
   } catch {
     // ignore missing stale session
   }
@@ -1011,12 +1012,12 @@ async function spawnConversationSession(
   // inherits the parent's env and -e can only SET, not UNSET, so we set
   // provider vars to empty strings to override stale inherited values.
   try {
-    await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+    await Effect.runPromise(createSessionAsyncEffect(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
       },
-    });
+    }));
   } catch (err) {
     if ((err as { code?: string })?.code === 'ENOENT') {
       throw new Error(
@@ -1041,8 +1042,8 @@ async function spawnConversationSession(
   }
 
   // Keep session alive when clients disconnect
-  await setOptionAsync(tmuxSession, 'destroy-unattached', 'off');
-  await setOptionAsync(tmuxSession, 'remain-on-exit', 'on');
+  await Effect.runPromise(setOptionAsyncEffect(tmuxSession, 'destroy-unattached', 'off'));
+  await Effect.runPromise(setOptionAsyncEffect(tmuxSession, 'remain-on-exit', 'on'));
 }
 
 /**
@@ -1124,7 +1125,7 @@ const getConversationsRoute = HttpRouter.add(
         // Grace period removed (PAN-826): POST /api/conversations now waits for
         // Claude to be ready before returning 201, so newly-created conversations
         // are always live by the time they appear in the list.
-        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
         const enriched = await Promise.all(conversations.map(async (conv) => {
           const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
           let isWorking = false;
@@ -1379,7 +1380,7 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await killSessionAsync(conv.tmuxSession).catch(() => {});
+        await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -1569,7 +1570,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const respawn = markRespawnPending(conv.tmuxSession);
         try {
           // Always kill the existing session first (if alive) so the model change takes effect
-          await killSessionAsync(conv.tmuxSession).catch(() => {});
+          await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
           if (!(await validateCwdContainment(conv.cwd))) {
             return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -2046,7 +2047,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         }
 
         // Kill tmux session if still alive
-        await killSessionAsync(conv.tmuxSession).catch(() => {});
+        await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
@@ -2121,7 +2122,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
         const allConvs = listConversations();
         // Filter to conversations with a live tmux session — use a single
         // listSessionNamesAsync() call instead of N subprocess spawns.
-        const liveSessionNames = new Set(await listSessionNamesAsync());
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
         const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
         const results: { name: string; model: string | null; status: string }[] = [];
 
@@ -2131,7 +2132,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
           const respawn = markRespawnPending(conv.tmuxSession);
           try {
             // Kill existing tmux session
-            await killSessionAsync(conv.tmuxSession).catch(() => {});
+            await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
             // Re-spawn with stored model
             const oldSessionId = conv.claudeSessionId;
@@ -2476,7 +2477,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
         const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
 
         if (action === 'reject-feedback') {
-          await sendRawKeystrokeAsync(conv.tmuxSession, '4', 'plan-action-reject');
+          await Effect.runPromise(sendRawKeystrokeAsyncEffect(conv.tmuxSession, '4', 'plan-action-reject'));
           if (feedback) {
             await new Promise(r => setTimeout(r, 300));
             const settings = loadSettingsApi();
@@ -2491,7 +2492,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
           return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
         }
 
-        await sendRawKeystrokeAsync(conv.tmuxSession, keystroke, `plan-action-${action}`);
+        await Effect.runPromise(sendRawKeystrokeAsyncEffect(conv.tmuxSession, keystroke, `plan-action-${action}`));
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

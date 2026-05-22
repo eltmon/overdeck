@@ -2,16 +2,31 @@
   "version": "1",
   "issueId": "PAN-1312",
   "created": "2026-05-22T03:27:22.833Z",
-  "updated": "2026-05-22T12:15:25.269Z",
+  "updated": "2026-05-22T13:02:48.442Z",
   "gitState": {
     "branch": "feature/pan-1312",
     "dirty": false
   },
   "decisions": [],
   "hazards": [],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Wave 1e gate complete: static import scan found no in-scope *Async imports from src/lib, and typecheck/lint/test pass. Next start Wave 2a deletion beads.",
+    "beadId": "workspace-9ld7",
+    "filesToRead": [
+      ".pan/spec.vbrief.json",
+      "src/lib/tmux.ts",
+      "src/lib/agents.ts"
+    ]
+  },
   "beadsMapping": {},
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-22T13:02:48.442Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-9ld7: migrated remaining src/dashboard and src/lib callers/tests to Effect siblings, verified the static import gate has zero in-scope *Async imports from src/lib, and passed npm run typecheck, npm run lint, and npm test.",
+      "agentModel": "gpt-5.5"
+    }
+  ],
   "swarmRuntime": {
     "model": "gpt-5.5",
     "slots": [
@@ -305,6 +320,19 @@
         "phase": "implementation",
         "dispatchedAt": "2026-05-22T10:49:15.194Z",
         "mergedAt": "2026-05-22T10:50:11.202Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "w1c-route-agents",
+        "itemTitle": "Wave 1c — migrate src/dashboard/server/routes/agents.ts off *Async",
+        "sessionName": "agent-pan-1312-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-2",
+        "branch": "feature/pan-1312-slot-2",
+        "status": "failed",
+        "phase": "implementation",
+        "failureReason": "tmux pane died before completion could be confirmed",
+        "dispatchedAt": "2026-05-22T12:21:44.061Z",
+        "mergedAt": "2026-05-22T12:23:22.592Z"
       }
     ],
     "currentWave": 0,
@@ -321,7 +349,13 @@
       }
     },
     "createdAt": "2026-05-22T03:27:22.833Z",
-    "updatedAt": "2026-05-22T12:15:25.269Z"
+    "updatedAt": "2026-05-22T12:59:51.913Z"
   },
-  "feedback": []
+  "feedback": [],
+  "statusOverrides": {
+    "w1e-gate": "completed",
+    "w1e-gate.ac1": "completed",
+    "w1e-gate.ac2": "completed",
+    "w1e-gate.ac3": "completed"
+  }
 }
