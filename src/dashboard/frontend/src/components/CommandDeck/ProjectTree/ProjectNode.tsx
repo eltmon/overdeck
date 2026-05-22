@@ -207,6 +207,8 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
     <div className={styles.projectNode}>
       <button
         className={styles.projectHeader}
+        data-component="project-node"
+        data-project-name={name}
         onClick={handleSelectProject}
         onContextMenu={handleContextMenu}
         style={{ background: selectedProject === name ? 'var(--accent)' : undefined }}
