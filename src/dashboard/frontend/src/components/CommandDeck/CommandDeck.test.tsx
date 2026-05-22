@@ -381,7 +381,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     renderCommandDeck();
 
     await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-    expect(screen.queryByTestId('command-deck-right-pane-tabs')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('command-deck-agent-view')).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
 

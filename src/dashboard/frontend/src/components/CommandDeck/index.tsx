@@ -321,8 +321,12 @@ function ProjectRightPaneTabs({
   useEffect(() => {
     if (selectedConversation && conversations.some(c => c.name === selectedConversation)) {
       setActiveTab('conversations');
+      return;
     }
-  }, [selectedConversation, conversations]);
+    if (!selectedConversation && !controlledActiveIssueId && !hasExplicitTabChoiceRef.current) {
+      setActiveTab('pipeline');
+    }
+  }, [selectedConversation, conversations, controlledActiveIssueId]);
 
   const selectTab = (tab: ProjectRightTab) => {
     hasExplicitTabChoiceRef.current = true;
