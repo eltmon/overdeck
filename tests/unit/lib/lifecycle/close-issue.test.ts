@@ -9,11 +9,16 @@ vi.mock('child_process', () => ({
 vi.mock('util', () => ({
   promisify: () => (...args: any[]) => mockExecAsync(...args),
 }));
-vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentStateAsync: vi.fn().mockResolvedValue(null),
-  markAgentStoppedState: vi.fn((state: unknown) => state),
-  saveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('../../../../src/lib/agents.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    getAgentStateAsync: vi.fn().mockResolvedValue(null),
+    getAgentStateEffect: vi.fn(() => Effect.succeed(null)),
+    markAgentStoppedState: vi.fn((state: unknown) => state),
+    saveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
+    saveAgentStateEffect: vi.fn(() => Effect.succeed(undefined)),
+  };
+});
 
 // Mock lifecycle helpers used by close-issue
 vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
