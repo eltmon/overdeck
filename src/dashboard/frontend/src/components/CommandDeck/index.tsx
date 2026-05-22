@@ -28,7 +28,7 @@ import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
-import { getReviewRestartRequest } from '../../lib/restartRouting';
+import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { WS_METHODS } from '@panctl/contracts';
 import type { ProjectSessionTree, SessionNode, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
@@ -952,16 +952,16 @@ export function CommandDeck({
           tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
         )?.[0];
 
-      const reviewRestartRequest = getReviewRestartRequest({ projectKey, issueId, sessionType, role, model });
-      if (reviewRestartRequest) {
-        const res = await fetch(reviewRestartRequest.endpoint, {
+      const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model });
+      if (directRestartRequest) {
+        const res = await fetch(directRestartRequest.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reviewRestartRequest.body),
+          body: JSON.stringify(directRestartRequest.body),
         });
         const data = await res.json().catch(() => ({})) as { error?: string };
-        if (!res.ok) throw new Error(data.error || reviewRestartRequest.errorMessage);
-        toast.success(reviewRestartRequest.successMessage);
+        if (!res.ok) throw new Error(data.error || directRestartRequest.errorMessage);
+        toast.success(directRestartRequest.successMessage);
         await refreshDashboardState(queryClient);
         return;
       }
