@@ -18,7 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
-import { killSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../tmux.js';
+import { killSessionAsyncEffect, sessionExistsAsyncEffect, listSessionNamesAsyncEffect } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
@@ -53,9 +53,9 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     `planning-${issueLower}`,
   ];
   for (const session of exactPatterns) {
-    if (await sessionExistsAsync(session)) {
+    if (await Effect.runPromise(sessionExistsAsyncEffect(session))) {
       try {
-        await killSessionAsync(session);
+        await Effect.runPromise(killSessionAsyncEffect(session));
         killed++;
       } catch {
         // session may have died between check and kill
@@ -75,7 +75,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   //   - review-<ISSUE>-<timestamp>-<role>          (legacy)
   //   - specialist-<projectKey>-<ISSUE>-<role>     (canonical PAN-830/915)
   try {
-    const allSessions = await listSessionNamesAsync();
+    const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
     const escapedLower = issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedUpper = issueLower.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const issuePart = `(${escapedLower}|${escapedUpper})`;
@@ -87,14 +87,14 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     const matchedSessions = allSessions.filter(s => patterns.some(p => p.test(s)));
     for (const session of matchedSessions) {
       try {
-        await killSessionAsync(session);
+        await Effect.runPromise(killSessionAsyncEffect(session));
         killed++;
       } catch {
         // session may have died between check and kill
       }
     }
   } catch {
-    // listSessionNamesAsync may fail if tmux server is not running
+    // Session listing may fail if tmux server is not running
   }
 
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.

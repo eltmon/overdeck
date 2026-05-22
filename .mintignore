@@ -1,0 +1,66 @@
+# .mintignore — scopes the Mintlify build to the docs site only.
+#
+# This repo is a monorepo; the Mintlify docs site lives at its root and
+# consists of: docs.json, the *.mdx pages (root + cli/, configuration/,
+# features/, guides/, reference/), favicon.svg, logo/, and the image
+# assets under images/ and docs/.
+#
+# Without this file Mintlify scans the entire repo and injects stray
+# source CSS/JS into the published site — causing font 404s
+# (@fontsource/*), duplicate 'electron'/'fs' identifier errors, and
+# "import statement outside a module" failures in the browser console.
+
+# --- Non-docs directories ---
+.beads/
+.cache/
+.claude/
+.codex/
+.devcontainer/
+.github/
+.husky/
+.moonshine-sidecar-build/
+.moonshine-sidecar-venv/
+.pan/
+.panopticon/
+.playwright-mcp/
+.release/
+.tldr/
+.venv/
+agents/
+apps/
+benchmarks/
+design/
+dev/
+dev-skills/
+dist/
+docker/
+graphify-out/
+infra/
+marketing/
+node_modules/
+packages/
+roles/
+rules/
+scripts/
+site/
+skills/
+src/
+templates/
+test-results/
+tests/
+vbrief/
+workspaces/
+
+# --- Stray source files anywhere else ---
+# The docs site ships no custom CSS/JS — every .css/.js found in this
+# repo is application source and must not be injected into the site.
+# All Mintlify pages are .mdx, so internal .md files are excluded too.
+*.md
+*.css
+*.js
+*.mjs
+*.cjs
+*.ts
+*.tsx
+*.jsx
+*.html

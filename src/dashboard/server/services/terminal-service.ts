@@ -14,7 +14,7 @@
 import { Cause, Effect, Layer, Queue, Context, Stream } from 'effect';
 import { homedir } from 'node:os';
 import { PanRpcError, TerminalOutput } from '@panctl/contracts';
-import { buildTmuxArgs, resizeWindowAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { buildTmuxArgs, resizeWindowAsyncEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ class NodePtyProcess implements PtyProcess {
 async function waitForTmuxSession(sessionName: string, timeoutMs = 60000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (await sessionExistsAsync(sessionName)) {
+    if (await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) {
       return;
     }
     await new Promise(r => setTimeout(r, 1000));
@@ -232,12 +232,12 @@ export const TerminalServiceLive = Layer.effect(
         setTimeout(() => {
           if (!state.ptyProcess) return;
           try { proc.resize(cols - 1, rows); } catch { return; }
-          resizeWindowAsync(state.sessionName, cols - 1, rows)
+          Effect.runPromise(resizeWindowAsyncEffect(state.sessionName, cols - 1, rows))
             .then(() => new Promise<void>((r) => setTimeout(r, 50)))
             .then(() => {
               if (!state.ptyProcess) return;
               try { proc.resize(cols, rows); } catch { return; }
-              return resizeWindowAsync(state.sessionName, cols, rows);
+              return Effect.runPromise(resizeWindowAsyncEffect(state.sessionName, cols, rows));
             })
             .catch(() => {});
         }, 200);
@@ -336,8 +336,8 @@ export const TerminalServiceLive = Layer.effect(
         state.lastRows = rows;
         if (state.ptyProcess) {
           try { state.ptyProcess.resize(cols, rows); } catch { return; /* PTY dead */ }
-          yield* Effect.promise(() =>
-            resizeWindowAsync(sessionName, cols, rows).catch(() => {}),
+          yield* resizeWindowAsyncEffect(sessionName, cols, rows).pipe(
+            Effect.catch(() => Effect.void),
           );
         }
       });

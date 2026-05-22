@@ -22,7 +22,7 @@ import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig }
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlanAsync, readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
+import { findPlanEffect, readWorkspacePlanEffect } from '../../../lib/vbrief/io.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 
 /**
@@ -204,7 +204,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       });
     }
 
-    const planPath = await findPlanAsync(workspacePath);
+    const planPath = await Effect.runPromise(findPlanEffect(workspacePath));
     let planMtimeMs = -1;
     if (planPath) {
       try {
@@ -227,7 +227,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
       return false;
     }
 
-    const doc = planPath ? await readWorkspacePlanAsync(workspacePath) : null;
+    const doc = planPath ? await Effect.runPromise(readWorkspacePlanEffect(workspacePath)) : null;
     const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
     const beadCounts = computeBeadCounts(doc);
     return updatePlanningStateCache(identifier, {

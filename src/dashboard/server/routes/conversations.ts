@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnv, buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
+import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, DSP_FLAG, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
@@ -109,6 +109,13 @@ import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
+import {
+  CONVERSATION_TITLE_MODEL,
+  serializeConversationTranscript,
+  summarizeFirstMessageTitle,
+  summarizeTranscriptTitle,
+  summarizeTranscriptAbout,
+} from '../../../lib/conversations/transcript-summary.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -1039,12 +1046,12 @@ async function spawnConversationSession(
 }
 
 /**
- * Generate an AI title for a conversation using Claude CLI (T3Code pattern).
- * Runs `claude -p --output-format json --json-schema ...` with the first message
- * as input, then updates the conversation title if it hasn't been manually renamed.
+ * Generate an AI title for a conversation from its opening message (T3Code pattern).
+ * Runs at conversation creation; updates the title only if it hasn't been
+ * manually renamed (`canReplaceTitle`). No fallback — if generation fails the
+ * error is logged and the existing title is kept.
  *
- * Uses the hardcoded haiku model for fast, cheap title generation. No fallback —
- * if generation fails the error is logged and the existing title is kept.
+ * For an explicit, whole-conversation re-title see the retitle route below.
  */
 async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
   const conv = getConversationByName(conversationName);
@@ -1052,91 +1059,11 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     return;
   }
 
-  const titleModel = 'claude-haiku-4-5-20251001';
-  console.log(`[claude-invoke] purpose=conversation-title | model=${titleModel} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
+  console.log(`[claude-invoke] purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
 
-  const schema = JSON.stringify({
-    type: 'object',
-    properties: { title: { type: 'string' } },
-    required: ['title'],
-  });
-
-  const prompt = [
-    'You write concise thread titles for coding conversations.',
-    'Summarize the user\'s request in 3-8 words.',
-    'Avoid quotes, filler, prefixes, and trailing punctuation.',
-    '',
-    'User message:',
-    firstMessage,
-  ].join('\n');
-
-  // Build provider-env for the title model (same routing as conversation sessions)
-  const providerEnv = await getProviderEnvForModel(titleModel);
-  const childEnv = { ...buildChildEnv(), ...providerEnv };
-
-  const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      'claude',
-      [
-        '-p',
-        '--output-format', 'json',
-        '--json-schema', schema,
-        '--model', titleModel,
-      ],
-      { env: childEnv },
-    );
-    let out = '';
-    let errOut = '';
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error('claude title generation timed out after 30s'));
-    }, 30_000);
-    child.stdout.setEncoding('utf-8');
-    child.stderr.setEncoding('utf-8');
-    child.stdout.on('data', (data: string) => { out += data; });
-    child.stderr.on('data', (data: string) => { errOut += data; });
-    child.on('error', (err: Error) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-    child.on('close', (code: number | null) => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        reject(new Error(errOut || `claude title generation exited with code ${code}`));
-      } else {
-        resolve(out);
-      }
-    });
-    try {
-      child.stdin.write(prompt, 'utf-8');
-      child.stdin.end();
-    } catch (err) {
-      clearTimeout(timeout);
-      child.kill('SIGTERM');
-      reject(err);
-    }
-  });
-
-  // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
-  const parsed = JSON.parse(stdout.trim());
-  const aiTitle = parsed?.structured_output?.title ?? parsed?.title;
-
-  if (!aiTitle || !aiTitle.trim()) {
-    console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
-    return;
-  }
-
-  // Sanitize: strip quotes, normalize whitespace, take first line only
-  const sanitized = aiTitle
-    .trim()
-    .split(/\r?\n/)[0]
-    ?.trim()
-    .replace(/^['"`]+|['"`]+$/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
-
+  const sanitized = await summarizeFirstMessageTitle(firstMessage);
   if (!sanitized) {
-    console.warn(`[generateAiTitle] Sanitized title is empty for "${conversationName}"`);
+    console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
     return;
   }
 
@@ -1148,8 +1075,29 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
   }
 
   updateConversationTitle(conversationName, sanitized, 'ai');
-  console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${titleModel} | conversation=${conversationName} | outputChars=${sanitized.length}`);
+  console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | outputChars=${sanitized.length}`);
 }
+
+// ─── Conversation retitle / about summary ─────────────────────────────────────
+//
+// Both read the conversation's own JSONL transcript on demand. The memory
+// Observation pipeline never observes ad-hoc conversations (it watches only
+// work-role pipeline agents), so there is no pre-computed data to draw on —
+// the transcript itself is the source of truth. A follow-up issue tracks
+// extending the observation pipeline to conversations.
+
+/** Conversations with a retitle currently running — guards against double-clicks. */
+const retitleInFlight = new Set<string>();
+
+interface ConversationAboutSummary {
+  summary: string;
+  messageCount: number;
+  generatedAt: string;
+}
+
+/** transcript-size-keyed cache so re-opening the About drawer doesn't re-summarize. */
+const aboutSummaryCache = new Map<string, { transcriptSize: number; data: ConversationAboutSummary }>();
+const ABOUT_SUMMARY_CACHE_MAX = 100;
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
@@ -2890,6 +2838,143 @@ const getConversationDiffTurnRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/retitle ────────────────────────────
+//
+// Regenerate the conversation title from the *whole* transcript (not just the
+// opening message). This is an explicit user action, so it overrides even a
+// manually-set title and records the new title with source 'ai'.
+
+const postConversationRetitleRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/retitle',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (retitleInFlight.has(name)) {
+          return jsonResponse(
+            { error: 'A title regeneration is already running for this conversation' },
+            { status: 409 },
+          );
+        }
+        const sessionFile = await resolveSessionFile(conv);
+        if (!sessionFile || !existsSync(sessionFile)) {
+          return jsonResponse({ error: 'Conversation has no transcript yet' }, { status: 400 });
+        }
+        const { messages } = await getCachedMessages(sessionFile, false);
+        const transcript = serializeConversationTranscript(messages);
+        if (!transcript.trim()) {
+          return jsonResponse(
+            { error: 'Conversation has no messages to summarize yet' },
+            { status: 400 },
+          );
+        }
+
+        retitleInFlight.add(name);
+        try {
+          console.log(`[claude-invoke] purpose=conversation-retitle | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
+          const title = await summarizeTranscriptTitle(transcript);
+          if (!title) {
+            return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
+          }
+          // Explicit user action — override any prior title, including manual ones.
+          updateConversationTitle(name, title, 'ai');
+          console.log(`[claude-invoke] SUCCESS purpose=conversation-retitle | conversation=${name} | title="${title}"`);
+          return jsonResponse({ title });
+        } finally {
+          retitleInFlight.delete(name);
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[conversations] retitle failed for "${name}":`, msg);
+        return jsonResponse({ error: 'Failed to regenerate title' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/about ───────────────────────────────
+//
+// A few-sentence description of what the conversation has been about, derived
+// from the transcript. Cached by transcript size — re-opening the drawer is
+// free until the conversation grows. Pass ?refresh=1 to force regeneration.
+
+const getConversationAboutRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/about',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const url = new URL(request.url, 'http://localhost');
+        const forceRefresh = url.searchParams.get('refresh') === '1';
+
+        const sessionFile = await resolveSessionFile(conv);
+        if (!sessionFile || !existsSync(sessionFile)) {
+          return jsonResponse({ summary: null, messageCount: 0, generatedAt: null });
+        }
+        const { size } = await stat(sessionFile);
+        const cached = aboutSummaryCache.get(name);
+        if (!forceRefresh && cached && cached.transcriptSize === size) {
+          return jsonResponse({ ...cached.data, cached: true });
+        }
+
+        const { messages } = await getCachedMessages(sessionFile, false);
+        const conversational = messages.filter(
+          (m) => m.role !== 'system' && typeof m.text === 'string' && m.text.trim().length > 0,
+        );
+        if (conversational.length === 0) {
+          return jsonResponse({ summary: null, messageCount: 0, generatedAt: null });
+        }
+
+        const transcript = serializeConversationTranscript(messages);
+        console.log(`[claude-invoke] purpose=conversation-about | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
+        const summary = await summarizeTranscriptAbout(transcript);
+        if (!summary) {
+          return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
+        }
+
+        const data: ConversationAboutSummary = {
+          summary,
+          messageCount: conversational.length,
+          generatedAt: new Date().toISOString(),
+        };
+        aboutSummaryCache.set(name, { transcriptSize: size, data });
+        if (aboutSummaryCache.size > ABOUT_SUMMARY_CACHE_MAX) {
+          const firstKey = aboutSummaryCache.keys().next().value;
+          if (firstKey !== undefined) aboutSummaryCache.delete(firstKey);
+        }
+        console.log(`[claude-invoke] SUCCESS purpose=conversation-about | conversation=${name} | summaryChars=${summary.length}`);
+        return jsonResponse({ ...data, cached: false });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[conversations] about summary failed for "${name}":`, msg);
+        return jsonResponse({ error: 'Failed to summarize conversation' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -2915,6 +3000,8 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationDiffsRoute,
   getConversationDiffFullRoute,
   getConversationDiffTurnRoute,
+  postConversationRetitleRoute,
+  getConversationAboutRoute,
 );
 
 export default conversationsRouteLayer;
