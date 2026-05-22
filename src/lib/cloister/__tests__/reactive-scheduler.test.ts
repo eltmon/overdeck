@@ -1,19 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../agents.js', () => ({
+vi.mock('../../agents.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   listRunningAgents: vi.fn(() => []),
-  // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsAsync
+  // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsEffect
   // on the reactive scheduler hot path.
-  listRunningAgentsAsync: vi.fn(async () => []),
+  listRunningAgentsEffect: effectMock([]),
   getAgentState: vi.fn(() => null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
   // dynamic call in the scheduler throws before reaching the wrapper spy.
-  getAgentStateAsync: vi.fn(async () => null),
+  getAgentStateEffect: effectMock(null),
   getAgentRuntimeState: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),
   spawnRun: vi.fn(async (issueId: string, role: string) => ({ id: `agent-${issueId.toLowerCase()}-${role}` })),
-}));
+  };
+});
 
 vi.mock('../../projects.js', () => ({
   resolveProjectFromIssue: vi.fn(() => ({
@@ -60,13 +81,34 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-vi.mock('../../tmux.js', () => ({
-  sessionExistsAsync: vi.fn(async () => false),
-  killSessionAsync: vi.fn(async () => undefined),
-}));
+vi.mock('../../tmux.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
+  sessionExistsAsyncEffect: effectMock(false),
+  killSessionAsyncEffect: effectMock(undefined),
+  };
+});
 
-import { listRunningAgents, listRunningAgentsAsync, spawnRun, getAgentStateAsync } from '../../agents.js';
-import { sessionExistsAsync, killSessionAsync } from '../../tmux.js';
+import { listRunningAgents, listRunningAgentsEffect, spawnRun, getAgentStateEffect } from '../../agents.js';
+import { sessionExistsAsyncEffect, killSessionAsyncEffect } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import {
@@ -80,11 +122,11 @@ describe('reactive Cloister scheduler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listRunningAgents).mockReturnValue([]);
-    vi.mocked(listRunningAgentsAsync).mockResolvedValue([]);
+    vi.mocked(listRunningAgentsEffect).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
-    vi.mocked(getAgentStateAsync).mockResolvedValue(null);
-    vi.mocked(sessionExistsAsync).mockResolvedValue(false);
-    vi.mocked(killSessionAsync).mockResolvedValue(undefined);
+    vi.mocked(getAgentStateEffect).mockResolvedValue(null);
+    vi.mocked(sessionExistsAsyncEffect).mockResolvedValue(false);
+    vi.mocked(killSessionAsyncEffect).mockResolvedValue(undefined);
     mockHeadSha = 'newhead1';
   });
 
@@ -114,7 +156,7 @@ describe('reactive Cloister scheduler', () => {
     // PAN-1048 P1 + C2: activeRoleRunExists no longer requires tmuxActive — any
     // non-stopped state.json with the matching role counts as in-flight, which
     // closes the spawn-route race against the reactive scheduler.
-    vi.mocked(listRunningAgentsAsync).mockResolvedValue([
+    vi.mocked(listRunningAgentsEffect).mockResolvedValue([
       {
         id: 'agent-pan-503-review',
         issueId: 'PAN-503',
@@ -206,7 +248,7 @@ describe('reactive Cloister scheduler', () => {
   it('treats a ship session as still-active when its roleRunHead matches the workspace HEAD', async () => {
     // A genuinely in-flight ship run: state.json HEAD marker == current HEAD.
     // The scheduler must NOT re-dispatch — that would double-spawn ship.
-    vi.mocked(getAgentStateAsync).mockImplementation(async (id: string) => {
+    vi.mocked(getAgentStateEffect).mockImplementation(async (id: string) => {
       if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
       if (id === 'agent-pan-503-ship') {
         return { role: 'ship', status: 'running', roleRunHead: 'samehead', workspace: '/tmp/ws' } as any;
@@ -218,7 +260,7 @@ describe('reactive Cloister scheduler', () => {
     await onIssueStateChange('PAN-503', 'shipping');
 
     expect(spawnRun).not.toHaveBeenCalled();
-    expect(killSessionAsync).not.toHaveBeenCalled();
+    expect(killSessionAsyncEffect).not.toHaveBeenCalled();
   });
 
   it('re-dispatches ship when the existing ship session is a stale zombie (HEAD moved past roleRunHead)', async () => {
@@ -226,7 +268,7 @@ describe('reactive Cloister scheduler', () => {
     // state.json status:'running' forever. Once the workspace HEAD advances
     // past the run's roleRunHead marker, that session is stale — the scheduler
     // must kill it and dispatch a fresh ship run for the new HEAD.
-    vi.mocked(getAgentStateAsync).mockImplementation(async (id: string) => {
+    vi.mocked(getAgentStateEffect).mockImplementation(async (id: string) => {
       if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
       if (id === 'agent-pan-503-ship') {
         return { role: 'ship', status: 'running', roleRunHead: 'oldhead0', workspace: '/tmp/ws' } as any;
@@ -234,12 +276,12 @@ describe('reactive Cloister scheduler', () => {
       return null;
     });
     // Zombie tmux session still physically present.
-    vi.mocked(sessionExistsAsync).mockResolvedValue(true);
+    vi.mocked(sessionExistsAsyncEffect).mockResolvedValue(true);
     mockHeadSha = 'newhead1';
 
     await onIssueStateChange('PAN-503', 'shipping');
 
-    expect(killSessionAsync).toHaveBeenCalledWith('agent-pan-503-ship');
+    expect(killSessionAsyncEffect).toHaveBeenCalledWith('agent-pan-503-ship');
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'ship', expect.any(Object));
   });
 });
