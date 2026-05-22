@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:22:39.266Z"
+    "updated": "2026-05-22T23:23:49.217Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:22:39.266Z",
+    "updated": "2026-05-22T23:23:49.217Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -332,7 +332,7 @@
       {
         "id": "frontend-provider-types",
         "title": "Add `dashscope` to frontend Settings/types.ts provider unions",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -353,7 +353,7 @@
           {
             "id": "frontend-provider-types.ac1",
             "title": "`Provider` union includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -361,7 +361,7 @@
           {
             "id": "frontend-provider-types.ac2",
             "title": "`ProvidersConfig.dashscope: boolean` exists (required, not optional, matching the shape of the other providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +369,7 @@
           {
             "id": "frontend-provider-types.ac3",
             "title": "`ApiKeysConfig.dashscope?: string` exists (optional, matching the shape of the other providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
