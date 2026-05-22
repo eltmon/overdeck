@@ -10,12 +10,13 @@
  * ESRCH, the writer reclaims the lock and retries the acquire.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { VBriefDocument } from '../types.js';
-import { applyTaskOperationToPlanFileAsync } from '../dag.js';
-import { isPidDead, removeStaleLockAsync } from '../dag.js';
+import { applyTaskOperationToPlanFileEffect } from '../dag.js';
+import { isPidDead, removeStaleLockEffect } from '../dag.js';
 
 function makeDoc(): VBriefDocument {
   return {
@@ -86,7 +87,7 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
     writeFileSync(join(lockPath, 'owner.json'), '{}', 'utf-8');
     const tmpPath = `${planPath}.${process.pid}.123.tmp`;
     writeFileSync(tmpPath, '{}', 'utf-8');
-    await removeStaleLockAsync(planPath);
+    await Effect.runPromise(removeStaleLockEffect(planPath));
     expect(existsSync(lockPath)).toBe(false);
     expect(existsSync(tmpPath)).toBe(false);
   });
@@ -106,12 +107,12 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
       'utf-8',
     );
 
-    const result = await applyTaskOperationToPlanFileAsync(planPath, {
+    const result = await Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
       type: 'claim',
       itemId: 'item-1',
       expectedSequence: 1,
       writerId: 'writer-reclaim',
-    });
+    }));
 
     expect(result.item.status).toBe('running');
     // The reclaim path removes the orphan lock, then the happy path's finally
@@ -135,12 +136,12 @@ describe('#1174 orphan writer-lock reclaim on dead owner pid', () => {
     );
 
     await expect(
-      applyTaskOperationToPlanFileAsync(planPath, {
+      Effect.runPromise(applyTaskOperationToPlanFileEffect(planPath, {
         type: 'claim',
         itemId: 'item-1',
         expectedSequence: 1,
         writerId: 'writer-conflict',
-      }),
+      })),
     ).rejects.toThrow(/writer conflict/);
 
     expect(existsSync(lockPath)).toBe(true);
