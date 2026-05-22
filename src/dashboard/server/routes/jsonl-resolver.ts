@@ -23,7 +23,8 @@ import { access, readFile, stat, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { Effect } from 'effect';
+import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
@@ -138,7 +139,7 @@ export async function resolveClaudeSessionId(
 
   // 3. runtime state claudeSessionId (in-process mirror)
   try {
-    const lookup = opts.getRuntimeStateAsync ?? getAgentRuntimeStateAsync;
+    const lookup = opts.getRuntimeStateAsync ?? ((id: string) => Effect.runPromise(getAgentRuntimeStateEffect(id)));
     const runtimeState = await lookup(agentId);
     if (runtimeState?.claudeSessionId) return runtimeState.claudeSessionId;
   } catch { /* non-fatal */ }

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { capturePaneAsync } from './tmux.js'
+import { capturePaneAsyncEffect } from './tmux.js'
 import { TmuxError } from './errors.js'
 
 export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'other'
@@ -202,7 +202,7 @@ export async function detectAwaitingInputForAgent(
   }
 
   const detectionPromise = withPaneDetectionSlot(async () => {
-    const pane = await capturePaneAsync(agentId, options.lines ?? 90)
+    const pane = await Effect.runPromise(capturePaneAsyncEffect(agentId, options.lines ?? 90))
     const detection = detectAwaitingInputFromPane(pane, options)
     if (cacheEnabled) {
       paneDetectionCache.set(cacheKey, {

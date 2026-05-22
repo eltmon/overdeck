@@ -26,19 +26,40 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../lib/agents.js', () => ({
+vi.mock('../../../lib/agents.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   getAgentDir: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   getAgentState: vi.fn(),
-  getAgentStateAsync: vi.fn(),
+  getAgentStateEffect: effectMock(null),
   listRunningAgents: vi.fn(() => []),
-  recordAgentFailureAsync: vi.fn(),
+  recordAgentFailureEffect: effectMock(null),
   resumeAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentState: vi.fn(),
-  saveAgentStateAsync: vi.fn(),
+  saveAgentStateEffect: effectMock(undefined),
   saveSessionId: vi.fn(),
-}));
+  };
+});
 
 vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatus: vi.fn(),
@@ -52,20 +73,41 @@ vi.mock('../../../lib/stashes.js', () => ({
   listStashes: vi.fn(async () => []),
 }));
 
-vi.mock('../../../lib/tmux.js', () => ({
+vi.mock('../../../lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsync: vi.fn(async () => ''),
-  createSessionAsync: vi.fn(async () => {}),
-  isPaneDeadAsync: vi.fn(async () => false),
+  capturePaneAsyncEffect: effectMock(''),
+  createSessionAsyncEffect: effectMock(undefined),
+  isPaneDeadAsyncEffect: effectMock(false),
   killSession: vi.fn(),
-  killSessionAsync: vi.fn(async () => {}),
+  killSessionAsyncEffect: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsync: vi.fn(async () => []),
-  listSessionNamesAsync: vi.fn(async () => []),
-  sendKeysAsync: vi.fn(async () => {}),
+  listPaneValuesAsyncEffect: effectMock([]),
+  listSessionNamesAsyncEffect: effectMock([]),
+  sendKeysEffect: effectMock(undefined),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsync: vi.fn(async () => false),
-}));
+  sessionExistsAsyncEffect: effectMock(false),
+  };
+});
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
@@ -89,10 +131,31 @@ vi.mock('../../projects.js', () => ({
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
 vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })) }));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
-vi.mock('../config.js', () => ({
+vi.mock('../config.js', async () => {
+  const { Effect } = await import('effect');
+  const effectMock = (initial?: unknown) => {
+    const wrap = (value: unknown) => {
+      if (value && typeof value === 'object' && 'pipe' in value) return value;
+      return Effect.succeed(value);
+    };
+    const fn: any = vi.fn(() => wrap(typeof initial === 'function' ? (initial as () => unknown)() : initial));
+    fn.mockResolvedValue = (value: unknown) => fn.mockReturnValue(Effect.succeed(value));
+    fn.mockRejectedValue = (error: unknown) => fn.mockReturnValue(Effect.fail(error));
+    fn.mockResolvedValueOnce = (value: unknown) => fn.mockReturnValueOnce(Effect.succeed(value));
+    fn.mockRejectedValueOnce = (error: unknown) => fn.mockReturnValueOnce(Effect.fail(error));
+    const originalMockImplementation = fn.mockImplementation.bind(fn);
+    fn.mockImplementation = (impl: (...args: unknown[]) => unknown) => originalMockImplementation((...args: unknown[]) => {
+      const result = impl(...args);
+      if (result && typeof result === 'object' && 'pipe' in result) return result;
+      return Effect.promise(() => Promise.resolve(result));
+    });
+    return fn;
+  };
+  return {
   loadCloisterConfig: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
-  loadCloisterConfigAsync: vi.fn(async () => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
-}));
+  loadCloisterConfigEffect: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
+  };
+});
 vi.mock('../specialists.js', () => ({
   getAllProjectSpecialistStatuses: vi.fn(async () => []),
   getTmuxSessionName: vi.fn((name: string) => `specialist-${name}`),
@@ -100,14 +163,14 @@ vi.mock('../specialists.js', () => ({
 }));
 
 import { autoCloseOut } from '../deacon.js';
-import { loadCloisterConfigAsync } from '../config.js';
+import { loadCloisterConfigEffect } from '../config.js';
 import { loadReviewStatuses, setReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../projects.js';
 import { resolveGitHubIssue } from '../../tracker-utils.js';
 import { emitActivityEntry } from '../../activity-logger.js';
 import { closeOut } from '../../lifecycle/workflows.js';
 
-const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigAsync);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigEffect);
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
 const mockSetReviewStatus = vi.mocked(setReviewStatus);
 const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);

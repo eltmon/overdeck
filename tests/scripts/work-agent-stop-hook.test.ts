@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
-const SCRIPT_PATH = join(process.cwd(), 'scripts', 'work-agent-stop-hook')
+const SCRIPT_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'work-agent-stop-hook')
 const AGENT_ID = 'agent-pan-986'
 
 function writeExecutable(path: string, content: string): void {

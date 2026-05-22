@@ -3,53 +3,106 @@ Usage: pan [options] [command]
 Multi-agent orchestration for AI coding assistants
 
 Options:
-  -V, --version                output the version number
-  -h, --help                   display help for command
+  -V, --version                   output the version number
+  --yolo [value]                  Override permission mode for spawned Claude
+                                  Code agents. Default is auto (Claude Code's
+                                  classifier blocks destructive ops). --yolo or
+                                  --yolo=true switches to
+                                  --dangerously-skip-permissions; --yolo=false
+                                  (--no-yolo) forces auto mode. Equivalent to
+                                  setting PAN_YOLO=true|false. Works in any
+                                  argv position. Falls back to
+                                  config.claude.permissionMode.
+  -h, --help                      display help for command
 
 Commands:
-  init                         Initialize Panopticon (~/.panopticon/)
-  sync [options]               Sync skills/agents/rules to devroot
-  restore [timestamp]          Restore from backup
-  backup                       Manage backups
-  skills [options]             List and manage skills
-  issues [options]             List and triage work across configured trackers
-  show [options] <id>          Unified lens: shadow state, CV, context, health
-                               for one issue
-  review                       Review-loop management: pending items, request
-                               re-review, reset cycles
-  plan [options] <id>          Create execution plan for an issue, or finalize
-                               an existing plan
-  tell <id> <message>          Send message to running agent
-  kill [options] <id>          Stop running agent (workspace preserved)
-  resume <id>                  Resume from saved Claude session
-  recover [options] [id]       Recover crashed or stopped agent
-  sync-main <id>               Merge latest main into workspace feature branch
-  done [options] <id>          Mark work complete, move to review
-  approve [options] <id>       Approve agent work, merge MR, update tracker
-  reopen [options] <id>        Re-open issue for rework (resets specialist
-                               state)
-  wipe [options] <id>          Destructive: reset all state for an issue.
-                               Confirms.
-  close [options] <id>         Verify, clean up, and close issue on tracker
-  start [options] <id>         Create workspace and spawn agent for an issue
-  workspace                    Workspace management
-  test                         Test running and management
-  admin                        Plumbing commands: watchdog, specialists, infra,
-                               db, config, and more
-  convoy                       Multi-agent convoy orchestration
-  conversations|conv           Discover, index, and search Claude Code session
-                               history
-  install [options]            Install Panopticon prerequisites
-  inspect [options] <issueId>  Request inspection of a completed bead before
-                               proceeding to the next
-  status [options]             Show running agents
-  up [options]                 Start dashboard (and Traefik if enabled)
-  down [options]               Stop dashboard (and Traefik if enabled)
-  project                      Project registry for multi-project workspace
-                               support
-  doctor                       Check system health and dependencies
-  update [options]             Update Panopticon to latest version
-  cost                         Track and report AI usage costs
-  serve [options]              Start the dashboard server and open it in the
-                               default browser (npx launcher)
-  help [command]               display help for command
+  init                            Initialize Panopticon (~/.panopticon/)
+  sync [options]                  Sync skills/agents to ~/.claude/ and render
+                                  the context layers
+  context                         Manage the layered context model (global /
+                                  project / workspace)
+  restore [timestamp]             Restore from backup
+  backup                          Manage backups
+  skills [options]                List and manage skills
+  issues [options]                List and triage work across configured
+                                  trackers
+  show [options] <id>             Unified lens: shadow state, CV, context,
+                                  health for one issue
+  open [options] <id>             Open an issue workspace in your preferred
+                                  editor
+  review                          Review-loop management: pending items,
+                                  request re-review, reset cycles
+  plan [options] [id]             Planning lifecycle commands
+  tell <id> <message>             Send message to running agent
+  kill [options] <id>             Stop running agent (workspace preserved)
+  pause [options] <id>            Persistently pause an agent and stop it if
+                                  running
+  unpause <id>                    Clear an agent pause gate without spawning it
+  untroubled <id>                 Clear an agent troubled gate without spawning
+                                  it
+  fork [options] <conv>           Summary Fork a conversation — creates new
+                                  session from a summary of previous work
+  unarchive-conversation <query>  Restore an archived conversation by exact
+                                  name or matching title
+  resume [options] <id>           Resume from saved Claude session
+  recover [options] [id]          Recover crashed or stopped agent
+  sync-main <id>                  Merge latest main into workspace feature
+                                  branch
+  done [options] <id>             Mark work complete, move to review
+  approve <id>                    [REMOVED] Use dashboard MERGE button instead
+  reopen [options] <id>           Re-enter the pipeline for a
+                                  closed/completed/cancelled issue (resets
+                                  specialist state). For issues already in
+                                  progress, use `pan review restart`.
+  wipe [options] <id>             Destructive: removes workspace files, kills
+                                  processes, deletes branches, clears review
+                                  state, and resets tracker status
+  destroy [options] <id>          Alias for workspace destroy: remove the issue
+                                  workspace worktree and branch
+  close [options] <id>            Verify, clean up, and close issue on tracker
+  start [options] <id>            Create workspace and spawn agent for an issue
+  swarm [options] [id]            Swarm execution: spawn parallel agents across
+                                  vBRIEF plan items using dependency-wave
+                                  scheduling
+  workspace                       Workspace management
+  test                            Test running and management
+  tts                             Local TTS daemon helpers
+  release                         Intentional release flow for stable and
+                                  canary publishes
+  memory                          Search and inspect Panopticon memory
+  admin                           Plumbing commands: watchdog, specialists,
+                                  infra, db, config, and more
+  conversations|conv              Discover, index, and search Claude Code
+                                  session history
+  install [options]               Install Panopticon prerequisites
+  inspect [options] <issueId>     Request inspection of a completed bead before
+                                  proceeding to the next
+  caveman-compress <file>         Compress a static reference doc using
+                                  caveman-compress (manual use only, never
+                                  automated). Calls the Claude API recursively
+                                  to compress prose by ~65-75% while preserving
+                                  technical accuracy.
+  scope                           vBRIEF lifecycle management
+  flywheel                        Flywheel orchestrator lifecycle and status
+                                  helpers
+  status [options]                Show running agents
+  dev [options]                   Start dashboard in development mode with Vite
+                                  HMR
+  up [options]                    Start dashboard (and Traefik if enabled)
+  down [options]                  Stop dashboard (and Traefik if enabled)
+  reload [options]                Build Panopticon, then restart the dashboard
+                                  only after the build succeeds
+  restart [options]               Restart a platform component (default:
+                                  dashboard only — leaves CLIProxy, Traefik,
+                                  TLDR running)
+  project                         Project registry for multi-project workspace
+                                  support
+  health                          Show runtime health of Panopticon services
+  doctor [options]                Check system health and dependencies
+  resources [options]             Show RAM usage by agents, conversations, and
+                                  system processes
+  update [options]                Update Panopticon to latest version
+  cost                            Track and report AI usage costs
+  serve [options]                 Start the dashboard server and open it in the
+                                  default browser (npx launcher)
+  help [command]                  display help for command

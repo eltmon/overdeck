@@ -1,0 +1,27 @@
+{/*
+  ThemedImage — renders the light or dark variant of a docs screenshot to
+  match the reader's docs theme. Mintlify toggles a `dark` class on <html>,
+  so Tailwind's `dark:` variant picks the right image.
+
+  Every screenshot in the docs ships two variants, captured together with
+  scripts/capture-doc-shot.mjs (see docs/SCREENSHOTS.md).
+
+  Usage in a page:
+    import { ThemedImage } from "/snippets/themed-image.mdx";
+
+    <ThemedImage
+      light="/images/specialists/01-board-hero-light.png"
+      dark="/images/specialists/01-board-hero-dark.png"
+      alt="Panopticon kanban board with specialists running"
+    />
+
+  If `dark` is omitted it falls back to `light` (shown in both modes), so a
+  screenshot can be added before its dark variant exists without breaking.
+*/}
+
+export const ThemedImage = ({ light, dark, alt = "" }) => (
+  <>
+    <img src={light} alt={alt} className="block dark:hidden" />
+    <img src={dark ?? light} alt={alt} className="hidden dark:block" />
+  </>
+);

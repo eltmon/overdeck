@@ -1,6 +1,12 @@
 import { stat } from 'node:fs/promises';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { getAgentRuntimeStateAsync, getAgentStateAsync } from '../agents.js';
+import { Effect } from 'effect';
+import {
+  getAgentRuntimeStateEffect,
+  getAgentStateEffect,
+  type AgentRuntimeState,
+  type AgentState,
+} from '../agents.js';
 import { getTranscriptCheckpoint, listTranscriptCheckpoints, type TranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
@@ -26,9 +32,12 @@ export interface ReconcileStaleTranscriptCheckpointsOptions extends ReconcileTra
   log?: (message: string) => void;
 }
 
+type GetAgentState = (agentId: string) => Promise<AgentState | null>;
+type GetAgentRuntimeState = (agentId: string) => Promise<AgentRuntimeState | null>;
+
 export interface ReconcileAgentMemoryOptions extends ReconcileTranscriptCheckpointOptions {
-  getAgentState?: typeof getAgentStateAsync;
-  getAgentRuntimeState?: typeof getAgentRuntimeStateAsync;
+  getAgentState?: GetAgentState;
+  getAgentRuntimeState?: GetAgentRuntimeState;
   getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
 }
 
@@ -58,8 +67,10 @@ export async function reconcileAgentMemory(
   agentId: string,
   options: ReconcileAgentMemoryOptions = {},
 ): Promise<MemoryReconciliationResult> {
-  const state = await (options.getAgentState ?? getAgentStateAsync)(agentId);
-  const sessionId = state?.sessionId ?? (await (options.getAgentRuntimeState ?? getAgentRuntimeStateAsync)(agentId))?.claudeSessionId;
+  const getAgentState = options.getAgentState ?? getAgentStateFromEffect;
+  const getAgentRuntimeState = options.getAgentRuntimeState ?? getAgentRuntimeStateFromEffect;
+  const state = await getAgentState(agentId);
+  const sessionId = state?.sessionId ?? (await getAgentRuntimeState(agentId))?.claudeSessionId;
   const result = emptyResult();
   if (!sessionId) return result;
 
@@ -113,6 +124,14 @@ function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
 async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs: number }> {
   const fileStat = await stat(path);
   return { size: fileStat.size, mtimeMs: fileStat.mtimeMs };
+}
+
+function getAgentStateFromEffect(agentId: string): Promise<AgentState | null> {
+  return Effect.runPromise(getAgentStateEffect(agentId));
+}
+
+function getAgentRuntimeStateFromEffect(agentId: string): Promise<AgentRuntimeState | null> {
+  return Effect.runPromise(getAgentRuntimeStateEffect(agentId));
 }
 
 function emptyResult(): MemoryReconciliationResult {

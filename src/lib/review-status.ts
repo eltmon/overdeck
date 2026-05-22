@@ -3,10 +3,10 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlanAsync } from './vbrief/io.js';
+import { findPlanEffect } from './vbrief/io.js';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
-import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileAsync } from './vbrief/dag.js';
+import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileEffect } from './vbrief/dag.js';
 import {
   upsertReviewStatus as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -16,6 +16,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
+  getReviewStatusFromDbEffect,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -419,6 +420,26 @@ export function getReviewStatus(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDb(issueId) ?? null;
 }
 
+export async function setReviewStatusAsync(
+  issueId: string,
+  update: Partial<ReviewStatus>,
+  existing?: ReviewStatus,
+): Promise<ReviewStatus> {
+  return new Promise((resolve, reject) => {
+    setImmediate(() => {
+      try {
+        resolve(setReviewStatus(issueId, update, existing));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
+  return Effect.runPromise(getReviewStatusFromDbEffect(issueId));
+}
+
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
  * Pending merge operations are in-memory only — they don't survive a restart.
@@ -611,16 +632,16 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
       if (!existsSync(workStateFile)) return;
       const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
       if (!workState.workspace) return;
-      const planPath = await findPlanAsync(workState.workspace);
+      const planPath = await Effect.runPromise(findPlanEffect(workState.workspace));
       if (!planPath) {
         console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
         return;
       }
-      const result = await writePipelineMirrorToPlanFileAsync(
+      const result = await Effect.runPromise(writePipelineMirrorToPlanFileEffect(
         planPath,
         buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
         `review-status-${process.pid}`,
-      );
+      ));
       if (!result) {
         console.warn(`[review-status] Failed to write pipeline mirror to ${planPath} for ${issueId}`);
       }
@@ -646,33 +667,33 @@ export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `setReviewStatus`. */
+/** Effect variant of `setReviewStatusAsync`. */
 export const setReviewStatusAsyncEffect = (
   issueId: string,
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
 ): Effect.Effect<ReviewStatus, ReviewStatusError> =>
-  Effect.try({
-    try: () => setReviewStatus(issueId, update, existing),
+  Effect.tryPromise({
+    try: () => setReviewStatusAsync(issueId, update, existing),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'setReviewStatus',
+        operation: 'setReviewStatusAsync',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
   });
 
-/** Effect variant of `getReviewStatus`. */
+/** Effect variant of `getReviewStatusAsync`. */
 export const getReviewStatusAsyncEffect = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
-  Effect.try({
-    try: () => getReviewStatus(issueId),
+  Effect.tryPromise({
+    try: () => getReviewStatusAsync(issueId),
     catch: (cause) =>
       new ReviewStatusError({
         issueId,
-        operation: 'getReviewStatus',
+        operation: 'getReviewStatusAsync',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

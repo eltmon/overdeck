@@ -83,6 +83,7 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/harnesses",
               "configuration/issue-trackers",
               "configuration/polyrepo"
             ]
@@ -109,6 +110,8 @@
             "group": "Reference",
             "pages": [
               "reference/architecture",
+              "reference/harness-landscape",
+              "reference/template-conversations",
               "reference/prompts",
               "reference/troubleshooting"
             ]
@@ -118,7 +121,7 @@
     ]
   },
   "metadata": {
-    "og:image": "/docs/screenshot-board.png",
+    "og:image": "/docs/screenshot-board-light.png",
     "og:type": "website"
   },
   "footerSocials": {
@@ -127,11 +130,5 @@
   "feedback": {
     "thumbsRating": true,
     "suggestEdit": true
-  },
-  "analytics": {
-    "posthog": {
-      "apiKey": "",
-      "host": "https://us.i.posthog.com"
-    }
   }
 }

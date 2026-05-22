@@ -17,14 +17,14 @@ import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
 import { sessionFilePath } from '../../lib/paths.js';
-import { listSessionNamesAsync } from '../../lib/tmux.js';
+import { listSessionNamesAsyncEffect } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
 import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
-import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
+import { getConversationsConfigAsyncEffect } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
@@ -390,7 +390,7 @@ function startSharedPresencePoller(): void {
 
   const tick = async () => {
     try {
-      const sessions = await listSessionNamesAsync();
+      const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
       const current = new Set(sessions.filter(s => s.trim()));
 
       for (const s of sharedPresencePoller.knownSessions) {
@@ -667,90 +667,92 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.scanConversations]: (input) =>
-        Effect.promise(async () => {
-          const config = await getConversationsConfigAsync();
-          await Effect.runPromise(eventStore.appendAsync({
-            type: 'scan.started',
-            timestamp: new Date().toISOString(),
-            payload: { mode: input.mode, dirs: input.dirs ?? [] },
-          } as ScanStartedEvent));
-          let lastProgressEmit = 0;
-          const result = await runDashboardDbJob<{
-            inserted: number;
-            updated: number;
-            skipped: number;
-            errors: number;
-            durationMs: number;
-          }>('scanConversations', {
-            mode: input.mode,
-            dirs: input.dirs,
-            dryRun: input.dryRun,
-            watchDirs: config.watchDirs,
-            maxParallel: config.scanMaxParallel,
-          }, async (rawProgress) => {
-            const progress = rawProgress as {
-              dirsProcessed: number;
-              dirsTotal: number;
-              sessionsFound: number;
-              elapsedMs: number;
-            };
-            const now = Date.now();
-            const complete = progress.dirsProcessed >= progress.dirsTotal;
-            if (!complete && now - lastProgressEmit < 500) return;
-            lastProgressEmit = now;
+        getConversationsConfigAsyncEffect().pipe(
+          Effect.flatMap((config) => Effect.promise(async () => {
             await Effect.runPromise(eventStore.appendAsync({
-              type: 'scan.progress',
+              type: 'scan.started',
               timestamp: new Date().toISOString(),
-              payload: progress,
-            } as ScanProgressEvent));
-          });
-          await Effect.runPromise(eventStore.appendAsync({
-            type: 'scan.complete',
-            timestamp: new Date().toISOString(),
-            payload: {
-              inserted: result.inserted,
-              updated: result.updated,
-              skipped: result.skipped,
-              errors: result.errors,
-              durationMs: result.durationMs,
-            },
-          } as ScanCompleteEvent));
-          return result;
-        }),
+              payload: { mode: input.mode, dirs: input.dirs ?? [] },
+            } as ScanStartedEvent));
+            let lastProgressEmit = 0;
+            const result = await runDashboardDbJob<{
+              inserted: number;
+              updated: number;
+              skipped: number;
+              errors: number;
+              durationMs: number;
+            }>('scanConversations', {
+              mode: input.mode,
+              dirs: input.dirs,
+              dryRun: input.dryRun,
+              watchDirs: config.watchDirs,
+              maxParallel: config.scanMaxParallel,
+            }, async (rawProgress) => {
+              const progress = rawProgress as {
+                dirsProcessed: number;
+                dirsTotal: number;
+                sessionsFound: number;
+                elapsedMs: number;
+              };
+              const now = Date.now();
+              const complete = progress.dirsProcessed >= progress.dirsTotal;
+              if (!complete && now - lastProgressEmit < 500) return;
+              lastProgressEmit = now;
+              await Effect.runPromise(eventStore.appendAsync({
+                type: 'scan.progress',
+                timestamp: new Date().toISOString(),
+                payload: progress,
+              } as ScanProgressEvent));
+            });
+            await Effect.runPromise(eventStore.appendAsync({
+              type: 'scan.complete',
+              timestamp: new Date().toISOString(),
+              payload: {
+                inserted: result.inserted,
+                updated: result.updated,
+                skipped: result.skipped,
+                errors: result.errors,
+                durationMs: result.durationMs,
+              },
+            } as ScanCompleteEvent));
+            return result;
+          })),
+        ),
 
       [WS_METHODS.searchConversations]: (input) =>
-        Effect.promise(async () => {
-          const config = await getConversationsConfigAsync();
-          const pagination = normalizeConversationPagination(input.limit, input.offset);
-          const filter = { ...normalizeConversationFilter(input), ...pagination };
-          try {
-            const operation = input.semantic === true ? 'searchSessionsSemantic' : 'searchSessions';
-            const result = await runDashboardDbJob<SearchResult>(operation, {
-              q: input.semantic === true ? undefined : input.query,
-              semanticQuery: input.semantic === true ? input.query : undefined,
-              similarTo: input.similarTo,
-              filter,
-              limit: pagination.limit,
-              offset: pagination.offset,
-              config,
-            });
-            return {
-              ...result,
-              sessions: result.sessions.map(toDiscoveredSessionSnapshot),
-            };
-          } catch (err) {
-            if (input.semantic === true) {
+        getConversationsConfigAsyncEffect().pipe(
+          Effect.flatMap((config) => Effect.promise(async () => {
+            const pagination = normalizeConversationPagination(input.limit, input.offset);
+            const filter = { ...normalizeConversationFilter(input), ...pagination };
+            try {
+              const operation = input.semantic === true ? 'searchSessionsSemantic' : 'searchSessions';
+              const result = await runDashboardDbJob<SearchResult>(operation, {
+                q: input.semantic === true ? undefined : input.query,
+                semanticQuery: input.semantic === true ? input.query : undefined,
+                similarTo: input.similarTo,
+                filter,
+                limit: pagination.limit,
+                offset: pagination.offset,
+                config,
+              });
               return {
-                sessions: [],
-                total: 0,
-                mode: 'semantic',
-                durationMs: 0,
-                error: err instanceof Error ? err.message : String(err),
+                ...result,
+                sessions: result.sessions.map(toDiscoveredSessionSnapshot),
               };
+            } catch (err) {
+              if (input.semantic === true) {
+                return {
+                  sessions: [],
+                  total: 0,
+                  mode: 'semantic',
+                  durationMs: 0,
+                  error: err instanceof Error ? err.message : String(err),
+                };
+              }
+              throw err;
             }
-            throw err;
-          }
-        }),
+          })),
+        ),
 
       [WS_METHODS.listDiscoveredSessions]: (input) =>
         Effect.promise(async () => {
@@ -776,72 +778,74 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         ),
 
       [WS_METHODS.enrichSessions]: (input) =>
-        Effect.promise(async () => {
-          const config = await getConversationsConfigAsync();
-          try {
-            const result = await runDashboardDbJob<{
-              enriched: number;
-              errors: number;
-              estimatedCost: number;
-              actualCost: number | null;
-              durationMs: number;
-            }>('enrichSessions', buildEnrichSessionsJobPayload(input as EnrichSessionsRpcInput, config), async (rawProgress) => {
-              const progress = rawProgress as {
-                session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
-              };
-              if (!progress.session) return;
-              const { session } = progress;
-              await Effect.runPromise(eventStore.appendAsync({
-                type: 'enrich.progress',
-                timestamp: new Date().toISOString(),
-                payload: {
-                  sessionId: session.sessionId,
-                  level: session.tier,
-                  model: session.model,
-                  cost: session.cost ?? 0,
-                  success: session.success,
-                  error: session.error,
-                },
-              } as EnrichProgressEvent));
-            });
-            const processed = result.enriched + result.errors;
-            await Effect.runPromise(eventStore.appendAsync({
-              type: 'enrich.complete',
-              timestamp: new Date().toISOString(),
-              payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
-            } as EnrichCompleteEvent));
-            return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
-          } catch (err) {
-            if (err instanceof CostThresholdError) {
-              throw new PanRpcError({
-                message: err.message,
-                code: `COST_THRESHOLD:${err.estimatedCost}:${err.threshold}:${err.sessionCount}`,
+        getConversationsConfigAsyncEffect().pipe(
+          Effect.flatMap((config) => Effect.promise(async () => {
+            try {
+              const result = await runDashboardDbJob<{
+                enriched: number;
+                errors: number;
+                estimatedCost: number;
+                actualCost: number | null;
+                durationMs: number;
+              }>('enrichSessions', buildEnrichSessionsJobPayload(input as EnrichSessionsRpcInput, config), async (rawProgress) => {
+                const progress = rawProgress as {
+                  session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
+                };
+                if (!progress.session) return;
+                const { session } = progress;
+                await Effect.runPromise(eventStore.appendAsync({
+                  type: 'enrich.progress',
+                  timestamp: new Date().toISOString(),
+                  payload: {
+                    sessionId: session.sessionId,
+                    level: session.tier,
+                    model: session.model,
+                    cost: session.cost ?? 0,
+                    success: session.success,
+                    error: session.error,
+                  },
+                } as EnrichProgressEvent));
               });
+              const processed = result.enriched + result.errors;
+              await Effect.runPromise(eventStore.appendAsync({
+                type: 'enrich.complete',
+                timestamp: new Date().toISOString(),
+                payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
+              } as EnrichCompleteEvent));
+              return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
+            } catch (err) {
+              if (err instanceof CostThresholdError) {
+                throw new PanRpcError({
+                  message: err.message,
+                  code: `COST_THRESHOLD:${err.estimatedCost}:${err.threshold}:${err.sessionCount}`,
+                });
+              }
+              throw err;
             }
-            throw err;
-          }
-        }),
+          })),
+        ),
 
       [WS_METHODS.embedSessions]: (input) =>
-        Effect.promise(async () => {
-          const config = await getConversationsConfigAsync();
-          const result = await runDashboardDbJob<{ embedded: number; skipped: number; errors: number }>('embedSessions', {
-            sessionIds: input.ids,
-            regenerate: input.regenerate,
-            config,
-          }, async (rawProgress) => {
-            const progress = rawProgress as {
-              session?: { sessionId: number; model: string; success: boolean; error?: string };
-            };
-            if (!progress.session) return;
-            await Effect.runPromise(eventStore.appendAsync({
-              type: 'embed.progress',
-              timestamp: new Date().toISOString(),
-              payload: progress.session,
-            } as EmbedProgressEvent));
-          });
-          return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
-        }),
+        getConversationsConfigAsyncEffect().pipe(
+          Effect.flatMap((config) => Effect.promise(async () => {
+            const result = await runDashboardDbJob<{ embedded: number; skipped: number; errors: number }>('embedSessions', {
+              sessionIds: input.ids,
+              regenerate: input.regenerate,
+              config,
+            }, async (rawProgress) => {
+              const progress = rawProgress as {
+                session?: { sessionId: number; model: string; success: boolean; error?: string };
+              };
+              if (!progress.session) return;
+              await Effect.runPromise(eventStore.appendAsync({
+                type: 'embed.progress',
+                timestamp: new Date().toISOString(),
+                payload: progress.session,
+              } as EmbedProgressEvent));
+            });
+            return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
+          })),
+        ),
 
       [WS_METHODS.getConversationCost]: (input) =>
         Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCost', normalizeConversationFilter(input))),

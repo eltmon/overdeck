@@ -1,6 +1,7 @@
 import chalk from 'chalk';
-import { listRunningAgentsAsync } from '../../lib/agents.js';
-import { listSessionsAsync, capturePaneAsync } from '../../lib/tmux.js';
+import { Effect } from 'effect';
+import { listRunningAgentsEffect } from '../../lib/agents.js';
+import { listSessionsAsyncEffect, capturePaneAsyncEffect } from '../../lib/tmux.js';
 
 interface AgentStatusOptions {
   json?: boolean;
@@ -79,12 +80,14 @@ function detectStatus(output: string): { status: SessionInfo['status']; detail: 
   return { status: 'running', detail: lastNonEmpty?.trim().slice(0, 80) || 'Active' };
 }
 
-async function analyzeSession(name: string, lines: number): Promise<SessionInfo> {
-  const output = await capturePaneAsync(name, lines);
-  const model = extractModel(output);
-  const cost = extractCost(output);
-  const { status, detail } = detectStatus(output);
-  return { name, model, status, detail, age: null, cost };
+function analyzeSession(name: string, lines: number) {
+  return Effect.gen(function* () {
+    const output = yield* capturePaneAsyncEffect(name, lines);
+    const model = extractModel(output);
+    const cost = extractCost(output);
+    const { status, detail } = detectStatus(output);
+    return { name, model, status, detail, age: null, cost } satisfies SessionInfo;
+  });
 }
 
 const STATUS_COLORS: Record<SessionInfo['status'], (s: string) => string> = {
@@ -98,43 +101,54 @@ const STATUS_COLORS: Record<SessionInfo['status'], (s: string) => string> = {
 export async function agentStatusCommand(options: AgentStatusOptions): Promise<void> {
   const lines = options.lines ?? 20;
 
-  const [allAgents, sessions] = await Promise.all([
-    listRunningAgentsAsync(),
-    listSessionsAsync(),
-  ]);
+  const { agentInfos, reviewInfos, planningInfos } = await Effect.runPromise(
+    Effect.gen(function* () {
+      const [allAgents, sessions] = yield* Effect.all([
+        listRunningAgentsEffect(),
+        listSessionsAsyncEffect(),
+      ], { concurrency: 'unbounded' });
 
-  const tmuxSessionNames = new Set(sessions.map(s => s.name));
+      const tmuxSessionNames = new Set(sessions.map(s => s.name));
 
-  // Only show agents that have a live tmux session
-  const agents = allAgents.filter(a => tmuxSessionNames.has(a.id));
+      // Only show agents that have a live tmux session
+      const agents = allAgents.filter(a => tmuxSessionNames.has(a.id));
 
-  const agentSessionNames = new Set(agents.map(a => a.id));
-  const reviewSessions = sessions.filter(s =>
-    s.name.startsWith('review-') || s.name.startsWith('specialist-')
-  );
-  const planningSessions = sessions.filter(s =>
-    s.name.startsWith('planning-') && !agentSessionNames.has(s.name)
-  );
+      const agentSessionNames = new Set(agents.map(a => a.id));
+      const reviewSessions = sessions.filter(s =>
+        s.name.startsWith('review-') || s.name.startsWith('specialist-')
+      );
+      const planningSessions = sessions.filter(s =>
+        s.name.startsWith('planning-') && !agentSessionNames.has(s.name)
+      );
 
-  // Analyze all sessions in parallel
-  const agentInfos = await Promise.all(
-    agents.map(async agent => {
-      const info = await analyzeSession(agent.id, lines);
-      return {
-        ...info,
-        model: info.model || agent.model,
-        issueId: agent.issueId,
-        role: agent.role,
-      };
-    })
-  );
+      // Analyze all sessions in parallel
+      const agentInfos = yield* Effect.forEach(
+        agents,
+        (agent) => analyzeSession(agent.id, lines).pipe(
+          Effect.map(info => ({
+            ...info,
+            model: info.model || agent.model,
+            issueId: agent.issueId,
+            role: agent.role,
+          })),
+        ),
+        { concurrency: 'unbounded' },
+      );
 
-  const reviewInfos = await Promise.all(
-    reviewSessions.map(s => analyzeSession(s.name, lines))
-  );
+      const reviewInfos = yield* Effect.forEach(
+        reviewSessions,
+        s => analyzeSession(s.name, lines),
+        { concurrency: 'unbounded' },
+      );
 
-  const planningInfos = await Promise.all(
-    planningSessions.map(s => analyzeSession(s.name, lines))
+      const planningInfos = yield* Effect.forEach(
+        planningSessions,
+        s => analyzeSession(s.name, lines),
+        { concurrency: 'unbounded' },
+      );
+
+      return { agentInfos, reviewInfos, planningInfos };
+    }),
   );
 
   if (options.json) {

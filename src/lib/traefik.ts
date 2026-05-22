@@ -10,7 +10,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdir
 import { join, basename } from 'path';
 import { execSync } from 'child_process';
 import { Effect } from 'effect';
-import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SOURCE_TRAEFIK_TEMPLATES } from './paths.js';
+import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SYNC_SOURCES } from './paths.js';
 import { loadConfig } from './config.js';
 import { loadProjectsConfig } from './projects.js';
 import { FsError } from './errors.js';
@@ -50,7 +50,7 @@ export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikR
  * which is the production layout. See template header for the full rationale.
  */
 export function generatePanopticonTraefikConfig(mode?: TraefikRenderMode): boolean {
-  const templatePath = join(SOURCE_TRAEFIK_TEMPLATES, 'dynamic', 'panopticon.yml.template');
+  const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'panopticon.yml.template');
   if (!existsSync(templatePath)) {
     return false;
   }

@@ -1,0 +1,472 @@
+{
+  "version": "1",
+  "issueId": "PAN-1312",
+  "created": "2026-05-22T03:27:22.833Z",
+  "updated": "2026-05-22T13:24:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1312",
+    "dirty": false
+  },
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": {
+    "description": "Wave 2a tmux deletion complete: src/lib/tmux.ts no longer exports in-scope *Async bridge functions and typecheck passes. Continue remaining Wave 2a deletion beads in vBRIEF order.",
+    "beadId": "workspace-egas",
+    "filesToRead": [
+      ".pan/spec.vbrief.json",
+      ".pan/continue.json"
+    ]
+  },
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-22T13:02:48.442Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-9ld7: migrated remaining src/dashboard and src/lib callers/tests to Effect siblings, verified the static import gate has zero in-scope *Async imports from src/lib, and passed npm run typecheck, npm run lint, and npm test.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-22T13:14:00.000Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-m9sw: deleted the now-unused src/lib/agents.ts *Async bridge exports, switched remaining same-file callers to Effect siblings, and verified npm run typecheck passes.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-22T13:24:00.000Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-egas: deleted the src/lib/tmux.ts *Async bridge exports, moved their behavior into Effect helpers, and verified npm run typecheck passes.",
+      "agentModel": "gpt-5.5"
+    }
+  ],
+  "swarmRuntime": {
+    "model": "gpt-5.5",
+    "slots": [
+      {
+        "slotId": 1,
+        "itemId": "w1a-agents-siblings",
+        "itemTitle": "Wave 1a \u2014 create Effect siblings for src/lib/agents.ts *Async functions",
+        "sessionName": "agent-pan-1312-1",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1",
+        "branch": "feature/pan-1312-slot-1",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T03:27:22.128Z",
+        "mergedAt": "2026-05-22T07:32:28.153Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "w1a-reviewdb-siblings",
+        "itemTitle": "Wave 1a \u2014 create Effect siblings for src/lib/database/review-status-db.ts *Async functions",
+        "sessionName": "agent-pan-1312-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-2",
+        "branch": "feature/pan-1312-slot-2",
+        "status": "failed",
+        "phase": "implementation",
+        "failureReason": "tmux pane died before completion could be confirmed",
+        "dispatchedAt": "2026-05-22T03:27:22.833Z",
+        "mergedAt": "2026-05-22T07:36:05.249Z"
+      },
+      {
+        "slotId": 3,
+        "itemId": "w1a-dag-siblings",
+        "itemTitle": "Wave 1a \u2014 create Effect siblings for src/lib/vbrief/dag.ts *Async writer-lock helpers",
+        "sessionName": "agent-pan-1312-3",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-3",
+        "branch": "feature/pan-1312-slot-3",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T03:27:22.126Z",
+        "mergedAt": "2026-05-22T07:31:28.126Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "w1a-gate",
+        "itemTitle": "Wave 1a gate \u2014 confirm every in-scope *Async function has an Effect sibling",
+        "sessionName": "agent-pan-1312-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
+        "branch": "feature/pan-1312-slot-4",
+        "status": "running",
+        "completedStatus": "completed",
+        "phase": "synthesis",
+        "dispatchedAt": "2026-05-22T07:32:48.784Z",
+        "mergedAt": "2026-05-22T07:36:09.292Z"
+      },
+      {
+        "slotId": 1,
+        "itemId": "w1a-gate",
+        "itemTitle": "Wave 1a gate \u2014 confirm every in-scope *Async function has an Effect sibling",
+        "sessionName": "agent-pan-1312-1",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1",
+        "branch": "feature/pan-1312-slot-1",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T07:36:25.127Z",
+        "mergedAt": "2026-05-22T07:38:28.024Z"
+      },
+      {
+        "slotId": 7,
+        "itemId": "w1c-route-issues-workspaces",
+        "itemTitle": "Wave 1c \u2014 migrate routes/issues.ts and routes/workspaces.ts off *Async",
+        "sessionName": "agent-pan-1312-7",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7",
+        "branch": "feature/pan-1312-slot-7",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T07:39:02.621Z",
+        "mergedAt": "2026-05-22T08:03:47.792Z"
+      },
+      {
+        "slotId": 8,
+        "itemId": "w1c-route-swarm",
+        "itemTitle": "Wave 1c \u2014 migrate routes/swarm.ts and its test off *Async",
+        "sessionName": "agent-pan-1312-8",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-8",
+        "branch": "feature/pan-1312-slot-8",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T07:39:03.670Z",
+        "mergedAt": "2026-05-22T08:03:38.064Z"
+      },
+      {
+        "slotId": 9,
+        "itemId": "w1c-route-session",
+        "itemTitle": "Wave 1c \u2014 migrate routes/misc.ts, command-deck.ts and reviewer-tree.ts off *Async",
+        "sessionName": "agent-pan-1312-9",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-9",
+        "branch": "feature/pan-1312-slot-9",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T07:39:14.418Z",
+        "mergedAt": "2026-05-22T08:04:09.689Z"
+      },
+      {
+        "slotId": 1,
+        "itemId": "w1c-svc-health",
+        "itemTitle": "Wave 1c \u2014 migrate system-health, resource-discovery and issue-data services off *Async",
+        "sessionName": "agent-pan-1312-1",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1",
+        "branch": "feature/pan-1312-slot-1",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:04:09.645Z",
+        "mergedAt": "2026-05-22T08:04:38.673Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "w1c-svc-lifecycle",
+        "itemTitle": "Wave 1c \u2014 migrate conversation-lifecycle, pending-respawn and agent-spawner services off *Async",
+        "sessionName": "agent-pan-1312-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
+        "branch": "feature/pan-1312-slot-4",
+        "status": "failed",
+        "phase": "implementation",
+        "failureReason": "tmux pane died before completion could be confirmed",
+        "dispatchedAt": "2026-05-22T08:04:07.934Z",
+        "mergedAt": "2026-05-22T08:35:15.110Z"
+      },
+      {
+        "slotId": 10,
+        "itemId": "w1c-svc-flywheel-terminal",
+        "itemTitle": "Wave 1c \u2014 migrate flywheel-actions and terminal services off *Async",
+        "sessionName": "agent-pan-1312-10",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-10",
+        "branch": "feature/pan-1312-slot-10",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:04:09.011Z",
+        "mergedAt": "2026-05-22T08:34:48.366Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "w1c-toplevel-bootstrap",
+        "itemTitle": "Wave 1c \u2014 migrate main.ts, pending-feedback.ts and read-model.ts off *Async",
+        "sessionName": "agent-pan-1312-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-2",
+        "branch": "feature/pan-1312-slot-2",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:37:53.067Z",
+        "mergedAt": "2026-05-22T08:38:54.174Z"
+      },
+      {
+        "slotId": 3,
+        "itemId": "w1c-toplevel-ws",
+        "itemTitle": "Wave 1c \u2014 migrate ws-rpc.ts and ws-terminal.ts off *Async",
+        "sessionName": "agent-pan-1312-3",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-3",
+        "branch": "feature/pan-1312-slot-3",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:37:53.253Z",
+        "mergedAt": "2026-05-22T08:39:11.772Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "w1c-health-filtering",
+        "itemTitle": "Wave 1c \u2014 migrate src/dashboard/lib/health-filtering.ts off *Async",
+        "sessionName": "agent-pan-1312-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
+        "branch": "feature/pan-1312-slot-4",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:37:55.002Z",
+        "mergedAt": "2026-05-22T08:49:53.658Z"
+      },
+      {
+        "slotId": 5,
+        "itemId": "w1d-cloister-orchestration",
+        "itemTitle": "Wave 1d \u2014 migrate cloister orchestration files (deacon, service, session-rotation, specialists) off *Async",
+        "sessionName": "agent-pan-1312-5",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-5",
+        "branch": "feature/pan-1312-slot-5",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:38:09.013Z",
+        "mergedAt": "2026-05-22T08:38:47.510Z"
+      },
+      {
+        "slotId": 7,
+        "itemId": "w1d-cloister-review",
+        "itemTitle": "Wave 1d \u2014 migrate cloister review files (review-agent, review-context, review-monitor, inspect-agent) off *Async",
+        "sessionName": "agent-pan-1312-7",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7",
+        "branch": "feature/pan-1312-slot-7",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:39:31.041Z",
+        "mergedAt": "2026-05-22T08:44:49.784Z"
+      },
+      {
+        "slotId": 10,
+        "itemId": "w1d-cloister-merge-flywheel",
+        "itemTitle": "Wave 1d \u2014 migrate cloister merge/flywheel files (merge-agent, flywheel, work-agent-prompt) off *Async",
+        "sessionName": "agent-pan-1312-10",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-10",
+        "branch": "feature/pan-1312-slot-10",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T08:39:30.066Z",
+        "mergedAt": "2026-05-22T08:39:48.858Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "w1d-runtimes",
+        "itemTitle": "Wave 1d \u2014 migrate src/lib/runtimes/ files off *Async",
+        "sessionName": "agent-pan-1312-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
+        "branch": "feature/pan-1312-slot-4",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:47:42.815Z",
+        "mergedAt": "2026-05-22T10:52:25.469Z"
+      },
+      {
+        "slotId": 5,
+        "itemId": "w1d-vbrief-internal",
+        "itemTitle": "Wave 1d \u2014 migrate cross-module *Async usage within src/lib/vbrief/",
+        "sessionName": "agent-pan-1312-5",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-5",
+        "branch": "feature/pan-1312-slot-5",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:47:45.345Z",
+        "mergedAt": "2026-05-22T10:48:19.019Z"
+      },
+      {
+        "slotId": 6,
+        "itemId": "w1d-config-internal",
+        "itemTitle": "Wave 1d \u2014 migrate cross-module *Async usage within config / review-status lib modules",
+        "sessionName": "agent-pan-1312-6",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-6",
+        "branch": "feature/pan-1312-slot-6",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:47:42.705Z",
+        "mergedAt": "2026-05-22T10:48:10.268Z"
+      },
+      {
+        "slotId": 7,
+        "itemId": "w1d-misc",
+        "itemTitle": "Wave 1d \u2014 migrate remaining src/lib/ caller files off *Async",
+        "sessionName": "agent-pan-1312-7",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7",
+        "branch": "feature/pan-1312-slot-7",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:48:01.152Z",
+        "mergedAt": "2026-05-22T10:48:51.863Z"
+      },
+      {
+        "slotId": 10,
+        "itemId": "w1c-route-infra",
+        "itemTitle": "Wave 1c \u2014 migrate routes/cliproxy.ts, codex-auth.ts, flywheel.ts, specialists.ts and discovered-sessions.ts off *Async",
+        "sessionName": "agent-pan-1312-10",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-10",
+        "branch": "feature/pan-1312-slot-10",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:48:51.859Z",
+        "mergedAt": "2026-05-22T10:54:31.839Z"
+      },
+      {
+        "slotId": 8,
+        "itemId": "w1c-svc-polling",
+        "itemTitle": "Wave 1c \u2014 migrate agent polling services off *Async",
+        "sessionName": "agent-pan-1312-8",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-8",
+        "branch": "feature/pan-1312-slot-8",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:49:14.405Z",
+        "mergedAt": "2026-05-22T10:55:15.665Z"
+      },
+      {
+        "slotId": 9,
+        "itemId": "w1d-runtimes",
+        "itemTitle": "Wave 1d \u2014 migrate src/lib/runtimes/ files off *Async",
+        "sessionName": "agent-pan-1312-9",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-9",
+        "branch": "feature/pan-1312-slot-9",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T10:49:15.194Z",
+        "mergedAt": "2026-05-22T10:50:11.202Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "w1c-route-agents",
+        "itemTitle": "Wave 1c \u2014 migrate src/dashboard/server/routes/agents.ts off *Async",
+        "sessionName": "agent-pan-1312-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-2",
+        "branch": "feature/pan-1312-slot-2",
+        "status": "failed",
+        "phase": "implementation",
+        "failureReason": "tmux pane died before completion could be confirmed",
+        "dispatchedAt": "2026-05-22T12:21:44.061Z",
+        "mergedAt": "2026-05-22T12:23:22.592Z"
+      },
+      {
+        "slotId": 1,
+        "itemId": "w2a-agents",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/agents.ts",
+        "sessionName": "agent-pan-1312-1",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-1",
+        "branch": "feature/pan-1312-slot-1",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:06:13.681Z",
+        "mergedAt": "2026-05-22T13:06:55.628Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "w2a-tmux",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/tmux.ts",
+        "sessionName": "agent-pan-1312-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-2",
+        "branch": "feature/pan-1312-slot-2",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:06:10.518Z",
+        "mergedAt": "2026-05-22T13:08:08.662Z"
+      },
+      {
+        "slotId": 3,
+        "itemId": "w2a-cliproxy",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/cliproxy.ts",
+        "sessionName": "agent-pan-1312-3",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-3",
+        "branch": "feature/pan-1312-slot-3",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:06:12.254Z",
+        "mergedAt": "2026-05-22T13:08:08.725Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "w2a-config",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/config.ts",
+        "sessionName": "agent-pan-1312-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-4",
+        "branch": "feature/pan-1312-slot-4",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:06:27.968Z",
+        "mergedAt": "2026-05-22T13:06:32.978Z"
+      },
+      {
+        "slotId": 9,
+        "itemId": "w2a-vbrief-io",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/vbrief/io.ts",
+        "sessionName": "agent-pan-1312-9",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-9",
+        "branch": "feature/pan-1312-slot-9",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:07:30.501Z",
+        "mergedAt": "2026-05-22T13:08:14.129Z"
+      },
+      {
+        "slotId": 5,
+        "itemId": "w2a-vbrief-continue-state",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/vbrief/continue-state.ts",
+        "sessionName": "agent-pan-1312-5",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-5",
+        "branch": "feature/pan-1312-slot-5",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-22T13:08:08.627Z",
+        "mergedAt": "2026-05-22T13:08:55.838Z"
+      }
+    ],
+    "currentWave": 0,
+    "totalWaves": 1,
+    "autoAdvance": true,
+    "hostOverride": false,
+    "autoAdvanceFailureCount": 1,
+    "lastAutoAdvanceError": "One or more swarm slots failed before completion was confirmed.",
+    "deferred": [
+      {
+        "itemId": "w2a-vbrief-dag",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/vbrief/dag.ts"
+      },
+      {
+        "itemId": "w2a-vbrief-index",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/vbrief/vbrief-index.ts"
+      },
+      {
+        "itemId": "w2a-work-agent-lifecycle",
+        "itemTitle": "Wave 2a \u2014 delete *Async exports and dead bridges from src/lib/work-agent-lifecycle.ts"
+      },
+      {
+        "itemId": "w2a-pan-dir",
+        "itemTitle": "Wave 2a \u2014 delete deprecated *Async aliases from src/lib/pan-dir/"
+      }
+    ],
+    "synthesisOutputs": {
+      "w1a-gate": {
+        "targetItemId": "w1a-gate",
+        "writtenAt": "2026-05-22T12:15:25.269Z",
+        "contextUpdate": "# PAN-1312 w1a-gate \u2014 exported `*Async` sibling map\n\n## Result\n\nA scan of exported symbols under `src/lib/**/*.ts` found 69 exported `*Async` APIs. 5 checkpoint-client exports are explicitly out of scope. Every other exported `*Async` API has a mapped Effect sibling, including plain-named Effect functions used by `src/lib/pan-dir/*` compatibility aliases.\n\n| Scope | Module | `*Async` export | Effect sibling |\n| --- | --- | --- | --- |\n| In scope | `src/lib/agents.ts` | `clearAgentPausedAsync` | `clearAgentPausedEffect` |\n| In scope | `src/lib/agents.ts` | `clearAgentTroubledAsync` | `clearAgentTroubledEffect` |\n| In scope | `src/lib/agents.ts` | `getAgentRuntimeStateAsync` | `getAgentRuntimeStateEffect` |\n| In scope | `src/lib/agents.ts` | `getAgentStateAsync` | `getAgentStateEffect` |\n| In scope | `src/lib/agents.ts` | `getLatestSessionIdAsync` | `getLatestSessionIdEffect` |\n| In scope | `src/lib/agents.ts` | `listRunningAgentsAsync` | `listRunningAgentsEffect` |\n| In scope | `src/lib/agents.ts` | `recordAgentFailureAsync` | `recordAgentFailureEffect` |\n| In scope | `src/lib/agents.ts` | `saveAgentStateAsync` | `saveAgentStateEffect` |\n| In scope | `src/lib/agents.ts` | `setAgentPausedAsync` | `setAgentPausedEffect` |\n| In scope | `src/lib/agents.ts` | `stopAgentAsync` | `stopAgentEffect` |\n| In scope | `src/lib/cliproxy.ts` | `bridgeCodexAuthToCliproxyAsync` | `bridgeCodexAuthToCliproxyEffect` |\n| In scope | `src/lib/cliproxy.ts` | `bridgeGeminiAuthToCliproxyAsync` | `bridgeGeminiAuthToCliproxyEffect` |\n| In scope | `src/lib/cliproxy.ts` | `checkCliproxyPortAsync` | `checkCliproxyPortEffect` |\n| In scope | `src/lib/cliproxy.ts` | `installCliproxyAsync` | `installCliproxyEffect` |\n| In scope | `src/lib/cliproxy.ts` | `isCliproxyRunningAsync` | `isCliproxyRunningEffect` |\n| In scope | `src/lib/cliproxy.ts` | `restartCliproxyAsync` | `restartCliproxyEffect` |\n| In scope | `src/lib/cliproxy.ts` | `startCliproxyAsync` | `startCliproxyEffect` |\n| In scope | `src/lib/cliproxy.ts` | `stopCliproxyAsync` | `stopCliproxyEffect` |\n| In scope | `src/lib/cloister/config.ts` | `loadCloisterConfigAsync` | `loadCloisterConfigEffect` |\n| In scope | `src/lib/cloister/config.ts` | `saveCloisterConfigAsync` | `saveCloisterConfigEffect` |\n| In scope | `src/lib/config-yaml.ts` | `getConversationsConfigAsync` | `getConversationsConfigAsyncEffect` |\n| In scope | `src/lib/config-yaml.ts` | `updateConversationsConfigAsync` | `updateConversationsConfigAsyncEffect` |\n| In scope | `src/lib/config.ts` | `getConversationsConfigAsync` | `getConversationsConfigEffect` |\n| In scope | `src/lib/config.ts` | `loadConfigAsync` | `loadConfigEffect` |\n| In scope | `src/lib/config.ts` | `saveConfigAsync` | `saveConfigEffect` |\n| In scope | `src/lib/database/review-status-db.ts` | `getReviewStatusFromDbAsync` | `getReviewStatusFromDbEffect` |\n| In scope | `src/lib/database/review-status-db.ts` | `upsertReviewStatusAsync` | `upsertReviewStatusEffect` |\n| Out of scope | `src/lib/memory/checkpoint-client.ts` | `claimTranscriptRangeAsync` | None \u2014 checkpoint client has no Effect sibling yet |\n| Out of scope | `src/lib/memory/checkpoint-client.ts` | `commitTranscriptRangeAsync` | None \u2014 checkpoint client has no Effect sibling yet |\n| Out of scope | `src/lib/memory/checkpoint-client.ts` | `getTranscriptCheckpointAsync` | None \u2014 checkpoint client has no Effect sibling yet |\n| Out of scope | `src/lib/memory/checkpoint-client.ts` | `listTranscriptCheckpointsAsync` | None \u2014 checkpoint client has no Effect sibling yet |\n| Out of scope | `src/lib/memory/checkpoint-client.ts` | `releaseTranscriptRangeAsync` | None \u2014 checkpoint client has no Effect sibling yet |\n| In scope | `src/lib/pan-dir/continue.ts` | `readWorkspaceContinueAsync` | `readWorkspaceContinue` |\n| In scope | `src/lib/pan-dir/continue.ts` | `writeWorkspaceContinueAsync` | `writeWorkspaceContinue` |\n| In scope | `src/lib/pan-dir/index.ts` | `readWorkspaceContinueAsync` | `readWorkspaceContinue` |\n| In scope | `src/lib/pan-dir/index.ts` | `writeWorkspaceContinueAsync` | `writeWorkspaceContinue` |\n| In scope | `src/lib/pan-dir/specs.ts` | `findSpecByIssueAsync` | `findSpecByIssue` |\n| In scope | `src/lib/review-status.ts` | `getReviewStatusAsync` | `getReviewStatusAsyncEffect` |\n| In scope | `src/lib/review-status.ts` | `setReviewStatusAsync` | `setReviewStatusAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `capturePaneAsync` | `capturePaneAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `createSessionAsync` | `createSessionAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `getAgentSessionsAsync` | `getAgentSessionsAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `getReviewSessionsAsync` | `getReviewSessionsAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `getWindowDimensionsAsync` | `getWindowDimensionsAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `isPaneDeadAsync` | `isPaneDeadAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `killSessionAsync` | `killSessionAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `listPaneValuesAsync` | `listPaneValuesAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `listSessionNamesAsync` | `listSessionNamesAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `listSessionsAsync` | `listSessionsAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `resizeWindowAsync` | `resizeWindowAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `sendKeysAsync` | `sendKeysEffect` |\n| In scope | `src/lib/tmux.ts` | `sendRawKeystrokeAsync` | `sendRawKeystrokeAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `sessionExistsAsync` | `sessionExistsAsyncEffect` |\n| In scope | `src/lib/tmux.ts` | `setOptionAsync` | `setOptionAsyncEffect` |\n| In scope | `src/lib/vbrief/continue-state.ts` | `readContinueStateAsync` | `readContinueStateEffect` |\n| In scope | `src/lib/vbrief/continue-state.ts` | `writeContinueStateAsync` | `writeContinueStateEffect` |\n| In scope | `src/lib/vbrief/dag.ts` | `applyTaskOperationToPlanFileAsync` | `applyTaskOperationToPlanFileEffect` |\n| In scope | `src/lib/vbrief/dag.ts` | `removeStaleLockAsync` | `removeStaleLockEffect` |\n| In scope | `src/lib/vbrief/dag.ts` | `writePipelineMirrorToPlanFileAsync` | `writePipelineMirrorToPlanFileEffect` |\n| In scope | `src/lib/vbrief/io.ts` | `findPlanAsync` | `findPlanEffect` |\n| In scope | `src/lib/vbrief/io.ts` | `findWorkspaceDraftPlanAsync` | `findWorkspaceDraftPlanEffect` |\n| In scope | `src/lib/vbrief/io.ts` | `isPlanningCompleteAsync` | `isPlanningCompleteEffect` |\n| In scope | `src/lib/vbrief/io.ts` | `isPlanningProposedAsync` | `isPlanningProposed` |\n| In scope | `src/lib/vbrief/io.ts` | `readPlanAsync` | `readPlanEffect` |\n| In scope | `src/lib/vbrief/io.ts` | `readWorkspacePlanAsync` | `readWorkspacePlanEffect` |\n| In scope | `src/lib/vbrief/vbrief-index.ts` | `findVBriefByIssueAsync` | `findVBriefByIssueEffect` |\n| In scope | `src/lib/vbrief/vbrief-index.ts` | `listVBriefsAsync` | `listVBriefsEffect` |\n| In scope | `src/lib/vbrief/vbrief-index.ts` | `readVBriefDocumentAsync` | `readVBriefDocumentEffect` |\n| In scope | `src/lib/work-agent-lifecycle.ts` | `getWorkAgentLifecycleStateAsync` | `getWorkAgentLifecycleStateEffect` |\n\n## Verification\n\n- `npm run typecheck` passed.\n- `npm run build` passed.\n- The build initially exposed missing `checkAgentHealthEffect` / `determineHealthStatusEffect` exports from `src/dashboard/lib/health-filtering.ts`; the module now exports those Effect-native functions and keeps the existing async wrappers as bridges.\n"
+      }
+    },
+    "createdAt": "2026-05-22T03:27:22.833Z",
+    "updatedAt": "2026-05-22T13:16:00.928Z"
+  },
+  "feedback": [],
+  "statusOverrides": {
+    "w1e-gate": "completed",
+    "w1e-gate.ac1": "completed",
+    "w1e-gate.ac2": "completed",
+    "w1e-gate.ac3": "completed",
+    "w2a-agents": "completed",
+    "w2a-agents.ac1": "completed",
+    "w2a-agents.ac2": "completed",
+    "w2a-agents.w2a-agents.ac1": "completed",
+    "w2a-agents.w2a-agents.ac2": "completed",
+    "w2a-tmux": "completed",
+    "w2a-tmux.ac1": "completed",
+    "w2a-tmux.ac2": "completed",
+    "w2a-tmux.w2a-tmux.ac1": "completed",
+    "w2a-tmux.w2a-tmux.ac2": "completed"
+  }
+}
