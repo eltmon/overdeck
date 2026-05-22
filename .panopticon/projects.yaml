@@ -1,9 +1,3 @@
-# Close-out lifecycle knobs live in ~/.panopticon/cloister.toml:
-# [close_out]
-# remove_workspace = false
-# delete_feature_branch = false
-# auto = false
-# auto_delay_minutes = 60
 projects:
   panopticon-cli:
     name: panopticon-cli
