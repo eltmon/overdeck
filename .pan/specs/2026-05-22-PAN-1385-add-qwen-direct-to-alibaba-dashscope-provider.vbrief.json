@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:49:47.358Z"
+    "updated": "2026-05-22T23:52:56.255Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:49:47.358Z",
+    "updated": "2026-05-22T23:52:56.255Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -505,7 +505,7 @@
       {
         "id": "add-routing-tests",
         "title": "Add unit tests for getProviderForModel routing of qwen3-* IDs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -521,7 +521,7 @@
           {
             "id": "add-routing-tests.ac1",
             "title": "Test file asserts all four qwen3-* IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7-or-canonical) route to PROVIDERS.dashscope.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -529,7 +529,7 @@
           {
             "id": "add-routing-tests.ac2",
             "title": "Test file asserts qwen/qwen3.6-plus still routes to PROVIDERS.nous (regression guard for H1/H3).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -537,7 +537,7 @@
           {
             "id": "add-routing-tests.ac3",
             "title": "Test file asserts getProviderEnv for PROVIDERS.dashscope emits the five expected ANTHROPIC_* env vars with the correct model IDs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -545,7 +545,7 @@
           {
             "id": "add-routing-tests.ac4",
             "title": "`npm test` passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
