@@ -33,19 +33,23 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   MAX_AUTO_REQUEUE: 25,
 }));
 
-vi.mock('../../../src/lib/tmux.js', () => ({
-  sessionExists: (...args: unknown[]) => mockSessionExists(...args),
-  sendKeysAsync: (...args: unknown[]) => mockSendKeysAsync(...args),
-  sessionExistsAsync: vi.fn().mockResolvedValue(false),
-  buildTmuxCommandString: vi.fn(),
-  capturePaneAsync: vi.fn(),
-  createSessionAsync: vi.fn(),
-  killSession: vi.fn(),
-  killSessionAsync: vi.fn(),
-  listPaneValues: vi.fn(),
-  listPaneValuesAsync: vi.fn(),
-  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-}));
+vi.mock('../../../src/lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    sessionExists: (...args: unknown[]) => mockSessionExists(...args),
+    sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
+    sessionExistsAsyncEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
+    buildTmuxCommandString: vi.fn(),
+    capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+    createSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
+    isPaneDeadAsyncEffect: vi.fn(() => Effect.succeed(false)),
+    killSession: vi.fn(),
+    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
+    listPaneValues: vi.fn(),
+    listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+  };
+});
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: (...args: unknown[]) => mockWriteFeedbackFile(...args),
@@ -390,7 +394,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
       },
     });
 
-    // Agent session exists; capturePaneAsync returns undefined → isAgentActiveInTmux = false (idle)
+    // Agent session exists; captured pane output is blank → isAgentActiveInTmux = false (idle)
     mockSessionExists.mockReturnValue(true);
     // resolveProjectFromIssue returns our temp project so the workspace path resolves
     mockResolveProjectFromIssue.mockReturnValue({ projectPath: tempProjectPath });

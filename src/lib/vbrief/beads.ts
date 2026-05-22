@@ -285,14 +285,17 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       .join('\n');
     const description = [actionText, acLines].filter(Boolean).join('\n');
 
-    const blockingDeps = [...(blockers.get(itemId) ?? [])].map(blockerId => {
-      const beadId = beadIds.get(blockerId);
-      return beadId ? `blocks:${beadId}` : null;
-    }).filter((d): d is string => d !== null);
+    // blockers.get(itemId) = items that block itemId, so itemId depends on each.
+    // `bd create <itemId> --deps <blockerBead>` (plain id, no prefix) records
+    // "itemId depends on blockerBead" / "blockerBead blocks itemId". A `blocks:`
+    // prefix inverts that relationship — do NOT use it here.
+    const dependencyBeadIds = [...(blockers.get(itemId) ?? [])]
+      .map(blockerId => beadIds.get(blockerId) ?? null)
+      .filter((d): d is string => d !== null);
 
     const args = ['create', fullTitle, '--type', 'task', '--silent', '-l', labelStr, '--metadata', JSON.stringify(beadMetadata)];
     if (description) args.push('-d', description);
-    if (blockingDeps.length > 0) args.push('--deps', blockingDeps.join(','));
+    if (dependencyBeadIds.length > 0) args.push('--deps', dependencyBeadIds.join(','));
 
     console.log(`[beads] (${i + 1}/${orderedIds.length}) creating "${item.title}"`);
 

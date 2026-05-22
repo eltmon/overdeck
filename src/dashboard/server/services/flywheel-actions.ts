@@ -4,10 +4,11 @@ import { freemem, totalmem } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { FlywheelStatus } from '@panctl/contracts';
-import { loadConfigAsyncNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
+import { Effect } from 'effect';
+import { loadConfigAsyncNoMigrationEffect, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/database/app-settings.js';
-import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { sessionExistsAsyncEffect } from '../../../lib/tmux.js';
 import {
   abortFlywheelRun,
   getFlywheelRunDetail,
@@ -117,7 +118,7 @@ async function readGateSnapshot(): Promise<FlywheelGateSnapshot> {
 }
 
 async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
-  const { config } = await loadConfigAsyncNoMigration();
+  const { config } = await Effect.runPromise(loadConfigAsyncNoMigrationEffect());
   const flywheel = config.roles?.flywheel;
   return {
     harness: flywheel?.harness ?? 'claude-code',
@@ -244,7 +245,7 @@ export async function pauseFlywheelRunForDashboard(): Promise<{ before: Flywheel
     } catch { /* non-fatal: resume falls back to fresh if session.id is missing */ }
   }
   await setPaused(true);
-  await import('../../../lib/agents.js').then(({ stopAgentAsync }) => stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  await import('../../../lib/agents.js').then(({ stopAgentEffect }) => Effect.runPromise(stopAgentEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID)));
   return { before, after: await readGateSnapshot(), changed: true };
 }
 
@@ -258,15 +259,15 @@ export async function abortFlywheelRunForDashboard(): Promise<{ aborted: string 
     const stale = await resolveLiveFlywheelRunId();
     return { aborted: stale ?? null };
   }
-  const { stopAgentAsync } = await import('../../../lib/agents.js');
-  await stopAgentAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+  const { stopAgentEffect } = await import('../../../lib/agents.js');
+  await Effect.runPromise(stopAgentEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
   await abortFlywheelRun(candidate);
   return { aborted: candidate };
 }
 
 export async function resumeFlywheelRunForDashboard(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
   const before = await readGateSnapshot();
-  if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
+  if (!before.paused && await Effect.runPromise(sessionExistsAsyncEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
     return { before, after: before, changed: false };
   }
   if (!before.activeRunId) throw new Error('No active flywheel run to resume');

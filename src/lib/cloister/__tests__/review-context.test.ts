@@ -1,8 +1,8 @@
 /**
  * Tests for review-context.ts (PAN-1059)
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 
 // ── fs/promises mocks ──────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ vi.mock('fs', () => ({
 
 // ── child_process mock ─────────────────────────────────────────────────────
 const mockExecAsync = vi.fn();
+const mockReadPlanEffect = vi.fn();
 vi.mock('child_process', () => ({
   exec: vi.fn((cmd: string, opts: unknown, cb: unknown) => {
     // promisify calls exec(cmd, opts, callback)
@@ -37,10 +38,9 @@ vi.mock('child_process', () => ({
 }));
 
 // ── vbrief / config mocks ──────────────────────────────────────────────────
-const mockReadPlanEffect = vi.hoisted(() => vi.fn());
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
-  readPlanEffect: mockReadPlanEffect,
+  readPlanEffect: (...args: unknown[]) => mockReadPlanEffect(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),

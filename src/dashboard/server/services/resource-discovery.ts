@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../../../lib/projects.js';
-import { listSessionNamesAsync } from '../../../lib/tmux.js';
+import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
 import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
 import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
@@ -250,7 +250,7 @@ async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
 
 async function loadTmuxSessions(): Promise<string[]> {
   try {
-    return (await listSessionNamesAsync()).map((name) => name.trim()).filter(Boolean);
+    return (await Effect.runPromise(listSessionNamesAsyncEffect())).map((name) => name.trim()).filter(Boolean);
   } catch {
     return [];
   }
@@ -540,7 +540,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
     const issueLower = issue.issueId.toLowerCase();
     const agentId = `agent-${issueLower}`;
-    const runtimeState = await getAgentRuntimeStateAsync(agentId).catch(() => null);
+    const runtimeState = await Effect.runPromise(getAgentRuntimeStateEffect(agentId)).catch(() => null);
     if (!runtimeState) return;
 
     issue.agentStatus = runtimeState.state;

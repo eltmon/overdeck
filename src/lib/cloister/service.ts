@@ -25,7 +25,7 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentStateAsync, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentStateEffect, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
@@ -65,7 +65,7 @@ import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
-import { sessionExistsAsync, killSessionAsync } from '../tmux.js';
+import { sessionExistsAsyncEffect, killSessionAsyncEffect } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
@@ -195,11 +195,11 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
   // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
   if (role === 'plan') {
     const legacyId = `planning-${issueLower}`;
-    const legacyState = await getAgentStateAsync(legacyId);
+    const legacyState = await Effect.runPromise(getAgentStateEffect(legacyId));
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
       // S1: if stuck at 'starting' with no live tmux session, treat as not-alive
       // so the next retry can spawn a fresh run without being blocked.
-      if (legacyState.status === 'starting' && !(await sessionExistsAsync(legacyId))) {
+      if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExistsAsyncEffect(legacyId)))) {
         return false;
       }
       return true;
@@ -210,13 +210,13 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     ? `agent-${issueLower}`
     : `agent-${issueLower}-${role}`;
 
-  const state = await getAgentStateAsync(candidateId);
+  const state = await Effect.runPromise(getAgentStateEffect(candidateId));
   if (!state) return false;
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
 
   // S1: treat a 'starting' state with no live tmux session as not-alive.
-  if (stateRole === role && state.status === 'starting' && !(await sessionExistsAsync(candidateId))) {
+  if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExistsAsyncEffect(candidateId)))) {
     return false;
   }
 
@@ -267,7 +267,7 @@ Required steps:
  */
 async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
-  const agentState = await getAgentStateAsync(`agent-${issueLower}`);
+  const agentState = await Effect.runPromise(getAgentStateEffect(`agent-${issueLower}`));
   if (agentState?.workspace) return agentState.workspace;
   const resolved = resolveProjectFromIssue(issueId);
   if (!resolved) return null;
@@ -310,12 +310,12 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   // dead one.
   const issueLower = normalizedIssueId.toLowerCase();
   const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
-  if (await sessionExistsAsync(roleSessionId)) {
+  if (await Effect.runPromise(sessionExistsAsyncEffect(roleSessionId))) {
     const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     try {
-      await killSessionAsync(roleSessionId);
+      await Effect.runPromise(killSessionAsyncEffect(roleSessionId));
     } catch (err) {
       console.error(`[cloister] failed to kill stale session ${roleSessionId}:`, err instanceof Error ? err.message : String(err));
     }
@@ -635,7 +635,7 @@ export class CloisterService {
             // For issue-scoped specialists, check the exact tmux session instead of the legacy
             // project/type singleton lookup, which cannot represent PAN-754 session identity.
             const stillRunning = parsed.issueId
-              ? await sessionExistsAsync(entry.name)
+              ? await Effect.runPromise(sessionExistsAsyncEffect(entry.name))
               : await isSpecialistRunning(parsed.specialistType, parsed.projectKey);
             if (!stillRunning) {
               saveAgentRuntimeState(entry.name, {
@@ -685,8 +685,8 @@ export class CloisterService {
         // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
         // Replaces the legacy getActiveParallelReviewIssues helper that scanned
         // tmux for dispatchParallelReview's coordinator session naming pattern.
-        const { listRunningAgentsAsync } = await import('../agents.js');
-        const agents = await listRunningAgentsAsync();
+        const { listRunningAgentsEffect } = await import('../agents.js');
+        const agents = await Effect.runPromise(listRunningAgentsEffect());
         for (const agent of agents) {
           if (agent.status === 'stopped' || agent.status === 'error') continue;
           const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);

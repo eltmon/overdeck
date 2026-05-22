@@ -2614,6 +2614,40 @@
   flex-direction: column;
 }
 
+/* "About this conversation" drawer — collapsible summary beneath the header */
+.conversationAboutDrawer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.conversationAboutText {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.conversationAboutMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.conversationAboutMuted {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
 .conversationResumeOverlay {
   flex: 1;
   display: flex;
