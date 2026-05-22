@@ -94,7 +94,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
       }
     }
   } catch {
-    // listSessionNamesAsyncEffect may fail if tmux server is not running
+    // Session listing may fail if tmux server is not running
   }
 
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.

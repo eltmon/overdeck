@@ -12,8 +12,10 @@ vi.mock('util', () => ({
 vi.mock('../../../../src/lib/agents.js', async () => {
   const { Effect } = await import('effect');
   return {
+    getAgentStateAsync: vi.fn().mockResolvedValue(null),
     getAgentStateEffect: vi.fn(() => Effect.succeed(null)),
     markAgentStoppedState: vi.fn((state: unknown) => state),
+    saveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
     saveAgentStateEffect: vi.fn(() => Effect.succeed(undefined)),
   };
 });

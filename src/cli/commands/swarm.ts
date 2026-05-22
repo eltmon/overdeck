@@ -7,7 +7,7 @@
  *
  * --dry-run: print the wave plan without spawning agents
  * --wave N:  only dispatch wave N (default: next unfinished wave)
- * --model:   override model for work slots (default: kimi-k2.6)
+ * --model:   override model for work slots (default: config roles.work.model)
  * --max-slots: max concurrent agents (default: respects guardrails)
  * --auto-advance: dispatch next wave automatically when the current wave completes
  * --host: bypass workspace docker stack-health gate after explicit confirmation
@@ -131,7 +131,7 @@ export function registerSwarmCommands(program: Command): void {
     .argument('[id]', 'Issue ID to dispatch')
     .option('--dry-run', 'Print the wave plan without spawning agents')
     .option('--wave <n>', 'Dispatch only wave N')
-    .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
+    .option('--model <model>', 'Override model for work slots (default: config roles.work.model)')
     .option('--max-slots <n>', 'Max concurrent agents')
     .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
     .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')

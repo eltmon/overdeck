@@ -188,7 +188,7 @@ export function closeOut(
     }
 
     // 4+5. Teardown workspace + agent state
-    const closeOutConfig = (yield* loadCloisterConfigEffect().pipe(Effect.orDie)).close_out;
+    const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfigEffect()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
       deleteBranches: closeOutConfig?.delete_feature_branch ?? false,

@@ -47,14 +47,12 @@ export interface CloseIssueOptions {
  * If a tracker is provided, uses the abstraction layer.
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
-function markWorkAgentStoppedForIssue(issueId: string): Effect.Effect<void, unknown> {
+async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
   const agentId = `agent-${normalizeIssueId(issueId)}`;
-  return Effect.gen(function* () {
-    const state = yield* getAgentStateEffect(agentId);
-    if (!state) return;
-    markAgentStoppedState(state);
-    yield* saveAgentStateEffect(state);
-  });
+  const state = await Effect.runPromise(getAgentStateEffect(agentId));
+  if (!state) return;
+  markAgentStoppedState(state);
+  await Effect.runPromise(saveAgentStateEffect(state));
 }
 
 export function closeIssue(
@@ -105,7 +103,7 @@ function closeViaTracker(
   const step = 'close-issue:transition';
   return Effect.gen(function* () {
     yield* tracker.transitionIssue(ctx.issueId, 'closed');
-    yield* markWorkAgentStoppedForIssue(ctx.issueId);
+    yield* Effect.promise(() => markWorkAgentStoppedForIssue(ctx.issueId));
     if (comment) {
       // Best-effort comment — swallow errors
       yield* tracker.addComment(ctx.issueId, comment).pipe(
@@ -205,7 +203,7 @@ async function closeGitHubDirectImpl(ctx: LifecycleContext, comment?: string): P
       `gh issue close ${number} --repo ${owner}/${repo}${commentArg}`,
       { encoding: 'utf-8' },
     );
-    await Effect.runPromise(markWorkAgentStoppedForIssue(ctx.issueId));
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Closed GitHub issue #${number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepFailed(step, `gh issue close failed: ${(err as Error).message}`);
@@ -339,7 +337,7 @@ async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Pro
       }
     }
 
-    await Effect.runPromise(markWorkAgentStoppedForIssue(ctx.issueId));
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Moved Linear issue ${ctx.issueId} to Done`]);
   } catch (err) {
     const message = (err as Error).message;
@@ -383,7 +381,7 @@ async function closeRallyDirectImpl(ctx: LifecycleContext): Promise<StepResult> 
   });
   // RallyTracker.transitionIssue returns Effect (migrated in PAN-1249).
   await Effect.runPromise(tracker.transitionIssue(ctx.issueId, 'closed'));
-  await Effect.runPromise(markWorkAgentStoppedForIssue(ctx.issueId));
+  await markWorkAgentStoppedForIssue(ctx.issueId);
   return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
 }
 
