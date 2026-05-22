@@ -423,15 +423,31 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Projects are visible by default
     await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
 
-    // Click feature row — should auto-select the active session
+    // Click feature row — should auto-select the active work session
     fireEvent.click(screen.getByTestId('feature-PAN-821'));
 
     // Verify lens is rendered instead of legacy IssueWorkbench
     const lens = screen.getByTestId('command-deck-right-pane-tabs');
     expect(lens).toBeInTheDocument();
     expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-    // Pipeline tab is active by default when a feature is selected
-    expect(screen.getByTestId('project-overview')).toBeInTheDocument();
+    // Auto-selecting the active work session opens the agent
+    // Conversation/Terminal view, not the Pipeline tab.
+    expect(await screen.findByTestId('command-deck-agent-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('project-overview')).not.toBeInTheDocument();
+  });
+
+  it('shows the agent Conversation/Terminal view on session click and exits on tab click', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
+
+    // Clicking a session row opens the agent view (ZoneB + SessionPanel).
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
+    expect(await screen.findByTestId('command-deck-agent-view')).toBeInTheDocument();
+
+    // Clicking a right-pane tab clears the session and returns to the tab strip.
+    fireEvent.click(screen.getByRole('tab', { name: 'Pipeline' }));
+    expect(screen.queryByTestId('command-deck-agent-view')).not.toBeInTheDocument();
   });
 
   it('renders the project overview when a project row is selected', async () => {
