@@ -33,6 +33,15 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { initCommand } from './commands/init.js';
 import { syncCommand } from './commands/sync.js';
+import {
+  contextListCommand,
+  contextEditCommand,
+  contextSyncCommand,
+  contextDiffCommand,
+  contextValidateCommand,
+  contextMigrateCommand,
+  contextLayersHelp,
+} from './commands/context-layers.js';
 import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
@@ -181,12 +190,54 @@ program
 
 program
   .command('sync')
-  .description('Sync skills/agents/rules to devroot')
+  .description('Sync skills/agents to ~/.claude/ and render the context layers')
   .option('--dry-run', 'Show what would be synced')
   .option('--force', 'Overwrite files modified since Panopticon installed them')
   .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
   .action(syncCommand);
+
+// pan context — layered context distribution (PAN-1201)
+const context = program
+  .command('context')
+  .description('Manage the layered context model (global / project / workspace)');
+
+context
+  .command('list')
+  .description("Show all three layers' files")
+  .option('--layer <layer>', 'Limit to one layer: global, project, or workspace')
+  .option('--json', 'Output as JSON')
+  .action(contextListCommand);
+
+context
+  .command('edit')
+  .description('Open a context layer in $EDITOR')
+  .option('--layer <layer>', 'Layer to edit: global (default), project, or workspace')
+  .action(contextEditCommand);
+
+context
+  .command('sync')
+  .description('Render the context layers into harness CLAUDE.md files')
+  .action(contextSyncCommand);
+
+context
+  .command('diff')
+  .description('Show what each harness would receive after templating')
+  .option('--harness <harness>', 'Limit to one harness: claude or pi')
+  .action(contextDiffCommand);
+
+context
+  .command('validate')
+  .description('Lint layer templates for unclosed or unknown harness blocks')
+  .action(contextValidateCommand);
+
+context
+  .command('migrate')
+  .description('One-shot migration from the deprecated sync.devroot model')
+  .option('--yes', 'Register every discovered project without prompting')
+  .action(contextMigrateCommand);
+
+context.action(contextLayersHelp);
 
 program
   .command('restore [timestamp]')

@@ -13,6 +13,7 @@ import {
   getIssuePrefix,
 } from '../../lib/projects.js';
 import { SYNC_SOURCES } from '../../lib/paths.js';
+import { ensureProjectLayer } from '../../lib/context-layers/index.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -131,9 +132,16 @@ export async function projectAddCommand(
 
   registerProject(key, projectConfig);
 
+  // PAN-1201: seed the project's context layer (.pan/context/project.md) so
+  // `pan sync` can render it into the project's CLAUDE.md.
+  const seededLayer = ensureProjectLayer(fullPath);
+
   console.log(chalk.green(`✓ Added project: ${name}`));
   console.log(chalk.dim(`  Key: ${key}`));
   console.log(chalk.dim(`  Path: ${fullPath}`));
+  if (seededLayer) {
+    console.log(chalk.dim('  Context layer: .pan/context/project.md (commit this)'));
+  }
   if (linearTeam) {
     console.log(chalk.dim(`  Linear team: ${linearTeam}`));
   }

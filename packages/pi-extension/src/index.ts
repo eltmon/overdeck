@@ -308,6 +308,33 @@ export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
   })
 }
 
+/**
+ * Load the assembled workspace context layer (PAN-1201) and fold it into the
+ * Pi session's system prompt.
+ *
+ * Panopticon assembles `<workspace>/.pan/context/workspace.md` at workspace
+ * creation. Pi is launched with its CWD set to the workspace, so the bundle
+ * is read relative to `process.cwd()`. The Pi API surface for extending the
+ * system prompt is still settling upstream, so the append is duck-typed and
+ * best-effort: when `ctx` exposes an `appendSystemPrompt(text)` method it is
+ * called; otherwise this is a silent no-op (the launcher's
+ * `--append-system-prompt` path still carries spawn context). Never throws —
+ * the extension must not break Pi.
+ */
+export async function handleWorkspaceContext(ctx: unknown, cwd: string = process.cwd()): Promise<void> {
+  const file = join(cwd, '.pan', 'context', 'workspace.md')
+  const content = await readFile(file, 'utf8').catch(() => '')
+  if (!content.trim()) return
+  const append = (ctx as { appendSystemPrompt?: unknown } | null | undefined)?.appendSystemPrompt
+  if (typeof append === 'function') {
+    try {
+      await append.call(ctx, content)
+    } catch {
+      // Pi API mismatch — ignore; spawn-time context delivery still applies.
+    }
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // Default export — registered with Pi via `pi --extension <dist/index.js>`.
 // ────────────────────────────────────────────────────────────────────────
@@ -323,9 +350,11 @@ export default function panopticonPiExtension(pi: PiExtensionAPI): void {
 
   const env: HookEnv = { agentId }
 
-  pi.on('session_start', async event => {
+  pi.on('session_start', async (event, ctx) => {
     try {
       await handleSessionStart(env, event)
+      // PAN-1201: fold the assembled workspace context layer into the prompt.
+      await handleWorkspaceContext(ctx)
     } catch {
       // Filesystem / network failures must never break Pi.
     }

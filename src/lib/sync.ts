@@ -4,7 +4,7 @@ import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
 import {
-  SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
+  SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, CLAUDE_DIR,
   SYNC_SOURCES,
   CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
   SYNC_TARGET, isDevMode,
@@ -13,10 +13,16 @@ import { FsError } from './errors.js';
 import {
   buildManifestFromDirectory, writeManifest, readManifest, hashFile,
   setManifestEntry, collectSourceFiles,
-  type Manifest, type FileStatus,
+  type Manifest,
   compareFileToManifest,
 } from './manifest.js';
-import { getDevrootPath } from './config.js';
+import { listProjects } from './projects.js';
+import {
+  ensureGlobalLayer,
+  renderGlobalLayer,
+  renderProjectLayer,
+  applyManagedRegion,
+} from './context-layers/index.js';
 
 export interface SyncItem {
   name: string;
@@ -322,22 +328,12 @@ export function refreshCache(): RefreshCacheResult {
 }
 
 /**
- * Devroot sync item — represents a single file to distribute.
- */
-export interface DevrootSyncItem {
-  /** Relative path from .claude/ (e.g., "skills/beads/SKILL.md") */
-  relativePath: string;
-  /** Absolute path to source file in cache */
-  sourcePath: string;
-  /** Absolute path to target file at devroot */
-  targetPath: string;
-  /** What action to take */
-  status: FileStatus;
-}
-
-/**
- * Plan what would be synced to devroot (dry run).
- * Reads from cache, targets <devroot>/.claude/, uses manifest comparison.
+ * Plan what `pan sync` would distribute to ~/.claude/ (dry run).
+ *
+ * PAN-1201: targets the user's Claude Code home directly — the layered
+ * context model replaced the old `<devroot>/.claude/` indirection. Skills
+ * and agents are distributed as files; rules now fold into CLAUDE.md (see
+ * the context-layers subsystem) and are not planned here.
  */
 export function planSync(): SyncPlan {
   const plan: SyncPlan = {
@@ -348,70 +344,37 @@ export function planSync(): SyncPlan {
     devSkills: [],
   };
 
-  const devrootPath = getDevrootPath();
-  if (!devrootPath) return plan;
-
-  const targetBase = join(devrootPath, '.claude');
+  const targetBase = CLAUDE_DIR;
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
   const manifest = readManifest(manifestPath);
 
-  // Plan skills
-  const skillFiles = collectSourceFiles(SKILLS_DIR, 'skills/');
-  for (const file of skillFiles) {
-    const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
-    const skillName = file.relativePath.split('/')[1] || file.relativePath;
+  const planInto = (sourceDir: string, prefix: string, bucket: SyncItem[]): void => {
+    for (const file of collectSourceFiles(sourceDir, prefix)) {
+      const targetFile = join(targetBase, file.relativePath);
+      const status = compareFileToManifest(targetFile, file.relativePath, manifest);
 
-    let syncStatus: SyncItem['status'] = 'new';
-    if (status.action === 'update') syncStatus = 'symlink';  // reusing 'symlink' for "managed, safe to update"
-    else if (status.action === 'modified') syncStatus = 'conflict';
-    else if (status.action === 'user-owned') syncStatus = 'conflict';
+      let syncStatus: SyncItem['status'] = 'new';
+      if (status.action === 'update') {
+        syncStatus = 'symlink'; // 'symlink' here means "managed, safe to update"
+      } else if (status.action === 'modified') {
+        syncStatus = 'conflict';
+      } else if (status.action === 'user-owned') {
+        // Identical content sitting at the target from a previous Panopticon
+        // era is not a conflict — it would simply be adopted on the real run.
+        syncStatus = hashFile(targetFile) === hashFile(file.absolutePath) ? 'exists' : 'conflict';
+      }
 
-    plan.skills.push({
-      name: file.relativePath,
-      sourcePath: file.absolutePath,
-      targetPath: targetFile,
-      status: syncStatus,
-    });
-  }
+      bucket.push({
+        name: file.relativePath,
+        sourcePath: file.absolutePath,
+        targetPath: targetFile,
+        status: syncStatus,
+      });
+    }
+  };
 
-  // Plan agents
-  const agentFiles = collectSourceFiles(CACHE_AGENTS_DIR, 'agents/');
-  for (const file of agentFiles) {
-    const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
-
-    let syncStatus: SyncItem['status'] = 'new';
-    if (status.action === 'update') syncStatus = 'symlink';
-    else if (status.action === 'modified') syncStatus = 'conflict';
-    else if (status.action === 'user-owned') syncStatus = 'conflict';
-
-    plan.agents.push({
-      name: file.relativePath,
-      sourcePath: file.absolutePath,
-      targetPath: targetFile,
-      status: syncStatus,
-    });
-  }
-
-  // Plan rules
-  const ruleFiles = collectSourceFiles(CACHE_RULES_DIR, 'rules/');
-  for (const file of ruleFiles) {
-    const targetFile = join(targetBase, file.relativePath);
-    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
-
-    let syncStatus: SyncItem['status'] = 'new';
-    if (status.action === 'update') syncStatus = 'symlink';
-    else if (status.action === 'modified') syncStatus = 'conflict';
-    else if (status.action === 'user-owned') syncStatus = 'conflict';
-
-    plan.rules.push({
-      name: file.relativePath,
-      sourcePath: file.absolutePath,
-      targetPath: targetFile,
-      status: syncStatus,
-    });
-  }
+  planInto(SKILLS_DIR, 'skills/', plan.skills);
+  planInto(CACHE_AGENTS_DIR, 'agents/', plan.agents);
 
   return plan;
 }
@@ -431,8 +394,19 @@ export interface SyncResult {
 }
 
 /**
- * Execute sync to devroot: copy from cache to <devroot>/.claude/.
- * Uses manifest-based conflict resolution. NEVER touches ~/.claude/.
+ * Distribute cached skills and agents into the user's Claude Code home
+ * (~/.claude/skills/, ~/.claude/agents/).
+ *
+ * PAN-1201: this is the Global → claude-code half of the sync output map.
+ * It targets ~/.claude/ directly — the deprecated `<devroot>/.claude/`
+ * indirection is gone. Rules are no longer distributed as files; they fold
+ * into the rendered CLAUDE.md instead (see syncContextLayers()).
+ *
+ * Conflict resolution is manifest-based. A file already at the target but
+ * absent from the manifest (a prior Panopticon era, or a fresh ~/.claude)
+ * is *adopted* when its content is byte-identical to our source — recorded
+ * into the manifest so future syncs can update it. A target file that
+ * differs is genuinely user-owned and is left untouched.
  */
 export function executeSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
@@ -443,20 +417,14 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
     diffs: [],
   };
 
-  const devrootPath = getDevrootPath();
-  if (!devrootPath) {
-    return result;
-  }
-
-  const targetBase = join(devrootPath, '.claude');
+  const targetBase = CLAUDE_DIR;
   const manifestPath = join(targetBase, '.panopticon-manifest.json');
   const manifest = readManifest(manifestPath);
 
-  // Collect all source files from cache
+  // Collect all source files from cache (skills + agent definitions).
   const allFiles = [
     ...collectSourceFiles(SKILLS_DIR, 'skills/'),
     ...collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'),
-    ...collectSourceFiles(CACHE_RULES_DIR, 'rules/'),
   ];
 
   for (const file of allFiles) {
@@ -507,7 +475,13 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
       }
 
       case 'user-owned': {
-        // User placed this file, never touch it
+        // Target file exists but is absent from the manifest. If its content
+        // is byte-identical to our source, it is ours (a prior era) — adopt
+        // it so future syncs can manage it. Otherwise it is genuinely
+        // user-authored: never touch it.
+        if (hashFile(targetFile) === hashFile(file.absolutePath)) {
+          setManifestEntry(manifest, file.relativePath, hashFile(targetFile), 'panopticon');
+        }
         result.skipped.push(file.relativePath);
         break;
       }
@@ -516,6 +490,71 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
 
   // Write updated manifest
   writeManifest(manifestPath, manifest);
+
+  return result;
+}
+
+export interface ContextLayerSyncResult {
+  /** True when ~/.claude/CLAUDE.md's managed region was written this run. */
+  globalWritten: boolean;
+  /** True when global.md did not exist and a starter template was seeded. */
+  globalStubCreated: boolean;
+  /** Names of registered projects whose CLAUDE.md was written this run. */
+  projectsWritten: string[];
+  errors: string[];
+}
+
+/**
+ * Render the global and project context layers into harness CLAUDE.md files.
+ *
+ * PAN-1201: the layered-context half of `pan sync`. The global layer
+ * (~/.panopticon/context/global.md + the folded bundled rules) renders into
+ * the managed region of ~/.claude/CLAUDE.md; each registered project's
+ * `.pan/context/project.md` renders into the managed region of its own
+ * CLAUDE.md. Content outside the managed region is preserved untouched, so a
+ * hand-authored CLAUDE.md is never clobbered.
+ */
+export function syncContextLayers(): ContextLayerSyncResult {
+  const result: ContextLayerSyncResult = {
+    globalWritten: false,
+    globalStubCreated: false,
+    projectsWritten: [],
+    errors: [],
+  };
+
+  // Global layer → ~/.claude/CLAUDE.md
+  result.globalStubCreated = ensureGlobalLayer();
+  try {
+    const managed = renderGlobalLayer('claude-code', isDevMode());
+    const claudeMd = join(CLAUDE_DIR, 'CLAUDE.md');
+    const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf-8') : '';
+    const next = applyManagedRegion(existing, managed);
+    if (next !== existing) {
+      mkdirSync(CLAUDE_DIR, { recursive: true });
+      writeFileSync(claudeMd, next, 'utf-8');
+      result.globalWritten = true;
+    }
+  } catch (err: any) {
+    result.errors.push(`global: ${err?.message ?? err}`);
+  }
+
+  // Project layers → <projectRoot>/CLAUDE.md
+  for (const { config } of listProjects()) {
+    if (!existsSync(config.path)) continue;
+    try {
+      const managed = renderProjectLayer(config.path, 'claude-code');
+      if (!managed) continue; // no project.md → leave this project's CLAUDE.md alone
+      const claudeMd = join(config.path, 'CLAUDE.md');
+      const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf-8') : '';
+      const next = applyManagedRegion(existing, managed);
+      if (next !== existing) {
+        writeFileSync(claudeMd, next, 'utf-8');
+        result.projectsWritten.push(config.name);
+      }
+    } catch (err: any) {
+      result.errors.push(`${config.name}: ${err?.message ?? err}`);
+    }
+  }
 
   return result;
 }
@@ -1029,6 +1068,13 @@ export const executeSyncEffect = (options: SyncOptions = {}): Effect.Effect<Sync
   Effect.try({
     try: () => executeSync(options),
     catch: (cause) => toSyncFsError('executeSync', cause),
+  });
+
+/** Render the global + project context layers into harness CLAUDE.md files. */
+export const syncContextLayersEffect = (): Effect.Effect<ContextLayerSyncResult, FsError> =>
+  Effect.try({
+    try: () => syncContextLayers(),
+    catch: (cause) => toSyncFsError('syncContextLayers', cause),
   });
 
 /** Plan hook files to be synced (pure). */

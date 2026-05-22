@@ -22,6 +22,7 @@ import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
 import { refreshCache } from '../../lib/sync.js';
+import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
 
@@ -252,6 +253,16 @@ async function installCommand(options: InstallOptions): Promise<void> {
     spinner.succeed(`Cache refreshed: ${parts.length > 0 ? parts.join(', ') : 'up to date'}`);
   } catch (error) {
     spinner.warn(`Failed to refresh cache: ${error}`);
+  }
+
+  // Step 2c: Seed the global context layer (PAN-1201). `pan sync` renders it
+  // into ~/.claude/CLAUDE.md; seed it here so it exists right after install.
+  try {
+    if (ensureGlobalLayer()) {
+      console.log(chalk.dim('  Seeded ~/.panopticon/context/global.md (starter template)'));
+    }
+  } catch {
+    // Non-fatal — `pan sync` / `pan context edit` will seed it later.
   }
 
   await setupHooksCommand();
