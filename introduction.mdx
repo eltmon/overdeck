@@ -3,6 +3,8 @@ title: Introduction
 description: 'The IDE for the agent era — watch agents code in real time, talk to them, review their diffs live, swap models mid-conversation, and let the pipeline ship it when you are ready'
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Panopticon
 
 > *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
@@ -17,7 +19,11 @@ No install step required — `npx @panctl/cli` starts Command Deck and opens the
 
 IDEs were built for humans who type code. Panopticon is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
 
-![Command Deck](/docs/screenshot-board.png)
+<ThemedImage
+  light="/docs/screenshot-board-light.png"
+  dark="/docs/screenshot-board-dark.png"
+  alt="Panopticon Command Deck board view"
+/>
 
 ## Command Deck
 
@@ -124,7 +130,11 @@ Command Deck at `https://pan.localhost` provides 13 views:
 | **God View** | Aggregate cross-project view of all agent activity |
 | **Settings** | Model routing, tracker API keys, and project configuration |
 
-![Command Deck](/docs/dashboard-overview.png)
+<ThemedImage
+  light="/docs/dashboard-overview-light.png"
+  dark="/docs/dashboard-overview-dark.png"
+  alt="Panopticon Command Deck dashboard overview"
+/>
 
 ## Quick Start
 
