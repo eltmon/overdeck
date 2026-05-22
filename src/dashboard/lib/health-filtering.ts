@@ -22,7 +22,7 @@ export const checkAgentHealthEffect = (agentId: string) =>
     const stdout = yield* capturePaneAsyncEffect(agentId, 5);
 
     return { alive: true, lastOutput: stdout.trim() };
-  }).pipe(Effect.catchAll(() => Effect.succeed({ alive: false })));
+  }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
 
 export async function checkAgentHealthAsync(agentId: string): Promise<{
   alive: boolean;
@@ -57,7 +57,7 @@ export const determineHealthStatusEffect = (
     const state = yield* Effect.tryPromise({
       try: () => readFile(stateFile, 'utf-8').then((content) => JSON.parse(content)),
       catch: () => null,
-    }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
 
     if (state === null) return null;
 
@@ -72,7 +72,7 @@ export const determineHealthStatusEffect = (
       const runtime = yield* Effect.tryPromise({
         try: () => readFile(runtimeFile, 'utf-8').then((content) => JSON.parse(content)),
         catch: () => null,
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+      }).pipe(Effect.catch(() => Effect.succeed(null)));
 
       if (runtime?.lastActivity) {
         const runtimeDate = new Date(runtime.lastActivity);

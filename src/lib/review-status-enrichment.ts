@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { listSessionNamesAsync } from './tmux.js';
+import { listSessionNamesAsyncEffect } from './tmux.js';
 import { resolveProjectFromIssue } from './projects.js';
 import type { ReviewStatus } from './review-status.js';
 
@@ -53,7 +53,7 @@ export async function enrichReviewStatus(
 ): Promise<EnrichedReviewStatus> {
   let allSessions: string[] = [];
   try {
-    allSessions = await listSessionNamesAsync();
+    allSessions = [...await Effect.runPromise(listSessionNamesAsyncEffect())];
   } catch {
     return status;
   }
