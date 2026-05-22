@@ -30,9 +30,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
-  stopAgentAsync: vi.fn(async (agentId: string) => {
-    flywheelLifecycleMocks.stoppedAgents.push(agentId);
-  }),
+  stopAgentEffect: vi.fn(),
 }));
 
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
@@ -53,13 +51,22 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
   },
 }));
 
-vi.mock('../../../lib/tmux.js', () => ({
-  sessionExistsAsync: vi.fn(async () => flywheelLifecycleMocks.sessionExists),
-}));
+vi.mock('../../../lib/tmux.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
+  };
+});
 
-vi.mock('../../../lib/agents.js', () => ({
-  stopAgentAsync: flywheelLifecycleMocks.stopAgentAsync,
-}));
+vi.mock('../../../lib/agents.js', async () => {
+  const { Effect } = await import('effect');
+  flywheelLifecycleMocks.stopAgentEffect.mockImplementation((agentId: string) => Effect.sync(() => {
+    flywheelLifecycleMocks.stoppedAgents.push(agentId);
+  }));
+  return {
+    stopAgentEffect: flywheelLifecycleMocks.stopAgentEffect,
+  };
+});
 
 vi.mock('../../../lib/config-yaml.js', () => ({
   loadConfig: () => ({
@@ -165,7 +172,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
-    flywheelLifecycleMocks.stopAgentAsync.mockClear();
+    flywheelLifecycleMocks.stopAgentEffect.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
