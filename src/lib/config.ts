@@ -274,25 +274,6 @@ export function saveConfig(config: PanopticonConfig): void {
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-export async function loadConfigAsync(): Promise<PanopticonConfig> {
-  try {
-    const content = await fs.readFile(CONFIG_FILE, 'utf8');
-    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
-    return deepMerge(DEFAULT_CONFIG, parsed);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return DEFAULT_CONFIG;
-    }
-    console.error('Warning: Failed to parse config, using defaults');
-    return DEFAULT_CONFIG;
-  }
-}
-
-export async function saveConfigAsync(config: PanopticonConfig): Promise<void> {
-  const content = stringify(config as any);
-  await fs.writeFile(CONFIG_FILE, content, 'utf8');
-}
-
 export function getDefaultConfig(): PanopticonConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
@@ -373,14 +354,8 @@ export function getConversationsConfig(): ConversationsConfig {
   return resolveConversationsConfig(loadConfig());
 }
 
-export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfigAsync());
-}
-
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Both sync and async config IO surfaces get Effect variants. The async paths
-// (preferred in dashboard-reachable code) wrap the existing Promise functions
-// via Effect.tryPromise; the sync paths route through Effect.try.
+// Both sync and async config IO surfaces get Effect variants.
 
 /** Load config.toml (sync). Surfaces FsError on read/parse failure. */
 export const loadConfigEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
@@ -403,7 +378,19 @@ export const saveConfigEffect = (
 /** Load config.toml (async; dashboard-safe). */
 export const loadConfigAsyncEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
   Effect.tryPromise({
-    try: () => loadConfigAsync(),
+    try: async () => {
+      try {
+        const content = await fs.readFile(CONFIG_FILE, 'utf8');
+        const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+        return deepMerge(DEFAULT_CONFIG, parsed);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return DEFAULT_CONFIG;
+        }
+        console.error('Warning: Failed to parse config, using defaults');
+        return DEFAULT_CONFIG;
+      }
+    },
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
   });
@@ -413,7 +400,10 @@ export const saveConfigAsyncEffect = (
   config: PanopticonConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
-    try: () => saveConfigAsync(config),
+    try: async () => {
+      const content = stringify(config as any);
+      await fs.writeFile(CONFIG_FILE, content, 'utf8');
+    },
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
   });
@@ -442,12 +432,4 @@ export const getConversationsConfigEffect = (): Effect.Effect<ConversationsConfi
 /** Resolve conversations sub-config (async). */
 export const getConversationsConfigAsyncEffect =
   (): Effect.Effect<ConversationsConfig, FsError> =>
-    Effect.tryPromise({
-      try: () => getConversationsConfigAsync(),
-      catch: (cause) =>
-        new FsError({
-          path: CONFIG_FILE,
-          operation: 'get-conversations-config-async',
-          cause,
-        }),
-    });
+    Effect.map(loadConfigAsyncEffect(), resolveConversationsConfig);
