@@ -2860,8 +2860,8 @@
     "hash": "d9098c137aed0a6eea37014e764be329"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/memory/checkpoint-client.ts": {
-    "mtime": 1779455195.070495,
-    "hash": "4c3c7d8f3d6f9571aab69b5dc2dd3b9f"
+    "mtime": 1779471194.2589626,
+    "hash": "9effb27454022ad93235b7f8eadeadb1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/memory/subagent-filter.ts": {
     "mtime": 1779455195.0723622,
@@ -2880,12 +2880,12 @@
     "hash": "a7ba1a12ac55e65e7ff39d5cb71ef27c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/memory/pipeline.ts": {
-    "mtime": 1779455195.0713756,
-    "hash": "8b2c01979e9e7077c597443d3ac660a0"
+    "mtime": 1779471224.4040053,
+    "hash": "ae8b6d6352659a890362e93df562c7ba"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/memory/poller.ts": {
-    "mtime": 1779455195.0713756,
-    "hash": "e036b46243bab4d563b282db688ad3ef"
+    "mtime": 1779471236.8344355,
+    "hash": "989644be24079237695d63ceea2849ee"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1312-slot-7/src/lib/memory/health.ts": {
     "mtime": 1779455195.0713756,

@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { Effect } from 'effect';
 import type {
   ClaimTranscriptRangeInput,
   ClaimTranscriptRangeResult,
@@ -90,22 +91,27 @@ function postWorkerRequest<T>(operation: string, payload: unknown): Promise<T> {
   });
 }
 
-export async function claimTranscriptRangeAsync(input: ClaimTranscriptRangeInput): Promise<ClaimTranscriptRangeResult> {
-  return postWorkerRequest('claimTranscriptRange', input);
-}
+const workerRequest = <T>(operation: string, payload: unknown): Effect.Effect<T, Error> =>
+  Effect.tryPromise({
+    try: () => postWorkerRequest<T>(operation, payload),
+    catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
+  });
 
-export async function commitTranscriptRangeAsync(input: CommitTranscriptRangeInput): Promise<CommitTranscriptRangeResult> {
-  return postWorkerRequest('commitTranscriptRange', input);
-}
+export const claimTranscriptRange = (input: ClaimTranscriptRangeInput): Effect.Effect<ClaimTranscriptRangeResult, Error> =>
+  workerRequest('claimTranscriptRange', input);
 
-export async function releaseTranscriptRangeAsync(sessionId: string, expectedFromOffset: number, toOffset: number): Promise<void> {
-  return postWorkerRequest('releaseTranscriptRange', { sessionId, expectedFromOffset, toOffset });
-}
+export const commitTranscriptRange = (input: CommitTranscriptRangeInput): Effect.Effect<CommitTranscriptRangeResult, Error> =>
+  workerRequest('commitTranscriptRange', input);
 
-export async function getTranscriptCheckpointAsync(sessionId: string): Promise<TranscriptCheckpoint | null> {
-  return postWorkerRequest('getTranscriptCheckpoint', sessionId);
-}
+export const releaseTranscriptRange = (
+  sessionId: string,
+  expectedFromOffset: number,
+  toOffset: number,
+): Effect.Effect<void, Error> =>
+  workerRequest('releaseTranscriptRange', { sessionId, expectedFromOffset, toOffset });
 
-export async function listTranscriptCheckpointsAsync(limit?: number): Promise<TranscriptCheckpoint[]> {
-  return postWorkerRequest('listTranscriptCheckpoints', limit);
-}
+export const getTranscriptCheckpoint = (sessionId: string): Effect.Effect<TranscriptCheckpoint | null, Error> =>
+  workerRequest('getTranscriptCheckpoint', sessionId);
+
+export const listTranscriptCheckpoints = (limit?: number): Effect.Effect<TranscriptCheckpoint[], Error> =>
+  workerRequest('listTranscriptCheckpoints', limit);

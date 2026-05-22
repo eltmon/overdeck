@@ -1,10 +1,11 @@
 import { createHash } from 'crypto';
+import { Effect } from 'effect';
 import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
 import {
-  claimTranscriptRangeAsync,
-  commitTranscriptRangeAsync,
-  releaseTranscriptRangeAsync,
-  getTranscriptCheckpointAsync,
+  claimTranscriptRange,
+  commitTranscriptRange,
+  releaseTranscriptRange,
+  getTranscriptCheckpoint,
 } from './checkpoint-client.js';
 import type {
   ClaimTranscriptRangeResult,
@@ -96,6 +97,11 @@ export type PipelineWritePendingTurn = (turn: PendingTurn, options?: StatusRollu
 export type PipelineMaybeTriggerRollup = (identity: MemoryIdentity, options?: StatusRollupTriggerOptions) => Promise<StatusRollupTriggerResult>;
 export type PipelineUpdateHealth = (identity: MemoryIdentity, update: MemoryHealthUpdate) => Promise<unknown>;
 export type PipelineEmitObservationCreated = (observation: MemoryObservation, timestamp: string) => Promise<void> | void;
+
+const claimTranscriptRangePromise: PipelineClaimRange = (input) => Effect.runPromise(claimTranscriptRange(input));
+const commitTranscriptRangePromise: PipelineCommitRange = (input) => Effect.runPromise(commitTranscriptRange(input));
+const releaseTranscriptRangePromise: PipelineReleaseRange = (sessionId, expectedFromOffset, toOffset) =>
+  Effect.runPromise(releaseTranscriptRange(sessionId, expectedFromOffset, toOffset));
 
 export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDeltaInput): Promise<ExtractFromTranscriptDeltaResult> {
   if (isSubagentHookPayload(input.hookPayload)) return { status: 'noop', observation: null, reason: 'subagent' };
@@ -228,7 +234,7 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
     return { status: 'failed', observation: null, reason: 'pipeline-error' };
   } finally {
     if (claimedRange && !checkpointCommitted) {
-      const release = input.releaseRange ?? releaseTranscriptRangeAsync;
+      const release = input.releaseRange ?? releaseTranscriptRangePromise;
       await release(input.sessionId, claimedRange.fromOffset, claimedRange.toOffset);
     }
   }
@@ -249,8 +255,8 @@ async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<
   | { status: 'failed'; reason: 'claim-failed' }
 > {
   try {
-    const claim = input.claimRange ?? claimTranscriptRangeAsync;
-    const fromOffset = input.fromOffset ?? (await getTranscriptCheckpointAsync(input.sessionId))?.lastOffset ?? 0;
+    const claim = input.claimRange ?? claimTranscriptRangePromise;
+    const fromOffset = input.fromOffset ?? (await Effect.runPromise(getTranscriptCheckpoint(input.sessionId)))?.lastOffset ?? 0;
     return {
       status: 'claimed',
       result: await claim({
@@ -290,7 +296,7 @@ async function safeCommit(
   | { status: 'failed' }
 > {
   try {
-    const commit = input.commitRange ?? commitTranscriptRangeAsync;
+    const commit = input.commitRange ?? commitTranscriptRangePromise;
     const result = await commit({
       sessionId: input.sessionId,
       expectedFromOffset: claimed.fromOffset,
