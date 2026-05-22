@@ -1,0 +1,275 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-22T21:50:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1192: Swarm default model resolves from parent work agent's state.json before falling back to roles.work.model config",
+    "updated": "2026-05-22T21:49:31.996Z"
+  },
+  "plan": {
+    "id": "pan-1192",
+    "title": "Swarm: DEFAULT_SWARM_MODEL hardcoded to kimi-k2.6 ignores parent agent model",
+    "status": "proposed",
+    "uid": "7a3f9b2d-5e8c-4d1a-9b6f-3e2a8d4c1f7e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-22T21:50:00.000Z",
+    "updated": "2026-05-22T21:49:31.996Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1192",
+        "label": "PAN-1192",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/commit/66d8025ba",
+        "label": "Partial fix: roles.work.model fallback",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "model-routing",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "When `POST /api/swarm` (or `pan swarm <id>`) is invoked without an explicit `model`, swarm work slots fall back to `resolveModel('work', undefined, config)` (i.e. `roles.work.model`, default workhorse:expensive). That ignores the model the *parent* work agent for the issue is actually running. If a user ran `pan start PAN-1148 --model gpt-5.5` and then someone dispatches a swarm for PAN-1148 without specifying `--model`, the slots silently use whatever `roles.work.model` resolves to — not gpt-5.5. This is cost- and behavior-surprising. A previous commit (66d8025ba) replaced a hardcoded `kimi-k2.6` constant with this config-based fallback; this issue closes the remaining gap by threading the parent agent's actual model through.",
+      "Proposal": "Add a small async helper `resolveSwarmDefaultModel(issueId)` that consults the parent work agent's `state.json` (via `getAgentStateAsync` from `src/lib/agents.ts`). When a parent exists with `role === 'work'` and a non-empty `model`, return that. Otherwise fall back to `resolveModel('work', undefined, config)`. Replace all three current `defaultSwarmModel()` call sites in `src/dashboard/server/routes/swarm.ts` (lines 362, 983, 1624) with the new helper. The dispatch response body gains a `modelSource: 'override' | 'parent' | 'config'` field so operators (CLI and dashboard) can see how the model was chosen. No new persisted state — `SwarmState.model` already pins the resolved model for the lifetime of the swarm. Tests cover all three resolution branches plus the response-shape contract."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolution order: explicit request `model` > parent work-agent's `state.json.model` > `resolveModel('work', undefined, config)`.",
+        "rationale": "Matches the issue's stated fix verbatim: 'default to the parent's model from state.json'. Falling back to config (rather than 422-ing) when no parent exists preserves backward compatibility for swarms dispatched before a parent has been spawned — a real use case today."
+      },
+      {
+        "summary": "Parent inheritance only triggers when `state.role === 'work'` AND `state.model` is non-empty.",
+        "rationale": "Defensive: a corrupted or partially-written state.json should not poison swarm dispatch. The role guard also future-proofs against any future agent type sharing the `agent-<issue-id>` ID space."
+      },
+      {
+        "summary": "Surface resolution via `modelSource` on the response body only; do NOT add a new field to `SwarmState`.",
+        "rationale": "`SwarmState.model` already persists the resolved model so auto-advance and synthesis-fallback reads stay consistent. Adding `modelSource` to SwarmState is dead weight — once resolved at dispatch time, the source becomes historical trivia. The response field gives operators the visibility the issue asks for without inflating the persisted shape."
+      },
+      {
+        "summary": "No 422/error when no parent agent exists; the response simply reports `modelSource: 'config'`.",
+        "rationale": "The issue says 'surface this in the dispatch response so the operator can explicitly pick a model rather than silently falling back to kimi'. After the 66d8025ba partial fix the config fallback is `roles.work.model` (no longer kimi), so the silent-fallback hazard is much smaller. Surfacing `modelSource: 'config'` lets the dashboard/CLI show a hint without breaking automation that legitimately dispatches swarms without a parent."
+      },
+      {
+        "summary": "All three current `defaultSwarmModel()` call sites are migrated to the new helper, not just the primary dispatch path.",
+        "rationale": "Lines 362 (`persistSynthesisOutput`) and 1624 (`onSlotMergeComplete` runtime-init branch) are rare runtime-initialization paths, but they exist and would otherwise diverge from the dispatch path. Keep them consistent."
+      },
+      {
+        "summary": "Tests mock `getAgentStateAsync` via `vi.mock` rather than spinning up real `~/.panopticon/agents/` fixtures.",
+        "rationale": "Faster, hermetic, no PANOPTICON_HOME mutation, matches the dominant testing style in the repo (cf. tests under `src/lib/__tests__/`)."
+      }
+    ],
+    "items": [
+      {
+        "id": "resolve-helper",
+        "title": "Add `resolveSwarmDefaultModel(issueId)` helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1192",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-helper",
+            "tests"
+          ]
+        },
+        "narrative": {
+          "Action": "Inside `src/dashboard/server/routes/swarm.ts`, add a new async helper `resolveSwarmDefaultModel(issueId: string): Promise<{ model: string; source: 'parent' | 'config' }>`. It must: (1) call `getAgentStateAsync(issueId)` from `src/lib/agents.js` — `normalizeAgentId` will map e.g. `PAN-1192` to `agent-pan-1192`; (2) when state exists AND `state.role === 'work'` AND `state.model` is a non-empty string, return `{ model: state.model, source: 'parent' }`; (3) otherwise return `{ model: resolveModel('work', undefined, loadYamlConfig().config), source: 'config' }`. The existing `defaultSwarmModel()` function should be deleted in this same bead (no callers left after bead 2) OR kept as a thin sync wrapper used only inside this helper's config branch — pick whichever leaves the diff smaller. Do not throw on missing/corrupted state.json; `getAgentStateAsync` already returns null in that case. No call sites are migrated in this bead — that is bead 2's job. This bead defines the helper's exact shape so bead 2's wiring and bead 3's tests have a stable contract to write against. Foundation flag is set because the return-shape and naming choices here propagate to two dependent beads; if the shape were wrong, both would have to be redone."
+        },
+        "subItems": [
+          {
+            "id": "resolve-helper.ac1",
+            "title": "Function `resolveSwarmDefaultModel(issueId)` exists in `src/dashboard/server/routes/swarm.ts` and is exported (or kept module-private — either is fine, since the only caller is the same file).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-helper.ac2",
+            "title": "When `getAgentStateAsync(issueId)` returns a state with `role === 'work'` and non-empty `model`, the helper returns `{ model: state.model, source: 'parent' }`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-helper.ac3",
+            "title": "When `getAgentStateAsync(issueId)` returns null (state.json missing), the helper returns `{ model: <config roles.work.model>, source: 'config' }` without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-helper.ac4",
+            "title": "When the returned state has `role !== 'work'` OR `model` is an empty string, the helper returns `{ source: 'config' }` (i.e. parent is ignored).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-helper.ac5",
+            "title": "`npm run typecheck` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-helper",
+        "title": "Migrate all `defaultSwarmModel()` callers to `resolveSwarmDefaultModel` and surface `modelSource` on the dispatch response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-22T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the three call sites of `defaultSwarmModel()` in `src/dashboard/server/routes/swarm.ts` with the new helper. (1) Line ~983 in `dispatchSwarmWave`: change `const swarmModel = modelGuard.value || defaultSwarmModel();` to resolve via the helper when `modelGuard.value` is absent, and record the source: `const resolved = modelGuard.value ? { model: modelGuard.value, source: 'override' as const } : await resolveSwarmDefaultModel(issueUpper); const swarmModel = resolved.model;`. (2) Line ~362 in `persistSynthesisOutput` and (3) line ~1624 in `onSlotMergeComplete`'s runtime-init branch: replace `model: defaultSwarmModel()` with `model: (await resolveSwarmDefaultModel(issueId)).model` (both functions are already `async`). Add `modelSource: resolved.source` to the response body returned by `dispatchSwarmWave` (alongside `model: swarmModel` at line ~1408). Update the response interface/comment if one exists. Update the docstring at the top of `src/cli/commands/swarm.ts` and the commander `--model` description to read 'override model for work slots (default: parent agent\\'s model, or config roles.work.model if no parent)'. Grep the workspace afterwards to confirm zero residual `defaultSwarmModel(` call sites (if the helper from bead 1 chose to keep `defaultSwarmModel` as a private wrapper, that single non-call definition is the only allowed survivor)."
+        },
+        "subItems": [
+          {
+            "id": "wire-helper.ac1",
+            "title": "Line ~983 in `dispatchSwarmWave` resolves the model via `resolveSwarmDefaultModel(issueUpper)` when `modelGuard.value` is absent and records `source` as one of 'override' | 'parent' | 'config'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helper.ac2",
+            "title": "Lines ~362 and ~1624 (runtime-init fallbacks) use `resolveSwarmDefaultModel(issueId)` instead of `defaultSwarmModel()`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helper.ac3",
+            "title": "POST /api/swarm response body includes `modelSource: 'override' | 'parent' | 'config'` next to `model`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helper.ac4",
+            "title": "`src/cli/commands/swarm.ts` docstring and commander `--model` description reflect parent-first resolution (no remaining reference to a hardcoded default or to 'config roles.work.model' as the sole default).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helper.ac5",
+            "title": "`grep -n 'defaultSwarmModel(' src/dashboard/server/routes/swarm.ts` returns at most one line (the helper's own definition if it was kept as a private wrapper), and zero call sites outside `resolveSwarmDefaultModel`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helper.ac6",
+            "title": "`npm run typecheck` and `npm run lint` both pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tests",
+        "title": "Unit-test parent-aware swarm model resolution and `modelSource` response field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new test file `src/dashboard/server/routes/__tests__/swarm-default-model.test.ts` (or extend the existing `swarm.test.ts` if it already covers `dispatchSwarmWave` shape — prefer the latter to keep related tests colocated). Use `vi.mock('../../../../lib/agents.js', ...)` to stub `getAgentStateAsync`. Cover three resolution branches and the response shape: (1) parent state exists with `role: 'work', model: 'gpt-5.5'` → `resolveSwarmDefaultModel('PAN-1148')` returns `{ model: 'gpt-5.5', source: 'parent' }`; (2) `getAgentStateAsync` returns null → returns `{ model: <whatever roles.work.model resolves to in test config>, source: 'config' }`; (3) parent state exists but `role: 'plan'` (or empty `model`) → falls through to config branch; plus a dispatch-shape test that exercises the response body and asserts `modelSource` is present with the right value across all three branches. Tests must use fake timers wherever any retry/delay code is touched (per workspace rule on `vi.useFakeTimers()`). Tests must not depend on a real `~/.panopticon/` — the mock is the only source of state."
+        },
+        "subItems": [
+          {
+            "id": "tests.ac1",
+            "title": "Test asserts `resolveSwarmDefaultModel('PAN-1148')` returns `{ model: 'gpt-5.5', source: 'parent' }` when `getAgentStateAsync` is mocked to return `{ role: 'work', model: 'gpt-5.5', ... }`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac2",
+            "title": "Test asserts the helper returns `source: 'config'` when `getAgentStateAsync` returns null (no parent state).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac3",
+            "title": "Test asserts the helper returns `source: 'config'` when the parent state has `role !== 'work'` or an empty `model` (defensive guard exercised).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac4",
+            "title": "A dispatch-level test (or integration-shape test) asserts the POST /api/swarm response body carries `modelSource: 'override'` when the request had an explicit `model`, `'parent'` when no explicit model but a parent exists, and `'config'` when neither.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac5",
+            "title": "All new tests pass under `npm test` (root vitest run).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolve-helper",
+        "to": "wire-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-helper",
+        "to": "tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helper",
+        "to": "tests",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-22-PAN-1192-swarm-default-swarm-model-hardcoded-to-kimi-k2-6-ignores-parent-agent-model.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
