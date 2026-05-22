@@ -8,6 +8,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
@@ -17,7 +18,7 @@ import {
 } from '../../lib/vbrief/lifecycle-io.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 import { readContinueState } from '../../lib/vbrief/continue-state.js';
-import { listVBriefsAsync, readVBriefDocumentAsync } from '../../lib/vbrief/vbrief-index.js';
+import { listVBriefsEffect, readVBriefDocumentEffect } from '../../lib/vbrief/vbrief-index.js';
 import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam, listProjects } from '../../lib/projects.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
@@ -87,28 +88,27 @@ function rowCreatedDate(doc: VBriefDocument | null, filenameDate: string | null,
   }
 }
 
-async function collectLifecycleRows(projectKey: string, projectPath: string): Promise<ScopeRow[]> {
-  const rows: ScopeRow[] = [];
-  const entries = await listVBriefsAsync(projectPath);
-  for (const entry of entries) {
-    let doc: VBriefDocument | null = null;
-    try {
-      doc = await readVBriefDocumentAsync(entry.path);
-    } catch {
-      doc = null;
+function collectLifecycleRows(projectKey: string, projectPath: string) {
+  return Effect.gen(function* () {
+    const rows: ScopeRow[] = [];
+    const entries = yield* listVBriefsEffect(projectPath);
+    for (const entry of entries) {
+      const doc = yield* readVBriefDocumentEffect(entry.path).pipe(
+        Effect.catch(() => Effect.succeed(null)),
+      );
+      rows.push({
+        projectKey,
+        projectPath,
+        lifecycle: entry.lifecycleDir,
+        issueId: (doc?.plan?.id ?? entry.issueId).toUpperCase(),
+        title: doc?.plan?.title ?? '(untitled)',
+        status: doc?.plan?.status ?? (doc ? 'unknown' : 'corrupt'),
+        created: rowCreatedDate(doc, entry.date, entry.path),
+        path: entry.path,
+      });
     }
-    rows.push({
-      projectKey,
-      projectPath,
-      lifecycle: entry.lifecycleDir,
-      issueId: (doc?.plan?.id ?? entry.issueId).toUpperCase(),
-      title: doc?.plan?.title ?? '(untitled)',
-      status: doc?.plan?.status ?? (doc ? 'unknown' : 'corrupt'),
-      created: rowCreatedDate(doc, entry.date, entry.path),
-      path: entry.path,
-    });
-  }
-  return rows;
+    return rows;
+  });
 }
 
 function collectInFlightRows(projectKey: string, projectPath: string): ScopeRow[] {
@@ -234,27 +234,30 @@ function printRowsTable(rows: ScopeRow[]): void {
 }
 
 async function listCommand(options: { project?: string }): Promise<void> {
-  const allRows: ScopeRow[] = [];
-  if (options.project) {
-    const path = options.project;
-    const key = path.split('/').filter(Boolean).pop() ?? path;
-    allRows.push(...await collectLifecycleRows(key, path));
-    allRows.push(...collectInFlightRows(key, path));
-  } else {
-    // Enumerate ALL registered projects + their in-flight worktrees.
-    const projects = listProjects();
-    if (projects.length === 0) {
-      console.log(
-        chalk.yellow('No projects registered in projects.yaml. Pass --project <path> or add a project first.'),
-      );
-      return;
+  const allRows = await Effect.runPromise(Effect.gen(function* () {
+    const rows: ScopeRow[] = [];
+    if (options.project) {
+      const path = options.project;
+      const key = path.split('/').filter(Boolean).pop() ?? path;
+      rows.push(...yield* collectLifecycleRows(key, path));
+      rows.push(...collectInFlightRows(key, path));
+    } else {
+      // Enumerate ALL registered projects + their in-flight worktrees.
+      const projects = listProjects();
+      if (projects.length === 0) {
+        console.log(
+          chalk.yellow('No projects registered in projects.yaml. Pass --project <path> or add a project first.'),
+        );
+        return rows;
+      }
+      for (const { key, config } of projects) {
+        if (!config.path || !existsSync(config.path)) continue;
+        rows.push(...yield* collectLifecycleRows(key, config.path));
+        rows.push(...collectInFlightRows(key, config.path));
+      }
     }
-    for (const { key, config } of projects) {
-      if (!config.path || !existsSync(config.path)) continue;
-      allRows.push(...await collectLifecycleRows(key, config.path));
-      allRows.push(...collectInFlightRows(key, config.path));
-    }
-  }
+    return rows;
+  }));
 
   const deduped = dedupeRows(allRows);
   printRowsTable(deduped);

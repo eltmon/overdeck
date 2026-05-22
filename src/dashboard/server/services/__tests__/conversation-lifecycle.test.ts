@@ -1,10 +1,11 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the conversations-db module
 const mockListActiveConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
-const mockListSessionNamesAsync = vi.fn();
+const mockListSessionNamesEffect = vi.fn();
 
 vi.mock('../../../../lib/database/conversations-db.js', () => ({
   listActiveConversations: mockListActiveConversations,
@@ -25,7 +26,7 @@ vi.mock('../conversation-attachments.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
-  listSessionNamesAsync: mockListSessionNamesAsync,
+  listSessionNamesAsyncEffect: mockListSessionNamesEffect,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
@@ -44,13 +45,13 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockListActiveConversations.mockReturnValue([
       { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
     ]);
-    mockListSessionNamesAsync.mockResolvedValue([]); // no sessions alive
+    mockListSessionNamesEffect.mockReturnValue(Effect.succeed([])); // no sessions alive
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
     await pollConversations();
 
-    expect(mockListSessionNamesAsync).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNamesEffect).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone-session', sessionFile: null }),
@@ -61,7 +62,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockListActiveConversations.mockReturnValue([
       { name: 'alive-session', tmuxSession: 'conv-alive-session', status: 'active' },
     ]);
-    mockListSessionNamesAsync.mockResolvedValue(['conv-alive-session']);
+    mockListSessionNamesEffect.mockReturnValue(Effect.succeed(['conv-alive-session']));
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
@@ -76,7 +77,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
       // listActiveConversations only returns active conversations
       { name: 'active-session', tmuxSession: 'conv-active-session', status: 'active' },
     ]);
-    mockListSessionNamesAsync.mockResolvedValue(['conv-active-session']);
+    mockListSessionNamesEffect.mockReturnValue(Effect.succeed(['conv-active-session']));
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
@@ -92,7 +93,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
     await expect(pollConversations()).resolves.toBeUndefined();
-    expect(mockListSessionNamesAsync).not.toHaveBeenCalled();
+    expect(mockListSessionNamesEffect).not.toHaveBeenCalled();
   });
 
   it('marks only gone sessions when multiple active conversations', async () => {
@@ -100,13 +101,13 @@ describe('ConversationLifecycleService — pollConversations', () => {
       { name: 'alive', tmuxSession: 'conv-alive', status: 'active', sessionFile: '/tmp/alive.jsonl' },
       { name: 'gone', tmuxSession: 'conv-gone', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
-    mockListSessionNamesAsync.mockResolvedValue(['conv-alive']);
+    mockListSessionNamesEffect.mockReturnValue(Effect.succeed(['conv-alive']));
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
     await pollConversations();
 
-    expect(mockListSessionNamesAsync).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNamesEffect).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledTimes(1);

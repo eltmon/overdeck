@@ -5,8 +5,9 @@
 
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
+import { Effect } from 'effect';
 import { loadCloisterConfig } from '../../lib/cloister/config.js';
-import { capturePaneAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { capturePaneAsyncEffect, sessionExistsAsyncEffect } from '../../lib/tmux.js';
 
 /**
  * Check if agent tmux session is alive
@@ -18,13 +19,13 @@ export async function checkAgentHealthAsync(agentId: string): Promise<{
 }> {
   try {
     // Check if tmux session exists
-    const alive = await sessionExistsAsync(agentId);
+    const alive = await Effect.runPromise(sessionExistsAsyncEffect(agentId));
     if (!alive) {
       return { alive: false };
     }
 
     // Get recent output to check if active
-    const stdout = await capturePaneAsync(agentId, 5);
+    const stdout = await Effect.runPromise(capturePaneAsyncEffect(agentId, 5));
 
     return { alive: true, lastOutput: stdout.trim() };
   } catch {

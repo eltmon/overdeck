@@ -1,13 +1,15 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
   spawnRun: vi.fn(),
-  saveAgentStateAsync: vi.fn(),
-  getAgentStateAsync: vi.fn(),
-  listSessionNamesAsync: vi.fn(),
-  isPaneDeadAsync: vi.fn(),
-  killSessionAsync: vi.fn(),
+  saveAgentStateEffect: vi.fn(),
+  getAgentStateEffect: vi.fn(),
+  listSessionNamesAsyncEffect: vi.fn(),
+  isPaneDeadAsyncEffect: vi.fn(),
+  killSessionAsyncEffect: vi.fn(),
   emitActivityEntry: vi.fn(),
   getReviewStatus: vi.fn(),
   setReviewStatus: vi.fn(),
@@ -26,15 +28,15 @@ vi.mock('child_process', () => ({
 
 vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
-  saveAgentStateAsync: mocks.saveAgentStateAsync,
-  getAgentStateAsync: mocks.getAgentStateAsync,
+  saveAgentStateEffect: mocks.saveAgentStateEffect,
+  getAgentStateEffect: mocks.getAgentStateEffect,
   messageAgent: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', () => ({
-  listSessionNamesAsync: mocks.listSessionNamesAsync,
-  isPaneDeadAsync: mocks.isPaneDeadAsync,
-  killSessionAsync: mocks.killSessionAsync,
+  listSessionNamesAsyncEffect: mocks.listSessionNamesAsyncEffect,
+  isPaneDeadAsyncEffect: mocks.isPaneDeadAsyncEffect,
+  killSessionAsyncEffect: mocks.killSessionAsyncEffect,
 }));
 
 vi.mock('../../activity-logger.js', () => ({
@@ -97,9 +99,9 @@ describe('spawnReviewRoleForIssue', () => {
       status: 'running',
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
-    mocks.saveAgentStateAsync.mockResolvedValue(undefined);
-    mocks.getAgentStateAsync.mockResolvedValue({ hostOverride: true });
-    mocks.listSessionNamesAsync.mockResolvedValue([]);
+    mocks.saveAgentStateEffect.mockReturnValue(Effect.void);
+    mocks.getAgentStateEffect.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.listSessionNamesAsyncEffect.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.listStashes.mockResolvedValue([]);
     mocks.createNamedStash.mockResolvedValue(null);
@@ -116,7 +118,7 @@ describe('spawnReviewRoleForIssue', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateAsync).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentStateEffect).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',

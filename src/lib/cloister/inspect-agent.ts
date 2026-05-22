@@ -25,9 +25,9 @@ import { setReviewStatus } from '../review-status.js';
 import { withBdMutex } from '../bd-mutex.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import {
-  createSessionAsync,
-  killSessionAsync,
-  sessionExistsAsync,
+  createSessionAsyncEffect,
+  killSessionAsyncEffect,
+  sessionExistsAsyncEffect,
 } from '../tmux.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { bypassPrefixForAgentFlag } from '../claude-permissions.js';
@@ -164,9 +164,9 @@ export async function spawnInspectAgent(
   const tmuxSession = `inspect-${issueLower}-${beadSlug}`;
 
   try {
-    if (await sessionExistsAsync(tmuxSession)) {
+    if (await Effect.runPromise(sessionExistsAsyncEffect(tmuxSession))) {
       // Stale session left behind by a previous inspection run — clear it.
-      await killSessionAsync(tmuxSession).catch(() => {});
+      await Effect.runPromise(killSessionAsyncEffect(tmuxSession)).catch(() => {});
     }
 
     const prompt = await buildInspectPrompt(context);
@@ -231,12 +231,12 @@ export async function spawnInspectAgent(
       ...providerEnv,
     };
 
-    await createSessionAsync(
+    await Effect.runPromise(createSessionAsyncEffect(
       tmuxSession,
       context.workspace,
       `bash '${launcherScript}'`,
       { env: envForTmux },
-    );
+    ));
 
     saveAgentRuntimeState(tmuxSession, {
       state: 'active',

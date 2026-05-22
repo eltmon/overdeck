@@ -18,13 +18,14 @@ import { readFile, readdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { Effect } from 'effect';
 import {
   createConversation,
   getConversationByName,
   listActiveConversations,
   markConversationEnded,
 } from '../../../lib/database/conversations-db.js';
-import { listSessionNamesAsync } from '../../../lib/tmux.js';
+import { listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
@@ -63,7 +64,7 @@ export async function pollConversations(): Promise<void> {
     const conversations = listActiveConversations();
     if (conversations.length === 0) return;
 
-    const aliveSessions = new Set(await listSessionNamesAsync());
+    const aliveSessions = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
 
     const endedConversations: typeof conversations = [];
     const now = Date.now();

@@ -37,7 +37,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { findPlanAsync, findWorkspaceDraftPlanAsync, isPlanningCompleteAsync, readPlan, readPlanAsync } from '../../../lib/vbrief/io.js';
+import { findPlanEffect, findWorkspaceDraftPlanEffect, isPlanningCompleteEffect, readPlan, readPlanEffect } from '../../../lib/vbrief/io.js';
 import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
@@ -59,8 +59,8 @@ import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js'
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
-import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
-import { getAgentStateAsync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
+import { killSessionAsyncEffect, listSessionNamesAsyncEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
+import { getAgentStateEffect, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
@@ -103,12 +103,14 @@ export async function completePlanningArtifacts(options: {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
   const upperIssueId = issueId.toUpperCase();
-  const workspacePlanPath = await findWorkspaceDraftPlanAsync(workspacePath) ?? await findPlanAsync(workspacePath);
+  const workspacePlanPath = await Effect.runPromise(Effect.gen(function* () {
+    return (yield* findWorkspaceDraftPlanEffect(workspacePath)) ?? (yield* findPlanEffect(workspacePath));
+  }));
   if (!workspacePlanPath) {
     throw new Error(`No workspace vBRIEF found for ${upperIssueId} at ${workspacePath}/.pan/spec.vbrief.json`);
   }
 
-  const workspaceDoc = await readPlanAsync(workspacePlanPath);
+  const workspaceDoc = await Effect.runPromise(readPlanEffect(workspacePlanPath));
   const workspaceIssueId = workspaceDoc.plan?.id;
   if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
@@ -634,7 +636,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     // Check if a work agent is already running
     const issueLowerForCheck = id.toLowerCase();
-    const tmuxSessions = yield* Effect.promise(() => listSessionNamesAsync());
+    const tmuxSessions = yield* listSessionNamesAsyncEffect();
     const workAgentSession = tmuxSessions.find((s: string) => s === `agent-${issueLowerForCheck}`);
     if (workAgentSession) {
       return jsonResponse({
@@ -911,8 +913,8 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     }
 
     // Kill tmux sessions
-    yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
-    yield* Effect.promise(() => killSessionAsync(`planning-${id.toLowerCase()}`).catch(() => {}));
+    yield* killSessionAsyncEffect(sessionName).pipe(Effect.ignore);
+    yield* killSessionAsyncEffect(`planning-${id.toLowerCase()}`).pipe(Effect.ignore);
 
     // Clean up agent state files (non-fatal, so absorbed inside the promise)
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -1162,7 +1164,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // planning finishes, but the user may have already clicked "Start Agent". Resetting the
     // issue to Planned would undo that and flash the card back to To Do.
     const workAgentSession = `agent-${issueLower}`;
-    const workAgentAlreadyRunning = yield* Effect.promise(() => sessionExistsAsync(workAgentSession));
+    const workAgentAlreadyRunning = yield* sessionExistsAsyncEffect(workAgentSession);
     if (workAgentAlreadyRunning) {
       console.log(`[complete-planning] Work agent ${workAgentSession} is already running — skipping status reset to Planned`);
     }
@@ -1241,7 +1243,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // body to leave the kernel buffer and for plan-finalize to print.
     if (!skipKill) {
       setTimeout(() => {
-        killSessionAsync(sessionName).catch((error: unknown) => {
+        Effect.runPromise(killSessionAsyncEffect(sessionName)).catch((error: unknown) => {
           const msg = error instanceof Error ? error.message : String(error);
           if (!/can't find session|session not found|no session found/i.test(msg)) {
             console.error(`[complete-planning] deferred kill-session failed for ${sessionName}:`, msg);
@@ -1552,9 +1554,8 @@ const postIssueReopenRoute = HttpRouter.add(
         const projectPath = projectConfig?.path || '';
         if (projectPath) {
           const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const { findPlanAsync } = await import('../../../lib/vbrief/io.js');
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
-          if (existsSync(workspacePath) && await findPlanAsync(workspacePath)) {
+          if (existsSync(workspacePath) && await Effect.runPromise(findPlanEffect(workspacePath))) {
             try {
               const { stdout: bdCheck } = await withBdMutex(() => execFileAsync(
                 'bd',
@@ -1648,8 +1649,8 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     yield* Effect.promise(async () => {
       const workAgentSession = `agent-${issueLower}`;
       try {
-        if (await sessionExistsAsync(workAgentSession)) {
-          await killSessionAsync(workAgentSession);
+        if (await Effect.runPromise(sessionExistsAsyncEffect(workAgentSession))) {
+          await Effect.runPromise(killSessionAsyncEffect(workAgentSession));
           console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
         }
       } catch { /* non-fatal */ }
@@ -2317,17 +2318,19 @@ async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false
   const agentId = normalizeAgentId(issueId);
   const planningId = normalizePlanningId(issueId);
 
-  // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
-  if (VALID_TMUX_NAME_RE.test(agentId) && await sessionExistsAsync(agentId)) return true;
-  if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
+  return Effect.runPromise(Effect.gen(function* () {
+    // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
+    if (VALID_TMUX_NAME_RE.test(agentId) && (yield* sessionExistsAsyncEffect(agentId))) return true;
+    if (VALID_TMUX_NAME_RE.test(planningId) && (yield* sessionExistsAsyncEffect(planningId))) return true;
 
-  const agentState = await getAgentStateAsync(agentId);
-  if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
+    const agentState = yield* getAgentStateEffect(agentId);
+    if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
 
-  const planningState = await getAgentStateAsync(planningId);
-  if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
+    const planningState = yield* getAgentStateEffect(planningId);
+    if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
 
-  return false;
+    return false;
+  }));
 }
 
 // ─── Route: POST /api/issues/bulk-close-out ──────────────────────────────────
@@ -2672,12 +2675,12 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
       : '';
-    const planPath = workspacePath ? yield* Effect.promise(() => findPlanAsync(workspacePath)) : null;
+    const planPath = workspacePath ? yield* findPlanEffect(workspacePath) : null;
     const hasPlan = planPath !== null;
     // planningComplete now means "plan.status indicates planning has finished" —
     // any of proposed/approved/pending/running/completed/blocked.
     // It's the definitive signal for "tasks have been generated from this plan."
-    const planningComplete = workspacePath ? yield* Effect.promise(() => isPlanningCompleteAsync(workspacePath)) : false;
+    const planningComplete = workspacePath ? yield* isPlanningCompleteEffect(workspacePath) : false;
 
     const hasBeads = !!planningComplete;
 
@@ -2726,7 +2729,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
+    const planPath = yield* findPlanEffect(workspacePath);
     if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
         { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },

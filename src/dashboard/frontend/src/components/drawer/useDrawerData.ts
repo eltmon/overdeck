@@ -110,7 +110,10 @@ export type DrawerData = {
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: DrawerVerificationGate[];
   phaseTimeline: DrawerPhaseTimelineStep[];
+  /** Capped (100 items) activity feed shown in the side rail. */
   activityRail: DrawerActivityItem[];
+  /** Full activity feed for the Activity tab — same filter, no slice cap. */
+  activityFull: DrawerActivityItem[];
 };
 
 const REVIEW_SPECIALIST_ROLES = [
@@ -377,7 +380,7 @@ export function useDrawerData(): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], reviewStatus: undefined, beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [] };
+      return { issue: null, agents: [], reviewStatus: undefined, beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
@@ -388,7 +391,7 @@ export function useDrawerData(): DrawerData {
       if (activityMatchesIssue(entry, drawerIssueId, agentIssueLookup)) byId.set(activityId(entry, byId.size), entry);
     }
 
-    const activityRail = Array.from(byId.entries())
+    const activityFull = Array.from(byId.entries())
       .map(([id, entry]) => {
         const when = entry.timestamp ?? '';
         const time = when ? new Date(when).getTime() : 0;
@@ -400,8 +403,9 @@ export function useDrawerData(): DrawerData {
           time: Number.isNaN(time) ? 0 : time,
         };
       })
-      .sort((a, b) => b.time - a.time)
-      .slice(0, 100);
+      .sort((a, b) => b.time - a.time);
+
+    const activityRail = activityFull.slice(0, 100);
 
     return {
       issue,
@@ -412,6 +416,7 @@ export function useDrawerData(): DrawerData {
       verificationGates: verificationGates(reviewStatus),
       phaseTimeline: phaseTimeline(issue, reviewStatus),
       activityRail,
+      activityFull,
     };
   }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
 }
