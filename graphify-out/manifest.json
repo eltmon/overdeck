@@ -4132,8 +4132,8 @@
     "hash": "6cc9ed261897e7227d0ffbda4ec292f3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/dashboard/frontend/src/components/Settings/RolesPanel.tsx": {
-    "mtime": 1779481492.963088,
-    "hash": "071a3e27a7f26f451bf6fc69d921914a"
+    "mtime": 1779484788.104746,
+    "hash": "31c4631ec4b2d54a453a5e3bebcc67d5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
     "mtime": 1779481492.963088,
@@ -4212,8 +4212,8 @@
     "hash": "cfffc305b84f68cbff8d374230cfca81"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx": {
-    "mtime": 1779481492.963974,
-    "hash": "39c4bc7bf846070e06eec6598a26a08d"
+    "mtime": 1779484853.0739791,
+    "hash": "c93f4f0be1982eb29b1e104ca0ef2604"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1382/src/dashboard/frontend/src/components/Settings/__tests__/SavedVoicesTab.test.tsx": {
     "mtime": 1779481492.963974,
