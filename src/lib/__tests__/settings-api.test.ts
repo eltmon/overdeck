@@ -55,6 +55,14 @@ vi.mock('../model-capabilities.js', () => ({
     'claude-opus-4-6': 'claude-opus-4-7',
   },
   getModelCapability: vi.fn(),
+  hasModelCapability: (modelId: string) => [
+    'claude-opus-4-7',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5',
+    'gpt-5.5',
+    'gpt-5.5-mini',
+    'minimax-m2.7-highspeed',
+  ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
 }));
 

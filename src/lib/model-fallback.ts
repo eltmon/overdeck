@@ -14,7 +14,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope';
 
 /**
  * Map of model ID to provider
@@ -74,6 +74,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Nous Portal models
   'qwen/qwen3.6-plus': 'nous',
+
+  // DashScope models
+  'qwen3-max': 'dashscope',
+  'qwen3-coder-plus': 'dashscope',
+  'qwen3-plus': 'dashscope',
+  'qwen3.7': 'dashscope',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -138,6 +144,12 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Nous Portal → Anthropic
   'qwen/qwen3.6-plus': 'claude-sonnet-4-6',
+
+  // DashScope → Anthropic
+  'qwen3-max': 'claude-sonnet-4-6',
+  'qwen3-coder-plus': 'claude-sonnet-4-6',
+  'qwen3-plus': 'claude-haiku-4-5',
+  'qwen3.7': 'claude-sonnet-4-6',
 };
 
 /**

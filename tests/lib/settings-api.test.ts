@@ -234,6 +234,7 @@ describe('settings-api', () => {
       expect(models.zai).toBeDefined();
       expect(models.kimi).toBeDefined();
       expect(models.nous).toBeDefined();
+      expect(models.dashscope).toBeDefined();
 
       // Each model should have id and name properties
       if (models.anthropic.length > 0) {
@@ -338,6 +339,7 @@ describe('settings-api', () => {
             minimax: false,
             openrouter: false,
             nous: false,
+            dashscope: false,
           },
         },
       };
@@ -361,6 +363,7 @@ describe('settings-api', () => {
             kimi: false,
             openrouter: false,
             nous: false,
+            dashscope: false,
           },
           overrides: {},
           default_conversation_model: 'gpt-5.4',
@@ -407,6 +410,7 @@ describe('settings-api', () => {
             kimi: false,
             openrouter: false,
             nous: false,
+            dashscope: false,
           },
           overrides: {},
           gemini_thinking_level: 4,

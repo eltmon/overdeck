@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T23:23:49.217Z"
+    "updated": "2026-05-22T23:32:32.712Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T23:23:49.217Z",
+    "updated": "2026-05-22T23:32:32.712Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -463,7 +463,7 @@
       {
         "id": "update-test-fixtures",
         "title": "Update test fixtures to include the new `dashscope` provider field",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -479,7 +479,7 @@
           {
             "id": "update-test-fixtures.ac1",
             "title": "`npm test` passes after this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -487,7 +487,7 @@
           {
             "id": "update-test-fixtures.ac2",
             "title": "Every ProvidersConfig literal in the test tree includes a `dashscope: false` entry.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -495,7 +495,7 @@
           {
             "id": "update-test-fixtures.ac3",
             "title": "tests/lib/settings-api.test.ts asserts `models.dashscope` is defined in its 'getAvailableModels returns all providers' block (mirroring the existing `nous` assertion).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -125,6 +125,7 @@ export interface ApiSettingsConfig {
       mimo: boolean;
       openrouter: boolean;
       nous: boolean;
+      dashscope: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -172,6 +173,7 @@ export interface ApiSettingsConfig {
     mimo?: string;
     openrouter?: string;
     nous?: string;
+    dashscope?: string;
   };
   tts?: ApiTtsConfig;
   openrouter?: {
@@ -518,6 +520,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
+        dashscope: config.enabledProviders.has('dashscope'),
       },
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
@@ -917,6 +920,7 @@ export function getAvailableModelsApi(): {
     mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
@@ -927,6 +931,7 @@ export function getAvailableModelsApi(): {
     mimo: [],
     openrouter: [],
     nous: [],
+    dashscope: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
@@ -960,6 +965,9 @@ export function getAvailableModelsApi(): {
         break;
       case 'nous':
         result.nous.push(entry);
+        break;
+      case 'dashscope':
+        result.dashscope.push(entry);
         break;
     }
   }
@@ -996,6 +1004,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
         nous: false,
+        dashscope: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1026,6 +1035,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
         nous: false,
+        dashscope: false,
       },
       gemini_thinking_level: 3,
     },
