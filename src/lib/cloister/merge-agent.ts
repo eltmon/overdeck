@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { capturePaneAsync, killSessionAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
+import { capturePaneAsyncEffect, killSessionAsyncEffect, listSessionNamesAsyncEffect, sendKeysEffect, sessionExistsAsyncEffect } from '../tmux.js';
 import { emitActivityEntry, emitActivityTts, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
@@ -474,17 +474,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
-      const { setAgentPausedAsync } = await import('../agents.js');
-      const { killSessionAsync, sessionExistsAsync } = await import('../tmux.js');
+      const { setAgentPausedEffect } = await import('../agents.js');
+      const { killSessionAsyncEffect, sessionExistsAsyncEffect } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-        const paused = await setAgentPausedAsync(agentId, reason, true);
+        const paused = await Effect.runPromise(setAgentPausedEffect(agentId, reason, true));
         if (paused) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
         }
-        if (await sessionExistsAsync(agentId)) {
-          await killSessionAsync(agentId);
+        if (await Effect.runPromise(sessionExistsAsyncEffect(agentId))) {
+          await Effect.runPromise(killSessionAsyncEffect(agentId));
           console.log(`[merge-agent] ✓ Killed ${agentId} tmux session to free resources`);
           logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
         }
@@ -630,10 +630,10 @@ function isPostMergeRoleSession(sessionName: string, issueLower: string): boolea
 async function killPostMergeRoleSessions(issueId: string): Promise<void> {
   try {
     const issueLower = issueId.toLowerCase();
-    const sessions = await listSessionNamesAsync();
+    const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
     const targets = sessions.filter((session) => isPostMergeRoleSession(session, issueLower));
     for (const session of targets) {
-      await killSessionAsync(session);
+      await Effect.runPromise(killSessionAsyncEffect(session));
     }
     if (targets.length > 0) {
       console.log(`[merge-agent] ✓ Killed ${targets.length} review/test/ship session(s) for ${issueId}`);
@@ -907,7 +907,7 @@ function announceMerge(
  */
 async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
-    return await capturePaneAsync(sessionName);
+    return await Effect.runPromise(capturePaneAsyncEffect(sessionName));
   } catch {
     return '';
   }
@@ -971,7 +971,7 @@ export function scanGitPatterns(
  * Check if specialist-merge-agent tmux session is running (async)
  */
 async function isMergeAgentRunning(): Promise<boolean> {
-  return sessionExistsAsync('specialist-merge-agent');
+  return Effect.runPromise(sessionExistsAsyncEffect('specialist-merge-agent'));
 }
 
 /**
@@ -983,13 +983,13 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 
   try {
     // Check if session exists
-    if (!sessionExists(sessionName)) {
+    if (!await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) {
       console.log(`[merge-agent] Could not send message to ${sessionName} (session does not exist)`);
       return false;
     }
 
     // Send the message using centralized sendKeys
-    await sendKeysAsync(sessionName, message);
+    await Effect.runPromise(sendKeysEffect(sessionName, message));
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);
     logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);

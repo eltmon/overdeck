@@ -1,9 +1,11 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearRunningAgentsCache, getCachedRunningAgents } from '../running-agents-cache.js';
-import type { listRunningAgentsAsync } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents.js';
 
-type ListAgentsFn = typeof listRunningAgentsAsync;
+type RunningAgent = AgentState & { tmuxActive: boolean };
+type ListAgentsFn = () => Effect.Effect<RunningAgent[], never>;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -21,9 +23,9 @@ describe('running-agents-cache', () => {
     const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' }];
     const secondAgents = [{ id: 'agent-2', issueId: 'PAN-999' }];
     const listAgents = vi
-      .fn<() => Promise<Array<{ id: string; issueId: string }>>>()
-      .mockResolvedValueOnce(firstAgents)
-      .mockResolvedValueOnce(secondAgents);
+      .fn<ListAgentsFn>()
+      .mockReturnValueOnce(Effect.succeed(firstAgents as RunningAgent[]))
+      .mockReturnValueOnce(Effect.succeed(secondAgents as RunningAgent[]));
 
     const first = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
     const second = await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
@@ -37,9 +39,9 @@ describe('running-agents-cache', () => {
     const firstAgents = [{ id: 'agent-1', issueId: 'PAN-895' }];
     const secondAgents = [{ id: 'agent-2', issueId: 'PAN-895' }];
     const listAgents = vi
-      .fn<() => Promise<Array<{ id: string; issueId: string }>>>()
-      .mockResolvedValueOnce(firstAgents)
-      .mockResolvedValueOnce(secondAgents);
+      .fn<ListAgentsFn>()
+      .mockReturnValueOnce(Effect.succeed(firstAgents as RunningAgent[]))
+      .mockReturnValueOnce(Effect.succeed(secondAgents as RunningAgent[]));
 
     await getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
     await vi.advanceTimersByTimeAsync(3_001);
@@ -50,11 +52,11 @@ describe('running-agents-cache', () => {
   });
 
   it('coalesces concurrent cache misses into one list call', async () => {
-    let resolveAgents: ((value: Array<{ id: string; issueId: string }>) => void) | undefined;
-    const listAgents = vi.fn(
-      () => new Promise<Array<{ id: string; issueId: string }>>((resolve) => {
+    let resolveAgents: ((value: RunningAgent[]) => void) | undefined;
+    const listAgents = vi.fn<ListAgentsFn>(
+      () => Effect.promise(() => new Promise<RunningAgent[]>((resolve) => {
         resolveAgents = resolve;
-      }),
+      })),
     );
 
     const firstPromise = getCachedRunningAgents(listAgents as unknown as ListAgentsFn);
@@ -62,7 +64,7 @@ describe('running-agents-cache', () => {
 
     expect(listAgents).toHaveBeenCalledTimes(1);
 
-    resolveAgents?.([{ id: 'agent-1', issueId: 'PAN-895' }]);
+    resolveAgents?.([{ id: 'agent-1', issueId: 'PAN-895' } as RunningAgent]);
 
     const [first, second] = await Promise.all([firstPromise, secondPromise]);
     expect(first).toEqual([{ id: 'agent-1', issueId: 'PAN-895' }]);

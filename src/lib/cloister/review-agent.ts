@@ -44,7 +44,7 @@ import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
+import { killSessionAsyncEffect, listSessionNamesAsyncEffect, isPaneDeadAsyncEffect } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
@@ -306,7 +306,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentStateAsync, spawnRun } = await import('../agents.js');
+    const { saveAgentStateEffect, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -354,7 +354,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
     run.reviewOutputPath = outputPath;
     run.reviewSynthesisAgentId = synthesisAgentId;
     run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
-    await saveAgentStateAsync(run);
+    await Effect.runPromise(saveAgentStateEffect(run));
     try {
       const { notifyPipeline } = await import('../pipeline-notifier.js');
       notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
@@ -384,9 +384,9 @@ export async function spawnReviewRoleForIssue(
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
   try {
-    const sessions = await listSessionNamesAsync();
+    const sessions = await Effect.runPromise(listSessionNamesAsyncEffect());
     if (sessions.includes(reviewSessionName)) {
-      const paneDead = await isPaneDeadAsync(reviewSessionName);
+      const paneDead = await Effect.runPromise(isPaneDeadAsyncEffect(reviewSessionName));
 
       // A synthesis agent that has finished its verdict does NOT terminate:
       // its role prompt tells it to "exit", but it runs `Bash(exit)` which
@@ -495,8 +495,8 @@ export async function spawnReviewRoleForIssue(
   }
 
   try {
-    const { spawnRun, saveAgentStateAsync, getAgentStateAsync } = await import('../agents.js');
-    const workAgentState = await getAgentStateAsync(`agent-${opts.issueId.toLowerCase()}`);
+    const { spawnRun, saveAgentStateEffect, getAgentStateEffect } = await import('../agents.js');
+    const workAgentState = await Effect.runPromise(getAgentStateEffect(`agent-${opts.issueId.toLowerCase()}`));
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers
@@ -543,7 +543,7 @@ export async function spawnReviewRoleForIssue(
     // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
     run.reviewRunId = runId;
     try {
-      await saveAgentStateAsync(run);
+      await Effect.runPromise(saveAgentStateEffect(run));
     } catch (saveErr) {
       console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
     }
@@ -640,10 +640,10 @@ export async function killAllReviewerSessions(
 ): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
-  let allSessions: string[];
+  let allSessions: readonly string[];
 
   try {
-    allSessions = await listSessionNamesAsync();
+    allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
     return { killed, failed };
@@ -653,7 +653,7 @@ export async function killAllReviewerSessions(
   await Promise.all(
     sessionsToKill.map(async (sessionName) => {
       try {
-        await killSessionAsync(sessionName);
+        await Effect.runPromise(killSessionAsyncEffect(sessionName));
         console.log(`[review-agent] Killed reviewer session ${sessionName}`);
         killed.push(sessionName);
       } catch (err) {
@@ -685,9 +685,9 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   const killed: string[] = [];
   const failed: string[] = [];
 
-  let allSessions: string[];
+  let allSessions: readonly string[];
   try {
-    allSessions = await listSessionNamesAsync();
+    allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during review cleanup:', err instanceof Error ? err.message : String(err));
     return { killed, failed };
@@ -710,7 +710,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   await Promise.all(
     sessionsToKill.map(async (sessionName) => {
       try {
-        await killSessionAsync(sessionName);
+        await Effect.runPromise(killSessionAsyncEffect(sessionName));
         console.log(`[review-agent] Killed review session ${sessionName}`);
         killed.push(sessionName);
       } catch (err) {
