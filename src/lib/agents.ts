@@ -688,15 +688,6 @@ export function getAgentState(agentId: string): AgentState | null {
   return parseAgentState(content, normalizedId);
 }
 
-export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
-  const normalizedId = normalizeAgentId(agentId);
-  const stateFile = join(getAgentDir(normalizedId), 'state.json');
-  if (!existsSync(stateFile)) return null;
-
-  const content = await readFile(stateFile, 'utf-8');
-  return parseAgentState(content, normalizedId);
-}
-
 export const getAgentStateEffect = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = join(getAgentDir(normalizedId), 'state.json');
@@ -729,38 +720,6 @@ export function saveAgentState(state: AgentState): void {
 
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
-  }
-}
-
-/**
- * PAN-1048 P1: Async variant of saveAgentState for hot paths reachable from
- * the dashboard event loop (spawnRun is invoked by Effect routes and the
- * reactive Cloister scheduler). Uses fs/promises so we never block the
- * Node event loop on disk I/O. Status-transition audit logging is preserved
- * — `getAgentState` is still synchronous because it's called from synchronous
- * read paths elsewhere; reading once before the write is acceptable here
- * (small file, infrequent transitions).
- */
-export async function saveAgentStateAsync(state: AgentState): Promise<void> {
-  const dir = getAgentDir(state.id);
-  await mkdirAsync(dir, { recursive: true });
-
-  const oldState = await getAgentStateAsync(state.id);
-  const oldStatus = oldState?.status;
-
-  if (state.status === 'running' || state.status === 'starting') {
-    delete state.stoppedAt;
-  } else if (state.status === 'stopped' && !state.stoppedAt) {
-    state.stoppedAt = new Date().toISOString();
-  }
-
-  await writeFileAsync(
-    join(dir, 'state.json'),
-    JSON.stringify(cleanAgentState(state), null, 2),
-  );
-
-  if (oldStatus && oldStatus !== state.status) {
-    logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
 }
 
@@ -828,16 +787,6 @@ export function setAgentPaused(agentId: string, reason?: string, stoppedByPause 
   return true;
 }
 
-/** Sets the persistent manual pause gate using async filesystem operations. */
-export async function setAgentPausedAsync(agentId: string, reason?: string, stoppedByPause = false): Promise<AgentState | null> {
-  const state = await getAgentStateAsync(agentId);
-  if (!state) return null;
-
-  applyAgentPaused(state, reason, stoppedByPause);
-  await saveAgentStateAsync(state);
-  return state;
-}
-
 export const setAgentPausedEffect = (
   agentId: string,
   reason?: string,
@@ -875,17 +824,6 @@ export function clearAgentPaused(agentId: string): boolean {
   applyAgentUnpaused(state);
   saveAgentState(state);
   return true;
-}
-
-/** Clears the persistent manual pause gate using async filesystem operations. */
-export async function clearAgentPausedAsync(agentId: string): Promise<AgentState | null> {
-  const state = await getAgentStateAsync(agentId);
-  if (!state) return null;
-  if (isAgentPauseClear(state)) return state;
-
-  applyAgentUnpaused(state);
-  await saveAgentStateAsync(state);
-  return state;
 }
 
 export const clearAgentPausedEffect = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
@@ -931,17 +869,6 @@ export function clearAgentTroubled(agentId: string): boolean {
   applyAgentUntroubled(state);
   saveAgentState(state);
   return true;
-}
-
-/** Clears the troubled gate and accumulated failure state using async filesystem operations. */
-export async function clearAgentTroubledAsync(agentId: string): Promise<AgentState | null> {
-  const state = await getAgentStateAsync(agentId);
-  if (!state) return null;
-  if (isAgentTroubledClear(state)) return state;
-
-  applyAgentUntroubled(state);
-  await saveAgentStateAsync(state);
-  return state;
 }
 
 export const clearAgentTroubledEffect = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
@@ -1001,16 +928,6 @@ export function recordAgentFailure(agentId: string, reason: string): boolean {
   return true;
 }
 
-/** Records one failed resume/crash observation using async filesystem operations. */
-export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<AgentState | null> {
-  const state = await getAgentStateAsync(agentId);
-  if (!state) return null;
-
-  applyAgentFailure(state, reason);
-  await saveAgentStateAsync(state);
-  return state;
-}
-
 export const recordAgentFailureEffect = (agentId: string, reason: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* getAgentStateEffect(agentId);
@@ -1047,10 +964,10 @@ export async function setAgentDeliveryMethod(
   agentId: string,
   deliveryMethod: 'auto' | 'channels' | 'tmux',
 ): Promise<void> {
-  const state = await getAgentStateAsync(agentId);
+  const state = await Effect.runPromise(getAgentStateEffect(agentId));
   if (!state) return;
   state.deliveryMethod = deliveryMethod;
-  await saveAgentStateAsync(state);
+  await Effect.runPromise(saveAgentStateEffect(state));
 }
 
 /**
@@ -1186,7 +1103,7 @@ export async function deliverAgentMessage(
   if (!resolvedMethod) {
     let channelsEnabled = false;
     try {
-      const state = await getAgentStateAsync(normalizedId);
+      const state = await Effect.runPromise(getAgentStateEffect(normalizedId));
       channelsEnabled = Boolean(state?.channelsEnabled);
       resolvedMethod = state?.deliveryMethod ?? (channelsEnabled ? 'auto' : 'tmux');
     } catch {
@@ -1268,7 +1185,7 @@ export async function deliverAgentPermissionDecision(
 
   let state: AgentState | null = null;
   try {
-    state = await getAgentStateAsync(normalizedId);
+    state = await Effect.runPromise(getAgentStateEffect(normalizedId));
   } catch {
     state = null;
   }
@@ -1612,20 +1529,8 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
 export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null {
   // Sync path: read from the in-process mirror (empty in fresh CLI processes,
   // populated inside the dashboard server). CLI commands should prefer
-  // getAgentRuntimeStateAsync so they fall through to HTTP.
+  // getAgentRuntimeStateEffect so they fall through to HTTP.
   return snapshotToRuntimeState(Effect.runSync(getRuntimeSnapshot(agentId)));
-}
-
-export async function getAgentRuntimeStateAsync(agentId: string): Promise<AgentRuntimeState | null> {
-  // In-process (inside the dashboard): the sync mirror is authoritative. Do
-  // NOT fall back to HTTP — that would fetch our own server, which may still
-  // be inside Layer construction and cause a startup deadlock.
-  if (Effect.runSync(isAgentStateServiceInProcess())) {
-    return getAgentRuntimeState(agentId);
-  }
-  // Cross-process (CLI, external lib callers): sync mirror is empty, hit HTTP.
-  const snap = await Effect.runPromise(fetchAgentRuntimeSnapshot(agentId));
-  return snapshotToRuntimeState(snap);
 }
 
 export const getAgentRuntimeStateEffect = (agentId: string): Effect.Effect<AgentRuntimeState | null> =>
@@ -1801,22 +1706,6 @@ export function getLatestSessionId(agentId: string): string | null {
   }
 
   return null;
-}
-
-export async function getLatestSessionIdAsync(agentId: string): Promise<string | null> {
-  const agentDir = getAgentDir(agentId);
-  try {
-    const sessionId = (await readFile(join(agentDir, 'session.id'), 'utf8')).trim();
-    if (sessionId) return sessionId;
-  } catch { /* non-fatal */ }
-
-  try {
-    const sessions = JSON.parse(await readFile(join(agentDir, 'sessions.json'), 'utf8'));
-    if (Array.isArray(sessions) && sessions.length > 0) return sessions[sessions.length - 1];
-  } catch { /* non-fatal */ }
-
-  const runtimeState = await getAgentRuntimeStateAsync(agentId);
-  return runtimeState?.claudeSessionId ?? null;
 }
 
 export const getLatestSessionIdEffect = (agentId: string): Effect.Effect<string | null> => {
@@ -2370,7 +2259,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
   // so we never block the Node event loop.
-  await saveAgentStateAsync(state);
+  await Effect.runPromise(saveAgentStateEffect(state));
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
@@ -2582,7 +2471,7 @@ if (prompt) {
     if (head) state.roleRunHead = head;
   } catch { /* non-fatal — marker stays absent */ }
 
-  await saveAgentStateAsync(state);
+  await Effect.runPromise(saveAgentStateEffect(state));
 
   emitActivityEntry({
     source: role,
@@ -2947,34 +2836,6 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
   return agents;
 }
 
-export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActive: boolean })[]> {
-  const tmuxSessions = await Effect.runPromise(getAgentSessionsAsyncEffect());
-  const tmuxNames = new Set(tmuxSessions.map(s => s.name));
-
-  const agents: (AgentState & { tmuxActive: boolean })[] = [];
-
-  // Read all agent states
-  if (!existsSync(AGENTS_DIR)) return agents;
-
-  const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
-
-  await Promise.all(
-    entries.map(async (entry) => {
-      const state = await getAgentStateAsync(entry);
-      if (state) {
-        const normalizedId = normalizeAgentId(state.id || entry);
-        agents.push({
-          ...state,
-          id: normalizedId,
-          tmuxActive: tmuxNames.has(normalizedId),
-        });
-      }
-    })
-  );
-
-  return agents;
-}
-
 export const listRunningAgentsEffect = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
     const tmuxSessions = yield* getAgentSessionsAsyncEffect();
@@ -3111,7 +2972,7 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
       } catch {
         return;
       }
-      const state = await getAgentStateAsync(entry);
+      const state = await Effect.runPromise(getAgentStateEffect(entry));
       if (state?.issueId && /^\d+$/.test(state.issueId)) {
         legacy.push(`${entry} (issueId: "${state.issueId}")`);
       }
@@ -3160,39 +3021,6 @@ export function stopAgent(agentId: string): void {
   // state.json and runtime.json are separate files — both must agree the agent
   // was intentionally stopped to prevent race conditions with health check polls.
   console.log(`[agents] Stopping ${normalizedId}: tmux=${sessionExists(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
-  saveAgentRuntimeState(normalizedId, {
-    state: 'stopped',
-    lastActivity: new Date().toISOString(),
-  });
-}
-
-export async function stopAgentAsync(agentId: string): Promise<void> {
-  const normalizedId = normalizeAgentId(agentId);
-
-  if (await Effect.runPromise(sessionExistsAsyncEffect(normalizedId))) {
-    try {
-      const output = await Effect.runPromise(capturePaneAsyncEffect(normalizedId, 5000));
-      if (output) {
-        const agentDir = getAgentDir(normalizedId);
-        mkdirSync(agentDir, { recursive: true });
-        writeFileSync(join(agentDir, 'output.log'), output);
-      }
-    } catch {
-      // Non-fatal — best effort log capture
-    }
-
-    await Effect.runPromise(killSessionAsyncEffect(normalizedId));
-  }
-
-  const state = getAgentState(normalizedId);
-  if (state) {
-    if (!state.id) state.id = normalizedId;
-
-    markAgentStoppedState(state);
-    saveAgentState(state);
-  }
-
-  console.log(`[agents] Stopping ${normalizedId} (async): tmux=${await Effect.runPromise(sessionExistsAsyncEffect(normalizedId))} stateStatus=${state?.status ?? 'none'}`);
   saveAgentRuntimeState(normalizedId, {
     state: 'stopped',
     lastActivity: new Date().toISOString(),
@@ -3703,7 +3531,7 @@ export async function restartAgent(
     }
   }
 
-  await stopAgentAsync(normalizedId);
+  await Effect.runPromise(stopAgentEffect(normalizedId));
 
   const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
   const requestedHarness = newHarness ?? agentState.harness;
