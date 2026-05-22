@@ -19,7 +19,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
-import { getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync, type AgentState } from '../../../lib/agents.js';
+import { getAgentRuntimeStateEffect, getAgentStateEffect, listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js';
 import { sessionFilePath } from '../../../lib/paths.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
@@ -416,7 +416,7 @@ async function resolveAgentState(
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
 ): Promise<AgentState | null> {
   const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
-  return agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId, resolveAgentIdBySessionId);
+  return agentId ? await Effect.runPromise(getAgentStateEffect(agentId)) : await findAgentStateBySessionId(sessionId, resolveAgentIdBySessionId);
 }
 
 async function findAgentStateBySessionId(
@@ -425,13 +425,13 @@ async function findAgentStateBySessionId(
 ): Promise<AgentState | null> {
   if (resolveAgentIdBySessionId) {
     const agentId = await resolveAgentIdBySessionId(sessionId);
-    return agentId ? await getAgentStateAsync(agentId) : null;
+    return agentId ? await Effect.runPromise(getAgentStateEffect(agentId)) : null;
   }
 
-  const agents = await listRunningAgentsAsync();
+  const agents = await Effect.runPromise(listRunningAgentsEffect());
   for (const agent of agents) {
     if (agent.sessionId === sessionId) return agent;
-    if ((await getAgentRuntimeStateAsync(agent.id))?.claudeSessionId === sessionId) return agent;
+    if ((await Effect.runPromise(getAgentRuntimeStateEffect(agent.id)))?.claudeSessionId === sessionId) return agent;
   }
   return null;
 }
