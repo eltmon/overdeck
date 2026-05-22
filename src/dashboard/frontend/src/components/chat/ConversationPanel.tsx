@@ -165,7 +165,12 @@ export function ConversationPanel({
   const { resolvedTheme } = useTheme();
 
   // Fetch turn diff summaries — always use JSONL-based conversation diffs
-  // (the checkpoint-based agent diffs path doesn't populate assistantMessageId)
+  // (the checkpoint-based agent diffs path doesn't populate assistantMessageId).
+  // The /diffs endpoint is keyed by a real conversations-table row; session-
+  // backed panels (SessionPanel, DrawerAgentSession) synthesize a conversation
+  // with id < 0 and have no such row, so skip the fetch — otherwise it
+  // 404-polls every 5s with the session id as the conversation name.
+  const isSyntheticConversation = conversation.id < 0;
   const { data: diffData } = useQuery({
     queryKey: ['conversation-diffs', conversation.name],
     queryFn: async () => {
@@ -173,6 +178,7 @@ export function ConversationPanel({
       if (!res.ok) return null
       return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
     },
+    enabled: !isSyntheticConversation,
     refetchInterval: 5000,
   })
 
