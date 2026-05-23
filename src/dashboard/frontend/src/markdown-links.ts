@@ -217,10 +217,7 @@ function resolvePathLinkTarget(rawPath: string, cwd: string): string {
   return `${resolvedPath}:${line}${column ? `:${column}` : ''}`;
 }
 
-export function resolveMarkdownFileLinkTarget(
-  href: string | undefined,
-  cwd?: string,
-): string | null {
+function parseMarkdownFileLinkHref(href: string | undefined): string | null {
   if (!href) return null;
   const rawHref = normalizeMarkdownLinkDestination(href);
   if (rawHref.length === 0 || rawHref.startsWith('#')) return null;
@@ -245,7 +242,20 @@ export function resolveMarkdownFileLinkTarget(
 
   if (!isLikelyPathCandidate(decodedPath)) return null;
 
-  const pathWithPosition = appendLineColumnFromHash(decodedPath, decodedHash);
+  return appendLineColumnFromHash(decodedPath, decodedHash);
+}
+
+export function shouldPreserveMarkdownFileLinkHref(href: string | undefined): boolean {
+  return parseMarkdownFileLinkHref(href) !== null;
+}
+
+export function resolveMarkdownFileLinkTarget(
+  href: string | undefined,
+  cwd?: string,
+): string | null {
+  const pathWithPosition = parseMarkdownFileLinkHref(href);
+  if (!pathWithPosition) return null;
+
   if (!isRelativePath(pathWithPosition)) {
     return pathWithPosition;
   }

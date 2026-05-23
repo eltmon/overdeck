@@ -98,7 +98,7 @@ export function PlanCard({ plan, conversationName }: PlanCardProps) {
 
       {expanded && (
         <div className={styles.planCardBody}>
-          <ChatMarkdown text={plan.plan} />
+          <ChatMarkdown text={plan.plan} cwd={undefined} />
         </div>
       )}
 

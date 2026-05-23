@@ -191,7 +191,7 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
       </div>
       <div style={{ fontSize: 13, lineHeight: 1.5 }}>
         {item.body && item.body.trim() !== '' ? (
-          <ChatMarkdown text={item.body} />
+          <ChatMarkdown text={item.body} cwd={undefined} />
         ) : (
           <span
             style={{

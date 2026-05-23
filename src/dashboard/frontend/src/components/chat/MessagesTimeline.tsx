@@ -107,6 +107,7 @@ export interface MessagesTimelineProps {
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
   conversationName?: string;
+  cwd?: string;
   turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
@@ -130,6 +131,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   compactBoundaries,
   compacting,
   conversationName,
+  cwd,
   turnDiffSummaryByAssistantMessageId,
   onOpenTurnDiff,
   resolvedTheme,
@@ -387,6 +389,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 row={row}
                 isStreaming={streaming}
                 conversationName={conversationName}
+                cwd={cwd}
                 turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                 onOpenTurnDiff={onOpenTurnDiff}
                 resolvedTheme={resolvedTheme}
@@ -411,7 +414,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         {failedMessages.map((fm) => (
           <div key={fm.id} className={styles.failedMessage}>
             <div className={styles.failedMessageBubble}>
-              <ChatMarkdown text={fm.text} />
+              <ChatMarkdown text={fm.text} cwd={cwd} />
             </div>
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>Failed to send</span>
@@ -476,6 +479,7 @@ interface RowProps {
   row: MessagesTimelineRow;
   isStreaming: boolean;
   conversationName?: string;
+  cwd?: string;
   turnDiffSummary?: TurnDiffSummary;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
@@ -483,12 +487,12 @@ interface RowProps {
   workingPhase?: WorkingPhase;
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase }: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
   if (row.kind === 'work') {
-    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} />;
+    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} cwd={cwd} />;
   }
   if (row.kind === 'proposed-plan') {
     return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
@@ -503,13 +507,14 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
     return <SessionPermissionsRow message={row.message} />;
   }
   if (row.message.role === 'user') {
-    return <UserMessageRow message={row.message} />;
+    return <UserMessageRow message={row.message} cwd={cwd} />;
   }
   return (
     <AssistantMessageRow
       message={row.message}
       durationStart={row.durationStart}
       isStreaming={isStreaming}
+      cwd={cwd}
       turnDiffSummary={turnDiffSummary}
       onOpenTurnDiff={onOpenTurnDiff}
       resolvedTheme={resolvedTheme}
@@ -528,12 +533,12 @@ function isReviewerContextMessage(text: string): boolean {
   return text.startsWith('# Review Context\n');
 }
 
-function UserMessageRow({ message }: { message: ChatMessage }) {
+function UserMessageRow({ message, cwd }: { message: ChatMessage; cwd?: string }) {
   if (isSummaryForkMessage(message.text)) {
-    return <ContextMessageBlock message={message} />;
+    return <ContextMessageBlock message={message} cwd={cwd} />;
   }
   if (isReviewerContextMessage(message.text)) {
-    return <ReviewerContextBlock message={message} />;
+    return <ReviewerContextBlock message={message} cwd={cwd} />;
   }
 
   const isPending = message.id.startsWith('optimistic-');
@@ -544,7 +549,7 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <div className={styles.userMessageText}><ChatMarkdown text={message.text} /></div>
+        <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} /></div>
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -562,7 +567,7 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
   );
 }
 
-function ContextMessageBlock({ message }: { message: ChatMessage }) {
+function ContextMessageBlock({ message, cwd }: { message: ChatMessage; cwd?: string }) {
   const [expanded, setExpanded] = useState(false);
   const cleanText = message.text
     .replace(/\n---\n\n\*\*Do not take any action\.\*\*.*$/s, '')
@@ -582,7 +587,7 @@ function ContextMessageBlock({ message }: { message: ChatMessage }) {
         </button>
         {expanded && (
           <div className={styles.contextMessageContent}>
-            <ChatMarkdown text={cleanText} />
+            <ChatMarkdown text={cleanText} cwd={cwd} />
           </div>
         )}
       </div>
@@ -590,7 +595,7 @@ function ContextMessageBlock({ message }: { message: ChatMessage }) {
   );
 }
 
-function ReviewerContextBlock({ message }: { message: ChatMessage }) {
+function ReviewerContextBlock({ message, cwd }: { message: ChatMessage; cwd?: string }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -607,7 +612,7 @@ function ReviewerContextBlock({ message }: { message: ChatMessage }) {
         </button>
         {expanded && (
           <div className={styles.contextMessageContent}>
-            <ChatMarkdown text={message.text} />
+            <ChatMarkdown text={message.text} cwd={cwd} />
           </div>
         )}
       </div>
@@ -624,10 +629,12 @@ function AssistantMessageRow({
   turnDiffSummary,
   onOpenTurnDiff,
   resolvedTheme,
+  cwd,
 }: {
   message: ChatMessage;
   durationStart: string;
   isStreaming: boolean;
+  cwd?: string;
   turnDiffSummary?: TurnDiffSummary;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
@@ -642,7 +649,7 @@ function AssistantMessageRow({
     <div className={styles.assistantMessageRow}>
       <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
       <div className={styles.assistantMessageContent}>
-        <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
+        <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} cwd={cwd} />
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">
@@ -699,7 +706,7 @@ function AssistantMessageRow({
 
 // ─── Work log group ───────────────────────────────────────────────────────────
 
-function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hideToolCalls?: boolean }) {
+function WorkLogGroup({ entries, hideToolCalls, cwd }: { entries: WorkLogEntry[]; hideToolCalls?: boolean; cwd?: string }) {
   const [expanded, setExpanded] = useState(false);
 
   const onlyToolEntries = entries.every((entry) => entry.tone === 'tool' || entry.tone === 'error');
@@ -735,7 +742,7 @@ function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hid
   return (
     <div className={styles.workLogGroup}>
       {visible.map((entry) => (
-        <SimpleWorkEntryRow key={entry.id} entry={entry} />
+        <SimpleWorkEntryRow key={entry.id} entry={entry} cwd={cwd} />
       ))}
       {hasOverflow && !expanded && (
         <button
@@ -761,7 +768,7 @@ function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hid
 
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
-function SimpleWorkEntryRow({ entry }: { entry: WorkLogEntry }) {
+function SimpleWorkEntryRow({ entry, cwd }: { entry: WorkLogEntry; cwd?: string }) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--muted-foreground)',
@@ -825,11 +832,11 @@ function SimpleWorkEntryRow({ entry }: { entry: WorkLogEntry }) {
           <pre className={styles.workLogResult}>{entry.result}</pre>
         ) : isThinking && entry.detail ? (
           <div className={styles.workLogResult}>
-            <ChatMarkdown text={entry.detail} />
+            <ChatMarkdown text={entry.detail} cwd={cwd} />
           </div>
         ) : entry.result ? (
           <div className={styles.workLogResult}>
-            <ChatMarkdown text={entry.result} />
+            <ChatMarkdown text={entry.result} cwd={cwd} />
           </div>
         ) : null
       )}
