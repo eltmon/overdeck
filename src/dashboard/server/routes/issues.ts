@@ -2737,7 +2737,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* Effect.promise(() => withBdMutex(() => createBeadsFromVBrief(workspacePath)));
+    const result = yield* withBdMutex(() => createBeadsFromVBrief(workspacePath));
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
