@@ -1,0 +1,107 @@
+{
+  "version": "1",
+  "issueId": "PAN-1415",
+  "created": "2026-05-23T11:20:40.698Z",
+  "updated": "2026-05-23T11:35:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1415",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Stuck-remediation config lives in ~/.panopticon/cloister.toml under a new top-level `stuck_remediation` block (with `enabled`, `stage1_minutes`, `stage2_minutes`, `stage3_minutes`, `poke_cooldown_ms`), NOT in ~/.panopticon/config.yaml as the issue body suggests.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Use `runtime.lastActivity` (Stop-hook authoritative) as the idle-age source. Reuse `isAgentIdleForNudge(agentId)` to gate stage-1 firing — same check the existing bead-nudge and dead-end patrols rely on. Don't depend on the `health.json` classifier output.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "New patrol lives in a new file `src/lib/cloister/stuck-remediation.ts` (exporting `checkStuckAgentRemediation`) plus a small helper module for the per-agent state file. `deacon.ts` only imports and calls it in `runPatrol()`. Keeps the 5800-line deacon.ts from growing further and gives stage tests a clean import boundary.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Per-agent remediation state stored at `~/.panopticon/agents/<agentId>/stuck-remediation.json` with shape `{ lastStage: 0|1|2|3, lastStageAt: ISO, firstStuckAt: ISO }`. Sibling to existing `health.json` and `.last-bead-nudge` cooldown files.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Stage 3 uses `markAgentTroubled(agentId)` (already exists in `src/lib/agents.ts`). It sets `state.troubled = true` so the dashboard surfaces it and resumeAgent/start refuse — but it does NOT kill the tmux session. The issue says 'don't keep poking,' not 'kill it.'",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Skip the new patrol's stage 1 when (a) the issue's review_status has `stuck` or `deaconIgnored`, (b) `bd ready -l <issue>` shows open beads (bead-nudge patrol owns that intervention), or (c) review_status is blocked/failed/test-failed/CI-blocked (dead-end-agents patrol owns those). Different patrols, no double-firing.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Log every stage transition with prefix `[deacon] stuck-remediation` via `logDeaconEventSync` and `addLog` so they appear in `pan logs` and the dashboard activity feed. Each log line names stage, issueId, and idle minutes; the per-issue counter is the count of distinct stage transitions persisted in the per-agent JSON.",
+      "recordedAt": "2026-05-23T11:35:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Double-firing with `nudgeIdleWorkAgentsWithOpenBeads` (10-min cooldown, targets idle agents with open beads) — stage 1 at 20min could re-poke an agent the bead-nudge already poked twice.",
+      "mitigation": "Before stage 1, run `bd ready -l <issue>` (same query bead-nudge uses) and skip if any rows return. Bead-nudge owns the open-bead case; stuck-remediation handles the residual cases where bead-nudge can't help (all beads claimed/closed but agent still idle, or no beads at all)."
+    },
+    {
+      "id": "H2",
+      "summary": "Activity reset semantics: if the agent does any work between stages, we must clear `lastStage`/`firstStuckAt` so the next stall starts the escalation fresh, not at the old stage.",
+      "mitigation": "On every patrol read, compare `runtime.lastActivity` to the stored `firstStuckAt`. If `lastActivity > firstStuckAt`, delete the stuck-remediation.json file before evaluating stages. Tested explicitly in bead-5."
+    },
+    {
+      "id": "H3",
+      "summary": "Risk of poking intentionally-stopped agents (stoppedByUser=true) or agents that already called `pan done`.",
+      "mitigation": "Only operate on agents with `state.status === 'running'` AND `state.role === 'work'`. Skip if `state.paused`, `state.troubled`, or `state.completedAt` is set. Same gate-pattern as `nudgeIdleWorkAgentsWithOpenBeads`."
+    },
+    {
+      "id": "H4",
+      "summary": "`resumeAgent` is async and can fail (failed-resume backoff, missing session id, stack-health gate). Stage 2 must not advance the stored stage if the resume itself failed — otherwise stage 3 would fire next cycle without the agent ever having been actually resumed.",
+      "mitigation": "Wrap the resumeAgent call in try/catch + check `result.success`. Only persist `lastStage = 2` and `lastStageAt = now` when the call returns `success: true`. On failure, leave state at `lastStage = 1` so the same patrol cycle retries stage 2 next time (with the existing failure-backoff in `recordAgentFailure` providing the throttle)."
+    },
+    {
+      "id": "H5",
+      "summary": "API cost: every poke and restart consumes tokens. Stage 1 is one short message (~50 tokens of prompt + model reply); stage 2 is a fresh session resume with a short continue prompt; stage 3 is zero further API calls. Worst case per stuck agent: two messages then silence.",
+      "mitigation": "Hard upper bound on poking is baked into the design (stage 3 = stop). Per-stage state is persisted so a deacon restart can't re-run the same poke. Stage-1 cooldown is implicit (once you've advanced to stage 1, you don't poke again until stage 2 timing)."
+    },
+    {
+      "id": "H6",
+      "summary": "Time-based test code: project CLAUDE.md mandates `vi.useFakeTimers()` for any retry/delay test. The stage-transition tests must use fake timers; using real `setTimeout` for 20/45/90 min waits is impossible.",
+      "mitigation": "Bead-5 acceptance criterion explicitly requires `vi.useFakeTimers()` + manipulation of `Date.now()` (or a `now` parameter injected into the patrol for testability). The patrol function should accept an optional `now?: number` argument for test injection."
+    },
+    {
+      "id": "H7",
+      "summary": "Patrol could run while the dashboard is globally paused (operator froze deacon), or against an agent the operator deliberately deacon-ignored.",
+      "mitigation": "Global pause is already handled at the top of `runPatrol()` (line ~4431). Per-issue ignore is handled by checking `reviewStatus.deaconIgnored` (already done in `checkStuckWorkAgents` and `checkApiErrorAgents`); mirror that exact check."
+    },
+    {
+      "id": "H8",
+      "summary": "`messageAgent` may take the agent through `resumeAgent` internally (see `src/lib/agents.ts:3089` — if the agent is stopped, messageAgent calls resumeAgent first). This means stage 1's 'tell' could resurrect a stopped agent unintentionally.",
+      "mitigation": "Gate stage 1 on `state.status === 'running'` AND `sessionExists(agentId)` — if either is false, skip the entire remediation cycle for this agent (a stopped or sessionless agent is not 'stuck,' it's already gone)."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T11:20:40.698Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1415: Stuck-agent auto-poke and auto-restart on extended inactivity",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-23T11:35:00.000Z",
+      "reason": "planning",
+      "note": "Discovery complete (auto mode). 7 decisions, 8 hazards, 5 beads queued. Writing vBRIEF and running pan plan finalize.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}

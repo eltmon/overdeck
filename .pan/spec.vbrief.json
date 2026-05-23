@@ -1,0 +1,542 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1415: Stuck-agent auto-poke and auto-restart on extended inactivity",
+    "updated": "2026-05-23T11:26:39.481Z"
+  },
+  "plan": {
+    "id": "pan-1415",
+    "title": "Stuck-agent auto-poke and auto-restart on extended inactivity",
+    "status": "proposed",
+    "uid": "40d3e57b-3b54-4237-9f8d-d9d3abf5b375",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:35:00.000Z",
+    "updated": "2026-05-23T11:26:39.481Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1415",
+        "label": "PAN-1415",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1405",
+        "label": "PAN-1405 (PTY supervisor — companion)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "patrol",
+      "stuck-recovery",
+      "remediation",
+      "auto-resume"
+    ],
+    "narratives": {
+      "Problem": "The deacon's health classifier already labels work agents 'stuck' after 30 minutes of no activity, but nothing acts on that signal. With 8+ work agents in flight, a stuck agent silently blocks its PR's downstream lifecycle until a human notices and runs `pan kill` or `pan tell` by hand. The remediation hooks (`messageAgent`, `resumeAgent`, `markAgentTroubled`) all already exist — they just need a patrol that escalates through them on a deterministic schedule.",
+      "Proposal": "Add a new patrol `checkStuckAgentRemediation` (in a new module `src/lib/cloister/stuck-remediation.ts`, called from `runPatrol()` in `deacon.ts`). For each running work agent that is idle (Stop-hook authoritative) and has no other patrol that should act first (bead-nudge, dead-end, first-completion):\n\n1. At ≥20 min idle and `lastStage < 1` — call `messageAgent(agentId, pokeText)` and persist `lastStage=1`.\n2. At ≥45 min idle and `lastStage < 2` (no activity since stage 1) — call `resumeAgent(agentId, recoveryMessage)`; only advance `lastStage=2` if the resume succeeds.\n3. At ≥90 min idle and `lastStage < 3` (still no activity since stage 2) — call `markAgentTroubled(agentId)` and stop poking. The dashboard surfaces troubled agents for human triage.\n\nState is per-agent at `~/.panopticon/agents/<id>/stuck-remediation.json` (siblings: health.json, .last-bead-nudge). It auto-resets when `runtime.lastActivity > firstStuckAt`. Config under `cloister.toml`'s new `stuck_remediation` block: `enabled`, `stage1_minutes` (default 20), `stage2_minutes` (45), `stage3_minutes` (90). Every transition logs `[deacon] stuck-remediation stage=N issue=... idleMin=...` via `logDeaconEventSync` and the addLog patrol-log stream."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Config lives in cloister.toml (not config.yaml as the issue body shows).",
+        "rationale": "All other deacon/patrol thresholds (`thresholds`, `auto_actions`, `monitoring`, `auto_restart`) live in `~/.panopticon/cloister.toml`. config.yaml is the per-project/global runtime+roles config — wrong layer for a patrol threshold. Following the existing convention makes the new config discoverable next to its siblings and consistent with how `pan-tldr` and similar deacon features are configured."
+      },
+      {
+        "summary": "Skip stage 1 when `bd ready -l <issue>` returns open beads.",
+        "rationale": "`nudgeIdleWorkAgentsWithOpenBeads` (10-min cooldown, more targeted message) already handles open-bead idle. Stuck-remediation should not double-poke. The new patrol covers the residual case: no open beads but agent still idle (e.g. agent forgot to call `pan done`, or it's mid-investigation without bead commits)."
+      },
+      {
+        "summary": "Skip stage 1 when `reviewStatus` is blocked/failed/test-failed/CI-blocked.",
+        "rationale": "`checkDeadEndAgents` already nudges those specific dead-end shapes with feedback-aware messaging. Stuck-remediation is a generic safety net — it should defer to specialized patrols when they apply."
+      },
+      {
+        "summary": "Stage 3 calls `markAgentTroubled` only; it does NOT kill the tmux session.",
+        "rationale": "The issue says 'don't keep poking' and 'mark agent troubled,' not 'kill it.' The existing `markAgentTroubled` API (in `src/lib/agents.ts:845`) sets `state.troubled = true`, which the dashboard surfaces and which gates `start`/`resume`/`messageAgent`. The session staying alive lets the operator attach to inspect what the agent was last doing — destructive cleanup belongs to `pan kill`/`pan wipe`, not to a patrol."
+      },
+      {
+        "summary": "Per-agent state at `~/.panopticon/agents/<id>/stuck-remediation.json`.",
+        "rationale": "Sibling to existing `health.json` and `.last-bead-nudge` cooldown files. Survives deacon restarts (so stage progression doesn't reset and re-poke the same idle agent every patrol cycle). Auto-removed by the existing `cleanupStaleAgentState` sweep when the agent dir is purged."
+      },
+      {
+        "summary": "Default `enabled: true` (patrol on by default).",
+        "rationale": "The issue's primary use case is the user's running pipeline; turning the patrol off by default would defeat the purpose. Operators can flip it off in cloister.toml. Default values (20/45/90 min) match the issue body."
+      },
+      {
+        "summary": "Patrol function accepts an optional `now?: number` arg for test injection.",
+        "rationale": "Project rule (CLAUDE.md) mandates `vi.useFakeTimers()` for time-based code. Accepting `now` makes stage-transition tests deterministic without needing to mock Date.now globally, which simplifies the test bead and matches the pattern other deacon helpers already use."
+      },
+      {
+        "summary": "Stage 3 escalation is also gated by the issue's tracker status: skip if mergeStatus=merged or readyForMerge=true.",
+        "rationale": "An agent that's already finished and is waiting for merge isn't 'stuck' in a remediable sense. The merge/close-out flow owns its lifecycle from there. Skipping prevents 'troubled' from being mis-applied to a working pipeline."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-schema",
+        "title": "Add stuck_remediation config block to CloisterConfig + cloister.toml defaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1415",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "remediation-patrol",
+            "stage-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend `CloisterConfig` in `src/lib/cloister/config.ts` with a new optional block `stuck_remediation?: StuckRemediationConfig` containing `{ enabled: boolean; stage1_minutes: number; stage2_minutes: number; stage3_minutes: number }`. Add the matching `StuckRemediationConfig` interface. Set defaults `{ enabled: true, stage1_minutes: 20, stage2_minutes: 45, stage3_minutes: 90 }` in `DEFAULT_CLOISTER_CONFIG`. Verify the deep-merge path handles a missing block (loads defaults) and a partial block (deep-merges)."
+        },
+        "subItems": [
+          {
+            "id": "config-schema.ac1",
+            "title": "`StuckRemediationConfig` interface exported from `src/lib/cloister/config.ts` with the four fields named exactly `enabled`, `stage1_minutes`, `stage2_minutes`, `stage3_minutes` (snake_case to match the rest of cloister.toml)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac2",
+            "title": "`CloisterConfig.stuck_remediation` field added (optional)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac3",
+            "title": "`DEFAULT_CLOISTER_CONFIG.stuck_remediation` set to `{ enabled: true, stage1_minutes: 20, stage2_minutes: 45, stage3_minutes: 90 }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac4",
+            "title": "`loadCloisterConfigSync()` returns the defaults when no `[stuck_remediation]` block exists in cloister.toml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac5",
+            "title": "`loadCloisterConfigSync()` deep-merges a partial `[stuck_remediation]` block (e.g. setting only `stage1_minutes = 10`) with the defaults for the other fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac6",
+            "title": "TypeScript build passes (`npm run typecheck`) and existing config tests in `src/lib/cloister/__tests__/config.test.ts` still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remediation-state",
+        "title": "Add per-agent stuck-remediation state file helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1415",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/lib/cloister/stuck-remediation-state.ts` with three exported helpers operating on `~/.panopticon/agents/<agentId>/stuck-remediation.json`: `readStuckRemediationState(agentId): StuckRemediationState | null`, `writeStuckRemediationState(agentId, state): void`, `clearStuckRemediationState(agentId): void`. The state shape is `{ lastStage: 0 | 1 | 2 | 3; lastStageAt: string /* ISO */; firstStuckAt: string /* ISO */ }`. Use `existsSync` + `readFileSync`/`writeFileSync` (CLI-process-safe — these helpers are only called from the patrol thread). On read failures (corrupt JSON, missing file), return `null` and do not throw."
+        },
+        "subItems": [
+          {
+            "id": "remediation-state.ac1",
+            "title": "New file `src/lib/cloister/stuck-remediation-state.ts` exports `StuckRemediationState` type, `readStuckRemediationState`, `writeStuckRemediationState`, `clearStuckRemediationState`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-state.ac2",
+            "title": "`readStuckRemediationState` returns `null` for a missing file (does not throw)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-state.ac3",
+            "title": "`readStuckRemediationState` returns `null` for a corrupt-JSON file (does not throw) and logs a warning via `console.warn`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-state.ac4",
+            "title": "`writeStuckRemediationState` creates the parent dir (`~/.panopticon/agents/<agentId>/`) if missing and writes pretty-printed JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-state.ac5",
+            "title": "`clearStuckRemediationState` is a no-op if the file does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-state.ac6",
+            "title": "Unit tests in `src/lib/cloister/__tests__/stuck-remediation-state.test.ts` cover the four edge cases above using a tmp-dir override (no real `~/.panopticon` writes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remediation-patrol",
+        "title": "Implement checkStuckAgentRemediation patrol with 3-stage escalation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1415",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wire-patrol",
+            "stage-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/lib/cloister/stuck-remediation.ts` exporting `async function checkStuckAgentRemediation(opts?: { now?: number }): Promise<string[]>`. The function iterates running work agents (`listRunningAgentsSync()` filtered by `state.role === 'work'` and `state.status === 'running'`), and for each one applies the gate cascade described below. Returns the same `string[]` action list shape as other deacon patrols.\n\nGate cascade (all must pass before stage logic runs):\n  1. Config: skip if `stuck_remediation.enabled === false`.\n  2. Session: skip if `!sessionExistsSync(agentId)`.\n  3. Status: skip if `state.paused || state.troubled || state.completedAt`.\n  4. Tracker: skip if `reviewStatus.stuck`, `reviewStatus.deaconIgnored`, `reviewStatus.mergeStatus === 'merged'`, or `reviewStatus.readyForMerge`.\n  5. Dead-end overlap: skip if `reviewStatus.reviewStatus` is `'blocked'` or `'failed'`, or `reviewStatus.verificationStatus === 'failed'`, or `reviewStatus.testStatus === 'failed'` (let `checkDeadEndAgents` handle those).\n  6. Idle: skip if `!isAgentIdleForNudge(agentId)` (active/waiting-on-human/uninitialized-fresh agents are not idle).\n  7. Bead overlap: skip if `bd ready -l <issueLabel>` returns any rows in the agent's workspace (let `nudgeIdleWorkAgentsWithOpenBeads` handle those).\n\nState handling:\n  - Read `runtime.lastActivity` from `getAgentRuntimeStateSync(agentId)`. If missing, skip.\n  - Read stored `stuckState = readStuckRemediationState(agentId)`.\n  - If `stuckState` exists AND `runtime.lastActivity > stuckState.firstStuckAt` → `clearStuckRemediationState(agentId)` and continue (treat as fresh stall).\n  - Compute `idleMinutes = (now - runtime.lastActivity) / 60_000`.\n\nStage transitions (highest applicable stage wins):\n  - `idleMinutes >= stage3_minutes` AND `(stuckState?.lastStage ?? 0) < 3` → call `markAgentTroubled(agentId)`. Write `{ lastStage: 3, lastStageAt: now, firstStuckAt: stuckState?.firstStuckAt ?? runtime.lastActivity }`. Log `[deacon] stuck-remediation stage=3 issue=<id> idleMin=<n> action=marked-troubled`. Push to actions.\n  - Else if `idleMinutes >= stage2_minutes` AND `(stuckState?.lastStage ?? 0) < 2` → call `resumeAgent(agentId, recoveryMessage)`. If `result.success` → write `{ lastStage: 2, lastStageAt: now, firstStuckAt }` and log/push action. If `!result.success` → DO NOT advance stored stage; log failure and let the next patrol retry.\n  - Else if `idleMinutes >= stage1_minutes` AND `(stuckState?.lastStage ?? 0) < 1` → call `messageAgent(agentId, pokeMessage)`. Write `{ lastStage: 1, lastStageAt: now, firstStuckAt: stuckState?.firstStuckAt ?? new Date(runtime.lastActivity).toISOString() }`. Log/push action.\n  - Otherwise no-op (waiting for the next threshold).\n\nMessages (deterministic strings, no per-call variability):\n  - Stage 1 poke: `\"You appear stuck — no tool calls for ${idleMinutes} min. If your implementation is complete, run \\`pan done ${issueId}\\`. Otherwise reply with a one-line summary of what you're waiting on, then continue.\"`\n  - Stage 2 resume: `\"Resuming after auto-detected stall (${idleMinutes} min idle). Review your last work and decide whether to continue or signal done with \\`pan done ${issueId}\\`.\"`\n  - Stage 3 has no message — it's silent gate-marking.\n\nAll exceptions wrapped per-agent in try/catch — one failing agent must not stop the loop for the others. Use `console.error` + `logDeaconEventSync` for unexpected throws."
+        },
+        "subItems": [
+          {
+            "id": "remediation-patrol.ac1",
+            "title": "New file `src/lib/cloister/stuck-remediation.ts` exports `checkStuckAgentRemediation(opts?: { now?: number }): Promise<string[]>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac2",
+            "title": "Function loads config via `loadCloisterConfigSync()` and returns `[]` immediately when `stuck_remediation.enabled === false`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac3",
+            "title": "All seven gates (config, session, status, tracker, dead-end overlap, idle, bead overlap) implemented and skip the agent without firing a stage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac4",
+            "title": "Activity-reset logic clears stored state and skips the cycle when `runtime.lastActivity > stuckState.firstStuckAt`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac5",
+            "title": "Stage 1 calls `messageAgent` with the exact poke message and persists `lastStage=1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac6",
+            "title": "Stage 2 calls `resumeAgent` with the exact recovery message; persists `lastStage=2` ONLY if the resume succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac7",
+            "title": "Stage 3 calls `markAgentTroubled`, persists `lastStage=3`, and never calls `messageAgent`/`resumeAgent` again on subsequent cycles for the same stall",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac8",
+            "title": "Each stage transition emits a `[deacon] stuck-remediation stage=N issue=<id> idleMin=<n> action=<verb>` log via `logDeaconEventSync` and is included in the returned actions array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac9",
+            "title": "Per-agent try/catch: an exception in one agent's stage logic does not stop the loop for other agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediation-patrol.ac10",
+            "title": "Function accepts optional `now?: number` argument used in place of `Date.now()` everywhere — for deterministic tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-patrol",
+        "title": "Wire checkStuckAgentRemediation into runPatrol() in deacon.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1415",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Import `checkStuckAgentRemediation` from `./stuck-remediation.js` in `src/lib/cloister/deacon.ts`. In `runPatrol()`, call it after `checkApiErrorAgents()` (currently line ~4689) and push its returned actions into `actions` + `addLog('action', a, state.patrolCycle)` exactly like the surrounding patrols. The patrol runs every cycle (no `Math.random()` gating)."
+        },
+        "subItems": [
+          {
+            "id": "wire-patrol.ac1",
+            "title": "`runPatrol()` calls `checkStuckAgentRemediation()` once per cycle after `checkApiErrorAgents()`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-patrol.ac2",
+            "title": "Returned actions are pushed into the `actions` array and each is logged via `addLog('action', a, state.patrolCycle)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-patrol.ac3",
+            "title": "Global pause path (`isDeaconGloballyPaused()`) still short-circuits before the new call (no change to existing pause behaviour)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-patrol.ac4",
+            "title": "Existing deacon tests in `src/lib/cloister/__tests__/` still pass (no regression in `deacon-stuck-skip.test.ts`, `deacon-auto-closeout.test.ts`, etc.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-tests",
+        "title": "Unit tests for stage 1/2/3 transitions and gate cascade",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1415",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `src/lib/cloister/__tests__/stuck-remediation.test.ts` with a vitest suite that mocks `agents.js`, `tmux.js`, `review-status.js`, `config.js`, and `stuck-remediation-state.js`. Inject `opts.now` to simulate time advancing through the 20/45/90-min thresholds. Use `vi.useFakeTimers()` for any test that lets real wall-clock pass (per CLAUDE.md rule). Each test asserts on (a) which agent helper was called, (b) what was persisted to state, (c) what was logged."
+        },
+        "subItems": [
+          {
+            "id": "stage-tests.ac1",
+            "title": "Test: agent idle 5 min → no stage fires (below stage1 threshold)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac2",
+            "title": "Test: agent idle 25 min, no prior state → stage 1 fires; `messageAgent` called once with poke text; state persists `lastStage=1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac3",
+            "title": "Test: agent idle 50 min, prior `lastStage=1` with no activity since → stage 2 fires; `resumeAgent` called with recovery text; state persists `lastStage=2`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac4",
+            "title": "Test: agent idle 50 min, prior `lastStage=1`, `resumeAgent` returns `{ success: false }` → state still `lastStage=1` (no advance on failure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac5",
+            "title": "Test: agent idle 100 min, prior `lastStage=2` → stage 3 fires; `markAgentTroubled` called; state persists `lastStage=3`; `messageAgent` and `resumeAgent` NOT called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac6",
+            "title": "Test: agent idle 30 min, prior `lastStage=3` → no further action (no messageAgent, no resumeAgent, no markTroubled re-call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac7",
+            "title": "Test: activity reset — agent had `lastStage=2` but `runtime.lastActivity > firstStuckAt` → `clearStuckRemediationState` called; no stage fires this cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac8",
+            "title": "Test: skip when `reviewStatus.stuck = true` (no stage fires regardless of idle minutes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac9",
+            "title": "Test: skip when `reviewStatus.deaconIgnored = true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac10",
+            "title": "Test: skip when `reviewStatus.reviewStatus === 'blocked'` (dead-end-agents owns it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac11",
+            "title": "Test: skip when `bd ready -l <issue>` returns open beads (bead-nudge owns it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac12",
+            "title": "Test: skip when `state.paused = true` or `state.troubled = true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac13",
+            "title": "Test: skip when config `stuck_remediation.enabled = false`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac14",
+            "title": "Test: skip when `isAgentIdleForNudge` returns false (agent active or waiting-on-human)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac15",
+            "title": "Test: one agent throwing inside its stage logic does not stop processing of other agents in the same cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-tests.ac16",
+            "title": "All tests use `vi.useFakeTimers()` or `opts.now` injection — zero real-wall-clock waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-schema",
+        "to": "remediation-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "remediation-state",
+        "to": "remediation-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "remediation-patrol",
+        "to": "wire-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "remediation-patrol",
+        "to": "stage-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-patrol",
+        "to": "stage-tests",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1415-stuck-agent-auto-poke-and-auto-restart-on-extended-inactivity.vbrief.json"
+    }
+  }
+}
