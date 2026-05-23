@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR } from './paths.js';
+import { AGENTS_DIR, packageRoot } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, getAgentSessionsSync, getAgentSessions, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -33,7 +33,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
-import { PTY_TOKEN_HEADER, readPtyTokenSync } from './pty-token.js';
+import { PTY_TOKEN_HEADER, readPtyTokenSync, writePtyTokenSync } from './pty-token.js';
 import { canUseHarnessSync } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
@@ -588,6 +588,8 @@ export interface AgentState {
    * sendKeysAsync. Absent or false means tmux-only delivery (current default).
    */
   channelsEnabled?: boolean;
+  /** True when this work agent was launched through the PTY supervisor wrapper. */
+  supervisorEnabled?: boolean;
   /**
    * Delivery method for agent messages. 'auto' tries supervisor, then channels,
    * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
@@ -654,6 +656,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
     roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
+    supervisorEnabled: raw.supervisorEnabled,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,
@@ -1267,6 +1270,46 @@ export async function deliverAgentPermissionDecision(
 interface ChannelsDecision {
   eligible: boolean;
   reason?: string;
+}
+
+interface SupervisorDecision {
+  eligible: boolean;
+  reason?: string;
+}
+
+export function decideSupervisorForWorkAgent(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): SupervisorDecision {
+  void options;
+  const log = (eligible: boolean, reason?: string): void => {
+    const tag = eligible ? 'supervisor:eligible' : `supervisor:ineligible:${reason ?? 'unknown'}`;
+    console.log(`[${agentId}] ${tag}`);
+  };
+
+  if (state.role !== 'work') {
+    log(false, 'not-a-work-agent');
+    return { eligible: false, reason: 'not-a-work-agent' };
+  }
+
+  if (process.env.PANOPTICON_DOCKER_WORKSPACE === '1' || process.env.PAN_DOCKER === '1') {
+    log(false, 'docker-not-supported-yet');
+    return { eligible: false, reason: 'docker-not-supported-yet' };
+  }
+
+  if (state.harness !== 'claude-code') {
+    const reason = `harness-${state.harness ?? 'unknown'}`;
+    log(false, reason);
+    return { eligible: false, reason };
+  }
+
+  log(true);
+  return { eligible: true };
+}
+
+function resolvePtySupervisorScriptPath(): string {
+  return join(packageRoot, 'dist', 'pty-supervisor.js');
 }
 
 /**
@@ -1991,6 +2034,8 @@ export async function buildAgentLaunchConfig(opts: {
   channelsBridgeMcpConfig?: string;
   /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
   channelsBridgeServerName?: string;
+  useSupervisor?: boolean;
+  supervisorScriptPath?: string;
   /**
    * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
    * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
@@ -2077,6 +2122,8 @@ export async function buildAgentLaunchConfig(opts: {
       resumeSessionId: opts.resumeSessionId,
       model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      useSupervisor: opts.useSupervisor,
+      supervisorScriptPath: opts.supervisorScriptPath,
       ...piLauncherFields,
     });
     return { launcherContent, providerEnv };
@@ -2104,6 +2151,8 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    useSupervisor: opts.useSupervisor,
+    supervisorScriptPath: opts.supervisorScriptPath,
     ...piLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
@@ -2594,6 +2643,17 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     hostOverride: options.allowHost || undefined,
   };
 
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
+  let supervisorScriptPath: string | undefined;
+  if (supervisorDecision.eligible) {
+    supervisorScriptPath = resolvePtySupervisorScriptPath();
+    if (!existsSync(supervisorScriptPath)) {
+      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    }
+    writePtyTokenSync(agentId);
+    state.supervisorEnabled = true;
+  }
+
   saveAgentStateSync(state);
 
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
@@ -2729,6 +2789,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role: 'work',
     isPlanning: false,
     channelsBridgeMcpConfig,
+    useSupervisor: state.supervisorEnabled === true,
+    supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
   });
 
