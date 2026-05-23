@@ -222,4 +222,41 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     await checkUndispatchedShip();
     expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
   });
+
+  it('logs the per-issue re-dispatch count after each fired shipping trigger', async () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-05-23T12:00:00.000Z');
+    vi.setSystemTime(now);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    try {
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-COUNTER': {
+          issueId: 'PAN-1414-COUNTER',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-COUNTER)',
+      );
+
+      vi.setSystemTime(new Date(now.getTime() + 91_000));
+      await checkUndispatchedShip();
+
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(2);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (2 total for issue PAN-1414-COUNTER)',
+      );
+    } finally {
+      logSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

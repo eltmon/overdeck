@@ -2618,6 +2618,7 @@ const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
 // so this is purely to keep the patrol log quiet while a ship run is in flight.
 const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
 const shipDispatchCooldowns = new Map<string, number>();
+const shipDispatchCounts = new Map<string, number>();
 
 /**
  * Safety-net patrol: re-dispatch the ship role for issues where review and
@@ -2672,6 +2673,9 @@ export async function checkUndispatchedShip(): Promise<string[]> {
 
       try {
         const { onIssueStateChange } = await import('./service.js');
+        const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
+        shipDispatchCounts.set(key, dispatchCount);
+        console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
         await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
         actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
       } catch (err) {

@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1414: Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
-    "updated": "2026-05-23T17:56:25.234Z"
+    "updated": "2026-05-23T17:59:45.867Z"
   },
   "plan": {
     "id": "pan-1414",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-23T11:25:00.000Z",
-    "updated": "2026-05-23T17:56:25.234Z",
+    "updated": "2026-05-23T17:59:45.867Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
@@ -125,7 +125,7 @@
       {
         "id": "per-issue-redispatch-counter",
         "title": "Add per-issue re-dispatch counter and log `[deacon] Ship re-dispatched (N total for issue X)`",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T11:25:00.000Z",
         "metadata": {
@@ -141,7 +141,7 @@
           {
             "id": "per-issue-redispatch-counter.ac1",
             "title": "Module-level `shipDispatchCounts: Map<string, number>` exists in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -149,7 +149,7 @@
           {
             "id": "per-issue-redispatch-counter.ac2",
             "title": "On each successful re-dispatch path, a log line of exact format `[deacon] Ship re-dispatched (N total for issue X)` is emitted, where N is the post-increment count and X is the issueId",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -157,7 +157,7 @@
           {
             "id": "per-issue-redispatch-counter.ac3",
             "title": "Counter increments on every re-dispatch attempt that actually fires onIssueStateChange (not on cooldown skips, staleness skips, or readyForMerge skips)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -165,7 +165,7 @@
           {
             "id": "per-issue-redispatch-counter.ac4",
             "title": "New unit test in deacon-undispatched-ship.test.ts asserts the log format and N value after a re-dispatch (using a console.log spy)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -173,7 +173,7 @@
           {
             "id": "per-issue-redispatch-counter.ac5",
             "title": "npm run typecheck, npm run lint, and the deacon-undispatched-ship test file all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
