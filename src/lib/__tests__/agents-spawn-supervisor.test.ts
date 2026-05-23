@@ -9,6 +9,8 @@ let tmpHome: string;
 let workspace: string;
 let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
+let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
+let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
@@ -34,6 +36,7 @@ function writeSupervisorArtifact(): string {
 
 function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
+  sendRawKeystrokeMock = vi.fn(() => Effect.void);
 
   vi.doMock('../paths.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../paths.js')>();
@@ -50,13 +53,13 @@ function mockSpawnDependencies(): void {
     killSessionSync: vi.fn(),
     killSession: vi.fn(() => Effect.void),
     sendKeys: vi.fn(() => Effect.void),
-    sendRawKeystroke: vi.fn(() => Effect.void),
+    sendRawKeystroke: sendRawKeystrokeMock,
     sessionExistsSync: vi.fn(() => false),
     sessionExists: vi.fn(() => Effect.succeed(false)),
     getAgentSessionsSync: vi.fn(() => []),
     getAgentSessions: vi.fn(() => Effect.succeed([])),
-    capturePaneSync: vi.fn(() => 'Claude Code'),
-    capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+    capturePaneSync: vi.fn(() => capturePaneText),
+    capturePane: vi.fn(() => Effect.succeed(capturePaneText)),
     listPaneValuesSync: vi.fn(() => []),
     listPaneValues: vi.fn(() => Effect.succeed([])),
     waitForClaudePrompt: vi.fn(async () => true),
@@ -103,6 +106,7 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
   process.env.PANOPTICON_HOME = tmpHome;
+  capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
   delete process.env.PAN_DOCKER;
   delete process.env.PANOPTICON_DOCKER_WORKSPACE;
@@ -185,6 +189,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
     expect(launcher).not.toContain('--mcp-config');
     expect(launcher).not.toContain('--dangerously-load-development-channels');
+    expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
@@ -194,26 +199,41 @@ describe('spawnAgent PTY supervisor wiring', () => {
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {
-    channelsMcpEnabled = true;
-    writeSupervisorArtifact();
-    const { spawnAgent } = await import('../agents.js');
+    vi.useFakeTimers();
+    try {
+      channelsMcpEnabled = true;
+      capturePaneText = 'WARNING: Loading development channels';
+      writeSupervisorArtifact();
+      const { spawnAgent } = await import('../agents.js');
 
-    const state = await spawnAgent({
-      issueId: 'PAN-1405',
-      workspace,
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-    });
+      const state = await spawnAgent({
+        issueId: 'PAN-1405',
+        workspace,
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+      });
 
-    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
-    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
-    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
-    expect(existsSync(join(workspace, '.pan', 'agent-mcp.json'))).toBe(true);
-    expect(existsSync(join(tmpHome, 'bridge-tokens', 'agent-pan-1405.token'))).toBe(true);
-    expect(state.channelsEnabled).toBe(true);
-    expect(persisted.channelsEnabled).toBe(true);
-    expect(launcher).toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
-    expect(launcher).toContain('--dangerously-load-development-channels');
+      const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+      const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(existsSync(join(workspace, '.pan', 'agent-mcp.json'))).toBe(true);
+      expect(existsSync(join(tmpHome, 'bridge-tokens', 'agent-pan-1405.token'))).toBe(true);
+      expect(state.channelsEnabled).toBe(true);
+      expect(persisted.channelsEnabled).toBe(true);
+      expect(launcher).toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
+      expect(launcher).toContain('--dangerously-load-development-channels');
+      expect(sendRawKeystrokeMock).toHaveBeenCalledWith(
+        'agent-pan-1405',
+        'C-m',
+        'channels:dismiss-dev-dialog',
+      );
+      capturePaneText = '';
+      await vi.advanceTimersByTimeAsync(150);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails before launcher or tmux creation when the supervisor artifact is missing', async () => {

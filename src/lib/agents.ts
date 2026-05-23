@@ -2837,7 +2837,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // the tmux session exists, but only block on completion when we are about to
   // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
   // loop waiting for a dialog they may never need.
-  const dismissChannelsDialogPromise = state.channelsEnabled
+  const dismissChannelsDialogPromise = channelsBridgeMcpConfig
     ? dismissDevChannelsDialog(agentId).catch(() => undefined)
     : null;
 

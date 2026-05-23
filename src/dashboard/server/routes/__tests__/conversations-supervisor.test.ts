@@ -5,21 +5,26 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let panopticonHome: string;
+let channelsEnabled = false;
 let createSupervisorSocket = false;
+let dismissDevChannelsDialogMock: ReturnType<typeof vi.fn>;
 let createSessionCalls: Array<{ session: string; command: string }> = [];
 
-vi.mock('../../../../lib/agents.js', () => ({
-  deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
-  writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
-  dismissDevChannelsDialog: vi.fn().mockResolvedValue(undefined),
-  getAgentRuntimeBaseCommand: vi.fn().mockResolvedValue('claude --model claude-sonnet-4-6'),
-  getProviderExportsForModel: vi.fn().mockResolvedValue(''),
-  getProviderEnvForModel: vi.fn().mockResolvedValue({}),
-  getProviderAuthMode: vi.fn().mockResolvedValue('anthropic'),
-}));
+vi.mock('../../../../lib/agents.js', () => {
+  dismissDevChannelsDialogMock = vi.fn().mockResolvedValue(undefined);
+  return {
+    deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+    writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
+    dismissDevChannelsDialog: dismissDevChannelsDialogMock,
+    getAgentRuntimeBaseCommand: vi.fn().mockResolvedValue('claude --model claude-sonnet-4-6'),
+    getProviderExportsForModel: vi.fn().mockResolvedValue(''),
+    getProviderEnvForModel: vi.fn().mockResolvedValue({}),
+    getProviderAuthMode: vi.fn().mockResolvedValue('anthropic'),
+  };
+});
 
 vi.mock('../../../../lib/config-yaml.js', () => ({
-  isClaudeCodeChannelsEnabled: vi.fn(() => false),
+  isClaudeCodeChannelsEnabled: vi.fn(() => channelsEnabled),
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
@@ -69,6 +74,8 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
   beforeEach(() => {
     panopticonHome = join(tmpdir(), `pan-conv-supervisor-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     process.env.PANOPTICON_HOME = panopticonHome;
+    channelsEnabled = false;
+    dismissDevChannelsDialogMock?.mockClear();
     delete process.env.PAN_DOCKER;
     delete process.env.PANOPTICON_DOCKER_WORKSPACE;
     createSupervisorSocket = false;
@@ -104,6 +111,27 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(panopticonHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
     expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
+    expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the dev-channels dialog only when Channels MCP is wired', async () => {
+    channelsEnabled = true;
+    createSupervisorSocket = true;
+    const { spawnConversationSession } = await import('../conversations.js');
+
+    await spawnConversationSession(
+      'conv-channels-test',
+      tmpdir(),
+      'session-channels-test',
+      'claude-sonnet-4-6',
+      undefined,
+      'PAN-1405',
+      false,
+      'claude-code',
+    );
+
+    expect(launcherFor('conv-channels-test')).toContain('--dangerously-load-development-channels');
+    expect(dismissDevChannelsDialogMock).toHaveBeenCalledWith('conv-channels-test');
   });
 
   it('does not wrap Pi conversations with the PTY supervisor', async () => {
