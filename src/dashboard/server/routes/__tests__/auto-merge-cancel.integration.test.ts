@@ -90,6 +90,7 @@ async function startHttpRouteServer(): Promise<void> {
 
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
+  process.env.API_PORT = String(address.port);
 }
 
 async function stopHttpRouteServer(): Promise<void> {
@@ -134,7 +135,7 @@ async function scheduleViaScheduler(issueId: string): Promise<void> {
 async function postCancel(issueId: string): Promise<{ status: number; body: { cancelled?: boolean; error?: string } }> {
   const response = await fetch(`${baseUrl}/api/issues/${issueId}/merge/cancel`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin: baseUrl },
     body: JSON.stringify({ reason: 'integration-test' }),
   });
   return { status: response.status, body: await response.json() };
@@ -151,6 +152,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await stopHttpRouteServer();
   resetDatabase();
+  delete process.env.API_PORT;
   delete process.env.PANOPTICON_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
