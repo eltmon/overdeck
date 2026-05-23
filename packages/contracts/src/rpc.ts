@@ -109,6 +109,14 @@ export const CompactBoundary = Schema.Struct({
 })
 export type CompactBoundary = typeof CompactBoundary.Type
 
+export const ContextUsage = Schema.Struct({
+  activeBytes: Schema.Number,
+  estimatedTokens: Schema.Number,
+  contextWindow: Schema.Number,
+  percentUsed: Schema.Number,
+})
+export type ContextUsage = typeof ContextUsage.Type
+
 // ─── Chat / conversation message types (PAN-451) ──────────────────────────────
 
 export const ChatMessage = Schema.Struct({
@@ -150,6 +158,7 @@ export interface ConversationResponse {
   byteOffset: number;
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
+  contextUsage?: ContextUsage | null;
 }
 
 export const ConversationEvent = Schema.Union([
@@ -160,6 +169,7 @@ export const ConversationEvent = Schema.Union([
     streaming: Schema.Boolean,
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
+    contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),

@@ -45,8 +45,15 @@ export interface CompactBoundary {
   model?: string;
 }
 
+export interface ContextUsage {
+  activeBytes: number;
+  estimatedTokens: number;
+  contextWindow: number;
+  percentUsed: number;
+}
+
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[] }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
   | { kind: 'discovering' };
 
 // ─── Turn Diff Types ─────────────────────────────────────────────────────────

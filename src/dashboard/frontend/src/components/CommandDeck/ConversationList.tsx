@@ -9,6 +9,13 @@ import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface ContextUsage {
+  activeBytes: number;
+  estimatedTokens: number;
+  contextWindow: number;
+  percentUsed: number;
+}
+
 export interface Conversation {
   id: number;
   name: string;
@@ -52,6 +59,7 @@ export interface Conversation {
   compacting?: boolean;
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
   deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;
+  contextUsage?: ContextUsage | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
