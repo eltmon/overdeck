@@ -83,6 +83,7 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/auto-merge",
               "configuration/harnesses",
               "configuration/issue-trackers",
               "configuration/polyrepo"

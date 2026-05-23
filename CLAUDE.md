@@ -110,6 +110,8 @@ Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi`
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Panopticon could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
+Auto-merge is documented in [configuration/auto-merge.mdx](configuration/auto-merge.mdx). It is opt-in and solo-workflow-only: shared/team instances must keep human merge consent at the dashboard MERGE action rather than moving that consent into configuration and a cooldown window.
+
 ## Panopticon Agent Taxonomy
 
 Panopticon's pipeline is expressed as five issue-scoped **roles**:

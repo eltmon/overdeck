@@ -1,0 +1,50 @@
+---
+title: Auto-Merge
+description: Opt-in automatic merge cooldowns for solo Panopticon workflows
+---
+
+# Auto-Merge
+
+Auto-merge is an opt-in per-project setting for solo Panopticon operators. When enabled, Panopticon schedules a cooldown after an issue becomes ready to merge, re-checks the merge gates when the cooldown expires, and then runs the same merge path as the dashboard MERGE button.
+
+<Warning>
+**Solo workflows only. Do not enable auto-merge on shared or team Panopticon instances.**
+
+Auto-merge preserves the safety intent of "humans only merge" by moving the human decision to the gate configuration and cooldown window. In a shared instance, that shifts consent away from the person who would normally click MERGE, so it is not appropriate for team workflows.
+</Warning>
+
+## Where to configure it
+
+Set `merge.autoMerge` in a project's `.pan.yaml`. Project config replaces the global `merge.autoMerge` block as a whole, so project-specific blocker labels do not silently inherit a global list.
+
+```yaml
+merge:
+  autoMerge:
+    enabled: true
+    cooldownMinutes: 5
+    maxStaleMinutes: 60
+    requireGitHubCiPassing: true
+    requireAllCommitStatusChecks: true
+    requireNoBlockerLabels:
+      - needs-design
+      - needs-discussion
+      - do-not-merge
+      - wip
+```
+
+## Settings
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `merge.autoMerge.enabled` | `false` | Enables auto-merge scheduling for the project. The default is disabled. |
+| `merge.autoMerge.cooldownMinutes` | `5` | Minutes to wait after an issue becomes ready for merge before firing. Values below `1` are clamped to `1`. |
+| `merge.autoMerge.maxStaleMinutes` | `60` | Maximum age for an overdue scheduled merge. If the dashboard was asleep longer than this, Panopticon aborts instead of merging. Values below `cooldownMinutes` are clamped up to `cooldownMinutes`. |
+| `merge.autoMerge.requireGitHubCiPassing` | `true` | Requires GitHub's combined PR status to be passing before auto-merge fires. |
+| `merge.autoMerge.requireAllCommitStatusChecks` | `true` | Requires all commit status checks to pass before auto-merge fires. |
+| `merge.autoMerge.requireNoBlockerLabels` | `['needs-design', 'needs-discussion', 'do-not-merge', 'wip']` | Blocks auto-merge when any listed label is present on the PR. Set a project-specific list when your workflow uses different labels. |
+
+## Gate behavior
+
+Auto-merge only schedules after `readyForMerge` changes from false to true. During the cooldown, the dashboard shows a cancelable countdown. When the timer fires, Panopticon re-validates readiness, blocker labels, and CI according to the project config. Any failed gate aborts the scheduled merge instead of clicking through.
+
+The feature is wall-clock based and persisted in SQLite, so pending cooldowns survive dashboard restarts. If a pending cooldown is stale on boot, Panopticon aborts it rather than surprising the operator with a late merge.
