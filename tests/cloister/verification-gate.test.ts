@@ -148,6 +148,32 @@ describe('runQualityGates — SSH remote support', () => {
       expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });
     }
   });
+
+  it('does not leak dashboard runtime ports into local gate processes', async () => {
+    const priorApiPort = process.env.API_PORT;
+    const priorPort = process.env.PORT;
+    const priorDashboardUrl = process.env.DASHBOARD_URL;
+    process.env.API_PORT = '4512';
+    process.env.PORT = '4512';
+    process.env.DASHBOARD_URL = 'http://localhost:4512';
+
+    try {
+      await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
+    } finally {
+      if (priorApiPort === undefined) delete process.env.API_PORT;
+      else process.env.API_PORT = priorApiPort;
+      if (priorPort === undefined) delete process.env.PORT;
+      else process.env.PORT = priorPort;
+      if (priorDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
+      else process.env.DASHBOARD_URL = priorDashboardUrl;
+    }
+
+    for (const call of execMock.mock.calls) {
+      expect(call[1]?.env?.API_PORT).toBeUndefined();
+      expect(call[1]?.env?.PORT).toBeUndefined();
+      expect(call[1]?.env?.DASHBOARD_URL).toBeUndefined();
+    }
+  });
 });
 
 describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
