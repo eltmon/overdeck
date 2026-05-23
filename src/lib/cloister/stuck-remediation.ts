@@ -78,10 +78,16 @@ async function evaluateAgent(
 ): Promise<void> {
   const agentId = agent.id;
   if (!agentId) return;
-  if (agent.role !== 'work' || agent.status !== 'running') return;
+  if (agent.status !== 'running') return;
   if (!sessionExistsSync(agentId)) return;
   const completedAt = (agent as AgentState & { completedAt?: string }).completedAt;
   if (agent.paused || agent.troubled || completedAt) return;
+
+  if (agent.role === 'flywheel') {
+    await evaluateFlywheelOrchestrator(agent, config, now, actions);
+    return;
+  }
+  if (agent.role !== 'work') return;
 
   const issueId = issueIdForAgent(agent);
   const reviewStatus = getReviewStatusSync(issueId);
@@ -134,6 +140,66 @@ async function evaluateAgent(
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck));
     logAction(actions, transitionAction(1, issueId, idleMinutes, 'poked'));
+  }
+}
+
+// The flywheel orchestrator is a singleton with role 'flywheel'. It ticks
+// sub-minute by design (each tick produces a FlywheelStatus snapshot via
+// `pan flywheel emit-status`), so a long silence indicates a stuck model
+// call or a dropped tick loop — not the natural between-task idleness that
+// work agents exhibit. Stage 2 escalates to pauseFlywheel() instead of
+// resumeAgent(): pausing preserves run state for human inspection and
+// matches what an operator would do manually on noticing a stall.
+async function evaluateFlywheelOrchestrator(
+  agent: AgentState,
+  config: StuckRemediationConfig,
+  now: number,
+  actions: string[],
+): Promise<void> {
+  const agentId = agent.id;
+  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+
+  const runtime = getAgentRuntimeStateSync(agentId);
+  if (!runtime?.lastActivity) return;
+
+  const lastActivityMs = new Date(runtime.lastActivity).getTime();
+  if (!Number.isFinite(lastActivityMs)) return;
+
+  const stuckState = readStuckRemediationState(agentId);
+  if (stuckState) {
+    const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
+    if (Number.isFinite(firstStuckMs) && lastActivityMs > firstStuckMs) {
+      clearStuckRemediationState(agentId);
+      return;
+    }
+  }
+
+  const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
+  const lastStage = stuckState?.lastStage ?? 0;
+  const firstStuck = firstStuckAt(runtime.lastActivity, stuckState);
+
+  if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
+    const { pauseFlywheel } = await import('./flywheel.js');
+    await pauseFlywheel();
+    markAgentTroubled(agentId);
+    writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
+    logAction(actions, transitionAction(3, 'FLYWHEEL', idleMinutes, 'paused-and-troubled'));
+    return;
+  }
+
+  if (idleMinutes >= config.stage2_minutes && lastStage < 2) {
+    const message = `Stage 2: idle ${idleMinutes} min — flywheel ticks should be sub-minute. Emit a status snapshot via \`pan flywheel emit-status\` or run \`pan flywheel pause\` to hand off cleanly.`;
+    await messageAgent(agentId, message);
+    writeStuckRemediationState(agentId, stageState(2, now, firstStuck));
+    logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'));
+    return;
+  }
+
+  if (idleMinutes >= config.stage1_minutes && lastStage < 1) {
+    const message = `You appear stuck — ${idleMinutes} min since last tick. Flywheel ticks should complete in under a minute. Emit a current status via \`pan flywheel emit-status --file <path>\`, or run \`pan flywheel pause\` if you're done.`;
+    await messageAgent(agentId, message);
+    writeStuckRemediationState(agentId, stageState(1, now, firstStuck));
+    logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'));
   }
 }
 

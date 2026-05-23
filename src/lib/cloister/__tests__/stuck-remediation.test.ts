@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   clearStuckRemediationState: vi.fn(),
   readStuckRemediationState: vi.fn(),
   writeStuckRemediationState: vi.fn(),
+  pauseFlywheel: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -63,6 +64,11 @@ vi.mock('../stuck-remediation-state.js', () => ({
   clearStuckRemediationState: mocks.clearStuckRemediationState,
   readStuckRemediationState: mocks.readStuckRemediationState,
   writeStuckRemediationState: mocks.writeStuckRemediationState,
+}));
+
+vi.mock('../flywheel.js', () => ({
+  pauseFlywheel: mocks.pauseFlywheel,
+  FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
 }));
 
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
@@ -354,5 +360,110 @@ describe('checkStuckAgentRemediation', () => {
       '[deacon] stuck-remediation agent=agent-pan-1415 error=send failed',
     );
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+});
+
+describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => {
+  // Singleton flywheel orchestrator with role='flywheel' was previously
+  // excluded by the role !== 'work' filter, so a stuck orchestrator (e.g.
+  // a model call hanging on a tick) was never poked, paused, or marked
+  // troubled. Coverage added 2026-05-23.
+  function flywheelAgent(overrides: Partial<AgentState> = {}): AgentState {
+    return {
+      id: 'flywheel-orchestrator',
+      issueId: '',
+      workspace: '/home/eltmon/Projects/panopticon-cli',
+      role: 'flywheel',
+      status: 'running',
+      startedAt: '2026-05-23T10:00:00.000Z',
+      tmuxActive: true,
+      ...overrides,
+    } as unknown as AgentState;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    vi.clearAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    mocks.loadCloisterConfigSync.mockReturnValue(DEFAULT_CONFIG);
+    mocks.listRunningAgentsSync.mockReturnValue([flywheelAgent()]);
+    mocks.sessionExistsSync.mockReturnValue(true);
+    mocks.isAgentIdleForNudge.mockReturnValue(true);
+    mocks.readStuckRemediationState.mockReturnValue(null);
+    mocks.messageAgent.mockResolvedValue(undefined);
+    mocks.pauseFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('pokes the orchestrator (stage 1) at 25 min idle with a flywheel-specific nudge', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=1 issue=FLYWHEEL idleMin=25 action=poked';
+    expect(actions).toEqual([expectedAction]);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('Flywheel ticks should complete in under a minute'),
+    );
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
+    // bd ready / review-status guards are work-agent-only and must NOT fire
+    // for the flywheel (no beads, no issueId).
+    expect(mocks.execFile).not.toHaveBeenCalled();
+    expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
+  });
+
+  it('escalates to stage 2 nudge at 50 min idle (no resumeAgent for flywheel)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual(['[deacon] stuck-remediation stage=2 issue=FLYWHEEL idleMin=50 action=escalated-nudge']);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('Stage 2'),
+    );
+    expect(mocks.resumeAgent).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('pauses and marks troubled at stage 3 (95 min idle)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(95));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual(['[deacon] stuck-remediation stage=3 issue=FLYWHEEL idleMin=95 action=paused-and-troubled']);
+    expect(mocks.pauseFlywheel).toHaveBeenCalledOnce();
+    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('flywheel-orchestrator');
+  });
+
+  it('skips when the orchestrator is already paused (no re-pause loop)', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([flywheelAgent({ paused: true } as Partial<AgentState>)]);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(120));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual([]);
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+  });
+
+  it('skips when the orchestrator tmux session is already gone', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(95));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual([]);
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
   });
 });
