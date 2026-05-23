@@ -5,16 +5,10 @@ import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
 import { useConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
+import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface ContextUsage {
-  activeBytes: number;
-  estimatedTokens: number;
-  contextWindow: number;
-  percentUsed: number;
-}
 
 export interface Conversation {
   id: number;
