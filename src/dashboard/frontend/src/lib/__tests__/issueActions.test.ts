@@ -72,6 +72,12 @@ function keys(actions: { key: IssueActionKey }[]) {
   return actions.map((action) => action.key);
 }
 
+function action(key: IssueActionKey) {
+  const entry = ISSUE_ACTIONS.find((candidate) => candidate.key === key);
+  if (!entry) throw new Error(`Missing action ${key}`);
+  return entry;
+}
+
 function reviewStatus(overrides: Partial<NonNullable<IssueActionState['reviewStatus']>> = {}): NonNullable<IssueActionState['reviewStatus']> {
   return {
     issueId: 'PAN-1331',
@@ -124,6 +130,58 @@ describe('ISSUE_ACTIONS', () => {
     expect(enabled).toContain('syncMain');
     expect(enabled).toContain('resumeSession');
     expect(enabled).toContain('resetSession');
+  });
+
+  it('aligns PRD action kinds for lifecycle and navigation actions', () => {
+    expect(action('watchPlanning').kind).toBe('dialog');
+    expect(action('donePlanning').kind).toBe('safe');
+    expect(action('doneWork').kind).toBe('safe');
+    expect(action('requestReview').kind).toBe('safe');
+    expect(action('restartReview').kind).toBe('safe');
+    expect(action('recoverReview').kind).toBe('safe');
+    expect(action('stopAgent').kind).toBe('safe');
+    expect(action('recoverAgent').kind).toBe('safe');
+    expect(action('reopen').kind).toBe('safe');
+    expect(action('open').kind).toBe('safe');
+    expect(action('closeOut').kind).toBe('destructive');
+    expect(action('wipe').kind).toBe('destructive');
+    expect(action('resetIssue').kind).toBe('destructive');
+  });
+
+  it('does not enable running-agent actions for stopped agents', () => {
+    const stopped: IssueActionState = {
+      ...baseState,
+      agent: { status: 'stopped', role: 'work' },
+      lifecycle: { canResumeSession: true },
+    };
+
+    expect(action('tell').enabledWhen(stopped)).toBe(false);
+    expect(action('stopAgent').enabledWhen(stopped)).toBe(false);
+    expect(action('pause').enabledWhen(stopped)).toBe(false);
+    expect(action('switchModel').enabledWhen(stopped)).toBe(false);
+    expect(action('recoverAgent').enabledWhen(stopped)).toBe(true);
+    expect(action('resumeSession').enabledWhen(stopped)).toBe(true);
+  });
+
+  it('gates planning and review actions to their lifecycle states', () => {
+    const planningActive: IssueActionState = { ...baseState, agent: { status: 'running', role: 'plan' }, issueCanonicalState: 'in_progress' };
+    const planAgentIdle: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'stopped', role: 'plan' } };
+    const workRunning: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' };
+    const readyForReview: IssueActionState = { ...baseState, hasPlan: true, workspace: { exists: true }, agent: { status: 'stopped', role: 'work' } };
+    const reviewRunning: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'reviewing' }) };
+    const reviewFailed: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'failed' }) };
+
+    expect(action('watchPlanning').enabledWhen(planningActive)).toBe(true);
+    expect(action('watchPlanning').enabledWhen(baseState)).toBe(false);
+    expect(action('donePlanning').enabledWhen(planAgentIdle)).toBe(true);
+    expect(action('donePlanning').enabledWhen(planningActive)).toBe(false);
+    expect(action('doneWork').enabledWhen(workRunning)).toBe(true);
+    expect(action('doneWork').enabledWhen(planAgentIdle)).toBe(false);
+    expect(action('requestReview').enabledWhen(readyForReview)).toBe(true);
+    expect(action('requestReview').enabledWhen(workRunning)).toBe(false);
+    expect(action('restartReview').enabledWhen(reviewRunning)).toBe(true);
+    expect(action('recoverReview').enabledWhen(reviewFailed)).toBe(true);
+    expect(action('recoverAgent').enabledWhen(reviewRunning)).toBe(false);
   });
 });
 

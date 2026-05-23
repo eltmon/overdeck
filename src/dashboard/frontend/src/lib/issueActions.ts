@@ -1,7 +1,7 @@
 import type { ReviewStatus, WorkspaceInfo } from './workspace-types';
 import type { Agent, WorkAgentLifecycle } from '../types';
 import { isReviewPipelineStuck } from './pipeline-state';
-import { derivePipelineState, isIssueAgentRunning, normalizeCanonicalState } from './issuePipelineState';
+import { derivePipelineState, normalizeCanonicalState } from './issuePipelineState';
 
 export type PipelinePhase =
   | 'QUEUED_FOR_PLAN'
@@ -104,23 +104,37 @@ export interface IssueActionEntry {
 const always = () => true;
 const hasAgent = (state: IssueActionState) => !!state.agent;
 const hasWorkspace = (state: IssueActionState) => state.workspace?.exists === true;
-const hasActiveAgent = (state: IssueActionState) => isIssueAgentRunning(state.agent);
-const hasStoppedAgent = (state: IssueActionState) => !hasActiveAgent(state);
+const hasLiveAgent = (state: IssueActionState) => !!state.agent && !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(state.agent.status);
+const hasStoppedAgent = (state: IssueActionState) => !hasLiveAgent(state);
 const hasResumableSession = (state: IssueActionState) => hasStoppedAgent(state) && state.lifecycle?.canResumeSession === true;
 const hasSelectedBead = (state: IssueActionState) => !!state.selectedBeadId;
 const isPaused = (state: IssueActionState) => state.agent?.paused === true;
 const isTroubled = (state: IssueActionState) => state.agent?.troubled === true;
+const canonicalState = (state: IssueActionState) => normalizeCanonicalState(state.issueCanonicalState);
+const isTodo = (state: IssueActionState) => {
+  const canonical = canonicalState(state);
+  return canonical === 'todo' || canonical === 'backlog';
+};
 const isDoneOrCanceled = (state: IssueActionState) => {
-  const canonical = normalizeCanonicalState(state.issueCanonicalState);
+  const canonical = canonicalState(state);
   return canonical === 'done' || canonical === 'canceled';
 };
 const isMerged = (state: IssueActionState) => state.isMerged === true || state.reviewStatus?.mergeStatus === 'merged';
-const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && !isMerged(state) && !isDoneOrCanceled(state);
-const hasReview = (state: IssueActionState) => !!state.reviewStatus;
+const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
+const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
+const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
+const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && isTodo(state) && !isMerged(state);
+const hasParallelizablePlan = (state: IssueActionState) => canStartAgent(state) && state.hasBeads;
+const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && hasStoppedAgent(state) && !state.reviewStatus && !isMerged(state) && !isDoneOrCanceled(state);
+const canRestartReview = (state: IssueActionState) => {
+  const review = state.reviewStatus;
+  return review?.reviewStatus === 'reviewing' || review?.reviewStatus === 'blocked' || review?.reviewStatus === 'failed' || review?.testStatus === 'testing' || review?.testStatus === 'failed' || review?.testStatus === 'dispatch_failed' || review?.mergeStatus === 'merging' || review?.mergeStatus === 'failed';
+};
 const hasReviewFailure = (state: IssueActionState) => isReviewPipelineStuck(state.reviewStatus ?? null);
+const canRecoverAgent = (state: IssueActionState) => state.agent?.status === 'stopped' || state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'dead' || state.agent?.status === 'error';
 const hasPrTarget = (state: IssueActionState) => state.hasPr === true || !!state.prUrl || !!state.workspace?.mrUrl || state.reviewStatus?.readyForMerge === true;
 const canCloseOut = (state: IssueActionState) => {
-  const canonical = normalizeCanonicalState(state.issueCanonicalState);
+  const canonical = canonicalState(state);
   return canonical === 'verifying_on_main' || canonical === 'verifying' || isMerged(state);
 };
 
@@ -152,33 +166,33 @@ const PHASE_PRIMARY_ACTION_KEYS_BY_ACTION: Partial<Record<IssueActionKey, Pipeli
 ) as Partial<Record<IssueActionKey, PipelinePhase[]>>;
 
 export const ISSUE_ACTIONS: IssueActionEntry[] = [
-  { key: 'plan', label: 'Plan', panVerb: 'plan', endpoint: '/api/issues/:id/start-planning', enabledWhen: hasStoppedAgent, phasePrimary: phasePrimary('plan'), kind: 'dialog', group: 'planning' },
-  { key: 'autoPlan', label: 'Auto-plan', panVerb: 'plan --auto', endpoint: '/api/issues/:id/plan', enabledWhen: hasStoppedAgent, phasePrimary: [], kind: 'dialog', group: 'planning' },
-  { key: 'watchPlanning', label: 'Watch planning', panVerb: null, endpoint: null, enabledWhen: hasActiveAgent, phasePrimary: phasePrimary('watchPlanning'), kind: 'safe', group: 'planning' },
-  { key: 'donePlanning', label: 'Done planning', panVerb: null, endpoint: '/api/issues/:id/complete-planning', enabledWhen: hasActiveAgent, phasePrimary: phasePrimary('donePlanning'), kind: 'dialog', group: 'planning' },
+  { key: 'plan', label: 'Plan', panVerb: 'plan', endpoint: '/api/issues/:id/start-planning', enabledWhen: canPlan, phasePrimary: phasePrimary('plan'), kind: 'dialog', group: 'planning' },
+  { key: 'autoPlan', label: 'Auto-plan', panVerb: 'plan --auto', endpoint: '/api/issues/:id/plan', enabledWhen: canPlan, phasePrimary: [], kind: 'dialog', group: 'planning' },
+  { key: 'watchPlanning', label: 'Watch planning', panVerb: null, endpoint: null, enabledWhen: (state) => deriveIssueActionPhase(state) === 'PLANNING', phasePrimary: phasePrimary('watchPlanning'), kind: 'dialog', group: 'planning' },
+  { key: 'donePlanning', label: 'Done planning', panVerb: 'plan', endpoint: '/api/issues/:id/complete-planning', enabledWhen: canFinalizePlanning, phasePrimary: phasePrimary('donePlanning'), kind: 'safe', group: 'planning' },
   { key: 'startAgent', label: 'Start agent', panVerb: 'start', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: phasePrimary('startAgent'), kind: 'dialog', group: 'work' },
-  { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: [], kind: 'dialog', group: 'work' },
-  { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/issues/:id/swarm', enabledWhen: canStartAgent, phasePrimary: [], kind: 'dialog', group: 'work' },
-  { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
-  { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/issues/:id/done', enabledWhen: hasActiveAgent, phasePrimary: phasePrimary('doneWork'), kind: 'dialog', group: 'work' },
-  { key: 'requestReview', label: 'Request review', panVerb: 'review', endpoint: '/api/review/:id/trigger', enabledWhen: hasWorkspace, phasePrimary: phasePrimary('requestReview'), kind: 'dialog', group: 'review' },
-  { key: 'restartReview', label: 'Restart review', panVerb: 'review --force', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: hasReview, phasePrimary: [], kind: 'dialog', group: 'review' },
-  { key: 'recoverReview', label: 'Recover review', panVerb: 'review --recover', endpoint: '/api/review/:id/recover', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'dialog', group: 'review' },
-  { key: 'stopAgent', label: 'Stop agent', panVerb: 'stop', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasActiveAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'pause', label: 'Pause agent', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
+  { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
+  { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/issues/:id/swarm', enabledWhen: hasParallelizablePlan, phasePrimary: [], kind: 'dialog', group: 'work' },
+  { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
+  { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/issues/:id/done', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
+  { key: 'requestReview', label: 'Request review', panVerb: 'review', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
+  { key: 'restartReview', label: 'Restart review', panVerb: 'review --force', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'recoverReview', label: 'Recover review', panVerb: 'review --recover', endpoint: '/api/review/:id/recover', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'stopAgent', label: 'Stop agent', panVerb: 'stop', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'agent' },
+  { key: 'pause', label: 'Pause agent', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'unpause', label: 'Unpause agent', panVerb: 'unpause', endpoint: '/api/agents/:agentId/unpause', enabledWhen: isPaused, phasePrimary: [], kind: 'safe', group: 'agent' },
   { key: 'untroubled', label: 'Clear troubled gate', panVerb: 'untroubled', endpoint: '/api/agents/:agentId/untroubled', enabledWhen: isTroubled, phasePrimary: [], kind: 'safe', group: 'agent' },
-  { key: 'recoverAgent', label: 'Recover agent', panVerb: 'recover', endpoint: '/api/issues/:id/recover', enabledWhen: (state) => hasReview(state) || state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'error', phasePrimary: phasePrimary('recoverAgent'), kind: 'dialog', group: 'agent' },
+  { key: 'recoverAgent', label: 'Recover agent', panVerb: 'recover', endpoint: '/api/agents/:agentId/recover', enabledWhen: canRecoverAgent, phasePrimary: phasePrimary('recoverAgent'), kind: 'safe', group: 'agent' },
   { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'switchModel', label: 'Switch model', panVerb: null, endpoint: null, enabledWhen: hasAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: (state) => !!state.agent?.git || hasWorkspace(state), phasePrimary: [], kind: 'dialog', group: 'workspace' },
+  { key: 'switchModel', label: 'Switch model', panVerb: null, endpoint: null, enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
+  { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
   { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: hasSelectedBead, phasePrimary: [], kind: 'dialog', group: 'review' },
-  { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'dialog', group: 'danger' },
-  { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'dialog', group: 'danger' },
-  { key: 'wipe', label: 'Wipe', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
+  { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
+  { key: 'wipe', label: 'Wipe', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'destroyWorkspace', label: 'Destroy workspace', panVerb: 'destroy', endpoint: '/api/issues/:id/cleanup-workspace', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'dialog', group: 'navigation' },
-  { key: 'resetIssue', label: 'Reset issue', panVerb: 'reset', endpoint: '/api/issues/:id/reset', enabledWhen: (state) => !isMerged(state) && !isDoneOrCanceled(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },
+  { key: 'resetIssue', label: 'Reset issue', panVerb: 'reset', endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
   { key: 'beads', label: 'Beads', panVerb: null, endpoint: '/api/issues/:id/beads', enabledWhen: (state) => state.hasBeads || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'inference', label: 'Inference', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
@@ -201,10 +215,8 @@ export function getEnabledActions(state: IssueActionState): IssueActionEntry[] {
   return ISSUE_ACTIONS.filter((action) => action.enabledWhen(state));
 }
 
-export function getPhasePrimaryActions(state: IssueActionState, phase: PipelinePhase): IssueActionEntry[] {
-  const enabled = new Set(getEnabledActions(state).map((action) => action.key));
+export function getPhasePrimaryActions(_state: IssueActionState, phase: PipelinePhase): IssueActionEntry[] {
   return PHASE_PRIMARY_KEYS[phase]
-    .filter((key) => enabled.has(key))
     .map((key) => ACTION_BY_KEY.get(key))
     .filter((action): action is IssueActionEntry => !!action);
 }
