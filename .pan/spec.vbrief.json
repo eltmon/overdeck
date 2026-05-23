@@ -1,0 +1,627 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1393: Flywheel: change orchestrator from auto-drive to suggest-only + fix runtime so it actually executes ticks",
+    "updated": "2026-05-23T04:31:37.275Z"
+  },
+  "plan": {
+    "id": "pan-1393",
+    "title": "Flywheel: change orchestrator from auto-drive to suggest-only + fix runtime so it actually executes ticks",
+    "status": "proposed",
+    "uid": "f9c4e1d2-3a6b-4f7e-8b1c-2d5e6f7a8b9c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:30:00.000Z",
+    "updated": "2026-05-23T04:31:37.275Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1393",
+        "label": "PAN-1393",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1386",
+        "label": "PAN-1386 (fixes)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/709",
+        "label": "PAN-709 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "orchestrator",
+      "dashboard",
+      "suggestions",
+      "substrate"
+    ],
+    "narratives": {
+      "Problem": "The Fix-All Flywheel orchestrator currently auto-drives the pipeline (tick step 4: 'Drive the pipeline') and frequently never reaches its emit-status step, leaving the dashboard Flywheel pane blank during active runs (PAN-1386). The operator wants the orchestrator to only SUGGEST next moves — never auto-pull issues into the pipeline — and the runtime needs to actually emit status reliably each tick so the suggestions surface stays live.",
+      "Proposal": "Two coordinated changes: (1) extend the FlywheelStatus contract with a `suggestions: FlywheelSuggestion[]` field, then rewrite both the role prompt (`roles/flywheel.md`) and the default brief (`docs/flywheel-brief.md`) so each tick produces ranked suggestions instead of pipeline actions — substrate-bug FILING remains allowed (it is recordkeeping), substrate-bug FIXING moves into the suggestion list, and lifecycle commands (`pan start`, `pan plan`, `pan tell`, `pan approve`, `pan sync-main`, `pan resume`) are explicitly forbidden. (2) Render the suggestion list as the primary section of the dashboard Flywheel pane, add a freshness indicator so a stalled orchestrator is visibly stalled instead of silently invisible, and verify end-to-end with a Playwright UAT that posts a status snapshot and asserts the suggestions section is visible."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Suggestion shape: { action: enum, issueId?: string, rationale: string, priority: enum }, with action ∈ {start,resume,plan,review,merge,unblock,park,investigate,wait} and priority ∈ {urgent,high,medium,low}.",
+        "rationale": "Issue body specifies `{action, issueId?, rationale, priority}` but leaves the value sets open. Literal unions keep the schema tight (so the orchestrator can't emit free-form garbage) while covering the verbs the brief actually uses (start/resume/review/merge/unblock/park) plus 'investigate' (for substrate bugs) and 'wait' (for items that should not be acted on yet). Priority labels mirror the brief's existing P0/P1/P2/P3 ladder in human-readable form."
+      },
+      {
+        "summary": "`suggestions` field is schema-optional with a default of `[]` (TypeScript type stays required) so historical `latest.json` files for old runs still decode.",
+        "rationale": "Adding a required field would break `readLatestFlywheelStatus` for every prior run on disk, breaking `listFlywheelRuns` and the run-detail surface. `Schema.optionalWith(..., { default: () => [] })` keeps backward compat while the TS type stays required so writers (the initial-status seed, work agents) cannot forget to include it."
+      },
+      {
+        "summary": "Runtime fix is prompt restructure + dashboard freshness indicator. No server-side auto-nag or auto-emit.",
+        "rationale": "PAN-1386's root cause is that emit-status was tick step 5 — after 'drive the pipeline', which the orchestrator interpreted as license to disappear into substrate-fix work. In suggest-only mode the tick has nothing to do EXCEPT emit suggestions, so emit becomes the natural deliverable. Backstop: dashboard surfaces 'Last tick: 3m ago — stalled' so silent failure is impossible to miss. Server-side nag (pan tell from a timer) risks loops and was deferred per the issue's scope."
+      },
+      {
+        "summary": "Substrate-bug FIXING is removed from the orchestrator's allowed actions. Filing remains allowed; the resulting bug appears as an investigate/start suggestion in the next tick.",
+        "rationale": "The issue body lists exactly four allowed actions: inventory, diagnose, emit suggestions, file substrate bugs. Fixing code requires editing/building/committing — these are pipeline actions per the spirit of suggest-only. Removing fix-in-orchestrator makes the role's responsibility crisp and unifies all 'work' under the normal pipeline."
+      },
+      {
+        "summary": "Suggestions render as the FIRST section of FlywheelStatusDetails, above the headline metrics strip.",
+        "rationale": "Issue body: 'the new suggestions[] list as the primary surface'. Putting it above MetricStrip makes 'what should the operator do next' the first thing on screen; metrics/pipeline/agents fall below as context."
+      },
+      {
+        "summary": "Click-to-apply on suggestions is OUT of scope. Suggestions render as read-only rows with the issueId linked to the existing kanban/inspector navigation.",
+        "rationale": "Issue body: 'click-to-apply is OUT of scope for this issue (will be filed separately if needed).' Linking the issueId is free (already-supported navigation) and turns a suggestion into an actionable jump without committing to action wiring."
+      },
+      {
+        "summary": "roles/flywheel.md and docs/flywheel-brief.md are updated in two separate beads with a blocking edge (brief depends on role).",
+        "rationale": "They describe the same loop in two different surfaces; keeping them in separate, independently reviewable beads makes the diff easy to verify in each file. The blocking edge forces brief-rewrite to land after role-rewrite, eliminating divergence windows."
+      },
+      {
+        "summary": "Freshness indicator threshold: lastTickAt > 90s ago → 'stalled' chip (warning tone); > 30s ago → 'last tick Xs ago' (info tone); ≤ 30s → 'live'.",
+        "rationale": "Typical tick cadence in suggest-only mode should be well under 30s (no work to do, just inventory+emit). 90s allows for a slow tick under heavy `gh issue` queries without flapping; 'stalled' is a clear visual cue the operator should investigate."
+      },
+      {
+        "summary": "Playwright UAT injects a stub FlywheelStatus via POST /api/flywheel/status with the internal token (matching the existing flywheel-page-status.spec.ts pattern) rather than spawning a real orchestrator.",
+        "rationale": "The existing UAT already uses this exact pattern with a MockWebSocket and a stub payload. Spawning a real orchestrator in a test would (a) consume agent budget, (b) be flaky under model load, and (c) test the wrong layer — the issue's acceptance criterion is 'pane shows suggestions list with at least one entry,' which is a rendering assertion."
+      }
+    ],
+    "items": [
+      {
+        "id": "contract-suggestions",
+        "title": "Add FlywheelSuggestion schema and suggestions field to FlywheelStatus contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1393",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "seed-empty-suggestions",
+            "role-prompt-rewrite",
+            "dashboard-suggestions-section",
+            "report-suggestions-section",
+            "playwright-uat"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/flywheel.ts, add FlywheelSuggestionAction and FlywheelSuggestionPriority literal unions, a FlywheelSuggestion interface + Schema struct ({action, issueId?, rationale, priority}), and add `suggestions: ReadonlyArray<FlywheelSuggestion>` to both the FlywheelStatus interface (required) and the Schema (optionalWith default `[]` for backward compatibility with historical latest.json). Update packages/contracts/src/flywheel.test.ts to (a) keep the existing validPayload passing by adding a `suggestions: [...]` entry, (b) cover absent-suggestions backward compat decode, (c) cover invalid action/priority rejection."
+        },
+        "subItems": [
+          {
+            "id": "contract-suggestions.ac1",
+            "title": "FlywheelSuggestion exported as both TS type and Effect Schema, with action ∈ {start,resume,plan,review,merge,unblock,park,investigate,wait} and priority ∈ {urgent,high,medium,low}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-suggestions.ac2",
+            "title": "FlywheelStatus TypeScript interface requires `suggestions: ReadonlyArray<FlywheelSuggestion>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-suggestions.ac3",
+            "title": "FlywheelStatus Schema decodes payloads WITHOUT a suggestions field (defaults to `[]`) — verifies historical latest.json files do not break",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-suggestions.ac4",
+            "title": "FlywheelStatus Schema rejects suggestions with unknown action or priority values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-suggestions.ac5",
+            "title": "packages/contracts/src/flywheel.test.ts covers: valid suggestions array, empty array, missing field (default), invalid action, invalid priority — all green under `bun --filter @panctl/contracts test`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-suggestions.ac6",
+            "title": "`bun --filter @panctl/contracts run build` succeeds and exports FlywheelSuggestion from packages/contracts/src/index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "seed-empty-suggestions",
+        "title": "Seed initial FlywheelStatus snapshot with empty suggestions[] in both spawn paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `suggestions: []` to the object returned by createInitialFlywheelStatus in BOTH src/cli/commands/flywheel.ts and src/dashboard/server/services/flywheel-actions.ts. Update any existing unit tests in src/dashboard/server/routes/__tests__/flywheel.test.ts and src/cli/commands/__tests__/flywheel.test.ts that build a FlywheelStatus fixture so they include the new field (the TypeScript type requires it)."
+        },
+        "subItems": [
+          {
+            "id": "seed-empty-suggestions.ac1",
+            "title": "createInitialFlywheelStatus in src/cli/commands/flywheel.ts returns an object with `suggestions: []`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-empty-suggestions.ac2",
+            "title": "createInitialFlywheelStatus in src/dashboard/server/services/flywheel-actions.ts returns an object with `suggestions: []`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-empty-suggestions.ac3",
+            "title": "`npm run typecheck` passes — no `Property 'suggestions' is missing` errors in any flywheel test or service file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-empty-suggestions.ac4",
+            "title": "All existing flywheel unit/route tests still pass after the fixture update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-prompt-rewrite",
+        "title": "Rewrite roles/flywheel.md tick loop to suggest-only (no pipeline driving, no substrate fixing)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite roles/flywheel.md so the tick loop becomes: 1. Inventory; 2. Diagnose; 3. Emit suggestions (the deliverable of every tick — a ranked list with action/issueId?/rationale/priority); 4. File substrate bugs as records when broken Panopticon behavior is discovered; 5. Respect pauses. Remove the 'Fix substrate first' step and replace it with 'Suggest substrate fixes — a substrate bug becomes an investigate/start suggestion in the suggestions list. The orchestrator never edits substrate code itself.' Expand the 'Never' list to explicitly forbid: pan start, pan plan, pan tell, pan approve, pan sync-main, pan resume, pan wake, pan kill, pan wipe, pan close, plus any direct git/PR mutation beyond `gh issue view` / `gh issue create` for substrate bug filing. Keep `pan flywheel emit-status` and `pan flywheel report` allowed. Make explicit that emit-status is the OUTPUT of every tick, not an afterthought."
+        },
+        "subItems": [
+          {
+            "id": "role-prompt-rewrite.ac1",
+            "title": "Tick loop in roles/flywheel.md no longer contains a 'Drive the pipeline' step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-rewrite.ac2",
+            "title": "Tick loop has an explicit 'Emit suggestions' step that requires producing a ranked suggestions[] every tick and calling `pan flywheel emit-status`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-rewrite.ac3",
+            "title": "Explicit 'Never' / do-not list includes (verbatim or equivalent): pan start, pan plan, pan tell, pan approve, pan sync-main, pan resume, pan wake, pan kill, pan wipe, pan close, direct edits to feature branches, direct PR merges",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-rewrite.ac4",
+            "title": "Substrate handling: filing bugs via `gh issue create` is explicitly allowed; editing substrate code is explicitly forbidden; substrate bugs surface as investigate/start suggestions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-rewrite.ac5",
+            "title": "Document references the new FlywheelSuggestion shape (action/issueId?/rationale/priority) so the orchestrator emits valid payloads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-rewrite.ac6",
+            "title": "Existing allowlist (author=eltmon or panopticon-agent[bot]) and label exclusions (needs-design, needs-discussion) are preserved as filters for what makes it into suggestions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brief-rewrite",
+        "title": "Rewrite docs/flywheel-brief.md tick loop to mirror the suggest-only role",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite docs/flywheel-brief.md so the tick loop, substrate-fix rule, and human-input invariant match the suggest-only role. Replace step 3 ('Act. Take the smallest Panopticon-native action…') with 'Emit ranked suggestions — produce a `suggestions[]` array in the FlywheelStatus snapshot, with the next-best moves for the operator.' Replace the substrate-fix-rule body so it describes filing-and-suggesting instead of fixing. Keep status/state separation and end-of-run report semantics unchanged. This bead is blocked by role-prompt-rewrite so the brief lands second and mirrors the role's final text."
+        },
+        "subItems": [
+          {
+            "id": "brief-rewrite.ac1",
+            "title": "docs/flywheel-brief.md step 3 says 'Emit ranked suggestions' (or equivalent) and no longer says 'Take the smallest Panopticon-native action'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-rewrite.ac2",
+            "title": "Substrate-fix rule body in the brief describes file-and-suggest, NOT fix-in-orchestrator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-rewrite.ac3",
+            "title": "Brief's do-not list matches the role's do-not list (no pipeline-driving verbs, no direct branch/PR mutation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-rewrite.ac4",
+            "title": "Status-vs-State section and end-of-run report section unchanged in substance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-rewrite.ac5",
+            "title": "Author allowlist and parked-label exclusion sections preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-suggestions-section",
+        "title": "Render Suggestions as the primary section in FlywheelStatusDetails",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx, add a new `<Section title=\"Suggestions\">` rendered BEFORE the existing MetricStrip. Sort suggestions by priority (urgent → high → medium → low). Each row shows: priority badge (color-coded), action verb, issueId (when present) as a click-through to the existing kanban/inspector navigation, and rationale text. When suggestions[] is empty, render a placeholder: 'No suggestions yet — orchestrator will emit on next tick.' Add component unit tests in src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx covering: rendering with multiple suggestions, priority sort order, empty state, click-through for suggestions with an issueId, click-through omission for system-level suggestions without an issueId."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-suggestions-section.ac1",
+            "title": "Suggestions section appears ABOVE the headline MetricStrip in FlywheelStatusDetails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-suggestions-section.ac2",
+            "title": "Suggestions are sorted urgent → high → medium → low; ties hold input order (stable sort)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-suggestions-section.ac3",
+            "title": "Each row displays priority badge, action, issueId (when present), and rationale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-suggestions-section.ac4",
+            "title": "issueId is rendered as a button/link that invokes onNavigateAgent (or equivalent navigation prop) when clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-suggestions-section.ac5",
+            "title": "Empty state placeholder visible when suggestions[] is empty (must not collapse the whole section)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-suggestions-section.ac6",
+            "title": "Component unit tests cover render, sort, empty state, click-through with issueId, no click-through without issueId — all green under `npm run test --workspace @panctl/frontend`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-freshness-indicator",
+        "title": "Show last-tick freshness chip on the Flywheel pane header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/FlywheelPage.tsx (header) and/or FlywheelStatusDetails.tsx, replace the existing static `Last tick` time cell with a freshness chip computed from `Date.now() - new Date(status.lastTickAt).getTime()`: ≤30s → green 'live'; 30–90s → amber 'last tick Xs ago'; >90s → red 'stalled — last tick Xm ago'. Update the displayed elapsed time on a 5s interval so the chip transitions in real time. Add a unit test in src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx using vi.useFakeTimers() + vi.setSystemTime() to assert all three states render at the correct thresholds (per the workspace fake-timers rule)."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-freshness-indicator.ac1",
+            "title": "Header shows a green 'live' indicator when lastTickAt is ≤30s old",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-freshness-indicator.ac2",
+            "title": "Header shows an amber 'last tick Xs ago' indicator when lastTickAt is 30–90s old",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-freshness-indicator.ac3",
+            "title": "Header shows a red 'stalled — last tick Xm ago' indicator when lastTickAt is >90s old",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-freshness-indicator.ac4",
+            "title": "Display refreshes at least every 5s while the page is mounted (so the chip transitions without waiting for a new snapshot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-freshness-indicator.ac5",
+            "title": "Unit test uses vi.useFakeTimers()/vi.setSystemTime() to verify all three thresholds — no real wall-clock waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "report-suggestions-section",
+        "title": "Include Suggestions in formatFlywheelStateReport markdown so they archive into the per-run report",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel.ts, extend formatFlywheelStateReport to render a '## Suggestions' section listing each suggestion (priority, action, issueId, rationale) before or after 'Active Pipeline'. Add a unit test in src/cli/commands/__tests__/flywheel.test.ts asserting both populated and empty-list rendering, including escape behavior for `|` and newlines in rationale text (mirrors existing tableCell escapes)."
+        },
+        "subItems": [
+          {
+            "id": "report-suggestions-section.ac1",
+            "title": "formatFlywheelStateReport renders a '## Suggestions' section after the Headline/Run-counters block and before 'Active Pipeline'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-suggestions-section.ac2",
+            "title": "Empty suggestions[] renders 'No suggestions emitted this run.' instead of an empty table row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-suggestions-section.ac3",
+            "title": "Rationale text containing `|` or newlines is escaped via tableCell (or equivalent) so markdown tables render correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-suggestions-section.ac4",
+            "title": "Unit tests cover populated and empty rendering; existing formatFlywheelStateReport tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-uat",
+        "title": "Playwright UAT: post a stubbed FlywheelStatus with suggestions and assert the pane renders the list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1393",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/tests/flywheel-page-status.spec.ts (or add a sibling spec) to: (1) add `suggestions: [{action:'start', issueId:'PAN-1234', rationale:'Oldest P1 substrate bug', priority:'urgent'}, …]` to the stub payload; (2) wait for the Flywheel page to mount; (3) assert the Suggestions section is visible, contains at least one entry, and the priority badge / action / issueId / rationale text are rendered; (4) verify the section is ABOVE the headline metrics in DOM order; (5) verify the freshness chip is in 'live' state at t=0. Use Playwright's `test.use({ contextOptions: { ... } })` or a fresh `browser.newContext()` per spec so the test runs in an isolated browser profile (per workspace Playwright Isolation rule). Existing 'renders a live FlywheelStatus payload without browser console errors' assertion is preserved."
+        },
+        "subItems": [
+          {
+            "id": "playwright-uat.ac1",
+            "title": "Stub payload includes a populated `suggestions: [...]` with at least one urgent and one medium entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac2",
+            "title": "Test asserts the Suggestions section is visible and contains a row matching each stubbed suggestion's rationale text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac3",
+            "title": "Test asserts DOM order: Suggestions section appears before the MetricStrip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac4",
+            "title": "Test asserts the freshness chip starts in 'live' state with the stub payload's lastTickAt set to a fresh timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac5",
+            "title": "Test uses an isolated browser context (no shared profile) per the workspace Playwright Isolation rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac6",
+            "title": "No-console-errors assertion from the existing test is preserved and still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-uat.ac7",
+            "title": "Pre-existing `pan flywheel pause/resume/abort/report/emit-status` CLI tests in src/cli/commands/__tests__/flywheel.test.ts still pass — verifies no regression in semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-suggestions",
+        "to": "seed-empty-suggestions",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-suggestions",
+        "to": "dashboard-suggestions-section",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-suggestions",
+        "to": "report-suggestions-section",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-suggestions",
+        "to": "playwright-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-suggestions",
+        "to": "role-prompt-rewrite",
+        "type": "informs"
+      },
+      {
+        "from": "role-prompt-rewrite",
+        "to": "brief-rewrite",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-suggestions-section",
+        "to": "playwright-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-freshness-indicator",
+        "to": "playwright-uat",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1393-flywheel-change-orchestrator-from-auto-drive-to-suggest-only-fix-runtime-so-it-actually-executes-ticks.vbrief.json"
+    }
+  }
+}

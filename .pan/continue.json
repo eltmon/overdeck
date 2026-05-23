@@ -1,0 +1,104 @@
+{
+  "version": "1",
+  "issueId": "PAN-1393",
+  "created": "2026-05-23T04:23:38.562Z",
+  "updated": "2026-05-23T04:30:00.000Z",
+  "gitState": { "branch": "feature/pan-1393" },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Suggest-only orchestrator. Each tick produces `suggestions[]` and emits a FlywheelStatus snapshot. The orchestrator does NOT call pan start, pan plan, pan tell, pan approve, pan sync-main, pan resume, pan wake, pan kill, pan wipe, pan close; does NOT edit feature branches; does NOT merge PRs.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Substrate-bug FILING (via `gh issue create`) remains allowed because it is recordkeeping. Substrate-bug FIXING is removed — broken substrate surfaces as an investigate/start suggestion in the next tick, and the operator picks it up through the normal pipeline.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "FlywheelSuggestion shape: { action: enum, issueId?: string, rationale: string, priority: enum }. action ∈ {start,resume,plan,review,merge,unblock,park,investigate,wait}; priority ∈ {urgent,high,medium,low}.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Schema field `suggestions` is optional-with-default `[]` so historical latest.json files keep decoding; TypeScript type is required so callers cannot omit it. Initial-status seeds explicitly write `suggestions: []`.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Runtime fix for PAN-1386 = (a) prompt restructure that makes emit-status the natural tick deliverable (in suggest-only mode there is nothing else to do in a tick) + (b) dashboard freshness indicator that turns amber at >30s and red 'stalled' at >90s since lastTickAt. No server-side auto-emit or pan-tell nag.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Suggestions render as the FIRST section of FlywheelStatusDetails, above the headline MetricStrip. Sort order: urgent → high → medium → low; stable within priority.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Click-to-apply on suggestions is OUT of scope. issueId in a suggestion row links to existing kanban/inspector navigation (jump only). A separate issue will handle action wiring if/when desired.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "roles/flywheel.md and docs/flywheel-brief.md are updated in separate beads with a blocking edge (brief depends on role). They describe the same loop in two surfaces; the blocking edge prevents a window where one is suggest-only and the other still says 'Drive the pipeline'.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Playwright UAT uses the existing stub-payload + MockWebSocket pattern from flywheel-page-status.spec.ts (no real orchestrator spawn). Per workspace Playwright Isolation rule, each spec runs in a fresh browser context.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Existing FlywheelStatus fixtures across test files will fail typecheck when `suggestions` becomes required in the TS type.",
+      "mitigation": "Bead seed-empty-suggestions enumerates every fixture site (src/cli/commands/__tests__/flywheel.test.ts, src/dashboard/server/routes/__tests__/flywheel.test.ts, src/dashboard/server/services/__tests__/flywheel-*.test.ts, src/dashboard/frontend/tests/flywheel-page-status.spec.ts) and adds `suggestions: []` (or a populated list) to each. Run `npm run typecheck` as the final acceptance check."
+    },
+    {
+      "id": "H2",
+      "summary": "Historical `~/.panopticon/flywheel/runs/RUN-*/latest.json` files written before this change lack `suggestions`. If the Schema field were strictly required, `listFlywheelRuns` would throw on every prior run.",
+      "mitigation": "Schema uses optionalWith({ default: () => [] }) so old payloads decode cleanly. Contract test `contract-suggestions.ac3` explicitly verifies this backward-compat path."
+    },
+    {
+      "id": "H3",
+      "summary": "Orchestrator might keep 'driving' out of trained habit if either the role or the brief still says 'drive'. Inconsistency between roles/flywheel.md and docs/flywheel-brief.md is the most likely failure mode.",
+      "mitigation": "Blocking edge role-prompt-rewrite → brief-rewrite ensures the brief lands after the role; the brief bead's acceptance criteria explicitly mirror the role's do-not list. A code review of both files side by side is part of bead 4's verification."
+    },
+    {
+      "id": "H4",
+      "summary": "Freshness indicator could flap when lastTickAt is near a threshold boundary.",
+      "mitigation": "Thresholds are 30s and 90s — wide enough that normal tick cadence (≤30s for suggest-only) stays solidly green and a real stall (>90s) is obvious. No hysteresis needed at these gaps."
+    },
+    {
+      "id": "H5",
+      "summary": "The orchestrator agent prompt loop is purely instruction-driven; nothing in the runtime enforces 'emit every tick'. Even with the rewrite, a model under stress could skip emission.",
+      "mitigation": "Dashboard freshness chip turns red at >90s — silent failure becomes loud failure. If this proves insufficient in practice, file a follow-up issue for a server-side watchdog that posts a synthesized 'stalled' snapshot when no emit arrives for N seconds (deliberately out of scope for PAN-1393 per D5)."
+    },
+    {
+      "id": "H6",
+      "summary": "Substrate-fix removal is a behavioral change: prior flywheel runs HAVE committed fixes to main (e.g., RUN-7 in PAN-1386's report). Removing this capability means broken substrate stalls the pipeline until the operator manually starts the bug.",
+      "mitigation": "Suggestion rows for substrate bugs use the 'investigate' or 'start' action and priority 'urgent' when the bug is blocking the pipeline. The freshness chip and 'No suggestions yet' empty state ensure the operator sees the stall immediately. Document this tradeoff in role-prompt-rewrite so the orchestrator surfaces blocking substrate bugs with maximum urgency."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<panopticon orchestration context — see workspace .pan/continue.json original entry>",
+      "note": "Planning session started for PAN-1393",
+      "timestamp": "2026-05-23T04:23:38.562Z"
+    },
+    {
+      "reason": "planning",
+      "note": "Planning completed in --auto mode. Produced 8-bead vBRIEF: contract-suggestions (foundation, requiresInspection), seed-empty-suggestions, role-prompt-rewrite, brief-rewrite, dashboard-suggestions-section, dashboard-freshness-indicator, report-suggestions-section, playwright-uat. Suggest-only model: orchestrator emits ranked suggestions and files substrate bugs as records; never drives the pipeline. Runtime fix: prompt restructure + dashboard freshness chip — no server-side auto-emit.",
+      "timestamp": "2026-05-23T04:30:00.000Z",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
