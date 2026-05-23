@@ -5,10 +5,15 @@ import { WS_METHODS } from '@panctl/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': 'test-csrf',
+  })),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
   getTransport: () => wsTransportMock,
+  dashboardMutationJsonHeaders: wsTransportMock.dashboardMutationJsonHeaders,
 }));
 
 import { useDashboardStore } from '../../lib/store';
@@ -519,9 +524,10 @@ describe('IssueDrawer', () => {
           "issue-action-startAgent",
           "issue-action-swarm",
           "issue-action-syncMain",
-          "issue-action-open",
+          "issue-action-inspectBead",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
+          "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-cancel",
           "issue-action-beads",
@@ -540,6 +546,7 @@ describe('IssueDrawer', () => {
           "issue-action-pause",
           "issue-action-switchModel",
           "issue-action-syncMain",
+          "issue-action-inspectBead",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-open",
@@ -559,7 +566,8 @@ describe('IssueDrawer', () => {
   });
 
   it('routes reset stop and merge requests through the shared action controls', async () => {
-    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {
@@ -591,8 +599,11 @@ describe('IssueDrawer', () => {
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
-    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset issue' }));
+    const resetDialog = await screen.findByRole('alertdialog');
+    fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
+    const resetConfirm = within(resetDialog).getByRole('button', { name: 'Reset issue' });
+    await waitFor(() => expect(resetConfirm).not.toBeDisabled());
+    fireEvent.click(resetConfirm);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({
         method: 'POST',

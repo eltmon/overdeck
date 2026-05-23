@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 
+import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
+import { SwarmDispatchDialog } from '../SwarmDispatchDialog';
 import { SwitchModelModal } from '../SwitchModelModal';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 import type { IssueActionKey } from '../../lib/issueActions';
@@ -132,66 +134,6 @@ function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps)
   );
 }
 
-function TellAgentDialog({ actions, onClose }: { actions: UseIssueActionsResult; onClose: () => void }) {
-  const [message, setMessage] = useState('');
-  const action = actions.activeDialog?.action;
-  if (!action) return null;
-
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const text = message.trim();
-    if (!text) return;
-    actions.submitDialogAction(action, { message: text });
-    onClose();
-  };
-
-  return (
-    <ActionDialogFrame label={action.label} onClose={onClose}>
-      <form className="space-y-3" onSubmit={onSubmit}>
-        <textarea
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          aria-label="Message to send to the agent"
-          placeholder="Tell the agent what to do..."
-          className="min-h-[110px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
-        />
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={!message.trim() || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-            {actions.isActionPending(action.key) ? 'Sending…' : 'Send'}
-          </button>
-        </div>
-      </form>
-    </ActionDialogFrame>
-  );
-}
-
-function SwarmDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
-  const action = actions.activeDialog?.action;
-  if (!action) return null;
-
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    actions.submitDialogAction(action);
-    onClose();
-  };
-
-  return (
-    <ActionDialogFrame label={action.label} onClose={onClose}>
-      <form className="space-y-3" onSubmit={onSubmit}>
-        <p className="text-xs text-muted-foreground">
-          Dispatch a parallel swarm for {issueId} using the planned beads.
-        </p>
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-            {actions.isActionPending(action.key) ? 'Dispatching…' : 'Dispatch swarm'}
-          </button>
-        </div>
-      </form>
-    </ActionDialogFrame>
-  );
-}
 
 function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
   const action = actions.activeDialog?.action;
@@ -309,11 +251,37 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
   }
 
   if (activeDialog.key === 'tell') {
-    return <TellAgentDialog actions={actions} onClose={handleClose} />;
+    return (
+      <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
+        <AgentTellForm
+          onSend={(message) => {
+            actions.submitDialogAction(activeDialog.action, { message });
+            handleClose();
+          }}
+          onCancel={handleClose}
+          sending={actions.isActionPending(activeDialog.action.key)}
+          ariaLabel="Message to send to the agent"
+          placeholder="Tell the agent what to do..."
+          multiline
+          className="space-y-3"
+          inputClassName="min-h-[110px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+          actionsClassName="flex justify-end gap-2"
+        />
+      </ActionDialogFrame>
+    );
   }
 
   if (activeDialog.key === 'swarm') {
-    return <SwarmDialog issueId={issueId} actions={actions} onClose={handleClose} />;
+    return (
+      <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
+        <SwarmDispatchDialog
+          issueId={issueId}
+          onClose={handleClose}
+          onDispatch={() => actions.submitDialogAction(activeDialog.action)}
+          pending={actions.isActionPending(activeDialog.action.key)}
+        />
+      </ActionDialogFrame>
+    );
   }
 
   if (activeDialog.key === 'inspectBead') {
