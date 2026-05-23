@@ -250,8 +250,12 @@ function toAgentStatusPayload(status: AgentState['status'] | undefined) {
     : 'unknown';
 }
 
-function buildAgentStatusChangedPayload(state: AgentState, previousStatus?: AgentState['status']) {
-  return {
+function buildAgentStatusChangedPayload(
+  state: AgentState,
+  previousStatus?: AgentState['status'],
+  hasLiveTmuxSession?: boolean,
+) {
+  const payload = {
     agentId: state.id,
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
@@ -267,6 +271,7 @@ function buildAgentStatusChangedPayload(state: AgentState, previousStatus?: Agen
     lastFailureReason: state.lastFailureReason ?? null,
     lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
   };
+  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLiveTmuxSession };
 }
 
 // Wire up deacon → domain events for orphaned agent recovery.
@@ -299,13 +304,13 @@ setAgentStoppedNotifier((agentId) => {
     }
   })();
 });
-setAgentStatusChangedNotifier((state, previousStatus) => {
+setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   try {
     const es = getEventStore();
     es.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: buildAgentStatusChangedPayload(state, previousStatus),
+      payload: buildAgentStatusChangedPayload(state, previousStatus, hasLiveTmuxSession),
     } as any);
   } catch (err) {
     console.error('[pipeline] Failed to append agent.status_changed event:', err);

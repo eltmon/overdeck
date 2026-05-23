@@ -1580,6 +1580,14 @@ export function markAgentStoppedState(state: AgentState): AgentState {
   return state;
 }
 
+export function markAgentRunningState(state: AgentState): AgentState {
+  if (!state.id) {
+    state.id = normalizeAgentId(state.issueId);
+  }
+  markAgentRunning(state);
+  return state;
+}
+
 /** Test-only internals. Do not import outside of test files. */
 export const __testInternals = { markAgentRunning, markAgentStopped };
 

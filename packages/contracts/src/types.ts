@@ -272,6 +272,7 @@ export const AgentSnapshot = Schema.Struct({
   costSoFar: Schema.optional(Schema.Number),
   sessionId: Schema.optional(Schema.String),
   role: Schema.optional(Role),
+  hasLiveTmuxSession: Schema.optional(Schema.Boolean),
   stoppedByUser: Schema.optional(Schema.Boolean),
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),

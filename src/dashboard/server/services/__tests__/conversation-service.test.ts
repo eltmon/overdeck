@@ -129,7 +129,7 @@ describe('computeContextUsage', () => {
   });
 
   it('clamps percentUsed at 100', async () => {
-    const buffer = Buffer.alloc(600000, 'x');
+    const buffer = Buffer.alloc(5_000_000, 'x');
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
