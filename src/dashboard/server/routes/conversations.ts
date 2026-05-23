@@ -76,7 +76,6 @@ import {
   listSessionNames,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
-import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -665,20 +664,12 @@ export async function handleConversationMessage(
     // Unmanaged @paths in prose are allowed to pass through
   }
 
-  // Deliver via deliverAgentMessage so channels eligibility and fallback
-  // policy are respected (PAN-1123). For Pi agents this resolves to tmux
-  // because channels eligibility requires harness === 'claude-code'.
-  let deliveryMethod = conv.deliveryMethod;
-  if (!deliveryMethod) {
-    const settings = loadSettingsApi();
-    deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
-  }
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
       message,
       'conversation-message',
-      deliveryMethod,
+      resolveConversationDeliveryMethod(conv),
     );
   } catch (deliveryErr: unknown) {
     const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
@@ -728,6 +719,10 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
   return harness === 'claude-code'
     && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
     && process.env.PAN_DOCKER !== '1';
+}
+
+function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
+  return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
 }
 
 function resolvePtySupervisorScriptPath(): string {
@@ -1365,9 +1360,7 @@ const postConversationRoute = HttpRouter.add(
 
             // If a message was provided, send it now that the runtime is ready.
             if (message) {
-              const settings = loadSettingsApi();
-              const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
-              await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
+              await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
             }
           } catch (spawnErr: unknown) {
             const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
@@ -2289,9 +2282,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }
   }
-  const settings = loadSettingsApi();
-  const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
-  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', deliveryMethod);
+  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', resolveConversationDeliveryMethod(conv));
 }
 
 async function runForkPipeline(
@@ -2527,9 +2518,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
           await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
           if (feedback) {
             await new Promise(r => setTimeout(r, 300));
-            const settings = loadSettingsApi();
-            const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
-            await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', deliveryMethod);
+            await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', resolveConversationDeliveryMethod(conv));
           }
           return jsonResponse({ ok: true });
         }

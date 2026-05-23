@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, watch } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,13 +34,37 @@ function startSupervisor(agentId: string, command: string, args: string[] = []):
   return proc;
 }
 
-async function waitFor(predicate: () => boolean, message: string): Promise<void> {
-  const deadline = Date.now() + 5_000;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
+async function waitForProcessOutput(predicate: () => boolean, message: string): Promise<void> {
+  if (predicate()) return;
+  await new Promise<void>((resolve) => {
+    const check = () => {
+      if (!predicate()) return;
+      proc?.stdout?.off('data', check);
+      proc?.stderr?.off('data', check);
+      resolve();
+    };
+    proc?.stdout?.on('data', check);
+    proc?.stderr?.on('data', check);
+  });
+  if (!predicate()) throw new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
+}
+
+async function waitForSocketPath(socketPath: string, predicate: () => boolean, message: string): Promise<void> {
+  if (predicate()) return;
+  const socketsDir = join(socketPath, '..');
+  mkdirSync(socketsDir, { recursive: true, mode: 0o700 });
+  await new Promise<void>((resolve) => {
+    const watcher = watch(socketsDir, () => {
+      if (!predicate()) return;
+      watcher.close();
+      resolve();
+    });
+    if (predicate()) {
+      watcher.close();
+      resolve();
+    }
+  });
+  if (!predicate()) throw new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
 }
 
 async function waitForExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
@@ -88,16 +112,20 @@ async function readySupervisor(agentId: string, command = 'cat', args: string[] 
   const token = await writePtyToken(agentId);
   startSupervisor(agentId, command, args);
   const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
-  await waitFor(() => existsSync(socketPath), 'supervisor socket was not created');
+  await waitForSocketPath(socketPath, () => {
+    try {
+      return (statSync(socketPath).mode & 0o777) === 0o600;
+    } catch {
+      return false;
+    }
+  }, 'supervisor socket was not created with mode 0600');
   return { token, socketPath };
 }
 
 afterEach(async () => {
   if (proc && !proc.killed) {
     proc.kill('SIGTERM');
-    const exit = waitForExit(proc);
-    await Promise.race([exit, new Promise((resolve) => setTimeout(resolve, 1_000))]);
-    if (!proc.killed) proc.kill('SIGKILL');
+    await waitForExit(proc);
   }
   proc = null;
   rmSync(tmpHome, { recursive: true, force: true });
@@ -118,7 +146,7 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     const result = await postToUnixSocket(socketPath, token, { content: 'ping', echo: false });
 
     expect(result.status).toBe(200);
-    await waitFor(() => stdout.includes('ping'), 'child did not echo posted content');
+    await waitForProcessOutput(() => stdout.includes('ping'), 'child did not echo posted content');
   });
 
   it('rejects Unix socket posts without a matching token', async () => {
@@ -139,18 +167,18 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     proc = null;
 
     expect(exit?.code === 0 || exit?.signal === 'SIGTERM').toBe(true);
-    await waitFor(() => !existsSync(socketPath), 'supervisor socket was not unlinked');
+    await waitForSocketPath(socketPath, () => !existsSync(socketPath), 'supervisor socket was not unlinked');
   });
 
   it('echoes a socket-delivered message to stdout exactly once when the child is quiet', async () => {
     const { token, socketPath } = await readySupervisor('agent-echo', 'bash', ['-lc', 'stty -echo; printf READY; sleep 30']);
-    await waitFor(() => stdout.includes('READY'), 'child did not disable TTY echo');
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not disable TTY echo');
     stdout = '';
 
     const result = await postToUnixSocket(socketPath, token, { content: 'echo-once' });
 
     expect(result.status).toBe(200);
-    await waitFor(() => stdout.includes('echo-once'), 'supervisor did not echo posted content');
+    await waitForProcessOutput(() => stdout.includes('echo-once'), 'supervisor did not echo posted content');
     expect(stdout.match(/echo-once/g)).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
