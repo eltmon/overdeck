@@ -15,7 +15,7 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
-import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import { computeContextUsage, parseConversationMessages, watchConversation } from './services/conversation-service.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -593,11 +593,20 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             const sessionFile = conv?.claudeSessionId
               ? sessionFilePath(conv.cwd, conv.claudeSessionId)
               : null;
+            const model = conv?.model ?? null;
 
             if (!sessionFile) {
               // Session file not yet discovered — emit a single discovering event
               return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
             }
+
+            const readContextUsage = async () => {
+              try {
+                return await computeContextUsage(sessionFile, model);
+              } catch {
+                return null;
+              }
+            };
 
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
               Effect.acquireRelease(
@@ -611,11 +620,12 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     streaming: initial.streaming,
                     proposedPlan: initial.proposedPlan,
                     compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
+                    contextUsage: await readContextUsage(),
                   });
 
                   // Watch for new content and stream incremental updates
                   let byteOffset = initial.byteOffset;
-                  const handle = watchConversation(sessionFile, (result) => {
+                  const handle = watchConversation(sessionFile, async (result) => {
                     byteOffset = result.byteOffset;
                     Queue.offerUnsafe(queue, {
                       kind: 'messages' as const,
@@ -624,6 +634,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                       streaming: result.streaming,
                       proposedPlan: result.proposedPlan,
                       compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
+                      contextUsage: await readContextUsage(),
                     });
                   });
 
