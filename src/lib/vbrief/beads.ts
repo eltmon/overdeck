@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
+import { withBdMutexPromise } from '../bd-mutex.js';
 import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -128,7 +129,10 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
     : false;
   const inspectionDepth = item.metadata?.inspectionDepth === 'deep' ? 'deep' : 'fast';
   return { requiresInspection, inspectionDepth };
-}async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+}
+
+async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+  return withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -385,6 +389,7 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   }
 
   return { success: errors.length === 0, created, errors, beadIds };
+  });
 }
 
 /**
@@ -547,7 +552,11 @@ export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `createBeadsFromVBrief`. */
+/**
+ * Idempotent and internally serialized via bd-mutex. Calling N times yields
+ * exactly planItemCount beads or returns success:false with errors. Do NOT wrap
+ * callers in withBdMutex — it will deadlock.
+ */
 export const createBeadsFromVBrief = (
   workspacePath: string,
 ): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>
