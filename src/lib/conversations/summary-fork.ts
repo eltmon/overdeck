@@ -27,7 +27,12 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import type { Conversation } from '../database/conversations-db.js';
-import { createConversation, recordConversationHandoff } from '../database/conversations-db.js';
+import {
+  createConversation,
+  getConversationByName,
+  recordConversationHandoff,
+  updateConversationForkFallbackReason,
+} from '../database/conversations-db.js';
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
@@ -502,6 +507,10 @@ function sanitizeEntryForPlainFork(entry: any): any {
   });
   if (handoffDocPath) {
     newConv = recordConversationHandoff(conv.name, newConv.name, handoffDocPath);
+  }
+  if (forkFallbackReason) {
+    updateConversationForkFallbackReason(newConv.name, forkFallbackReason);
+    newConv = getConversationByName(newConv.name) ?? newConv;
   }
 
   return {

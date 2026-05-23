@@ -66,6 +66,39 @@ function validDoc(): string {
   ].join('\n\n');
 }
 
+function invalidLongDoc(): string {
+  return [
+    '## Current objective',
+    'This document is intentionally long enough to pass the minimum length requirement but it omits the required suggested skills heading.',
+    '## Open work',
+    'The fallback path should detect this validation failure and downgrade the request to a summary fork without surfacing a failed fork to the caller.',
+  ].join('\n\n');
+}
+
+async function createSourceConversation(home: string, overrides: Partial<Conversation> = {}): Promise<Conversation> {
+  process.env.PANOPTICON_HOME = home;
+  process.env.HOME = home;
+  resetDatabase();
+
+  const cwd = overrides.cwd ?? '/home/test/project';
+  const sessionId = overrides.claudeSessionId ?? 'source-session-123';
+  const sourceFile = sessionFilePath(cwd, sessionId);
+  await mkdir(dirname(sourceFile), { recursive: true });
+  await writeFile(sourceFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'Continue this work' } })}\n`, 'utf-8');
+
+  const source = createConversation({
+    name: overrides.name ?? 'conv-source',
+    tmuxSession: overrides.tmuxSession ?? 'conv-source-session',
+    cwd,
+    issueId: overrides.issueId ?? 'PAN-1358',
+    claudeSessionId: sessionId,
+    title: overrides.title ?? 'Source title',
+    titleSource: 'manual',
+  });
+
+  return { ...source, ...overrides };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.mocked(deliverAgentMessage).mockReset();
@@ -168,6 +201,102 @@ describe('handoff fork handshake', () => {
     const sourceRow = getConversationByName(source.name);
     expect(targetRow?.handoffDocPath).toBe(result.handoffDocPath);
     expect(sourceRow?.handoffTargetConvId).toBe(result.conversation.id);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('falls back to summary fork when the source conversation has ended', async () => {
+    const home = join(tmpdir(), `pan-handoff-ended-${Date.now()}`);
+    const source = await createSourceConversation(home, { status: 'ended' });
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      localSummaryOnly: true,
+    }));
+
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('source-ended');
+    expect(result.summary).toContain('## Conversation Summary Fork');
+    expect(result.conversation.title).toBe('Summary Fork: Source title');
+    expect(getConversationByName(result.conversation.name)?.forkFallbackReason).toBe('source-ended');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('falls back to summary fork on handshake timeout using fake timers', async () => {
+    vi.useFakeTimers();
+    const home = join(tmpdir(), `pan-handoff-fallback-timeout-${Date.now()}`);
+    const source = await createSourceConversation(home);
+
+    const resultPromise = Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      localSummaryOnly: true,
+      handoffTimeoutMs: 0,
+      handoffPollIntervalMs: 1,
+    }));
+    await vi.advanceTimersByTimeAsync(0);
+    const result = await resultPromise;
+
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('handoff-timeout');
+    expect(result.summary).toContain('## Conversation Summary Fork');
+    expect(getConversationByName(result.conversation.name)?.forkFallbackReason).toBe('handoff-timeout');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['doc without sentinel', async (outputPath: string, docText: string) => {
+      await writeFile(outputPath, docText, 'utf-8');
+    }],
+    ['sentinel without doc', async (outputPath: string) => {
+      await writeFile(`${outputPath}.done`, '', 'utf-8');
+    }],
+  ])('treats %s as incomplete until timeout', async (_label, writePartial) => {
+    const home = join(tmpdir(), `pan-handoff-partial-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const docText = validDoc();
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
+      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
+      if (!outputPath) throw new Error('missing output path');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writePartial(outputPath, docText);
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      localSummaryOnly: true,
+      handoffTimeoutMs: 0,
+      handoffPollIntervalMs: 1,
+    }));
+
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('handoff-timeout');
+    expect(result.summary).toContain('## Conversation Summary Fork');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('falls back to summary fork when the handoff document fails validation', async () => {
+    const home = join(tmpdir(), `pan-handoff-validation-fallback-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const docText = invalidLongDoc();
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
+      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
+      if (!outputPath) throw new Error('missing output path');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, docText, 'utf-8');
+      await writeFile(`${outputPath}.done`, '', 'utf-8');
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      localSummaryOnly: true,
+    }));
+
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('handoff-validation');
+    expect(result.summary).toContain('## Conversation Summary Fork');
+    expect(result.handoffDocPath).toBeNull();
     rmSync(home, { recursive: true, force: true });
   });
 
