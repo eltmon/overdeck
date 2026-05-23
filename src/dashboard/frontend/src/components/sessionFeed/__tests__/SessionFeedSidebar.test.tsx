@@ -57,8 +57,24 @@ function gitEntry(overrides: Partial<GitSessionFeedEntry> = {}): GitSessionFeedE
   };
 }
 
+function conversationEntry(overrides: Partial<ConversationSessionFeedEntry> = {}): ConversationSessionFeedEntry {
+  return {
+    kind: 'conversation',
+    id: 'conversation:conv-42',
+    timestamp: '2026-05-23T01:04:00.000Z',
+    workspaceId: '/workspace/a',
+    issueId: 'PAN-1389',
+    conversationName: '42',
+    agent: 'claude_code',
+    lastMessageDate: '2026-05-23T01:04:00.000Z',
+    lastMessageSnippet: 'Conversation destination',
+    ...overrides,
+  };
+}
+
 describe('SessionFeedSidebar', () => {
   beforeEach(() => {
+    window.history.pushState(null, '', '/');
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
     hookSources.git = { entries: [], isLoading: false, error: null };
@@ -164,5 +180,49 @@ describe('SessionFeedSidebar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
 
     expect(window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY)).toBe('activity');
+  });
+
+  it('navigates conversation entries to their conversation route and dispatches popstate', () => {
+    const onPopState = vi.fn();
+    window.addEventListener('popstate', onPopState);
+    hookSources.conversations = { entries: [conversationEntry()], isLoading: false, error: null };
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+    fireEvent.click(screen.getByText('Claude Code').closest('button') as HTMLButtonElement);
+
+    expect(window.location.pathname).toBe('/conv/42');
+    expect(onPopState).toHaveBeenCalledOnce();
+    window.removeEventListener('popstate', onPopState);
+  });
+
+  it('navigates activity entries to the command deck activity route for their issue', () => {
+    const onPopState = vi.fn();
+    window.addEventListener('popstate', onPopState);
+    useDashboardStore.setState({
+      observationsByIssueId: {
+        'PAN-1389': [observation('activity-nav', '2026-05-23T01:04:00.000Z', 'Navigate to activity')],
+      },
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+    fireEvent.click(screen.getByText('Navigate to activity').closest('button') as HTMLButtonElement);
+
+    expect(window.location.pathname).toBe('/command-deck');
+    expect(window.location.search).toBe('?issue=PAN-1389&tab=activity');
+    expect(onPopState).toHaveBeenCalledOnce();
+    window.removeEventListener('popstate', onPopState);
+  });
+
+  it('leaves git entry clicks as a no-op destination', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    hookSources.git = { entries: [gitEntry()], isLoading: false, error: null };
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+    fireEvent.click(screen.getByText('Committed sidebar work').closest('button') as HTMLButtonElement);
+
+    expect(window.location.pathname).toBe('/');
+    expect(window.location.search).toBe('');
+    expect(debug).toHaveBeenCalledOnce();
+    debug.mockRestore();
   });
 });

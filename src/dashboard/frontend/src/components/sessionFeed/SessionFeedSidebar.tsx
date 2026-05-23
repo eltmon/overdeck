@@ -32,7 +32,9 @@ const EMPTY_STATES: Record<SessionFeedTab, string> = {
   activity: 'No activity updates yet.',
 };
 
-export function SessionFeedSidebar({ onClose, onSelect = () => undefined, now = new Date() }: SessionFeedSidebarProps) {
+let loggedGitNavigationNoop = false;
+
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date() }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
   const feed = useMergedFeed(activeTab);
   const groups = useMemo(
@@ -114,4 +116,31 @@ function isSessionFeedTab(value: string | null): value is SessionFeedTab {
     || value === 'git'
     || value === 'comments'
     || value === 'activity';
+}
+
+function navigateToFeedEntry(entry: SessionFeedEntry) {
+  if (typeof window === 'undefined') return;
+
+  switch (entry.kind) {
+    case 'conversation':
+      pushRoute(`/conv/${encodeURIComponent(entry.conversationName)}`);
+      return;
+    case 'activity':
+      if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
+      return;
+    case 'git':
+      if (!loggedGitNavigationNoop) {
+        console.debug('Session feed git entries do not have a destination yet.');
+        loggedGitNavigationNoop = true;
+      }
+      return;
+    case 'file_change':
+    case 'comment':
+      return;
+  }
+}
+
+function pushRoute(path: string) {
+  window.history.pushState(null, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
