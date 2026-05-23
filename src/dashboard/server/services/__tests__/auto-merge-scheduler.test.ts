@@ -140,7 +140,10 @@ describe('AutoMergeScheduler', () => {
 
     expect(harness.deps.schedulePending).toHaveBeenCalledWith('PAN-1', '2026-05-23T12:05:00.000Z');
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'pending', executeAt: '2026-05-23T12:05:00.000Z' });
-    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'merge.auto.scheduled' }));
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.scheduled',
+      payload: { issueId: 'PAN-1', executeAt: '2026-05-23T12:05:00.000Z', cooldownSeconds: 300 },
+    }));
     expect(activityTtsMock).toHaveBeenCalledTimes(1);
     expectLastTts({
       issueId: 'PAN-1',
@@ -198,6 +201,10 @@ describe('AutoMergeScheduler', () => {
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'cancelled', cancelReason: 'operator_cancelled' });
     expect(harness.deps.triggerMerge).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.cancelled',
+      payload: { issueId: 'PAN-1', reason: 'operator_cancelled', cancelledBy: 'human' },
+    }));
     expectLastTts({
       issueId: 'PAN-1',
       utterance: 'Auto merge of pan 1 cancelled',
@@ -216,6 +223,10 @@ describe('AutoMergeScheduler', () => {
     expect(harness.deps.markExecuting).toHaveBeenCalledWith('PAN-1');
     expect(harness.deps.triggerMerge).toHaveBeenCalledWith('PAN-1');
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'executed' });
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.executed',
+      payload: { issueId: 'PAN-1' },
+    }));
     expectLastTts({
       issueId: 'PAN-1',
       utterance: 'Auto merging pan 1 now',
@@ -238,7 +249,10 @@ describe('AutoMergeScheduler', () => {
 
     expect(harness.deps.triggerMerge).not.toHaveBeenCalled();
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'aborted', abortReason: expectedReason });
-    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'merge.auto.aborted' }));
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.aborted',
+      payload: { issueId: 'PAN-1', gateFailureReason: expectedReason },
+    }));
     expectLastTts({
       issueId: 'PAN-1',
       utterance: `Auto merge of pan 1 aborted — ${expectedReason}`,

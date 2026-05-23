@@ -70,6 +70,9 @@ const emptyState: DashboardState = {
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
   channelPermissionRequestsById: {},
+  channelPermissionRequestIdsByAgentId: {},
+  resolvedChannelPermissionDecisionsById: {},
+  resolvedChannelPermissionDecisionIdsByAgentId: {},
   observationsByIssueId: {},
   statusByIssueId: {},
   rollupsByIssueId: {},
@@ -87,6 +90,12 @@ const emptyState: DashboardState = {
   },
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
+  conversationsListRevision: 0,
+  scanProgress: null,
+  enrichStats: null,
+  enrichProgressBySessionId: {},
+  embedProgressBySessionId: {},
+  agentIdBySessionId: {},
 }
 
 function makeSnapshot(seq = 5): DashboardSnapshot {
@@ -343,6 +352,34 @@ describe('applyEventReducer — review/pipeline events', () => {
     const event = makeEvent('pipeline.status_changed', 8, { issueId: 'PAN-1', status })
     const next = applyEventReducer(emptyState, event)
     expect(next.reviewStatusByIssueId['PAN-1']).toEqual(status)
+  })
+
+  it('merge.auto.scheduled stores auto-merge schedule state', () => {
+    const event = makeEvent('merge.auto.scheduled', 9, {
+      issueId: 'PAN-1',
+      executeAt: '2026-05-23T12:05:00.000Z',
+      cooldownSeconds: 300,
+    })
+    const next = applyEventReducer(emptyState, event)
+
+    expect(next.reviewStatusByIssueId['PAN-1']).toMatchObject({
+      issueId: 'PAN-1',
+      autoMergeScheduled: { executeAt: '2026-05-23T12:05:00.000Z', cooldownSeconds: 300 },
+    })
+  })
+
+  it('terminal merge.auto events clear auto-merge schedule state', () => {
+    const scheduled = applyEventReducer(emptyState, makeEvent('merge.auto.scheduled', 9, {
+      issueId: 'PAN-1',
+      executeAt: '2026-05-23T12:05:00.000Z',
+      cooldownSeconds: 300,
+    }))
+    const next = applyEventReducer(scheduled, makeEvent('merge.auto.aborted', 10, {
+      issueId: 'PAN-1',
+      gateFailureReason: 'ci-failing',
+    }))
+
+    expect(next.reviewStatusByIssueId['PAN-1']?.autoMergeScheduled).toBeUndefined()
   })
 })
 

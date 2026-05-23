@@ -299,6 +299,12 @@ export type AgentSnapshot = typeof AgentSnapshot.Type
 
 // ─── Review / Pipeline ────────────────────────────────────────────────────────
 
+export const AutoMergeScheduledSnapshot = Schema.Struct({
+  executeAt: Schema.String,
+  cooldownSeconds: Schema.Number,
+})
+export type AutoMergeScheduledSnapshot = typeof AutoMergeScheduledSnapshot.Type
+
 export const ReviewStatusSnapshot = Schema.Struct({
   issueId: IssueId,
   reviewStatus: Schema.optional(ReviewStatusValue),
@@ -310,6 +316,7 @@ export const ReviewStatusSnapshot = Schema.Struct({
   verificationNotes: Schema.optional(Schema.String),
   verificationCycleCount: Schema.optional(Schema.Number),
   readyForMerge: Schema.optional(Schema.Boolean),
+  autoMergeScheduled: Schema.optional(AutoMergeScheduledSnapshot),
   updatedAt: Schema.optional(Schema.String),
   prUrl: Schema.optional(Schema.String),
   /** Persistent stuck flag — set by divergence guard, cleared by /unstick */

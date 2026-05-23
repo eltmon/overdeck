@@ -571,6 +571,34 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'merge.ready':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
+    case 'merge.auto.scheduled': {
+      const { issueId, executeAt, cooldownSeconds } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId] ?? { issueId }
+      const nextStatus: ReviewStatusSnapshot = {
+        ...existing,
+        autoMergeScheduled: { executeAt, cooldownSeconds },
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+      }
+    }
+
+    case 'merge.auto.cancelled':
+    case 'merge.auto.executed':
+    case 'merge.auto.aborted': {
+      const { issueId } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId]
+      if (!existing) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const { autoMergeScheduled: _autoMergeScheduled, ...nextStatus } = existing
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus as ReviewStatusSnapshot },
+      }
+    }
+
     // PAN-1048 — specialist.* events still flow but no longer feed a separate
     // projection. The same lifecycle is now visible via agent.started /
     // agent.stopped + role-filtered agentsById. Sequence-only update keeps
