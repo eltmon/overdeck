@@ -27,7 +27,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import type { Conversation } from '../database/conversations-db.js';
-import { createConversation } from '../database/conversations-db.js';
+import { createConversation, recordConversationHandoff } from '../database/conversations-db.js';
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
@@ -35,6 +35,7 @@ import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
+import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
 
@@ -43,6 +44,9 @@ export interface SummaryForkOptions {
   cwd?: string;
   localSummaryOnly?: boolean;
   forkMode?: SummaryForkMode;
+  focus?: string;
+  handoffTimeoutMs?: number;
+  handoffPollIntervalMs?: number;
   /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
   includeThinkingInSummary?: boolean;
 }
@@ -53,6 +57,9 @@ export interface SummaryForkResult {
   sessionFile: string;
   summary: string;
   summaryModel: string | null;
+  forkMode: SummaryForkMode;
+  handoffDocPath: string | null;
+  forkFallbackReason: string | null;
 }
 
 const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
@@ -160,6 +167,60 @@ export async function requestHandoffFromAgent(
   }
 
   return { docPath: paths.docPath, docText };
+}
+
+function workspaceSourceFromCwd(sourceConv: Conversation): { issueId: string; workspacePath: string } | null {
+  const normalizedCwd = sourceConv.cwd.replace(/\\/g, '/');
+  const match = normalizedCwd.match(/^((?:(?:.*)\/)?workspaces\/feature-([a-z]+-\d+))(?:\/.*)?$/i);
+  if (!match?.[1] || !match[2]) return null;
+  return {
+    issueId: sourceConv.issueId ?? match[2].toUpperCase(),
+    workspacePath: match[1],
+  };
+}
+
+export async function handoffPreconditionFallbackReason(sourceConv: Conversation): Promise<string | null> {
+  if (sourceConv.status === 'ended') return 'source-ended';
+
+  const workspaceSource = workspaceSourceFromCwd(sourceConv);
+  if (!workspaceSource) return null;
+
+  try {
+    await access(join(workspaceSource.workspacePath, '.devcontainer'));
+  } catch {
+    return null;
+  }
+
+  const health = await Effect.runPromise(getWorkspaceStackHealth(workspaceSource.issueId, {
+    workspacePath: workspaceSource.workspacePath,
+  }));
+  return health.healthy ? 'source-workspace-devcontainer' : null;
+}
+
+export function handoffFailureReason(error: unknown): string {
+  if (error instanceof HandoffStallError) return 'handoff-timeout';
+  if (error instanceof HandoffValidationError) return 'handoff-validation';
+  return 'handoff-request-failed';
+}
+
+export function logHandoffFallback(sourceConv: Conversation, reason: string): void {
+  console.warn(`[summary-fork] handoff-fallback source=${sourceConv.name} reason=${reason}`);
+}
+
+async function generateSummarySeed(
+  sourceSessionFile: string,
+  summaryModel: string | undefined,
+  localSummaryOnly: boolean | undefined,
+  includeThinkingInSummary: boolean | undefined,
+  summaryHarness?: RuntimeName,
+): Promise<{ summary: string; summaryModel: string | null }> {
+  if (localSummaryOnly) {
+    return {
+      summary: await Effect.runPromise(generateFallbackSummary(sourceSessionFile)),
+      summaryModel: null,
+    };
+  }
+  return generateSummaryForFork(sourceSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
 }
 
 async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
@@ -371,6 +432,9 @@ function sanitizeEntryForPlainFork(entry: any): any {
 
   let summary: string;
   let usedSummaryModel: string | null;
+  let effectiveForkMode = forkMode;
+  let handoffDocPath: string | null = null;
+  let forkFallbackReason: string | null = null;
 
   if (forkMode === 'plain') {
     // Plain fork: copy raw JSONL from last compact boundary (or full history)
@@ -378,11 +442,35 @@ function sanitizeEntryForPlainFork(entry: any): any {
     await Effect.runPromise(copySessionFromCompactBoundary(sourceSessionFile, sessionFile));
     summary = '';
     usedSummaryModel = null;
-  } else if (options.localSummaryOnly) {
-    summary = await Effect.runPromise(generateFallbackSummary(sourceSessionFile));
-    usedSummaryModel = null;
+  } else if (forkMode === 'handoff') {
+    const preconditionFallback = await handoffPreconditionFallbackReason(conv);
+    if (preconditionFallback) {
+      forkFallbackReason = preconditionFallback;
+      effectiveForkMode = 'summary';
+      logHandoffFallback(conv, preconditionFallback);
+      const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+      summary = result.summary;
+      usedSummaryModel = result.summaryModel;
+    } else {
+      try {
+        const handoff = await requestHandoffFromAgent(conv, options.focus, {
+          timeoutMs: options.handoffTimeoutMs,
+          pollIntervalMs: options.handoffPollIntervalMs,
+        });
+        summary = handoff.docText;
+        usedSummaryModel = null;
+        handoffDocPath = handoff.docPath;
+      } catch (error) {
+        forkFallbackReason = handoffFailureReason(error);
+        effectiveForkMode = 'summary';
+        logHandoffFallback(conv, forkFallbackReason);
+        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+        summary = result.summary;
+        usedSummaryModel = result.summaryModel;
+      }
+    }
   } else {
-    const result = await generateSummaryForFork(sourceSessionFile, summaryModel ?? undefined, options.includeThinkingInSummary);
+    const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
     summary = result.summary;
     usedSummaryModel = result.summaryModel;
   }
@@ -392,22 +480,29 @@ function sanitizeEntryForPlainFork(entry: any): any {
   const newName = `${timestamp}-${suffix}`;
   const newTmux = `conv-${newName}`;
 
-  const newConv = createConversation({
+  let newConv = createConversation({
     name: newName,
     tmuxSession: newTmux,
     cwd,
     issueId: conv.issueId ?? undefined,
-    title: forkMode === 'plain'
+    title: effectiveForkMode === 'plain'
       ? `Fork: ${conv.title || conv.name}`
-      : `Summary Fork: ${conv.title || conv.name}`,
+      : effectiveForkMode === 'handoff'
+        ? `Handoff: ${conv.title || conv.name}`
+        : `Summary Fork: ${conv.title || conv.name}`,
     titleSource: 'manual',
-    titleSeed: forkMode === 'plain'
+    titleSeed: effectiveForkMode === 'plain'
       ? `Fork of ${conv.name}`
-      : `Summary Fork of ${conv.name}`,
+      : effectiveForkMode === 'handoff'
+        ? `Handoff of ${conv.name}`
+        : `Summary Fork of ${conv.name}`,
     claudeSessionId: sessionId,
     model: launchModel ?? undefined,
     effort: conv.effort ?? undefined,
   });
+  if (handoffDocPath) {
+    newConv = recordConversationHandoff(conv.name, newConv.name, handoffDocPath);
+  }
 
   return {
     conversation: newConv,
@@ -415,6 +510,9 @@ function sanitizeEntryForPlainFork(entry: any): any {
     sessionFile,
     summary,
     summaryModel: usedSummaryModel,
+    forkMode: effectiveForkMode,
+    handoffDocPath,
+    forkFallbackReason,
   };
 }
 

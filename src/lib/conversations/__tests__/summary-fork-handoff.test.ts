@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import type { Conversation } from '../../database/conversations-db.js';
+import { createConversation, getConversationByName } from '../../database/conversations-db.js';
+import { resetDatabase } from '../../database/index.js';
+import { sessionFilePath } from '../../paths.js';
 import { createHandoffPaths } from '../handoff-paths.js';
 import {
   HandoffStallError,
+  createSummaryFork,
   requestHandoffFromAgent,
   validateHandoffDoc,
 } from '../summary-fork.js';
@@ -18,6 +23,7 @@ vi.mock('../../agents.js', () => ({
 }));
 
 const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalHome = process.env.HOME;
 const fixedNow = new Date('2026-05-23T04:35:00.000Z');
 
 function sourceConversation(): Conversation {
@@ -43,6 +49,9 @@ function sourceConversation(): Conversation {
     runtimeStatus: null,
     harness: 'claude-code',
     deliveryMethod: null,
+    handoffDocPath: null,
+    handoffTargetConvId: null,
+    forkFallbackReason: null,
   };
 }
 
@@ -61,10 +70,16 @@ afterEach(() => {
   vi.useRealTimers();
   vi.mocked(deliverAgentMessage).mockReset();
   vi.mocked(deliverAgentMessage).mockResolvedValue(undefined);
+  resetDatabase();
   if (originalPanopticonHome === undefined) {
     delete process.env.PANOPTICON_HOME;
   } else {
     process.env.PANOPTICON_HOME = originalPanopticonHome;
+  }
+  if (originalHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = originalHome;
   }
 });
 
@@ -105,6 +120,54 @@ describe('handoff fork handshake', () => {
       'handoff-request',
     );
     expect(result).toEqual({ docPath: paths.docPath, docText });
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('uses the handoff document as the fork seed and records source/target metadata', async () => {
+    const home = join(tmpdir(), `pan-handoff-fork-${Date.now()}`);
+    process.env.PANOPTICON_HOME = home;
+    process.env.HOME = home;
+    resetDatabase();
+
+    const cwd = '/home/test/project';
+    const sessionId = 'source-session-123';
+    const sourceFile = sessionFilePath(cwd, sessionId);
+    await mkdir(dirname(sourceFile), { recursive: true });
+    await writeFile(sourceFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'Continue this work' } })}\n`, 'utf-8');
+
+    const source = createConversation({
+      name: 'conv-source',
+      tmuxSession: 'conv-source-session',
+      cwd,
+      issueId: 'PAN-1358',
+      claudeSessionId: sessionId,
+      title: 'Source title',
+      titleSource: 'manual',
+    });
+    const docText = validDoc();
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
+      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
+      if (!outputPath) throw new Error('missing output path');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, docText, 'utf-8');
+      await writeFile(`${outputPath}.done`, '', 'utf-8');
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(source, { forkMode: 'handoff' }));
+
+    expect(result.summary).toBe(docText);
+    expect(result.summaryModel).toBeNull();
+    expect(result.forkMode).toBe('handoff');
+    expect(result.handoffDocPath).toBeTruthy();
+    expect(result.conversation.title).toBe('Handoff: Source title');
+    expect(result.conversation.issueId).toBe('PAN-1358');
+    expect(result.conversation.cwd).toBe(cwd);
+
+    const targetRow = getConversationByName(result.conversation.name);
+    const sourceRow = getConversationByName(source.name);
+    expect(targetRow?.handoffDocPath).toBe(result.handoffDocPath);
+    expect(sourceRow?.handoffTargetConvId).toBe(result.conversation.id);
     rmSync(home, { recursive: true, force: true });
   });
 

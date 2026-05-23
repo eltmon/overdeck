@@ -56,6 +56,8 @@ import {
   setConversationHarness,
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
+  updateConversationForkFallbackReason,
+  recordConversationHandoff,
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
@@ -117,6 +119,10 @@ import {
   generateFallbackSummary,
   reserveSummaryForkSession,
   copySessionFromCompactBoundary,
+  requestHandoffFromAgent,
+  handoffPreconditionFallbackReason,
+  handoffFailureReason,
+  logHandoffFallback,
   type SummaryForkMode,
 } from '../../../lib/conversations/summary-fork.js';
 import {
@@ -2462,6 +2468,7 @@ async function runForkPipeline(
   localSummaryOnly = false,
   includeThinkingInSummary?: boolean,
   summaryHarness?: RuntimeName,
+  handoffFocus?: string,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -2507,11 +2514,51 @@ async function runForkPipeline(
   }
 
   let summary: string;
-  if (localSummaryOnly) {
-    summary = await Effect.runPromise(generateFallbackSummary(parentSessionFile));
-  } else {
+  let effectiveForkMode = forkMode;
+  let handoffDocPath: string | null = null;
+  let forkFallbackReason: string | null = null;
+
+  const buildSummary = async (): Promise<string> => {
+    if (localSummaryOnly) {
+      return Effect.runPromise(generateFallbackSummary(parentSessionFile));
+    }
     const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
-    summary = result.summary;
+    return result.summary;
+  };
+
+  if (forkMode === 'handoff') {
+    const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
+    if (preconditionFallback) {
+      forkFallbackReason = preconditionFallback;
+      effectiveForkMode = 'summary';
+      logHandoffFallback(parentConv, preconditionFallback);
+      summary = await buildSummary();
+    } else {
+      try {
+        const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+        summary = handoff.docText;
+        handoffDocPath = handoff.docPath;
+      } catch (error) {
+        forkFallbackReason = handoffFailureReason(error);
+        effectiveForkMode = 'summary';
+        logHandoffFallback(parentConv, forkFallbackReason);
+        summary = await buildSummary();
+      }
+    }
+  } else {
+    summary = await buildSummary();
+  }
+
+  updateConversationForkFallbackReason(convName, forkFallbackReason);
+  updateConversationTitle(
+    convName,
+    effectiveForkMode === 'handoff'
+      ? `Handoff: ${parentConv.title || parentConv.name}`
+      : `Summary Fork: ${parentConv.title || parentConv.name}`,
+    'manual',
+  );
+  if (handoffDocPath) {
+    recordConversationHandoff(parentConv.name, convName, handoffDocPath);
   }
 
   updateForkStatus(convName, 'spawning');
@@ -2624,7 +2671,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         }
         const defaultTitle = forkMode === 'plain'
           ? `Fork: ${conv.title || conv.name}`
-          : `Summary Fork: ${conv.title || conv.name}`;
+          : forkMode === 'handoff'
+            ? `Handoff: ${conv.title || conv.name}`
+            : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({
           name: newName,
@@ -2635,12 +2684,14 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           titleSource: 'manual',
           titleSeed: forkMode === 'plain'
             ? `Fork of ${conv.name}`
-            : `Summary Fork of ${conv.name}`,
+            : forkMode === 'handoff'
+              ? `Handoff of ${conv.name}`
+              : `Summary Fork of ${conv.name}`,
           claudeSessionId: sessionId,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
           harness: launchHarness,
-          forkStatus: forkMode === 'plain' ? 'spawning' : 'summarizing',
+          forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
         });
         markConversationActive(newConv.name);
 
