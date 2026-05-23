@@ -1,0 +1,156 @@
+{
+  "version": "1",
+  "issueId": "PAN-1405",
+  "created": "2026-05-23T06:41:32.787Z",
+  "updated": "2026-05-23T06:55:00.000Z",
+  "gitState": { "branch": "feature/pan-1405", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Supervisor runs under Node 22, not Bun.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "@homebridge/node-pty-prebuilt-multiarch is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits code 0 immediately (documented in CLAUDE.md and the dashboard-node22-only rule). The supervisor *owns* the PTY master fd so it cannot be Bun. Bridge stays Bun because it doesn't need a PTY."
+    },
+    {
+      "id": "D2",
+      "summary": "Socket path is ${PANOPTICON_HOME}/sockets/pty-<agentId>.sock, mode 0600.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Matches the existing channels bridge convention (`sockets/agent-<id>.sock`) so dashboard/CLI/log code can use one socket directory and identical permissioning. The `pty-` prefix keeps the two sockets distinguishable."
+    },
+    {
+      "id": "D3",
+      "summary": "Wire format is HTTP-on-unix with a per-agent pty-token header.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Symmetric with panopticon-bridge so deliverAgentMessage's HTTP-over-unix POST helper (postUnixSocketJson) is reused. New helper src/lib/pty-token.ts mirrors bridge-token.ts; tokens never live in env or argv, only in 0600 files under the agent state dir."
+    },
+    {
+      "id": "D4",
+      "summary": "Supervisor echoes socket-delivered messages to its stdout (and therefore to the tmux pane) by default.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Transcript completeness > secrecy. Operators looking at the tmux pane should see what Cloister sent, just as if they had typed it. A per-message `{ echo: false }` field is reserved for a future silent-delivery case but is not used by any caller in this issue."
+    },
+    {
+      "id": "D5",
+      "summary": "deliverAgentMessage becomes a three-tier router: supervisor → channels → tmux.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Already-running agents (channelsEnabled=true) keep working because supervisor socket is absent → fallback to channels socket → tmux. New agents get pty socket first. No forced respawn."
+    },
+    {
+      "id": "D6",
+      "summary": "Channels MCP becomes off-by-default for new spawns; the supervisor replaces it as the preferred transport.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Channels MCP was Anthropic-only (provider.name === 'anthropic' gate), pays an MCP-tool-schema context tax, and requires dismissDevChannelsDialog. Supervisor delivers reliably across every Claude Code provider with zero MCP context cost. Channels code path stays for delivery fallback only; new spawns do not wire --dangerously-load-development-channels."
+    },
+    {
+      "id": "D7",
+      "summary": "Plain forks: re-apply the 'skip channels MCP wiring' policy (the reverted 1d621196c reasoning is correct) and add supervisor delivery instead.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Original plain-fork concerns (MCP tool-schema pushes resume across auto-compact threshold; dismissDevChannelsDialog can confirm an auto-compact prompt by accident) still apply. With the supervisor providing a reliable side-channel, plain forks finally have a delivery path that doesn't depend on channels MCP."
+    },
+    {
+      "id": "D8",
+      "summary": "Supervisor is built to dist/pty-supervisor.js via tsdown; launcher invokes `node <projectRoot>/dist/pty-supervisor.js claude ...`.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Node 22 cannot run TS sources directly (no top-level Bun, ESM circular-deps land on the dashboard server but the supervisor must also work cleanly), so we ship a built artifact. Add @homebridge/node-pty-prebuilt-multiarch to the root package.json with node-pty marked `external` in the new tsdown entry so the build doesn't bundle the native addon."
+    },
+    {
+      "id": "D9",
+      "summary": "Docker workspaces stay on the existing eligibility gate — supervisor is not enabled for Docker yet.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Host↔container shared-socket plumbing is unsolved (same reason channels gates Docker off today). Defer to a follow-up issue; document in supervisor docs and re-use the existing PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE env-var gate."
+    },
+    {
+      "id": "D10",
+      "summary": "Permission-decision relay (bidirectional tool-call mediation) is OUT OF SCOPE; existing channels MCP path keeps owning it.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "The issue body lists bidirectional tool-call mediation as out-of-scope. Supervisor is one-way (orchestrator→agent). Permission decisions continue to flow through the existing channels socket for agents that still wire channels MCP; new spawns without channels MCP will not request permissions via that path (they rely on Claude's built-in permission flags)."
+    },
+    {
+      "id": "D11",
+      "summary": "Pi runtime is untouched — Pi continues to use its rpc.in FIFO (src/lib/runtimes/pi-fifo.ts).",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "Pi already solved its own delivery via FIFO. Adding the supervisor on top would duplicate work and obscure failure modes. Eligibility check filters on harness === 'claude-code' so Pi never enters the supervisor path."
+    },
+    {
+      "id": "D12",
+      "summary": "Existing tmux paste-buffer scroll-mode lockout is the canonical UAT signal: when the dashboard terminal panel is scrolled up, supervisor-delivered messages must still reach Claude.",
+      "recordedAt": "2026-05-23T06:55:00.000Z",
+      "rationale": "This is the user-visible problem motivating the issue. UAT writes a Playwright test that opens the terminal panel, scrolls up to put tmux into copy-mode, sends a Cloister message, and asserts the agent's transcript advanced. Without this assertion the supervisor's reason-for-existing is unverified."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Supervisor crash kills Claude because the supervisor owns the PTY master fd.",
+      "mitigation": "Document explicitly in supervisor.ts header. Resume via the dashboard regenerates launcher + supervisor — same as a fresh spawn. The Deacon's recoverOrphanedAgents path treats this case the same as any other dead tmux session."
+    },
+    {
+      "id": "H2",
+      "summary": "node-pty must be present at the root package.json AND must build cleanly for the supervisor entry.",
+      "mitigation": "Add @homebridge/node-pty-prebuilt-multiarch to root deps. Add a tsdown entry that emits dist/pty-supervisor.js with node-pty marked `external`. Verify `npm run build` produces the file before merging."
+    },
+    {
+      "id": "H3",
+      "summary": "Supervisor stdout backpressure: if claude's output outpaces tmux's read rate, supervisor's stdout pipe could fill.",
+      "mitigation": "Use Node streams correctly — listen to `process.stdout.write` return value, pause node-pty's data flow until `drain` fires. Add a log line if backpressure trips so we can observe it in the field. Defer formal load-testing to a follow-up unless UAT reveals dropped bytes."
+    },
+    {
+      "id": "H4",
+      "summary": "Docker workspaces do not yet share the supervisor socket between host and container.",
+      "mitigation": "Eligibility gate (PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE) skips the supervisor — Docker conversations stay on tmux as today. Document in supervisor.ts header and CLAUDE.md."
+    },
+    {
+      "id": "H5",
+      "summary": "Existing agents with channelsEnabled=true must keep working — the three-tier router must fall through cleanly when the supervisor socket is absent.",
+      "mitigation": "deliver-agent-message.test.ts adds explicit cases: (a) only channels socket exists → routes to channels, (b) neither exists → routes to tmux, (c) both exist → prefers supervisor. Test resume of a pre-supervisor agent doesn't regress."
+    },
+    {
+      "id": "H6",
+      "summary": "Re-applying the plain-fork channels-skip behavior (the recent revert) must happen ATOMICALLY with supervisor enablement.",
+      "mitigation": "Land the plain-fork bead AFTER the supervisor-wiring bead in the same release. Add an integration test that spawns a plain fork and asserts (i) no panopticon-bridge MCP in the launcher script, (ii) supervisor socket present and POSTable."
+    },
+    {
+      "id": "H7",
+      "summary": "Supervisor must inherit and forward TTY-rendering env vars (TERM, COLORTERM, LANG, NODE_EXTRA_CA_CERTS, PATH) so Claude renders correctly under the wrapped PTY.",
+      "mitigation": "Supervisor passes through process.env unchanged to the spawned claude. Launcher continues to export TERM/COLORTERM/LANG/LC_ALL before invoking node. Unit test asserts env propagation."
+    },
+    {
+      "id": "H8",
+      "summary": "Resize events from the dashboard terminal panel must reach Claude through the supervisor.",
+      "mitigation": "Supervisor listens to its own stdout `resize` events (via process.stdout.on('resize')) and calls pty.resize(cols, rows). Tmux already propagates SIGWINCH into the pane's foreground process; the supervisor is that process, so this path is the standard one. Unit test simulates a resize and asserts pty.resize was called."
+    },
+    {
+      "id": "H9",
+      "summary": "Token file races: the launcher writes pty-token before tmux spawn, but deliverAgentMessage may run before the supervisor has bound the socket.",
+      "mitigation": "deliverAgentMessage already handles socket-missing as a fallback — the three-tier router falls through to channels (legacy) or tmux. Add a small grace-period (existing 30s ready-check in spawnAgent already covers this for the initial prompt). No race-prone polling needed."
+    },
+    {
+      "id": "H10",
+      "summary": "Dev-mode (running from source) vs prod-mode (running from dist/) supervisor path resolution.",
+      "mitigation": "Launcher generator resolves an absolute supervisor path passed in by the caller — caller resolves dist/pty-supervisor.js relative to the project root. If dist is missing, spawnAgent / spawnConversationSession surface a clear error: 'pty-supervisor build artifact missing — run `npm run build`'. Don't silently fall back to tmux for new spawns."
+    },
+    {
+      "id": "H11",
+      "summary": "Skipping dismissDevChannelsDialog when channels MCP is not wired is correct but easy to get wrong.",
+      "mitigation": "Gate the dialog dismissal on the same boolean (channelsBridgeMcpConfig != null OR state.channelsEnabled). Add an assertion test that for a supervisor-only spawn, dismissDevChannelsDialog is never called."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T06:41:32.787Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1405: Universal PTY supervisor for message delivery (replace tmux paste-buffer + obsolete channels MCP gate)",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-23T06:55:00.000Z",
+      "reason": "planning",
+      "note": "Completed discovery in --auto mode. 12 decisions and 11 hazards recorded; vBRIEF drafted with 12 beads.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
