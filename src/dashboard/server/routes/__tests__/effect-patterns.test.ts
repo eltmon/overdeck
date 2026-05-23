@@ -12,9 +12,9 @@ import { Effect, Layer } from 'effect';
 import { HttpServerResponse as HttpServerResponseModule } from 'effect/unstable/http';
 
 type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { httpHandler } from '../http-handler.js';
 import { EventStoreService, EventStoreServiceLive } from '../../services/domain-services.js';
 import { ReadModelServiceLive } from '../../read-model.js';
@@ -99,6 +99,15 @@ describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
       rmSync(tmpDir, { recursive: true, force: true });
     }
   }, 30000);
+});
+
+describe('Effect-returning helper composition', () => {
+  it('does not wrap review temp cleanup Effect in Effect.promise', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/dashboard/server/routes/workspaces.ts'), 'utf8');
+
+    expect(source).not.toMatch(/Effect\.promise\(\(\) => cleanupReviewTempStash\(/);
+    expect(source).toMatch(/yield\* cleanupReviewTempStash\(issueId, wsInfo\.localPath!\)/);
+  });
 });
 
 describe('EventStoreService.append via yield*', () => {
