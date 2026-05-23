@@ -207,8 +207,6 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
   });
 
   it('applies a per-issue cooldown so a ship run in flight is not re-poked every tick', async () => {
-    // Distinct issueId — the module-level cooldown map persists across tests in
-    // this file, so the first test's PAN-977 entry would mask this assertion.
     mockLoadReviewStatuses.mockReturnValue({
       'PAN-888': {
         issueId: 'PAN-888',
@@ -285,6 +283,64 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     } finally {
       logSpy.mockRestore();
       vi.useRealTimers();
+    }
+  });
+
+  it('drops re-dispatch counters when issues leave the ship-eligible state', async () => {
+    const now = new Date('2026-05-23T14:00:00.000Z');
+    vi.setSystemTime(now);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    try {
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-PRUNE)',
+      );
+
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+      await checkUndispatchedShip();
+
+      mockOnIssueStateChange.mockClear();
+      logSpy.mockClear();
+      vi.setSystemTime(new Date(now.getTime() + 91_000));
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() + 31_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-PRUNE)',
+      );
+    } finally {
+      logSpy.mockRestore();
     }
   });
 });

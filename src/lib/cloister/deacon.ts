@@ -2649,16 +2649,31 @@ export async function checkUndispatchedShip(): Promise<string[]> {
   try {
     const statuses = loadReviewStatuses();
     const now = Date.now();
+    const shipEligibleKeys = new Set<string>();
 
     for (const [key, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'passed') continue;
       if (status.readyForMerge) continue;
       if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
+      if (!status.updatedAt) continue;
+      shipEligibleKeys.add(key);
+    }
+
+    for (const key of new Set([...shipDispatchCooldowns.keys(), ...shipDispatchCounts.keys()])) {
+      if (!shipEligibleKeys.has(key)) {
+        shipDispatchCooldowns.delete(key);
+        shipDispatchCounts.delete(key);
+      }
+    }
+
+    for (const [key, status] of Object.entries(statuses)) {
+      if (!shipEligibleKeys.has(key)) continue;
 
       // Give the reactive scheduler's primary trigger time to land first.
-      if (!status.updatedAt) continue;
-      if (now - new Date(status.updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
+      const updatedAt = status.updatedAt;
+      if (!updatedAt) continue;
+      if (now - new Date(updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
 
       // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
       const lastAttempt = shipDispatchCooldowns.get(key);
@@ -2673,10 +2688,10 @@ export async function checkUndispatchedShip(): Promise<string[]> {
 
       try {
         const { onIssueStateChange } = await import('./service.js');
+        await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
         const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
         shipDispatchCounts.set(key, dispatchCount);
         console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
-        await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
         actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
       } catch (err) {
         console.error(
