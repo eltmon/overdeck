@@ -3308,8 +3308,8 @@
     "hash": "91769fa19dcbbf193da2e053d50bdf18"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/EventRouter.tsx": {
-    "mtime": 1779535299.7933466,
-    "hash": "b5f367e9c81433efe55de5eed8ee542c"
+    "mtime": 1779547503.4772925,
+    "hash": "926e6bad73adaa12151439091f7b22e2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/StandaloneTerminal.tsx": {
     "mtime": 1779535299.8006465,
@@ -3346,6 +3346,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/HealthHistoryTimeline.tsx": {
     "mtime": 1779535299.7943468,
     "hash": "f74be14115e37711537c9536c1334bde"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/MergeAutoMergeCountdown.test.tsx": {
+    "mtime": 1779547597.5217085,
+    "hash": "cbf1083f4f43f3b302a311d4728b811e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/ResourceBar.test.tsx": {
     "mtime": 1779535299.7974763,
@@ -3398,6 +3402,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/SystemHealthPill.tsx": {
     "mtime": 1779535299.8006465,
     "hash": "3b345e510999705cab512db22053d54c"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/MergeAutoMergeCountdown.tsx": {
+    "mtime": 1779547631.7959461,
+    "hash": "450223650899f500a29679a8496519c6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/components/Sidebar.tsx": {
     "mtime": 1779535299.8006465,
@@ -4532,8 +4540,8 @@
     "hash": "26a23cf1803ff327c3eede0d6ced22ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/lib/wsTransport.ts": {
-    "mtime": 1779535299.807347,
-    "hash": "dea0d8cc7f1b83605323b7d1ec3178d1"
+    "mtime": 1779547472.956177,
+    "hash": "1f0386b89275b4e70d71ce8e794c1c4a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/lib/utils.ts": {
     "mtime": 1779535299.806796,
@@ -4620,8 +4628,8 @@
     "hash": "4bbc4df88776fdd982bbf44b83817d18"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/lib/store.ts": {
-    "mtime": 1779535299.806796,
-    "hash": "20a69203e521d499fefb5da8a2dfeb99"
+    "mtime": 1779547440.9670577,
+    "hash": "da8dae791e0a41ca8ff1a9350b2ced8b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/frontend/src/lib/dashboard-utils.ts": {
     "mtime": 1779535299.806796,

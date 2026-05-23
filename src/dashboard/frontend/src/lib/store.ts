@@ -38,6 +38,8 @@ export interface DashboardState extends ReadModelState {
   drawer: DrawerState
   /** Whether the initial snapshot has been loaded */
   bootstrapComplete: boolean
+  /** Whether the dashboard RPC event stream is currently connected */
+  rpcConnected: boolean
   /** ISO timestamp of the last received snapshot (used for freshness indicator) */
   snapshotTimestamp: string | null
 }
@@ -50,6 +52,7 @@ export interface DashboardStore extends DashboardState {
   closeIssue(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
+  setRpcConnected(connected: boolean): void
 }
 
 // ─── Initial state ────────────────────────────────────────────────────────────
@@ -58,6 +61,7 @@ const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
   drawer: { issueId: null, tab: 'overview' },
   bootstrapComplete: false,
+  rpcConnected: false,
   snapshotTimestamp: null,
 }
 
@@ -151,6 +155,9 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   syncDrawerFromUrl: () =>
     set({ drawer: readDrawerFromUrl() }),
+
+  setRpcConnected: (connected) =>
+    set({ rpcConnected: connected }),
 }))
 
 // ─── Selector memoization helpers ─────────────────────────────────────────────

@@ -27,6 +27,7 @@ const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
 export function EventRouter() {
   const syncSnapshot = useDashboardStore((s) => s.syncSnapshot)
   const applyEvents = useDashboardStore((s) => s.applyEvents)
+  const setRpcConnected = useDashboardStore((s) => s.setRpcConnected)
   const recovery = useRef<RecoveryCoordinator | null>(null)
   const pendingBatch = useRef<DomainEvent[]>([])
   const flushScheduled = useRef(false)
@@ -75,6 +76,7 @@ export function EventRouter() {
           (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
         ) as DashboardSnapshot
         syncSnapshot(snapshot)
+        setRpcConnected(true)
         bootstrapComplete = true
         stopFallbackPoller()
         const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
@@ -82,6 +84,7 @@ export function EventRouter() {
           await replay(snapshot.sequence)
         }
       } catch (err) {
+        setRpcConnected(false)
         console.error('[EventRouter] bootstrap failed:', err)
         coordinator.failRecovery()
       } finally {
@@ -177,11 +180,15 @@ export function EventRouter() {
         // frontend operates on a stale snapshot and conversations/sessions
         // that were being viewed vanish with "no longer exists" errors.
         onReconnect: () => {
+          setRpcConnected(true)
           console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
           bootstrap()
           // Broadcast to all useQuery consumers so they re-fetch stale data
           // (session trees, conversations, costs, etc.)
           window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+        },
+        onDisconnect: () => {
+          setRpcConnected(false)
         },
       },
     )
@@ -193,7 +200,7 @@ export function EventRouter() {
       stopFallbackPoller()
       unsubscribe()
     }
-  }, [syncSnapshot, applyEvents])
+  }, [syncSnapshot, applyEvents, setRpcConnected])
 
   return null
 }

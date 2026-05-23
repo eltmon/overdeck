@@ -108,6 +108,7 @@ export interface SubscribeOptions {
   /** Called when the subscription reconnects after a failure. Use this to
    *  re-bootstrap state (e.g. re-fetch the snapshot from the new server). */
   readonly onReconnect?: () => void
+  readonly onDisconnect?: () => void
 }
 
 const DEFAULT_RETRY_DELAY = Duration.millis(250)
@@ -174,6 +175,7 @@ export class WsTransport {
     let currentCancel: (() => void) | null = null
     const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
     const onReconnect = options?.onReconnect
+    const onDisconnect = options?.onDisconnect
     let hasConnectedOnce = false
 
     const run = () => {
@@ -208,6 +210,7 @@ export class WsTransport {
             Effect.sync(() => {
               if (active) {
                 hasConnectedOnce = true // mark that next successful data = reconnect
+                try { onDisconnect?.() } catch { /* non-fatal */ }
                 console.warn('[WsTransport] subscription error, retrying:', formatError(err))
               }
             }),
@@ -219,6 +222,7 @@ export class WsTransport {
           onExit: (exit) => {
             if (active && Exit.isFailure(exit)) {
               hasConnectedOnce = true
+              try { onDisconnect?.() } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
               setTimeout(run, 1000)
