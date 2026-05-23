@@ -133,7 +133,7 @@ describe('computeContextUsage', () => {
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
-    const result = await computeContextUsage('/fake/context-overflow.jsonl', 'gpt-4o');
+    const result = await computeContextUsage('/fake/context-overflow.jsonl', 'gpt-5.3-codex-spark');
 
     expect(result?.percentUsed).toBe(100);
   });
