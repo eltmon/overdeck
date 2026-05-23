@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 
 import { PlanDialog } from '../PlanDialog';
@@ -99,6 +99,172 @@ function OverflowButton({ views, triggerRef, openSignal }: { views: IssueActionV
   );
 }
 
+type BeadTask = {
+  id: string;
+  title: string;
+  status: string;
+};
+
+type ActionDialogFrameProps = {
+  label: string;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={label}
+        className="w-full max-w-md rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-medium">{label}</h3>
+          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TellAgentDialog({ actions, onClose }: { actions: UseIssueActionsResult; onClose: () => void }) {
+  const [message, setMessage] = useState('');
+  const action = actions.activeDialog?.action;
+  if (!action) return null;
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = message.trim();
+    if (!text) return;
+    actions.submitDialogAction(action, { message: text });
+    onClose();
+  };
+
+  return (
+    <ActionDialogFrame label={action.label} onClose={onClose}>
+      <form className="space-y-3" onSubmit={onSubmit}>
+        <textarea
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          aria-label="Message to send to the agent"
+          placeholder="Tell the agent what to do..."
+          className="min-h-[110px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+        />
+        <div className="flex justify-end gap-2">
+          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={!message.trim() || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            {actions.isActionPending(action.key) ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+      </form>
+    </ActionDialogFrame>
+  );
+}
+
+function SwarmDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
+  const action = actions.activeDialog?.action;
+  if (!action) return null;
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    actions.submitDialogAction(action);
+    onClose();
+  };
+
+  return (
+    <ActionDialogFrame label={action.label} onClose={onClose}>
+      <form className="space-y-3" onSubmit={onSubmit}>
+        <p className="text-xs text-muted-foreground">
+          Dispatch a parallel swarm for {issueId} using the planned beads.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            {actions.isActionPending(action.key) ? 'Dispatching…' : 'Dispatch swarm'}
+          </button>
+        </div>
+      </form>
+    </ActionDialogFrame>
+  );
+}
+
+function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
+  const action = actions.activeDialog?.action;
+  const [tasks, setTasks] = useState<BeadTask[]>([]);
+  const [selectedBeadId, setSelectedBeadId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/issues/${encodeURIComponent(issueId)}/beads`, { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to load beads');
+        return response.json() as Promise<{ tasks?: BeadTask[] }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const nextTasks = data.tasks ?? [];
+        setTasks(nextTasks);
+        setSelectedBeadId(nextTasks[0]?.id ?? '');
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [issueId]);
+
+  if (!action) return null;
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedBeadId) return;
+    actions.submitDialogAction(action, undefined, selectedBeadId);
+    onClose();
+  };
+
+  return (
+    <ActionDialogFrame label={action.label} onClose={onClose}>
+      <form className="space-y-3" onSubmit={onSubmit}>
+        {loading ? <p className="text-xs text-muted-foreground">Loading beads…</p> : null}
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        {!loading && !error && tasks.length === 0 ? <p className="text-xs text-muted-foreground">No beads are available for inspection.</p> : null}
+        {tasks.length > 0 ? (
+          <label className="block space-y-1 text-xs text-muted-foreground">
+            <span>Bead</span>
+            <select
+              value={selectedBeadId}
+              onChange={(event) => setSelectedBeadId(event.target.value)}
+              aria-label="Bead to inspect"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            >
+              {tasks.map((task) => (
+                <option key={task.id} value={task.id}>{task.id} — {task.title}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <div className="flex justify-end gap-2">
+          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={!selectedBeadId || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            {actions.isActionPending(action.key) ? 'Starting…' : 'Inspect bead'}
+          </button>
+        </div>
+      </form>
+    </ActionDialogFrame>
+  );
+}
+
 export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
   const { activeDialog, agent, lifecycle, issue, workspace, closeDialog } = actions;
   const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
@@ -142,23 +308,22 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
     return <IssueOpenInDialog cwd={workspace.path} onClose={handleClose} />;
   }
 
+  if (activeDialog.key === 'tell') {
+    return <TellAgentDialog actions={actions} onClose={handleClose} />;
+  }
+
+  if (activeDialog.key === 'swarm') {
+    return <SwarmDialog issueId={issueId} actions={actions} onClose={handleClose} />;
+  }
+
+  if (activeDialog.key === 'inspectBead') {
+    return <InspectBeadDialog issueId={issueId} actions={actions} onClose={handleClose} />;
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={handleClose}>
-      <div
-        role="dialog"
-        aria-label={activeDialog.action.label}
-        className="min-w-[260px] rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-medium">{activeDialog.action.label}</h3>
-          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={handleClose}>
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">This action opens from the shared issue action surface.</p>
-      </div>
-    </div>
+    <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
+      <p className="text-xs text-muted-foreground">This action opens from the shared issue action surface.</p>
+    </ActionDialogFrame>
   );
 }
 

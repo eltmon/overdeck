@@ -267,4 +267,73 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-open')).toBeDisabled();
     expect(screen.getByTestId('issue-action-open')).toHaveAttribute('title', 'Workspace does not exist');
   });
+
+  it('opens the shared tell dialog and sends the entered message', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-tell'));
+
+    expect(screen.getByRole('dialog', { name: 'Tell agent' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Message to send to the agent'), { target: { value: 'Please continue' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-1/tell', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'Please continue' }),
+      }));
+    });
+  });
+
+  it('opens the shared swarm dialog and dispatches via the mounted swarm endpoint', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({ currentIssue: issue({ hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-swarm'));
+
+    expect(screen.getByRole('dialog', { name: 'Swarm' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dispatch swarm' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/swarm', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ issueId: 'PAN-1' }),
+      }));
+    });
+  });
+
+  it('opens the inspect bead dialog and posts the selected bead id', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
+      if (url === '/api/issues/PAN-1/beads' && !init?.method) {
+        return Response.json({ tasks: [{ id: 'bead-1', title: 'First bead', status: 'open' }], count: 1, workspacePath: '/tmp/pan-1' });
+      }
+      return Response.json({ success: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({ currentIssue: issue({ hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-inspectBead'));
+
+    expect(await screen.findByRole('dialog', { name: 'Inspect bead' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Bead to inspect')).toHaveValue('bead-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect bead' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/beads/bead-1/inspect', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ deep: false }),
+      }));
+    });
+  });
 });

@@ -46,11 +46,14 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
+  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => void;
+  isActionPending: (key: IssueActionKey) => boolean;
 };
 
 type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
+  selectedBeadId?: string | null;
 };
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
@@ -69,11 +72,11 @@ async function responseError(response: Response, fallback: string) {
   }
 }
 
-function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState) {
+function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedBeadId?: string | null) {
   return endpoint
     .replace(':id', encodeURIComponent(issueId))
     .replace(':agentId', encodeURIComponent(agent?.id ?? ''))
-    .replace(':beadId', encodeURIComponent(state.selectedBeadId ?? ''));
+    .replace(':beadId', encodeURIComponent(selectedBeadId ?? state.selectedBeadId ?? ''));
 }
 
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {
@@ -83,6 +86,8 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { issueId, projectId: issue?.project?.id };
     case 'startSkipPlanning':
       return { issueId, projectId: issue?.project?.id, auto: true };
+    case 'swarm':
+      return { issueId };
     case 'createWorkspace':
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
@@ -156,7 +161,10 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'plan',
   'autoPlan',
   'startSkipPlanning',
+  'swarm',
+  'tell',
   'switchModel',
+  'inspectBead',
   'open',
   'upload',
 ]);
@@ -235,10 +243,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body }: PostActionInput) => {
+    mutationFn: async ({ action, body, selectedBeadId }: PostActionInput) => {
       if (!action.endpoint) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state), {
+      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedBeadId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
@@ -256,6 +264,13 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
+  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => {
+    setPendingKey(action.key);
+    postActionMutation.mutate({ action, body, selectedBeadId });
+  }, [postActionMutation]);
+
+  const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && postActionMutation.isPending, [pendingKey, postActionMutation.isPending]);
+
   const runAction = useCallback(async (action: IssueActionEntry) => {
     if (!action.enabledWhen(state)) return;
 
@@ -268,14 +283,6 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     const artifactTab = artifactTabs[action.key];
     if (artifactTab) {
       openIssue(issueId, artifactTab);
-      return;
-    }
-
-    if (action.key === 'tell') {
-      const message = window.prompt('Message to send to the agent');
-      if (!message?.trim()) return;
-      setPendingKey(action.key);
-      postActionMutation.mutate({ action, body: { message: message.trim() } });
       return;
     }
 
@@ -296,9 +303,8 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     }
 
     if (!action.endpoint) return;
-    setPendingKey(action.key);
-    postActionMutation.mutate({ action });
-  }, [confirm, issueId, openIssue, postActionMutation, state]);
+    submitDialogAction(action);
+  }, [confirm, issueId, openIssue, state, submitDialogAction]);
 
   const all = useMemo<IssueActionView[]>(() => ISSUE_ACTIONS.map((action) => {
     const enabled = action.enabledWhen(state);
@@ -306,10 +312,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       action,
       enabled,
       disabledReason: enabled ? undefined : disabledReasonForAction(action),
-      isPending: pendingKey === action.key && postActionMutation.isPending,
+      isPending: isActionPending(action.key),
       invoke: () => { void runAction(action); },
     };
-  }), [pendingKey, postActionMutation.isPending, runAction, state]);
+  }), [isActionPending, runAction, state]);
 
   const layout = useMemo<IssueActionLayout>(() => {
     const byKey = new Map(all.map((view) => [view.action.key, view]));
@@ -334,5 +340,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     phase,
     activeDialog,
     closeDialog: () => setActiveDialog(null),
+    submitDialogAction,
+    isActionPending,
   };
 }

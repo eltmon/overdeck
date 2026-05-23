@@ -138,7 +138,7 @@ const hasWorkspace = (state: IssueActionState) => state.workspace?.exists === tr
 const hasLiveAgent = (state: IssueActionState) => !!state.agent && !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(state.agent.status);
 const hasStoppedAgent = (state: IssueActionState) => !hasLiveAgent(state);
 const hasResumableSession = (state: IssueActionState) => hasStoppedAgent(state) && state.lifecycle?.canResumeSession === true;
-const hasSelectedBead = (state: IssueActionState) => !!state.selectedBeadId;
+const canInspectBead = (state: IssueActionState) => state.hasBeads || !!state.selectedBeadId;
 const isPaused = (state: IssueActionState) => state.agent?.paused === true;
 const isTroubled = (state: IssueActionState) => state.agent?.troubled === true;
 const canonicalState = (state: IssueActionState) => normalizeCanonicalState(state.issueCanonicalState);
@@ -207,7 +207,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'donePlanning', label: 'Done planning', panVerb: 'plan finalize', endpoint: '/api/issues/:id/complete-planning', enabledWhen: canFinalizePlanning, phasePrimary: phasePrimary('donePlanning'), kind: 'safe', group: 'planning' },
   { key: 'startAgent', label: 'Start agent', panVerb: 'start', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: phasePrimary('startAgent'), kind: 'dialog', group: 'work' },
   { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
-  { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/issues/:id/swarm', enabledWhen: hasParallelizablePlan, phasePrimary: [], kind: 'dialog', group: 'work' },
+  { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/swarm', enabledWhen: hasParallelizablePlan, phasePrimary: [], kind: 'dialog', group: 'work' },
   { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
   { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
   { key: 'requestReview', label: 'Request review', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
@@ -221,7 +221,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'switchModel', label: 'Switch model', panVerb: null, endpoint: null, enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
-  { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: hasSelectedBead, phasePrimary: [], kind: 'dialog', group: 'review' },
+  { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: canInspectBead, phasePrimary: [], kind: 'dialog', group: 'review' },
   { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
   { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
   { key: 'wipe', label: 'Wipe', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
