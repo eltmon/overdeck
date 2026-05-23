@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionDetail } from '../SessionDetail';
 
@@ -25,7 +26,9 @@ vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => ({ request: rpcMocks.request }),
 }));
 
-const BASE_SESSION = {
+type Session = ComponentProps<typeof SessionDetail>['session'];
+
+const BASE_SESSION: Session = {
   id: 42,
   jsonlPath: '/fake/42.jsonl',
   workspacePath: '/home/user/Projects/alpha',
@@ -47,12 +50,22 @@ const BASE_SESSION = {
   panIssueId: null,
 };
 
+const ARCHIVED_SESSION: Session = {
+  ...BASE_SESSION,
+  id: 7,
+  source: 'managed-archived',
+  conversationName: 'archived session',
+  archivedAt: '2025-01-02T00:00:00Z',
+  panopticonManaged: true,
+  panIssueId: 'PAN-1391',
+};
+
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
 function renderDetail(
-  session: typeof BASE_SESSION,
+  session: Session,
   onClose = vi.fn(),
   fetchMock?: ReturnType<typeof vi.fn>,
 ) {
@@ -63,6 +76,7 @@ function renderDetail(
   vi.stubGlobal('fetch', mock);
   const client = makeClient();
   return {
+    client,
     mock,
     onClose,
     ...render(
@@ -216,5 +230,41 @@ describe('SessionDetail', () => {
   it('renders file path', () => {
     renderDetail(BASE_SESSION);
     expect(screen.getByText('/fake/42.jsonl')).toBeInTheDocument();
+  });
+
+  it('does not show Unarchive for discovered rows', () => {
+    renderDetail(BASE_SESSION);
+    expect(screen.queryByRole('button', { name: 'Unarchive' })).not.toBeInTheDocument();
+  });
+
+  it('shows an enabled Unarchive button for managed-archived rows', () => {
+    renderDetail(ARCHIVED_SESSION);
+    expect(screen.getByText('Archived at')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unarchive' })).toBeEnabled();
+    expect(screen.queryByText('Quick (L1)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Embed')).not.toBeInTheDocument();
+  });
+
+  it('posts to the unarchive endpoint and invalidates archived conversations on success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const { client } = renderDetail(ARCHIVED_SESSION, vi.fn(), fetchMock);
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unarchive' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/conversations/archived%20session/unarchive', {
+      method: 'POST',
+    }));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['archived-conversations'] }));
+    expect(screen.getByText('Conversation restored')).toBeInTheDocument();
+  });
+
+  it('shows an inline error and re-enables Unarchive after non-2xx responses', async () => {
+    renderDetail(ARCHIVED_SESSION, vi.fn(), vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unarchive' }));
+
+    await waitFor(() => expect(screen.getByText('Unarchive failed: 500')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Unarchive' })).toBeEnabled();
   });
 });
