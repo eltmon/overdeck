@@ -3095,6 +3095,10 @@
     "mtime": 1779511306.0738437,
     "hash": "ccc384b799d17e70dd9e237860d9c940"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/contextMenuFallback.test.ts": {
+    "mtime": 1779545271.067555,
+    "hash": "6f0359d1a3e4df86efb8a6464f5028d3"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/filePathDisplay.test.ts": {
     "mtime": 1779526198.1879041,
     "hash": "eef50c16948dd8ca442004699667f6ff"
@@ -3106,6 +3110,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/App.tsx": {
     "mtime": 1779511306.0576081,
     "hash": "3b5e4dadc96900bc81ace305a93ef93f"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/contextMenuFallback.ts": {
+    "mtime": 1779545252.472917,
+    "hash": "6eb9131c2f8777a832d01c8c4574dcf1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/App.test.tsx": {
     "mtime": 1779511306.0563753,
@@ -5160,8 +5168,8 @@
     "hash": "1ed1ef154e5cc24820a53619c16d396a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/read-workspace-file.ts": {
-    "mtime": 1779544533.8622427,
-    "hash": "fc3af2cf08110e5bb76e612b49ac14d0"
+    "mtime": 1779545000.7082787,
+    "hash": "4fec4fd2d0edcf5bb930c89ae40d5b1f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/issue-service-singleton.ts": {
     "mtime": 1779511306.0860825,
@@ -5256,8 +5264,8 @@
     "hash": "b0f361fc7f731061f80651175d78daec"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/__tests__/read-workspace-file.test.ts": {
-    "mtime": 1779544568.943449,
-    "hash": "9cc31c829a3148ffff1b3def564037e1"
+    "mtime": 1779545019.6649292,
+    "hash": "13711fcb99f7e2b275711f29451c35b5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts": {
     "mtime": 1779511306.0860825,
