@@ -1,0 +1,382 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:55:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1419: Dashboard header 'stopped' count includes actively-running agents",
+    "updated": "2026-05-23T11:50:10.613Z"
+  },
+  "plan": {
+    "id": "pan-1419",
+    "title": "Dashboard header 'stopped' count includes actively-running agents (state.status=running + live tmux session)",
+    "status": "proposed",
+    "uid": "b7fb4de9-c0e0-4e62-8e3d-4dc4a2d7991b",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:55:00.000Z",
+    "updated": "2026-05-23T11:50:10.613Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1419",
+        "label": "PAN-1419",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/454",
+        "label": "PAN-454 (related: orphaned agent recovery UI)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1416",
+        "label": "PAN-1416 (recent: workspace dashboard hijack)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "dashboard",
+      "topbar",
+      "agent-state",
+      "classification",
+      "drift"
+    ],
+    "narratives": {
+      "Problem": "The TopBar's StoppedAgentsBanner shows actively-running work agents (state.status=running + live tmux session) inside its 'Restart All' list. Clicking Restart All would kill agents mid-work. The list also conflates this with long-dead test/AC/PI/REVIEW/SHIP/SUB residue from prior testing, so users cannot tell genuinely-failed runs apart from orphaned debris. Root cause: AgentSnapshot (the WebSocket store contract) does not carry tmux liveness, so the banner's `lifecycle?.hasLiveTmuxSession` exclusion is a no-op for every store-fed agent — `a.lifecycle` is always undefined on snapshots delivered via /ws/rpc. Combined with stale `status: 'stopped'` values that never re-reconcile after a deacon reset (manual restart paths don't always emit a follow-up status_changed: 'running' event), running agents leak into the stopped surface.",
+      "Proposal": "Defense in depth across two layers. (1) Plumb tmux liveness into AgentSnapshot itself — add `hasLiveTmuxSession: boolean` to the schema, populate at bootstrap from `listRunningAgents()`, and emit a `status_changed` event from the deacon patrol whenever tmuxActive disagrees with the persisted state.status. This eliminates the snapshot.status drift class of bugs. (2) Replace the inline filter in StoppedAgentsBanner with a single classifier helper that returns one of `active | stopped | orphan_test`. Bucket-by-classifier so the same logic also drives a separate visual surface for orphaned-test residue (with a copy-to-clipboard `pan wipe` hint, no new destructive endpoint). Add a `pan doctor` check that detects the same misclassification at the CLI layer for offline diagnosis. Cover the classifier with mixed-state unit tests, and add a banner integration test for the bucketing rules."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plumb tmux liveness into AgentSnapshot rather than relying on continuous status reconciliation alone.",
+        "rationale": "`status` is a derived field that lies under drift; tmux liveness is the ground truth. Adding it to the snapshot makes correctness reachable without a separate reconciliation pipeline and matches how the REST endpoint already surfaces it for stopped agents."
+      },
+      {
+        "summary": "Orphan classification gated by ID prefix AND age threshold (>7d since lastActivity).",
+        "rationale": "Prefix-only would misclassify a future legitimate PAN-TEST-* issue. Age-only would miss recent test residue. The conjunction keeps the surface safe."
+      },
+      {
+        "summary": "Orphan-cleanup UI surfaces the existing `pan wipe <id>` command (copy-hint) rather than a new state-delete endpoint.",
+        "rationale": "Inventing new destructive HTTP endpoints exceeds bugfix scope; `pan wipe` is the canonical destructive reset and is documented. Keeps blast radius small."
+      },
+      {
+        "summary": "AgentSnapshot.hasLiveTmuxSession is Schema.optional(Schema.Boolean) with undefined treated as 'unknown'; classifier defaults to 'active' when status='running' and tmux unknown.",
+        "rationale": "Forward-compatible with older event streams and projection-cache rows. The asymmetric default keeps already-correct cases correct while shifting the burden of proof onto 'stopped' classifications."
+      },
+      {
+        "summary": "Deacon emits status_changed when tmuxActive contradicts persisted state.status; reuses existing notifyAgentStatusChanged wiring rather than introducing a new event type.",
+        "rationale": "Smaller surface area; preserves event-store invariants; the reducer already handles the payload shape."
+      },
+      {
+        "summary": "Banner integration tests live alongside StoppedAgentsBanner refactor in a single bead rather than a separate snapshot-test bead.",
+        "rationale": "Granularity rule about 'one snapshot test = one bead' applies to standalone visual snapshots; a render-level test that exercises the bucketing rule belongs with the component it asserts on."
+      },
+      {
+        "summary": "No separate root-cause-investigation bead.",
+        "rationale": "The issue body already isolates the symptom with verified examples; the planning session traced the bug to specific files/lines. Splitting investigation from the fix would not add reviewer value."
+      }
+    ],
+    "items": [
+      {
+        "id": "plumb-tmux-active-snapshot",
+        "title": "Add hasLiveTmuxSession to AgentSnapshot and keep it fresh from bootstrap + deacon patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:55:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1419",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "agent-classifier-helper",
+            "stopped-banner-uses-classifier",
+            "orphan-test-cleanup-surface"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the AgentSnapshot Effect Schema in packages/contracts/src/types.ts to include `hasLiveTmuxSession: Schema.optional(Schema.Boolean)`. Populate this field at read-model bootstrap from `listRunningAgents()`'s `tmuxActive` (both fast/cache and slow paths in src/dashboard/server/read-model.ts). Update buildAgentStatusChangedPayload in src/dashboard/server/main.ts to include `hasLiveTmuxSession` (sourced from the deacon's tmux check at notification time). Extend the agent.status_changed reducer in packages/contracts/src/event-reducers.ts to fold the new field into the snapshot. In the deacon patrol (src/lib/cloister/deacon.ts: recoverOrphanedAgents and its sibling resume scan), emit a status_changed event whenever observed tmuxActive disagrees with the last-known snapshot status — including the contrapositive of the existing orphan path (state.status='stopped' but tmux now alive → emit running). Update every test fixture that constructs AgentSnapshot literals to keep the suite green."
+        },
+        "subItems": [
+          {
+            "id": "plumb-tmux-active-snapshot.ac1",
+            "title": "AgentSnapshot Effect Schema exposes `hasLiveTmuxSession?: boolean`; type-check passes across packages/contracts and all consumers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plumb-tmux-active-snapshot.ac2",
+            "title": "Read-model bootstrap (both projection-cache fast path and slow path) sets `hasLiveTmuxSession` for every agent it inserts into agentsById, sourced from listRunningAgents().tmuxActive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plumb-tmux-active-snapshot.ac3",
+            "title": "The agent.status_changed event payload carries `hasLiveTmuxSession`, and the reducer folds it into the snapshot without overwriting other fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plumb-tmux-active-snapshot.ac4",
+            "title": "Deacon emits status_changed when its patrol observes a tmuxActive transition that contradicts the snapshot's status (covers both stopped→running revive and the existing running→stopped orphan path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plumb-tmux-active-snapshot.ac5",
+            "title": "All existing AgentSnapshot fixture literals in vitest suites compile and the full suite passes (`npm test` clean)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-classifier-helper",
+        "title": "Frontend classifier returns active | stopped | orphan_test for every agent, with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1419",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stopped-banner-uses-classifier",
+            "orphan-test-cleanup-surface"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/agent-classifier.ts that exports `classifyDashboardAgent(agent): 'active' | 'stopped' | 'orphan_test'`. Rules: (1) if `agent.hasLiveTmuxSession === true` → 'active' (overrides any stale status); (2) if `agent.status === 'running' || agent.status === 'starting'` → 'active' (tmux-undefined fallback); (3) if `agent.issueId` matches the orphan-prefix regex `/^PAN-(AC|PI(-PROMPT)?|TEST|REVIEW|SHIP|SUB(REVIEW|SIGNAL)?)-?\\d*$/` AND lastActivity/startedAt older than 7d → 'orphan_test'; (4) otherwise → 'stopped'. Export the orphan-prefix regex and the age threshold as named constants so they can be reused by pan doctor. Co-locate Vitest unit tests in src/dashboard/frontend/src/lib/__tests__/agent-classifier.test.ts covering every mixed-state combination from the issue body (running+tmux, stopped+tmux, stopped+no-tmux+recent, stopped+no-tmux+old+orphan-prefix, etc.)."
+        },
+        "subItems": [
+          {
+            "id": "agent-classifier-helper.ac1",
+            "title": "`classifyDashboardAgent` returns 'active' whenever hasLiveTmuxSession===true, regardless of status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-classifier-helper.ac2",
+            "title": "`classifyDashboardAgent` returns 'orphan_test' only when BOTH the prefix matches AND the age exceeds 7d",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-classifier-helper.ac3",
+            "title": "`classifyDashboardAgent` returns 'stopped' for pipeline-role agents with status='stopped', tmux dead, and recent activity (the genuinely-failed-recently case)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-classifier-helper.ac4",
+            "title": "Unit tests cover all five named cases from the issue body (PAN-1370 running+tmux; PAN-AC22 orphan; PAN-TEST-1 orphan; recently-stopped pipeline agent; ambiguous tmux-unknown running)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-classifier-helper.ac5",
+            "title": "ORPHAN_PREFIX_PATTERN and ORPHAN_AGE_THRESHOLD_MS are named exports reused by the pan doctor check (no duplicate regex)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stopped-banner-uses-classifier",
+        "title": "Refactor StoppedAgentsBanner to use the classifier; running-with-tmux agents never appear",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1419",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Rewrite the filter chain in src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx to call `classifyDashboardAgent(a)` and keep only agents whose bucket is 'stopped'. Remove the now-redundant inline `lifecycle?.hasLiveTmuxSession` check (the classifier owns that rule). Keep the existing exclusions for completed/done resolutions and the 7-day recency window; they remain valid for the 'stopped' bucket. Add a render-level Vitest in src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx that feeds the store a mixed fixture (running+tmux, stopped+tmux, stopped+no-tmux+recent, orphan-prefix+old) and asserts the banner's count, ID list, and that Restart All is wired only to genuinely-stopped IDs."
+        },
+        "subItems": [
+          {
+            "id": "stopped-banner-uses-classifier.ac1",
+            "title": "StoppedAgentsBanner.tsx's filter delegates to classifyDashboardAgent and keeps only the 'stopped' bucket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-banner-uses-classifier.ac2",
+            "title": "An agent with state.status='running' and hasLiveTmuxSession=true NEVER appears in the banner's count or ID list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-banner-uses-classifier.ac3",
+            "title": "The banner's Restart All button only iterates IDs whose classifier bucket is 'stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-banner-uses-classifier.ac4",
+            "title": "Render-level integration test asserts correct count and IDs for the mixed fixture (uses the same fixture shape as the classifier unit tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orphan-test-cleanup-surface",
+        "title": "Separate visual surface for orphan_test agents with copy-to-clipboard pan wipe hint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1419",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add a new low-prominence surface (collapsed by default, expandable) below or beside the StoppedAgentsBanner that lists agents whose classifier bucket is 'orphan_test'. The visual treatment must be visually distinct from the warning-toned stopped banner (e.g. muted/secondary). Each entry shows the issueId and a 'Copy `pan wipe <id>`' button that puts the literal command on the clipboard. No new destructive HTTP endpoint — the action is informational. Add a brief inline note explaining these are residue from prior test runs and cleanup is manual via pan wipe. Mount the new surface in the same parent that today renders StoppedAgentsBanner (likely the dashboard shell or TopBar wrapper)."
+        },
+        "subItems": [
+          {
+            "id": "orphan-test-cleanup-surface.ac1",
+            "title": "A new component lists orphan_test agents with visual treatment distinct from the warning-toned stopped banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-test-cleanup-surface.ac2",
+            "title": "Each row has a 'Copy `pan wipe <id>`' button that writes the literal command to the clipboard; clicking does NOT issue any HTTP request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-test-cleanup-surface.ac3",
+            "title": "The orphan surface is hidden when no orphan_test agents are present (no empty-state chrome)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-test-cleanup-surface.ac4",
+            "title": "Render-level test verifies the new component appears for the PAN-AC22 / PAN-TEST-1 fixture rows and does not appear for genuinely-stopped pipeline agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-doctor-misclassification-check",
+        "title": "pan doctor reports stopped-list misclassification when state files and tmux disagree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1419",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add a new check in src/cli/commands/doctor.ts that walks ~/.panopticon/agents/*/state.json, intersects with the live tmux agent session list (via getAgentSessions / getAgentSessionsSync), and applies the same classification rule used by classifyDashboardAgent (reusing the ORPHAN_PREFIX_PATTERN and ORPHAN_AGE_THRESHOLD_MS exports). For each agent whose state.status === 'running' AND tmux is alive, the doctor verifies that the dashboard's /api/agents response would classify it 'active' (not 'stopped'). On disagreement, emit a `warn` CheckResult naming the agent and the recommended remediation. The check must run in the existing doctor pipeline — wire it into the same checks array that runs alongside the others."
+        },
+        "subItems": [
+          {
+            "id": "pan-doctor-misclassification-check.ac1",
+            "title": "`pan doctor` runs the new check by default (no opt-in flag) and reports `ok` when no misclassification is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-misclassification-check.ac2",
+            "title": "When an agent has state.status='running' + live tmux but the dashboard's /api/agents would classify it 'stopped', the check emits a `warn` (or `fail`) CheckResult naming the agent IDs and pointing at PAN-1419",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-misclassification-check.ac3",
+            "title": "The check shares the orphan classifier exports (no duplicated prefix regex or age threshold)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-misclassification-check.ac4",
+            "title": "Vitest covers two scenarios: clean (no drift → ok) and dirty (one running+tmux agent missing from active → warn)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "plumb-tmux-active-snapshot",
+        "to": "agent-classifier-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-classifier-helper",
+        "to": "stopped-banner-uses-classifier",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-classifier-helper",
+        "to": "orphan-test-cleanup-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-classifier-helper",
+        "to": "pan-doctor-misclassification-check",
+        "type": "blocks"
+      },
+      {
+        "from": "stopped-banner-uses-classifier",
+        "to": "orphan-test-cleanup-surface",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1419-dashboard-header-stopped-count-includes-actively-running-agents-state-status-running-live-tmux-session.vbrief.json"
+    }
+  }
+}

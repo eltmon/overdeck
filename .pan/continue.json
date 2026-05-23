@@ -1,0 +1,82 @@
+{
+  "version": "1",
+  "issueId": "PAN-1419",
+  "created": "2026-05-23T11:38:38.347Z",
+  "updated": "2026-05-23T11:55:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1419",
+    "sha": "20624bbbf",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Root cause: AgentSnapshot (the WebSocket store contract) does not carry tmux liveness, so the StoppedAgentsBanner's `lifecycle?.hasLiveTmuxSession` exclusion is a no-op for all store-fed agents. Combined with stale `status: 'stopped'` values that never get re-reconciled after a deacon reset, actively-running agents leak into the stopped-banner list.",
+      "recordedAt": "2026-05-23T11:55:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Fix uses defense-in-depth: (a) add `hasLiveTmuxSession: boolean` to AgentSnapshot schema and keep it fresh via deacon-patrol delta events; (b) replace the inline filter in StoppedAgentsBanner with a single classifier helper (`active | stopped | orphan_test`) that consults tmux liveness directly. Either layer alone leaves residual drift; together they make misclassification unreachable.",
+      "recordedAt": "2026-05-23T11:55:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Orphan classification (PAN-AC*, PAN-PI*, PAN-TEST*, PAN-REVIEW-*, PAN-SHIP-*, PAN-SUB*) is gated by BOTH an ID-prefix match AND an age threshold (lastActivity/startedAt older than 7d) to avoid false positives on legitimate issues that happen to share a prefix.",
+      "recordedAt": "2026-05-23T11:55:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Orphan-cleanup UI surfaces the recommended `pan wipe <id>` command (copy-to-clipboard / inline tip), not a new destructive HTTP endpoint. Inventing a new state-only-delete endpoint is out of scope for a bugfix; pan wipe is documented and reversible-by-not-confirming.",
+      "recordedAt": "2026-05-23T11:55:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Deacon emits `agent.status_changed` (with the existing payload shape) whenever its 60s patrol observes a tmuxActive transition that disagrees with the snapshot's last-known status. Reuses the existing notifier wiring; no new event type required.",
+      "recordedAt": "2026-05-23T11:55:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "AgentSnapshot's new `hasLiveTmuxSession` field is Schema.optional(Schema.Boolean) for forward compatibility with older event streams and projection-cache rows. The classifier treats `undefined` as `false` only when `status === 'stopped'`; when `status === 'running'` and tmux is unknown, the agent is classified `active` (trust the freshly-bootstrapped status)."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "AgentSnapshot schema change is cross-cutting — projection cache rows, ws-rpc replay, and any test fixture that constructs AgentSnapshot literals must tolerate the new optional field.",
+      "mitigation": "Field is Schema.optional. Add fixture-update sweep as part of the plumb bead; run the full vitest suite before signaling done."
+    },
+    {
+      "id": "H2",
+      "summary": "Emitting `agent.status_changed` on every tmux flip could become noisy under churn (e.g. flapping panes during shutdown).",
+      "mitigation": "Only emit when (a) the new tmuxActive disagrees with the persisted state.status AND (b) the previous patrol observed a different value. Reuse `notifyAgentStatusChanged` debounce semantics."
+    },
+    {
+      "id": "H3",
+      "summary": "Orphan ID-prefix matching could misclassify a real issue (e.g. a future PAN-TEST-99 ticket).",
+      "mitigation": "Require BOTH the prefix match AND an age threshold (>7d since lastActivity OR startedAt). Document the prefix list in code with a comment pointing to PAN-1419."
+    },
+    {
+      "id": "H4",
+      "summary": "The frontend classifier returning 'active' for any agent with `hasLiveTmuxSession === true` could hide genuinely-failed agents whose tmux pane stayed alive after the harness died.",
+      "mitigation": "The classifier already considers `lifecycle.isCrashed` paths via the existing banner filter chain; the tmux-alive override applies only to the running-vs-stopped axis, not to the crashed-vs-healthy axis. Banner integration tests must include the 'tmux alive but process dead' fixture."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T11:38:38.347Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1419",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-23T11:55:00.000Z",
+      "reason": "planning",
+      "note": "Discovery complete: traced bug to missing tmux-liveness on AgentSnapshot and stale snapshot.status drift. Plan finalized with 5 beads (1 schema/plumbing foundation, 1 classifier foundation, 3 leaf beads).",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
