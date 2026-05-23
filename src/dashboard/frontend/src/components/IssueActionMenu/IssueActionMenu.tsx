@@ -16,7 +16,19 @@ export interface IssueActionMenuProps {
   mode: IssueActionMenuMode;
   pinRight?: IssueActionKey[];
   className?: string;
+  agentScopeOnly?: boolean;
 }
+
+const AGENT_SCOPE_ACTION_KEYS = new Set<IssueActionKey>([
+  'tell',
+  'stopAgent',
+  'pause',
+  'unpause',
+  'untroubled',
+  'recoverAgent',
+  'resumeSession',
+  'switchModel',
+]);
 
 function actionButtonClass(view: IssueActionView, inline: boolean) {
   const base = inline
@@ -145,17 +157,22 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
   );
 }
 
-export function IssueActionMenu({ issueId, mode, pinRight = [], className }: IssueActionMenuProps) {
+export function IssueActionMenu({ issueId, mode, pinRight = [], className, agentScopeOnly = false }: IssueActionMenuProps) {
   const actions = useIssueActions(issueId);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreOverflowFocus = () => overflowTriggerRef.current?.focus();
   const pinSet = useMemo(() => new Set(pinRight), [pinRight]);
+  const inScope = (view: IssueActionView) => !agentScopeOnly || AGENT_SCOPE_ACTION_KEYS.has(view.action.key);
+  const scopedAll = actions.all.filter(inScope);
+  const scopedPrimary = actions.primary.filter(inScope);
+  const scopedSecondary = actions.secondary.filter(inScope);
+  const scopedOverflow = actions.overflow.filter(inScope);
   const pinned = pinRight
-    .map((key) => actions.all.find((view) => view.action.key === key))
+    .map((key) => scopedAll.find((view) => view.action.key === key))
     .filter((view): view is IssueActionView => !!view);
-  const primary = actions.primary.filter((view) => !pinSet.has(view.action.key));
-  const hybridOverflow = [...actions.secondary, ...actions.overflow].filter((view) => !pinSet.has(view.action.key));
-  const overflowOnly = actions.all.filter((view) => !pinSet.has(view.action.key));
+  const primary = scopedPrimary.filter((view) => !pinSet.has(view.action.key));
+  const hybridOverflow = [...scopedSecondary, ...scopedOverflow].filter((view) => !pinSet.has(view.action.key));
+  const overflowOnly = scopedAll.filter((view) => !pinSet.has(view.action.key));
 
   return (
     <div data-testid="issue-action-menu" className={className ?? 'flex items-center gap-1'}>

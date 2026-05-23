@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DialogProvider } from '../DialogProvider';
@@ -109,6 +109,33 @@ describe('IssueActionMenu', () => {
 
     expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
+  });
+
+  it('renders only agent-control actions when agentScopeOnly is enabled', () => {
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running', paused: true, troubled: true }) });
+
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" agentScopeOnly />);
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+
+    const menu = screen.getByTestId('issue-action-overflow-menu');
+    expect(screen.getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
+    expect(screen.getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
+    expect(screen.getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
+    expect(screen.getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');
+    expect(screen.getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
+    expect(screen.getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
+    expect(screen.getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
+    expect(screen.getByTestId('issue-action-switchModel')).toHaveTextContent('Switch model');
+    expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-swarm')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-inspectBead')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });
 
   it('renders hybrid primary actions plus overflow actions', () => {
