@@ -641,7 +641,9 @@ describe('dispatch failure reviewStatus regression', () => {
     const requestReviewBlock = requestReviewMatch![0];
 
     expect(requestReviewBlock).toContain('yield* runVerificationForIssue(');
+    expect(requestReviewBlock).toContain('yield* getWorkspaceGitInfo(workspacePath)');
     expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
