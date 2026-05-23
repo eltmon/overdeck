@@ -46,7 +46,7 @@ import { createConnection } from 'node:net';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
 
@@ -118,6 +118,7 @@ import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enric
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { generateDailySummary } from '../../../lib/memory/cli.js';
+import { getWorkspacePathForIssue } from '../workspace-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -179,25 +180,6 @@ function setCachedProbe(key: string, result: { healthy: boolean; reason?: string
   pruneProbeCache(now);
   probeCache.set(key, { result, cachedAt: now });
   pruneProbeCache(now);
-}
-
-export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
-  const parsed = parseIssueIdSync(rawIssueId);
-  if (!parsed) {
-    throw new Error('Invalid issue ID');
-  }
-
-  const workspaceRoot = resolve(join(projectPath, 'workspaces'));
-  const workspacePath = resolve(join(workspaceRoot, `feature-${parsed.normalized}`));
-
-  if (workspacePath !== workspaceRoot && !workspacePath.startsWith(`${workspaceRoot}${sep}`)) {
-    throw new Error('Invalid workspace path');
-  }
-
-  return {
-    parsedIssueId: parsed.raw,
-    workspacePath,
-  };
 }
 
 async function readWorkspacePlanningMarkdown(
@@ -3180,7 +3162,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         const localPath = workspaceInfo.localPath;
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(localPath));
+          const gitInfo = yield* getWorkspaceGitInfo(localPath);
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
           }
@@ -3224,7 +3206,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           const { cleanupReviewTempStash } = yield* Effect.promise(() =>
             import('../../../lib/cloister/review-agent.js')
           );
-          yield* Effect.promise(() => cleanupReviewTempStash(issueId, wsInfo.localPath!));
+          yield* cleanupReviewTempStash(issueId, wsInfo.localPath!);
         }
       } catch (err) {
         console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);
@@ -3901,7 +3883,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (!workspaceInfo.isRemote) {
       try {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
-        const commitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
+        const commitInfo = yield* getWorkspaceGitInfo(workspacePath);
         requestReviewCommits = { HEAD: commitInfo.HEAD, branch: commitInfo.branch };
       } catch {}
     }

@@ -101,6 +101,11 @@ export interface SettingsConfig {
   roles?: RolesConfig;
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
+  agents?: {
+    rtk?: {
+      enabled?: boolean;
+    };
+  };
   memory?: MemorySettingsConfig;
   openrouter?: {
     favorites?: string[];
@@ -130,8 +135,10 @@ export interface SettingsConfig {
     };
   };
   experimental?: {
-    /** Use Claude Code Channels (research-preview) for prompt delivery to eligible work agents. */
+    /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
+    /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
+    claudeCodeChannelsMcp?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.

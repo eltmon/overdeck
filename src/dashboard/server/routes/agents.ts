@@ -77,6 +77,7 @@ import {
   saveSessionId,
   getSessionId,
   getLatestSessionId,
+  recoverAgent,
   resumeAgent,
   restartAgent,
   messageAgent,
@@ -1847,6 +1848,69 @@ const postAgentResumeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/agents/:id/recover ──────────────────────────────────────
+
+const postAgentRecoverRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/recover',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
+    const { model } = body as { model?: string };
+    let recoveryModel: string | undefined;
+    try {
+      recoveryModel = normalizeModelOverrideSync(model);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
+
+    const stateBeforeRecover = yield* getAgentState(id);
+    if (!stateBeforeRecover) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_requested', {
+      model: recoveryModel || undefined,
+    }));
+
+    const result = yield* Effect.promise(() => recoverAgent(id, recoveryModel ? { modelOverride: recoveryModel } : undefined));
+    if (!result) {
+      const error = `Could not recover agent ${id}`;
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_failed', { error }));
+      return jsonResponse({ success: false, error }, { status: 400 });
+    }
+
+    const updatedState = yield* getAgentState(id);
+    if (updatedState) {
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.started',
+        timestamp: new Date().toISOString(),
+        payload: {
+          agentId: id,
+          issueId: updatedState.issueId || stateBeforeRecover.issueId || id.replace('agent-', '').toUpperCase(),
+          recovered: true,
+          agent: {
+            id,
+            issueId: updatedState.issueId || stateBeforeRecover.issueId,
+            workspace: updatedState.workspace,
+            model: updatedState.model,
+            status: 'running',
+            startedAt: updatedState.startedAt,
+            lastActivity: updatedState.lastActivity,
+            role: updatedState.role ?? 'work',
+          },
+        },
+      })));
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_succeeded'));
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, recovered: true, agent: updatedState ?? null });
+  })),
+);
+
 // ─── Route: POST /api/agents/:id/restart ──────────────────────────────────────
 //
 // Restart an agent with optional model override. Graceful mode sends a 30s
@@ -3560,6 +3624,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentUnpauseRoute,
   postAgentUntroubledRoute,
   postAgentResumeRoute,
+  postAgentRecoverRoute,
   postAgentRestartRoute,
   getAgentCloisterHealthRoute,
   getAgentHandoffSuggestionRoute,

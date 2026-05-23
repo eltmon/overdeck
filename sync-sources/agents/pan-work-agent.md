@@ -4,34 +4,6 @@ description: Autonomous Panopticon implementation agent — claims beads, writes
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
-hooks:
-  PreToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
-    - matcher: "Read"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/tldr-read-enforcer"
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-    - matcher: "Edit|Write"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/tldr-post-edit"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Work Agent

@@ -12,6 +12,7 @@ import PhaseHeader from '../primitives/PhaseHeader';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import TopBar from '../primitives/TopBar';
 import VerbBadge from '../primitives/VerbBadge';
+import { IssueActionMenu } from '../IssueActionMenu';
 
 const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'verifying', 'work', 'plan', 'todo'];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
@@ -182,6 +183,44 @@ type PipelineViewProps = {
   onSearchOpen?: () => void;
   onTabChange?: (tab: string) => void;
 };
+
+type PipelineIssueRowProps = {
+  issue: Issue;
+  phase: PipelineIssuePhase;
+  agent?: Agent;
+  costEvents?: CostEvent[];
+  now: Date;
+  onOpen: (issueId: string) => void;
+};
+
+function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: PipelineIssueRowProps) {
+  const [openSignal, setOpenSignal] = useState(0);
+  const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
+  const ledger = {
+    runtime: agent?.startedAt
+      ? formatDuration(now.getTime() - new Date(agent.startedAt).getTime())
+      : undefined,
+    cost: costSum > 0 ? formatCost(costSum) : undefined,
+  };
+
+  return (
+    <IssueRow
+      issueId={issue.identifier}
+      phase={phase}
+      priority={priorityForIssue(issue.priority)}
+      title={issue.title}
+      project={issue.project ? { name: issue.project.name } : undefined}
+      labels={issue.labels.slice(0, 3)}
+      verbBadge={verbBadgeForPhase(phase)}
+      agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
+      ledger={ledger}
+      assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
+      onOpen={onOpen}
+      onContextMenu={() => setOpenSignal((value) => value + 1)}
+      actionMenu={<IssueActionMenu issueId={issue.identifier} mode="overflow-only" className="inline-flex" openSignal={openSignal} />}
+    />
+  );
+}
 
 export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
@@ -486,33 +525,17 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
             data-phase={phase}
           >
             <PhaseHeader phase={phase} count={groupedIssues[phase].length} />
-            {groupedIssues[phase].map((issue) => {
-              const agent = agentByIssueId.get(issue.identifier.toLowerCase());
-              const costEvents = eventsByIssue[issue.identifier];
-              const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
-              const ledger = {
-                runtime: agent?.startedAt
-                  ? formatDuration(now.getTime() - new Date(agent.startedAt).getTime())
-                  : undefined,
-                cost: costSum > 0 ? formatCost(costSum) : undefined,
-              };
-              return (
-                <IssueRow
-                  key={issue.identifier}
-                  issueId={issue.identifier}
-                  phase={phase}
-                  priority={priorityForIssue(issue.priority)}
-                  title={issue.title}
-                  project={issue.project ? { name: issue.project.name } : undefined}
-                  labels={issue.labels.slice(0, 3)}
-                  verbBadge={verbBadgeForPhase(phase)}
-                  agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
-                  ledger={ledger}
-                  assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
-                  onOpen={(id) => { savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0; openIssue(id); }}
-                />
-              );
-            })}
+            {groupedIssues[phase].map((issue) => (
+              <PipelineIssueRow
+                key={issue.identifier}
+                issue={issue}
+                phase={phase}
+                agent={agentByIssueId.get(issue.identifier.toLowerCase())}
+                costEvents={eventsByIssue[issue.identifier]}
+                now={now}
+                onOpen={(id) => { savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0; openIssue(id); }}
+              />
+            ))}
           </section>
         ))}
         <div className="h-[72px]" data-component="pipeline-footer-empty" />

@@ -273,6 +273,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
     try {
       mkdirSync(workspacePath, { recursive: true });
+      mkdirSync(join(projectPath, '.venv'), { recursive: true });
       mkdirSync(agentStateDir, { recursive: true });
       mkdirSync(planningStateDir, { recursive: true });
       await writeSpecForIssue(projectPath, {
@@ -321,6 +322,11 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(tmuxMocks.killSession).not.toHaveBeenCalledWith('unrelated-session');
 
       const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
+      const tldrDiffIndex = commands.findIndex(command => command === 'git diff --name-only HEAD~1 HEAD');
+      const graphifyRefreshIndex = commands.findIndex(command => command === 'which graphify');
+      expect(tldrDiffIndex).toBeGreaterThanOrEqual(0);
+      expect(graphifyRefreshIndex).toBeGreaterThanOrEqual(0);
+      expect(tldrDiffIndex).toBeLessThan(graphifyRefreshIndex);
       expect(commands.some(command => command.includes('--add-label') && command.includes('verifying-on-main'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label') && command.includes('in-review'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label') && command.includes('in-progress'))).toBe(true);

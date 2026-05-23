@@ -107,7 +107,8 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         rollupPendingThreshold: 4,
         sidebarRefreshIntervalMs: 10000,
       },
-      experimental: { claudeCodeChannels: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
+      rtk: { enabled: false },
       claude: { permissionMode: 'auto' },
       tts: {
         enabled: false,
@@ -450,6 +451,25 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('dashscope: dashscope-test-key');
   });
 
+  it('persists RTK agent settings without removing existing agent settings', async () => {
+    mockReadFile.mockResolvedValue('agents:\n  caveman:\n    enabled: true\n');
+    mockLoadConfig.mockReturnValue(baseConfig({ rtk: { enabled: true } }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.agents?.rtk?.enabled).toBe(true);
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      agents: { rtk: { enabled: false } },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('caveman:');
+    expect(written).toContain('rtk:');
+    expect(written).toContain('enabled: false');
+  });
+
   it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -608,6 +628,21 @@ describe('validateSettingsApi', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Unknown tts setting(s): daemonPort');
+  });
+
+  it('rejects invalid experimental flag types', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      experimental: {
+        claudeCodeChannels: 'yes',
+        claudeCodeChannelsMcp: 'yes',
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('experimental.claudeCodeChannels must be a boolean');
+    expect(result.errors).toContain('experimental.claudeCodeChannelsMcp must be a boolean');
   });
 
   it('rejects invalid tts field types', async () => {

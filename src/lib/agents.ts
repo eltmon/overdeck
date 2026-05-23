@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR } from './paths.js';
+import { AGENTS_DIR, packageRoot } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, getAgentSessionsSync, getAgentSessions, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -15,7 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -33,6 +33,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
+import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
 import { canUseHarnessSync } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
@@ -587,12 +588,14 @@ export interface AgentState {
    * sendKeysAsync. Absent or false means tmux-only delivery (current default).
    */
   channelsEnabled?: boolean;
+  /** True when this work agent was launched through the PTY supervisor wrapper. */
+  supervisorEnabled?: boolean;
   /**
-   * Delivery method for agent messages. 'auto' tries channels then falls back
-   * to tmux; 'channels' is strict (throws on failure); 'tmux' bypasses
-   * channels entirely. When absent, resolved from global settings.
+   * Delivery method for agent messages. 'auto' tries supervisor, then channels,
+   * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
+   * bypasses socket transports entirely.
    */
-  deliveryMethod?: 'auto' | 'channels' | 'tmux';
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
 
   /**
    * Short HEAD sha (8 chars) of the workspace at the moment this role run was
@@ -653,6 +656,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
     roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
+    supervisorEnabled: raw.supervisorEnabled,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,
@@ -968,7 +972,7 @@ export function isAgentTroubled(agentId: string): boolean {
 /** Update just the delivery method on an agent's state file. */
 export async function setAgentDeliveryMethod(
   agentId: string,
-  deliveryMethod: 'auto' | 'channels' | 'tmux',
+  deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
   const state = await Effect.runPromise(getAgentState(agentId));
   if (!state) return;
@@ -979,8 +983,12 @@ export async function setAgentDeliveryMethod(
 /**
  * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
  */
-function panopticonHomeForChannels(): string {
+function panopticonHomeForSockets(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+function panopticonHomeForChannels(): string {
+  return panopticonHomeForSockets();
 }
 
 /**
@@ -988,10 +996,16 @@ function panopticonHomeForChannels(): string {
  */
 async function appendChannelDeliveryLog(
   agentId: string,
-  entry: { path: 'channel' | 'tmux'; reason?: string; caller?: string },
+  entry: {
+    path: 'supervisor' | 'channel' | 'tmux';
+    reason?: string;
+    caller?: string;
+    'pty-supervisor'?: string;
+    channels?: string;
+  },
 ): Promise<void> {
   try {
-    const home = panopticonHomeForChannels();
+    const home = panopticonHomeForSockets();
     const dir = join(home, 'logs');
     await (await import('fs/promises')).mkdir(dir, { recursive: true });
     const line = JSON.stringify({
@@ -1021,7 +1035,8 @@ async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
   timeoutMs: number,
-  bridgeToken: string,
+  token: string,
+  tokenHeader: string = BRIDGE_TOKEN_HEADER,
 ): Promise<{ status: number; body: string }> {
   const payload = JSON.stringify(body);
 
@@ -1054,7 +1069,7 @@ async function postUnixSocketJson(
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
-          [BRIDGE_TOKEN_HEADER]: bridgeToken,
+          [tokenHeader]: token,
         },
       },
       (res) => {
@@ -1086,34 +1101,34 @@ async function postUnixSocketJson(
 }
 
 /**
- * Single delivery primitive for orchestrator-to-work-agent messages. When the
- * target agent has channelsEnabled set in its state.json AND the per-agent
- * bridge socket exists AND the POST returns 200, the message goes through the
- * bridge and tmux is not involved. In every other case (flag off, state file
- * missing, socket missing, socket POST failure for any reason) the call falls
- * back to sendKeysAsync — the user-visible behaviour is identical to today's
- * tmux-only delivery. Internal callers that today reach for sendKeysAsync to
- * talk to a work agent should call this primitive instead so the eligibility
- * and fallback policy live in one place.
+ * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
+ * tries the PTY supervisor socket, then legacy Channels MCP, then tmux. Explicit
+ * socket methods are strict and throw instead of falling back.
  */
 export async function deliverAgentMessage(
   agentId: string,
   message: string,
   caller: string = 'unknown',
-  deliveryMethod?: 'auto' | 'channels' | 'tmux',
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
 
-  // Resolve delivery method.
+  let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
   if (!resolvedMethod) {
-    let channelsEnabled = false;
     try {
       const state = await Effect.runPromise(getAgentState(normalizedId));
       channelsEnabled = Boolean(state?.channelsEnabled);
-      resolvedMethod = state?.deliveryMethod ?? (channelsEnabled ? 'auto' : 'tmux');
+      resolvedMethod = state?.deliveryMethod ?? 'auto';
     } catch {
-      resolvedMethod = 'tmux';
+      resolvedMethod = 'auto';
+    }
+  } else if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
+    try {
+      const state = await Effect.runPromise(getAgentState(normalizedId));
+      channelsEnabled = Boolean(state?.channelsEnabled);
+    } catch {
+      channelsEnabled = false;
     }
   }
 
@@ -1122,64 +1137,84 @@ export async function deliverAgentMessage(
     return;
   }
 
-  // resolvedMethod is 'auto' or 'channels' — attempt channels delivery.
-  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
-  if (!existsSync(socketPath)) {
-    const errMsg = `Channels socket missing for ${normalizedId} (${caller})`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+  let supervisorFailure: string | undefined;
+  if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
+    const supervisorSocketPath = join(panopticonHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
+    const ptyToken = await readPtyToken(normalizedId);
+    if (!existsSync(supervisorSocketPath)) {
+      supervisorFailure = 'socket-missing';
+    } else if (!ptyToken) {
+      supervisorFailure = 'pty-token-missing';
+    } else {
+      try {
+        await postUnixSocketJson(
+          supervisorSocketPath,
+          { content: message, meta: { caller } },
+          2000,
+          ptyToken,
+          PTY_TOKEN_HEADER,
+        );
+        await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
+        return;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        supervisorFailure = `socket-post-failed: ${reason}`;
+      }
     }
-    // auto mode: log visibly and fallback
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
+
+    if (resolvedMethod === 'supervisor') {
+      throw new Error(`MessageDeliveryFailed: PTY supervisor delivery failed for ${normalizedId} (${caller}): ${supervisorFailure}`);
+    }
+  }
+
+  if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
+    let channelFailure: string | undefined;
+    const socketPath = join(panopticonHomeForSockets(), 'sockets', `agent-${normalizedId}.sock`);
+    if (!channelsEnabled) {
+      channelFailure = 'channels-disabled';
+    } else if (!existsSync(socketPath)) {
+      channelFailure = 'socket-missing';
+    } else {
+      const bridgeToken = readBridgeTokenSync(normalizedId);
+      if (!bridgeToken) {
+        channelFailure = 'bridge-token-missing';
+      } else {
+        try {
+          await postUnixSocketJson(
+            socketPath,
+            { content: message, meta: { caller } },
+            2000,
+            bridgeToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, {
+            path: 'channel',
+            caller,
+            ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
+          });
+          return;
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          channelFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+    }
+
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: Channels delivery failed for ${normalizedId} (${caller}): ${channelFailure}`);
+    }
+
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
-      reason: 'socket-missing',
+      reason: channelFailure,
       caller,
+      ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
+      ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await Effect.runPromise(sendKeys(normalizedId, message));
     return;
   }
 
-  const bridgeToken = readBridgeTokenSync(normalizedId);
-  if (!bridgeToken) {
-    const errMsg = `Channels bridge token missing for ${normalizedId} (${caller})`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
-    }
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
-    await appendChannelDeliveryLog(normalizedId, {
-      path: 'tmux',
-      reason: 'bridge-token-missing',
-      caller,
-    });
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
-  }
-
-  try {
-    await postUnixSocketJson(
-      socketPath,
-      { content: message, meta: { caller } },
-      2000,
-      bridgeToken,
-    );
-    await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
-    return;
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    const errMsg = `Channels socket post failed for ${normalizedId} (${caller}): ${reason}`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
-    }
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
-    await appendChannelDeliveryLog(normalizedId, {
-      path: 'tmux',
-      reason: `socket-post-failed: ${reason}`,
-      caller,
-    });
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
-  }
+  await Effect.runPromise(sendKeys(normalizedId, message));
 }
 
 export async function deliverAgentPermissionDecision(
@@ -1237,12 +1272,105 @@ interface ChannelsDecision {
   reason?: string;
 }
 
+interface SupervisorDecision {
+  eligible: boolean;
+  reason?: string;
+}
+
+export function decideSupervisorForWorkAgent(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): SupervisorDecision {
+  void options;
+  const log = (eligible: boolean, reason?: string): void => {
+    const tag = eligible ? 'supervisor:eligible' : `supervisor:ineligible:${reason ?? 'unknown'}`;
+    console.log(`[${agentId}] ${tag}`);
+  };
+
+  if (state.role !== 'work') {
+    log(false, 'not-a-work-agent');
+    return { eligible: false, reason: 'not-a-work-agent' };
+  }
+
+  if (process.env.PANOPTICON_DOCKER_WORKSPACE === '1' || process.env.PAN_DOCKER === '1') {
+    log(false, 'docker-not-supported-yet');
+    return { eligible: false, reason: 'docker-not-supported-yet' };
+  }
+
+  if (state.harness !== 'claude-code') {
+    const reason = `harness-${state.harness ?? 'unknown'}`;
+    log(false, reason);
+    return { eligible: false, reason };
+  }
+
+  log(true);
+  return { eligible: true };
+}
+
+async function prepareSupervisorForFreshLaunch(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
+  if (!supervisorDecision.eligible) {
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
+  }
+
+  const supervisorScriptPath = resolvePtySupervisorScriptPath();
+  if (!existsSync(supervisorScriptPath)) {
+    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+  }
+  await writePtyToken(agentId);
+  state.supervisorEnabled = true;
+  return { useSupervisor: true, supervisorScriptPath };
+}
+
+async function prepareSupervisorForRelaunch(
+  agentId: string,
+  state: AgentState,
+  model: string,
+  harness: 'claude-code' | 'pi',
+): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
+  if (state.supervisorEnabled !== true) {
+    return { useSupervisor: false };
+  }
+
+  const relaunchState: AgentState = { ...state, model, harness };
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, {
+    issueId: state.issueId || agentId.replace(/^agent-/, '').toUpperCase(),
+    workspace: state.workspace,
+    role: 'work',
+    model,
+    harness,
+    allowHost: state.hostOverride,
+  }, relaunchState);
+  if (!supervisorDecision.eligible) {
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
+  }
+
+  const supervisorScriptPath = resolvePtySupervisorScriptPath();
+  if (!existsSync(supervisorScriptPath)) {
+    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+  }
+  await writePtyToken(agentId);
+  state.supervisorEnabled = true;
+  return { useSupervisor: true, supervisorScriptPath };
+}
+
+function resolvePtySupervisorScriptPath(): string {
+  return join(packageRoot, 'dist', 'pty-supervisor.js');
+}
+
 /**
  * Decide whether to enable Claude Code Channels for a work-agent launch.
  *
  * Eligibility (all required):
- *   - experimental.claudeCodeChannels is true in the merged config
- *   - the agent is a work agent (specialists/conversations stay on tmux)
+ *   - experimental.claudeCodeChannelsMcp is true in the merged config
+ *   - the agent is a work agent (specialists/conversations stay off MCP)
  *   - the harness is Claude Code (not Pi or another runtime harness)
  *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
  *   - the workspace is not running inside a Docker container
@@ -1250,7 +1378,8 @@ interface ChannelsDecision {
  * Logs the decision exactly once with a category prefix so users can see why
  * the bridge did or did not engage. The function is otherwise side-effect
  * free; the caller is responsible for writing the .mcp.json and mutating
- * state.channelsEnabled when eligible is true.
+ * state.channelsEnabled when eligible is true. This legacy MCP transport is now
+ * opt-in for new spawns; the PTY supervisor is the default delivery transport.
  */
 export function decideChannelsForWorkAgent(
   agentId: string,
@@ -1262,11 +1391,8 @@ export function decideChannelsForWorkAgent(
     console.log(`[${agentId}] ${tag}`);
   };
 
-  if (!isClaudeCodeChannelsEnabled()) {
-    // Flag-off path is the silent default: no log line, no work. The bead
-    // explicitly limits eligibility logs to launches where the flag is on so
-    // the signal is meaningful.
-    return { eligible: false, reason: 'flag-off' };
+  if (!isClaudeCodeChannelsMcpEnabled()) {
+    return { eligible: false, reason: 'mcp-default-off' };
   }
 
   if (state.role !== 'work') {
@@ -1959,6 +2085,8 @@ export async function buildAgentLaunchConfig(opts: {
   channelsBridgeMcpConfig?: string;
   /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
   channelsBridgeServerName?: string;
+  useSupervisor?: boolean;
+  supervisorScriptPath?: string;
   /**
    * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
    * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
@@ -2045,6 +2173,8 @@ export async function buildAgentLaunchConfig(opts: {
       resumeSessionId: opts.resumeSessionId,
       model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      useSupervisor: opts.useSupervisor,
+      supervisorScriptPath: opts.supervisorScriptPath,
       ...piLauncherFields,
     });
     return { launcherContent, providerEnv };
@@ -2072,6 +2202,8 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    useSupervisor: opts.useSupervisor,
+    supervisorScriptPath: opts.supervisorScriptPath,
     ...piLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
@@ -2562,6 +2694,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     hostOverride: options.allowHost || undefined,
   };
 
+  const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
+
   saveAgentStateSync(state);
 
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
@@ -2673,13 +2807,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
-  // Channels gate: when the experimental flag is on AND this work agent is
-  // eligible, write a per-agent .mcp.json that wires the panopticon-bridge as
-  // a stdio MCP server, set channelsEnabled in the agent state record, and
-  // pass the bridge MCP path through to buildAgentLaunchConfig so claude is
-  // started with --mcp-config + --dangerously-load-development-channels. When
-  // the flag is off OR the agent is ineligible we touch nothing here — same
-  // code path, same files on disk, as before PAN-985.
+  // Channels MCP gate: only the explicit legacy override writes a per-agent
+  // .mcp.json, bridge token, and channelsEnabled state for new spawns. The PTY
+  // supervisor remains the default delivery transport.
   const channelsDecision = decideChannelsForWorkAgent(agentId, options, state);
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {
@@ -2697,6 +2827,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role: 'work',
     isPlanning: false,
     channelsBridgeMcpConfig,
+    useSupervisor: supervisorLaunch.useSupervisor,
+    supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
   });
 
@@ -2749,7 +2881,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // the tmux session exists, but only block on completion when we are about to
   // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
   // loop waiting for a dialog they may never need.
-  const dismissChannelsDialogPromise = state.channelsEnabled
+  const dismissChannelsDialogPromise = channelsBridgeMcpConfig
     ? dismissDevChannelsDialog(agentId).catch(() => undefined)
     : null;
 
@@ -3186,6 +3318,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
+    const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
+    saveAgentStateSync(agentState);
     const fallbackContent = generateLauncherScriptSync({
       role: resumeRole,
       workingDir: agentState.workspace,
@@ -3198,6 +3332,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
         resumeRole,
         fallbackHarness,
       ),
+      useSupervisor: fallbackSupervisorLaunch.useSupervisor,
+      supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
@@ -3394,6 +3530,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
     agentState.harness = effectiveHarness;
+    const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
+    saveAgentStateSync(agentState);
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -3403,6 +3541,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       spawnMode: 'resume',
       resumeSessionId: sessionId,
       harness: effectiveHarness,
+      useSupervisor: supervisorLaunch.useSupervisor,
+      supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -3553,6 +3693,8 @@ export async function restartAgent(
 
   try {
     clearReadySignal(normalizedId);
+    const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, effectiveModel, effectiveHarness);
+    saveAgentStateSync(agentState);
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -3561,6 +3703,8 @@ export async function restartAgent(
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
       harness: effectiveHarness,
+      useSupervisor: supervisorLaunch.useSupervisor,
+      supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -3619,16 +3763,14 @@ export async function restartAgent(
 }
 
 /**
- * Check whether a tmux session has an active Claude Code process.
+ * Check whether a tmux session has an active agent runtime.
  * A session may exist with only a bare bash shell after Claude exits.
  */
-function isClaudeRunningInSession(sessionName: string): boolean {
+async function hasAgentRuntimeInSession(sessionName: string, harness: 'claude-code' | 'pi'): Promise<boolean> {
   try {
-    const panePids = listPaneValuesSync(sessionName, '#{pane_pid}');
+    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
     if (panePids.length === 0) return false;
-    const panePid = panePids[0]!;
-    const comm = execSync(`ps -p ${panePid} -o comm=`, { encoding: 'utf-8' }).trim();
-    return comm === 'claude';
+    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
   } catch {
     return false;
   }
@@ -3697,10 +3839,13 @@ export async function recoverAgent(
   // Check if already running — session may exist with only a bare shell
   // after Claude exited (zombie session). Kill it and recover.
   if (sessionExistsSync(normalizedId)) {
-    if (isClaudeRunningInSession(normalizedId)) {
+    const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+      ? state.harness
+      : 'claude-code';
+    if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
       return state;
     }
-    console.log(`[agents] ${normalizedId} tmux session is a zombie (no Claude process) — killing and recovering`);
+    console.log(`[agents] ${normalizedId} tmux session is a zombie (no ${recoveryHarness} runtime) — killing and recovering`);
     try { killSessionSync(normalizedId); } catch { /* ignore */ }
   }
 
@@ -3739,6 +3884,8 @@ export async function recoverAgent(
   const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
     ? state.harness
     : 'claude-code';
+  const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
+  saveAgentStateSync(state);
 
   if (recoveryHarness === 'pi') {
     // PAN-1055: Pi cannot consume the recovery prompt as a positional shell
@@ -3778,9 +3925,22 @@ export async function recoverAgent(
     return state;
   }
 
-  const claudeCmd = `${await getRoleRuntimeBaseCommand(state.model, agentId, recoveryRole, recoveryHarness)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
-  createSessionSync(normalizedId, state.workspace, claudeCmd, {
+  const recoveryLauncherContent = generateLauncherScriptSync({
+    role: recoveryRole,
+    workingDir: state.workspace,
+    changeDir: false,
+    setTerminalEnv: true,
+    providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
+    baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
+    promptInline: recoveryPrompt,
+    useSupervisor: recoverySupervisorLaunch.useSupervisor,
+    supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
+  });
+  const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+  await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);
+  createSessionSync(normalizedId, state.workspace, `bash ${launcherScript}`, {
     env: {
+      ...BLANKED_PROVIDER_ENV,
       PANOPTICON_AGENT_ID: normalizedId,
       PANOPTICON_ISSUE_ID: state.issueId || '',
       PANOPTICON_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),

@@ -14,7 +14,28 @@ import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage } from '../chat-types';
 
 vi.mock('../ChatMarkdown', () => ({
-  ChatMarkdown: ({ text }: { text: string }) => <div data-testid="chat-markdown">{text}</div>,
+  ChatMarkdown: ({ text, cwd, issueId }: { text: string; cwd?: string; issueId?: string | null }) => (
+    <div data-testid="chat-markdown" data-cwd={cwd ?? ''} data-issue-id={issueId ?? ''}>{text}</div>
+  ),
+}));
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, getItemKey, estimateSize }: {
+    count: number;
+    getItemKey?: (index: number) => string;
+    estimateSize?: (index: number) => number;
+  }) => ({
+    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({
+      index,
+      key: getItemKey?.(index) ?? index,
+      start: index * 40,
+      size: estimateSize?.(index) ?? 40,
+    })),
+    getTotalSize: () => count * 40,
+    measure: vi.fn(),
+    measureElement: vi.fn(),
+    scrollToIndex: vi.fn(),
+  }),
 }));
 
 function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, text = `text:${id}`): ChatMessage {
@@ -31,6 +52,26 @@ function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, te
 }
 
 describe('MessagesTimeline — roundMarkers', () => {
+  it('passes file-link context to virtualized message rows', () => {
+    const messages: ChatMessage[] = Array.from({ length: 10 }, (_, index) =>
+      makeMessage(`a${index + 1}`, 'assistant', index * 5_000),
+    );
+
+    render(
+      <MessagesTimeline
+        messages={messages}
+        workLog={[]}
+        streaming={false}
+        cwd="/home/eltmon/project"
+        issueId="PAN-1370"
+      />,
+    );
+
+    const oldestRenderedMarkdown = screen.getByText('text:a1');
+    expect(oldestRenderedMarkdown).toHaveAttribute('data-cwd', '/home/eltmon/project');
+    expect(oldestRenderedMarkdown).toHaveAttribute('data-issue-id', 'PAN-1370');
+  });
+
   it('renders no dividers when roundMarkers is omitted', () => {
     const messages: ChatMessage[] = [
       makeMessage('u1', 'user', 0),

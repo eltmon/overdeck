@@ -315,6 +315,7 @@ export function buildMiniMaxFormData(
       gemini_thinking_level: formData?.models.gemini_thinking_level,
     },
     api_keys: { ...(formData?.api_keys || {}) },
+    agents: { ...(formData?.agents || miniMaxDefaults.agents || {}) },
     tracker_keys: { ...(formData?.tracker_keys || {}) },
     conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
     memory: { ...(formData?.memory || miniMaxDefaults.memory || {}) },
@@ -984,6 +985,24 @@ export function SettingsPage() {
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
+  };
+
+  const handleRtkToggle = (enabled: boolean) => {
+    const next: SettingsConfig = {
+      ...formData,
+      agents: {
+        ...formData.agents,
+        rtk: {
+          ...formData.agents?.rtk,
+          enabled,
+        },
       },
     };
     setFormData(next);
@@ -2931,9 +2950,33 @@ export function SettingsPage() {
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
             <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">RTK Bash compression</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Filters Bash command outputs through rtk-ai/rtk to reduce token consumption. Opt-in.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.agents?.rtk?.enabled)}
+              aria-label="Enable RTK Bash compression"
+              data-testid="experimental-rtk-toggle"
+              onClick={() => handleRtkToggle(!formData.agents?.rtk?.enabled)}
+              disabled={saveMutation.isPending}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.agents?.rtk?.enabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.agents?.rtk?.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
               <span className="text-sm font-medium text-foreground">Claude Code Channels</span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Route prompts via stdio MCP bridge instead of tmux send-keys (work agents only)
+                Use Channels transport for conversation delivery; work-agent MCP wiring is YAML-only
               </p>
             </div>
             <button

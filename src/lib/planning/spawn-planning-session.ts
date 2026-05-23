@@ -296,6 +296,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
       MEMORY_CONTEXT: memoryContext,
+      TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv')),
     },
   }));
 }

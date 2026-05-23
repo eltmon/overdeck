@@ -16,6 +16,10 @@ hooks:
       hooks:
         - type: command
           command: "$HOME/.panopticon/bin/tldr-read-enforcer"
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "$HOME/.panopticon/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
       hooks:

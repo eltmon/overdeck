@@ -27,18 +27,20 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models (current — per developers.openai.com/codex/models)
+  // OpenAI models (supported per Codex CLI catalog, 2026-05-23)
   'gpt-5.5': 'openai',
-  'gpt-5.5-pro': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
-  'gpt-5.4-pro': 'openai',
   'gpt-5.3-codex': 'openai',
+  'gpt-5.3-codex-spark': 'openai',
   'gpt-5.2': 'openai',
+
+  // OpenAI retired (kept for backward compat with saved configs; migrated
+  // out via MODEL_DEPRECATIONS in src/lib/model-capabilities.ts)
+  'gpt-5.5-pro': 'openai',
+  'gpt-5.4-pro': 'openai',
   'o3': 'openai',
   'o4-mini': 'openai',
-
-  // OpenAI legacy (for backward compat with existing configs/tests)
   'o3-deep-research': 'openai',
   'gpt-4o': 'openai',
   'gpt-4o-mini': 'openai',
@@ -101,6 +103,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
   'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'gpt-5.3-codex': 'claude-sonnet-4-6', // Coding flagship → Sonnet
+  'gpt-5.3-codex-spark': 'claude-haiku-4-5', // Ultra-fast coder → Haiku
   'gpt-5.2': 'claude-sonnet-4-6', // Previous-gen flagship → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
   'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
@@ -162,16 +165,19 @@ const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
  * Used for within-provider tier-aware fallback.
  */
 const MODEL_TIER_RANK: Record<string, number> = {
-  // OpenAI tiers
-  'gpt-5.5-pro': 3,
+  // OpenAI tiers — addendum 2026-05-23 catalog (Codex CLI)
   'gpt-5.5': 2,
-  'gpt-5.4-pro': 3,
   'gpt-5.4': 2,
   'gpt-5.3-codex': 2,
+  'gpt-5.3-codex-spark': 1,
   'gpt-5.2': 2,
+  'gpt-5.4-mini': 0,
+  // Retired — kept for backward compat with saved configs until users
+  // re-save (deprecation migrations in MODEL_DEPRECATIONS will rewrite them)
+  'gpt-5.5-pro': 3,
+  'gpt-5.4-pro': 3,
   'o3': 2,
   'o4-mini': 1,
-  'gpt-5.4-mini': 0,
 };
 
 /**

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Effect } from 'effect';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -52,14 +51,14 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: (path) => {
+      createBeads: async (path) => {
         expect(path).toBe(workspacePath);
-        return Effect.succeed({
+        return {
           success: true,
           created: ['PAN-1143: Promote spec', 'PAN-1143: Create beads'],
           errors: [],
           beadIds: new Map(),
-        }) as never;
+        };
       },
     });
 
@@ -84,12 +83,12 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: () => Effect.succeed({
+      createBeads: async () => ({
         success: true,
         created: ['PAN-1144: Promote spec'],
         errors: [],
         beadIds: new Map(),
-      }) as never,
+      }),
     })).rejects.toThrow('created 1 beads for 2 plan items');
   });
 });

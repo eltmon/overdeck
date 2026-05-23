@@ -1,0 +1,152 @@
+#!/bin/bash
+# ~/.panopticon/bin/rtk-bash-filter
+# PreToolUse hook on Bash — delegates command rewriting to rtk-ai/rtk so
+# expensive command output can be filtered before Claude Code runs the command.
+#
+# Bypasses (allows normal Bash execution):
+#   - Non-Bash tool_name
+#   - jq unavailable or malformed PreToolUse JSON
+#   - PANOPTICON_RTK_ENABLED is unset/false and agents.rtk.enabled is absent/false
+#   - ~/.panopticon/bin/rtk is missing or not executable
+#   - rtk exits non-zero, emits no output, or emits an invalid PreToolUse response
+#   - rtk chooses not to rewrite a command, including commands whose output it
+#     expects to be too small to benefit from filtering
+#
+# Don't use set -e — hooks must never break Claude Code execution.
+set +e
+
+rtk_truthy() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on|enabled) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+rtk_project_root() {
+  local current
+  current="$PWD"
+  while [ "$current" != "/" ]; do
+    if [ -e "$current/.git" ]; then
+      printf '%s\n' "$current"
+      return 0
+    fi
+    current=$(dirname "$current")
+  done
+}
+
+rtk_read_config_enabled() {
+  local config_path
+  config_path="$1"
+  [ -z "$config_path" ] && return 0
+  [ ! -f "$config_path" ] && return 0
+
+  awk '
+    function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
+    BEGIN { in_agents = 0; in_rtk = 0; agents_indent = -1; rtk_indent = -1 }
+    {
+      line = $0
+      sub(/#.*/, "", line)
+      if (line ~ /^[[:space:]]*$/) next
+      match(line, /^[ ]*/)
+      indent = RLENGTH
+      key = line
+      sub(/^[[:space:]]*/, "", key)
+
+      if (key ~ /^agents:[[:space:]]*$/) {
+        in_agents = 1
+        in_rtk = 0
+        agents_indent = indent
+        next
+      }
+      if (in_agents && indent <= agents_indent) {
+        in_agents = 0
+        in_rtk = 0
+      }
+      if (in_agents && key ~ /^rtk:[[:space:]]*$/) {
+        in_rtk = 1
+        rtk_indent = indent
+        next
+      }
+      if (in_rtk && indent <= rtk_indent) {
+        in_rtk = 0
+      }
+      if (in_rtk && key ~ /^enabled:[[:space:]]*/) {
+        sub(/^enabled:[[:space:]]*/, "", key)
+        gsub(/"/, "", key)
+        gsub(/\047/, "", key)
+        print trim(key)
+        exit
+      }
+    }
+  ' "$config_path" 2>/dev/null
+}
+
+rtk_config_enabled_value() {
+  local config_path project_root value result
+
+  if [ -n "${PANOPTICON_CONFIG:-}" ]; then
+    value=$(rtk_read_config_enabled "$PANOPTICON_CONFIG")
+  else
+    value=$(rtk_read_config_enabled "$HOME/.panopticon/config.yaml")
+  fi
+  [ -n "$value" ] && result="$value"
+
+  project_root=$(rtk_project_root)
+  if [ -n "$project_root" ]; then
+    if [ -f "$project_root/.pan.yaml" ]; then
+      config_path="$project_root/.pan.yaml"
+    elif [ -f "$project_root/.panopticon.yaml" ]; then
+      config_path="$project_root/.panopticon.yaml"
+    else
+      config_path=""
+    fi
+
+    value=$(rtk_read_config_enabled "$config_path")
+    [ -n "$value" ] && result="$value"
+  fi
+
+  printf '%s\n' "$result"
+}
+
+RTK_BIN="$HOME/.panopticon/bin/rtk"
+
+if [ -n "${PANOPTICON_RTK_ENABLED+x}" ]; then
+  if ! rtk_truthy "$PANOPTICON_RTK_ENABLED"; then
+    exit 0
+  fi
+else
+  CONFIG_VALUE=$(rtk_config_enabled_value)
+  if ! rtk_truthy "$CONFIG_VALUE"; then
+    exit 0
+  fi
+fi
+
+if [ ! -x "$RTK_BIN" ]; then
+  exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  exit 0
+fi
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "Bash" ]; then
+  exit 0
+fi
+
+RTK_OUTPUT=$(printf '%s' "$INPUT" | "$RTK_BIN" hook claude 2>/dev/null)
+RTK_STATUS=$?
+if [ $RTK_STATUS -ne 0 ] || [ -z "$RTK_OUTPUT" ]; then
+  exit 0
+fi
+
+if ! printf '%s' "$RTK_OUTPUT" | jq -e '
+  .hookSpecificOutput.hookEventName == "PreToolUse"
+  and (.hookSpecificOutput.updatedInput.command | type == "string")
+' >/dev/null 2>&1; then
+  exit 0
+fi
+
+printf '%s\n' "$RTK_OUTPUT"
+exit 0

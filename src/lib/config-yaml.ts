@@ -331,6 +331,8 @@ export interface YamlConfig {
   agents?: {
     /** Caveman compressed output mode configuration */
     caveman?: CavemanConfig;
+    /** RTK Bash output compression configuration */
+    rtk?: RtkConfig;
   };
 
   /** TTS configuration */
@@ -378,6 +380,7 @@ export interface ExperimentalConfig {
    * delivery sites continue to use tmux send-keys. Default: false.
    */
   claudeCodeChannels?: boolean;
+  claudeCodeChannelsMcp?: boolean;
 }
 
 /**
@@ -418,6 +421,10 @@ export interface CavemanConfig {
   test?: CavemanMode;
   /** Intensity for merge agents (default: 'full') */
   merge?: CavemanMode;
+}
+
+export interface RtkConfig {
+  enabled?: boolean;
 }
 
 /**
@@ -535,6 +542,9 @@ export interface NormalizedConfig {
   /** Caveman compressed output configuration (normalised, never undefined) */
   caveman: NormalizedCavemanConfig;
 
+  /** RTK Bash output compression configuration (normalised, never undefined) */
+  rtk: NormalizedRtkConfig;
+
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
 
@@ -568,6 +578,8 @@ export interface NormalizedConfig {
 export interface NormalizedExperimentalConfig {
   /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
   claudeCodeChannels: boolean;
+  /** Whether legacy Claude Code Channels MCP wiring is enabled for new spawns. */
+  claudeCodeChannelsMcp: boolean;
 }
 
 /**
@@ -585,6 +597,10 @@ export interface NormalizedCavemanConfig {
     test: CavemanMode;
     merge: CavemanMode;
   };
+}
+
+export interface NormalizedRtkConfig {
+  enabled: boolean;
 }
 
 /**
@@ -706,6 +722,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       merge: 'full',
     },
   },
+  rtk: {
+    enabled: false,
+  },
   tts: {
     enabled: false,
     voice: '',
@@ -734,6 +753,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   experimental: {
     claudeCodeChannels: false,
+    claudeCodeChannelsMcp: false,
   },
   claude: {
     permissionMode: 'auto',
@@ -976,6 +996,29 @@ function mergeCavemanConfig(
   }
 }
 
+function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig | null): void {
+  const rtk = config?.agents?.rtk;
+  if (!rtk) return;
+
+  if (rtk.enabled !== undefined) {
+    result.enabled = rtk.enabled;
+  }
+}
+
+export function getDefaultRtkConfig(): NormalizedRtkConfig {
+  return {
+    enabled: DEFAULT_CONFIG.rtk.enabled,
+  };
+}
+
+export function mergeRtkConfigs(...configs: (YamlConfig | null)[]): NormalizedRtkConfig {
+  const result = getDefaultRtkConfig();
+  for (const config of configs) {
+    mergeRtkConfig(result, config);
+  }
+  return result;
+}
+
 function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {
   const tts = config?.tts;
   if (!tts) return;
@@ -1185,6 +1228,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       abTest: DEFAULT_CONFIG.caveman.abTest,
       modes: { ...DEFAULT_CONFIG.caveman.modes },
     },
+    rtk: {
+      enabled: DEFAULT_CONFIG.rtk.enabled,
+    },
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
       voice: DEFAULT_CONFIG.tts.voice,
@@ -1213,6 +1259,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     experimental: {
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+      claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
     },
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
@@ -1535,6 +1582,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge caveman configuration
     mergeCavemanConfig(result.caveman, config);
 
+    // Merge RTK configuration
+    mergeRtkConfig(result.rtk, config);
+
     // Merge TTS daemon configuration
     mergeTtsConfig(result.tts, config);
 
@@ -1570,6 +1620,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.experimental) {
       if (typeof config.experimental.claudeCodeChannels === 'boolean') {
         result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
+      }
+      if (typeof config.experimental.claudeCodeChannelsMcp === 'boolean') {
+        result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
       }
     }
 
@@ -1916,6 +1969,10 @@ export function getProjectConfigPath(): string | null {
  */
 export function isClaudeCodeChannelsEnabled(): boolean {
   return loadConfigSync().config.experimental.claudeCodeChannels;
+}
+
+export function isClaudeCodeChannelsMcpEnabled(): boolean {
+  return loadConfigSync().config.experimental.claudeCodeChannelsMcp;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

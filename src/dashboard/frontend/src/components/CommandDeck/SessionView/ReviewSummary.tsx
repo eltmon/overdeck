@@ -200,7 +200,7 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
       {synthSummary && (
         <div className={styles.reviewSynthesis}>
           <div className={styles.reviewSynthesisHeading}>Findings</div>
-          <ChatMarkdown text={synthSummary} isStreaming={false} />
+          <ChatMarkdown text={synthSummary} isStreaming={false} cwd={undefined} />
         </div>
       )}
 

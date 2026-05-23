@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
+import { withBdMutexPromise } from '../bd-mutex.js';
 import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -41,6 +42,83 @@ export interface CreateBeadsResult {
   beadIds: Map<string, string>;
 }
 
+export interface ClearBeadsResult {
+  cleared: number;
+  errors: string[];
+}
+
+function firstLine(value: unknown): string {
+  const raw = typeof value === 'string'
+    ? value
+    : value instanceof Error
+      ? value.message
+      : String(value ?? '');
+  return raw.split('\n')[0] || 'unknown error';
+}
+
+function execFileErrorMessage(error: any): string {
+  return firstLine(error?.stderr?.toString() || error?.message || error);
+}
+
+function parseBdList(stdout: unknown): any[] {
+  const parsed = JSON.parse(String(stdout || '[]'));
+  if (!Array.isArray(parsed)) throw new Error('bd list returned non-array JSON');
+  return parsed;
+}
+
+function beadIdsFromList(beads: any[]): string[] {
+  return beads
+    .map(bead => bead?.id)
+    .filter(id => id !== undefined && id !== null && String(id).length > 0)
+    .map(id => String(id));
+}
+
+async function listBeadsForIssue(workspacePath: string, issueLabel: string): Promise<any[]> {
+  const { stdout } = await execFileAsync(
+    'bd',
+    ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+    { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
+  );
+  return parseBdList(stdout);
+}
+
+export async function clearBeadsForIssue(workspacePath: string, issueLabel: string): Promise<ClearBeadsResult> {
+  let existingBeads: any[];
+  try {
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel);
+  } catch (error: any) {
+    return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
+  }
+
+  const errors: string[] = [];
+  let cleared = 0;
+  for (const id of beadIdsFromList(existingBeads)) {
+    try {
+      await execFileAsync('bd', ['delete', id, '--force'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+      });
+      cleared++;
+    } catch (error: any) {
+      errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
+    }
+  }
+
+  let residualBeads: any[];
+  try {
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel);
+  } catch (error: any) {
+    errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
+    return { cleared, errors };
+  }
+
+  const residualIds = beadIdsFromList(residualBeads);
+  if (residualIds.length > 0) {
+    errors.push(`residual ${residualIds.length} beads after delete: ${residualIds.join(', ')}`);
+  }
+
+  return { cleared, errors };
+}
+
 function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefItem): { requiresInspection: boolean; inspectionDepth: 'fast' | 'deep' } {
   if (policy === 'never') return { requiresInspection: false, inspectionDepth: 'fast' };
   if (policy === 'fast') return { requiresInspection: true, inspectionDepth: 'fast' };
@@ -51,7 +129,10 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
     : false;
   const inspectionDepth = item.metadata?.inspectionDepth === 'deep' ? 'deep' : 'fast';
   return { requiresInspection, inspectionDepth };
-}async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+}
+
+async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+  return withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -165,27 +246,17 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  // Re-planning means "the old plan was invalid" — start fresh.
-  try {
-    const { stdout: existingJson } = await execFileAsync(
-      'bd',
-      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
-    );
-    const existingBeads = JSON.parse(existingJson || '[]');
-    if (Array.isArray(existingBeads) && existingBeads.length > 0) {
-      const ids = existingBeads.map((b: any) => b.id).filter(Boolean);
-      for (const id of ids) {
-        try {
-          await execFileAsync('bd', ['delete', id, '--force'], { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
-        } catch {
-          // Individual delete failure is non-fatal
-        }
-      }
-      console.log(`[beads] Cleared ${ids.length} existing beads for ${issueLabel} before re-creating`);
-    }
-  } catch {
-    // If listing fails (no beads exist, bd not initialized), proceed with creation
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel);
+  if (clearResult.errors.length > 0) {
+    return {
+      success: false,
+      created: [],
+      errors: clearResult.errors.map(error => `dedup failed: ${error}`),
+      beadIds: new Map(),
+    };
+  }
+  if (clearResult.cleared > 0) {
+    console.log(`[beads] Cleared ${clearResult.cleared} existing beads for ${issueLabel} (verified)`);
   }
 
   // Build blocking-edge map: item.id → set of item IDs that block it
@@ -318,6 +389,7 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   }
 
   return { success: errors.length === 0, created, errors, beadIds };
+  });
 }
 
 /**
@@ -480,7 +552,11 @@ export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `createBeadsFromVBrief`. */
+/**
+ * Idempotent and internally serialized via bd-mutex. Calling N times yields
+ * exactly planItemCount beads or returns success:false with errors. Do NOT wrap
+ * callers in withBdMutex — it will deadlock.
+ */
 export const createBeadsFromVBrief = (
   workspacePath: string,
 ): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>

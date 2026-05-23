@@ -18,6 +18,17 @@ import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
+const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
+
+function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key)) {
+      delete env[key];
+    }
+  }
+  return { ...env, ...gateEnv };
+}
 
 /**
  * Context for validation execution
@@ -407,7 +418,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     try {
       // When running in container, don't set host cwd (irrelevant)
       const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-      const env = { ...process.env, ...gate.env };
+      const env = buildQualityGateEnv(gate.env);
       const { stdout, stderr } = await execAsync(resolvedCommand, {
         cwd: useHostCwd ? cwd : undefined,
         env,

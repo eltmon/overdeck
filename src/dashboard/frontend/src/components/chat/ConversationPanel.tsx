@@ -3,16 +3,17 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
+import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
@@ -436,6 +437,16 @@ export function ConversationPanel({
     });
   }, [conversation.id, viewMode]);
 
+  const openHandoffDoc = useCallback(() => {
+    window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');
+  }, [conversation.name]);
+
+  const openHandoffTarget = useCallback(() => {
+    if (conversation.handoffTargetConvId) {
+      window.location.href = `/conv/${conversation.handoffTargetConvId}`;
+    }
+  }, [conversation.handoffTargetConvId]);
+
   const showTerminal = conversation.sessionAlive || resumed;
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
@@ -450,12 +461,13 @@ export function ConversationPanel({
     ? 'var(--success)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const headerContextUsage = messagesData?.contextUsage ?? conversation.contextUsage ?? null;
 
   return (
     <div className={styles.conversationTerminal}>
-      {/* Header bar — hidden in embedded mode (ZoneB already shows session info) */}
+      {/* Header bar — hidden in embedded mode (ZoneB already shows session info), so its context indicator is omitted there. */}
       {!embedded && (
-        <div className={styles.conversationTerminalHeader}>
+        <div className={`${styles.conversationTerminalHeader} ${styles.conversationHeaderContainer}`}>
           <span className={styles.conversationTerminalTitle}>
             {isWorking && (
               <span title={workingLabel} style={{ display: 'contents' }}>
@@ -510,6 +522,7 @@ export function ConversationPanel({
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
             </span>
           )}
+          <ContextUsageIndicator contextUsage={headerContextUsage} />
           <span className={styles.conversationTerminalStatus}>
             <Circle
               size={7}
@@ -520,6 +533,28 @@ export function ConversationPanel({
           <span className={styles.conversationSessionId}>
             {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
           </span>
+
+          {conversation.handoffDocPath && (
+            <button
+              className={styles.copyLinkButton}
+              onClick={openHandoffDoc}
+              title="Handoff doc"
+              aria-label={`Open handoff doc for ${conversation.name}`}
+            >
+              <FileText size={14} />
+            </button>
+          )}
+
+          {conversation.handoffTargetConvId && (
+            <button
+              className={styles.copyLinkButton}
+              onClick={openHandoffTarget}
+              title="Open handoff target"
+              aria-label={`Open handoff target for ${conversation.name}`}
+            >
+              <ExternalLink size={14} />
+            </button>
+          )}
 
           {/* Copy link button */}
           <button
@@ -806,6 +841,7 @@ interface MessagesResponse {
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
+  contextUsage?: ContextUsage | null;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -1038,6 +1074,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           compactBoundaries={data?.compactBoundaries}
           compacting={isCompacting}
           conversationName={conversation.name}
+          cwd={conversation.cwd}
+          issueId={conversation.issueId}
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
           onOpenTurnDiff={onOpenTurnDiff}
           resolvedTheme={resolvedTheme}

@@ -1,11 +1,50 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, chmodSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  chmodSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+} from 'fs';
 import { join, dirname } from 'path';
-import { execSync } from 'child_process';
-import { homedir } from 'os';
+import { execFileSync, execSync } from 'child_process';
+import { arch as osArch, homedir, platform as osPlatform, tmpdir } from 'os';
+import { createHash } from 'crypto';
 import { readSettingsOrAbortSync, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
 import { SYNC_SOURCES } from '../../../lib/paths.js';
+
+const RTK_VERSION = '0.41.0';
+const RTK_RELEASE_TAG = `v${RTK_VERSION}`;
+const RTK_RELEASE_BASE_URL = `https://github.com/rtk-ai/rtk/releases/download/${RTK_RELEASE_TAG}`;
+
+interface RtkReleaseAsset {
+  assetName: string;
+  sha256: string;
+}
+
+const RTK_ASSETS: Record<string, RtkReleaseAsset> = {
+  'linux-x64': {
+    assetName: 'rtk-x86_64-unknown-linux-musl.tar.gz',
+    sha256: '90ae10f5c76de9bacaec5eeeefb6012f74dd47f4e280ec614295555b64da6b57',
+  },
+  'linux-arm64': {
+    assetName: 'rtk-aarch64-unknown-linux-gnu.tar.gz',
+    sha256: '68d6fedfd76f16437eb79cb659169ef8bc3994124486cc71d9479a1b241b7812',
+  },
+  'darwin-arm64': {
+    assetName: 'rtk-aarch64-apple-darwin.tar.gz',
+    sha256: '8b9751f927da4fb433be23f24f205bf1c22f9dd6949790c0980d2cc91b14658c',
+  },
+  'darwin-x64': {
+    assetName: 'rtk-x86_64-apple-darwin.tar.gz',
+    sha256: 'b2729d9983b38af77824a5c7a3c23de415533be9fb022a5e473904ecc9620db9',
+  },
+};
 
 export interface HookConfig {
   matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
@@ -95,6 +134,80 @@ function installJq(): boolean {
   }
 }
 
+function getRtkReleaseAsset(): RtkReleaseAsset | null {
+  const key = `${osPlatform()}-${osArch()}`;
+  return RTK_ASSETS[key] ?? null;
+}
+
+function readInstalledRtkVersion(rtkPath: string): string | null {
+  try {
+    return execFileSync(rtkPath, ['--version'], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+async function installRtk(binDir: string): Promise<boolean> {
+  const asset = getRtkReleaseAsset();
+  if (!asset) {
+    console.log(
+      chalk.yellow(`⚠ RTK prebuilt binary unavailable for ${osPlatform()}-${osArch()} — skipping`),
+    );
+    return false;
+  }
+
+  const rtkPath = join(binDir, 'rtk');
+  const expectedVersion = `rtk ${RTK_VERSION}`;
+  if (existsSync(rtkPath) && readInstalledRtkVersion(rtkPath) === expectedVersion) {
+    console.log(chalk.cyan(`✓ RTK ${RTK_VERSION} already installed`));
+    return true;
+  }
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'pan-rtk-'));
+  try {
+    const archiveUrl = `${RTK_RELEASE_BASE_URL}/${asset.assetName}`;
+    const response = await fetch(archiveUrl);
+    if (!response.ok) {
+      throw new Error(`download failed: ${response.status} ${response.statusText}`);
+    }
+
+    const archiveBytes = Buffer.from(await response.arrayBuffer());
+    const actualSha = createHash('sha256').update(archiveBytes).digest('hex');
+    if (actualSha !== asset.sha256) {
+      throw new Error(`checksum mismatch for ${asset.assetName}`);
+    }
+
+    const archivePath = join(tempDir, asset.assetName);
+    writeFileSync(archivePath, archiveBytes);
+    execFileSync('tar', ['-xzf', archivePath, '-C', tempDir], { stdio: 'pipe' });
+
+    const extractedRtk = join(tempDir, 'rtk');
+    if (!existsSync(extractedRtk)) {
+      throw new Error(`archive did not contain rtk binary`);
+    }
+
+    chmodSync(extractedRtk, 0o755);
+    renameSync(extractedRtk, rtkPath);
+    const installedVersion = readInstalledRtkVersion(rtkPath);
+    if (installedVersion !== expectedVersion) {
+      throw new Error(`rtk --version returned ${installedVersion ?? 'no output'}`);
+    }
+
+    console.log(chalk.green(`✓ Installed RTK ${RTK_VERSION} to ~/.panopticon/bin/rtk`));
+    return true;
+  } catch (err: unknown) {
+    console.log(
+      chalk.yellow(`⚠ RTK install failed: ${err instanceof Error ? err.message : String(err)} (non-fatal)`),
+    );
+    return false;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 /**
  * Per-hook-type detection of whether a Panopticon hook is already registered.
  * PAN-800: rewritten from an all-or-nothing short-circuit to a delta-install
@@ -135,54 +248,6 @@ export function addPanopticonHookIfMissing(
   return true;
 }
 
-/**
- * PAN-982: Remove a Panopticon hook entry by hookType + script name.
- *
- * Filters out the inner hook commands matching the given scriptName from each
- * matcher group, then drops any matcher group whose hook list became empty,
- * then drops the top-level hookType key if no matcher groups remain.
- *
- * Returns true if anything was removed (used to drive the "migrated" log line
- * in setupHooksCommand). Idempotent — safe to call when the hook is already
- * absent.
- */
-function removeHookIfPresent(
-  settings: ClaudeSettings,
-  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-  binDir: string,
-  scriptName: string,
-): boolean {
-  const groups = settings?.hooks?.[hookType];
-  if (!groups || groups.length === 0) return false;
-
-  const fullPath = join(binDir, scriptName);
-  const legacyMatch = `panopticon/bin/${scriptName}`;
-
-  let removed = false;
-  const newGroups: HookConfig[] = [];
-  for (const group of groups) {
-    const filteredInner = (group.hooks || []).filter((hook) => {
-      const isMatch =
-        (hook.command?.includes(fullPath) ?? false) ||
-        (hook.command?.includes(legacyMatch) ?? false);
-      if (isMatch) removed = true;
-      return !isMatch;
-    });
-    if (filteredInner.length > 0) {
-      newGroups.push({ ...group, hooks: filteredInner });
-    } else {
-      removed = true;
-    }
-  }
-
-  if (newGroups.length > 0) {
-    settings.hooks![hookType] = newGroups;
-  } else {
-    delete settings.hooks![hookType];
-  }
-
-  return removed;
-}
 
 export interface SetupHooksOptions {
   /**
@@ -251,6 +316,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
+    'rtk-bash-filter',
     'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   ];
   for (const scriptName of hookScripts) {
@@ -349,60 +415,23 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     }
   };
 
-  // PAN-982: PreToolUse, PostToolUse, and Stop hooks are NO LONGER registered in
-  // global ~/.claude/settings.json. They were migrated into per-agent frontmatter
-  // at agents/pan-<type>-agent.md so each Panopticon pipeline agent declares its
-  // own tool-event hooks. Registering them again here would cause every event to
-  // fire twice (once from frontmatter, once from global settings) — the exact
-  // double-fire window the migration exists to close (PAN-982 hazard H4).
-  //
-  // Ad-hoc Claude sessions launched without --agent will no longer trigger
-  // pre-tool-hook / heartbeat-hook / stop-hook / tldr-* / inspect-on-bead-close.
-  // That is intentional: those hooks were Panopticon-specific (heartbeat tracking,
-  // cost recording, bead-close detection) and have no meaning outside a pipeline
-  // agent.
-  //
-  // The remaining hook events below stay in global settings because Claude Code's
-  // agent frontmatter cannot host them reliably for the bootstrap path: they fire
-  // before --agent is fully bound (SessionStart, UserPromptSubmit) or are session-
-  // wide signals that need uniform routing across agent and ad-hoc sessions
-  // (PreCompact/PostCompact/Notification/PermissionRequest).
+  // PAN-1402: Tool-event hooks briefly lived in per-agent frontmatter during
+  // PAN-982, but Claude Code did not honor them when Panopticon invoked agents
+  // with path-form `--agent roles/<role>.md`, so these registrations are global again.
+  addHookIfMissing('PreToolUse', 'pre-tool-hook');
+  addHookIfMissing('PostToolUse', 'heartbeat-hook');
+  addHookIfMissing('PostToolUse', 'permission-event-hook');
+  addHookIfMissing('Stop', 'stop-hook');
+  addHookIfMissing('Stop', 'permission-event-hook');
   addHookIfMissing('SessionStart', 'session-start-hook');
   addHookIfMissing('Notification', 'notification-hook');
   addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
   addHookIfMissing('PreCompact', 'pre-compact-hook');
   addHookIfMissing('PostCompact', 'post-compact-hook');
   addHookIfMissing('PermissionRequest', 'permission-event-hook');
-
-  // PAN-982: Atomic migration — strip out any pre-existing PreToolUse / PostToolUse /
-  // Stop / TLDR registrations that older Panopticon installs added to
-  // ~/.claude/settings.json. Without this prune, users upgrading across PAN-982
-  // would have BOTH global and per-agent hooks firing for every tool event,
-  // doubling heartbeat/cost/inspect signals and tripping H4 (the dedup hazard
-  // the bead exists to close). The prune is keyed on Panopticon's own bin/
-  // paths, so user-authored hooks pointing elsewhere are left intact.
-  const removed: string[] = [];
-  const removeIfPresent = (
-    hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-    scriptName: string,
-  ): void => {
-    if (removeHookIfPresent(settings, hookType, binDir, scriptName)) {
-      removed.push(`${hookType}:${scriptName}`);
-    }
-  };
-  removeIfPresent('PreToolUse', 'pre-tool-hook');
-  removeIfPresent('PreToolUse', 'tldr-read-enforcer');
-  removeIfPresent('PostToolUse', 'heartbeat-hook');
-  removeIfPresent('PostToolUse', 'permission-event-hook');
-  removeIfPresent('PostToolUse', 'tldr-post-edit');
-  removeIfPresent('PostToolUse', 'inspect-on-bead-close');
-  removeIfPresent('Stop', 'stop-hook');
-  removeIfPresent('Stop', 'permission-event-hook');
-  removeIfPresent('Stop', 'work-agent-stop-hook');
-  removeIfPresent('Stop', 'specialist-stop-hook');
-  if (removed.length > 0) {
-    console.log(chalk.yellow(`\n✓ Migrated ${removed.length} legacy hook(s) to per-agent frontmatter:`));
-    for (const entry of removed) console.log(chalk.dim(`  • ${entry}`));
+  if (python3Available) {
+    addHookIfMissing('PreToolUse', 'tldr-read-enforcer', 'Read');
+    addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write');
   }
 
   if (added.length === 0) {
@@ -432,6 +461,8 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     console.log(chalk.yellow(`⚠ Caveman hook install failed: ${err instanceof Error ? err.message : String(err)} (non-fatal)`));
   }
 
+  await installRtk(binDir);
+
   // 9. Write updated settings — PAN-1137: backup + atomic write + dry-run
   if (dryRun) {
     console.log(chalk.cyan('\nProposed settings.json diff:'));
@@ -450,17 +481,20 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
+  console.log(chalk.dim('  • PreToolUse        - Records tool usage before tools run'));
+  console.log(chalk.dim('  • PostToolUse       - Emits heartbeats and tool/permission events'));
+  console.log(chalk.dim('  • Stop              - Records session stop and permission lifecycle events'));
   console.log(chalk.dim('  • SessionStart      - Bootstraps agent state, emits model_set'));
   console.log(chalk.dim('  • UserPromptSubmit  - Clears waiting state, restarts spinner'));
   console.log(chalk.dim('  • PreCompact/Post   - Tracks compaction lifecycle'));
   console.log(chalk.dim('  • Notification      - Emits agent.waiting_started events'));
   console.log(chalk.dim('  • PermissionRequest - Surfaces permission prompts to dashboard'));
-  console.log(chalk.dim('  PAN-982: PreToolUse/PostToolUse/Stop now live in per-agent frontmatter'));
-  console.log(chalk.dim('           at agents/pan-<type>-agent.md (work, planning, review, ...).'));
   if (python3Available) {
+    console.log(chalk.dim('  • TLDR hooks        - Enforce token-efficient reads and post-edit updates'));
     console.log(chalk.dim('  • TLDR MCP          - Token-efficient code analysis'));
   }
   console.log(chalk.dim('  • Caveman           - Compressed output hooks (activate with agents.caveman.enabled: true)'));
+  console.log(chalk.dim('  • RTK Bash filter   - Token-efficient Bash output hooks (activate with agents.rtk.enabled: true)'));
   console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));

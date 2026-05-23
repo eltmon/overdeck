@@ -72,7 +72,7 @@ export function IsolationMode({ section, onClose }: IsolationModeProps) {
       </div>
       <div ref={contentRef} className={styles.isolationContent}>
         {section.transcript
-          ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} />
+          ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} cwd={undefined} />
           : '(no output)'}
       </div>
     </div>

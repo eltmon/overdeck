@@ -41,6 +41,7 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: {
     conversationTerminal: 'conversationTerminal',
     conversationTerminalHeader: 'conversationTerminalHeader',
+    conversationHeaderContainer: 'conversationHeaderContainer',
     conversationTerminalTitle: 'conversationTerminalTitle',
     conversationTerminalStatus: 'conversationTerminalStatus',
     conversationTerminalBody: 'conversationTerminalBody',
@@ -59,7 +60,7 @@ import { updateConversationTitle } from '../../CommandDeck/ConversationList';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const mockConversation = {
+const mockConversation: React.ComponentProps<typeof ConversationPanel>['conversation'] = {
   id: 1,
   name: 'test-conv',
   tmuxSession: 'test-session',
@@ -74,7 +75,11 @@ const mockConversation = {
   model: 'claude-opus-4-6',
 };
 
-function makeClient() {
+function makeClient(messagesData = {
+  messages: [],
+  workLog: [],
+  streaming: false,
+}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -82,19 +87,16 @@ function makeClient() {
     },
   });
   // Pre-seed messages so the useQuery doesn't attempt a real fetch
-  client.setQueryData(['conversation-messages', 'test-conv'], {
-    messages: [],
-    workLog: [],
-    streaming: false,
-  });
+  client.setQueryData(['conversation-messages', 'test-conv'], messagesData);
   return client;
 }
 
 function renderPanel(
   conversation = mockConversation,
   props: Partial<React.ComponentProps<typeof ConversationPanel>> = {},
+  messagesData?: Parameters<typeof makeClient>[0],
 ) {
-  const client = makeClient();
+  const client = makeClient(messagesData);
   render(
     <DialogProvider>
       <QueryClientProvider client={client}>
@@ -127,6 +129,46 @@ describe('ConversationPanel rename flow', () => {
   it('renders the conversation title in the header', () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+  });
+
+  it('renders context usage in the header', () => {
+    renderPanel({
+      ...mockConversation,
+      contextUsage: {
+        activeBytes: 6_000,
+        estimatedTokens: 1_500,
+        contextWindow: 200_000,
+        percentUsed: 0.75,
+      },
+    });
+    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('1.50k');
+  });
+
+  it('prefers the latest messages response context usage', () => {
+    renderPanel(
+      {
+        ...mockConversation,
+        contextUsage: {
+          activeBytes: 6_000,
+          estimatedTokens: 1_500,
+          contextWindow: 200_000,
+          percentUsed: 0.75,
+        },
+      },
+      {},
+      {
+        messages: [],
+        workLog: [],
+        streaming: false,
+        contextUsage: {
+          activeBytes: 132_164,
+          estimatedTokens: 33_041,
+          contextWindow: 200_000,
+          percentUsed: 16.52,
+        },
+      },
+    );
+    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('33.04k');
   });
 
   it('shows title input with current value when pencil button is clicked', () => {

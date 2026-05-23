@@ -1,14 +1,22 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WS_METHODS } from '@panctl/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),
+  request: vi.fn(),
+  getAvailableEditors: vi.fn(),
+  shellOpenInEditor: vi.fn(),
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': 'test-csrf',
+  })),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
   getTransport: () => wsTransportMock,
+  dashboardMutationJsonHeaders: wsTransportMock.dashboardMutationJsonHeaders,
 }));
 
 import { useDashboardStore } from '../../lib/store';
@@ -42,6 +50,23 @@ function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
+function mockFetch() {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const currentIssue = useDashboardStore.getState().issuesRaw.find((candidate) => candidate.identifier === 'PAN-1');
+    if (url.endsWith('/plan')) return Response.json(null);
+    if (url.includes('/planning-state')) return Response.json({
+      hasPlan: currentIssue?.hasPlan ?? false,
+      hasBeads: currentIssue?.hasBeads ?? false,
+      beadsCount: currentIssue?.hasBeads ? 1 : 0,
+      planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
+    });
+    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
+    return Response.json({ success: true });
+  });
+}
+
 function drawerUi(queryClient: QueryClient) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -62,13 +87,35 @@ function renderDrawer(beads: TestBead[] = []) {
   return { queryClient, ...render(drawerUi(queryClient)) };
 }
 
+function drawerActionBar() {
+  return screen.getByTestId('drawer-action-bar');
+}
+
+function drawerIssueActionIds() {
+  return Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
+    .filter((button) => button.getAttribute('data-testid') !== 'issue-action-overflow-button')
+    .filter((button) => !(button as HTMLButtonElement).disabled)
+    .map((button) => button.getAttribute('data-testid'));
+}
+
 describe('IssueDrawer', () => {
   beforeEach(() => {
     vi.useRealTimers();
     resetDrawerIssueSubscriptionForTest();
     vi.restoreAllMocks();
+    vi.stubGlobal('fetch', mockFetch());
     wsTransportMock.subscribe.mockReset();
     wsTransportMock.subscribe.mockReturnValue(vi.fn());
+    wsTransportMock.getAvailableEditors.mockReset();
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: [] });
+    wsTransportMock.shellOpenInEditor.mockReset();
+    wsTransportMock.shellOpenInEditor.mockResolvedValue({ success: true });
+    wsTransportMock.request.mockReset();
+    wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
+      [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
+      [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
+    }));
+    localStorage.clear();
     window.history.replaceState(null, '', '/');
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
@@ -78,6 +125,10 @@ describe('IssueDrawer', () => {
       recentActivity: [],
       detailedActivity: [],
     } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('opens from issue URL params on mount', async () => {
@@ -134,6 +185,48 @@ describe('IssueDrawer', () => {
 
     expect(subscribeIssueEvents).toHaveBeenCalledWith({ issueId: 'PAN-1' });
     expect(useDashboardStore.getState().recentActivity).toEqual([{ id: 'activity-1', issueId: 'PAN-1', message: 'Scoped update' }]);
+  });
+
+  it('renders the open-in picker for an existing drawer workspace', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      exists: true,
+      issueId: 'PAN-1',
+      path: '/tmp/pan-workspace',
+    }), { status: 200 }));
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const section = await screen.findByTestId('drawer-workspace-section');
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1');
+    expect(within(section).getByText('/tmp/pan-workspace')).toHaveAttribute('title', '/tmp/pan-workspace');
+    expect(await within(section).findByText('Cursor')).toBeInTheDocument();
+
+    fireEvent.click(within(section).getByLabelText('Choose editor'));
+    fireEvent.click(await screen.findByText('VS Code'));
+
+    await waitFor(() => {
+      expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+        cwd: '/tmp/pan-workspace',
+        editor: 'vscode',
+      });
+    });
+    expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+  });
+
+  it('hides the drawer open-in picker when no workspace exists', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      exists: false,
+      issueId: 'PAN-1',
+    }), { status: 200 }));
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1'));
+    expect(screen.queryByTestId('drawer-workspace-section')).toBeNull();
+    expect(wsTransportMock.getAvailableEditors).not.toHaveBeenCalled();
   });
 
   it('tears down the drawer issue subscription on close and reuses quick same-issue reopens', async () => {
@@ -400,25 +493,14 @@ describe('IssueDrawer', () => {
     expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
   });
 
-  it('renders action bar with reset stop PR and merge controls', () => {
+  it('renders action bar with the shared hybrid menu and pinned merge control', () => {
     useDashboardStore.setState({
-      agentsById: {
-        'agent-PAN-1': {
-          id: 'agent-PAN-1',
-          issueId: 'PAN-1',
-          runtime: 'claude-code',
-          harness: 'claude-code',
-          model: 'gpt-5.5',
-          status: 'running',
-          role: 'work',
-          startedAt: '2026-05-18T00:00:00.000Z',
-          consecutiveFailures: 0,
-          killCount: 0,
-        },
-      },
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
           readyForMerge: true,
           mergeStatus: 'pending',
           prUrl: 'https://example.com/pr/1',
@@ -431,19 +513,118 @@ describe('IssueDrawer', () => {
     renderDrawer();
 
     expect(screen.getByTestId('drawer-action-bar')).toHaveClass('px-[22px]', 'py-[12px]', 'border-t', 'bg-card/70');
-    expect(screen.getByTestId('drawer-action-reset')).toHaveAttribute('data-component', 'shared-button');
-    expect(screen.getByTestId('drawer-action-reset')).toHaveClass('border-input', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-action-stop')).toBeEnabled();
-    expect(screen.getByTestId('drawer-action-view-pr')).toHaveAttribute('href', 'https://example.com/pr/1');
-    expect(screen.getByTestId('drawer-action-view-pr')).toHaveClass('border-input');
-    expect(screen.getByTestId('drawer-action-merge')).toBeEnabled();
-    expect(screen.getByTestId('drawer-action-merge')).toHaveAttribute('data-component', 'shared-button');
-    expect(screen.getByTestId('drawer-action-merge')).toHaveClass('bg-success', 'text-success-foreground', 'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]');
+    expect(screen.getByTestId('issue-action-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
+    expect(screen.getByTestId('merge-btn')).toBeEnabled();
+    expect(screen.getByTestId('merge-btn')).toHaveClass('bg-success', 'text-success-foreground');
+    expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
+    expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
   });
 
-  it('confirms action bar reset stop and merge requests', async () => {
-    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+  it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
     useDashboardStore.setState({
+      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
+      agentsById: {
+        'agent-PAN-1': {
+          id: 'agent-PAN-1',
+          issueId: 'PAN-1',
+          runtime: 'claude-code',
+          harness: 'claude-code',
+          model: 'gpt-5.5',
+          status: 'running',
+          role: 'work',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    const first = renderDrawer();
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    const actionSets: Record<string, (string | null)[]> = {
+      WORK_RUNNING: drawerIssueActionIds(),
+    };
+    first.unmount();
+    resetDrawerIssueSubscriptionForTest();
+
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
+      agentsById: {},
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          prUrl: 'https://example.com/pr/1',
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    actionSets.READY_TO_MERGE = drawerIssueActionIds();
+
+    expect(actionSets).toMatchInlineSnapshot(`
+      {
+        "READY_TO_MERGE": [
+          "issue-action-startAgent",
+          "issue-action-swarm",
+          "issue-action-syncMain",
+          "issue-action-inspectBead",
+          "issue-action-wipe",
+          "issue-action-destroyWorkspace",
+          "issue-action-open",
+          "issue-action-resetIssue",
+          "issue-action-cancel",
+          "issue-action-beads",
+          "issue-action-upload",
+          "issue-action-syncDiscussions",
+          "issue-action-statusReview",
+          "issue-action-copySettings",
+          "issue-action-restartFromPlan",
+          "issue-action-reviewTest",
+          "issue-action-viewPr",
+        ],
+        "WORK_RUNNING": [
+          "issue-action-tell",
+          "issue-action-doneWork",
+          "issue-action-stopAgent",
+          "issue-action-pause",
+          "issue-action-switchModel",
+          "issue-action-syncMain",
+          "issue-action-inspectBead",
+          "issue-action-wipe",
+          "issue-action-destroyWorkspace",
+          "issue-action-open",
+          "issue-action-resetIssue",
+          "issue-action-cancel",
+          "issue-action-beads",
+          "issue-action-upload",
+          "issue-action-syncDiscussions",
+          "issue-action-statusReview",
+          "issue-action-copySettings",
+          "issue-action-restartFromPlan",
+          "issue-action-restartAgent",
+          "issue-action-reviewTest",
+        ],
+      }
+    `);
+  });
+
+  it('routes reset stop and merge requests through the shared action controls', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {
         'agent-PAN-1': {
           id: 'agent-PAN-1',
@@ -471,8 +652,13 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    fireEvent.click(screen.getByTestId('drawer-action-reset'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset Issue' }));
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
+    const resetDialog = await screen.findByRole('alertdialog');
+    fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
+    const resetConfirm = within(resetDialog).getByRole('button', { name: 'Reset issue' });
+    await waitFor(() => expect(resetConfirm).not.toBeDisabled());
+    fireEvent.click(resetConfirm);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({
         method: 'POST',
@@ -480,20 +666,20 @@ describe('IssueDrawer', () => {
       }));
     });
 
-    fireEvent.click(screen.getByTestId('drawer-action-stop'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop Agent' }));
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-stopAgent'));
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', { method: 'POST' });
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', expect.objectContaining({ method: 'POST' }));
     });
 
-    fireEvent.click(screen.getByTestId('drawer-action-merge'));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge to main' }));
+    fireEvent.click(screen.getByTestId('merge-btn'));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge' }));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/merge', expect.objectContaining({ method: 'POST' }));
     });
   });
 
-  it('disables merge and hides View PR when action bar targets are unavailable', () => {
+  it('hides unavailable pinned PR and merge controls', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, url: '' }],
       reviewStatusByIssueId: {
@@ -509,9 +695,9 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.queryByTestId('drawer-action-view-pr')).toBeNull();
-    expect(screen.getByTestId('drawer-action-stop')).toBeDisabled();
-    expect(screen.getByTestId('drawer-action-merge')).toBeDisabled();
+    expect(screen.queryByTestId('issue-action-viewPr')).toBeNull();
+    expect(screen.queryByTestId('merge-btn')).toBeNull();
+    expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
   });
 
   it('renders active agent placeholder when no agent is active', () => {

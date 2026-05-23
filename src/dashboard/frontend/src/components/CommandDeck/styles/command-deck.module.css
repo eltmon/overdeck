@@ -2466,6 +2466,10 @@
   background: var(--card);
 }
 
+.conversationHeaderContainer {
+  container-type: inline-size;
+}
+
 .conversationTerminalTitle {
   font-size: 12px;
   font-weight: 600;
@@ -2579,7 +2583,7 @@
   border-radius: 4px;
   display: flex;
   align-items: center;
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity 0.15s, color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
@@ -4565,6 +4569,19 @@
   cursor: not-allowed;
 }
 
+.forkModeGroup {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0 0 4px;
+}
+
+.forkModeGroup legend {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
 .forkCheckboxRow {
   display: flex;
   align-items: center;
@@ -4572,14 +4589,16 @@
   margin-top: 4px;
 }
 
-.forkCheckboxRow input[type="checkbox"] {
+.forkCheckboxRow input[type="checkbox"],
+.forkCheckboxRow input[type="radio"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--primary);
 }
 
-.forkCheckboxRow label {
+.forkCheckboxRow label,
+.forkCheckboxRow span {
   font-size: 12px;
   color: var(--muted-foreground);
   cursor: pointer;

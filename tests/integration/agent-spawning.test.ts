@@ -140,13 +140,13 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
         titleModel: 'claude-haiku-4-5',
       },
       claude: { permissionMode: 'bypass' },
-      experimental: { claudeCodeChannels: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
       caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
     } as NormalizedConfig,
   };
   return {
     ...actual,
-    isClaudeCodeChannelsEnabled: vi.fn().mockReturnValue(false),
+    isClaudeCodeChannelsMcpEnabled: vi.fn().mockReturnValue(false),
     loadConfig: vi.fn().mockReturnValue(loadedConfig),
     loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
   };
@@ -275,7 +275,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('untracks workspace .pan/ artifacts when tracked and working tree is clean (AC22)', async () => {
       const workspace = join(tmpdir(), `pan-1215-ac22-${Date.now()}`);
       mkdirSync(join(workspace, '.pan'), { recursive: true });
-      execSync('git init', { cwd: workspace });
+      execSync('git init --initial-branch=main', { cwd: workspace });
       execSync('git config user.email "test@test.com"', { cwd: workspace });
       execSync('git config user.name "Test"', { cwd: workspace });
       writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
@@ -300,7 +300,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('warns and skips untrack when .pan/ paths have uncommitted changes (AC23)', async () => {
       const workspace = join(tmpdir(), `pan-1215-ac23-${Date.now()}`);
       mkdirSync(join(workspace, '.pan'), { recursive: true });
-      execSync('git init', { cwd: workspace });
+      execSync('git init --initial-branch=main', { cwd: workspace });
       execSync('git config user.email "test@test.com"', { cwd: workspace });
       execSync('git config user.name "Test"', { cwd: workspace });
       writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
@@ -328,7 +328,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('short-cuits .pan/ cleanup when neither file is tracked (AC24)', async () => {
       const workspace = join(tmpdir(), `pan-1215-ac24-${Date.now()}`);
       mkdirSync(join(workspace, '.pan'), { recursive: true });
-      execSync('git init', { cwd: workspace });
+      execSync('git init --initial-branch=main', { cwd: workspace });
       execSync('git config user.email "test@test.com"', { cwd: workspace });
       execSync('git config user.name "Test"', { cwd: workspace });
       writeFileSync(join(workspace, 'readme.md'), '# test');
@@ -363,7 +363,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('checkpoint after cleanup excludes previously tracked .pan/ artifacts (AC28)', async () => {
       const workspace = join(tmpdir(), `pan-1215-ac28-${Date.now()}`);
       mkdirSync(join(workspace, '.pan'), { recursive: true });
-      execSync('git init', { cwd: workspace });
+      execSync('git init --initial-branch=main', { cwd: workspace });
       execSync('git config user.email "test@test.com"', { cwd: workspace });
       execSync('git config user.name "Test"', { cwd: workspace });
       writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');

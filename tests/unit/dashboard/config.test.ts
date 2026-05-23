@@ -34,7 +34,16 @@ function restoreEnv(snapshot: EnvSnapshot) {
   }
 }
 
-const ENV_KEYS = ['API_PORT', 'PORT', 'HOST', 'LINEAR_API_KEY', 'ANTHROPIC_API_KEY', 'DASHBOARD_URL', 'PANOPTICON_HOME'];
+const ENV_KEYS = [
+  'API_PORT',
+  'PORT',
+  'HOST',
+  'LINEAR_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'DASHBOARD_URL',
+  'PANOPTICON_HOME',
+  'PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY',
+];
 
 let envSnapshot: EnvSnapshot;
 
@@ -42,6 +51,7 @@ beforeEach(() => {
   envSnapshot = captureEnv(ENV_KEYS);
   // Clear all relevant env vars so each test starts from a clean baseline
   for (const k of ENV_KEYS) delete process.env[k];
+  process.env['PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
 });
 
 afterEach(() => {

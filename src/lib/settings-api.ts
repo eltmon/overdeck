@@ -175,6 +175,11 @@ export interface ApiSettingsConfig {
     nous?: string;
     dashscope?: string;
   };
+  agents?: {
+    rtk?: {
+      enabled?: boolean;
+    };
+  };
   tts?: ApiTtsConfig;
   openrouter?: {
     favorites?: string[];
@@ -189,8 +194,10 @@ export interface ApiSettingsConfig {
     rally?: string;
   };
   experimental?: {
-    /** Use Claude Code Channels for prompt delivery to eligible work agents. */
+    /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
+    /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
+    claudeCodeChannelsMcp?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.
@@ -527,6 +534,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
       default_conversation_model: getDefaultConversationModelApi(),
     },
     api_keys: config.apiKeys,
+    agents: {
+      rtk: {
+        enabled: config.rtk?.enabled ?? false,
+      },
+    },
     tts: toApiTtsConfig(config.tts),
     openrouter: {
       favorites: config.openrouterFavorites,
@@ -551,6 +563,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tracker_keys: config.trackerKeys,
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
+      claudeCodeChannelsMcp: config.experimental?.claudeCodeChannelsMcp ?? false,
     },
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
@@ -615,6 +628,10 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   }
 
+  if (config.agents?.rtk !== undefined) {
+    doc.setIn(['agents', 'rtk'], config.agents.rtk);
+  }
+
   if (config.tts !== undefined) {
     for (const [key, value] of Object.entries(config.tts)) {
       doc.setIn(['tts', key], value);
@@ -673,6 +690,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
     },
+    agents: settings.agents?.rtk !== undefined
+      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
+      : undefined,
     tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
@@ -698,7 +718,10 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : undefined,
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
-      ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
+      ? {
+          claudeCodeChannels: settings.experimental.claudeCodeChannels,
+          claudeCodeChannelsMcp: settings.experimental.claudeCodeChannelsMcp,
+        }
       : undefined,
     claude: settings.claude?.permissionMode
       ? { permissionMode: settings.claude.permissionMode }
@@ -734,6 +757,14 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    agents: {
+      ...current.agents,
+      ...updates.agents,
+      rtk: {
+        ...current.agents?.rtk,
+        ...updates.agents?.rtk,
+      },
     },
     tts: {
       ...current.tts,
@@ -851,6 +882,18 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
+  if (settings.agents !== undefined) {
+    if (!isRecord(settings.agents)) {
+      errors.push('agents must be an object');
+    } else if (settings.agents.rtk !== undefined) {
+      if (!isRecord(settings.agents.rtk)) {
+        errors.push('agents.rtk must be an object');
+      } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
+        errors.push('agents.rtk.enabled must be a boolean');
+      }
+    }
+  }
+
   if (settings.memory !== undefined) {
     if (settings.memory.per_day_cost_cap_usd !== undefined && settings.memory.per_day_cost_cap_usd < 0) {
       errors.push('memory.per_day_cost_cap_usd must be greater than or equal to 0');
@@ -871,9 +914,12 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (typeof settings.experimental !== 'object' || settings.experimental === null) {
       errors.push('experimental must be an object');
     } else {
-      const ccc = (settings.experimental as { claudeCodeChannels?: unknown }).claudeCodeChannels;
-      if (ccc !== undefined && typeof ccc !== 'boolean') {
+      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown };
+      if (experimental.claudeCodeChannels !== undefined && typeof experimental.claudeCodeChannels !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
+      }
+      if (experimental.claudeCodeChannelsMcp !== undefined && typeof experimental.claudeCodeChannelsMcp !== 'boolean') {
+        errors.push('experimental.claudeCodeChannelsMcp must be a boolean');
       }
     }
   }
