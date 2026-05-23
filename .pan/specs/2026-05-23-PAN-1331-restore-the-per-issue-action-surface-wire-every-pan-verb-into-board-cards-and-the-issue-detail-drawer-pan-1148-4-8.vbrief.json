@@ -1,0 +1,801 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1331: Restore the per-issue action surface — wire every `pan` verb into Board cards and the Issue Detail drawer (PAN-1148 §4.8)",
+    "updated": "2026-05-23T04:09:19.224Z"
+  },
+  "plan": {
+    "id": "pan-1331",
+    "title": "Restore the per-issue action surface — wire every `pan` verb into Board cards and the Issue Detail drawer (PAN-1148 §4.8)",
+    "status": "proposed",
+    "uid": "86eabc36-2861-4d24-a017-68368d817147",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:30:00.000Z",
+    "updated": "2026-05-23T04:09:19.224Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1331",
+        "label": "PAN-1331",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/docs/prds/planned/pan-dashboard-unified-redesign.md#48-action-surface",
+        "label": "PRD §4.8 Action surface",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
+        "label": "PAN-1148 (redesign that caused regression)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/243",
+        "label": "#243 (CLI↔dashboard parity audit — closed by this work)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/637",
+        "label": "#637 (Start — skip planning — subsumed)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/483",
+        "label": "#483 (Unify Resume Agent UX — subsumed)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "ui",
+      "action-surface",
+      "registry",
+      "PAN-1148-followup"
+    ],
+    "narratives": {
+      "Problem": "The PAN-1148 redesign deleted InspectorPanel.tsx and the inspector/ folder, reducing the per-issue action surface to a 4-button drawer footer (Reset · Stop · View PR · Merge) plus a Tell input. Roughly 20 issue-scoped `pan` verbs (plan/swarm/tell/done/review/restart/reset/recover/pause/unpause/untroubled/resume/sync-main/inspect/reopen/close/wipe/destroy/open/start--auto) have no dashboard entry point anywhere except the Command Deck project tree. Three actions (untroubled, per-bead inspect, open in editor) have zero UI on any surface. The existing `commandDeckSurfaceRegistry.ts` is a stale parity table referenced as dead code (`void`) in multiple components. This is not a redesign conformance gap — the PRD never specified a full action surface until §4.8 was added as an amendment.",
+      "Proposal": "Implement PRD §4.8 in one initiative: (1) Replace `commandDeckActions.ts` with a single canonical `issueActions` registry matching §4.8.1's catalog. (2) Build `<IssueActionMenu>` as the shared rendering primitive (one component, three modes: inline / overflow-only / hybrid). (3) Add `POST /api/issues/:id/beads/:beadId/inspect` server route. (4) Wire the new primitive into the Issue Detail drawer footer (canonical full-coverage surface). (5) Wire into Board cards with hybrid mode + right-click. (6) Wire into Pipeline rows and Agent cards (fix dead `⋯` button). (7) Reconcile ZoneActionStrip onto the new registry; delete `commandDeckActions.ts` + `commandDeckSurfaceRegistry.ts` and sweep all `void` references. (8) Ship a CLI↔dashboard parity test that asserts every issue-scoped `pan` verb has a registry entry and renders on the drawer — closes the long-standing #243 audit and makes the 'CLI is the lower bound' contract enforceable in CI."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Package the shared rendering as ONE component `<IssueActionMenu>` with a `mode` prop (`inline` | `overflow-only` | `hybrid`) rather than two sibling components or a headless hook + per-surface renderers.",
+        "rationale": "User explicitly waived input on this packaging detail. One component keeps call sites trivial (`<IssueActionMenu issueId={id} mode='hybrid' />`), centralizes the inline-vs-overflow decision, and matches the PRD's 'one shared primitive' phrasing. The internal `useIssueActions(issueId)` hook stays exported so a future surface needing custom layout can still use it."
+      },
+      {
+        "summary": "Registry lives at `src/dashboard/frontend/src/lib/issueActions.ts`; per-action client handlers live in `src/dashboard/frontend/src/lib/issueActions/` (one file per logical group: planning, lifecycle, review, agent-control, workspace, destructive, navigation).",
+        "rationale": "Mirrors the codebase's existing convention of a `lib/<thing>.ts` index module with implementation in a sibling folder. Keeps each handler file small and unit-testable in isolation; keeps the registry itself a thin declarative table."
+      },
+      {
+        "summary": "Right-click context-menu support is scoped to Board cards only. Issue Detail drawer body does NOT get a right-click handler.",
+        "rationale": "PRD §4.8.3 explicitly calls out right-click only on the Board card row. Drawer footer already exposes the full action set inline + ⋯ overflow, so a context menu would be redundant. Avoiding a drawer-body right-click handler also avoids shadowing the browser-native right-click on text content the user may want to copy/inspect."
+      },
+      {
+        "summary": "Merge stays human-only and is surfaced via the drawer's `pinRight` slot (using the existing `<MergeButton>` component), NOT via the registry. The registry only catalogs actions that can be triggered programmatically.",
+        "rationale": "PRD §4.8.2 hard rule: 'Merge stays human-only; no agent or automation path may invoke it.' Keeping Merge out of the registry prevents an automation harness from ever invoking it through the registry's handler interface."
+      },
+      {
+        "summary": "Phase-primary inline selection (the 1-2 buttons surfaced before ⋯) is data-driven via a `phasePrimary: PipelinePhase[]` field on each registry entry, filtered by the live phase from `derivePipelineState()`. The PRD §4.8.3 phase table is encoded directly in the registry, not in the renderer.",
+        "rationale": "Keeps the inline-vs-overflow decision testable in isolation (`getPhasePrimaryActions(phase)` is a pure function over the registry) and makes it trivial to A/B different phase mappings without touching JSX."
+      }
+    ],
+    "items": [
+      {
+        "id": "registry",
+        "title": "Create canonical `issueActions` registry module matching PRD §4.8.1 catalog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1331",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "menu-primitive",
+            "drawer-wire",
+            "board-wire",
+            "pipeline-wire",
+            "agents-wire",
+            "deck-reconcile",
+            "deck-zone-actions",
+            "parity-test"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/lib/issueActions.ts` exporting (a) `IssueActionKey` union type with one key per PRD §4.8.1 row (plan, autoPlan, watchPlanning, donePlanning, startAgent, startSkipPlanning, swarm, tell, doneWork, requestReview, restartReview, recoverReview, stopAgent, pause, unpause, untroubled, recoverAgent, resumeSession, switchModel, syncMain, inspectBead, reopen, closeOut, wipe, destroyWorkspace, open, resetIssue, viewPr), (b) `IssueActionEntry` interface (`key`, `label`, `panVerb`, `endpoint`, `enabledWhen(state)`, `phasePrimary: PipelinePhase[]`, `kind: 'safe'|'dialog'|'destructive'`, `group`), (c) the full `ISSUE_ACTIONS: IssueActionEntry[]` table populated from §4.8.1, (d) `getEnabledActions(state)` and `getPhasePrimaryActions(state, phase)` pure selector functions. No React, no JSX, no handlers — pure declarative metadata + selector logic. Reuse the existing `derivePipelineState()` from `commandDeckActions.ts` (extract it into its own module if needed). Comprehensive unit tests for the selectors against fixture states covering each PRD §4.8.3 phase row.",
+          "WhyInspect": "This bead is the foundation every other bead encodes assumptions about. A wrong shape for `IssueActionEntry`, a missing action key, or a flawed `enabledWhen` predicate cascades into every surface — work agent could redo half the consumers if this is wrong. `inspectionDepth: deep` because the registry also encodes the §4.8.3 phase-primary mapping, which the inspector should verify against the PRD table line-by-line."
+        },
+        "subItems": [
+          {
+            "id": "registry.ac1",
+            "title": "`IssueActionKey` union contains one key for every row in PRD §4.8.1 (28 keys including the 'View PR' link surface but excluding 'Merge to main' per Decision D6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry.ac2",
+            "title": "Every registry entry has a non-empty `label`, a `panVerb` that matches an actual CLI command (or null for client-only actions like View PR), an `endpoint` (or null), an `enabledWhen` predicate, a `phasePrimary` array (may be empty), a `kind`, and a `group`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry.ac3",
+            "title": "`getPhasePrimaryActions(state, 'QUEUED_FOR_PLAN')` returns `[plan, startAgent]` in order; same exhaustive check for every phase row in PRD §4.8.3 (PLANNING → [watchPlanning, donePlanning], Planned-idle → [startAgent], WORK_RUNNING → [tell, doneWork], INPUT → [open, tell], REVIEW_RUNNING/SHIP_RUNNING → [tell, recoverAgent], CHANGES_REQUESTED → [open, requestReview], STUCK → [recoverAgent, tell], READY_TO_MERGE → [viewPr, merge], MERGED → [closeOut])",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry.ac4",
+            "title": "Unit tests cover the selector functions with fixtures for every PRD §4.8.3 phase row; tests are added to `npm test` and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry.ac5",
+            "title": "`derivePipelineState()` is extracted into its own module if not already isolated, and is the SINGLE source of phase classification consumed by both the registry selectors and the Board card's verb badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-endpoint",
+        "title": "Add `POST /api/issues/:id/beads/:beadId/inspect` server route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an Effect-based POST route at `/api/issues/:id/beads/:beadId/inspect` in `src/dashboard/server/routes/issues.ts`. Accept JSON body `{ deep?: boolean }`. Resolve project via `resolveProjectFromIssue()`, derive workspace path via the standard `workspaces/feature-<id-lowercase>` convention (mirror logic from `src/cli/commands/inspect.ts` lines 41-64), and call `spawnInspectAgent({ projectKey, projectPath, issueId, beadId, workspace, branch: 'feature/<id>' }, { deep })`. Return `{ success, runId, tmuxSession }` on success; HTTP 4xx with a JSON `{ error }` on missing workspace or unknown project. Use the existing `execAsync` / `fs/promises` / Effect FileSystem service — NO `execSync`, NO synchronous fs (per CLAUDE.md and the `no-execsync-server.md` rule). Integration test against a fixture workspace asserts the spawn call shape."
+        },
+        "subItems": [
+          {
+            "id": "inspect-endpoint.ac1",
+            "title": "POST /api/issues/:id/beads/:beadId/inspect responds 200 with `{ success: true, runId, tmuxSession }` when workspace and beadId are valid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-endpoint.ac2",
+            "title": "Responds 404 with `{ error }` when the issue cannot be resolved to a project, or when no workspace exists at the expected path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-endpoint.ac3",
+            "title": "Optional `{ deep: true }` body forwards `deep: true` to `spawnInspectAgent()`; absence defaults to fast inspection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-endpoint.ac4",
+            "title": "Route uses Effect / `execAsync` / `fs/promises` only — no `execSync` and no synchronous fs in any code path; verified by lint or grep at end of bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-endpoint.ac5",
+            "title": "Integration test in `src/dashboard/server/routes/__tests__/issues.inspect.test.ts` covers happy path + unknown issue + missing workspace + deep flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-primitive",
+        "title": "Create `<IssueActionMenu>` shared primitive + `useIssueActions()` hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1331",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "drawer-wire",
+            "board-wire",
+            "pipeline-wire",
+            "agents-wire",
+            "deck-zone-actions",
+            "parity-test"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/IssueActionMenu/` containing: (a) `useIssueActions.ts` — hook that takes an issueId, gathers live state (agent, reviewStatus, workspace, lifecycle, planning, beads, phase) from `useDashboardStore` + React Query, runs every registry entry's `enabledWhen` predicate, partitions into `{ primary, secondary, overflow }` using `getPhasePrimaryActions()` + the kind-and-group rules, and exposes handlers (one per action) that perform the right side effect (fetch POST / open existing dialog / open PanOpenInPicker). (b) `IssueActionMenu.tsx` — component with `mode: 'inline' | 'overflow-only' | 'hybrid'` and optional `pinRight: IssueActionKey[]`. Inline renders ghost buttons; overflow renders a `<DropdownMenu>` triggered by a `⋯` button. Disabled actions render greyed with a tooltip showing the `enabledWhen` reason. Destructive actions trigger `useConfirm()` interstitial before firing. Dialog actions open existing components (`PlanDialog`, `SwitchModelModal`, `PanOpenInPicker`, etc.) — does NOT re-implement them. (c) Tests covering: every mode renders the right set; destructive prompts confirm; disabled actions are unclickable with tooltip; the open/close states of opened dialogs are tracked correctly.",
+          "WhyInspect": "Every surface bead (drawer-wire, board-wire, pipeline-wire, agents-wire, deck-zone-actions) imports this component. A wrong props API or a wrong handler-dispatch shape forces every consumer to change. `inspectionDepth: fast` (not deep) because the API surface is small and the inspector can verify it against the PRD §4.8.2 rules in a brief diff read."
+        },
+        "subItems": [
+          {
+            "id": "menu-primitive.ac1",
+            "title": "`<IssueActionMenu issueId mode='inline'>` renders ghost buttons for the primary set returned by `useIssueActions()`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac2",
+            "title": "`<IssueActionMenu issueId mode='overflow-only'>` renders a single `⋯` button that opens a dropdown containing every enabled action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac3",
+            "title": "`<IssueActionMenu issueId mode='hybrid'>` renders the primary set inline plus a `⋯` button containing secondary + overflow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac4",
+            "title": "`pinRight={['viewPr']}` renders View PR after a `flex-1` spacer; supports any registry key in the pin array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac5",
+            "title": "Destructive actions (wipe, destroy, closeOut, resetIssue) open the `useConfirm()` dialog with a typed confirmation; one-click destructive is impossible to trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac6",
+            "title": "Disabled actions render greyed with a `title` tooltip (or shadcn Tooltip) showing the reason from `enabledWhen`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac7",
+            "title": "Dialog actions (plan, swarm, tell, switchModel, open) open the existing dialog component without re-implementing it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-primitive.ac8",
+            "title": "Component tests cover all three modes, destructive confirm flow, disabled-with-tooltip rendering, and the dialog-open side effect for at least one dialog action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-pan-open",
+        "title": "Mount `PanOpenInPicker` so the `open` action has a working dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the existing `src/dashboard/frontend/src/components/PanOpenInPicker.tsx` into a portal/overlay reachable from the new `open` registry handler. The picker takes a `cwd` prop (workspace path). The handler computes the workspace path from the issueId via the existing workspace-info store/state. Add a small wrapper (`IssueOpenInDialog`) that translates `(issueId) → cwd` and mounts the picker in a modal overlay. Manual-test the chain: click Open in the menu → picker appears → selecting an editor actually launches it. If the picker is broken end-to-end, file a follow-up issue; this bead's scope is wiring only."
+        },
+        "subItems": [
+          {
+            "id": "mount-pan-open.ac1",
+            "title": "Clicking the `open` action from the menu opens `PanOpenInPicker` as an overlay with the correct `cwd` for the issue's workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-pan-open.ac2",
+            "title": "Closing the picker (escape / click-outside / close button) restores focus to the menu trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-pan-open.ac3",
+            "title": "If the issue has no workspace, the `open` action is disabled in the menu with a tooltip ('Workspace does not exist')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-pan-open.ac4",
+            "title": "Manual smoke-test verifies an editor actually launches when an option is selected; result documented in PR description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-wire",
+        "title": "Replace drawer footer with `<IssueActionMenu mode='hybrid'>` — canonical full-coverage surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite `src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx` to render `<IssueActionMenu issueId={id} mode='hybrid' pinRight={['viewPr']} />` plus the existing `<MergeButton>` pinned far right (Merge stays human-only and lives outside the registry per Decision D6). Delete the hardcoded Reset/Stop buttons — they're now in the menu. Remove the `void COMMAND_DECK_SURFACE_REGISTRY;` reference. Update `IssueDrawer.tsx` to delete its own `void COMMAND_DECK_SURFACE_REGISTRY;` reference (handled here, not in deck-cleanup, because they're in the same drawer subtree). Update `IssueDrawer.test.tsx` to assert the new footer's action coverage."
+        },
+        "subItems": [
+          {
+            "id": "drawer-wire.ac1",
+            "title": "`DrawerActionBar` renders the phase-primary inline set for the issue's current phase via `<IssueActionMenu mode='hybrid'>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-wire.ac2",
+            "title": "`⋯` overflow on the drawer footer exposes every registry action enabled for the issue (full coverage — verified by snapshot test against a fixture in WORK_RUNNING and one in READY_TO_MERGE)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-wire.ac3",
+            "title": "View PR (when present) renders pinned right of the spacer; Merge to main (when ready) renders pinned far right via the existing `<MergeButton>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-wire.ac4",
+            "title": "The old hardcoded `data-testid='drawer-action-reset'` / `drawer-action-stop` buttons are gone; equivalent actions appear inside the menu and are reachable in the existing tests with new selectors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-wire.ac5",
+            "title": "No `void COMMAND_DECK_SURFACE_REGISTRY;` left in `DrawerActionBar.tsx` or `IssueDrawer.tsx`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-wire",
+        "title": "Wire `<IssueActionMenu mode='hybrid'>` into Board cards with right-click support",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an Action row to `IssueCard.tsx` per PRD §4.7.6: below the foot, 1px top border, `<IssueActionMenu issueId={id} mode='hybrid' />`. Revealed on card hover (pointer devices) per PRD §4.7.6; always visible when the issue has a running agent or a pending action. Add `onContextMenu` on the card root that prevents the browser default ONLY when at least one registry action is enabled (per Hazard H6) and opens the same menu the `⋯` would open. Update `KanbanBoard.tsx` to remove any legacy inline action snippets and the `void COMMAND_DECK_SURFACE_REGISTRY;` reference if present. Snapshot tests for Board card action rendering in 3-4 representative phases."
+        },
+        "subItems": [
+          {
+            "id": "board-wire.ac1",
+            "title": "Board cards render an Action row (per §4.7.6) with `<IssueActionMenu mode='hybrid'>` showing phase-primary inline + `⋯` overflow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-wire.ac2",
+            "title": "Action row is hidden by default on pointer devices, revealed on card hover, and always visible when the issue has a running agent or a pending action (e.g., STUCK, INPUT, READY_TO_MERGE)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-wire.ac3",
+            "title": "Right-click on the card opens the same overflow menu the `⋯` opens; browser-default context menu is only suppressed when the registry has at least one enabled action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-wire.ac4",
+            "title": "No `void COMMAND_DECK_SURFACE_REGISTRY;` left in `KanbanBoard.tsx`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-wire.ac5",
+            "title": "Snapshot tests cover the inline action set for at least four phases: QUEUED_FOR_PLAN, WORK_RUNNING, CHANGES_REQUESTED, READY_TO_MERGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-wire",
+        "title": "Wire `<IssueActionMenu mode='overflow-only'>` into Pipeline rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update `src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx` so each issue row renders `<IssueActionMenu issueId={id} mode='overflow-only' />` as a hover-revealed trailing slot (rows stay dense per PRD §4.8.3). Also support right-click on the row anchored to the same menu. Update `PipelineView.test.tsx` to assert the menu renders for at least one row."
+        },
+        "subItems": [
+          {
+            "id": "pipeline-wire.ac1",
+            "title": "Each Pipeline row has a `⋯` button on hover (or always-visible when an action is urgent) rendering `<IssueActionMenu mode='overflow-only'>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire.ac2",
+            "title": "Right-click on a row opens the same menu (per the right-click rule from H6: only suppress browser default when actions exist)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire.ac3",
+            "title": "Rows stay visually dense — no inline buttons added; the `⋯` is the only added affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire.ac4",
+            "title": "Existing PipelineView tests still pass; new test asserts the `⋯` button opens the menu and the menu contains at least one action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-wire",
+        "title": "Fix dead `⋯` button on Agents card — wire to `<IssueActionMenu mode='overflow-only'>` (agent-scoped subset)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the existing dead `⋯` button in `IssueAgentCard.tsx` (and any equivalent in `FleetAgentsView.tsx` / `GodView/AgentCard.tsx`) to render `<IssueActionMenu issueId={issueId} mode='overflow-only' agentScopeOnly />`. The new `agentScopeOnly` prop filters the registry to agent-control actions only (tell, stopAgent, pause, unpause, untroubled, recoverAgent, resumeSession, switchModel) per PRD §4.8.3 'Agents card' row. If the agent card lacks an issueId (rare orphan case), disable the button with a tooltip. Update tests to assert the menu actually opens."
+        },
+        "subItems": [
+          {
+            "id": "agents-wire.ac1",
+            "title": "Clicking the `⋯` on an Agent card opens an overflow menu containing tell, stopAgent, pause, unpause, untroubled, recoverAgent, resumeSession, switchModel (subset, agent-scoped only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-wire.ac2",
+            "title": "`<IssueActionMenu agentScopeOnly>` excludes issue-lifecycle actions (plan, swarm, closeOut, wipe, destroy, reopen, sync-main, inspect, open, viewPr) — verified by snapshot or assertion test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-wire.ac3",
+            "title": "Orphan agents without an issueId render the `⋯` button disabled with a tooltip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-wire.ac4",
+            "title": "No code path in `IssueAgentCard.tsx` calls `onClick={() => {}}` or otherwise leaves the `⋯` button as a no-op",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-zone-actions",
+        "title": "Reconcile `ZoneActionStrip` onto the new registry; delete `commandDeckActions.ts`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite `src/dashboard/frontend/src/components/CommandDeck/ZoneActionStrip.tsx` (657 lines) to render `<IssueActionMenu issueId={id} mode='hybrid'>` instead of its current bespoke 25-action switch statement. Move any zone-specific labeling/density rules into the registry as needed (most should be expressible via existing `phasePrimary` + `enabledWhen`). Update `useZoneAActions.ts` to provide the data the registry handlers consume rather than the legacy ActionKey set. Delete `src/dashboard/frontend/src/lib/commandDeckActions.ts` and its associated tests. Sweep `void COMMAND_DECK_SURFACE_REGISTRY;` references in `KanbanBoard.tsx`, `ZoneActionStrip.tsx`, `ProjectTree/ContainerNode.tsx`, `FeatureMetadata/BadgeBar.tsx`, `ZoneCOverviewTabs/*.tsx`. Update `ZoneActionStrip.test.tsx`, `IssueWorkbench.test.tsx`, and `CommandDeck.test.tsx` to test against the new primitive's behavior."
+        },
+        "subItems": [
+          {
+            "id": "deck-zone-actions.ac1",
+            "title": "`ZoneActionStrip.tsx` no longer contains a `renderAction(key)` switch statement; it renders `<IssueActionMenu mode='hybrid'>` (or two siblings if needed for the Command Deck's compact layout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac2",
+            "title": "`src/dashboard/frontend/src/lib/commandDeckActions.ts` is deleted; `getZoneAActions` / `flattenActions` / `ActionKey` are no longer exported anywhere",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac3",
+            "title": "Zero `void COMMAND_DECK_SURFACE_REGISTRY;` references remain in the codebase (verified by `grep -rn 'COMMAND_DECK_SURFACE_REGISTRY' src/dashboard/frontend`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac4",
+            "title": "`src/dashboard/frontend/src/lib/commandDeckSurfaceRegistry.ts` is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac5",
+            "title": "`ZoneActionStrip.test.tsx`, `IssueWorkbench.test.tsx`, `CommandDeck.test.tsx`, and `commandDeckActions.test.ts` are updated or removed; full test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac6",
+            "title": "Command Deck's project-tree right-click context menu uses the same registry — actions are not redefined; the existing tree context menu becomes a thin wrapper over the new hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-zone-actions.ac7",
+            "title": "Command Deck now exposes the previously-missing actions: `untroubled`, `inspectBead`, `open` (per PRD §4.8.3 'Add the gaps it still lacks')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parity-test",
+        "title": "CLI ↔ dashboard parity test wired into CI (closes #243)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.ts` that (a) defines `ISSUE_SCOPED_PAN_VERBS` — the canonical list of every issue-scoped `pan` verb: plan, plan-finalize, start, start --auto, swarm, tell, done, request-review, review --restart, review --reset (alias: recover), kill, pause, unpause, untroubled, recover, resume, sync-main, inspect, reopen, close, wipe, destroy, open. (b) Asserts every verb appears in the registry's `panVerb` field at least once. (c) Renders `<IssueActionMenu issueId='PAN-1331' mode='hybrid'>` against a fixture state that enables ALL actions and asserts every registry entry's `label` appears in the rendered output (modulo `agentScopeOnly` filter). (d) Includes a 'no orphan registry entries' check — every registry entry's `panVerb` resolves to a real CLI command (or is null for client-only actions like viewPr). The test is added to `npm test` and runs in CI."
+        },
+        "subItems": [
+          {
+            "id": "parity-test.ac1",
+            "title": "Test file at `src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.ts` exports a hardcoded `ISSUE_SCOPED_PAN_VERBS` array covering every verb listed in the AC of PAN-1331",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-test.ac2",
+            "title": "Test asserts every CLI verb in the list has at least one registry entry where `panVerb === verb`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-test.ac3",
+            "title": "Test renders the drawer's `<IssueActionMenu mode='hybrid'>` against a fixture state that enables every action, and asserts every registry entry's label appears in the DOM (either inline or in the open `⋯` menu)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-test.ac4",
+            "title": "Test asserts no registry entry has a `panVerb` that doesn't resolve to a real CLI command (cross-check against the actual list of files under `src/cli/commands/`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-test.ac5",
+            "title": "Test is run by `npm test` (and therefore CI); adding it does not increase the suite's runtime by more than ~2 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-test.ac6",
+            "title": "Issue #243 (and the subsumed #637, #483) are listed in the PR description as closed by this work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "registry",
+        "to": "menu-primitive",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "drawer-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "board-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "pipeline-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "agents-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "deck-zone-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "registry",
+        "to": "parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "drawer-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "board-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "pipeline-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "agents-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "deck-zone-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-primitive",
+        "to": "parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "inspect-endpoint",
+        "to": "registry",
+        "type": "informs"
+      },
+      {
+        "from": "mount-pan-open",
+        "to": "drawer-wire",
+        "type": "informs"
+      },
+      {
+        "from": "mount-pan-open",
+        "to": "board-wire",
+        "type": "informs"
+      },
+      {
+        "from": "deck-zone-actions",
+        "to": "parity-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1331-restore-the-per-issue-action-surface-wire-every-pan-verb-into-board-cards-and-the-issue-detail-drawer-pan-1148-4-8.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
