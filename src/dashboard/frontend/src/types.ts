@@ -90,6 +90,7 @@ export interface Agent {
   pid?: number;
   startedAt: string;
   lastActivity?: string;
+  hasLiveTmuxSession?: boolean;
   stoppedByUser?: boolean;
   paused?: boolean;
   pausedReason?: string;
