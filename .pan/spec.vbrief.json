@@ -1,0 +1,187 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1417: POST /api/review/:id/request is destructive on already-passed reviews — should refuse or take a --nudge flag",
+    "updated": "2026-05-23T11:28:22.561Z"
+  },
+  "plan": {
+    "id": "pan-1417",
+    "title": "POST /api/review/:id/request is destructive on already-passed reviews — should refuse or take a --nudge flag",
+    "status": "proposed",
+    "uid": "665a3247-e895-4bb4-bf2f-1f6d6e5fa93c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:45:00.000Z",
+    "updated": "2026-05-23T11:28:22.561Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1417",
+        "label": "PAN-1417",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
+        "label": "PAN-1414 (related — ship-dispatch staleness)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "review-pipeline",
+      "api",
+      "safety-gate"
+    ],
+    "narratives": {
+      "Problem": "POST /api/review/:id/request currently runs `shouldTreatAsRerun(existingStatus)` whenever `reviewStatus === 'passed'`, which unconditionally resets reviewStatus → pending, testStatus → pending, mergeStatus → pending, autoRequeueCount → 0, verificationStatus → pending. This is correct when code has drifted since review passed. It is actively harmful when the operator wanted to nudge ship dispatch (because the reactive scheduler missed) — they lose a fully-green pipeline state and must wait through a full re-review cycle for code that did not change. Observed live on PAN-1393 on 2026-05-23: an operator hit the endpoint to re-trigger ship dispatch, the endpoint wiped passed state, ~15 minutes wasted.",
+      "Proposal": "Add a drift gate to the `reviewStatus === 'passed'` branch of POST /api/review/:id/request. Read current workspace HEAD (using flyExecCmd for remote workspaces, plain execAsync for local) and compare against `existingStatus.reviewedAtCommit`. Default behavior when SHAs match (no drift) AND no flags set: refuse with HTTP 200 + `{ success: false, noCodeDrift: true, error, hint }` pointing operators at `?force=true` and `?nudge=true`. `?nudge=true` re-emits the `test.passed` lifecycle event ONLY (no status writes) when both reviewStatus and testStatus are passed — this is the 'I want ship to actually dispatch' knob for when the reactive scheduler missed. `?force=true` preserves the current destructive rerun (logged loudly). Drift detected (HEAD !== reviewedAtCommit) OR `reviewedAtCommit` undefined falls through to the existing destructive rerun — same behavior as today. Tests cover all branches."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Inline the drift-check and flag-handling logic in the existing route handler at src/dashboard/server/routes/workspaces.ts:3677 instead of extracting a helper module.",
+        "rationale": "The added logic is ~30 lines. Extracting a helper would mean a new file, new test file, and new import — churn that outweighs the modularity gain. The route handler already owns request-review semantics; this fits its scope."
+      },
+      {
+        "summary": "Accept `force` and `nudge` from both query string (?force=true) and JSON body ({ force: true }).",
+        "rationale": "The sibling /api/review/:id/trigger route already uses this dual-source pattern (workspaces.ts:3395-3398). Consistency reduces surprise for operators and matches the CLI's body-based call style."
+      },
+      {
+        "summary": "?nudge=true requires `testStatus === 'passed'`; reject with HTTP 400 otherwise.",
+        "rationale": "Nudge re-emits `test.passed`. Emitting that event when tests have not actually passed would falsely advance the pipeline to shipping, bypassing the test gate. The 400 + hint guides operators to the correct flag."
+      },
+      {
+        "summary": "Refusal returns HTTP 200 + `{ success: false, noCodeDrift: true, error, hint }`, not a 4xx.",
+        "rationale": "Consistent with existing patterns in the same route handler: `alreadyMerged: true` (line 3670) and `alreadyPassed: true` (line 3835) both return 200 with `success: false`. Existing CLI handles `!response.ok` as fatal — keeping 200 avoids that path for what is a soft refusal with a clear remediation hint."
+      },
+      {
+        "summary": "When `reviewedAtCommit` is undefined OR the HEAD lookup fails, fall through to the existing destructive rerun.",
+        "rationale": "Without a snapshot SHA we cannot prove no-drift. The conservative default preserves pre-PAN-1417 semantics for legacy rows and matches deacon.ts:2365 which also skips drift-check when `reviewedAtCommit` is missing."
+      },
+      {
+        "summary": "When drift IS detected (HEAD !== reviewedAtCommit) and no flag is set, behavior matches `?force=true`: fall through to destructive rerun.",
+        "rationale": "Drift means the code the review approved is no longer on disk — a fresh review is justified. This preserves correct behavior for the existing merge-agent rebase-conflict curl hint, which always involves a force-pushed HEAD."
+      },
+      {
+        "summary": "Do NOT add a --force flag to the `pan review request` CLI in this PR.",
+        "rationale": "The CLI's primary call sites (agents auto-requesting after review_blocked/failed) never hit the new gate because the gate only fires on `reviewStatus === 'passed'`. Adding a CLI flag that no caller exercises is dead surface. Out of scope for PAN-1417 — a future PR can add it if a real use case appears."
+      },
+      {
+        "summary": "Do NOT update the merge-agent rebase-conflict hint message at merge-agent.ts:592.",
+        "rationale": "A real rebase-conflict resolution always force-pushes a new HEAD, so drift IS detected naturally and the existing `curl -X POST /api/review/:id/request -d '{}'` hint continues to work without modification. Modifying the hint would be churn for no behavior change."
+      },
+      {
+        "summary": "Use the route handler's existing EventStoreService Effect pattern (yield* EventStoreService + Effect.promise) for the nudge `test.passed` emission.",
+        "rationale": "Matches workspaces.ts:3987-3991 and workspaces.ts:3545-3551 within this same handler. The alternate `initEventStore` + `appendAsync` pattern used by specialists.ts:501-507 would be inconsistent here and pull in a second import path."
+      },
+      {
+        "summary": "Tree-identical-rebase race (deacon hasn't yet updated reviewedAtCommit after a clean rebase) is accepted as a known limitation rather than handled inline.",
+        "rationale": "Operators can use `?nudge=true` if they know the rebase was tree-identical. Duplicating deacon.ts:2395-2414 tree-comparison logic inside the route handler is premature optimization. Document the limitation in a code comment; revisit if real usage hits it."
+      }
+    ],
+    "items": [
+      {
+        "id": "pan-1417-1",
+        "title": "Make POST /api/review/:id/request non-destructive on already-passed reviews; add ?force and ?nudge flags",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1417",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Modify the `reviewStatus === 'passed'` branch in `src/dashboard/server/routes/workspaces.ts` (around line 3677, inside the `postWorkspaceRequestReviewRoute` handler) to add a code-drift safety gate. Parse `force` and `nudge` flags from both query string and JSON body (mirror the /trigger route's pattern at workspaces.ts:3395-3398). Read the workspace HEAD via `git rev-parse HEAD` — use `flyExecCmd` for `workspaceInfo.isRemote`, plain `execAsync` for local — and compare against `existingStatus.reviewedAtCommit`. Branch logic: (a) `force=true` → preserve existing `shouldTreatAsRerun` destructive path, log `[request-review] FORCE: full reset requested by operator for <id>`; (b) `nudge=true` AND reviewStatus=passed AND testStatus=passed → re-emit `test.passed` via the route's existing `EventStoreService` (yield* pattern, matching workspaces.ts:3987-3991), do NOT touch any status fields, log `[request-review] NUDGE: re-emitting test.passed for <id> without state reset`, return `{ success: true, nudged: true, message }`; (c) `nudge=true` AND tests have not passed → HTTP 400 with `{ success: false, error: 'Cannot nudge — tests have not passed', hint: 'Use ?force=true for a full re-review or wait for tests to complete' }`; (d) no flags AND `reviewedAtCommit` is defined AND matches current HEAD (no drift) → HTTP 200 + `{ success: false, noCodeDrift: true, error: 'No code drift since review passed', hint: 'Use ?nudge=true to re-emit lifecycle events without resetting state, or ?force=true to force a full re-review' }`, log `[request-review] REFUSED: no code drift since review passed for <id> at <short-sha>`; (e) no flags AND drift detected OR `reviewedAtCommit` undefined OR HEAD lookup failed → fall through to the existing `shouldTreatAsRerun` destructive path unchanged. Wrap the HEAD lookup in try/catch — failure falls through to (e). Add vitest coverage in `src/dashboard/server/routes/__tests__/request-review-nudge.test.ts` exercising every branch above with mocked review-status, mocked git-info helper, and mocked EventStoreService."
+        },
+        "subItems": [
+          {
+            "id": "pan-1417-1.ac1",
+            "title": "When reviewStatus === 'passed' AND reviewedAtCommit === currentHeadSha AND neither force nor nudge is set, the endpoint returns HTTP 200 + { success: false, noCodeDrift: true, error: 'No code drift since review passed', hint: <mentions both ?force=true and ?nudge=true> } and does NOT mutate review-status (verified by reading status before and after).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac2",
+            "title": "When `?nudge=true` is sent AND reviewStatus === 'passed' AND testStatus === 'passed', the endpoint emits exactly one `test.passed` event via EventStoreService (payload includes the normalized issueId), returns HTTP 200 + { success: true, nudged: true, message }, and does NOT write to reviewStatus, testStatus, verificationStatus, autoRequeueCount, mergeStatus, readyForMerge, or any other status field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac3",
+            "title": "When `?nudge=true` is sent AND testStatus !== 'passed', the endpoint returns HTTP 400 + { success: false, error: 'Cannot nudge — tests have not passed', hint } and does NOT emit a `test.passed` event or mutate any status field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac4",
+            "title": "When `?force=true` is sent AND reviewStatus === 'passed', the endpoint preserves the current destructive `shouldTreatAsRerun` behavior: reviewStatus → pending, testStatus → pending, mergeStatus → pending, readyForMerge → false, autoRequeueCount → 0, verificationCycleCount → 0, verificationStatus → pending, notes cleared; dispatches review role; logs `[request-review] FORCE: full reset requested by operator for <id>`. Existing log line `[request-review] ${issueId}: forcing full review/test rerun from passed state` is preserved verbatim.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac5",
+            "title": "When reviewStatus === 'passed' AND reviewedAtCommit is defined AND currentHeadSha !== reviewedAtCommit (drift detected) AND no flags are set, the endpoint falls through to the existing destructive rerun path (same as `?force=true` outcome). This preserves correct behavior for the merge-agent rebase-conflict curl hint and for any operator who legitimately rebased before re-requesting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac6",
+            "title": "When reviewStatus === 'passed' AND reviewedAtCommit is undefined (legacy row) AND no flags are set, the endpoint falls through to the existing destructive rerun path. When the HEAD lookup throws (e.g. workspace path missing, git unavailable, remote VM unreachable), the endpoint also falls through to the destructive path with a warning log — never a 5xx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac7",
+            "title": "Both `force` and `nudge` are accepted from either the URL query string (?force=true / ?nudge=true) OR the JSON request body ({ force: true } / { nudge: true }). When both are sent, `force` takes precedence (full reset wins over nudge). When neither is sent and the no-drift gate refuses, the response hint mentions BOTH flags so operators can pick the right one.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac8",
+            "title": "Remote workspaces (workspaceInfo.isRemote === true) read HEAD via `flyExecCmd(vmName, 'cd <path> && git rev-parse HEAD')` with a 30s timeout, mirroring the existing pattern at workspaces.ts:3495-3503. Local workspaces use plain `execAsync('git rev-parse HEAD', { cwd: workspacePath })`. Both are wrapped in try/catch and fall through on failure (AC6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac9",
+            "title": "Vitest unit-test file at `src/dashboard/server/routes/__tests__/request-review-nudge.test.ts` exercises every branch (AC1, AC2, AC3, AC4, AC5, AC6, AC7) against the postWorkspaceRequestReviewRoute handler with mocked getReviewStatusSync, mocked setReviewStatus, mocked EventStoreService, mocked getWorkspaceInfoForIssue, and mocked execAsync. Tests use `vi.useFakeTimers()` if any retry/timeout paths are exercised. `npm run typecheck`, `npm run lint`, and `npm test` all pass on the workspace after the change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1417-1.ac10",
+            "title": "Regression: `pan review request <id>` CLI continues to work for its primary use case (reviewStatus === 'blocked' or 'failed' — agent re-requesting after fixing feedback). That path is untouched because the new gate only fires on reviewStatus === 'passed'. No CLI changes are required and no existing CLI tests need updating.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1417-post-api-review-id-request-is-destructive-on-already-passed-reviews-should-refuse-or-take-a-nudge-flag.vbrief.json"
+    }
+  }
+}

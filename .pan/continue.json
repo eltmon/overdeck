@@ -1,0 +1,118 @@
+{
+  "version": "1",
+  "issueId": "PAN-1417",
+  "created": "2026-05-23T11:21:34.405Z",
+  "updated": "2026-05-23T11:45:00.000Z",
+  "gitState": { "branch": "feature/pan-1417", "sha": "5f67b8be3", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Inline the drift-check + flag-handling in the existing /api/review/:id/request route handler instead of extracting a helper module.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Accept ?force and ?nudge from EITHER query string OR JSON body, matching the existing /api/review/:id/trigger route's dual-source parsing pattern.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Detect drift by reading `git rev-parse HEAD` in the workspace (using flyExecCmd for remote workspaces) and comparing against `existingStatus.reviewedAtCommit`. Mirror the existing pattern at workspaces.ts:3903-3905 and deacon.ts:2381-2382.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "?nudge=true requires `testStatus === 'passed'` — otherwise return HTTP 400 with a clear hint. Re-emitting `test.passed` only makes sense if tests have actually passed; without that guard nudge would falsely advance the pipeline to shipping.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Refusal returns HTTP 200 with `{ success: false, noCodeDrift: true, error, hint }`. Matches existing patterns for `alreadyMerged: true` (line 3670) and `alreadyPassed: true` (line 3835) in the same route — those use 200+success:false rather than 4xx.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "When `reviewedAtCommit` is undefined (legacy data) or the HEAD lookup fails, fall through to the existing `shouldTreatAsRerun` destructive path. Without a snapshot SHA we cannot prove no-drift; the conservative default preserves pre-PAN-1417 semantics for those rows.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "When drift IS detected (HEAD !== reviewedAtCommit) and no flag is set, behavior matches `?force=true` — fall through to the destructive rerun. Drift means the reviewed code is no longer what's on disk, so a fresh review is justified.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Do NOT add a --force flag to the `pan review request` CLI. The CLI's primary call sites (agents auto-requesting after review_blocked/failed) never hit the new gate (the gate only fires on `reviewStatus === 'passed'`), so no CLI plumbing is needed. Out of scope for PAN-1417.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Do NOT update the merge-agent rebase-conflict hint message at merge-agent.ts:592 to mention `?force=true`. A real rebase-conflict resolution always force-pushes a new HEAD, so drift IS detected naturally and the existing curl hint continues to work without modification.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "?nudge=true re-emits the `test.passed` event via `eventStore.append({ type: 'test.passed', timestamp, payload: { issueId } })` (the same shape emitted at specialists.ts:503-507). The reactive scheduler at cloister/service.ts:390 maps that to `onIssueStateChange('shipping')`, which dispatches the ship role — exactly the behavior we want without touching status fields.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Log loudly on both `?force=true` and successful nudge so operators can grep for them in deacon logs: `[request-review] FORCE: full reset requested by operator for <id>` and `[request-review] NUDGE: re-emitting test.passed for <id> without state reset`.",
+      "recordedAt": "2026-05-23T11:45:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Legacy review-status rows may have `reviewedAtCommit === undefined`. If we treat 'no SHA snapshot' as 'no drift', we would refuse legitimate re-reviews on legacy data.",
+      "mitigation": "Treat undefined `reviewedAtCommit` as drift — fall through to the existing destructive rerun path. This preserves pre-PAN-1417 semantics for legacy rows and aligns with deacon.ts:2365 which also skips drift-check when `reviewedAtCommit` is missing."
+    },
+    {
+      "id": "H2",
+      "summary": "Remote workspaces (fly.io VMs) need `flyExecCmd` to read HEAD — a direct `execAsync('git rev-parse HEAD', { cwd })` would fail because the path doesn't exist on the dashboard host.",
+      "mitigation": "Check `workspaceInfo.isRemote` (same pattern used at workspaces.ts:3495 for `git push origin`). Use `flyExecCmd(vmName, 'cd ' + workspacePath + ' && git rev-parse HEAD')` for remote; plain `execAsync` for local. Wrap in try/catch — on lookup failure, fall through to destructive rerun (hazard H1 mitigation applies)."
+    },
+    {
+      "id": "H3",
+      "summary": "Tree-identical rebase race: if the deacon hasn't yet patrol-updated `reviewedAtCommit` after a clean rebase (60s cadence), our drift check sees a SHA mismatch and falls through to destructive rerun — wasteful for code the review already approved.",
+      "mitigation": "Acceptable trade-off. The operator can use `?nudge=true` if they know the rebase was tree-identical. Implementing tree-identical detection inline would duplicate deacon.ts:2395-2414 logic; defer that optimization unless it shows up in real usage. Documented as a known limitation in the route handler comment."
+    },
+    {
+      "id": "H4",
+      "summary": "If `?nudge=true` is sent when reviewStatus or testStatus is NOT 'passed', re-emitting `test.passed` would falsely advance the pipeline to shipping — bypassing the review/test gates entirely.",
+      "mitigation": "Gate nudge on `existingStatus.reviewStatus === 'passed' && existingStatus.testStatus === 'passed'`. Reject with HTTP 400 + hint when either is missing. The hint distinguishes 'tests haven't passed' from 'review hasn't passed' for clearer operator UX."
+    },
+    {
+      "id": "H5",
+      "summary": "Concurrent calls: two operators (or one operator + a script) could hit the endpoint in quick succession. The first call's drift check might race with a deacon-driven reset.",
+      "mitigation": "Use `getReviewStatusSync` once at the start of the handler (same as current code at line 3666) and operate on the snapshot. The deacon's reset writes synchronously; on race we accept the deacon's last-writer-wins behavior. No new race introduced — the existing route already has this characteristic."
+    },
+    {
+      "id": "H6",
+      "summary": "Existing log messages may be grep'd by ops dashboards or alerting — e.g. `[request-review] ${issueId}: forcing full review/test rerun from passed state` (workspaces.ts:3695).",
+      "mitigation": "Preserve that log line verbatim for the `?force=true` branch. Add NEW log lines for the new branches: `[request-review] FORCE:`, `[request-review] NUDGE:`, `[request-review] REFUSED: no code drift since review passed on HEAD <sha>`. Do not delete or rename any existing logs in this PR."
+    },
+    {
+      "id": "H7",
+      "summary": "EventStore.append must use the async API (`appendAsync` in specialists.ts:503 OR `Effect.runPromise(eventStore.append(...))` as the route already does — workspaces.ts:3987). Mixing the two patterns in the same handler is a footgun.",
+      "mitigation": "Use the route handler's existing `EventStoreService` Effect pattern (yield* + Effect.promise) consistent with workspaces.ts:3987-3991 and workspaces.ts:3545-3551. Do not import `initEventStore`/`appendAsync` — that's the alternate codepath used by specialists.ts and would be inconsistent here."
+    },
+    {
+      "id": "H8",
+      "summary": "If the nudge path emits `test.passed` while `readyForMerge` is already true (e.g. ship dispatched but human is re-nudging), it will trigger `onIssueStateChange('shipping')` again. That re-dispatches ship — fine in most cases but may interfere with an in-flight ship agent.",
+      "mitigation": "`onIssueStateChange('shipping')` already guards against duplicate ship dispatches via the reactive scheduler's de-dup logic (reactive-scheduler.test.ts:237). Nudge is safe to re-emit — it's idempotent from the dispatcher's perspective. Document this in the route handler comment."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T11:21:34.405Z",
+      "reason": "planning",
+      "note": "Initial planning session — explored route handler at workspaces.ts:3653, reviewed shouldTreatAsRerun, reviewedAtCommit/deacon drift detection, test.passed emission pattern. Confirmed only caller is the pan review request CLI; dashboard frontend uses /trigger and /reset (unaffected).",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
