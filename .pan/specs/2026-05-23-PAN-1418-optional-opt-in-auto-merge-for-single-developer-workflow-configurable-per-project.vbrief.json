@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
-    "updated": "2026-05-23T16:29:46.144Z"
+    "updated": "2026-05-23T17:07:13.894Z"
   },
   "plan": {
     "id": "pan-1418",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 11,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-23T16:29:46.144Z",
+    "updated": "2026-05-23T17:07:13.894Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
@@ -1128,55 +1128,55 @@
         "phase": "review",
         "issueId": "PAN-1418",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-23T16:29:43.664Z",
+        "updatedAt": "2026-05-23T17:07:13.345Z",
         "work": {
-          "updatedAt": "2026-05-23T16:29:43.664Z",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-23T16:29:43.664Z",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-23T16:29:43.664Z"
+              "at": "2026-05-23T17:07:13.345Z"
             }
           ]
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-05-23T16:29:43.664Z",
-          "notes": "Stale review head plus CSRFable auto-merge cancel endpoint",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-05-23T16:29:43.664Z",
-              "notes": "Stale review head plus CSRFable auto-merge cancel endpoint"
+              "at": "2026-05-23T17:07:13.345Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-23T16:29:43.664Z",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T16:29:43.664Z"
+              "at": "2026-05-23T17:07:13.345Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-23T16:29:43.664Z",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-23T16:29:43.664Z",
+          "updatedAt": "2026-05-23T17:07:13.345Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T16:29:43.664Z"
+              "at": "2026-05-23T17:07:13.345Z"
             }
           ],
           "readyForMerge": false,
