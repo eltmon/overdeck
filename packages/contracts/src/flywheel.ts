@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 
 export const FlywheelRunId = Schema.String.check(Schema.isPattern(/^RUN-\d+$/))
 export type FlywheelRunId = typeof FlywheelRunId.Type
@@ -146,6 +146,36 @@ export const FlywheelParkedItem = Schema.Struct({
   parkedAt: Schema.optional(Schema.String),
 })
 
+export const FlywheelSuggestionAction = Schema.Literals([
+  "start",
+  "resume",
+  "plan",
+  "review",
+  "merge",
+  "unblock",
+  "park",
+  "investigate",
+  "wait",
+])
+export type FlywheelSuggestionAction = typeof FlywheelSuggestionAction.Type
+
+export const FlywheelSuggestionPriority = Schema.Literals(["urgent", "high", "medium", "low"])
+export type FlywheelSuggestionPriority = typeof FlywheelSuggestionPriority.Type
+
+export interface FlywheelSuggestion {
+  action: FlywheelSuggestionAction
+  issueId?: string | undefined
+  rationale: string
+  priority: FlywheelSuggestionPriority
+}
+
+export const FlywheelSuggestion = Schema.Struct({
+  action: FlywheelSuggestionAction,
+  issueId: Schema.optional(Schema.String),
+  rationale: Schema.String,
+  priority: FlywheelSuggestionPriority,
+})
+
 export interface FlywheelSystemStatus {
   mainHead: string
   ramUsedMb: number
@@ -176,6 +206,7 @@ export interface FlywheelStatus {
   substrateBugs: ReadonlyArray<FlywheelSubstrateBug>
   agents: ReadonlyArray<FlywheelAgent>
   parked: ReadonlyArray<FlywheelParkedItem>
+  suggestions: ReadonlyArray<FlywheelSuggestion>
   system: FlywheelSystemStatus
   openQuestions: ReadonlyArray<string>
   ticks: number
@@ -192,6 +223,9 @@ export const FlywheelStatus = Schema.Struct({
   substrateBugs: Schema.Array(FlywheelSubstrateBug),
   agents: Schema.Array(FlywheelAgent),
   parked: Schema.Array(FlywheelParkedItem),
+  suggestions: Schema.Array(FlywheelSuggestion).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
   system: FlywheelSystemStatus,
   openQuestions: Schema.Array(Schema.String),
   ticks: Schema.Number,
