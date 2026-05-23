@@ -1308,6 +1308,59 @@ export function decideSupervisorForWorkAgent(
   return { eligible: true };
 }
 
+async function prepareSupervisorForFreshLaunch(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
+  if (!supervisorDecision.eligible) {
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
+  }
+
+  const supervisorScriptPath = resolvePtySupervisorScriptPath();
+  if (!existsSync(supervisorScriptPath)) {
+    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+  }
+  await writePtyToken(agentId);
+  state.supervisorEnabled = true;
+  return { useSupervisor: true, supervisorScriptPath };
+}
+
+async function prepareSupervisorForRelaunch(
+  agentId: string,
+  state: AgentState,
+  model: string,
+  harness: 'claude-code' | 'pi',
+): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
+  if (state.supervisorEnabled !== true) {
+    return { useSupervisor: false };
+  }
+
+  const relaunchState: AgentState = { ...state, model, harness };
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, {
+    issueId: state.issueId || agentId.replace(/^agent-/, '').toUpperCase(),
+    workspace: state.workspace,
+    role: 'work',
+    model,
+    harness,
+    allowHost: state.hostOverride,
+  }, relaunchState);
+  if (!supervisorDecision.eligible) {
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
+  }
+
+  const supervisorScriptPath = resolvePtySupervisorScriptPath();
+  if (!existsSync(supervisorScriptPath)) {
+    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+  }
+  await writePtyToken(agentId);
+  state.supervisorEnabled = true;
+  return { useSupervisor: true, supervisorScriptPath };
+}
+
 function resolvePtySupervisorScriptPath(): string {
   return join(packageRoot, 'dist', 'pty-supervisor.js');
 }
@@ -2641,16 +2694,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     hostOverride: options.allowHost || undefined,
   };
 
-  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
-  let supervisorScriptPath: string | undefined;
-  if (supervisorDecision.eligible) {
-    supervisorScriptPath = resolvePtySupervisorScriptPath();
-    if (!existsSync(supervisorScriptPath)) {
-      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
-    }
-    await writePtyToken(agentId);
-    state.supervisorEnabled = true;
-  }
+  const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
 
@@ -2783,8 +2827,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role: 'work',
     isPlanning: false,
     channelsBridgeMcpConfig,
-    useSupervisor: state.supervisorEnabled === true,
-    supervisorScriptPath,
+    useSupervisor: supervisorLaunch.useSupervisor,
+    supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
   });
 
@@ -3274,6 +3318,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
+    const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
+    saveAgentStateSync(agentState);
     const fallbackContent = generateLauncherScriptSync({
       role: resumeRole,
       workingDir: agentState.workspace,
@@ -3286,6 +3332,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
         resumeRole,
         fallbackHarness,
       ),
+      useSupervisor: fallbackSupervisorLaunch.useSupervisor,
+      supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
@@ -3482,6 +3530,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
     agentState.harness = effectiveHarness;
+    const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
+    saveAgentStateSync(agentState);
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -3491,6 +3541,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       spawnMode: 'resume',
       resumeSessionId: sessionId,
       harness: effectiveHarness,
+      useSupervisor: supervisorLaunch.useSupervisor,
+      supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -3641,6 +3693,8 @@ export async function restartAgent(
 
   try {
     clearReadySignal(normalizedId);
+    const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, effectiveModel, effectiveHarness);
+    saveAgentStateSync(agentState);
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -3649,6 +3703,8 @@ export async function restartAgent(
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
       harness: effectiveHarness,
+      useSupervisor: supervisorLaunch.useSupervisor,
+      supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -3707,16 +3763,14 @@ export async function restartAgent(
 }
 
 /**
- * Check whether a tmux session has an active Claude Code process.
+ * Check whether a tmux session has an active agent runtime.
  * A session may exist with only a bare bash shell after Claude exits.
  */
-function isClaudeRunningInSession(sessionName: string): boolean {
+async function hasAgentRuntimeInSession(sessionName: string, harness: 'claude-code' | 'pi'): Promise<boolean> {
   try {
-    const panePids = listPaneValuesSync(sessionName, '#{pane_pid}');
+    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
     if (panePids.length === 0) return false;
-    const panePid = panePids[0]!;
-    const comm = execSync(`ps -p ${panePid} -o comm=`, { encoding: 'utf-8' }).trim();
-    return comm === 'claude';
+    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
   } catch {
     return false;
   }
@@ -3785,10 +3839,13 @@ export async function recoverAgent(
   // Check if already running — session may exist with only a bare shell
   // after Claude exited (zombie session). Kill it and recover.
   if (sessionExistsSync(normalizedId)) {
-    if (isClaudeRunningInSession(normalizedId)) {
+    const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+      ? state.harness
+      : 'claude-code';
+    if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
       return state;
     }
-    console.log(`[agents] ${normalizedId} tmux session is a zombie (no Claude process) — killing and recovering`);
+    console.log(`[agents] ${normalizedId} tmux session is a zombie (no ${recoveryHarness} runtime) — killing and recovering`);
     try { killSessionSync(normalizedId); } catch { /* ignore */ }
   }
 
@@ -3827,6 +3884,8 @@ export async function recoverAgent(
   const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
     ? state.harness
     : 'claude-code';
+  const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
+  saveAgentStateSync(state);
 
   if (recoveryHarness === 'pi') {
     // PAN-1055: Pi cannot consume the recovery prompt as a positional shell
@@ -3866,9 +3925,22 @@ export async function recoverAgent(
     return state;
   }
 
-  const claudeCmd = `${await getRoleRuntimeBaseCommand(state.model, agentId, recoveryRole, recoveryHarness)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
-  createSessionSync(normalizedId, state.workspace, claudeCmd, {
+  const recoveryLauncherContent = generateLauncherScriptSync({
+    role: recoveryRole,
+    workingDir: state.workspace,
+    changeDir: false,
+    setTerminalEnv: true,
+    providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
+    baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
+    promptInline: recoveryPrompt,
+    useSupervisor: recoverySupervisorLaunch.useSupervisor,
+    supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
+  });
+  const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+  await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);
+  createSessionSync(normalizedId, state.workspace, `bash ${launcherScript}`, {
     env: {
+      ...BLANKED_PROVIDER_ENV,
       PANOPTICON_AGENT_ID: normalizedId,
       PANOPTICON_ISSUE_ID: state.issueId || '',
       PANOPTICON_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),

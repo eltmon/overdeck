@@ -157,6 +157,40 @@ describe('spawnAgent PTY supervisor wiring', () => {
     });
   });
 
+  it.each([
+    ['Anthropic', 'claude-sonnet-4-6', {}],
+    ['GPT', 'gpt-5.4', {}],
+    ['Kimi', 'kimi-k2.6', {}],
+    ['MiniMax', 'minimax-m2.7', {}],
+    ['Bedrock', 'claude-sonnet-4-6', { CLAUDE_CODE_USE_BEDROCK: '1' }],
+    ['Vertex', 'claude-sonnet-4-6', { CLAUDE_CODE_USE_VERTEX: '1' }],
+    ['Foundry', 'claude-sonnet-4-6', { CLAUDE_CODE_USE_FOUNDRY: '1' }],
+  ])('keeps %s-routed Claude Code work agents supervisor-eligible', async (_label, model, env) => {
+    const { decideSupervisorForWorkAgent } = await import('../agents.js');
+    const previous = {
+      CLAUDE_CODE_USE_BEDROCK: process.env.CLAUDE_CODE_USE_BEDROCK,
+      CLAUDE_CODE_USE_VERTEX: process.env.CLAUDE_CODE_USE_VERTEX,
+      CLAUDE_CODE_USE_FOUNDRY: process.env.CLAUDE_CODE_USE_FOUNDRY,
+    };
+    delete process.env.CLAUDE_CODE_USE_BEDROCK;
+    delete process.env.CLAUDE_CODE_USE_VERTEX;
+    delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+    Object.assign(process.env, env);
+
+    try {
+      expect(decideSupervisorForWorkAgent('agent-pan-1405', {} as any, baseState({ model }))).toEqual({ eligible: true });
+    } finally {
+      for (const key of Object.keys(previous) as Array<keyof typeof previous>) {
+        const value = previous[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
   it('persists supervisorEnabled through state read/write', async () => {
     const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
 

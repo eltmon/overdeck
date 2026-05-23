@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getPtyTokenPath, PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from '../pty-token.js';
+import { getPtyTokenPath, PTY_TOKEN_HEADER, readPtyToken, readPtyTokenSync, writePtyToken, writePtyTokenSync } from '../pty-token.js';
 
 let tmpHome: string;
 let previousPanopticonHome: string | undefined;
@@ -32,6 +32,14 @@ describe('pty-token', () => {
 
   it('returns null when the token file does not exist', async () => {
     await expect(readPtyToken('missing-agent')).resolves.toBeNull();
+    expect(readPtyTokenSync('missing-agent')).toBeNull();
+  });
+
+  it('writes and reads tokens through the sync API', () => {
+    const token = writePtyTokenSync('agent-sync');
+
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
+    expect(readPtyTokenSync('agent-sync')).toBe(token);
   });
 
   it('writes the token under the agent directory with mode 0600', async () => {
