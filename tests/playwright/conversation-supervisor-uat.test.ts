@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { writeFile as writeFileAsync } from 'node:fs/promises';
+import { rm as rmAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { createServer as createHttpServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
@@ -138,6 +138,10 @@ function responseHeaders(response: Response): Record<string, string> {
 
 async function closeBridge(server: NetServer): Promise<void> {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+}
+
+async function removeTemporaryDirectory(path: string): Promise<void> {
+  await rmAsync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }
 
 async function runTmux(args: string[]): Promise<string> {
@@ -387,9 +391,9 @@ afterEach(async () => {
   if (originalTrustedOrigins === undefined) delete process.env.PANOPTICON_TRUSTED_ORIGINS;
   else process.env.PANOPTICON_TRUSTED_ORIGINS = originalTrustedOrigins;
   delete process.env.PANOPTICON_FRONTEND_DIR;
-  rmSync(tmpHome, { recursive: true, force: true });
-  rmSync(fakeHome, { recursive: true, force: true });
-  rmSync(workspace, { recursive: true, force: true });
+  await removeTemporaryDirectory(tmpHome);
+  await removeTemporaryDirectory(fakeHome);
+  await removeTemporaryDirectory(workspace);
   vi.doUnmock('../../src/dashboard/server/event-store.js');
   vi.doUnmock('../../src/lib/tmux.js');
 });
