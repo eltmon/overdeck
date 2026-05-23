@@ -28,7 +28,7 @@ The following files and directories are written by active code:
 | `mail/` | `messageAgent()` | Inbound message queue |
 | `initial-prompt.md` | `spawnAgent()` / `spawnRun()` | Prompt sent on startup |
 | `launcher.sh` | `spawnAgent()` / `spawnRun()` | Shell script that launches the run |
-| `pty-token` | `spawnAgent()` | Per-agent bearer token for PTY supervisor delivery |
+| `pty-token` | `spawnAgent()` / `spawnConversationSession()` | Per-agent bearer token for PTY supervisor delivery |
 | `output.log` | `messageAgent()` / capture | Captured output |
 | `completed` | `recoverAgent()` | Completion marker |
 | `health.json` | `recoverAgent()` | Last-known health snapshot |
@@ -38,10 +38,22 @@ The following files and directories are written by active code:
 
 ## Delivery artifacts
 
-New Claude Code work agents launch through the PTY supervisor by default. The
-legacy Claude Code Channels MCP bridge is opt-in for new spawns through
-`experimental.claudeCodeChannelsMcp: true`; when enabled, `spawnAgent()` writes
-`<workspace>/.pan/agent-mcp.json`, a bridge token under
+New Claude Code work agents and Claude Code conversation sessions launch through
+the PTY supervisor by default. Their launchers wrap Claude as
+`node <projectRoot>/dist/pty-supervisor.js claude ...`; the supervisor runs under
+Node 22, owns Claude's PTY master fd, and binds
+`${PANOPTICON_HOME}/sockets/pty-<id>.sock` at mode `0600`. Because the
+supervisor owns the PTY, a supervisor crash also terminates Claude; resume the
+session through the normal dashboard/Deacon flow.
+
+`deliverAgentMessage()` uses a three-tier router: PTY supervisor first, legacy
+Claude Code Channels MCP second, and tmux paste-buffer last. Docker workspaces
+are still excluded from supervisor wiring until host/container socket sharing is
+designed, and Pi keeps using its `rpc.in` FIFO.
+
+The legacy Claude Code Channels MCP bridge is opt-in for new work-agent spawns
+through `experimental.claudeCodeChannelsMcp: true`; when enabled,
+`spawnAgent()` writes `<workspace>/.pan/agent-mcp.json`, a bridge token under
 `~/.panopticon/bridge-tokens/`, and `state.channelsEnabled = true`. Existing
 agents with `channelsEnabled = true` continue to use Channels as the delivery
 fallback even when the MCP override is later disabled.

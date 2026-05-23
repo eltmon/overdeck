@@ -54,34 +54,38 @@ unit tests in `__tests__/panopticon-bridge.test.ts` and
 
 4. **Tail the bridge log.**
    - `tail -f ${PANOPTICON_HOME:-~/.panopticon}/logs/bridge-agent-pan-XXX.log`.
-   - For each delivered prompt you should see one JSON line per delivery,
-     e.g.:
+   - `deliverAgentMessage` writes the routing decision to this file. On a
+     healthy new agent the default decision is now `path: 'supervisor'`, because
+     the PTY supervisor is tried before Channels.
+   - A `path: 'channel'` line verifies the legacy MCP fallback only when the
+     supervisor tier is unavailable or when a caller explicitly forces Channels.
+     The bridge then writes a companion JSON line such as:
      ```
      {"ts":"2026-05-07T...","agentId":"agent-pan-XXX","contentLength":1234,"metaKeys":[]}
      ```
-     This is written by the bridge itself when it forwards a push as a
-     channel notification.
-   - The companion line written by `deliverAgentMessage` records the
-     decision (`path: 'channel'` for the success case,
-     `path: 'tmux', reason: 'socket-...'` for fallback). Both go to the
-     same `bridge-<id>.log` file.
 
 5. **Force a second delivery via `pan tell`.**
    - Run `pan tell PAN-XXX "echo smoke-test"`.
-   - The bridge log gains another entry, this time with
-     `caller: 'messageAgent:pan-tell'`. The agent's tmux pane should
-     show no typed text (the message went through the channel, not via
-     paste-buffer).
+   - With the supervisor healthy, the decision line should be
+     `path: 'supervisor'`. To test the Channels fallback itself, stop or remove
+     the PTY supervisor socket for this disposable smoke-test agent, then send a
+     second `pan tell` and expect `path: 'channel'` plus the bridge companion
+     line.
 
 ## Expected log signatures
 
-Successful channel push:
+Default supervisor push:
+```
+{"ts":"2026-...","agentId":"agent-pan-XXX","path":"supervisor","caller":"messageAgent:pan-tell"}
+```
+
+Legacy channel fallback push:
 ```
 {"ts":"2026-...","agentId":"agent-pan-XXX","path":"channel","caller":"messageAgent:pan-tell"}
 {"ts":"2026-...","agentId":"agent-pan-XXX","contentLength":17,"metaKeys":["caller"]}
 ```
 
-Fallback to tmux (transient bridge crash):
+Fallback to tmux (both sockets unavailable):
 ```
 {"ts":"2026-...","agentId":"agent-pan-XXX","path":"tmux","reason":"socket-post-failed: ...","caller":"messageAgent:pan-tell"}
 ```

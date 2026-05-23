@@ -239,50 +239,50 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
-## Claude Code Channels (experimental)
+## PTY supervisor for orchestrator delivery
+
+Claude Code work agents and Claude Code conversation sessions use the PTY
+supervisor as the preferred orchestrator-to-agent delivery path. The launcher
+wraps Claude as `node <projectRoot>/dist/pty-supervisor.js claude ...`, exports
+`PANOPTICON_AGENT_ID`, and writes a per-agent `pty-token` under
+`${PANOPTICON_HOME}/agents/<id>/pty-token` before the tmux session starts.
+
+The supervisor is Node 22-only because it owns a real PTY through
+`@homebridge/node-pty-prebuilt-multiarch`; do not run it under Bun. It binds
+`${PANOPTICON_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
+HTTP-on-unix POSTs, writes each delivered message into Claude's PTY input, and
+echoes the message into the tmux transcript so operators can see what was sent.
+
+`deliverAgentMessage(agentId, message, caller?)` is the single delivery
+primitive. In automatic mode it tries, in order:
+
+1. PTY supervisor socket (`path: "supervisor"`)
+2. legacy Claude Code Channels MCP socket for already-wired sessions
+3. tmux paste-buffer fallback
+
+Docker workspaces remain excluded from supervisor wiring until host/container
+socket sharing is designed; Pi keeps using its `rpc.in` FIFO. H1 lifecycle
+semantics apply: the supervisor owns Claude's PTY master fd, so if the
+supervisor process exits, Claude exits with it and the session must be resumed
+through the normal dashboard/Deacon flow.
+
+## Claude Code Channels (experimental legacy fallback)
 
 Reference: https://code.claude.com/docs/en/channels
 
-Claude Code Channels is a research-preview MCP capability that delivers
-orchestrator-to-agent messages over a stdio JSON-RPC transport instead of
-tmux send-keys. It exists because tmux paste-buffer delivery has a long
-tail of failure modes (paste before render, dropped Enter, partial text)
-that surface as silently-unanswered prompts; Channels removes the timing
-race entirely.
+Claude Code Channels is now a legacy fallback — see the PTY supervisor section
+above for the recommended transport. Channels remains only for already-running
+agents with `state.channelsEnabled = true` and for explicit diagnostic opt-in
+via `experimental.claudeCodeChannelsMcp: true`.
 
-The integration in this repo is **opt-in and off by default**, gated
-behind a single experimental flag in the dashboard Settings page
-(`experimental.claudeCodeChannels`). Eligibility is narrow on purpose:
-the path engages only for **work agents** running the **Claude Code**
-runtime with **Anthropic auth** (claude.ai OAuth or Console API key) on
-**non-Docker workspaces**. Codex, Cursor, Gemini, Cliproxy-routed-GPT,
-Bedrock, Vertex, Foundry, and Docker workspaces all stay on tmux send-keys
-unconditionally.
-
-**Architecture:**
-
-- `src/lib/channels/panopticon-bridge.ts` — per-agent Bun stdio MCP server.
-  Spawned by `claude --dangerously-load-development-channels server:panopticon-bridge`
-  using a workspace-local `.pan/agent-mcp.json`. Listens on
-  `${PANOPTICON_HOME}/sockets/agent-<id>.sock` (mode 0o600), accepts POSTs
-  of `{ content, meta? }`, and forwards each as a
-  `notifications/claude/channel` MCP frame.
-- `deliverAgentMessage(agentId, message, caller?)` in `src/lib/agents.ts`
-  is the **single delivery primitive** — eligibility check, socket POST
-  with 2s timeout, automatic tmux fallback on any failure mode (state
-  missing, socket missing, ENOENT, ECONNREFUSED, EPIPE, non-2xx, write
-  timeout). Callers stay caller-agnostic; the primitive owns the policy.
-- The dev-channels confirmation TUI dialog (`WARNING: Loading development
-  channels`) is dismissed automatically at agent startup via one
-  `sendRawKeystrokeAsync(C-m)` call, gated on `state.channelsEnabled`.
-
-**Scope:** only the work-role prompt-delivery sites in `src/lib/agents.ts`
-migrate. The following intentionally stay on `sendKeysAsync`:
-Cloister orchestration helpers outside work-message delivery, `src/lib/runtimes/`
-(non-Claude-Code runtimes), `src/dashboard/server/routes/conversations.ts`,
-and `src/dashboard/server/routes/misc.ts`. Bidirectional reply tools and
-dashboard-routed permission relay are out of scope and tracked as separate
-follow-up issues.
+`src/lib/channels/panopticon-bridge.ts` is a per-agent Bun stdio MCP server.
+When the diagnostic override is enabled, Claude is spawned with
+`--mcp-config <workspace>/.pan/agent-mcp.json --dangerously-load-development-channels server:panopticon-bridge`,
+the bridge listens on `${PANOPTICON_HOME}/sockets/agent-<id>.sock`, and
+`deliverAgentMessage` uses it only after the supervisor tier fails. The
+`WARNING: Loading development channels` dialog is dismissed only when that MCP
+config is actually wired; supervisor-only sessions must not receive this Enter
+keystroke.
 
 ## Dashboard Server Architecture (Effect + Raw WebSocket)
 
