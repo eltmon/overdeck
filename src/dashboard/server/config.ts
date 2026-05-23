@@ -69,6 +69,25 @@ export const ServerConfigLayer = Layer.effect(
       throw new ServerConfigError('API_PORT', `Invalid port value: "${portStr}"`);
     }
 
+    // PAN-1416 canonical-path guard. A dashboard started from a workspace cwd
+    // (`workspaces/feature-pan-XXX/`) must NEVER bind the primary port 3011 unless
+    // the operator explicitly opts in. Without this guard, a workspace dashboard
+    // started for Playwright UAT can hijack pan.localhost when the canonical
+    // dashboard is restarting, leaving the user looking at stale workspace code.
+    const cwdIsWorkspace = /\/workspaces\/feature-pan-/i.test(process.cwd());
+    const portWasExplicit = !!(process.env['API_PORT'] ?? process.env['PORT']);
+    const overrideAllowed = process.env['PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
+    if (cwdIsWorkspace && !portWasExplicit && !overrideAllowed) {
+      const msg = (
+        `Refusing to bind primary port ${port} from workspace cwd ${process.cwd()} ` +
+        `(PAN-1416). Workspace dashboards must set API_PORT to a non-primary port. ` +
+        `To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
+        `PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
+      );
+      console.error(`[panopticon] ${msg}`);
+      throw new ServerConfigError('API_PORT', msg);
+    }
+
     // Default to 0.0.0.0 so the panopticon-traefik docker container can reach the
     // dashboard via host-gateway routing. Binding to 127.0.0.1 leaves Traefik
     // returning 502 because it sees the host as 172.17.0.1 (docker bridge gateway)
