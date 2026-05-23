@@ -112,6 +112,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   kimi: 'Kimi',
   mimo: 'Xiaomi MiMo',
   nous: 'Nous Portal',
+  dashscope: 'Alibaba DashScope',
   openrouter: 'OpenRouter',
 };
 

@@ -18,6 +18,7 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
       mimo: false,
       openrouter: false,
       nous: false,
+      dashscope: false,
     },
     overrides: {
       'legacy.route': 'minimax-m2.7-highspeed',

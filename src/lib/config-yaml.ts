@@ -264,6 +264,7 @@ export interface YamlConfig {
       mimo?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
       nous?: ProviderConfig | boolean;
+      dashscope?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
@@ -293,6 +294,7 @@ export interface YamlConfig {
     mimo?: string;
     openrouter?: string;
     nous?: string;
+    dashscope?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -457,6 +459,7 @@ export interface NormalizedConfig {
     mimo?: string;
     openrouter?: string;
     nous?: string;
+    dashscope?: string;
   };
 
   /** Provider auth mode (subscription vs api-key) by provider */
@@ -1330,6 +1333,17 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       } else if (providers.nous !== undefined) {
         explicitlyDisabled.add('nous');
       }
+
+      // Alibaba DashScope
+      const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+      if (dashscope.enabled) {
+        result.enabledProviders.add('dashscope');
+        if (dashscope.api_key) {
+          result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
+        }
+      } else if (providers.dashscope !== undefined) {
+        explicitlyDisabled.add('dashscope');
+      }
     }
 
     // Merge tmux configuration
@@ -1471,6 +1485,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
         if (!explicitlyDisabled.has('nous')) {
           result.enabledProviders.add('nous');
+        }
+      }
+      if (config.api_keys.dashscope) {
+        result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
+        if (!explicitlyDisabled.has('dashscope')) {
+          result.enabledProviders.add('dashscope');
         }
       }
     }
@@ -1698,6 +1718,10 @@ function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled:
     config.apiKeys.nous = process.env.NOUS_API_KEY;
     if (!explicitlyDisabled.has('nous')) config.enabledProviders.add('nous');
   }
+  if (process.env.DASHSCOPE_API_KEY && !config.apiKeys.dashscope) {
+    config.apiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
+    if (!explicitlyDisabled.has('dashscope')) config.enabledProviders.add('dashscope');
+  }
   if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) config.trackerKeys.linear = process.env.LINEAR_API_KEY;
   if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) config.trackerKeys.github = process.env.GITHUB_TOKEN;
   if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
@@ -1831,82 +1855,7 @@ export function loadConfigSync(): ConfigLoadResult {
 
   const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
 
-  // Load API keys from environment variables as fallback
-  // This allows using ~/.panopticon.env for API keys
-  // Only enable providers that weren't explicitly disabled in models.providers
-  if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
-    config.apiKeys.openai = process.env.OPENAI_API_KEY;
-    if (!explicitlyDisabled.has('openai')) {
-      config.enabledProviders.add('openai');
-    }
-  }
-  if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
-    config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
-  }
-  if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
-    config.apiKeys.google = process.env.GOOGLE_API_KEY;
-    if (!explicitlyDisabled.has('google')) {
-      config.enabledProviders.add('google');
-    }
-  }
-  if (process.env.MINIMAX_API_KEY && !config.apiKeys.minimax) {
-    config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
-    if (!explicitlyDisabled.has('minimax')) {
-      config.enabledProviders.add('minimax');
-    }
-  }
-  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
-    config.apiKeys.zai = process.env.ZAI_API_KEY;
-    if (!explicitlyDisabled.has('zai')) {
-      config.enabledProviders.add('zai');
-    }
-  }
-  const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
-  if (kimiKey && !config.apiKeys.kimi) {
-    config.apiKeys.kimi = kimiKey;
-    if (!explicitlyDisabled.has('kimi')) {
-      config.enabledProviders.add('kimi');
-    }
-  }
-  if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
-    config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
-    if (!explicitlyDisabled.has('openrouter')) {
-      config.enabledProviders.add('openrouter');
-    }
-  }
-  if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
-    config.apiKeys.mimo = process.env.MIMO_API_KEY;
-    if (!explicitlyDisabled.has('mimo')) {
-      config.enabledProviders.add('mimo');
-    }
-  }
-  if (process.env.NOUS_API_KEY && !config.apiKeys.nous) {
-    config.apiKeys.nous = process.env.NOUS_API_KEY;
-    if (!explicitlyDisabled.has('nous')) {
-      config.enabledProviders.add('nous');
-    }
-  }
-
-  // Load tracker API keys from environment variables as fallback
-  if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) {
-    config.trackerKeys.linear = process.env.LINEAR_API_KEY;
-  }
-  if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) {
-    config.trackerKeys.github = process.env.GITHUB_TOKEN;
-  }
-  if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) {
-    config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
-  }
-  if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) {
-    config.trackerKeys.rally = process.env.RALLY_API_KEY;
-  }
-
-  // Load shadow mode from environment as fallback
-  // Environment variable takes precedence over config file
-  if (process.env.SHADOW_MODE !== undefined) {
-    const envShadowMode = ['true', '1', 'yes'].includes(process.env.SHADOW_MODE.toLowerCase());
-    config.shadow.enabled = envShadowMode;
-  }
+  applyEnvironmentFallbacks(config, explicitlyDisabled);
 
   const result: ConfigLoadResult = { config, migration: migrationResult };
 

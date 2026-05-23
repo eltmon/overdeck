@@ -95,6 +95,15 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'qwen/qwen3.6-plus' as ModelId, name: 'Qwen 3.6 Plus', icon: Network, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'cost-efficient'], description: 'Qwen 3.6 Plus via Nous Portal, currently free with 1M context.' },
     ],
   },
+  dashscope: {
+    name: 'Alibaba DashScope',
+    models: [
+      { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
+      { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
+      { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
+      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
+    ],
+  },
 };
 
 export type OpenRouterFavoriteModel = {

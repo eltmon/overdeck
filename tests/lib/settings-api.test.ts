@@ -178,7 +178,10 @@ describe('settings-api', () => {
           minimax: false,
           zai: false,
           kimi: false,
+          mimo: false,
           openrouter: false,
+          nous: false,
+          dashscope: false,
         },
         overrides: {},
         gemini_thinking_level: 3,
@@ -257,6 +260,7 @@ describe('settings-api', () => {
       expect(models.zai).toBeDefined();
       expect(models.kimi).toBeDefined();
       expect(models.nous).toBeDefined();
+      expect(models.dashscope).toBeDefined();
 
       // Each model should have id and name properties
       if (models.anthropic.length > 0) {
@@ -361,6 +365,7 @@ describe('settings-api', () => {
             minimax: false,
             openrouter: false,
             nous: false,
+            dashscope: false,
           },
         },
       };
@@ -384,6 +389,7 @@ describe('settings-api', () => {
             kimi: false,
             openrouter: false,
             nous: false,
+            dashscope: false,
           },
           overrides: {},
           default_conversation_model: 'gpt-5.4',
@@ -430,6 +436,7 @@ describe('settings-api', () => {
             kimi: false,
             openrouter: false,
             nous: false,
+            dashscope: true,
           },
           overrides: {},
           gemini_thinking_level: 4,
@@ -438,6 +445,7 @@ describe('settings-api', () => {
           openai: 'sk-test-123',
           minimax: 'minimax-test-123',
           zai: 'zai-test-123',
+          dashscope: 'dashscope-test-123',
         },
       };
 
@@ -456,9 +464,11 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('openai: true');
       expect(yamlContent).toContain('minimax: true');
       expect(yamlContent).toContain('zai: true');
+      expect(yamlContent).toContain('dashscope: true');
       expect(yamlContent).toContain('openai: sk-test-123');
       expect(yamlContent).toContain('minimax: minimax-test-123');
       expect(yamlContent).toContain('zai: zai-test-123');
+      expect(yamlContent).toContain('dashscope: dashscope-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
     });
   });
@@ -561,6 +571,26 @@ describe('settings-api', () => {
       });
       const model = getDefaultConversationModelApi();
       expect(model).toContain('glm');
+    });
+
+    it('returns a DashScope model when only DashScope is enabled', () => {
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['dashscope']),
+          apiKeys: { dashscope: 'dashscope-test-key' },
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          tts: makeTtsConfig(),
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toBe('qwen3-coder-plus');
     });
 
     it('does not return claude-sonnet-4-6 when Anthropic is disabled and Google is enabled', () => {

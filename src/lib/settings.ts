@@ -12,7 +12,8 @@ export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel;
+export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -44,6 +45,7 @@ export interface ApiKeysConfig {
   minimax?: string;
   mimo?: string;
   nous?: string;
+  dashscope?: string;
 }
 
 // Complete settings structure
@@ -137,6 +139,7 @@ export function loadSettingsSync(): SettingsConfig {
   else if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
   if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
   if (process.env.NOUS_API_KEY) envApiKeys.nous = process.env.NOUS_API_KEY;
+  if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -214,6 +217,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   minimax: MiniMaxModel[];
   mimo: MimoModel[];
   nous: NousModel[];
+  dashscope: DashScopeModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-opus-4-6',
@@ -245,6 +249,10 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     ? ['qwen/qwen3.6-plus']
     : [];
 
+  const dashscopeModels: DashScopeModel[] = settings.api_keys.dashscope
+    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
@@ -253,6 +261,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     minimax: minimaxModels,
     mimo: mimoModels,
     nous: nousModels,
+    dashscope: dashscopeModels,
   };
 }
 

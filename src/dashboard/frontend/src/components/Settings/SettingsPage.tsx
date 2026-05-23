@@ -359,6 +359,7 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
   { id: 'mimo', name: 'Xiaomi MiMo', icon: Zap, placeholder: 'sk-... or tp-...' },
   { id: 'nous', name: 'Nous Portal', icon: Globe, placeholder: 'ns-...' },
+  { id: 'dashscope', name: 'Alibaba DashScope', icon: Globe, placeholder: 'sk-...' },
 ];
 
 const TTS_EVENT_KEYS = [

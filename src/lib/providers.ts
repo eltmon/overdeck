@@ -13,7 +13,7 @@ import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, Mimo
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 /**
  * Provider configuration
@@ -159,6 +159,19 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: true,
     description: 'Route Nous Portal OpenAI-compatible models through Panopticon’s local Anthropic-compatible adapter using NOUS_API_KEY.',
   },
+
+  dashscope: {
+    name: 'dashscope',
+    displayName: 'Alibaba DashScope',
+    compatibility: 'direct',
+    baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
+    authType: 'static',
+    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'],
+    haikuModel: 'qwen3-plus',
+    tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
+    tested: false,
+    description: 'Route Alibaba DashScope Qwen models through Panopticon’s local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).',
+  },
 };
 
 /**
@@ -169,6 +182,9 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
+  }
+  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'].includes(modelId)) {
+    return PROVIDERS.dashscope;
   }
   if (modelId.includes('/')) {
     return PROVIDERS.openrouter;

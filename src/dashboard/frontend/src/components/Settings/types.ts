@@ -1,7 +1,7 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 export type ModelId = string;
 export type Harness = 'claude-code' | 'pi';
@@ -16,6 +16,7 @@ export interface ProvidersConfig {
   mimo: boolean;
   openrouter: boolean;
   nous: boolean;
+  dashscope: boolean;
 }
 
 export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
@@ -51,6 +52,7 @@ export interface ApiKeysConfig {
   mimo?: string;
   openrouter?: string;
   nous?: string;
+  dashscope?: string;
 }
 
 export interface TrackerKeysConfig {

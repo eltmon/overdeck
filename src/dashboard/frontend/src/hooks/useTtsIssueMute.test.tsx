@@ -21,6 +21,7 @@ const SETTINGS: SettingsConfig = {
       mimo: false,
       openrouter: false,
       nous: false,
+      dashscope: false,
     },
     overrides: {},
   },

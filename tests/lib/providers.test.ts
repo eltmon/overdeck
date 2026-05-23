@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -92,6 +92,25 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1',
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
+    });
+  });
+
+  it('routes DashScope Qwen models to the DashScope provider', () => {
+    for (const model of ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']) {
+      expect(getProviderForModelSync(model)).toBe(PROVIDERS.dashscope);
+    }
+    expect(getProviderForModelSync('qwen/qwen3.6-plus')).toBe(PROVIDERS.nous);
+  });
+
+  it('returns Anthropic-compatible env for DashScope direct routing', () => {
+    expect(getProviderEnvSync(PROVIDERS.dashscope, 'sk-test')).toEqual({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
+      ANTHROPIC_AUTH_TOKEN: 'sk-test',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-max',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3-coder-plus',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',
+      ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-plus',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3-plus',
     });
   });
 });

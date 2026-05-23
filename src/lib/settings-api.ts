@@ -27,7 +27,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { MODEL_CAPABILITIES, getModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
 
 /**
  * Deprecation warning in API format
@@ -125,6 +125,7 @@ export interface ApiSettingsConfig {
       mimo: boolean;
       openrouter: boolean;
       nous: boolean;
+      dashscope: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -172,6 +173,7 @@ export interface ApiSettingsConfig {
     mimo?: string;
     openrouter?: string;
     nous?: string;
+    dashscope?: string;
   };
   tts?: ApiTtsConfig;
   openrouter?: {
@@ -222,6 +224,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.1');
   if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
   if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
+  if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
     if (fav) return resolveModelIdSync(fav);
@@ -358,7 +361,7 @@ function validateModelRef(
   }
 
   const resolved = resolveModelIdSync(ref);
-  if (!MODEL_CAPABILITIES[resolved]) {
+  if (!hasModelCapabilitySync(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
@@ -518,6 +521,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
+        dashscope: config.enabledProviders.has('dashscope'),
       },
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
@@ -618,7 +622,9 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
-}async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+}
+
+async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
   const providerAuth = currentConfig.providerAuth ?? {};
   const providerPlan = currentConfig.providerPlan ?? {};
@@ -650,6 +656,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
         mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
         nous: settings.models.providers.nous,
+        dashscope: settings.models.providers.dashscope,
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -664,6 +671,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
       mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
+      dashscope: settings.api_keys.dashscope,
     },
     tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
@@ -702,7 +710,9 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   // Clear the config-yaml cache because mtime-based invalidation can miss rapid
   // writes (same-millisecond) or coarse filesystem mtime resolution.
   clearConfigCache();
-}async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
+}
+
+async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates
@@ -766,17 +776,21 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
 
 export function getRoleConfig(role: Role): RoleConfig | undefined {
   return loadSettingsApi().roles?.[role];
-}async function setRoleConfigPromise(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
-  return (await Effect.runPromise(updateSettingsApi({ roles: { [role]: roleConfig } })));
-}async function updateProviderApiKeyPromise(
-  provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous',
+}
+
+async function setRoleConfigPromise(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
+  return Effect.runPromise(updateSettingsApi({ roles: { [role]: roleConfig } }));
+}
+
+async function updateProviderApiKeyPromise(
+  provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
-  return (await Effect.runPromise(updateSettingsApi({
+  return Effect.runPromise(updateSettingsApi({
     api_keys: {
       [provider]: apiKey,
     },
-  })));
+  }));
 }
 
 /**
@@ -892,6 +906,7 @@ export function getAvailableModelsApi(): {
   mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
     anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
@@ -903,6 +918,7 @@ export function getAvailableModelsApi(): {
     mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
@@ -913,6 +929,7 @@ export function getAvailableModelsApi(): {
     mimo: [],
     openrouter: [],
     nous: [],
+    dashscope: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
@@ -946,6 +963,9 @@ export function getAvailableModelsApi(): {
         break;
       case 'nous':
         result.nous.push(entry);
+        break;
+      case 'dashscope':
+        result.dashscope.push(entry);
         break;
     }
   }
@@ -982,6 +1002,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
         nous: false,
+        dashscope: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1012,13 +1033,16 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
         nous: false,
+        dashscope: false,
       },
       gemini_thinking_level: 3,
     },
     api_keys: {},
     tracker_keys: {},
   };
-}async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void> {
+}
+
+async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void> {
   const current = loadSettingsApi();
   await Effect.runPromise(saveSettingsApi({
     ...current,

@@ -4,7 +4,7 @@
     "created": "2026-05-22T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1385: Add Qwen direct-to-Alibaba (DashScope) provider",
-    "updated": "2026-05-22T22:13:05.930Z"
+    "updated": "2026-05-23T00:00:05.456Z"
   },
   "plan": {
     "id": "pan-1385",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 3,
     "created": "2026-05-22T22:05:00.000Z",
-    "updated": "2026-05-22T22:13:05.930Z",
+    "updated": "2026-05-23T00:00:05.456Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1385",
@@ -31,21 +31,21 @@
     ],
     "narratives": {
       "Problem": "Today Qwen is only reachable in Panopticon via the `nous` provider (`qwen/qwen3.6-plus` through Nous Portal's OpenAI-compatible proxy). For users with direct Alibaba DashScope API keys (Singapore intl endpoint, ap-southeast-1), there is no first-class way to spawn Panopticon agents on Qwen3 models without going through Nous. We need a parallel `dashscope` provider that wires Qwen3 models direct to DashScope while leaving the Nous route untouched.",
-      "Proposal": "Add a new `dashscope` provider that mirrors the existing `nous` provider shape: register a new upstream in the local OpenAI-compatible proxy, add the provider to PROVIDERS with `getOpenAICompatibleProxyBaseUrl('dashscope')` as the base URL, extend `getProviderForModel()` to route the new qwen3-* model IDs to the new provider, add MODEL_CAPABILITIES entries, update the dashboard server/frontend so the provider shows up in settings and pickers, ship with `tested: false` until a real spawn succeeds, then conditionally flip to `tested: true` via a smoke-test bead. The change set is mechanical and well-contained: one new entry in each provider-aware surface, plus the two type-foundation beads that downstream beads bind to. **Scope addition (user request 2026-05-22):** also wire `qwen3.7` as a first-class DashScope model alongside `qwen3-max` (opus tier). The exact DashScope intl model ID for the Qwen3.7 release is ambiguous at planning time — see open question.",
-      "OpenQuestions": "**Q1: What is the canonical DashScope intl model ID for Qwen3.7?** The user requested wiring `qwen3.7` as a first-class model. Alibaba's existing intl naming convention uses hyphens (`qwen3-max`, `qwen3-plus`, `qwen3-coder-plus`), so a plain dotted literal `qwen3.7` may not be the actual published ID. Plausible candidates: `qwen3.7`, `qwen3.7-max`, `qwen3-7-max`, `qwen-3.7`, or a dated snapshot like `qwen3-max-2026-XX-XX`. The work agent MUST verify the canonical ID against `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or DashScope intl docs) before landing the literal. If the canonical ID differs from the placeholder `qwen3.7`, update every site that references it (settings types, providers map, capabilities, frontend catalog, label maps, tests, docs) in the SAME bead pass — do NOT split into a follow-up. If the model is not yet available on the intl endpoint, the work agent should remove the qwen3.7 entries and surface a deferred-scope note rather than guessing."
+      "Proposal": "Add a new `dashscope` provider that mirrors the existing `nous` provider shape: register a new upstream in the local OpenAI-compatible proxy, add the provider to PROVIDERS with `getOpenAICompatibleProxyBaseUrl('dashscope')` as the base URL, extend `getProviderForModel()` to route the new qwen3-* model IDs to the new provider, add MODEL_CAPABILITIES entries, update the dashboard server/frontend so the provider shows up in settings and pickers, ship with `tested: false` until a real spawn succeeds, then conditionally flip to `tested: true` via a smoke-test bead. The change set is mechanical and well-contained: one new entry in each provider-aware surface, plus the two type-foundation beads that downstream beads bind to. **Scope addition (user request 2026-05-22):** also wire `qwen3.7-max` as a first-class DashScope model alongside `qwen3-max` (opus tier). The Qwen3.7 release is wired using the canonical `qwen3.7-max` DashScope intl model ID verified from current Qwen Cloud docs.",
+      "OpenQuestions": "**Q1 resolved 2026-05-22:** current Qwen Cloud docs for Qwen3.7-Max show the OpenAI-compatible sample using `model: \"qwen3.7-max\"` with base URL `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` and `DASHSCOPE_API_KEY`. The bare `qwen3.7` placeholder is not documented, so all landed references use `qwen3.7-max`."
     },
     "autoDecisions": [
       {
         "summary": "Display name 'Alibaba DashScope' with placeholder 'sk-...' in the Settings provider tile.",
-        "rationale": "DashScope keys are sk-prefixed (per DashScope intl docs). 'Alibaba DashScope' makes the origin obvious in the picker — distinct from 'Nous Portal' which also serves Qwen, so users can tell which route they're picking."
+        "rationale": "DashScope keys are sk-prefixed (per DashScope intl docs). 'Alibaba DashScope' makes the origin obvious in the picker \u2014 distinct from 'Nous Portal' which also serves Qwen, so users can tell which route they're picking."
       },
       {
-        "summary": "Tier mapping: opus=qwen3-max (with qwen3.7 also opus-tier), sonnet=qwen3-coder-plus, haiku=qwen3-plus; haikuModel=qwen3-plus.",
-        "rationale": "Direct read from the issue's 'Models (initial set)' table. qwen3-coder-plus is the coding-specialized variant, which naturally lines up with the sonnet tier where work-role agents land. Per user scope addition, qwen3.7 sits at opus tier alongside qwen3-max — both are flagship reasoning models; users can pick either, but the orchestrator's default opus pick remains qwen3-max because its DashScope ID is unambiguous."
+        "summary": "Tier mapping: opus=qwen3-max (with qwen3.7-max also opus-tier), sonnet=qwen3-coder-plus, haiku=qwen3-plus; haikuModel=qwen3-plus.",
+        "rationale": "Direct read from the issue's 'Models (initial set)' table. qwen3-coder-plus is the coding-specialized variant, which naturally lines up with the sonnet tier where work-role agents land. Per user scope addition, qwen3.7-max sits at opus tier alongside qwen3-max \u2014 both are flagship reasoning models; users can pick either, but the orchestrator's default opus pick remains qwen3-max because its DashScope ID is unambiguous."
       },
       {
-        "summary": "Treat `qwen3.7` as a first-class DashScope model ID alongside qwen3-max/coder-plus/plus, but flag the exact canonical ID as an open question.",
-        "rationale": "User scope addition (2026-05-22). Alibaba's intl naming for newly-released variants is not consistent enough to guess. The work agent MUST verify the actual DashScope intl model ID by hitting `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or reading current Alibaba docs) before committing the literal. Placeholder `qwen3.7` is used in all artifacts; if the canonical ID differs, the work agent updates every reference in one bead pass."
+        "summary": "Treat `qwen3.7-max` as a first-class DashScope model ID alongside qwen3-max/coder-plus/plus, but flag the exact canonical ID as an open question.",
+        "rationale": "User scope addition (2026-05-22). Alibaba's intl naming for newly-released variants is not consistent enough to guess. The work agent MUST verify the actual DashScope intl model ID by hitting `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or reading current Alibaba docs) before committing the literal. Placeholder `qwen3.7-max` is used in all artifacts; if the canonical ID differs, the work agent updates every reference in one bead pass."
       },
       {
         "summary": "Ship with `tested: false`; smoke-test bead conditionally flips to `tested: true` only if a DASHSCOPE_API_KEY is available in the workspace environment.",
@@ -56,19 +56,23 @@
         "rationale": "Public Alibaba documentation lists these context windows for the DashScope intl variants. Flagged as 'approximate, verify during smoke test' in the bead acceptance criteria so a reviewer can correct them if Alibaba's published numbers have shifted."
       },
       {
-        "summary": "Do NOT remove the existing `qwen/qwen3.6-plus` → Nous routing. Nous and DashScope coexist as parallel routes for the Qwen family.",
+        "summary": "Do NOT remove the existing `qwen/qwen3.6-plus` \u2192 Nous routing. Nous and DashScope coexist as parallel routes for the Qwen family.",
         "rationale": "Spec out-of-scope explicitly says 'Dropping Nous. Coexistence is the explicit choice.'"
       },
       {
         "summary": "Two `requiresInspection: true` beads: the lib/settings types foundation and the frontend Settings/types foundation. All other beads default to `requiresInspection: false`.",
         "rationale": "Both type-foundation beads encode the literal string `'dashscope'` and the field name shape that 8+ downstream beads bind to. A typo or wrong default at the foundation cascades; the inspector earns its keep at exactly those two points. The remaining beads are mechanical one-shape edits caught by typecheck if anything is off."
+      },
+      {
+        "summary": "Verified Qwen3.7 canonical DashScope intl model ID as `qwen3.7-max`; no DASHSCOPE_API_KEY was available, so end-to-end smoke testing is deferred and PROVIDERS.dashscope.tested remains false.",
+        "rationale": "Qwen Cloud docs for Qwen3.7-Max show `model: \"qwen3.7-max\"` with the DashScope intl OpenAI-compatible base URL. The environment and ~/.panopticon/config.yaml did not contain a DashScope key, so the bead follows its no-key path instead of blocking shipment."
       }
     ],
     "items": [
       {
         "id": "add-dashscope-types",
         "title": "Add `dashscope` provider type to src/lib/settings.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -84,13 +88,13 @@
           ]
         },
         "narrative": {
-          "Action": "Extend src/lib/settings.ts to recognize DashScope as a first-class provider. Add `DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7'` type alias (the `qwen3.7` literal is a placeholder; if DashScope intl publishes a different canonical ID like `qwen3.7-max` or `qwen3-7-max`, the work agent verifies via the intl `/models` endpoint and substitutes the canonical literal across every artifact in this same bead pass). Include `DashScopeModel` in the `ModelId` union. Add optional `dashscope?: string` to `ApiKeysConfig`. Add env-var loading: `if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;`. Extend `getAvailableModels()` return type and body with a `dashscope: DashScopeModel[]` field populated from `settings.api_keys.dashscope`."
+          "Action": "Extend src/lib/settings.ts to recognize DashScope as a first-class provider. Add `DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max'` type alias (the `qwen3.7-max` literal is a placeholder; if DashScope intl publishes a different canonical ID like `qwen3.7-max` or `qwen3-7-max`, the work agent verifies via the intl `/models` endpoint and substitutes the canonical literal across every artifact in this same bead pass). Include `DashScopeModel` in the `ModelId` union. Add optional `dashscope?: string` to `ApiKeysConfig`. Add env-var loading: `if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;`. Extend `getAvailableModels()` return type and body with a `dashscope: DashScopeModel[]` field populated from `settings.api_keys.dashscope`."
         },
         "subItems": [
           {
             "id": "add-dashscope-types.ac1",
-            "title": "`DashScopeModel` type alias is exported from settings.ts and includes the four literals from the issue + scope addition (`'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7'`), with the qwen3.7 literal substituted for the canonical DashScope intl ID if verification against `/v1/models` shows a different one.",
-            "status": "pending",
+            "title": "`DashScopeModel` type alias is exported from settings.ts and includes the four literals from the issue + scope addition (`'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max'`), with the qwen3.7-max literal substituted for the canonical DashScope intl ID if verification against `/v1/models` shows a different one.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -98,7 +102,7 @@
           {
             "id": "add-dashscope-types.ac2",
             "title": "`ModelId` union includes `DashScopeModel`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -106,7 +110,7 @@
           {
             "id": "add-dashscope-types.ac3",
             "title": "`ApiKeysConfig` has an optional `dashscope?: string` field.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -114,15 +118,15 @@
           {
             "id": "add-dashscope-types.ac4",
             "title": "`loadSettings()` reads `process.env.DASHSCOPE_API_KEY` into `envApiKeys.dashscope` as fallback.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "add-dashscope-types.ac5",
-            "title": "`getAvailableModels()` return type includes `dashscope: DashScopeModel[]` and the body returns the four model IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7) when `api_keys.dashscope` is set, empty array otherwise.",
-            "status": "pending",
+            "title": "`getAvailableModels()` return type includes `dashscope: DashScopeModel[]` and the body returns the four model IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7-max) when `api_keys.dashscope` is set, empty array otherwise.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -130,7 +134,7 @@
           {
             "id": "add-dashscope-types.ac6",
             "title": "`npm run typecheck` passes after this bead alone (no downstream changes yet).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -140,7 +144,7 @@
       {
         "id": "register-dashscope-proxy",
         "title": "Register `dashscope` upstream in the OpenAI-compatible proxy",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -150,13 +154,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add `dashscope: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'` to the `UPSTREAMS` map in src/lib/openai-compatible-proxy.ts. No other proxy logic needs to change — the existing Anthropic↔OpenAI bridge handles the request shape, and `Authorization: Bearer ${apiKey}` is already in the forwarding path."
+          "Action": "Add `dashscope: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'` to the `UPSTREAMS` map in src/lib/openai-compatible-proxy.ts. No other proxy logic needs to change \u2014 the existing Anthropic\u2194OpenAI bridge handles the request shape, and `Authorization: Bearer ${apiKey}` is already in the forwarding path."
         },
         "subItems": [
           {
             "id": "register-dashscope-proxy.ac1",
             "title": "`UPSTREAMS.dashscope` resolves to exactly `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +168,7 @@
           {
             "id": "register-dashscope-proxy.ac2",
             "title": "An HTTP request to `http://127.0.0.1:12436/dashscope/v1/models` (with a stub key) reaches the proxy's provider-resolution path and does NOT return the 'Unknown provider' 404 branch (verified by unit test or curl after a fresh proxy boot).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -174,7 +178,7 @@
       {
         "id": "register-and-route-dashscope-provider",
         "title": "Register `dashscope` in PROVIDERS and route qwen3-* model IDs",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -184,13 +188,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Edit src/lib/providers.ts to (1) extend the `ProviderName` union with `'dashscope'`; (2) add a PROVIDERS.dashscope entry mirroring the `nous` shape — `displayName: 'Alibaba DashScope'`, `compatibility: 'direct'`, `baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope')`, `authType: 'static'`, `models: ['qwen3-max','qwen3-coder-plus','qwen3-plus','qwen3.7']`, `haikuModel: 'qwen3-plus'`, `tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' }` — note `qwen3.7` is listed in `models[]` but the `opus` tier default stays `qwen3-max` to keep the Cloister opus pick on an unambiguous ID; `tested: false`; description mentioning 'Singapore intl endpoint (ap-southeast-1) using DASHSCOPE_API_KEY'; (3) extend `getProviderForModel()` with an explicit check `if (['qwen3-max','qwen3-coder-plus','qwen3-plus','qwen3.7'].includes(modelId)) return PROVIDERS.dashscope;` BEFORE the slash-based openrouter fallback and BEFORE the Anthropic default. Leave the existing `qwen/qwen3.6-plus` → Nous shortcut completely untouched. No changes to `getProviderEnv()` are needed — the nous-style `baseUrl` + `static` auth + `tierModels` path already covers DashScope correctly. **qwen3.7 ambiguity:** if the work agent verifies that the canonical DashScope intl ID is NOT `qwen3.7` (see open question), substitute the canonical literal everywhere `qwen3.7` appears in this bead's edits — same file, same diff."
+          "Action": "Edit src/lib/providers.ts to (1) extend the `ProviderName` union with `'dashscope'`; (2) add a PROVIDERS.dashscope entry mirroring the `nous` shape \u2014 `displayName: 'Alibaba DashScope'`, `compatibility: 'direct'`, `baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope')`, `authType: 'static'`, `models: ['qwen3-max','qwen3-coder-plus','qwen3-plus','qwen3.7-max']`, `haikuModel: 'qwen3-plus'`, `tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' }` \u2014 note `qwen3.7-max` is listed in `models[]` but the `opus` tier default stays `qwen3-max` to keep the Cloister opus pick on an unambiguous ID; `tested: false`; description mentioning 'Singapore intl endpoint (ap-southeast-1) using DASHSCOPE_API_KEY'; (3) extend `getProviderForModel()` with an explicit check `if (['qwen3-max','qwen3-coder-plus','qwen3-plus','qwen3.7-max'].includes(modelId)) return PROVIDERS.dashscope;` BEFORE the slash-based openrouter fallback and BEFORE the Anthropic default. Leave the existing `qwen/qwen3.6-plus` \u2192 Nous shortcut completely untouched. No changes to `getProviderEnv()` are needed \u2014 the nous-style `baseUrl` + `static` auth + `tierModels` path already covers DashScope correctly. **qwen3.7-max ambiguity:** if the work agent verifies that the canonical DashScope intl ID is NOT `qwen3.7-max` (see open question), substitute the canonical literal everywhere `qwen3.7-max` appears in this bead's edits \u2014 same file, same diff."
         },
         "subItems": [
           {
             "id": "register-and-route-dashscope-provider.ac1",
             "title": "`ProviderName` union in providers.ts includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -198,23 +202,23 @@
           {
             "id": "register-and-route-dashscope-provider.ac2",
             "title": "PROVIDERS.dashscope has `tested: false`, `authType: 'static'`, and `tierModels` populated with the three qwen3-* IDs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "register-and-route-dashscope-provider.ac3",
-            "title": "`getProviderForModel('qwen3-max')`, `getProviderForModel('qwen3-coder-plus')`, `getProviderForModel('qwen3-plus')`, and `getProviderForModel('qwen3.7')` (or its verified canonical equivalent) all return PROVIDERS.dashscope.",
-            "status": "pending",
+            "title": "`getProviderForModel('qwen3-max')`, `getProviderForModel('qwen3-coder-plus')`, `getProviderForModel('qwen3-plus')`, and `getProviderForModel('qwen3.7-max')` (or its verified canonical equivalent) all return PROVIDERS.dashscope.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "register-and-route-dashscope-provider.ac6",
-            "title": "PROVIDERS.dashscope.models includes the qwen3.7 literal (canonical-verified per open question); tierModels.opus remains `qwen3-max` (qwen3.7 is NOT promoted to the default opus pick to keep the Cloister opus-tier default on an unambiguous ID).",
-            "status": "pending",
+            "title": "PROVIDERS.dashscope.models includes the qwen3.7-max literal (canonical-verified per open question); tierModels.opus remains `qwen3-max` (qwen3.7-max is NOT promoted to the default opus pick to keep the Cloister opus-tier default on an unambiguous ID).",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -222,15 +226,15 @@
           {
             "id": "register-and-route-dashscope-provider.ac4",
             "title": "`getProviderForModel('qwen/qwen3.6-plus')` still returns PROVIDERS.nous (Nous routing is untouched).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "register-and-route-dashscope-provider.ac5",
-            "title": "`getProviderEnv(PROVIDERS.dashscope, 'sk-test')` produces an env object with `ANTHROPIC_BASE_URL` (proxy URL), `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` — no changes required to getProviderEnv itself; verify via a unit-test-friendly assertion.",
-            "status": "pending",
+            "title": "`getProviderEnv(PROVIDERS.dashscope, 'sk-test')` produces an env object with `ANTHROPIC_BASE_URL` (proxy URL), `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL` \u2014 no changes required to getProviderEnv itself; verify via a unit-test-friendly assertion.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -240,7 +244,7 @@
       {
         "id": "add-qwen3-capabilities",
         "title": "Add MODEL_CAPABILITIES entries for qwen3-max, qwen3-coder-plus, qwen3-plus",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -250,29 +254,29 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add four new entries to MODEL_CAPABILITIES in src/lib/model-capabilities.ts under a 'DASHSCOPE (ALIBABA) MODELS' section. Extend the `provider` union on line ~93 to include `'dashscope'`. Use the existing Qwen 3.6 Plus entry as the baseline for skill scores, with adjustments: qwen3-max (flagship reasoning, code-gen=95, planning=94, synthesis=94), qwen3-coder-plus (coding-specialist, code-gen=96, code-review=94, debugging=94), qwen3-plus (smaller/faster, code-gen=88, speed=82), and qwen3.7 (next-gen flagship: tentatively code-gen=96, planning=95, synthesis=95 — same general profile as qwen3-max but ~1pt higher across reasoning dims; if Alibaba publishes benchmark numbers at canonical-ID verification time, update these). All four: `costPer1MTokens: 0` placeholder pending real pricing — flag in notes that this should be updated once Alibaba publishes intl-endpoint pricing. Context windows: qwen3-max 262144, qwen3-coder-plus 262144, qwen3-plus 131072, qwen3.7 262144 (placeholder — verify). Notes for each: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY.' For qwen3.7 specifically, prepend the note with 'Canonical DashScope ID verified at <YYYY-MM-DD>; substitute everywhere if upstream renames.'"
+          "Action": "Add four new entries to MODEL_CAPABILITIES in src/lib/model-capabilities.ts under a 'DASHSCOPE (ALIBABA) MODELS' section. Extend the `provider` union on line ~93 to include `'dashscope'`. Use the existing Qwen 3.6 Plus entry as the baseline for skill scores, with adjustments: qwen3-max (flagship reasoning, code-gen=95, planning=94, synthesis=94), qwen3-coder-plus (coding-specialist, code-gen=96, code-review=94, debugging=94), qwen3-plus (smaller/faster, code-gen=88, speed=82), and qwen3.7-max (next-gen flagship: tentatively code-gen=96, planning=95, synthesis=95 \u2014 same general profile as qwen3-max but ~1pt higher across reasoning dims; update if Alibaba publishes benchmark numbers). All four: `costPer1MTokens: 0` placeholder pending real pricing \u2014 flag in notes that this should be updated once Alibaba publishes intl-endpoint pricing. Context windows: qwen3-max 262144, qwen3-coder-plus 262144, qwen3-plus 131072, qwen3.7-max 262144. Notes for each: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY.' For qwen3.7-max specifically, prepend the note with 'Canonical DashScope ID verified on 2026-05-22.'"
         },
         "subItems": [
           {
             "id": "add-qwen3-capabilities.ac1",
             "title": "`ModelCapability.provider` union includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "add-qwen3-capabilities.ac2",
-            "title": "MODEL_CAPABILITIES contains entries for `qwen3-max`, `qwen3-coder-plus`, `qwen3-plus`, and `qwen3.7` (or its verified canonical equivalent), each with `provider: 'dashscope'` and a `notes` field mentioning 'Singapore intl / ap-southeast-1'.",
-            "status": "pending",
+            "title": "MODEL_CAPABILITIES contains entries for `qwen3-max`, `qwen3-coder-plus`, `qwen3-plus`, and `qwen3.7-max` (or its verified canonical equivalent), each with `provider: 'dashscope'` and a `notes` field mentioning 'Singapore intl / ap-southeast-1'.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "add-qwen3-capabilities.ac3",
-            "title": "`getModelsForProvider('dashscope')` returns exactly the four new model IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7 or canonical equivalent).",
-            "status": "pending",
+            "title": "`getModelsForProvider('dashscope')` returns exactly the four new model IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7-max or canonical equivalent).",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -280,7 +284,7 @@
           {
             "id": "add-qwen3-capabilities.ac4",
             "title": "Each new entry has all 11 SkillDimension scores populated (no missing keys).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -290,7 +294,7 @@
       {
         "id": "dashboard-settings-route",
         "title": "Wire `dashscope` into dashboard /test-api-key and /validate-api-key routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -300,13 +304,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/routes/settings.ts: (1) add a `case 'dashscope': { … }` block to the `/api/settings/test-api-key` switch, mirroring the `nous` block but POSTing to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions` with model fallback `qwen3-max`; (2) add the same in the `/api/settings/validate-api-key` switch, GETting `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models`; (3) add `'dashscope'` to the provider allow-list array on line ~442."
+          "Action": "In src/dashboard/server/routes/settings.ts: (1) add a `case 'dashscope': { \u2026 }` block to the `/api/settings/test-api-key` switch, mirroring the `nous` block but POSTing to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions` with model fallback `qwen3-max`; (2) add the same in the `/api/settings/validate-api-key` switch, GETting `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models`; (3) add `'dashscope'` to the provider allow-list array on line ~442."
         },
         "subItems": [
           {
             "id": "dashboard-settings-route.ac1",
             "title": "Provider allow-list in /api/settings/validate-api-key includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -314,7 +318,7 @@
           {
             "id": "dashboard-settings-route.ac2",
             "title": "Both /test-api-key and /validate-api-key handle `provider: 'dashscope'` and call `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/...` URLs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -322,7 +326,7 @@
           {
             "id": "dashboard-settings-route.ac3",
             "title": "401 / 404 / generic-HTTP error paths in the new `case 'dashscope'` blocks match the nous block's error-message shape (so the UI surfaces identical messages across providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -332,7 +336,7 @@
       {
         "id": "frontend-provider-types",
         "title": "Add `dashscope` to frontend Settings/types.ts provider unions",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -353,7 +357,7 @@
           {
             "id": "frontend-provider-types.ac1",
             "title": "`Provider` union includes `'dashscope'`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -361,7 +365,7 @@
           {
             "id": "frontend-provider-types.ac2",
             "title": "`ProvidersConfig.dashscope: boolean` exists (required, not optional, matching the shape of the other providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +373,7 @@
           {
             "id": "frontend-provider-types.ac3",
             "title": "`ApiKeysConfig.dashscope?: string` exists (optional, matching the shape of the other providers).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -379,7 +383,7 @@
       {
         "id": "frontend-settings-ui",
         "title": "Expose DashScope as a Settings provider tile + catalog entry",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -389,21 +393,21 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a DashScope entry to: (1) the `PROVIDERS` list in src/dashboard/frontend/src/components/Settings/SettingsPage.tsx (with name 'Alibaba DashScope', placeholder 'sk-...'); (2) the `PROVIDER_META` map in src/dashboard/frontend/src/components/Settings/Provider/ProviderPanel.tsx and the `providerList` array in the same file; (3) src/dashboard/frontend/src/components/Settings/modelCatalog.ts (new `dashscope` section with FOUR model entries — qwen3-max, qwen3-coder-plus, qwen3-plus, plus qwen3.7 or its verified canonical equivalent — capabilities tags ['reasoning','code','agentic','large-context'])."
+          "Action": "Add a DashScope entry to: (1) the `PROVIDERS` list in src/dashboard/frontend/src/components/Settings/SettingsPage.tsx (with name 'Alibaba DashScope', placeholder 'sk-...'); (2) the `PROVIDER_META` map in src/dashboard/frontend/src/components/Settings/Provider/ProviderPanel.tsx and the `providerList` array in the same file; (3) src/dashboard/frontend/src/components/Settings/modelCatalog.ts (new `dashscope` section with FOUR model entries \u2014 qwen3-max, qwen3-coder-plus, qwen3-plus, plus qwen3.7-max or its verified canonical equivalent \u2014 capabilities tags ['reasoning','code','agentic','large-context'])."
         },
         "subItems": [
           {
             "id": "frontend-settings-ui.ac1",
             "title": "Settings page shows an 'Alibaba DashScope' provider tile with an API-key input.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "frontend-settings-ui.ac2",
-            "title": "modelCatalog.ts includes qwen3-max (premium), qwen3-coder-plus (premium, coding tag emphasized), qwen3-plus (balanced), and qwen3.7 or canonical equivalent (premium, flagship — sits alongside qwen3-max).",
-            "status": "pending",
+            "title": "modelCatalog.ts includes qwen3-max (premium), qwen3-coder-plus (premium, coding tag emphasized), qwen3-plus (balanced), and qwen3.7-max or canonical equivalent (premium, flagship \u2014 sits alongside qwen3-max).",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -411,7 +415,7 @@
           {
             "id": "frontend-settings-ui.ac3",
             "title": "ProviderPanel.tsx `providerList` array includes `'dashscope'` (place it adjacent to `'nous'` for visual grouping).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -421,7 +425,7 @@
       {
         "id": "frontend-label-maps",
         "title": "Add DashScope label + icon-color entries to cross-cutting frontend maps",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -431,13 +435,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a `dashscope: 'Alibaba DashScope'` entry to the provider-label maps in: src/dashboard/frontend/src/components/chat/ModelPicker.tsx (PROVIDER_LABELS), src/dashboard/frontend/src/components/PlanDialog.tsx (provider label map), src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx, src/dashboard/frontend/src/components/Settings/RolesPanel.tsx. Add an entry to src/dashboard/frontend/src/components/chat/ProviderIcons.tsx (pick a distinct color — suggest `'#f59e0b'` amber, which is distinct from Nous's purple `'#8b5cf6'`)."
+          "Action": "Add a `dashscope: 'Alibaba DashScope'` entry to the provider-label maps in: src/dashboard/frontend/src/components/chat/ModelPicker.tsx (PROVIDER_LABELS), src/dashboard/frontend/src/components/PlanDialog.tsx (provider label map), src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx, src/dashboard/frontend/src/components/Settings/RolesPanel.tsx. Add an entry to src/dashboard/frontend/src/components/chat/ProviderIcons.tsx (pick a distinct color \u2014 suggest `'#f59e0b'` amber, which is distinct from Nous's purple `'#8b5cf6'`)."
         },
         "subItems": [
           {
             "id": "frontend-label-maps.ac1",
             "title": "All five files (ModelPicker, PlanDialog, WorkhorsePanel, RolesPanel, ProviderIcons) have a `dashscope` entry.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -445,7 +449,7 @@
           {
             "id": "frontend-label-maps.ac2",
             "title": "Label string is exactly `'Alibaba DashScope'` in every file (consistency, matches PROVIDERS.dashscope.displayName).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -453,7 +457,7 @@
           {
             "id": "frontend-label-maps.ac3",
             "title": "Icon color in ProviderIcons.tsx is distinct from `nous` and from Anthropic/OpenAI brand colors.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -463,7 +467,7 @@
       {
         "id": "update-test-fixtures",
         "title": "Update test fixtures to include the new `dashscope` provider field",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -473,13 +477,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Find every test file that constructs a `ProvidersConfig` literal and add `dashscope: false` to it. Search targets: tests/lib/settings-api.test.ts (multiple fixtures around lines 340, 363, 409), src/dashboard/frontend/src/hooks/useTtsIssueMute.test.tsx, src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts. Also extend any test that asserts on `models.<provider>` shape from `getAvailableModels()` to assert `models.dashscope` exists. Do NOT change any test's expected behavior — these are purely fixture-shape updates so TypeScript compiles."
+          "Action": "Find every test file that constructs a `ProvidersConfig` literal and add `dashscope: false` to it. Search targets: tests/lib/settings-api.test.ts (multiple fixtures around lines 340, 363, 409), src/dashboard/frontend/src/hooks/useTtsIssueMute.test.tsx, src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts. Also extend any test that asserts on `models.<provider>` shape from `getAvailableModels()` to assert `models.dashscope` exists. Do NOT change any test's expected behavior \u2014 these are purely fixture-shape updates so TypeScript compiles."
         },
         "subItems": [
           {
             "id": "update-test-fixtures.ac1",
             "title": "`npm test` passes after this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -487,7 +491,7 @@
           {
             "id": "update-test-fixtures.ac2",
             "title": "Every ProvidersConfig literal in the test tree includes a `dashscope: false` entry.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -495,7 +499,7 @@
           {
             "id": "update-test-fixtures.ac3",
             "title": "tests/lib/settings-api.test.ts asserts `models.dashscope` is defined in its 'getAvailableModels returns all providers' block (mirroring the existing `nous` assertion).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -505,7 +509,7 @@
       {
         "id": "add-routing-tests",
         "title": "Add unit tests for getProviderForModel routing of qwen3-* IDs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -515,13 +519,13 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a new test file (or extend an existing one — likely src/lib/__tests__/model-validation.test.ts or a new src/lib/__tests__/providers-dashscope.test.ts) covering: (1) `getProviderForModel('qwen3-max')` → PROVIDERS.dashscope; (2) `getProviderForModel('qwen3-coder-plus')` → PROVIDERS.dashscope; (3) `getProviderForModel('qwen3-plus')` → PROVIDERS.dashscope; (4) `getProviderForModel('qwen3.7')` (or canonical-verified literal) → PROVIDERS.dashscope; (5) `getProviderForModel('qwen/qwen3.6-plus')` → PROVIDERS.nous (regression guard); (6) `getProviderEnv(PROVIDERS.dashscope, 'sk-test')` returns an env object containing ANTHROPIC_BASE_URL (proxy URL), ANTHROPIC_AUTH_TOKEN='sk-test', ANTHROPIC_DEFAULT_OPUS_MODEL='qwen3-max', ANTHROPIC_DEFAULT_SONNET_MODEL='qwen3-coder-plus', ANTHROPIC_DEFAULT_HAIKU_MODEL='qwen3-plus' (note: qwen3.7 is in `models[]` but NOT in `tierModels` defaults — assertion stays on qwen3-max for opus)."
+          "Action": "Add a new test file (or extend an existing one \u2014 likely src/lib/__tests__/model-validation.test.ts or a new src/lib/__tests__/providers-dashscope.test.ts) covering: (1) `getProviderForModel('qwen3-max')` \u2192 PROVIDERS.dashscope; (2) `getProviderForModel('qwen3-coder-plus')` \u2192 PROVIDERS.dashscope; (3) `getProviderForModel('qwen3-plus')` \u2192 PROVIDERS.dashscope; (4) `getProviderForModel('qwen3.7-max')` (or canonical-verified literal) \u2192 PROVIDERS.dashscope; (5) `getProviderForModel('qwen/qwen3.6-plus')` \u2192 PROVIDERS.nous (regression guard); (6) `getProviderEnv(PROVIDERS.dashscope, 'sk-test')` returns an env object containing ANTHROPIC_BASE_URL (proxy URL), ANTHROPIC_AUTH_TOKEN='sk-test', ANTHROPIC_DEFAULT_OPUS_MODEL='qwen3-max', ANTHROPIC_DEFAULT_SONNET_MODEL='qwen3-coder-plus', ANTHROPIC_DEFAULT_HAIKU_MODEL='qwen3-plus' (note: qwen3.7-max is in `models[]` but NOT in `tierModels` defaults \u2014 assertion stays on qwen3-max for opus)."
         },
         "subItems": [
           {
             "id": "add-routing-tests.ac1",
-            "title": "Test file asserts all four qwen3-* IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7-or-canonical) route to PROVIDERS.dashscope.",
-            "status": "pending",
+            "title": "Test file asserts all four qwen3-* IDs (qwen3-max, qwen3-coder-plus, qwen3-plus, qwen3.7-max-or-canonical) route to PROVIDERS.dashscope.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -529,7 +533,7 @@
           {
             "id": "add-routing-tests.ac2",
             "title": "Test file asserts qwen/qwen3.6-plus still routes to PROVIDERS.nous (regression guard for H1/H3).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -537,7 +541,7 @@
           {
             "id": "add-routing-tests.ac3",
             "title": "Test file asserts getProviderEnv for PROVIDERS.dashscope emits the five expected ANTHROPIC_* env vars with the correct model IDs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -545,7 +549,7 @@
           {
             "id": "add-routing-tests.ac4",
             "title": "`npm test` passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -555,7 +559,7 @@
       {
         "id": "docs-providers-list",
         "title": "Mention DashScope in provider lists in the Mintlify docs",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -571,15 +575,15 @@
           {
             "id": "docs-providers-list.ac1",
             "title": "Both .mdx files mention DashScope (or Alibaba DashScope) wherever they enumerate the provider list.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "docs-providers-list.ac2",
-            "title": "No broken Mintlify links or syntax errors — `npm run lint` (or whatever doc linter is in place) passes.",
-            "status": "pending",
+            "title": "No broken Mintlify links or syntax errors \u2014 `npm run lint` (or whatever doc linter is in place) passes.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -589,7 +593,7 @@
       {
         "id": "manual-smoke-test",
         "title": "Manual smoke test on qwen3-max and conditional `tested: true` flip",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-22T22:05:00.000Z",
         "metadata": {
@@ -599,21 +603,22 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Two checks. **(A) qwen3.7 canonical-ID verification (open question Q1):** before or during this bead, hit `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or read current Alibaba intl docs) to confirm the canonical model ID for Qwen3.7. If the canonical ID is NOT the literal `qwen3.7`, substitute the canonical literal across every artifact landed in earlier beads (settings types, providers map, capabilities, frontend catalog, label maps, routing tests, docs) — one focused diff, same bead. Record the verified ID and verification date in continue.json decisions. If Qwen3.7 is NOT yet available on the intl endpoint, REMOVE every qwen3.7 reference instead and add a deferred-scope note. **(B) Smoke test:** check whether `DASHSCOPE_API_KEY` is available in the workspace environment or in `~/.panopticon/config.yaml` under `apiKeys.dashscope`. IF present: spawn a throwaway agent on `qwen3-max` (`pan start <id> --model qwen3-max` against a benign test issue) AND on the qwen3.7 canonical literal, confirm both boot through the local proxy and emit coherent responses — then flip `tested: true` on PROVIDERS.dashscope in src/lib/providers.ts. IF NOT present: leave `tested: false`, write a short verification checklist into the bead's completion notes, and do NOT block the issue — the smoke test is a verification gate, not a blocker for shipping the wiring."
+          "Action": "Two checks. **(A) qwen3.7-max canonical-ID verification (open question Q1):** before or during this bead, hit `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models` (or read current Alibaba intl docs) to confirm the canonical model ID for Qwen3.7. If the canonical ID is NOT the literal `qwen3.7-max`, substitute the canonical literal across every artifact landed in earlier beads (settings types, providers map, capabilities, frontend catalog, label maps, routing tests, docs) \u2014 one focused diff, same bead. Record the verified ID and verification date in continue.json decisions. If Qwen3.7 is NOT yet available on the intl endpoint, REMOVE every qwen3.7-max reference instead and add a deferred-scope note. **(B) Smoke test:** check whether `DASHSCOPE_API_KEY` is available in the workspace environment or in `~/.panopticon/config.yaml` under `apiKeys.dashscope`. IF present: spawn a throwaway agent on `qwen3-max` (`pan start <id> --model qwen3-max` against a benign test issue) AND on the qwen3.7-max canonical literal, confirm both boot through the local proxy and emit coherent responses \u2014 then flip `tested: true` on PROVIDERS.dashscope in src/lib/providers.ts. IF NOT present: leave `tested: false`, write a short verification checklist into the bead's completion notes, and do NOT block the issue \u2014 the smoke test is a verification gate, not a blocker for shipping the wiring.",
+          "Result": "Canonical ID verified as `qwen3.7-max` from current Qwen Cloud docs. No `DASHSCOPE_API_KEY` was present in the workspace environment or ~/.panopticon/config.yaml, so throwaway agent smoke tests were deferred and `PROVIDERS.dashscope.tested` remains `false`."
         },
         "subItems": [
           {
             "id": "manual-smoke-test.ac1",
-            "title": "If a DASHSCOPE_API_KEY is available, a throwaway `pan start <id> --model qwen3-max` AND `pan start <id> --model <qwen3.7-canonical-ID>` both boot agents that respond to a tmux-delivered prompt with non-error output.",
-            "status": "pending",
+            "title": "If a DASHSCOPE_API_KEY is available, a throwaway `pan start <id> --model qwen3-max` AND `pan start <id> --model qwen3.7-max` both boot agents that respond to a tmux-delivered prompt with non-error output.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "manual-smoke-test.ac4",
-            "title": "The canonical DashScope intl model ID for Qwen3.7 has been verified (via `/v1/models` listing or current Alibaba intl docs) and either (a) every reference in the codebase uses the canonical literal, or (b) qwen3.7 entries have been removed with a deferred-scope note recorded in continue.json.",
-            "status": "pending",
+            "title": "The canonical DashScope intl model ID for Qwen3.7 has been verified (via `/v1/models` listing or current Alibaba intl docs) and either (a) every reference in the codebase uses the canonical literal, or (b) qwen3.7-max entries have been removed with a deferred-scope note recorded in continue.json.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -621,7 +626,7 @@
           {
             "id": "manual-smoke-test.ac2",
             "title": "If smoke test succeeded, PROVIDERS.dashscope.tested is flipped to `true` in src/lib/providers.ts; otherwise the bead is closed with a completion note documenting that the smoke test was deferred (and `tested: false` remains).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -629,7 +634,7 @@
           {
             "id": "manual-smoke-test.ac3",
             "title": "The decision (tested / deferred) is recorded in the bead's completion comment for downstream traceability.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
