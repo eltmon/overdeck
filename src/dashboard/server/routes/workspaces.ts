@@ -113,6 +113,8 @@ import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-ma
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
+import { cancelAutoMerge } from '../services/auto-merge-scheduler.js';
+import { getAutoMergeStatus } from '../../../lib/database/auto-merge-db.js';
 import { getWorkAgentLifecycleStateSync } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
@@ -5330,6 +5332,36 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   }))
 );
 
+const postWorkspaceMergeCancelRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:issueId/merge/cancel',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
+
+    const normalizedIssueId = issueId.toUpperCase();
+    const status = getAutoMergeStatus(normalizedIssueId);
+    if (status?.status === 'executing') {
+      return jsonResponse({ cancelled: false, error: 'Auto-merge already executing' }, { status: 409 });
+    }
+
+    const body = yield* readJsonBody;
+    const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'manual';
+    const cancelled = yield* Effect.promise(() => cancelAutoMerge(normalizedIssueId, reason, 'api'));
+    if (!cancelled && getAutoMergeStatus(normalizedIssueId)?.status === 'executing') {
+      return jsonResponse({ cancelled: false, error: 'Auto-merge already executing' }, { status: 409 });
+    }
+
+    return jsonResponse({ cancelled });
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/forge-approve ──────────────────────
 // Approves the PR/MR on GitHub/GitLab (submits an approving review).
 // This is distinct from the Panopticon /approve endpoint which runs the
@@ -6104,6 +6136,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceDeaconIgnoreRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
+  postWorkspaceMergeCancelRoute,
   postForgeApproveRoute,
   postForgeMergeRoute,
   postWorkspaceApproveRoute,
