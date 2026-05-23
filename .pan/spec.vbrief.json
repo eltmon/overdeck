@@ -1,0 +1,328 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T06:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1402: Work agent state.json.claudeSessionId stays null — heartbeat hook never records the Claude session",
+    "updated": "2026-05-23T06:15:37.990Z"
+  },
+  "plan": {
+    "id": "pan-1402",
+    "title": "Restore PreToolUse/PostToolUse/Stop hook registration in global settings.json (revert PAN-982)",
+    "status": "proposed",
+    "uid": "3a92961a-e967-4dab-9eb2-582bda8ea473",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T06:30:00.000Z",
+    "updated": "2026-05-23T06:15:37.990Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1402",
+        "label": "PAN-1402",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/982",
+        "label": "PAN-982 (the migration this reverts)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/sub-agents",
+        "label": "Claude Code subagents docs (--agent reference)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "hooks",
+      "bug",
+      "regression",
+      "heartbeat",
+      "PAN-982-revert"
+    ],
+    "narratives": {
+      "Problem": "For every new work agent (e.g. agent-pan-1132), the Claude Code JSONL transcript exists on disk but ~/.panopticon/agents/<id>/sessions.json and activity.jsonl are never created, the runtime snapshot reports claudeSessionId as null, and the dashboard's Command Deck Session pane shows 'No conversation data available'. Resume-after-stop also fails with 'No saved session ID found'. Root cause: PAN-982 moved PreToolUse, PostToolUse, and Stop hook registrations out of ~/.claude/settings.json and into per-agent frontmatter at roles/<role>.md (and sync-sources/agents/pan-*-agent.md) on the assumption Claude Code honors frontmatter hooks when the agent is loaded via `--agent`. The launcher invokes `claude --agent roles/work.md` — a file path rather than the agent-name lookup Claude Code's CLI reference documents. Whether Claude silently drops frontmatter hooks for path-form invocations or refuses to load the agent at all, the observable effect is the same: heartbeat-hook/pre-tool-hook/stop-hook never fire, no sessions.json or activity.jsonl is written, and the dashboard's session pane is empty for every running work agent.",
+      "Proposal": "Revert PAN-982. Restore the pre-migration registrations in setupHooksCommand (src/cli/commands/setup/hooks.ts) so PreToolUse:pre-tool-hook, PostToolUse:heartbeat-hook + permission-event-hook, Stop:stop-hook + permission-event-hook, and the python3-gated TLDR helpers are written back into ~/.claude/settings.json on `pan install`. Delete the matching `removeIfPresent(...)` prune block. Strip the now-redundant `hooks:` blocks from roles/*.md (5 files) and sync-sources/agents/pan-*-agent.md (7 files) so settings.json is the single source of truth and there is zero double-fire risk regardless of whether Claude Code ever starts honoring `--agent <path>` frontmatter. Add a regression test in setup-hooks.test.ts that asserts the tool-event hooks ARE registered after setup. Update docs/HOOKS.md to describe the post-PAN-1402 state (all hooks live globally, with a 'History' paragraph explaining the PAN-982 attempt and the PAN-1402 revert)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Revert PAN-982 by restoring hooks to settings.json rather than fixing Claude Code's path-form `--agent` to load frontmatter hooks.",
+        "rationale": "Restoring known-working pre-PAN-982 behavior is the smallest change that fixes the bug. Investigating/fixing whatever Claude Code does with `--agent <path>` is upstream work outside Panopticon's control; even if it could be fixed, the revert removes Panopticon's dependency on the undocumented path-form behavior entirely."
+      },
+      {
+        "summary": "Strip `hooks:` from both roles/*.md AND sync-sources/agents/pan-*-agent.md.",
+        "rationale": "Required to eliminate the H4 double-fire hazard from PAN-982 in case Claude Code ever starts honoring frontmatter hooks via path. Removing the duplication makes settings.json the only source of truth and matches the no-bandaids rule (one canonical declaration, not two)."
+      },
+      {
+        "summary": "Do NOT in this issue migrate the launcher to `--agent <name>` lookups from `.claude/agents/`.",
+        "rationale": "That would be a separate, larger restructure (rename `name:` in role files, sync to `.claude/agents/` reliably, update getRoleRuntimeBaseCommand, update tests). It's orthogonal to the heartbeat-hook bug. File a follow-up if the team wants Panopticon to use Claude Code's named-agent mechanism end-to-end."
+      },
+      {
+        "summary": "Run `pan install` (idempotent) as the user-facing migration; do not write a separate migration script.",
+        "rationale": "setupHooksCommand already uses addHookIfMissing, which is the standard upgrade path. A bespoke migration script would duplicate logic and add a one-time-use code path. Document the requirement to re-run `pan install` after upgrading in HOOKS.md."
+      },
+      {
+        "summary": "Replace the role-definitions.test.ts `frontmatter.hooks` assertions with a regression test in setup-hooks.test.ts rather than keeping the frontmatter assertion.",
+        "rationale": "After the strip, role frontmatter has no `hooks:` field, so the old assertion is wrong. The new home for the guarantee — 'tool-event hooks are registered globally' — is the install code path, which setup-hooks.test.ts already exercises."
+      }
+    ],
+    "items": [
+      {
+        "id": "restore-tool-event-hooks-in-settings",
+        "title": "Re-register PreToolUse/PostToolUse/Stop hooks in setupHooksCommand and remove the PAN-982 prune block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1402",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "strip-role-frontmatter-hooks",
+            "strip-sync-sources-agents-hooks",
+            "add-setup-hooks-regression-test",
+            "update-hooks-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/setup/hooks.ts, restore the pre-PAN-982 registrations: addHookIfMissing('PreToolUse', 'pre-tool-hook'), addHookIfMissing('PostToolUse', 'heartbeat-hook'), addHookIfMissing('PostToolUse', 'permission-event-hook'), addHookIfMissing('Stop', 'stop-hook'), addHookIfMissing('Stop', 'permission-event-hook'), and (inside the existing `if (python3Available)` gate) addHookIfMissing('PreToolUse', 'tldr-read-enforcer', 'Read') + addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write'). Delete the entire `removeIfPresent(...)` block (lines 384–406 of the current file) including the 'PAN-982: Atomic migration' comment. Rewrite the PAN-982 explanatory comment (lines 352–369) into a shorter PAN-1402 note explaining that tool-event hooks were briefly migrated to per-agent frontmatter and reverted because the path-form `--agent` did not honor them. Update the success-message `console.log` block (lines 452–464) to list the restored hooks alongside the existing six. The bead lands cleanly only when `npm run lint`, `npm run typecheck`, and `npm test src/cli/commands/__tests__/setup-hooks.test.ts` all pass."
+        },
+        "subItems": [
+          {
+            "id": "restore-tool-event-hooks-in-settings.ac1",
+            "title": "After running setupHooksCommand on an empty settings.json, the result contains PreToolUse with pre-tool-hook, PostToolUse with heartbeat-hook + permission-event-hook, and Stop with stop-hook + permission-event-hook.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-tool-event-hooks-in-settings.ac2",
+            "title": "When python3 is detected, the post-setup settings.json also contains PreToolUse with tldr-read-enforcer (matcher 'Read') and PostToolUse with tldr-post-edit (matcher 'Edit|Write').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-tool-event-hooks-in-settings.ac3",
+            "title": "The `removeIfPresent(...)` PAN-982 migration block (and its console.log of removed entries) is fully deleted; setupHooksCommand never strips PreToolUse/PostToolUse/Stop entries that point at Panopticon's bin dir.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-tool-event-hooks-in-settings.ac4",
+            "title": "Running setupHooksCommand twice in a row leaves settings.json byte-identical the second time (idempotency preserved by addHookIfMissing).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-tool-event-hooks-in-settings.ac5",
+            "title": "`npm run lint`, `npm run typecheck`, and `npm test -- src/cli/commands/__tests__/setup-hooks.test.ts` all pass with no new failures after the change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-role-frontmatter-hooks",
+        "title": "Remove `hooks:` blocks from roles/*.md and drop the matching assertions in role-definitions.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete the `hooks:` YAML block from the frontmatter of all five role files: roles/work.md, roles/plan.md, roles/review.md, roles/test.md, roles/ship.md. Keep every other frontmatter field (name, description, permissionMode, effort, tools, mcpServers) untouched. In src/lib/__tests__/role-definitions.test.ts, drop every `expect(frontmatter.hooks).toEqual(expect.any(Object))` assertion (lines 33, 57, 97, 116, 137). The role files themselves remain in roles/ — only the hooks declaration goes."
+        },
+        "subItems": [
+          {
+            "id": "strip-role-frontmatter-hooks.ac1",
+            "title": "roles/work.md, roles/plan.md, roles/review.md, roles/test.md, and roles/ship.md no longer contain a `hooks:` key in their YAML frontmatter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-role-frontmatter-hooks.ac2",
+            "title": "All other frontmatter fields (name, description, permissionMode, effort, tools, mcpServers) on the five role files are preserved exactly as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-role-frontmatter-hooks.ac3",
+            "title": "src/lib/__tests__/role-definitions.test.ts contains no `frontmatter.hooks` assertions; `npm test -- src/lib/__tests__/role-definitions.test.ts` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-sync-sources-agents-hooks",
+        "title": "Remove `hooks:` blocks from sync-sources/agents/pan-*-agent.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete the `hooks:` YAML block from the frontmatter of all seven Panopticon pipeline agent definitions under sync-sources/agents/: pan-work-agent.md, pan-planning-agent.md, pan-review-agent.md, pan-inspect-agent.md, pan-test-agent.md, pan-uat-agent.md, pan-merge-agent.md. Keep every other frontmatter field (name, description, model, permissionMode, effort, tools, mcpServers) untouched. These files are sync sources — the workspace `.claude/agents/` directory copies them on `pan install` / `pan sync`. After this strip, the agents (if Claude Code ever discovers them by name) carry no frontmatter hooks, eliminating any future double-fire pathway."
+        },
+        "subItems": [
+          {
+            "id": "strip-sync-sources-agents-hooks.ac1",
+            "title": "sync-sources/agents/pan-work-agent.md, pan-planning-agent.md, pan-review-agent.md, pan-inspect-agent.md, pan-test-agent.md, pan-uat-agent.md, and pan-merge-agent.md no longer contain a `hooks:` key in their YAML frontmatter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-sync-sources-agents-hooks.ac2",
+            "title": "All other frontmatter fields (name, description, model, permissionMode, effort, tools, mcpServers) on the seven agent files are preserved exactly as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-sync-sources-agents-hooks.ac3",
+            "title": "Any existing test that asserts `frontmatter.hooks` exists for these agent files is updated or removed; `npm test` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-setup-hooks-regression-test",
+        "title": "Add regression tests in setup-hooks.test.ts that assert tool-event hooks register globally",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/cli/commands/__tests__/setup-hooks.test.ts with new unit tests that exercise the helper-level surface (`addPanopticonHookIfMissing` on a fresh ClaudeSettings) for each restored entry: PreToolUse:pre-tool-hook, PostToolUse:heartbeat-hook, PostToolUse:permission-event-hook, Stop:stop-hook, Stop:permission-event-hook, PreToolUse:tldr-read-enforcer ('Read'), PostToolUse:tldr-post-edit ('Edit|Write'). Each test asserts both (a) the first call returns true and writes the expected matcher + command, and (b) a duplicate call is a no-op. The intent is a regression net: if anyone re-introduces a PAN-982-style strip in setupHooksCommand, these tests still pass at the helper layer, so add a higher-level test too that invokes the full setupHooksCommand with a temp HOME / .claude directory and asserts each of the six entries lands on disk. Use existing test patterns in the file."
+        },
+        "subItems": [
+          {
+            "id": "add-setup-hooks-regression-test.ac1",
+            "title": "setup-hooks.test.ts contains a regression test for each tool-event hook restored in restore-tool-event-hooks-in-settings, asserting addPanopticonHookIfMissing writes the entry and is idempotent on the second call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-setup-hooks-regression-test.ac2",
+            "title": "A higher-level test exercises setupHooksCommand against an isolated temp HOME and asserts the resulting settings.json contains PreToolUse:pre-tool-hook, PostToolUse:heartbeat-hook, PostToolUse:permission-event-hook, Stop:stop-hook, and Stop:permission-event-hook (TLDR entries conditional on python3 detection).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-setup-hooks-regression-test.ac3",
+            "title": "`npm test -- src/cli/commands/__tests__/setup-hooks.test.ts` passes with the new assertions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-hooks-docs",
+        "title": "Update docs/HOOKS.md to describe the PAN-1402 revert and remove the split-registry section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite the 'Split-Registry Rule (PAN-982)' section of docs/HOOKS.md (lines 23–48). Replace it with a 'Hook Registration' section explaining all nine hook events live in global ~/.claude/settings.json and are installed by `pan install` / `pan admin hooks install`. Add a short 'History' note: PAN-982 attempted a per-agent frontmatter migration for PreToolUse/PostToolUse/Stop; PAN-1402 reverted it because Claude Code did not honor the frontmatter hooks when `--agent` was passed a file path. Update the 'Migration Pruning' subsection to point at the new PAN-1402 state (no pruning needed; the prune block was removed). Leave the rest of the document (hook inventory, execution flow, Pi gaps) unchanged."
+        },
+        "subItems": [
+          {
+            "id": "update-hooks-docs.ac1",
+            "title": "docs/HOOKS.md no longer contains the 'Split-Registry Rule (PAN-982)' section claiming PreToolUse/PostToolUse/Stop live in per-agent frontmatter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-hooks-docs.ac2",
+            "title": "A new 'Hook Registration' section describes all nine hooks living in global settings.json, with a 'History' paragraph summarizing the PAN-982 attempt and PAN-1402 revert.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-hooks-docs.ac3",
+            "title": "Users upgrading across PAN-1402 are explicitly told to re-run `pan install` and restart any in-flight work agents to pick up the restored hook registration.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "restore-tool-event-hooks-in-settings",
+        "to": "strip-role-frontmatter-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-tool-event-hooks-in-settings",
+        "to": "strip-sync-sources-agents-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-tool-event-hooks-in-settings",
+        "to": "add-setup-hooks-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-tool-event-hooks-in-settings",
+        "to": "update-hooks-docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1402-restore-pretooluse-posttooluse-stop-hook-registration-in-global-settings-json-revert-pan-982.vbrief.json"
+    }
+  }
+}

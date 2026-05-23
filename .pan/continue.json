@@ -1,0 +1,83 @@
+{
+  "version": "1",
+  "issueId": "PAN-1402",
+  "created": "2026-05-23T06:03:55.853Z",
+  "updated": "2026-05-23T06:30:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1402",
+    "sha": "c11d4861d",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Revert PAN-982: re-register PreToolUse, PostToolUse, and Stop hooks in global ~/.claude/settings.json via setupHooksCommand. Strip the matching `hooks:` blocks from roles/*.md and sync-sources/agents/pan-*-agent.md so there is exactly one source of truth and zero double-fire risk.",
+      "recordedAt": "2026-05-23T06:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "The Panopticon launcher invokes `claude --agent roles/work.md` (a path), but Claude Code's `--agent` CLI flag documents only agent-name lookup from `.claude/agents/`. Whether Claude silently drops frontmatter hooks for path-style invocations or refuses to load the agent entirely is undetermined and out of scope for this fix. The revert removes Panopticon's dependency on either behavior — global settings.json is honored regardless of how `--agent` is invoked.",
+      "recordedAt": "2026-05-23T06:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Scope is limited to restoring heartbeat/cost/stop hook flow. We do NOT migrate the launcher to `--agent <name>` lookups or move roles/*.md into .claude/agents/ in this issue — that is a larger restructure and orthogonal to the bug. If a follow-up wants to fully exercise Claude Code's named-agent path, file a separate issue.",
+      "recordedAt": "2026-05-23T06:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Restored registrations exactly mirror the pre-PAN-982 state: PreToolUse:pre-tool-hook, PostToolUse:heartbeat-hook, PostToolUse:permission-event-hook, Stop:stop-hook, Stop:permission-event-hook, and the python3-gated PreToolUse:tldr-read-enforcer (Read) + PostToolUse:tldr-post-edit (Edit|Write). The chained hooks (work-agent-stop-hook, specialist-stop-hook, inspect-on-bead-close) are invoked from inside stop-hook/heartbeat-hook and were never top-level registrations.",
+      "recordedAt": "2026-05-23T06:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "The existing PAN-982 `removeIfPresent(...)` block in setupHooksCommand is deleted as part of the revert. Re-running `pan install` (or `pan admin hooks install`) on an upgraded machine becomes the user-facing migration: the idempotent `addHookIfMissing` adds the restored entries; existing global-settings entries (if any survived the prior prune) are left alone. No manual settings.json edit is required by the user.",
+      "recordedAt": "2026-05-23T06:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Double-fire risk: if Claude Code DOES honor frontmatter hooks via `--agent <path>` (contrary to current observation), leaving `hooks:` in roles/*.md after re-adding hooks to settings.json would cause every tool event to POST twice (the original PAN-982 hazard H4).",
+      "mitigation": "Strip `hooks:` from both roles/*.md AND sync-sources/agents/pan-*-agent.md as part of this fix (beads `strip-role-frontmatter-hooks` and `strip-sync-sources-agents-hooks`). After the revert, settings.json is the single source of truth for tool-event hooks regardless of whether Claude Code loads agent frontmatter via path or name."
+    },
+    {
+      "id": "H2",
+      "summary": "Existing running work agents will not pick up the restored hooks until they are stopped and respawned. Their `~/.claude/settings.json` was already correct (no PostToolUse), so editing it now does not retroactively register hooks for an already-bound Claude session.",
+      "mitigation": "Document in commit body and HOOKS.md update that any agent started before the fix lands must be restarted (`pan kill <id>` + `pan start <id>`) to begin emitting heartbeats. New spawns get the fix automatically because the launcher sources from the updated settings.json via Claude Code's per-session bootstrap."
+    },
+    {
+      "id": "H3",
+      "summary": "Ad-hoc Claude sessions in any directory now fire pan-hook-lib.sh scripts (heartbeat-hook etc.). When `PANOPTICON_AGENT_ID` is absent, `pan_resolve_agent_id` falls back to `tmux display-message -p '#S'` which produces a tmux pane name. If that name doesn't match an agent ID in `~/.panopticon/agents/`, the heartbeat POST hits a 4xx and `pan_emit_event` drops the body (no buffering). Cost: a single sub-500ms curl per tool call. No correctness impact.",
+      "mitigation": "Accept the cost — this was the pre-PAN-982 behavior and was not a problem in practice. If a user-facing complaint emerges, gate hook execution on `PANOPTICON_AGENT_ID` presence (early-exit before curl). Not required for this fix."
+    },
+    {
+      "id": "H4",
+      "summary": "The role-definitions.test.ts file currently asserts `expect(frontmatter.hooks).toEqual(expect.any(Object))` for every role. Stripping `hooks:` will fail those assertions.",
+      "mitigation": "Drop the `frontmatter.hooks` assertions in role-definitions.test.ts as part of `strip-role-frontmatter-hooks`. The new regression test in `setup-hooks.test.ts` (bead `add-setup-hooks-regression-test`) provides the replacement guard: tool-event hooks ARE registered globally."
+    },
+    {
+      "id": "H5",
+      "summary": "docs/HOOKS.md devotes a whole 'Split-Registry Rule (PAN-982)' section to explaining the migration. Leaving it in place after the revert misleads future readers.",
+      "mitigation": "Rewrite the section in bead `update-hooks-docs` to describe the post-PAN-1402 state: all nine hooks live in global settings.json, with a brief 'History' note that PAN-982 attempted a per-agent migration that was reverted by PAN-1402 because Claude Code does not reliably honor frontmatter hooks via the path-form `--agent`."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T06:03:55.853Z",
+      "reason": "planning",
+      "note": "Initial planning session started for PAN-1402",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-23T06:30:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning: investigated PAN-982 hook migration, confirmed launcher uses `--agent roles/work.md` (path), Claude Code docs document only name-based --agent lookup. State.json on disk for agent-pan-1132 has no claudeSessionId field, no sessions.json, no activity.jsonl. Diagnosis matches issue body. Plan: revert PAN-982 — restore hooks to global settings.json, strip frontmatter hooks, add regression test, update docs.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
