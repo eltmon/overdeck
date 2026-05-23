@@ -47,6 +47,7 @@ export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
 export interface SummaryForkOptions {
   model?: string;
   cwd?: string;
+  harness?: RuntimeName;
   localSummaryOnly?: boolean;
   forkMode?: SummaryForkMode;
   focus?: string;
@@ -504,6 +505,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
     claudeSessionId: sessionId,
     model: launchModel ?? undefined,
     effort: conv.effort ?? undefined,
+    harness: options.harness ?? conv.harness ?? undefined,
   });
   if (handoffDocPath) {
     newConv = recordConversationHandoff(conv.name, newConv.name, handoffDocPath);
