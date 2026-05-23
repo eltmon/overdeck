@@ -1,0 +1,190 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-22T22:45:02.941Z",
+    "updated": "2026-05-23T00:26:22.096Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1379: Effect migration Phase 3 — delete legacy Promise/*Async variants AND canonicalize *Effect → unsuffixed (FINISH the migration)",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1379",
+    "title": "Effect migration Phase 3 — delete legacy Promise/*Async variants AND canonicalize *Effect → unsuffixed (FINISH the migration)",
+    "status": "completed",
+    "uid": "ba1c9548-58b6-4633-a43e-6b04ac05f627",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 44,
+    "created": "2026-05-22T22:45:02.941Z",
+    "updated": "2026-05-23T00:26:22.096Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1379",
+        "label": "PAN-1379",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-22-PAN-1379-effect-migration-phase-3-delete-legacy-promise-async-variants-and-canonicalize-effect-unsuffixed-finish-the-migration.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1379",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-23T00:22:58.733Z",
+        "work": {
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-23T00:22:58.733Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "blocked",
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "notes": "Security reviewer failed before writing a report",
+          "history": [
+            {
+              "status": "blocked",
+              "at": "2026-05-23T00:22:58.733Z",
+              "notes": "Security reviewer failed before writing a report"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-23T00:22:58.733Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-23T00:22:58.733Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-23T00:22:58.733Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1387"
+        }
+      }
+    },
+    "narratives": {
+      "Problem": "## Background\n\nPAN-1249 migrated `src/lib/` to **additive** Effect — every `async fn(): Promise<T>` got an `fnEffect()` sibling, keeping the Promise originals to avoid cascade breakage.\n\n**PAN-1312 (Phase 2) is done** — every `src/cli/` and `src/dashboard/server/` caller now consumes the `*Effect` variants; gate-verified, `typecheck` green, on `main`. Zero `*Async()` call sites remain in production code.\n\n## This issue — Phase 3: finish the migration\n\nDeliver the full Effect-native end state for `src/lib/`. Two phases, in this order, with a verification gate between them:\n\n### Phase 3a — Delete the legacy Promise variants\n\n- **22 `*Async` exports** remain in `src/lib/`, across 8 files: `vbrief/vbrief-index.ts`, `vbrief/io.ts`, `vbrief/dag.ts`, `vbrief/continue-state.ts`, `pan-dir/specs.ts`, `pan-dir/continue.ts`, `memory/checkpoint-client.ts`, `cloister/config.ts`.\n- **3 test files** still import `*Async` from `src/lib/`: `tests/lib/cloister/pan-464-container-health.test.ts`, `tests/unit/dashboard/server/routes/projects.test.ts`, `tests/unit/lib/lifecycle/teardown-workspace.test.ts` — migrate these to the `*Effect` siblings *first*, then the `*Async` exports can be deleted.\n- Delete each `*Async` export and the dead `Effect.runPromise` bridges that only existed to span the Promise↔Effect boundary.\n- Per-file: migrate any remaining test importers → delete `*Async` exports → `npm run typecheck`. A deletion that breaks typecheck means a caller was missed.\n\n**Verification gate:** zero `*Async`-from-`src/lib/` imports anywhere in the repo; `npm run typecheck` + `npm run lint` + `npm test` all green.\n\n### Phase 3b — Canonicalize naming\n\nOnce Phase 3a is verified clean (gate above passes), do the cosmetic rename:\n\n- Rename every surviving `fooEffect` → `foo` across `src/lib/`, `src/cli/`, `src/dashboard/server/`, and the test suite. Effect is the canonical form; the `Effect` suffix was temporary scaffolding from PAN-1249's additive phase.\n- Where a function has *both* an `*Effect` variant *and* a genuinely-needed sync variant of the same logical operation, the sync one becomes `*Sync` (e.g. `readPlanSync`). The Effect-returning one takes the plain name (`readPlan`).\n- This is a codebase-wide mechanical rename — a single coherent commit using a scripted find-replace, then test fixups in the same commit.\n\n**End state:** `src/lib/` exposes `foo()` (returns `Effect`) as the canonical name, `fooSync()` only where sync is genuinely needed. **No `*Async`, no `*Effect` suffix anywhere.**\n\n## Risk control\n\nA prior attempt to do canonicalization *bundled with the caller migration* spiraled ($82 of agent time, ~145 files of test fallout, no convergence — abandoned). The conditions now are different:\n\n- Caller migration is **already done on `main`** — the canonicalization is a pure rename, not bundled with semantic changes.\n- Phase 3a + 3b are explicitly **sequenced** — finish deletions first, *verify clean*, *then* canonicalize. Do NOT interleave.\n- Use a scripted rename for 3b (one find-replace pass + test fix-ups), not 100 separate Edits.\n\n## Reference\n\n- `backup/pan-1312-deletion-attempt` (on origin) has 4 of the 8 Phase-3a files already cleanly deleted: `agents`, `tmux`, `config-yaml`, `vbrief-dag` async bridges. Those commits can be cherry-picked as a starting reference.\n\n## Done = the migration is fully complete\n\nWhen 3a + 3b land, `src/lib/` is Effect-native end-to-end, with clean canonical names — the migration arc (PAN-1249 → PAN-1312 → PAN-1379) closed.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-22T22:45:02.941Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1379",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Background\n\nPAN-1249 migrated `src/lib/` to **additive** Effect — every `async fn(): Promise<T>` got an `fnEffect()` sibling, keeping the Promise originals to avoid cascade breakage.\n\n**PAN-1312 (Phase 2) is done** — every `src/cli/` and `src/dashboard/server/` caller now consumes the `*Effect` variants; gate-verified, `typecheck` green, on `main`. Zero `*Async()` call sites remain in production code.\n\n## This issue — Phase 3: finish the migration\n\nDeliver the full Effect-native end state for `src/lib/`. Two phases, in this order, with a verification gate between them:\n\n### Phase 3a — Delete the legacy Promise variants\n\n- **22 `*Async` exports** remain in `src/lib/`, across 8 files: `vbrief/vbrief-index.ts`, `vbrief/io.ts`, `vbrief/dag.ts`, `vbrief/continue-state.ts`, `pan-dir/specs.ts`, `pan-dir/continue.ts`, `memory/checkpoint-client.ts`, `cloister/config.ts`.\n- **3 test files** still import `*Async` from `src/lib/`: `tests/lib/cloister/pan-464-container-health.test.ts`, `tests/unit/dashboard/server/routes/projects.test.ts`, `tests/unit/lib/lifecycle/teardown-workspace.test.ts` — migrate these to the `*Effect` siblings *first*, then the `*Async` exports can be deleted.\n- Delete each `*Async` export and the dead `Effect.runPromise` bridges that only existed to span the Promise↔Effect boundary.\n- Per-file: migrate any remaining test importers → delete `*Async` exports → `npm run typecheck`. A deletion that breaks typecheck means a caller was missed.\n\n**Verification gate:** zero `*Async`-from-`src/lib/` imports anywhere in the repo; `npm run typecheck` + `npm run lint` + `npm test` all green.\n\n### Phase 3b — Canonicalize naming\n\nOnce Phase 3a is verified clean (gate above passes), do the cosmetic rename:\n\n- Rename every surviving `fooEffect` → `foo` across `src/lib/`, `src/cli/`, `src/dashboard/server/`, and the test suite. Effect is the canonical form; the `Effect` suffix was temporary scaffolding from PAN-1249's additive phase.\n- Where a function has *both* an `*Effect` variant *and* a genuinely-needed sync variant of the same logical operation, the sync one becomes `*Sync` (e.g. `readPlanSync`). The Effect-returning one takes the plain name (`readPlan`).\n- This is a codebase-wide mechanical rename — a single coherent commit using a scripted find-replace, then test fixups in the same commit.\n\n**End state:** `src/lib/` exposes `foo()` (returns `Effect`) as the canonical name, `fooSync()` only where sync is genuinely needed. **No `*Async`, no `*Effect` suffix anywhere.**\n\n## Risk control\n\nA prior attempt to do canonicalization *bundled with the caller migration* spiraled ($82 of agent time, ~145 files of test fallout, no convergence — abandoned). The conditions now are different:\n\n- Caller migration is **already done on `main`** — the canonicalization is a pure rename, not bundled with semantic changes.\n- Phase 3a + 3b are explicitly **sequenced** — finish deletions first, *verify clean*, *then* canonicalize. Do NOT interleave.\n- Use a scripted rename for 3b (one find-replace pass + test fix-ups), not 100 separate Edits.\n\n## Reference\n\n- `backup/pan-1312-deletion-attempt` (on origin) has 4 of the 8 Phase-3a files already cleanly deleted: `agents`, `tmux`, `config-yaml`, `vbrief-dag` async bridges. Those commits can be cherry-picked as a starting reference.\n\n## Done = the migration is fully complete\n\nWhen 3a + 3b land, `src/lib/` is Effect-native end-to-end, with clean canonical names — the migration arc (PAN-1249 → PAN-1312 → PAN-1379) closed."
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "**22 *Async exports** remain in src/lib/, across 8 files: vbrief/vbrief-index.ts, vbrief/io.ts, vbrief/dag.ts, vbrief/continue-state.ts, pan-dir/specs.ts, pan-dir/continue.ts, memory/checkpoint-client.ts, cloister/config.ts.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "**3 test files** still import *Async from src/lib/: tests/lib/cloister/pan-464-container-health.test.ts, tests/unit/dashboard/server/routes/projects.test.ts, tests/unit/lib/lifecycle/teardown-workspace.test.ts — migrate these to the *Effect siblings *first*, then the *Async exports can be deleted.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Delete each *Async export and the dead Effect.runPromise bridges that only existed to span the Promise↔Effect boundary.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Per-file: migrate any remaining test importers → delete *Async exports → npm run typecheck. A deletion that breaks typecheck means a caller was missed.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Rename every surviving fooEffect → foo across src/lib/, src/cli/, src/dashboard/server/, and the test suite. Effect is the canonical form; the Effect suffix was temporary scaffolding from PAN-1249's additive phase.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Where a function has *both* an *Effect variant *and* a genuinely-needed sync variant of the same logical operation, the sync one becomes *Sync (e.g. readPlanSync). The Effect-returning one takes the plain name (readPlan).",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "This is a codebase-wide mechanical rename — a single coherent commit using a scripted find-replace, then test fixups in the same commit.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac8",
+            "title": "Caller migration is **already done on main** — the canonicalization is a pure rename, not bundled with semantic changes.",
+            "status": "pending",
+            "created": "2026-05-22T22:45:02.941Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

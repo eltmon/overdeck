@@ -59,7 +59,7 @@ Ask the user for (or auto-detect from the filesystem):
 
 | Field | Required | Example | Notes |
 |-------|----------|---------|-------|
-| Path | Yes | `/home/eltmon/Projects/myapp` | Must exist, must have `.git/` |
+| Path | Yes | `~/Projects/myapp` | Must exist, must have `.git/` |
 | Name | Yes | `myapp` | Short lowercase key for projects.yaml |
 | Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `issue_prefix` field |
 | Tracker | Yes | `github` / `linear` / `gitlab` | Where issues live |

@@ -54,13 +54,13 @@ Conversation #108
   Status:        ended
   Model:         claude-opus-4-6
   Effort:        medium
-  CWD:           /home/eltmon/Projects
+  CWD:           ~/Projects
   Issue:         N/A
   Title:         Lexerra game rules query out of scope
   Cost:          $22.90
   Created:       2026-04-12T01:44:30.908Z
   Ended:         2026-04-12T17:00:06.619Z
-  Session file:  /home/eltmon/.claude/projects/-home-eltmon-Projects/9b714cc0.jsonl
+  Session file:  ~/.claude/projects/<project-hash>/<session-id>.jsonl
 
   Session messages: 130
   By role:        assistant=62, user=68

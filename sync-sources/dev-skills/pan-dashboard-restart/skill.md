@@ -13,8 +13,8 @@ Compile and restart the Panopticon dashboard with dependency installation.
 
 1. **Install dependencies** in both frontend and server:
    ```bash
-   cd /home/eltmon/projects/panopticon/src/dashboard/frontend && npm install
-   cd /home/eltmon/projects/panopticon/src/dashboard && npm install
+   cd ~/Projects/panopticon-cli/src/dashboard/frontend && npm install
+   cd ~/Projects/panopticon-cli/src/dashboard && npm install
    ```
 
 2. **Kill existing processes**:
@@ -26,7 +26,7 @@ Compile and restart the Panopticon dashboard with dependency installation.
 
 3. **Start the dashboard**:
    ```bash
-   cd /home/eltmon/projects/panopticon/src/dashboard && npm run dev > /tmp/dashboard.log 2>&1 &
+   cd ~/Projects/panopticon-cli/src/dashboard && npm run dev > /tmp/dashboard.log 2>&1 &
    ```
 
 4. **Wait and verify health**:

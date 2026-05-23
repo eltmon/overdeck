@@ -71,7 +71,7 @@ echo "Dashboard: $DASHBOARD"
 
 # 2. Workspace exists?
 WS_PATH=""
-for dir in ~/.panopticon/workspaces/feature-$ISSUE_LOWER /home/eltmon/projects/*/workspaces/feature-$ISSUE_LOWER; do
+for dir in ~/.panopticon/workspaces/feature-$ISSUE_LOWER ~/Projects/*/workspaces/feature-$ISSUE_LOWER; do
   if [ -d "$dir" ]; then WS_PATH="$dir"; break; fi
 done
 echo "Workspace: ${WS_PATH:-NONE}"

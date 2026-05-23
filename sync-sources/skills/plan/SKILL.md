@@ -40,10 +40,10 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 ### Step 1: Parse Issue ID and Create Workspace
 
 ```bash
-# PAN-XXX -> /home/eltmon/projects/panopticon (GitHub)
-# MIN-XXX -> /home/eltmon/projects/myn (Linear)
-# HH-XXX  -> /home/eltmon/projects/househunt (Linear)
-# JH-XXX  -> /home/eltmon/projects/jobhunt (Linear)
+# PAN-XXX -> ~/Projects/panopticon-cli (GitHub)
+# MIN-XXX -> ~/Projects/myn (Linear)
+# HH-XXX  -> ~/Projects/househunt (Linear)
+# JH-XXX  -> ~/Projects/jobhunt (Linear)
 
 # CRITICAL: Create a proper git worktree with feature branch
 # DO NOT use mkdir -p - that creates a directory without git tracking!

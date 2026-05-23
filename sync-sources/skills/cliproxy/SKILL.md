@@ -79,7 +79,7 @@ Config contents:
 ```yaml
 host: "127.0.0.1"
 port: 8317
-auth-dir: "/home/eltmon/.panopticon/cliproxy/auth"
+auth-dir: "~/.panopticon/cliproxy/auth"
 api-keys:
   - "panopticon-local-cliproxy-key"
 debug: false
