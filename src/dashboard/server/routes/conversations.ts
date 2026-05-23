@@ -1955,6 +1955,15 @@ const getConversationMessagesRoute = HttpRouter.add(
             updateConversationCost(name, result.totalCost);
           }
 
+          let contextUsage = null;
+          if (conv) {
+            try {
+              contextUsage = await computeContextUsage(sessionFile, conv.model);
+            } catch {
+              contextUsage = null;
+            }
+          }
+
           return jsonResponse({
             messages: result.messages,
             workLog: result.workLog,
@@ -1963,6 +1972,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             proposedPlan: result.proposedPlan,
             compactBoundaries: (result.compactBoundaries?.length ?? 0) > 0 ? result.compactBoundaries : undefined,
             compacting: isCompacting(sessionFile) || undefined,
+            contextUsage,
           });
         } catch (parseErr: unknown) {
           // File may not exist yet — Claude Code is still starting up.

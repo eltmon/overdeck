@@ -2466,6 +2466,10 @@
   background: var(--card);
 }
 
+.conversationHeaderContainer {
+  container-type: inline-size;
+}
+
 .conversationTerminalTitle {
   font-size: 12px;
   font-weight: 600;
