@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-1407",
+  "created": "2026-05-23T08:10:58.030Z",
+  "updated": "2026-05-23T08:25:00.000Z",
+  "gitState": { "branch": "feature/pan-1407", "sha": "a0902fe75", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Download rtk from rtk-ai/rtk GitHub releases at install time (not vendored). Mirrors caveman install-time pattern; avoids per-platform vendored binaries.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D2", "summary": "Use prebuilt binaries only (linux-x64, darwin-arm64, darwin-x64). Compile-from-source path is rejected to avoid forcing cargo as an install dependency. Unsupported platforms degrade gracefully (warn + skip + hook no-ops).", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D3", "summary": "RTK hook is registered in ALL six role frontmatters (work, plan, review, test, ship, flywheel). The hook self-gates on agents.rtk.enabled, so zero-cost when disabled. Keeps role files structurally identical.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D4", "summary": "Config knob is agents.rtk.enabled, default false. Mirrors agents.caveman.enabled (also default false). Opt-in, per issue spec.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D5", "summary": "Hook wrapper lives at sync-sources/hooks/rtk-bash-filter and follows the same shape and bypass-on-failure rules as tldr-read-enforcer. Hook never blocks Claude Code execution; on any failure it falls through to passthrough.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D6", "summary": "The ≥30% Bash-output token reduction acceptance criterion is verified by a documented manual A/B benchmark with one captured measurement attached to docs/RTK-INTEGRATION.md, not an automated CI test. End-to-end agent runs are non-deterministic and a CI benchmark is not justified for an opt-in feature.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D7", "summary": "TLDR (Read tool) and RTK (Bash tool) are orthogonal — different PreToolUse matchers, no double-compression. Commands like cat that read files via Bash get RTK only, which is the desired behavior.", "recordedAt": "2026-05-23T08:25:00.000Z" },
+    { "id": "D8", "summary": "review-correctness.md / review-performance.md / review-requirements.md / review-security.md sub-role files do NOT carry their own hooks frontmatter today. They are prompt templates inlined by the review role's convoy orchestrator. Do NOT add RTK to them — the parent review.md hook entry covers them.", "recordedAt": "2026-05-23T08:25:00.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "rtk-ai/rtk may not publish a prebuilt linux-x64 (or other) binary at the version we want to pin. bead research-rtk-release must verify before bead install-rtk-binary proceeds.", "mitigation": "research-rtk-release bead has an explicit acceptance criterion to document the platform→asset mapping. If a platform is missing, the bead's hazard-flagging AC requires updating the plan rather than silently skipping." },
+    { "id": "H2", "summary": "RTK rewriting Bash output could corrupt structured outputs the agent depends on byte-for-byte (e.g. piping git status into a parser, base64 blobs, JSON output). A naïve always-on compression would break some commands.", "mitigation": "Hook wrapper bypasses when output is short, and the broader gate is agents.rtk.enabled defaulting OFF. CLAUDE.md note documents the behavior so operators can disable per session. Smoke test bead exercises a representative commit cycle." },
+    { "id": "H3", "summary": "PreToolUse hooks can have subtle interactions with Claude Code's tool-call retry path. If the hook returns an unexpected JSON envelope it can break tool invocation entirely.", "mitigation": "Wrapper script wraps every step in defensive checks and falls through to passthrough on any failure (modeled on tldr-read-enforcer). Bypass on Tool != Bash. Exit 0 with no replacement output if any condition fails." },
+    { "id": "H4", "summary": "Installing rtk at pan admin hooks install time adds an outbound network dependency at install time. Air-gapped environments will silently skip rtk.", "mitigation": "Graceful degradation: install logs a warning, hook wrapper no-ops when binary missing. The whole feature is opt-in so air-gapped operators are not surprised." },
+    { "id": "H5", "summary": "The config gate must reach the hook script. tldr-read-enforcer reads its gate from filesystem signals (TLDR binary presence + .tldr/dirty-files); RTK has no equivalent. The wrapper needs a clean way to know agents.rtk.enabled.", "mitigation": "Two paths to consider in the rtk-hook-wrapper-script bead: (a) read the config gate from a Panopticon state file the agent launcher already writes, or (b) have the launcher set PANOPTICON_RTK_ENABLED=1 in the agent's env. Whichever already has precedent in the codebase wins. Bead narrative calls this out explicitly." },
+    { "id": "H6", "summary": "Six role files duplicated by hand could drift over time. PAN-982 already noted hook duplication across global settings and per-agent frontmatter as a real problem.", "mitigation": "Plan covers all six role files in beads add-rtk-to-work-role and add-rtk-to-other-roles; verification AC requires that all five non-work role files contain the same matcher block. Lint check is already run as part of npm run lint." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    { "timestamp": "2026-05-23T08:10:58.030Z", "reason": "planning", "note": "Planning session started for PAN-1407: Integrate RTK as PreToolUse Bash hook for token-efficient command outputs", "agentModel": "agent:claude-opus-4-7" },
+    { "timestamp": "2026-05-23T08:25:00.000Z", "reason": "planning", "note": "Auto-planning complete. Produced 11-bead vBRIEF: research/document rtk release → config knob → install binary → hook wrapper script (INSPECT) → register in install → add to work role → add to other 5 roles → CLAUDE.md note → settings UI toggle → cost benchmark doc → end-to-end smoke. Two inspection gates (research-rtk-release, rtk-hook-wrapper-script) cover the foundation decisions: release artifact pinning and the PreToolUse JSON contract. 8 auto-decisions and 6 hazards recorded. Ready for pan plan finalize.", "agentModel": "agent:claude-opus-4-7" }
+  ],
+  "feedback": []
+}
