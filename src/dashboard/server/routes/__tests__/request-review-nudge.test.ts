@@ -229,15 +229,15 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
 
     const headCall = execBehaviorMock.mock.calls.find(([command]) => String(command).includes('git rev-parse HEAD'));
     expect(headCall?.[0]).toContain('fly ssh console -a pan-workspace');
-    expect(headCall?.[0]).toContain('cd /remote/workspace && git rev-parse HEAD');
+    expect(headCall?.[0]).toContain("cd '/remote/workspace' && git rev-parse HEAD");
     expect(headCall?.[1]).toMatchObject({ timeout: 30000 });
     expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 
-  it('re-emits test.passed without status mutation when nudged after review and tests passed', async () => {
+  it('re-emits test.passed with canonical issue ID without workspace lookup when nudged after review and tests passed', async () => {
     getReviewStatusMock.mockReturnValue(passedStatus());
 
-    const result = await postRequestReview('PAN-1417', { query: '?nudge=true' });
+    const result = await postRequestReview('pan-1417', { query: '?nudge=true' });
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ success: true, nudged: true });
@@ -246,6 +246,8 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
       type: 'test.passed',
       payload: { issueId: 'PAN-1417' },
     });
+    expect(resolveProjectFromIssueMock).not.toHaveBeenCalled();
+    expect(loadWorkspaceMetadataMock).not.toHaveBeenCalled();
     expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 
@@ -262,6 +264,30 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(result.body.hint).toContain('?force=true');
     expect(result.appendedEvents).toEqual([]);
     expect(setReviewStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('honors query force and preserves the destructive rerun reset', async () => {
+    getReviewStatusMock.mockReturnValue(passedStatus());
+
+    const result = await postRequestReview('PAN-1417', { query: '?force=true' });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ success: true, rerun: true });
+    expect(result.appendedEvents).toEqual([]);
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1417', expect.objectContaining({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      autoRequeueCount: 0,
+      verificationCycleCount: 0,
+      verificationStatus: 'pending',
+      reviewNotes: undefined,
+      testNotes: undefined,
+      mergeNotes: undefined,
+    }));
+    expect(console.log).toHaveBeenCalledWith('[request-review] FORCE: full reset requested by operator for PAN-1417');
+    expect(console.log).toHaveBeenCalledWith('[request-review] PAN-1417: forcing full review/test rerun from passed state');
   });
 
   it('lets body force take precedence over nudge and preserves the destructive rerun reset', async () => {

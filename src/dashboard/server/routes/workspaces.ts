@@ -1080,6 +1080,10 @@ function getFlyAppName(vmName: string): string {
   return match ? match[1] : vmName;
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function flyExecCmd(vmName: string, command: string): string {
   const appName = getFlyAppName(vmName);
   return `fly ssh console -a ${appName} -C "${command.replace(/"/g, '\\"')}"`;
@@ -3638,9 +3642,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    const parsedIssueId = parseIssueIdSync(issueId);
+    if (!parsedIssueId) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+    const canonicalIssueId = issueId.toUpperCase();
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
@@ -3666,16 +3672,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     if (existingStatus?.reviewStatus === 'passed') {
-      const issueLowerRerun = issueId.toLowerCase();
-      const issuePrefixRerun = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-      const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
-      const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
-      const workspacePathRerun = wsInfoRerun.isRemote
-        ? wsInfoRerun.remotePath!
-        : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
-
       if (forceReview) {
-        console.log(`[request-review] FORCE: full reset requested by operator for ${issueId}`);
+        console.log(`[request-review] FORCE: full reset requested by operator for ${canonicalIssueId}`);
       } else if (nudgeReview) {
         if (existingStatus.testStatus !== 'passed') {
           return jsonResponse(
@@ -3688,24 +3686,34 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           );
         }
 
-        console.log(`[request-review] NUDGE: re-emitting test.passed for ${issueId} without state reset`);
+        console.log(`[request-review] NUDGE: re-emitting test.passed for ${canonicalIssueId} without state reset`);
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'test.passed',
           timestamp: new Date().toISOString(),
-          payload: { issueId },
+          payload: { issueId: canonicalIssueId },
         } as any)));
         return jsonResponse({
           success: true,
           nudged: true,
-          message: `Re-emitted test.passed for ${issueId}`,
+          message: `Re-emitted test.passed for ${canonicalIssueId}`,
         });
-      } else if (existingStatus.reviewedAtCommit) {
+      }
+
+      const issueLowerRerun = canonicalIssueId.toLowerCase();
+      const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+      const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+      const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
+      const workspacePathRerun = wsInfoRerun.isRemote
+        ? wsInfoRerun.remotePath!
+        : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+
+      if (existingStatus.reviewedAtCommit && !forceReview) {
         let currentHeadSha: string | undefined;
         const headResult = yield* Effect.promise(async () => {
           try {
             const result = wsInfoRerun.isRemote && wsInfoRerun.vmName
               ? await execAsync(
-                  flyExecCmd(wsInfoRerun.vmName!, `cd ${workspacePathRerun} && git rev-parse HEAD`),
+                  flyExecCmd(wsInfoRerun.vmName!, `cd ${shellQuote(workspacePathRerun)} && git rev-parse HEAD`),
                   { encoding: 'utf-8', timeout: 30000 },
                 )
               : await execAsync('git rev-parse HEAD', {
@@ -3776,7 +3784,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
                 await execAsync(
                   flyExecCmd(
                     wsInfoRerun.vmName,
-                    `cd ${workspacePathRerun} && git push origin ${branchNameRerun} 2>&1 || true`
+                    `cd ${shellQuote(workspacePathRerun)} && git push origin ${branchNameRerun} 2>&1 || true`
                   ),
                   { encoding: 'utf-8', timeout: 30000 }
                 );
