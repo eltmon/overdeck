@@ -2,7 +2,7 @@ import type { IssueId } from '@panctl/contracts';
 
 export type SessionFeedTab = 'all' | 'chats' | 'files' | 'git' | 'comments' | 'activity';
 
-export type SessionFeedEntryKind = 'conversation' | 'activity' | 'git' | 'file_change' | 'comment';
+export type SessionFeedEntryKind = 'conversation' | 'activity' | 'git' | 'file_change' | 'comment' | 'placeholder';
 
 export interface SessionFeedEntryBase {
   id: string;
@@ -13,6 +13,7 @@ export interface SessionFeedEntryBase {
 
 export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
   kind: 'conversation';
+  conversationId: number;
   conversationName: string;
   agent: string;
   lastMessageDate: string;
@@ -55,9 +56,17 @@ export interface CommentSessionFeedEntry extends SessionFeedEntryBase {
   url?: string;
 }
 
+export interface PlaceholderSessionFeedEntry extends SessionFeedEntryBase {
+  kind: 'placeholder';
+  tab: Extract<SessionFeedTab, 'files' | 'comments'>;
+  label: string;
+  description: string;
+}
+
 export type SessionFeedEntry =
   | ConversationSessionFeedEntry
   | ActivitySessionFeedEntry
   | GitSessionFeedEntry
   | FileChangeSessionFeedEntry
-  | CommentSessionFeedEntry;
+  | CommentSessionFeedEntry
+  | PlaceholderSessionFeedEntry;

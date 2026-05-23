@@ -33,6 +33,7 @@ function renderEntry(entry: SessionFeedEntry, onSelect: (entry: SessionFeedEntry
       return <GitFeedCard key={entry.id} entry={entry} onSelect={handleSelect} now={now} />;
     case 'file_change':
     case 'comment':
+    case 'placeholder':
       return null;
   }
 }

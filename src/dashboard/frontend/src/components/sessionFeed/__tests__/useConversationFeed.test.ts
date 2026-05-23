@@ -14,6 +14,7 @@ const useQueryMock = vi.mocked(useQuery);
 
 function conversation(overrides: Partial<ConversationFeedRow>): ConversationFeedRow {
   return {
+    id: 1,
     name: 'conv-a',
     createdAt: '2026-05-23T01:00:00.000Z',
     lastAttachedAt: null,
@@ -93,6 +94,7 @@ describe('useConversationFeed', () => {
       entries: [expect.objectContaining({
         kind: 'conversation',
         id: 'conversation:conv-a',
+        conversationId: 1,
         conversationName: 'conv-a',
         messageCount: 3,
       })],

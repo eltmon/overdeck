@@ -155,7 +155,7 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
 
   switch (entry.kind) {
     case 'conversation':
-      pushRoute(`/conv/${encodeURIComponent(entry.conversationName)}`);
+      pushRoute(`/conv/${entry.conversationId}`);
       return;
     case 'activity':
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
@@ -168,6 +168,7 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
       return;
     case 'file_change':
     case 'comment':
+    case 'placeholder':
       return;
   }
 }

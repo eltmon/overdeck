@@ -4,6 +4,7 @@ import type { IssueId } from '@panctl/contracts';
 import type { ConversationSessionFeedEntry } from './types';
 
 export interface ConversationFeedRow {
+  id: number;
   name: string;
   createdAt: string;
   lastAttachedAt: string | null;
@@ -35,6 +36,7 @@ export function mapConversationToFeedEntry(conversation: ConversationFeedRow): C
     timestamp: lastMessageDate,
     workspaceId: conversation.cwd ?? null,
     issueId: conversation.issueId as IssueId | null,
+    conversationId: conversation.id,
     conversationName: conversation.name,
     agent: mapHarnessToAgent(conversation.harness),
     lastMessageDate,

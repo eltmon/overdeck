@@ -10,6 +10,7 @@ function entry(overrides: Partial<ConversationSessionFeedEntry> = {}): Conversat
     timestamp: '2026-05-23T01:00:00.000Z',
     workspaceId: '/workspace/a',
     issueId: 'PAN-1389',
+    conversationId: 42,
     conversationName: 'conv-a',
     agent: 'claude_code',
     lastMessageDate: '2026-05-23T01:00:00.000Z',

@@ -31,6 +31,7 @@ function entry(kind: SessionFeedEntry['kind'], id: string, timestamp: string): S
       return {
         ...base,
         kind,
+        conversationId: 1,
         conversationName: id,
         agent: 'claude_code',
         lastMessageDate: timestamp,
@@ -44,6 +45,8 @@ function entry(kind: SessionFeedEntry['kind'], id: string, timestamp: string): S
       return { ...base, kind, path: 'src/file.ts' };
     case 'comment':
       return { ...base, kind, body: 'Comment' };
+    case 'placeholder':
+      return { ...base, kind, tab: 'files', label: 'Coming soon', description: 'Stub entry' };
   }
 }
 
