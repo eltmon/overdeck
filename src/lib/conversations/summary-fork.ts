@@ -22,15 +22,17 @@
  * wires the options through and handles tmux spawn + summary injection.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
-import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
+import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
+import { deliverAgentMessage } from '../agents.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
 
@@ -53,7 +55,114 @@ export interface SummaryForkResult {
   summaryModel: string | null;
 }
 
-const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
+const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
+const DEFAULT_HANDOFF_TIMEOUT_MS = 300_000;
+const DEFAULT_HANDOFF_POLL_INTERVAL_MS = 1_000;
+const NO_HANDOFF_FOCUS = 'No specific focus was provided.';
+
+export type HandoffDocValidation =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+export interface RequestHandoffOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  now?: Date;
+}
+
+export interface RequestHandoffResult {
+  docPath: string;
+  docText: string;
+}
+
+export class HandoffStallError extends Error {
+  constructor(
+    public readonly docPath: string,
+    public readonly sentinelPath: string,
+    public readonly timeoutMs: number,
+  ) {
+    super(`Timed out waiting ${timeoutMs}ms for handoff document and sentinel: ${docPath}, ${sentinelPath}`);
+    this.name = 'HandoffStallError';
+  }
+}
+
+export class HandoffValidationError extends Error {
+  constructor(
+    public readonly docPath: string,
+    public readonly reason: string,
+  ) {
+    super(`Invalid handoff document ${docPath}: ${reason}`);
+    this.name = 'HandoffValidationError';
+  }
+}
+
+export function validateHandoffDoc(text: string): HandoffDocValidation {
+  const trimmed = text.trim();
+  if (trimmed.length < 200) {
+    return { ok: false, reason: 'handoff document must be at least 200 characters' };
+  }
+  if (!/^##\s+Suggested skills\s*$/imu.test(trimmed)) {
+    return { ok: false, reason: 'handoff document must contain a ## Suggested skills section' };
+  }
+  return { ok: true };
+}
+
+function renderHandoffPrompt(template: string, focus: string | undefined, outputPath: string): string {
+  const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
+  return template
+    .split('{{focus}}').join(safeFocus)
+    .split('{{outputPath}}').join(outputPath);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollIntervalMs: number): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (true) {
+    try {
+      await access(paths.docPath);
+      await access(paths.sentinelPath);
+      return await readFile(paths.docPath, 'utf-8');
+    } catch {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        throw new HandoffStallError(paths.docPath, paths.sentinelPath, timeoutMs);
+      }
+      await delay(Math.min(pollIntervalMs, remainingMs));
+    }
+  }
+}
+
+export async function requestHandoffFromAgent(
+  sourceConv: Conversation,
+  focus?: string,
+  options: RequestHandoffOptions = {},
+): Promise<RequestHandoffResult> {
+  await ensureHandoffsDir();
+  const timestamp = (options.now ?? new Date()).toISOString();
+  const paths = createHandoffPaths(sourceConv.name, timestamp);
+  const template = await readFile(join(packageRoot, 'roles', 'handoff.md'), 'utf-8');
+  const prompt = renderHandoffPrompt(template, focus, paths.docPath);
+
+  await deliverAgentMessage(sourceConv.tmuxSession, prompt, 'handoff-request');
+
+  const docText = await waitForHandoffDoc(
+    paths,
+    options.timeoutMs ?? DEFAULT_HANDOFF_TIMEOUT_MS,
+    options.pollIntervalMs ?? DEFAULT_HANDOFF_POLL_INTERVAL_MS,
+  );
+  const validation = validateHandoffDoc(docText);
+  if (!validation.ok) {
+    throw new HandoffValidationError(paths.docPath, validation.reason);
+  }
+
+  return { docPath: paths.docPath, docText };
+}
+
+async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
   const { readFile } = await import('node:fs/promises');
   const lines = (await readFile(jsonlPath, 'utf-8'))
     .split('\n')
