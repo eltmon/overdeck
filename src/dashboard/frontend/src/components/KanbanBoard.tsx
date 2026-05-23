@@ -27,7 +27,7 @@ import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { deriveIssueActionPhase, type PipelinePhase } from '../lib/issueActions';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
@@ -2726,7 +2726,20 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, workspace: workspaceProp }: IssueCardProps) {
+const CARD_VERB_BY_PHASE: Partial<Record<PipelinePhase, 'WORK RUNNING' | 'REVIEW RUNNING' | 'SHIP RUNNING' | 'PLANNING' | 'INPUT' | 'READY TO MERGE' | 'MERGED' | 'CHANGES REQUESTED' | 'QUEUED FOR PLAN'>> = {
+  QUEUED_FOR_PLAN: 'QUEUED FOR PLAN',
+  PLANNING: 'PLANNING',
+  WORK_RUNNING: 'WORK RUNNING',
+  INPUT: 'INPUT',
+  REVIEW_RUNNING: 'REVIEW RUNNING',
+  SHIP_RUNNING: 'SHIP RUNNING',
+  CHANGES_REQUESTED: 'CHANGES REQUESTED',
+  STUCK: 'CHANGES REQUESTED',
+  READY_TO_MERGE: 'READY TO MERGE',
+  MERGED: 'MERGED',
+};
+
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
@@ -2745,17 +2758,21 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
-  const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
-  const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
+  const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
+  const issueActionPhase = deriveIssueActionPhase({
+    reviewStatus,
+    agent: activeAgent,
+    workspace: { exists: !!(workspaceProp?.path || issue.workspacePath) },
+    hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
+    hasBeads: planningState?.hasBeads ?? issue.hasBeads ?? false,
+    issueCanonicalState: canonical,
+    isMerged,
+  });
+  const isPipelineStuck = issueActionPhase === 'STUCK';
+  const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
   const cardVerbBadge =
     canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
-    isTerminal ? <VerbBadge variant="MERGED" /> :
-    isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
-    isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :
-    canonical === 'in_review' ? <VerbBadge variant="REVIEW RUNNING" /> :
-    canonical === 'in_progress' && isRunning ? <VerbBadge variant="WORK RUNNING" /> :
-    canonical === 'todo' || canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
+    cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
   const beadProgressColor =
     isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :

@@ -42,6 +42,7 @@ const prdActionKeys: readonly IssueActionKey[] = [
 ];
 
 const preservedActionKeys: readonly IssueActionKey[] = [
+  'cancel',
   'beads',
   'inference',
   'discussions',
@@ -146,6 +147,7 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('closeOut').kind).toBe('destructive');
     expect(action('wipe').kind).toBe('destructive');
     expect(action('resetIssue').kind).toBe('destructive');
+    expect(action('cancel').kind).toBe('destructive');
   });
 
   it('does not enable running-agent actions for stopped agents', () => {

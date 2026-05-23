@@ -1,8 +1,10 @@
 import type { ReviewStatus, WorkspaceInfo } from './workspace-types';
 import type { Agent, WorkAgentLifecycle } from '../types';
 
+export type PipelineReviewStatus = Pick<Partial<ReviewStatus>, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'readyForMerge'>;
+
 export interface PipelineStateInput {
-  reviewStatus?: ReviewStatus | null;
+  reviewStatus?: PipelineReviewStatus | null;
   agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;

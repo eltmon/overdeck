@@ -1,7 +1,7 @@
-import type { ReviewStatus, WorkspaceInfo } from './workspace-types';
+import type { WorkspaceInfo } from './workspace-types';
 import type { Agent, WorkAgentLifecycle } from '../types';
 import { isReviewPipelineStuck } from './pipeline-state';
-import { derivePipelineState, normalizeCanonicalState } from './issuePipelineState';
+import { derivePipelineState, normalizeCanonicalState, type PipelineReviewStatus } from './issuePipelineState';
 
 export type PipelinePhase =
   | 'QUEUED_FOR_PLAN'
@@ -45,6 +45,7 @@ export type IssueActionKey =
   | 'open'
   | 'resetIssue'
   | 'viewPr'
+  | 'cancel'
   | 'beads'
   | 'inference'
   | 'discussions'
@@ -73,7 +74,7 @@ export type IssueActionGroup =
   | 'preserved';
 
 export interface IssueActionState {
-  reviewStatus?: ReviewStatus | null;
+  reviewStatus?: PipelineReviewStatus | null;
   agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git' | 'paused' | 'troubled'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists' | 'path' | 'mrUrl'> | null;
@@ -137,6 +138,10 @@ const canCloseOut = (state: IssueActionState) => {
   const canonical = canonicalState(state);
   return canonical === 'verifying_on_main' || canonical === 'verifying' || isMerged(state);
 };
+const canCancelIssue = (state: IssueActionState) => {
+  const canonical = canonicalState(state);
+  return canonical !== 'verifying_on_main' && canonical !== 'verifying' && !isMerged(state) && !isDoneOrCanceled(state);
+};
 
 const phasePrimary = (key: IssueActionKey): PipelinePhase[] => PHASE_PRIMARY_ACTION_KEYS_BY_ACTION[key] ?? [];
 
@@ -194,6 +199,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },
   { key: 'resetIssue', label: 'Reset issue', panVerb: 'reset', endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
+  { key: 'cancel', label: 'Cancel issue', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'beads', label: 'Beads', panVerb: null, endpoint: '/api/issues/:id/beads', enabledWhen: (state) => state.hasBeads || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'inference', label: 'Inference', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'discussions', label: 'Discussions', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasDiscussions === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
