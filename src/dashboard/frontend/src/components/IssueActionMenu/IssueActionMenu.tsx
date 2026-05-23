@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 
 import { PlanDialog } from '../PlanDialog';
-import { PanOpenInPicker } from '../PanOpenInPicker';
 import { SwitchModelModal } from '../SwitchModelModal';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 import type { IssueActionKey } from '../../lib/issueActions';
+import { IssueOpenInDialog } from './IssueOpenInDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
 import { useIssueActions } from './useIssueActions';
 
@@ -62,12 +62,13 @@ function OverflowMenu({ views, onClose }: { views: IssueActionView[]; onClose: (
   );
 }
 
-function OverflowButton({ views }: { views: IssueActionView[] }) {
+function OverflowButton({ views, triggerRef }: { views: IssueActionView[]; triggerRef?: RefObject<HTMLButtonElement> }) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="relative inline-flex">
       <button
+        ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
         aria-label="More issue actions"
@@ -81,9 +82,14 @@ function OverflowButton({ views }: { views: IssueActionView[] }) {
   );
 }
 
-function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions: UseIssueActionsResult }) {
+function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
   const { activeDialog, agent, lifecycle, issue, workspace, closeDialog } = actions;
   const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
+  const handleClose = () => {
+    const restoreFocus = activeDialog?.key === 'open';
+    closeDialog();
+    if (restoreFocus) onAfterClose?.();
+  };
 
   if (!activeDialog) return null;
 
@@ -93,8 +99,8 @@ function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions:
         issue={issue}
         isOpen
         autoStart={activeDialog.key === 'startSkipPlanning'}
-        onClose={closeDialog}
-        onComplete={closeDialog}
+        onClose={handleClose}
+        onComplete={handleClose}
       />
     );
   }
@@ -108,7 +114,7 @@ function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions:
         issueId={issueId}
         agentStatus={agent.status}
         hasResumableSession={lifecycle?.canResumeSession === true}
-        onClose={closeDialog}
+        onClose={handleClose}
         onSwitch={(model, message, harness) => switchMutation.mutate({ model, message, harness })}
         isPending={isSwitchPending}
       />
@@ -116,28 +122,11 @@ function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions:
   }
 
   if (activeDialog.key === 'open' && workspace?.path) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeDialog}>
-        <div
-          role="dialog"
-          aria-label="Open workspace"
-          className="min-w-[260px] rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-xl"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-medium">Open workspace</h3>
-            <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={closeDialog}>
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <PanOpenInPicker cwd={workspace.path} />
-        </div>
-      </div>
-    );
+    return <IssueOpenInDialog cwd={workspace.path} onClose={handleClose} />;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeDialog}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={handleClose}>
       <div
         role="dialog"
         aria-label={activeDialog.action.label}
@@ -146,7 +135,7 @@ function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions:
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-medium">{activeDialog.action.label}</h3>
-          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={closeDialog}>
+          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={handleClose}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -158,6 +147,8 @@ function IssueActionDialogHost({ issueId, actions }: { issueId: string; actions:
 
 export function IssueActionMenu({ issueId, mode, pinRight = [], className }: IssueActionMenuProps) {
   const actions = useIssueActions(issueId);
+  const overflowTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreOverflowFocus = () => overflowTriggerRef.current?.focus();
   const pinSet = useMemo(() => new Set(pinRight), [pinRight]);
   const pinned = pinRight
     .map((key) => actions.all.find((view) => view.action.key === key))
@@ -171,13 +162,13 @@ export function IssueActionMenu({ issueId, mode, pinRight = [], className }: Iss
       {mode !== 'overflow-only' ? primary.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
-      {mode === 'overflow-only' ? <OverflowButton views={overflowOnly} /> : null}
-      {mode === 'hybrid' && hybridOverflow.length > 0 ? <OverflowButton views={hybridOverflow} /> : null}
+      {mode === 'overflow-only' ? <OverflowButton views={overflowOnly} triggerRef={overflowTriggerRef} /> : null}
+      {mode === 'hybrid' && hybridOverflow.length > 0 ? <OverflowButton views={hybridOverflow} triggerRef={overflowTriggerRef} /> : null}
       {pinned.length > 0 ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {pinned.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       ))}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
+      <IssueActionDialogHost issueId={issueId} actions={actions} onAfterClose={restoreOverflowFocus} />
     </div>
   );
 }

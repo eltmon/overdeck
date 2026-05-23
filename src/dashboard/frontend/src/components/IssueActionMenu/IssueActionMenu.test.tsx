@@ -189,4 +189,52 @@ describe('IssueActionMenu', () => {
     expect(await screen.findByRole('dialog', { name: 'Open workspace' })).toBeInTheDocument();
     expect(screen.getByTestId('pan-open-picker')).toHaveTextContent('/tmp/pan-1');
   });
+
+  it('closes the open dialog with Escape or backdrop click', async () => {
+    mockStore({ currentIssue: issue({ workspacePath: '/tmp/pan-1' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-open'));
+    expect(await screen.findByRole('dialog', { name: 'Open workspace' })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Open workspace' })).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-open'));
+    const dialog = await screen.findByRole('dialog', { name: 'Open workspace' });
+
+    fireEvent.click(dialog.parentElement!);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Open workspace' })).not.toBeInTheDocument());
+  });
+
+  it('restores focus to the overflow trigger when the open dialog closes', async () => {
+    mockStore({ currentIssue: issue({ workspacePath: '/tmp/pan-1' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    const trigger = screen.getByTestId('issue-action-overflow-button');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByTestId('issue-action-open'));
+    expect(await screen.findByRole('dialog', { name: 'Open workspace' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('disables the open action with a no-workspace tooltip', () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/planning-state')) return Response.json({ hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false });
+      if (url.includes('/api/workspaces/')) return Response.json({ exists: false, issueId: 'PAN-1' });
+      return Response.json({ success: true });
+    }));
+
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    expect(screen.getByTestId('issue-action-open')).toBeDisabled();
+    expect(screen.getByTestId('issue-action-open')).toHaveAttribute('title', 'Workspace does not exist');
+  });
 });

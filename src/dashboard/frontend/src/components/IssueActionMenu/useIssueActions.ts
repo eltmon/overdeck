@@ -127,6 +127,7 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'viewPr':
       return 'No pull request URL is available yet.';
     case 'open':
+      return 'Workspace does not exist';
     case 'syncMain':
     case 'copySettings':
     case 'destroyWorkspace':
