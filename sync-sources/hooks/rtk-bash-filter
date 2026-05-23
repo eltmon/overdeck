@@ -33,52 +33,90 @@ rtk_truthy() {
   esac
 }
 
-rtk_config_enabled_value() {
-  local config_path
-  for config_path in "${PANOPTICON_CONFIG:-}" "$PWD/.panopticon/config.yaml" "$HOME/.panopticon/config.yaml"; do
-    [ -z "$config_path" ] && continue
-    [ ! -f "$config_path" ] && continue
-    awk '
-      function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
-      BEGIN { in_agents = 0; in_rtk = 0; agents_indent = -1; rtk_indent = -1 }
-      {
-        line = $0
-        sub(/#.*/, "", line)
-        if (line ~ /^[[:space:]]*$/) next
-        match(line, /^[ ]*/)
-        indent = RLENGTH
-        key = line
-        sub(/^[[:space:]]*/, "", key)
-
-        if (key ~ /^agents:[[:space:]]*$/) {
-          in_agents = 1
-          in_rtk = 0
-          agents_indent = indent
-          next
-        }
-        if (in_agents && indent <= agents_indent) {
-          in_agents = 0
-          in_rtk = 0
-        }
-        if (in_agents && key ~ /^rtk:[[:space:]]*$/) {
-          in_rtk = 1
-          rtk_indent = indent
-          next
-        }
-        if (in_rtk && indent <= rtk_indent) {
-          in_rtk = 0
-        }
-        if (in_rtk && key ~ /^enabled:[[:space:]]*/) {
-          sub(/^enabled:[[:space:]]*/, "", key)
-          gsub(/"/, "", key)
-          gsub(/\047/, "", key)
-          print trim(key)
-          exit
-        }
-      }
-    ' "$config_path" 2>/dev/null
-    return 0
+rtk_project_root() {
+  local current
+  current="$PWD"
+  while [ "$current" != "/" ]; do
+    if [ -e "$current/.git" ]; then
+      printf '%s\n' "$current"
+      return 0
+    fi
+    current=$(dirname "$current")
   done
+}
+
+rtk_read_config_enabled() {
+  local config_path
+  config_path="$1"
+  [ -z "$config_path" ] && return 0
+  [ ! -f "$config_path" ] && return 0
+
+  awk '
+    function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
+    BEGIN { in_agents = 0; in_rtk = 0; agents_indent = -1; rtk_indent = -1 }
+    {
+      line = $0
+      sub(/#.*/, "", line)
+      if (line ~ /^[[:space:]]*$/) next
+      match(line, /^[ ]*/)
+      indent = RLENGTH
+      key = line
+      sub(/^[[:space:]]*/, "", key)
+
+      if (key ~ /^agents:[[:space:]]*$/) {
+        in_agents = 1
+        in_rtk = 0
+        agents_indent = indent
+        next
+      }
+      if (in_agents && indent <= agents_indent) {
+        in_agents = 0
+        in_rtk = 0
+      }
+      if (in_agents && key ~ /^rtk:[[:space:]]*$/) {
+        in_rtk = 1
+        rtk_indent = indent
+        next
+      }
+      if (in_rtk && indent <= rtk_indent) {
+        in_rtk = 0
+      }
+      if (in_rtk && key ~ /^enabled:[[:space:]]*/) {
+        sub(/^enabled:[[:space:]]*/, "", key)
+        gsub(/"/, "", key)
+        gsub(/\047/, "", key)
+        print trim(key)
+        exit
+      }
+    }
+  ' "$config_path" 2>/dev/null
+}
+
+rtk_config_enabled_value() {
+  local config_path project_root value result
+
+  if [ -n "${PANOPTICON_CONFIG:-}" ]; then
+    value=$(rtk_read_config_enabled "$PANOPTICON_CONFIG")
+  else
+    value=$(rtk_read_config_enabled "$HOME/.panopticon/config.yaml")
+  fi
+  [ -n "$value" ] && result="$value"
+
+  project_root=$(rtk_project_root)
+  if [ -n "$project_root" ]; then
+    if [ -f "$project_root/.pan.yaml" ]; then
+      config_path="$project_root/.pan.yaml"
+    elif [ -f "$project_root/.panopticon.yaml" ]; then
+      config_path="$project_root/.panopticon.yaml"
+    else
+      config_path=""
+    fi
+
+    value=$(rtk_read_config_enabled "$config_path")
+    [ -n "$value" ] && result="$value"
+  fi
+
+  printf '%s\n' "$result"
 }
 
 RTK_ENABLED=false
