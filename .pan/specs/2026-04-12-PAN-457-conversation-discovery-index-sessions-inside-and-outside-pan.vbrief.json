@@ -9,7 +9,7 @@
   "plan": {
     "id": "pan-457",
     "title": "Conversation discovery — index sessions inside and outside Panopticon",
-    "status": "completed",
+    "status": "proposed",
     "uid": "11a0ca78-86d3-4568-9fe8-a99ad5d0eb16",
     "author": "agent:claude-opus-4-6",
     "sequence": 136,
@@ -1305,5 +1305,5 @@
       }
     }
   },
-  "status": "completed"
+  "status": "proposed"
 }
