@@ -1,11 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Detect if running in container/Traefik mode
 const isContainerMode = process.env.TRAEFIK_ENABLED === 'true' || process.env.CONTAINER_MODE === 'true';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@panctl/contracts': path.resolve(__dirname, '../../../packages/contracts/src/index.ts'),
+    },
+  },
   server: {
     port: 3010,
     host: '0.0.0.0',

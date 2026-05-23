@@ -4120,6 +4120,19 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_queue_project
       ON merge_queue(project_key, status, position);
 
+    -- ===== Auto Merge (PAN-1418: pending cooldown persistence) =====
+    CREATE TABLE IF NOT EXISTS auto_merge (
+      issue_id      TEXT PRIMARY KEY,
+      scheduled_at  TEXT NOT NULL,
+      execute_at    TEXT NOT NULL,
+      status        TEXT NOT NULL CHECK(status IN ('pending','executing','cancelled','executed','aborted','failed')),
+      cancel_reason TEXT,
+      abort_reason  TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_auto_merge_pending_execute
+      ON auto_merge(status, execute_at);
+
     -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
     CREATE TABLE IF NOT EXISTS merge_sets (
       issue_id       TEXT PRIMARY KEY,
@@ -4257,7 +4270,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 42`);
+	db.pragma(`user_version = 43`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4265,7 +4278,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 42) return;
+	if (currentVersion === 43) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4745,7 +4758,23 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 42`);
+	if (currentVersion < 43) db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS auto_merge (
+        issue_id      TEXT PRIMARY KEY,
+        scheduled_at  TEXT NOT NULL,
+        execute_at    TEXT NOT NULL,
+        status        TEXT NOT NULL CHECK(status IN ('pending','executing','cancelled','executed','aborted','failed')),
+        cancel_reason TEXT,
+        abort_reason  TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_auto_merge_pending_execute
+        ON auto_merge(status, execute_at);
+    `);
+	db.pragma(`user_version = 43`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
