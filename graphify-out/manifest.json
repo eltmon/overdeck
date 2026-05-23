@@ -364,8 +364,8 @@
     "hash": "c77ccf516b479bc0783a5197b499ece1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/tests/unit/dashboard/server/routes/workspace-planning-markdown.test.ts": {
-    "mtime": 1779511306.139064,
-    "hash": "c5bf15b87c99067e56323ae13e87c2fe"
+    "mtime": 1779547210.1661866,
+    "hash": "24ed2ea8433be38115da65f8cf6b0b8e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/tests/unit/dashboard/server/routes/merge-reconciliation.test.ts": {
     "mtime": 1779511306.139064,
@@ -840,8 +840,8 @@
     "hash": "a60fc877b1de024c1364acf31a76fc34"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/tests/integration/agent-spawning.test.ts": {
-    "mtime": 1779511306.1351418,
-    "hash": "f58f8036279c9818ef0968f7b4aa91fa"
+    "mtime": 1779547625.2727108,
+    "hash": "b89050b99db7d80cc234a4f0028d0efb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/tests/integration/cli/doctor.test.ts": {
     "mtime": 1779511306.1353831,
@@ -4996,8 +4996,8 @@
     "hash": "c35ac153dd7102fac986957d415a6972"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/routes/__tests__/complete-planning.test.ts": {
-    "mtime": 1779511306.0814734,
-    "hash": "eb0ea0d17c57093090c659f985550ebe"
+    "mtime": 1779547235.018034,
+    "hash": "eb96eb1faf9e6c6662686108e8f96548"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/routes/__tests__/agents-guardrails.test.ts": {
     "mtime": 1779511306.0814734,
