@@ -12,7 +12,7 @@ export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
-export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7';
+export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max';
 export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel;
 
 // Task complexity levels
@@ -250,7 +250,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const dashscopeModels: DashScopeModel[] = settings.api_keys.dashscope
-    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7']
+    ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']
     : [];
 
   return {

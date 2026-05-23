@@ -101,7 +101,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'qwen3-max' as ModelId, name: 'Qwen3 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship reasoning model.' },
       { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
       { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
-      { id: 'qwen3.7' as ModelId, name: 'Qwen3.7', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 model.' },
+      { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
     ],
   },
 };

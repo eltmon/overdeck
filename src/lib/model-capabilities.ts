@@ -855,10 +855,10 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
   },
 
-  'qwen3.7': {
-    model: 'qwen3.7',
+  'qwen3.7-max': {
+    model: 'qwen3.7-max',
     provider: 'dashscope',
-    displayName: 'Qwen3.7 (DashScope)',
+    displayName: 'Qwen3.7 Max (DashScope)',
     costPer1MTokens: 0,
     contextWindow: 262144,
     skills: {
@@ -874,7 +874,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 98,
     },
-    notes: 'Canonical DashScope ID pending smoke-test verification; substitute everywhere if upstream renames. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+    notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
   },
 };
 

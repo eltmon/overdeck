@@ -166,7 +166,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
-    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7'],
+    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'],
     haikuModel: 'qwen3-plus',
     tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
     tested: false,
@@ -183,7 +183,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
   }
-  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7'].includes(modelId)) {
+  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
   }
   if (modelId.includes('/')) {

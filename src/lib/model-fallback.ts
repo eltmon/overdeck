@@ -79,7 +79,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'qwen3-max': 'dashscope',
   'qwen3-coder-plus': 'dashscope',
   'qwen3-plus': 'dashscope',
-  'qwen3.7': 'dashscope',
+  'qwen3.7-max': 'dashscope',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -149,7 +149,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'qwen3-max': 'claude-sonnet-4-6',
   'qwen3-coder-plus': 'claude-sonnet-4-6',
   'qwen3-plus': 'claude-haiku-4-5',
-  'qwen3.7': 'claude-sonnet-4-6',
+  'qwen3.7-max': 'claude-sonnet-4-6',
 };
 
 /**

@@ -650,7 +650,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7'];
+              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
