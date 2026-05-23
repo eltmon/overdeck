@@ -4,7 +4,7 @@
     "created": "2026-05-23T04:48:22Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-748: Show context usage indicator at top of conversations",
-    "updated": "2026-05-23T04:50:59.040Z"
+    "updated": "2026-05-23T04:54:41.222Z"
   },
   "plan": {
     "id": "pan-748",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "97ffce1a-52a5-4886-8816-83c4923604a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-23T04:48:22Z",
-    "updated": "2026-05-23T04:50:59.040Z",
+    "updated": "2026-05-23T04:54:41.222Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/748",
