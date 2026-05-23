@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, GitMerge, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useAlert, useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface MergeButtonProps {
   issueId: string;
@@ -20,7 +21,7 @@ export function MergeButton({ issueId, reviewStatus, variant, issueState, onClic
     mutationFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/merge`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
       });
       if (!res.ok) {
         const text = await res.text();

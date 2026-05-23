@@ -5318,6 +5318,10 @@ const postWorkspaceMergeCancelRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/merge/cancel',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     if (!parseIssueIdSync(issueId)) {

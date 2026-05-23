@@ -290,6 +290,21 @@ describe('AutoMergeScheduler', () => {
     expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'merge.auto.aborted' }));
   });
 
+  it('aborts a live timer that fires after maxStaleMinutes', async () => {
+    const harness = createHarness();
+    await scheduleReadyIssue(harness);
+
+    vi.setSystemTime(new Date('2026-05-23T13:05:01.000Z'));
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'aborted', abortReason: 'stale' });
+    expect(harness.deps.triggerMerge).not.toHaveBeenCalled();
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.aborted',
+      payload: { issueId: 'PAN-1', gateFailureReason: 'stale' },
+    }));
+  });
+
   it('lets executing win a cancel-vs-fire race without double-triggering merge', async () => {
     let releaseFireConfig!: (value: NormalizedAutoMergeConfig) => void;
     let configCalls = 0;
@@ -303,7 +318,7 @@ describe('AutoMergeScheduler', () => {
     const harness = createHarness({ getConfig });
     await scheduleReadyIssue(harness);
 
-    const firePromise = (harness.scheduler as unknown as { fire: (issueId: string, projectKey?: string) => Promise<void> }).fire('PAN-1', 'pan');
+    const firePromise = (harness.scheduler as unknown as { fire: (issueId: string, executeAt: string, projectKey?: string) => Promise<void> }).fire('PAN-1', '2026-05-23T12:05:00.000Z', 'pan');
     await Promise.resolve();
     await expect(harness.scheduler.cancel('PAN-1', 'too_late', 'human')).resolves.toBe(false);
     releaseFireConfig(config());

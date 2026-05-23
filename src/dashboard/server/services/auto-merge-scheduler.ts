@@ -236,7 +236,7 @@ export class AutoMergeScheduler {
     const delayMs = Math.max(0, executeAtMs - this.deps.now().getTime());
     const timer = this.deps.setTimer(() => {
       this.timers.delete(normalizedIssueId);
-      void this.fire(normalizedIssueId, projectKey);
+      void this.fire(normalizedIssueId, executeAt, projectKey);
     }, delayMs);
     this.timers.set(normalizedIssueId, timer);
 
@@ -270,13 +270,10 @@ export class AutoMergeScheduler {
     }
   }
 
-  private async fire(issueId: string, projectKey?: string): Promise<void> {
+  private async fire(issueId: string, executeAt: string, projectKey?: string): Promise<void> {
     const normalizedIssueId = normalizeIssueId(issueId);
     if (!this.deps.markExecuting(normalizedIssueId)) return;
     this.clearIssueTimers(normalizedIssueId);
-
-    transitionLog(normalizedIssueId, 'executing');
-    emitAutoMergeTts(normalizedIssueId, `Auto merging ${spokenIssueId(normalizedIssueId)} now`, 'merge.auto.executing', 1);
 
     try {
       const config = await this.deps.getConfig(resolveProjectKey(normalizedIssueId, projectKey));
@@ -284,6 +281,21 @@ export class AutoMergeScheduler {
         this.abort(normalizedIssueId, 'disabled');
         return;
       }
+
+      const executeAtMs = Date.parse(executeAt);
+      if (Number.isNaN(executeAtMs)) {
+        this.abort(normalizedIssueId, 'invalid_execute_at');
+        return;
+      }
+
+      const overdueMs = this.deps.now().getTime() - executeAtMs;
+      if (overdueMs > config.maxStaleMinutes * 60_000) {
+        this.abort(normalizedIssueId, 'stale');
+        return;
+      }
+
+      transitionLog(normalizedIssueId, 'executing');
+      emitAutoMergeTts(normalizedIssueId, `Auto merging ${spokenIssueId(normalizedIssueId)} now`, 'merge.auto.executing', 1);
 
       const abortReason = await this.validateGates(normalizedIssueId, config);
       if (abortReason) {

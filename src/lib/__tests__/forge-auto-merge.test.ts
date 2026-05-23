@@ -121,12 +121,31 @@ describe('auto-merge forge helpers', () => {
     });
   });
 
-  it('returns no-op GitLab gate stubs for v1', async () => {
-    await expect(getCombinedCommitStatus('https://gitlab.com/acme/app/-/merge_requests/12')).resolves.toMatchObject({
-      passing: true,
-      checks: [],
+  it('fails closed for unsupported GitLab gate checks', async () => {
+    await expect(getCombinedCommitStatus('https://gitlab.com/acme/app/-/merge_requests/12')).rejects.toMatchObject({
+      _tag: 'ForgeCommandError',
+      forge: 'gitlab',
+      operation: 'getCombinedCommitStatus',
+      message: 'GitLab auto-merge gate checks are not supported',
     });
-    await expect(getPrLabels('https://gitlab.com/acme/app/-/merge_requests/12')).resolves.toEqual([]);
+    await expect(getPrLabels('https://gitlab.com/acme/app/-/merge_requests/12')).rejects.toMatchObject({
+      _tag: 'ForgeCommandError',
+      forge: 'gitlab',
+      operation: 'getPrLabels',
+      message: 'GitLab auto-merge gate checks are not supported',
+    });
     expect(execMock).not.toHaveBeenCalled();
+  });
+
+  it('does not classify GitHub URLs as GitLab by substring', async () => {
+    mockExec((command) => {
+      expect(command).toBe("gh pr checks 'https://github.com/acme/gitlab-mirror/pull/12' --json name,conclusion");
+      return { stdout: JSON.stringify([{ name: 'build', conclusion: 'success' }]) };
+    });
+
+    await expect(getCombinedCommitStatus('https://github.com/acme/gitlab-mirror/pull/12')).resolves.toMatchObject({
+      passing: true,
+      checks: [{ name: 'build', conclusion: 'success' }],
+    });
   });
 });

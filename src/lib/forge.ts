@@ -134,9 +134,30 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-function detectForgeFromPrUrl(prUrl: string): ForgeType {
-  const lower = prUrl.toLowerCase();
-  return lower.includes('gitlab') || lower.includes('/merge_requests/') ? 'gitlab' : 'github';
+function requireGitHubPrGateTarget(prUrl: string, operation: string): string {
+  let url: URL;
+  try {
+    url = new URL(prUrl);
+  } catch {
+    throw new ForgeCommandError({
+      forge: 'github',
+      operation,
+      message: 'Pull request URL must be an absolute GitHub pull request URL',
+    });
+  }
+
+  if (url.hostname === 'github.com' && /^\/[^/]+\/[^/]+\/pull\/\d+\/?$/.test(url.pathname)) {
+    return prUrl;
+  }
+
+  const isGitLabMergeRequest = url.hostname === 'gitlab.com' || /\/-\/merge_requests\/\d+\/?$/.test(url.pathname);
+  throw new ForgeCommandError({
+    forge: isGitLabMergeRequest ? 'gitlab' : 'github',
+    operation,
+    message: isGitLabMergeRequest
+      ? 'GitLab auto-merge gate checks are not supported'
+      : 'Unsupported pull request URL for auto-merge gate checks',
+  });
 }
 
 function isExecTimeoutError(cause: unknown): boolean {
@@ -366,15 +387,10 @@ const githubForgeAdapter: ForgeAdapter = {
 
 export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCommitStatus> {
   const target = requirePrUrl(prUrl, 'getCombinedCommitStatus');
-  const forge = detectForgeFromPrUrl(target);
-
-  if (forge === 'gitlab') {
-    // GitLab status-gate parity is intentionally deferred to the v2 GitLab auto-merge follow-up.
-    return { passing: true, checks: [], queriedAt: new Date().toISOString() };
-  }
+  requireGitHubPrGateTarget(target, 'getCombinedCommitStatus');
 
   const stdout = await runForgeJsonCommand(
-    forge,
+    'github',
     'getCombinedCommitStatus',
     `gh pr checks ${shellQuote(target)} --json name,conclusion`,
   );
@@ -396,7 +412,7 @@ export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCo
     };
   } catch (cause) {
     throw new ForgeCommandError({
-      forge,
+      forge: 'github',
       operation: 'getCombinedCommitStatus',
       message: cause instanceof Error ? cause.message : String(cause),
       cause,
@@ -406,15 +422,10 @@ export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCo
 
 export async function getPrLabels(prUrl: string): Promise<string[]> {
   const target = requirePrUrl(prUrl, 'getPrLabels');
-  const forge = detectForgeFromPrUrl(target);
-
-  if (forge === 'gitlab') {
-    // GitLab label-gate parity is intentionally deferred to the v2 GitLab auto-merge follow-up.
-    return [];
-  }
+  requireGitHubPrGateTarget(target, 'getPrLabels');
 
   const stdout = await runForgeJsonCommand(
-    forge,
+    'github',
     'getPrLabels',
     `gh pr view ${shellQuote(target)} --json labels`,
   );
@@ -426,7 +437,7 @@ export async function getPrLabels(prUrl: string): Promise<string[]> {
       .filter((label): label is string => typeof label === 'string' && label.length > 0);
   } catch (cause) {
     throw new ForgeCommandError({
-      forge,
+      forge: 'github',
       operation: 'getPrLabels',
       message: cause instanceof Error ? cause.message : String(cause),
       cause,

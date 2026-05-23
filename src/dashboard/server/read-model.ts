@@ -80,25 +80,55 @@ function cleanIssues(issues: unknown[]): unknown[] {
   return issues.map((issue) => toJsonish(issue) ?? null);
 }
 
-function withAutoMergeSchedules(issues: unknown[]): unknown[] {
-  const pendingByIssueId = new Map(
-    getPendingAutoMerges().map((row) => [
-      row.issueId,
-      { executeAt: row.executeAt, scheduledAt: row.scheduledAt },
-    ]),
-  );
+type AutoMergeScheduleSnapshot = { executeAt: string; scheduledAt: string };
+
+function issueIdForRawIssue(issue: unknown): string | null {
+  if (!issue || typeof issue !== 'object') return null;
+  const record = issue as Record<string, unknown>;
+  return typeof record['identifier'] === 'string'
+    ? record['identifier']
+    : typeof record['id'] === 'string'
+      ? record['id']
+      : null;
+}
+
+function withAutoMergeSchedules(issues: unknown[], schedulesByIssueId: Map<string, AutoMergeScheduleSnapshot>): unknown[] {
+  if (schedulesByIssueId.size === 0) return issues;
 
   return issues.map((issue) => {
-    if (!issue || typeof issue !== 'object') return issue;
-    const record = issue as Record<string, unknown>;
-    const issueId = typeof record['identifier'] === 'string'
-      ? record['identifier']
-      : typeof record['id'] === 'string'
-        ? record['id']
-        : null;
-    if (!issueId) return record;
-    return { ...record, autoMergeScheduled: pendingByIssueId.get(issueId.toUpperCase()) ?? null };
+    const issueId = issueIdForRawIssue(issue);
+    if (!issueId || !issue || typeof issue !== 'object') return issue;
+    return { ...(issue as Record<string, unknown>), autoMergeScheduled: schedulesByIssueId.get(issueId.toUpperCase()) ?? null };
   });
+}
+
+function autoMergeSchedulesFromReviewStatuses(reviewStatusByIssueId: ReadModelState['reviewStatusByIssueId']): Map<string, AutoMergeScheduleSnapshot> {
+  const schedules = new Map<string, AutoMergeScheduleSnapshot>();
+  for (const [issueId, status] of Object.entries(reviewStatusByIssueId)) {
+    const schedule = (status as { autoMergeScheduled?: AutoMergeScheduleSnapshot | null }).autoMergeScheduled;
+    if (schedule) schedules.set(issueId.toUpperCase(), schedule);
+  }
+  return schedules;
+}
+
+function hydratePendingAutoMergeSchedules(state: ReadModelState): ReadModelState {
+  const pendingRows = getPendingAutoMerges();
+  if (pendingRows.length === 0) return state;
+
+  const schedulesByIssueId = new Map<string, AutoMergeScheduleSnapshot>();
+  const reviewStatusByIssueId = { ...state.reviewStatusByIssueId };
+  for (const row of pendingRows) {
+    const issueId = row.issueId.toUpperCase();
+    const autoMergeScheduled = { executeAt: row.executeAt, scheduledAt: row.scheduledAt };
+    schedulesByIssueId.set(issueId, autoMergeScheduled);
+    reviewStatusByIssueId[issueId] = { ...(reviewStatusByIssueId[issueId] ?? { issueId }), autoMergeScheduled } as ReviewStatusSnapshot;
+  }
+
+  return {
+    ...state,
+    reviewStatusByIssueId,
+    issuesRaw: withAutoMergeSchedules(state.issuesRaw, schedulesByIssueId),
+  };
 }
 
 // ─── Value validators for strict literal types ──────────────────────────────
@@ -263,7 +293,7 @@ export const ReadModelServiceLive = Layer.effect(
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
-        issues: withAutoMergeSchedules(state.issuesRaw),
+        issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         memory: {
           observationsByIssueId: state.observationsByIssueId,
@@ -295,7 +325,10 @@ export const ReadModelServiceLive = Layer.effect(
           () => import('./services/issue-service-singleton.js'),
         );
         const issueService = getSharedIssueService();
-        const currentIssues = cleanIssues(issueService.getIssues());
+        const currentIssues = withAutoMergeSchedules(
+          cleanIssues(issueService.getIssues()),
+          autoMergeSchedulesFromReviewStatuses(state.reviewStatusByIssueId),
+        );
         if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
           state = { ...state, issuesRaw: currentIssues };
         }
@@ -711,11 +744,16 @@ export const ReadModelServiceLive = Layer.effect(
           state = { ...state, issuesRaw: currentIssues };
         }
 
+        state = hydratePendingAutoMergeSchedules(state);
+
         // Wire live issue updates — when IssueDataService polls new data,
         // update the read model directly AND emit to event store for
         // WebSocket subscribers (PAN-433).
         issueService.onIssuesChanged((issues) => {
-          const cleaned = cleanIssues(issues);
+          const cleaned = withAutoMergeSchedules(
+            cleanIssues(issues),
+            autoMergeSchedulesFromReviewStatuses(state.reviewStatusByIssueId),
+          );
           state = { ...state, issuesRaw: cleaned };
           // Persist updated snapshot to projection cache
           projectionCache?.save(buildSnapshot());

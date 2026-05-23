@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, Loader2, WifiOff, XCircle } from 'lucide-react';
 import { useDashboardStore } from '../lib/store';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
+import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 
 interface MergeAutoMergeCountdownProps {
   issueId: string;
@@ -22,7 +24,7 @@ function formatRemaining(seconds: number): string {
 async function cancelAutoMerge(issueId: string): Promise<void> {
   const response = await fetch(`/api/issues/${issueId}/merge/cancel`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ reason: 'manual' }),
   });
   if (!response.ok) throw new Error(`Failed to cancel auto-merge (${response.status})`);
@@ -30,6 +32,7 @@ async function cancelAutoMerge(issueId: string): Promise<void> {
 
 export function MergeAutoMergeCountdown({ issueId, executeAt, onCancel }: MergeAutoMergeCountdownProps) {
   const rpcConnected = useDashboardStore((state) => state.rpcConnected);
+  const queryClient = useQueryClient();
   const [remainingSeconds, setRemainingSeconds] = useState(() => remainingSecondsUntil(executeAt));
   const [cancelling, setCancelling] = useState(false);
 
@@ -50,7 +53,10 @@ export function MergeAutoMergeCountdown({ issueId, executeAt, onCancel }: MergeA
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelAutoMerge(issueId),
-    onSuccess: () => onCancel?.(),
+    onSuccess: async () => {
+      await refreshDashboardState(queryClient);
+      onCancel?.();
+    },
     onSettled: () => setCancelling(false),
   });
 

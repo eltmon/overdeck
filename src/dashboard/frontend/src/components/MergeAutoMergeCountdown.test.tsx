@@ -4,6 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MergeAutoMergeCountdown } from './MergeAutoMergeCountdown';
 import { useDashboardStore } from '../lib/store';
 
+vi.mock('../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': 'test-csrf-token',
+  }),
+}));
+
+vi.mock('../lib/refresh-dashboard-state', () => ({
+  refreshDashboardState: vi.fn().mockResolvedValue(undefined),
+}));
+
 const baseNow = new Date('2026-05-23T12:00:00.000Z');
 
 function renderCountdown(props: Partial<Parameters<typeof MergeAutoMergeCountdown>[0]> = {}) {
@@ -62,7 +73,10 @@ describe('MergeAutoMergeCountdown', () => {
     expect(screen.getByText('Cancelling…')).toBeTruthy();
     expect(fetch).toHaveBeenCalledWith('/api/issues/PAN-1418/merge/cancel', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-panopticon-csrf-token': 'test-csrf-token',
+      },
       body: JSON.stringify({ reason: 'manual' }),
     });
 

@@ -79,9 +79,9 @@ const snapshot = {
   timestamp: now,
   agents: [agent],
   agentRuntimeById: {},
-  reviewStatuses: [],
+  reviewStatuses: [] as unknown[],
   resources: null,
-  issues: [issue],
+  issues: [issue] as unknown[],
   channelPermissionRequests: [],
   scanProgress: null,
   enrichStats: null,
@@ -89,7 +89,9 @@ const snapshot = {
   embedProgressBySessionId: {},
 };
 
-async function newContext(): Promise<BrowserContext> {
+type DashboardFixture = typeof snapshot;
+
+async function newContext(fixtures: { snapshotFixture?: DashboardFixture; featureFixture?: typeof feature } = {}): Promise<BrowserContext> {
   const context = await browser.newContext();
   await context.addInitScript(({ snapshotFixture, featureFixture }) => {
     localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: snapshotFixture, timestamp: new Date().toISOString() }));
@@ -169,6 +171,22 @@ async function newContext(): Promise<BrowserContext> {
         count: 1,
       });
       if (path === '/api/costs/trends') return json({ trends: [{ totalCost: 1.25, totalTokens: 4200 }] });
+      if (path === '/api/issues/PAN-1148/merge/cancel') {
+        const raw = localStorage.getItem('pan-snapshot-cache-v1');
+        const cached = raw ? JSON.parse(raw) : { data: snapshotFixture };
+        const nextIssues = (cached.data.issues ?? []).map((candidate: Record<string, unknown>) => candidate.identifier === 'PAN-1148'
+          ? { ...candidate, autoMergeScheduled: null }
+          : candidate);
+        const nextReviewStatuses = (cached.data.reviewStatuses ?? []).map((candidate: Record<string, unknown>) => candidate.issueId === 'PAN-1148'
+          ? { ...candidate, autoMergeScheduled: undefined }
+          : candidate);
+        localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({
+          ...cached,
+          data: { ...cached.data, issues: nextIssues, reviewStatuses: nextReviewStatuses },
+          timestamp: new Date().toISOString(),
+        }));
+        return json({ cancelled: true });
+      }
       if (path === '/api/metrics/summary') return json({
         today: { totalCost: 1.25, agentCount: 1, activeCount: 1, stuckCount: 0, warningCount: 0 },
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
@@ -181,12 +199,12 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
-  }, { snapshotFixture: snapshot, featureFixture: feature });
+  }, { snapshotFixture: fixtures.snapshotFixture ?? snapshot, featureFixture: fixtures.featureFixture ?? feature });
   return context;
 }
 
-async function openRoute(path: string): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await newContext();
+async function openRoute(path: string, fixtures: { snapshotFixture?: DashboardFixture; featureFixture?: typeof feature } = {}): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await newContext(fixtures);
   const page = await context.newPage();
   await page.goto(`${baseUrl}${path}`);
   return { context, page };
@@ -263,6 +281,42 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
+  it('clears auto-merge countdown after cancel and hides Merge after execution', async () => {
+    const readyReviewStatus = {
+      issueId: 'PAN-1148',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeStatus: 'pending',
+      prUrl: 'https://github.com/acme/app/pull/1148',
+      updatedAt: now,
+      autoMergeScheduled: { executeAt: '2030-05-23T12:05:00.000Z', scheduledAt: now },
+    };
+    const scheduledSnapshot = {
+      ...snapshot,
+      issues: [{ ...issue, autoMergeScheduled: readyReviewStatus.autoMergeScheduled, mergeStatus: 'pending' }],
+      reviewStatuses: [readyReviewStatus],
+    };
+    const scheduled = await openRoute('/board', { snapshotFixture: scheduledSnapshot });
+
+    await expect.poll(() => scheduled.page.getByText('Auto-merging in').count(), renderPoll).toBe(1);
+    await scheduled.page.locator('[data-component="issue-card"][data-issue-id="PAN-1148"]').getByRole('button', { name: 'Cancel' }).click();
+    await expect.poll(() => scheduled.page.getByText('Auto-merging in').count(), renderPoll).toBe(0);
+    await scheduled.page.locator('[data-component="issue-card"][data-issue-id="PAN-1148"]').click();
+    await expect.poll(() => scheduled.page.locator('[data-testid="merge-btn"]').count(), renderPoll).toBe(1);
+    await scheduled.context.close();
+
+    const executedSnapshot = {
+      ...snapshot,
+      issues: [{ ...issue, autoMergeScheduled: null, mergeStatus: 'merged' }],
+      reviewStatuses: [{ ...readyReviewStatus, autoMergeScheduled: undefined, mergeStatus: 'merged' }],
+    };
+    const executed = await openRoute('/pipeline?issue=PAN-1148&tab=overview', { snapshotFixture: executedSnapshot });
+    await expect.poll(() => executed.page.locator('[data-testid="issue-drawer"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => executed.page.locator('[data-testid="merge-btn"]').count(), renderPoll).toBe(0);
+    await executed.context.close();
+  }, 45_000);
+
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
