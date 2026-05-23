@@ -108,6 +108,56 @@ describe('FlywheelStatusDetails', () => {
     expect(screen.getByText('67%')).toBeInTheDocument();
   });
 
+  it('renders suggestions before headline metrics sorted by priority', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'low', action: 'wait', issueId: 'PAN-40', rationale: 'Low-priority follow-up' },
+        { priority: 'urgent', action: 'investigate', issueId: 'PAN-10', rationale: 'Substrate gate is blocked' },
+        { priority: 'medium', action: 'review', issueId: 'PAN-30', rationale: 'Review is ready' },
+        { priority: 'urgent', action: 'resume', issueId: 'PAN-11', rationale: 'Second urgent keeps input order' },
+        { priority: 'high', action: 'start', rationale: 'System-wide starter suggestion' },
+      ],
+    }} />);
+
+    const suggestions = screen.getByText('Suggestions').closest('section');
+    expect(suggestions).not.toBeNull();
+    expect(screen.getByText('Suggestions').compareDocumentPosition(screen.getByLabelText('Flywheel headline metrics'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    const rows = within(suggestions!).getAllByTestId('flywheel-suggestion');
+    expect(rows).toHaveLength(5);
+    expect(rows.map((row, index) => within(row).getByText(['urgent', 'urgent', 'high', 'medium', 'low'][index]).textContent)).toEqual(['urgent', 'urgent', 'high', 'medium', 'low']);
+    expect(rows.map((row, index) => within(row).getByText(['investigate', 'resume', 'start', 'review', 'wait'][index]).textContent)).toEqual(['investigate', 'resume', 'start', 'review', 'wait']);
+    expect(within(rows[0]).getByRole('button', { name: 'PAN-10' })).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('button', { name: 'PAN-11' })).toBeInTheDocument();
+    expect(within(suggestions!).getByText('Substrate gate is blocked')).toBeInTheDocument();
+    expect(within(suggestions!).getByText('System-wide starter suggestion')).toBeInTheDocument();
+  });
+
+  it('renders the suggestions empty state', () => {
+    render(<FlywheelStatusDetails status={{ ...status, suggestions: [] }} />);
+
+    expect(screen.getByText('No suggestions yet — orchestrator will emit on next tick.')).toBeInTheDocument();
+  });
+
+  it('navigates issue suggestions but leaves system suggestions without click-through', () => {
+    const onNavigateAgent = vi.fn();
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-55', rationale: 'Start this eligible issue' },
+        { priority: 'medium', action: 'investigate', rationale: 'Investigate host-level state' },
+      ],
+    }} onNavigateAgent={onNavigateAgent} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'PAN-55' }));
+    expect(onNavigateAgent).toHaveBeenCalledWith('PAN-55');
+
+    const systemSuggestion = screen.getByText('Investigate host-level state').closest('[data-testid="flywheel-suggestion"]');
+    expect(systemSuggestion).not.toBeNull();
+    expect(within(systemSuggestion as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('renders substrate bugs with status badges and commit links', () => {
     render(<FlywheelStatusDetails status={status} />);
 
