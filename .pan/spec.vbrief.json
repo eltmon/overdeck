@@ -1,0 +1,1129 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
+    "updated": "2026-05-23T11:31:02.607Z"
+  },
+  "plan": {
+    "id": "pan-1418",
+    "title": "Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
+    "status": "proposed",
+    "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:35:00.000Z",
+    "updated": "2026-05-23T11:31:02.607Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
+        "label": "PAN-1418",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge",
+      "automation",
+      "solo-workflow",
+      "opt-in",
+      "config",
+      "cli",
+      "dashboard",
+      "tts"
+    ],
+    "narratives": {
+      "Problem": "In a solo-dev Panopticon workflow the same human is both operator and developer. Every PR that lands with all gates green (review, test, verification, GitHub CI) still requires a manual MERGE button click. Across a 9-PR day this is meaningful friction without serving the safety intent of the 'humans only merge' rule — that intent (no merge-agent auto-merge of unreviewed work) is already satisfied at the gate level.",
+      "Proposal": "Add an opt-in per-project auto-merge feature: when `merge.autoMerge.enabled: true`, the system watches for the readyForMerge false->true transition, schedules a wall-clock cooldown (default 5 min) during which the operator can cancel via `pan merge cancel <id>` or a dashboard banner, then on expiration re-validates ALL gates (review, test, blocker labels, GitHub CI) and calls the same triggerMerge() function the MERGE button uses. Defaults to disabled. Persisted cooldown state in SQLite survives dashboard restarts. Stale-fire protection (default 60 min) ensures host-asleep cases do not produce surprise merges. Multi-PR queueing inherits the existing merge serializer."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Default cooldown = 5 minutes; minimum clamp = 1 minute.",
+        "rationale": "Issue body suggests 5 min as default. 1-minute minimum prevents accidental near-instant fires from misconfiguration while keeping the cooldown meaningful."
+      },
+      {
+        "summary": "Stale-fire protection threshold = 60 minutes (configurable).",
+        "rationale": "Open question H4 asked about mobile/offline. Wall-clock-based timers fire at executeAt regardless of how long the host has slept; without a stale check, a laptop closed at the moment of scheduling could auto-merge on wake hours later. 60 min is a defensible balance — long enough to ride out short sleeps and lunch breaks, short enough to prevent overnight surprise merges."
+      },
+      {
+        "summary": "Default blocker labels = ['needs-design', 'needs-discussion', 'do-not-merge', 'wip'].",
+        "rationale": "These are the most common conventions in OSS and reflect the issue body's 'requireNoBlockerLabels' example with 'wip' added as a widely-used WIP convention. Fully overridable in config."
+      },
+      {
+        "summary": "Cancel during 'executing' phase returns 409 — cancel is only valid during 'pending'.",
+        "rationale": "Once triggerMerge is called the existing merge flow owns the operation. Trying to cancel a merge that has already entered the merge pipeline must use the same recovery paths as a failed manual merge — not a separate code path. 409 distinguishes 'too late' from 'nothing to cancel' (200, cancelled=false)."
+      },
+      {
+        "summary": "TTS emits at most 3 utterances per cooldown: schedule, T-30s (if cooldown > 1 min), execute/cancel/abort.",
+        "rationale": "Open question 1 mentioned spamming concerns. Three utterances is enough to be unmissable without becoming background noise. Periodic countdown ticks every minute would be auditory noise during normal work."
+      },
+      {
+        "summary": "Auto-merge fires same triggerMerge() as the MERGE button — no parallel merge path.",
+        "rationale": "Reuses the queue serializer, the post-merge lifecycle, Docker cleanup, and idempotency guards. Forking the merge path would duplicate ~300 lines and re-create the PAN-328 idempotency loop risk."
+      },
+      {
+        "summary": "PANOPTICON_DISABLE_AUTO_MERGE=1 env var as kill switch, default in test envs.",
+        "rationale": "Mirrors the PANOPTICON_DISABLE_DEACON=1 pattern documented in CLAUDE.md. Tests that touch review-status transitions must not accidentally trigger auto-merge scheduling."
+      },
+      {
+        "summary": "Gate re-validation at fire time queries GitHub directly for labels (gh pr view --json labels).",
+        "rationale": "Hazard H3: webhook lag means the local label cache can be stale. Fail closed on label-query failure rather than firing optimistically."
+      },
+      {
+        "summary": "Feature gated to GitHub forges in v1; GitLab gets a follow-up.",
+        "rationale": "Hazard H8: the CI gate and label gate are GitHub-shaped. Implementing both forges in one issue risks scope creep. Config validation warns when requireGitHubCiPassing is enabled on a non-GitHub project; the gate is a no-op on non-GitHub forges."
+      },
+      {
+        "summary": "Foundation chain = (1) config schema, (2) auto_merge DB module, (3) scheduler service. All three marked requiresInspection: deep.",
+        "rationale": "These three beads encode the contracts every downstream bead reads/writes/subscribes to. A wrong choice here cascades through ~10 dependent beads. The other 14 beads are mechanically scoped and verified by typecheck + tests + end-of-MR review."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-schema",
+        "title": "Add merge.autoMerge.* config schema with defaults and project override merge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "scheduler-service",
+            "gate-revalidation",
+            "ci-gate-helper",
+            "config-docs",
+            "read-model-extension"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend YamlConfig in src/lib/config-yaml.ts with a `merge` top-level slot containing `autoMerge: { enabled, cooldownMinutes, maxStaleMinutes, requireGitHubCiPassing, requireAllCommitStatusChecks, requireNoBlockerLabels }`. Add normalized defaults to DEFAULT_CONFIG. Wire per-project .pan.yaml merge so project values override global (replacing arrays, not deep-merging) the same way other config sections work. Expose a typed accessor `getAutoMergeConfig(projectKey?: string): NormalizedAutoMergeConfig` for downstream consumers."
+        },
+        "subItems": [
+          {
+            "id": "config-schema.ac1",
+            "title": "YamlConfig.merge.autoMerge interface defined with all 6 keys and their TypeScript types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac2",
+            "title": "DEFAULT_CONFIG includes merge.autoMerge with enabled=false, cooldownMinutes=5, maxStaleMinutes=60, requireGitHubCiPassing=true, requireAllCommitStatusChecks=true, requireNoBlockerLabels=['needs-design','needs-discussion','do-not-merge','wip']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac3",
+            "title": "cooldownMinutes clamps to >= 1; maxStaleMinutes clamps to >= cooldownMinutes; both emit a console warning on clamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac4",
+            "title": "Project-level .pan.yaml merge.autoMerge override fully replaces global value for the project (no deep-merge that would silently inherit a global list)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac5",
+            "title": "getAutoMergeConfig(projectKey) returns the normalized merged config for a project; unit tests cover global-only, project-only, and global+project-override cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "db-schema",
+        "title": "Add auto_merge SQLite table and CRUD helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "scheduler-service",
+            "cancel-endpoint",
+            "read-model-extension"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/database/auto-merge-db.ts with a new auto_merge table: (issue_id TEXT PRIMARY KEY, scheduled_at TEXT NOT NULL, execute_at TEXT NOT NULL, status TEXT NOT NULL CHECK status IN ('pending','executing','cancelled','executed','aborted','failed'), cancel_reason TEXT, abort_reason TEXT). Export: schedulePendingAutoMerge(issueId, executeAt) (idempotent — fails if existing pending row), cancelPendingAutoMerge(issueId, reason): boolean (atomic UPDATE WHERE status='pending'), markAutoMergeExecuting(issueId): boolean (atomic transition from pending), markAutoMergeExecuted(issueId), markAutoMergeAborted(issueId, reason), markAutoMergeFailed(issueId, reason), getPendingAutoMerges(): Row[] (for boot recovery), getAutoMergeStatus(issueId): Row | null."
+        },
+        "subItems": [
+          {
+            "id": "db-schema.ac1",
+            "title": "auto_merge table created via migration on dashboard boot; idempotent (CREATE TABLE IF NOT EXISTS)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac2",
+            "title": "schedulePendingAutoMerge returns false (no-op) when a pending row already exists for the same issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac3",
+            "title": "cancelPendingAutoMerge atomically updates only rows where status='pending'; returns true if 1 row updated, false otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac4",
+            "title": "markAutoMergeExecuting atomically transitions pending->executing; returns false if not pending (cancel won the race)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac5",
+            "title": "Unit tests cover all helpers, including the race window between cancelPending and markAutoMergeExecuting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-gate-helper",
+        "title": "Add getCombinedCommitStatus(prUrl) and getPrLabels(prUrl) forge-aware helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add two helpers in src/lib/forge.ts (or extend the existing forge adapter): getCombinedCommitStatus(prUrl): Promise<{ passing: boolean; checks: Array<{ name; conclusion }>; queriedAt }> and getPrLabels(prUrl): Promise<string[]>. GitHub implementation uses `gh pr checks <url> --json` and `gh pr view <url> --json labels`. Both have 5s timeout and throw a typed error on timeout/failure. GitLab adapter returns { passing: true, checks: [] } as a no-op stub for v1 with a comment pointing to the v2 issue."
+        },
+        "subItems": [
+          {
+            "id": "ci-gate-helper.ac1",
+            "title": "getCombinedCommitStatus returns passing=true only when every check has conclusion in ('success','neutral','skipped'); failing/cancelled/timed_out -> passing=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-gate-helper.ac2",
+            "title": "Both helpers timeout after 5s and throw a typed TimeoutError; callers can distinguish timeout from real failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-gate-helper.ac3",
+            "title": "Both helpers use execAsync (NOT execSync) per CLAUDE.md async tmux/exec rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-gate-helper.ac4",
+            "title": "Unit tests with mocked exec cover: all-green, mixed-success, mixed-failure, timeout, missing-pr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduler-service",
+        "title": "Implement AutoMergeScheduler service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1418",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "readyForMerge-hook",
+            "cancel-endpoint",
+            "events-emission",
+            "tts-announcements",
+            "boot-recovery",
+            "scheduler-unit-tests",
+            "merge-cli-command",
+            "merge-cancel-banner-component",
+            "read-model-extension"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/auto-merge-scheduler.ts exporting an AutoMergeScheduler service with: start() (initialize at dashboard boot, gated by PANOPTICON_DISABLE_AUTO_MERGE), stop() (clear all timers on shutdown), maybeSchedule(issueId, projectKey) (called when readyForMerge transitions false->true; checks config.enabled, no existing pending row, mergeStatus null/pending; on success persists row via schedulePendingAutoMerge, sets in-memory timeout, emits merge.auto.scheduled event, emits TTS), cancel(issueId, reason, cancelledBy) (clears in-memory timeout, calls cancelPendingAutoMerge, emits merge.auto.cancelled, emits TTS), and the internal fire(issueId) handler that runs at executeAt: atomically transitions to executing (returns if already cancelled), re-validates gates, calls triggerMerge or emits merge.auto.aborted. Maintains Map<issueId, NodeJS.Timeout> for live arms. Wall-clock based: timer set via setTimeout(fire, executeAt - now); if now > executeAt (stale at boot) and within maxStaleMinutes, fire immediately, otherwise abort with reason='stale'."
+        },
+        "subItems": [
+          {
+            "id": "scheduler-service.ac1",
+            "title": "start() honors PANOPTICON_DISABLE_AUTO_MERGE=1 — when set, start() is a no-op and no scheduling happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac2",
+            "title": "maybeSchedule returns early without scheduling when config.enabled=false for the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac3",
+            "title": "maybeSchedule never schedules when mergeStatus is in ('merged','merging','queued','failed') — preventing the idempotency loop H2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac4",
+            "title": "Boot recovery: start() reads getPendingAutoMerges() and re-arms each one; rows with executeAt more than maxStaleMinutes in the past are aborted with reason='stale' (event + TTS) instead of fired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac5",
+            "title": "fire(issueId) uses markAutoMergeExecuting atomic transition — if cancel won the race, fire returns without calling triggerMerge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac6",
+            "title": "fire(issueId) re-validates gates (readyForMerge, no blocker labels via getPrLabels, CI passing via getCombinedCommitStatus when requireGitHubCiPassing); on any gate failure emits merge.auto.aborted with a specific reason and does NOT call triggerMerge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac7",
+            "title": "Logging: every state transition logs '[merge-auto] <ISSUEID> <event>' with relevant context (scheduled execute_at, cancel reason, abort reason)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-service.ac8",
+            "title": "stop() clears all in-memory timers but does NOT touch DB rows — pending rows survive for boot recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readyForMerge-hook",
+        "title": "Wire scheduler.maybeSchedule() into the readyForMerge false->true transition",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts at the existing readyForMerge false->true transition site (~line 373), call into the AutoMergeScheduler. Use a registered handler pattern (setAutoMergeOnReadyHandler) so review-status.ts does not statically import the dashboard service — avoiding a circular dep (review-status is in src/lib, scheduler is in src/dashboard/server/services). The dashboard's main.ts boot registers the handler when starting the scheduler."
+        },
+        "subItems": [
+          {
+            "id": "readyForMerge-hook.ac1",
+            "title": "review-status.ts exports setAutoMergeOnReadyHandler(fn); when readyForMerge transitions false->true and a handler is registered, it is invoked with (issueId, projectKey)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readyForMerge-hook.ac2",
+            "title": "Handler invocation is fire-and-forget (Promise.resolve().then) — review-status updates do not block on scheduler decisions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readyForMerge-hook.ac3",
+            "title": "Dashboard main.ts boot calls setAutoMergeOnReadyHandler(scheduler.maybeSchedule) after scheduler.start()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readyForMerge-hook.ac4",
+            "title": "When no handler is registered (CLI invocations, tests), review-status updates proceed normally and no scheduling happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "events-emission",
+        "title": "Define and emit merge.auto.* event types",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add four event types to the EventStore domain event union (packages/contracts or the dashboard server's event types): merge.auto.scheduled { issueId, executeAt, cooldownSeconds }, merge.auto.cancelled { issueId, reason, cancelledBy }, merge.auto.executed { issueId }, merge.auto.aborted { issueId, gateFailureReason }. AutoMergeScheduler emits all four via eventStore.append() at the appropriate state transitions. Update the read-model reducer (src/dashboard/server/read-model.ts) to apply these events to the autoMergeScheduled field."
+        },
+        "subItems": [
+          {
+            "id": "events-emission.ac1",
+            "title": "All four event types are added to the typed event union and pass typecheck on producers and consumers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-emission.ac2",
+            "title": "Scheduler appends each event at the correct transition (scheduled on maybeSchedule success, cancelled on cancel, executed after triggerMerge success, aborted on gate failure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-emission.ac3",
+            "title": "Frontend store (Zustand) applies events to update issue.autoMergeScheduled state; banner reflects state transitions live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-announcements",
+        "title": "Emit TTS at schedule, T-30s, and execute/cancel/abort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire emitActivityTtsSync() from src/lib/activity-logger.ts into the scheduler. On maybeSchedule success: priority=1 'Auto merging PAN-XXXX in N minutes — say pan merge cancel PAN-XXXX to abort'. On a separate setTimeout fired at T-30s when cooldownMinutes > 1: priority=2 'Auto merge of PAN-XXXX in 30 seconds'. On cancel: priority=1 'Auto merge of PAN-XXXX cancelled'. On execute: priority=1 'Auto merging PAN-XXXX now'. On abort (gate failure): priority=1 'Auto merge of PAN-XXXX aborted — <reason>'. Each utterance limited to <140 chars per the emitActivityTtsSync contract."
+        },
+        "subItems": [
+          {
+            "id": "tts-announcements.ac1",
+            "title": "Scheduling emits exactly one schedule TTS utterance with priority=1 and source='dashboard'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-announcements.ac2",
+            "title": "When cooldownMinutes > 1, exactly one T-30s reminder utterance is emitted with priority=2; not emitted when cooldownMinutes <= 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-announcements.ac3",
+            "title": "Cancel, execute, and abort each emit exactly one priority=1 utterance with the issueId normalized to spoken form (PAN-1418 -> 'pan 1418')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-announcements.ac4",
+            "title": "All utterances < 140 chars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-endpoint",
+        "title": "Add POST /api/issues/:issueId/merge/cancel HTTP route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new Effect HTTP route in src/dashboard/server/routes/workspaces.ts (alongside the existing /api/issues/:issueId/merge): POST /api/issues/:issueId/merge/cancel { reason?: string }. Validates issueId format. Calls AutoMergeScheduler.cancel(issueId, reason ?? 'manual', 'api'). Returns 200 with { cancelled: true } on successful cancel, 200 with { cancelled: false } if no pending row (idempotent), 409 if status is already 'executing'."
+        },
+        "subItems": [
+          {
+            "id": "cancel-endpoint.ac1",
+            "title": "POST /api/issues/:issueId/merge/cancel exists and validates issueId format like the existing merge endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-endpoint.ac2",
+            "title": "Returns 200 {cancelled:true} when a pending auto-merge exists and is cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-endpoint.ac3",
+            "title": "Returns 200 {cancelled:false} when no pending auto-merge exists (idempotent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-endpoint.ac4",
+            "title": "Returns 409 when auto-merge is already in 'executing' state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-cli-command",
+        "title": "Add `pan merge cancel <id>` CLI command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/merge.ts following the approveCommand pattern. Export a registerMergeCommands(program) function that adds `pan merge` (subgroup) with a `cancel <issueId>` subcommand. Implementation fetches the local dashboard URL (configured the same way other CLI commands do — via existing dashboard URL resolver), POSTs to /api/issues/:issueId/merge/cancel, and prints a status line: 'Cancelled auto-merge for PAN-XXXX' or 'No pending auto-merge for PAN-XXXX' or 'Cannot cancel — auto-merge for PAN-XXXX is already executing'. Register via src/cli/index.ts."
+        },
+        "subItems": [
+          {
+            "id": "merge-cli-command.ac1",
+            "title": "`pan merge cancel PAN-1234` succeeds against a pending auto-merge and prints a confirmation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cli-command.ac2",
+            "title": "`pan merge cancel PAN-1234` is idempotent — running it twice prints 'No pending auto-merge' on the second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cli-command.ac3",
+            "title": "Exit codes: 0 on cancel success, 0 on idempotent no-op, 2 on 409 (already executing), 1 on unexpected error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cli-command.ac4",
+            "title": "`pan merge --help` displays the new `cancel` subcommand with its description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-model-extension",
+        "title": "Extend issue read-model with autoMergeScheduled field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `autoMergeScheduled: { executeAt: string; scheduledAt: string } | null` to the issue read-model shape (read-model.ts and the corresponding frontend store type). On snapshot bootstrap, populate from getPendingAutoMerges(). On merge.auto.scheduled event, set to { executeAt, scheduledAt }. On merge.auto.cancelled/executed/aborted events, set to null. The frontend issue type in packages/contracts mirrors the field."
+        },
+        "subItems": [
+          {
+            "id": "read-model-extension.ac1",
+            "title": "Snapshot returned by getSnapshot RPC includes autoMergeScheduled for any issue with a pending row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-extension.ac2",
+            "title": "Live merge.auto.* events update the in-memory read-model and broadcast to subscribed clients",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-extension.ac3",
+            "title": "TypeScript types in packages/contracts include autoMergeScheduled; typecheck passes on both server and frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-cancel-banner-component",
+        "title": "Add MergeAutoMergeCountdown banner component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/MergeAutoMergeCountdown.tsx forking the GraceCountdown.tsx pattern. Props: { issueId: string; executeAt: string; onCancel?: () => void }. Displays 'Auto-merging in M:SS' with a Cancel button. Tick every 1000ms updating remainingSeconds from (executeAt - now). On Cancel click: POST /api/issues/:issueId/merge/cancel, show optimistic 'Cancelling…' state, rely on merge.auto.cancelled event to remove banner. Show 'Connection lost' state when WS disconnects (read from existing connection store)."
+        },
+        "subItems": [
+          {
+            "id": "merge-cancel-banner-component.ac1",
+            "title": "Component renders 'Auto-merging in M:SS' format that updates every second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cancel-banner-component.ac2",
+            "title": "Cancel button calls POST /api/issues/:issueId/merge/cancel; loading state shows while in-flight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cancel-banner-component.ac3",
+            "title": "When the WS is disconnected, banner shows a 'connection lost' indicator and the cooldown text reads '(local view — host may be offline)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-cancel-banner-component.ac4",
+            "title": "Component unmounts cleanly when executeAt passes or autoMergeScheduled becomes null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-integration",
+        "title": "Integrate auto-merge banner into issue card and InspectorPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In the existing issue card component and the InspectorPanel, render MergeAutoMergeCountdown inline above the MergeButton when issue.autoMergeScheduled is non-null. Hide the MergeButton when the banner is shown (operator should not see two ways to merge at the same time); or render both with the banner taking primary visual weight. Decision: hide MergeButton during auto-merge cooldown — operator cancels via banner, then MergeButton returns. Pick the 1-2 spots where MergeButton is rendered today and add the conditional banner there."
+        },
+        "subItems": [
+          {
+            "id": "banner-integration.ac1",
+            "title": "Issue card renders MergeAutoMergeCountdown when autoMergeScheduled is set; MergeButton is hidden during that window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-integration.ac2",
+            "title": "InspectorPanel renders the same banner+conditional-button pattern for the focused issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-integration.ac3",
+            "title": "After cancel or execute, MergeButton reappears (or is hidden if mergeStatus=merged) — verified via browser test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-revalidation",
+        "title": "Implement gate re-validation logic in scheduler.fire()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Inside scheduler.fire(), after the atomic pending->executing transition succeeds, run gate checks in this order: (1) re-read review-status, fail if readyForMerge != true with reason='no-longer-ready'; (2) if requireNoBlockerLabels is non-empty, call getPrLabels(prUrl) and fail if any blocker label is present with reason='blocker-label:<label>'; on timeout fail with reason='label-check-timeout'; (3) if requireGitHubCiPassing OR requireAllCommitStatusChecks, call getCombinedCommitStatus(prUrl) and fail if not passing with reason='ci-failing'; on timeout fail with reason='ci-check-timeout'. On any gate fail, call markAutoMergeAborted(issueId, reason), emit merge.auto.aborted, emit TTS, and return WITHOUT calling triggerMerge."
+        },
+        "subItems": [
+          {
+            "id": "gate-revalidation.ac1",
+            "title": "All four gate checks (ready, labels, CI, status checks) are evaluated in sequence; first failure short-circuits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-revalidation.ac2",
+            "title": "On gate failure, triggerMerge is NOT called and DB row status = 'aborted' with reason captured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-revalidation.ac3",
+            "title": "Gate-check timeouts (5s) result in fail-closed behavior (abort, not merge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-revalidation.ac4",
+            "title": "On all gates passing, triggerMerge(issueId) is called and markAutoMergeExecuted is recorded after triggerMerge returns success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduler-unit-tests",
+        "title": "Unit tests for AutoMergeScheduler with fake timers and mocked DB",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Tests in src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts using vi.useFakeTimers() per CLAUDE.md test rule. Cover: maybeSchedule schedules and persists; double-schedule is a no-op; cancel during cooldown clears timer and updates DB; fire after cooldown calls triggerMerge when gates pass; fire after cooldown aborts when gates fail; boot recovery re-arms pending; boot recovery aborts stale; cancel-during-execute race (executing wins); PANOPTICON_DISABLE_AUTO_MERGE makes start() a no-op."
+        },
+        "subItems": [
+          {
+            "id": "scheduler-unit-tests.ac1",
+            "title": "Tests use vi.useFakeTimers + vi.advanceTimersByTimeAsync — no real setTimeout delays per CLAUDE.md retry-timer rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-unit-tests.ac2",
+            "title": "Coverage includes both happy path and all four gate-failure reasons (ready, label, ci, timeout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-unit-tests.ac3",
+            "title": "Cancel-vs-fire race test asserts that exactly one of cancel/fire wins (DB row reflects the winner), no double triggerMerge invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-unit-tests.ac4",
+            "title": "Boot recovery test verifies stale rows (executeAt > maxStaleMinutes ago) emit merge.auto.aborted and do NOT fire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-endpoint-integration-test",
+        "title": "HTTP integration test for the cancel endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an integration test that boots a test dashboard (real HTTP, real SQLite, mocked triggerMerge), schedules a pending auto-merge via the scheduler API, calls POST /api/issues/PAN-XXXX/merge/cancel, verifies 200 + {cancelled:true}, re-calls and verifies {cancelled:false}, and tests the 409 path by transitioning the row to 'executing' before calling cancel."
+        },
+        "subItems": [
+          {
+            "id": "cancel-endpoint-integration-test.ac1",
+            "title": "Test boots a real HTTP server with the route and a temp SQLite file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-endpoint-integration-test.ac2",
+            "title": "Three test cases: pending->cancelled (200, true), no-pending (200, false), executing (409)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-endpoint-integration-test.ac3",
+            "title": "Test cleans up temp SQLite file in afterEach to avoid cross-test bleed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-merge-skill",
+        "title": "Add sync-sources/skills/pan-merge/SKILL.md wrapper for the new CLI verb",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create sync-sources/skills/pan-merge/SKILL.md following the Skills <-> CLI convention in docs/SKILLS-CONVENTION.md. Documents the `pan merge cancel <id>` subcommand: what it does, when to use it (during auto-merge cooldown), example output, the relationship to the dashboard banner Cancel button. Cross-checked by scripts/lint-skills.sh."
+        },
+        "subItems": [
+          {
+            "id": "pan-merge-skill.ac1",
+            "title": "SKILL.md exists at sync-sources/skills/pan-merge/SKILL.md with frontmatter (name, description, type=cli-wrapper)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-merge-skill.ac2",
+            "title": "Skill documents the `cancel <issueId>` subcommand with its actual flags and exit codes — matches `pan merge --help` output exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-merge-skill.ac3",
+            "title": "npm run lint passes (scripts/lint-skills.sh sees no drift between the skill and the CLI)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-docs",
+        "title": "Document the merge.autoMerge config block with the solo-workflow warning",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new Mintlify page configuration/auto-merge.mdx describing the merge.autoMerge config block with every key, defaults, and a prominent 'Solo workflows only — do not enable in shared/team Panopticon instances' warning callout. Cross-link from CLAUDE.md (Configuration section or near the merge flow notes) and from the pan-merge skill. Add the page to docs.json so it appears in the nav."
+        },
+        "subItems": [
+          {
+            "id": "config-docs.ac1",
+            "title": "configuration/auto-merge.mdx documents every merge.autoMerge.* key with default and example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-docs.ac2",
+            "title": "A 'Solo workflows only' warning is prominently displayed with the rationale (preserves the 'humans only merge' safety intent at the gate level, not the click level)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-docs.ac3",
+            "title": "docs.json updated to include the new page in the nav under Configuration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-docs.ac4",
+            "title": "CLAUDE.md gets a one-paragraph reference linking to the new page; pan-merge skill cross-links to it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-startup-log",
+        "title": "Emit unmissable startup log when auto-merge is enabled",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T11:35:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In dashboard main.ts after AutoMergeScheduler.start(), log a high-visibility banner whenever any project has merge.autoMerge.enabled=true: '[merge-auto] AUTO-MERGE ENABLED for project(s): <comma-list>'. Repeated at every boot. Mitigates hazard H5."
+        },
+        "subItems": [
+          {
+            "id": "boot-startup-log.ac1",
+            "title": "When at least one project has auto-merge enabled, dashboard boot prints one [merge-auto] AUTO-MERGE ENABLED line listing the project key(s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-startup-log.ac2",
+            "title": "When no project has it enabled, no line is printed (no log spam in the default case)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-schema",
+        "to": "scheduler-service",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema",
+        "to": "gate-revalidation",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema",
+        "to": "ci-gate-helper",
+        "type": "informs"
+      },
+      {
+        "from": "config-schema",
+        "to": "config-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema",
+        "to": "boot-startup-log",
+        "type": "blocks"
+      },
+      {
+        "from": "db-schema",
+        "to": "scheduler-service",
+        "type": "blocks"
+      },
+      {
+        "from": "db-schema",
+        "to": "cancel-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "db-schema",
+        "to": "read-model-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-gate-helper",
+        "to": "gate-revalidation",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "readyForMerge-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "cancel-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "events-emission",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "tts-announcements",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "gate-revalidation",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "scheduler-unit-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "read-model-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "scheduler-service",
+        "to": "boot-startup-log",
+        "type": "blocks"
+      },
+      {
+        "from": "events-emission",
+        "to": "merge-cancel-banner-component",
+        "type": "informs"
+      },
+      {
+        "from": "events-emission",
+        "to": "read-model-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "cancel-endpoint",
+        "to": "merge-cli-command",
+        "type": "blocks"
+      },
+      {
+        "from": "cancel-endpoint",
+        "to": "merge-cancel-banner-component",
+        "type": "blocks"
+      },
+      {
+        "from": "cancel-endpoint",
+        "to": "cancel-endpoint-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "read-model-extension",
+        "to": "banner-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-cancel-banner-component",
+        "to": "banner-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-cli-command",
+        "to": "pan-merge-skill",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1418-optional-opt-in-auto-merge-for-single-developer-workflow-configurable-per-project.vbrief.json"
+    }
+  }
+}
