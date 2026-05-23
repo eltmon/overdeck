@@ -214,7 +214,7 @@ describe('SessionFeedSidebar', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
     fireEvent.click(screen.getByText('Claude Code').closest('button') as HTMLButtonElement);
 
-    expect(window.location.pathname).toBe('/conv/42');
+    expect(window.location.pathname).toBe('/conv/20260523-1234');
     expect(onPopState).toHaveBeenCalledOnce();
     window.removeEventListener('popstate', onPopState);
   });

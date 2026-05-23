@@ -155,7 +155,7 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
 
   switch (entry.kind) {
     case 'conversation':
-      pushRoute(`/conv/${entry.conversationId}`);
+      pushRoute(`/conv/${encodeURIComponent(entry.conversationName)}`);
       return;
     case 'activity':
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);

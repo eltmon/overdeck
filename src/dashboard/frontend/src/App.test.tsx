@@ -177,8 +177,9 @@ describe('conversation route helpers', () => {
     expect(getConversationViewModeFromSearch('')).toBe('conversation');
   });
 
-  it('extracts conversation id from conversation paths only', () => {
+  it('extracts conversation route keys from conversation paths only', () => {
     expect(getConvIdFromPath('/conv/123')).toBe('123');
+    expect(getConvIdFromPath('/conv/20260523-1234')).toBe('20260523-1234');
     expect(getConvIdFromPath('/command-deck')).toBeNull();
   });
 

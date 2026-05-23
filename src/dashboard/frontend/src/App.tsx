@@ -143,10 +143,15 @@ function readSessionFeedSidebarOpen(): boolean {
   return window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY) === 'true';
 }
 
-/** Extract conversation ID from /conv/:id path, or null if not matching. */
+/** Extract conversation route key from /conv/:key path, or null if not matching. */
 export function getConvIdFromPath(path = window.location.pathname): string | null {
-  const match = path.match(/^\/conv\/(\d+)$/);
-  return match ? match[1] : null;
+  const match = path.match(/^\/conv\/([^/]+)$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1] ?? '');
+  } catch {
+    return match[1] ?? null;
+  }
 }
 
 export function getConversationRouteState() {
