@@ -45,6 +45,73 @@ describe('PanOpen service', () => {
       expect(editors).not.toContain('zed');
     });
 
+    it('detects Kiro without JetBrains editors', async () => {
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd === 'which kiro') return { stdout: '/usr/bin/kiro' };
+        throw new Error('not found');
+      });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableEditors();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const editors = await Effect.runPromise(program);
+      expect(editors).toContain('kiro');
+      expect(editors).not.toContain('idea');
+      expect(editors).not.toContain('pycharm');
+      expect(editors).not.toContain('webstorm');
+    });
+
+    it('detects the full JetBrains editor family', async () => {
+      const jetBrainsCommands = new Set([
+        'idea',
+        'aqua',
+        'clion',
+        'datagrip',
+        'dataspell',
+        'goland',
+        'phpstorm',
+        'pycharm',
+        'rider',
+        'rubymine',
+        'rustrover',
+        'webstorm',
+      ]);
+
+      mockExecAsync.mockImplementation(async (cmd: string) => {
+        const command = cmd.split(' ').at(-1);
+        if (command && jetBrainsCommands.has(command)) return { stdout: `/usr/bin/${command}` };
+        throw new Error('not found');
+      });
+
+      const { PanOpen, PanOpenLive } = await import('../open.js');
+
+      const program = Effect.gen(function* () {
+        const svc = yield* PanOpen;
+        return yield* svc.getAvailableEditors();
+      }).pipe(Effect.provide(PanOpenLive));
+
+      const editors = await Effect.runPromise(program);
+      expect(editors).toEqual(expect.arrayContaining([
+        'idea',
+        'aqua',
+        'clion',
+        'datagrip',
+        'dataspell',
+        'goland',
+        'phpstorm',
+        'pycharm',
+        'rider',
+        'rubymine',
+        'rustrover',
+        'webstorm',
+      ]));
+      expect(editors).not.toContain('kiro');
+    });
+
     it('returns empty array when no editors found', async () => {
       mockExecAsync.mockRejectedValue(new Error('not found'));
 
