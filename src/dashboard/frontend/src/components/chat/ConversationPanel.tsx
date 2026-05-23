@@ -10,9 +10,10 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
+import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
@@ -460,12 +461,13 @@ export function ConversationPanel({
     ? 'var(--success)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const headerContextUsage = messagesData?.contextUsage ?? conversation.contextUsage ?? null;
 
   return (
     <div className={styles.conversationTerminal}>
-      {/* Header bar — hidden in embedded mode (ZoneB already shows session info) */}
+      {/* Header bar — hidden in embedded mode (ZoneB already shows session info), so its context indicator is omitted there. */}
       {!embedded && (
-        <div className={styles.conversationTerminalHeader}>
+        <div className={`${styles.conversationTerminalHeader} ${styles.conversationHeaderContainer}`}>
           <span className={styles.conversationTerminalTitle}>
             {isWorking && (
               <span title={workingLabel} style={{ display: 'contents' }}>
@@ -520,6 +522,7 @@ export function ConversationPanel({
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
             </span>
           )}
+          <ContextUsageIndicator contextUsage={headerContextUsage} />
           <span className={styles.conversationTerminalStatus}>
             <Circle
               size={7}
@@ -838,6 +841,7 @@ interface MessagesResponse {
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
+  contextUsage?: ContextUsage | null;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {

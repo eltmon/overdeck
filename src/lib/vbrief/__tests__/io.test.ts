@@ -97,6 +97,15 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
+  it('resolves the workspace-local spec when the workspace is itself a git worktree', () => {
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+    writeFileSync(join(WORKSPACE_PATH, '.git'), 'gitdir: ../../.git/worktrees/feature-pan-100');
+
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
+  });
+
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
     const doc = makePlanDoc([{ id: 'draft-item' }]);
     doc.plan.id = ISSUE_ID.toLowerCase();

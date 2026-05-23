@@ -5,6 +5,7 @@ import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
 import { useConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
+import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export interface Conversation {
   compacting?: boolean;
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
   deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;
+  contextUsage?: ContextUsage | null;
   /** Agent-authored handoff document path for handoff-fork targets. */
   handoffDocPath?: string | null;
   /** Target conversation id created from this source's handoff. */
