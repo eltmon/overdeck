@@ -69,3 +69,21 @@ The rewritten command then executes normally through Bash. RTK subcommands proxy
 On 2026-05-23, `agent-pan-1410` was spawned with `PANOPTICON_RTK_ENABLED=true` and the work role's `Bash` PreToolUse matcher installed. The agent completed PAN-1410, produced commits through the normal bead workflow, passed `npm run typecheck`, `npm run lint`, and `npm test`, pushed `origin/feature/pan-1410`, and `pan done PAN-1410` moved the issue to In Review.
 
 Representative Bash transcript entries showed large command outputs reduced to model-visible persisted previews: `npm run build` reported a 153.9KB persisted output with a 2KB preview, `npm run lint` reported a 41KB persisted output with a 2KB preview, and the final `npm test` completed successfully with `npm test exit 0`. No RTK hook errors or Bash execution corruption appeared in the tmux capture.
+
+## Cost benchmark
+
+Reproducible A/B steps:
+
+1. Pick a representative command that emits enough Bash output to matter; for PAN-1407, use `git diff 47a8df418...HEAD` from the feature branch.
+2. Capture the raw output with RTK disabled: `PANOPTICON_RTK_ENABLED=0 git diff 47a8df418...HEAD > raw.txt`.
+3. Capture the RTK output that the hook would execute: `~/.panopticon/bin/rtk git diff 47a8df418...HEAD > rtk.txt`.
+4. Estimate output tokens as `ceil(bytes / 4)` for both files, then compute `(raw_tokens - rtk_tokens) / raw_tokens * 100`.
+
+Captured measurement on 2026-05-23:
+
+| Command | Variant | Bytes | Estimated output tokens |
+| --- | --- | ---: | ---: |
+| `git diff 47a8df418...HEAD` | RTK disabled/raw | 31,710 | 7,928 |
+| `git diff 47a8df418...HEAD` | RTK enabled (`rtk git diff ...`) | 21,587 | 5,397 |
+
+Reduction: `(7,928 - 5,397) / 7,928 = 31.9%`, clearing the ≥30% PAN-1407 acceptance bar. No follow-up issue is required for this measurement.
