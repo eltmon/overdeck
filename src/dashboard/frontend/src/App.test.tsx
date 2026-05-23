@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App, {
+  SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
   getConversationRouteState,
   getConversationViewModeFromSearch,
@@ -69,6 +70,13 @@ vi.mock('./components/MetricsSummaryRow', () => ({ MetricsSummaryRow: () => null
 vi.mock('./components/MetricsPage', () => ({ MetricsPage: () => null }));
 vi.mock('./components/CostsPage', () => ({ CostsPage: () => null }));
 vi.mock('./components/Settings/SettingsPage', () => ({ SettingsPage: () => null }));
+vi.mock('./components/sessionFeed/SessionFeedSidebar', () => ({
+  SessionFeedSidebar: ({ onClose }: { onClose: () => void }) => (
+    <aside data-testid="session-feed-sidebar">
+      <button onClick={onClose}>Close activity feed</button>
+    </aside>
+  ),
+}));
 vi.mock('./components/search/SearchModal', () => ({ SearchModal: () => null }));
 vi.mock('./components/CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
@@ -83,7 +91,7 @@ vi.mock('./components/skeletons/PipelineSkeleton', () => ({ PipelineSkeleton: ()
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
+vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, History: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({
   Toaster: () => null,
@@ -155,6 +163,7 @@ beforeEach(() => {
   mockToastError.mockClear()
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
+  window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
 })
 
 describe('conversation route helpers', () => {
@@ -323,6 +332,58 @@ describe('App Pipeline routing', () => {
     window.history.replaceState(null, '', '/board');
     renderApp();
     expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+});
+
+describe('App session feed sidebar', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('keeps the sidebar closed by default', () => {
+    renderApp();
+
+    expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
+  });
+
+  it('opens the sidebar from the toggle and persists the open state', () => {
+    renderApp();
+
+    fireEvent.click(screen.getByLabelText('Toggle activity feed'));
+
+    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
+    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('true');
+  });
+
+  it('restores the open sidebar from localStorage on mount', () => {
+    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
+
+    renderApp();
+
+    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
+  });
+
+  it('closes from the in-sidebar close button and persists the closed state', () => {
+    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
+    renderApp();
+
+    fireEvent.click(screen.getByText('Close activity feed'));
+
+    expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
+    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
   });
 });
 

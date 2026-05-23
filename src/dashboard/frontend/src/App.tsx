@@ -22,6 +22,7 @@ import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
+import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
 import { Tab } from './components/Header';
@@ -40,7 +41,7 @@ import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
-import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
@@ -86,6 +87,8 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ) as Record<string, Tab>,
   '/pipeline': 'pipeline',
 };
+
+export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarOpen';
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
@@ -133,6 +136,11 @@ export function normalizeLegacyAwaitingMergeRoute(_path = window.location.pathna
 function normalizeCurrentRoute() {
   // No legacy route normalization needed currently — Awaiting Merge is a
   // first-class page at /awaiting-merge again.
+}
+
+function readSessionFeedSidebarOpen(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY) === 'true';
 }
 
 /** Extract conversation ID from /conv/:id path, or null if not matching. */
@@ -347,6 +355,7 @@ export default function App() {
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
   const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
@@ -482,6 +491,11 @@ export default function App() {
     if (window.location.pathname !== path) {
       window.history.pushState({ tab }, '', path);
     }
+  }, []);
+
+  const setSessionFeedSidebarOpen = useCallback((open: boolean) => {
+    setIsSessionFeedSidebarOpen(open);
+    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
   }, []);
 
   // Handle browser back/forward
@@ -843,11 +857,21 @@ export default function App() {
         )}
 
         <div className="relative border-b border-border bg-background px-3 py-1 shrink-0">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              aria-label="Toggle activity feed"
+              aria-pressed={isSessionFeedSidebarOpen}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+            >
+              <History className="h-4 w-4" aria-hidden="true" />
+            </button>
             <SystemHealthPill />
           </div>
         </div>
 
+        <div className="min-h-0 flex flex-1 overflow-hidden">
         <main
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
@@ -976,6 +1000,10 @@ export default function App() {
           </BootstrapGate>
         )}
         </main>
+        {isSessionFeedSidebarOpen && (
+          <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
+        )}
+        </div>
       </div>
 
       <IssueDrawer />
