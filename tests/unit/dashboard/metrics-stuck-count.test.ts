@@ -28,6 +28,7 @@ vi.mock('../../../src/lib/cloister/service.js', () => ({
 const mockListRunningAgents = vi.fn();
 vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgents: (...args: unknown[]) => mockListRunningAgents(...args),
+  listRunningAgentsSync: (...args: unknown[]) => mockListRunningAgents(...args),
 }));
 
 const mockLoadReviewStatuses = vi.fn();

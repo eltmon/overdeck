@@ -74,7 +74,7 @@ export interface AgentMessage {
 /**
  * Runtime adapter interface
  */
-export interface RuntimeAdapter {
+export interface RuntimeAdapterLegacy {
   readonly type: RuntimeType;
   readonly config: RuntimeConfig;
 
@@ -146,22 +146,22 @@ export interface RuntimeRegistry {
   /**
    * Register a runtime adapter
    */
-  register(adapter: RuntimeAdapter): void;
+  register(adapter: RuntimeAdapterLegacy): void;
 
   /**
    * Get a runtime adapter by type
    */
-  get(type: RuntimeType): RuntimeAdapter | undefined;
+  get(type: RuntimeType): RuntimeAdapterLegacy | undefined;
 
   /**
    * Get all registered runtimes
    */
-  getAll(): RuntimeAdapter[];
+  getAll(): RuntimeAdapterLegacy[];
 
   /**
    * Get all available (installed) runtimes
    */
-  getAvailable(): Promise<RuntimeAdapter[]>;
+  getAvailable(): Promise<RuntimeAdapterLegacy[]>;
 
   /**
    * Sync skills to all registered runtimes
@@ -171,10 +171,9 @@ export interface RuntimeRegistry {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// Additive Effect-channel companion interface for RuntimeAdapter. The legacy
-// Promise-based RuntimeAdapter shape above is preserved so existing dashboard
-// and CLI callers keep working without churn. New consumers can implement or
-// consume RuntimeAdapterEffect to get typed error channels.
+// Effect-channel runtime adapter interface. The legacy Promise-based
+// RuntimeAdapterLegacy shape above is preserved for existing dashboard and CLI
+// callers while new consumers compose through the canonical Effect API.
 
 import type { Effect } from 'effect';
 import type {
@@ -190,11 +189,10 @@ export type RuntimeAdapterError =
   | FsError;
 
 /**
- * Effect-channel variant of {@link RuntimeAdapter}. Methods that previously
- * returned a Promise now return an Effect; failure channels carry tagged errors
- * for typed `Effect.catchTag` branching.
+ * Runtime adapter whose methods return Effects; failure channels carry tagged
+ * errors for typed `Effect.catchTag` branching.
  */
-export interface RuntimeAdapterEffect {
+export interface RuntimeAdapter {
   readonly type: RuntimeType;
   readonly config: RuntimeConfig;
 

@@ -5,8 +5,8 @@
  */
 
 import { Effect } from 'effect';
-import { readEvents, replaceEventsFile, getLastEventMetadata, CostEvent } from './events.js';
-import { rebuildCache } from './aggregator.js';
+import { readEventsSync, replaceEventsFileSync, getLastEventMetadataSync, CostEvent } from './events.js';
+import { rebuildCacheSync } from './aggregator.js';
 import { FsError } from '../errors.js';
 
 // ============== Types ==============
@@ -25,14 +25,14 @@ export interface RetentionStats {
  * Prune events older than the specified retention period
  * Returns stats about what was pruned
  */
-export function pruneOldEvents(retentionDays: number = 90): RetentionStats {
+export function pruneOldEventsSync(retentionDays: number = 90): RetentionStats {
   console.log(`Pruning events older than ${retentionDays} days...`);
 
   // Calculate cutoff date using milliseconds (not setDate, which is DST-sensitive)
   const cutoffTs = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
 
   // Read all events
-  const allEvents = readEvents();
+  const allEvents = readEventsSync();
   const totalEvents = allEvents.length;
 
   if (totalEvents === 0) {
@@ -56,11 +56,11 @@ export function pruneOldEvents(retentionDays: number = 90): RetentionStats {
   // If we removed any events, write the pruned file
   if (eventsRemoved > 0) {
     console.log(`Removing ${eventsRemoved} events older than ${cutoffTs}...`);
-    replaceEventsFile(retainedEvents);
+    replaceEventsFileSync(retainedEvents);
 
     // Rebuild cache after pruning
     console.log('Rebuilding cache after pruning...');
-    rebuildCache();
+    rebuildCacheSync();
 
     console.log(`Pruning complete: removed ${eventsRemoved} events, retained ${retainedEvents.length} events`);
   } else {
@@ -79,8 +79,8 @@ export function pruneOldEvents(retentionDays: number = 90): RetentionStats {
 /**
  * Check if pruning is needed based on oldest event
  */
-export function needsPruning(retentionDays: number = 90): boolean {
-  const allEvents = readEvents();
+export function needsPruningSync(retentionDays: number = 90): boolean {
+  const allEvents = readEventsSync();
 
   if (allEvents.length === 0) {
     return false;
@@ -97,14 +97,14 @@ export function needsPruning(retentionDays: number = 90): boolean {
 /**
  * Get retention status
  */
-export function getRetentionStatus(retentionDays: number = 90): {
+export function getRetentionStatusSync(retentionDays: number = 90): {
   totalEvents: number;
   oldestEventTs: string | null;
   oldestEventAge: number; // days
   needsPruning: boolean;
   eventsToRemove: number;
 } {
-  const allEvents = readEvents();
+  const allEvents = readEventsSync();
 
   if (allEvents.length === 0) {
     return {
@@ -137,25 +137,25 @@ export function getRetentionStatus(retentionDays: number = 90): {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Effect variant of pruneOldEvents. */
-export const pruneOldEventsEffect = (
+export const pruneOldEvents = (
   retentionDays: number = 90,
 ): Effect.Effect<RetentionStats, FsError> =>
   Effect.try({
-    try: () => pruneOldEvents(retentionDays),
+    try: () => pruneOldEventsSync(retentionDays),
     catch: (cause) => new FsError({ path: '<events>', operation: 'pruneOldEvents', cause }),
   });
 
 /** Effect variant of needsPruning. */
-export const needsPruningEffect = (
+export const needsPruning = (
   retentionDays: number = 90,
 ): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => needsPruning(retentionDays),
+    try: () => needsPruningSync(retentionDays),
     catch: (cause) => new FsError({ path: '<events>', operation: 'needsPruning', cause }),
   });
 
 /** Effect variant of getRetentionStatus. */
-export const getRetentionStatusEffect = (
+export const getRetentionStatus = (
   retentionDays: number = 90,
 ): Effect.Effect<
   {
@@ -168,6 +168,6 @@ export const getRetentionStatusEffect = (
   FsError
 > =>
   Effect.try({
-    try: () => getRetentionStatus(retentionDays),
+    try: () => getRetentionStatusSync(retentionDays),
     catch: (cause) => new FsError({ path: '<events>', operation: 'getRetentionStatus', cause }),
   });

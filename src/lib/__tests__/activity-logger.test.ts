@@ -9,12 +9,12 @@ vi.mock('../../dashboard/server/event-store.js', () => ({
   getEventStore: () => store,
 }));
 
-import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 
 describe('activity logger', () => {
   it('persists activity events asynchronously', () => {
-    emitActivityEntry({ source: 'cloister', level: 'info', message: 'review started', issueId: 'PAN-829' });
-    emitActivityTts({ utterance: 'PAN-829 review started', issueId: 'PAN-829' });
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'review started', issueId: 'PAN-829' });
+    emitActivityTtsSync({ utterance: 'PAN-829 review started', issueId: 'PAN-829' });
 
     expect(store.append).not.toHaveBeenCalled();
     expect(store.appendAsync).toHaveBeenCalledTimes(2);

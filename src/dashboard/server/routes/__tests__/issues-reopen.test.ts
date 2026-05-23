@@ -51,6 +51,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 
 vi.mock('../review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
   clearReviewStatus: mockClearReviewStatus,
 }));
 
@@ -67,6 +68,7 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: mockResolveGitHubIssue,
+    resolveGitHubIssueSync: mockResolveGitHubIssue,
   };
 });
 

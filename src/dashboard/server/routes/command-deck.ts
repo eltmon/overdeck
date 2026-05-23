@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnv } from '../../../lib/child-env.js';
+import { buildChildEnvSync } from '../../../lib/child-env.js';
 /**
  * Command Deck route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
@@ -33,21 +33,21 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
-import { getAgentRuntimeStateEffect, listRunningAgentsEffect } from '../../../lib/agents.js';
-import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
-import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
-import { capturePaneAsyncEffect, listSessionNamesAsyncEffect } from '../../../lib/tmux.js';
+import { getAgentRuntimeState, listRunningAgents } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
+import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
+import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
-import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
+import { findPrdAtStatusSync, type PrdLocation } from '../../../lib/prd-locations.js';
+import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
+import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
-import { getAgentCommand } from '../../../lib/settings.js';
-import { getReviewStatus } from '../review-status.js';
+import { getAgentCommandSync } from '../../../lib/settings.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
@@ -61,7 +61,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { readWorkspacePlanEffect } from '../../../lib/vbrief/io.js';
+import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -132,7 +132,7 @@ function getProjectPath(issuePrefix?: string): string {
   const cached = projectPathCache.get(issuePrefix);
   if (cached) return cached;
 
-  const resolved = resolveProjectFromIssue(`${issuePrefix}-1`);
+  const resolved = resolveProjectFromIssueSync(`${issuePrefix}-1`);
   if (resolved) {
     return setProjectPathCache(issuePrefix, resolved.projectPath);
   }
@@ -232,14 +232,14 @@ export async function fetchActivityDataWithContext(
   context: ActivityContext = {},
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const includeTranscripts = context.includeTranscripts ?? true;
 
   // Use shared tmux session names if provided, else fetch once (PAN-821)
   const tmuxSessionNames = context.tmuxSessionNames ?? new Set<string>();
   if (!context.tmuxSessionNames) {
     try {
-      const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+      const allSessions = await Effect.runPromise(listSessionNames());
       for (const s of allSessions) {
         if (s.trim()) tmuxSessionNames.add(s.trim());
       }
@@ -292,7 +292,7 @@ export async function fetchActivityDataWithContext(
       let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
-          transcript = (await Effect.runPromise(capturePaneAsyncEffect(checkId, 500))).trim();
+          transcript = (await Effect.runPromise(capturePane(checkId, 500))).trim();
           transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
@@ -311,15 +311,15 @@ export async function fetchActivityDataWithContext(
         }
       }
 
-      const rtState = await Effect.runPromise(getAgentRuntimeStateEffect(checkId));
+      const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
         : transcriptFromPane
-          ? detectAwaitingInputFromPane(transcript, { isPlanning })
+          ? detectAwaitingInputFromPaneSync(transcript, { isPlanning })
           : tmuxSessionNames.has(checkId)
-            ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+            ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
             : null;
 
       // Resolve JSONL path for conversation rendering (PAN-821)
@@ -380,7 +380,7 @@ export async function fetchActivityDataWithContext(
   }
 
   // Build specialist sections from review-status history
-  const centralStatus = getReviewStatus(issueId.toUpperCase());
+  const centralStatus = getReviewStatusSync(issueId.toUpperCase());
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
     const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
@@ -459,7 +459,7 @@ export async function fetchActivityDataWithContext(
       (idx, s, i) => (s.type === 'merge' ? i : idx),
       -1,
     );
-    const resolvedProject = resolveProjectFromIssue(issueId);
+    const resolvedProject = resolveProjectFromIssueSync(issueId);
     const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
 
     for (let i = 0; i < specialistSections.length; i++) {
@@ -569,7 +569,7 @@ export async function fetchActivityDataWithContext(
 
       if (includeTranscripts && ss.status === 'running') {
         try {
-          const output = (await Effect.runPromise(capturePaneAsyncEffect(specialistSessionId, 100))).trim();
+          const output = (await Effect.runPromise(capturePane(specialistSessionId, 100))).trim();
           if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
             transcriptParts.push(`\n--- Live Output ---\n${output}`);
           } else if (output) {
@@ -617,8 +617,8 @@ export async function fetchActivityDataWithContext(
       aggregateCost = cached.data.totalCost;
       costByStage = cached.data.costByStage;
     } else {
-      syncCache();
-      const issueData = getCostsForIssue(cacheKey);
+      syncCacheSync();
+      const issueData = getCostsForIssueSync(cacheKey);
       if (issueData) {
         aggregateCost = issueData.totalCost;
         costByStage = Object.fromEntries(
@@ -629,7 +629,7 @@ export async function fetchActivityDataWithContext(
       costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
 
-    const agents = includeTranscripts ? await Effect.runPromise(listRunningAgentsEffect()) : await getCachedRunningAgents();
+    const agents = includeTranscripts ? await Effect.runPromise(listRunningAgents()) : await getCachedRunningAgents();
     const resolvedCost = resolveIssueHeadlineCost({
       issueId,
       aggregateCost,
@@ -676,7 +676,7 @@ async function fetchPlanningData(
   options: { summaryOnly?: boolean } = {},
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
   const summaryOnly = options.summaryOnly ?? false;
 
   const projectPath = getProjectPath(issuePrefix);
@@ -725,7 +725,7 @@ async function fetchPlanningData(
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   // Pipeline mirror corroboration (PAN-977)
   try {
-    const doc = await Effect.runPromise(readWorkspacePlanEffect(workspacePath));
+    const doc = await Effect.runPromise(readWorkspacePlan(workspacePath));
     if (doc) {
       const items = doc.plan.items;
       if (items.length > 0) {
@@ -741,7 +741,7 @@ async function fetchPlanningData(
   } catch { /* no vBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
+    const prd = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, 'active'));
     if (prd) {
       result.prd = prd;
       result.hasPrd = true;
@@ -777,7 +777,7 @@ async function fetchPlanningData(
 
   if (!result.prd) {
     for (const status of ['active', 'planned', 'completed'] as const) {
-      const content = await readPrdContent(findPrdAtStatus(projectPath, issueId, status));
+      const content = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, status));
       if (content) {
         result.prd = content;
         result.hasPrd = true;
@@ -888,7 +888,7 @@ async function generateStatusReview(issueId: string): Promise<
   | { type: 'err'; response: unknown; status: number }
 > {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -961,7 +961,7 @@ async function generateStatusReview(issueId: string): Promise<
     execSafe(`cd "${workspacePath}" && git diff --name-only main 2>/dev/null || git diff --name-only HEAD~5 2>/dev/null || echo "No files changed"`),
   ]);
 
-  const centralReviewStatus = getReviewStatus(issueId.toUpperCase());
+  const centralReviewStatus = getReviewStatusSync(issueId.toUpperCase());
   const reviewStatus = centralReviewStatus?.reviewStatus || 'unknown';
   const testStatus = centralReviewStatus?.testStatus || 'unknown';
 
@@ -1034,21 +1034,21 @@ Be specific: reference actual file names, function names, requirement text, disc
   const apiSettings = loadSettingsApi();
   const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
     || 'claude-sonnet-4-6';
-  const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
+  const { command: cliCmd, args: cliArgs } = getAgentCommandSync(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');
 
   // Build provider env vars for non-Anthropic models
-  const { getProviderForModel, getProviderEnv } = await import('../../../lib/providers.js');
-  const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+  const { getProviderForModelSync, getProviderEnvSync } = await import('../../../lib/providers.js');
+  const { loadConfigSync: loadYamlConfig } = await import('../../../lib/config-yaml.js');
   let providerEnvStr = '';
   let providerEnv: Record<string, string> = {};
-  const statusProvider = getProviderForModel(statusModelId);
+  const statusProvider = getProviderForModelSync(statusModelId);
   if (statusProvider.name !== 'anthropic') {
     const { config } = loadYamlConfig();
     const apiKey = config.apiKeys[statusProvider.name as keyof typeof config.apiKeys];
     if (apiKey) {
-      providerEnv = getProviderEnv(statusProvider, apiKey);
+      providerEnv = getProviderEnvSync(statusProvider, apiKey);
       providerEnvStr = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ') + ' ';
     }
   }
@@ -1057,7 +1057,7 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
-    const env = buildChildEnv(process.env, providerEnv);
+    const env = buildChildEnvSync(process.env, providerEnv);
     const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
       `${cliCmd} -p${modelFlag} --no-session-persistence`,
@@ -1126,7 +1126,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
 
     const { type, filename, content } = body as { type?: string; filename?: string; content?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     if (!type || !filename || !content) {
       return jsonResponse({ error: 'type, filename, and content are required' }, { status: 400 });
@@ -1170,7 +1170,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
+    if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue id: ' + issueId }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -1178,7 +1178,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const { tracker } = body as { tracker?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
       return jsonResponse({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
@@ -1335,7 +1335,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const { shadow } = body as { shadow?: boolean };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);

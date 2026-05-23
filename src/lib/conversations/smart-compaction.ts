@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
-import { getClaudePermissionFlags } from '../claude-permissions.js';
+import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError, ProcessSpawnError } from '../errors.js';
 
@@ -665,9 +665,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   } finally {
     await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
   }
-}
-
-export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
+}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
@@ -680,7 +678,7 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   const args = [
     '-p',
     '--model', useModel,
-    ...getClaudePermissionFlags(),
+    ...getClaudePermissionFlagsSync(),
   ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
@@ -769,7 +767,7 @@ async function generateSummaryFromPrompt(
 
   // Wrap in system prompt via claude -p
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${messages[0].content[0].text}`;
-  return runModelSummary(fullPrompt, model, timeoutMs, harness);
+  return (await Effect.runPromise(runModelSummary(fullPrompt, model, timeoutMs, harness)));
 }
 
 async function generateTurnPrefixSummary(
@@ -780,7 +778,7 @@ async function generateTurnPrefixSummary(
 ): Promise<string> {
   const promptText = `<conversation>\n${serialized}\n</conversation>\n\n${TURN_PREFIX_PROMPT}`;
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${promptText}`;
-  return runModelSummary(fullPrompt, model, timeoutMs, harness);
+  return (await Effect.runPromise(runModelSummary(fullPrompt, model, timeoutMs, harness)));
 }
 
 // ============================================================================
@@ -849,13 +847,7 @@ async function generateChunkedSummary(
   }
 
   return running ?? '';
-}
-
-// ============================================================================
-// Main smart compaction
-// ============================================================================
-
-export async function generateSmartSummary(options: CompactionOptions): Promise<CompactionResult> {
+}async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
   const entries = await parseEntries(options.jsonlPath);
   if (entries.length === 0) {
     throw new Error(`Session file is empty: ${options.jsonlPath}`);
@@ -1008,14 +1000,14 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
 // (ProcessSpawnError for spawn / generation failures, FsError for IO).
 
 /** Effect variant of runModelSummary. */
-export function runModelSummaryEffect(
+export function runModelSummary(
   prompt: string,
   model?: string,
   timeoutMs?: number,
   harness: RuntimeName = 'claude-code',
 ): Effect.Effect<string, ProcessSpawnError> {
   return Effect.tryPromise({
-    try: () => runModelSummary(prompt, model, timeoutMs, harness),
+    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness),
     catch: (cause) =>
       new ProcessSpawnError({
         command: harness === 'pi' ? 'pi' : 'claude',
@@ -1027,11 +1019,11 @@ export function runModelSummaryEffect(
 }
 
 /** Effect variant of generateSmartSummary. */
-export function generateSmartSummaryEffect(
+export function generateSmartSummary(
   options: CompactionOptions,
 ): Effect.Effect<CompactionResult, FsError | ProcessSpawnError> {
   return Effect.tryPromise({
-    try: () => generateSmartSummary(options),
+    try: () => generateSmartSummaryPromise(options),
     catch: (cause) => {
       const msg = cause instanceof Error ? cause.message : String(cause);
       // Distinguish between fs failures (read jsonl) and spawn failures (LLM).

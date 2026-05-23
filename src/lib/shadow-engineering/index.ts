@@ -10,7 +10,7 @@
  * - Observer Agent: Watches PRs, comments with observations
  */
 
-export { gatherArtifacts, generateMonitoringPrompt, generateBasicInference, updateInferenceDocument, readInferenceDocument } from './monitoring-agent.js';
+export { gatherArtifacts, generateMonitoringPrompt, generateBasicInference, updateInferenceDocumentSync, readInferenceDocumentSync } from './monitoring-agent.js';
 export type { MonitoringAgentConfig, InferenceDocument } from './monitoring-agent.js';
 
 export { pollPRs, generateObservation, postPRComment, generateObserverPrompt, runObserverCycle } from './observer-agent.js';

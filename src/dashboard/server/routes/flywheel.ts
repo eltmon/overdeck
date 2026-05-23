@@ -16,7 +16,7 @@ import {
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
 import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
-import { sessionExistsAsyncEffect } from '../../../lib/tmux.js';
+import { sessionExists } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
   abortFlywheelRunForDashboard,
@@ -173,7 +173,7 @@ export async function getFlywheelCurrentPayload() {
 export async function getFlywheelConversationPayload() {
   const conversation = await runDashboardDbJob<{ tmuxSession: string } | null>('getConversationByName', FLYWHEEL_CONVERSATION_NAME);
   if (!conversation) return null;
-  const sessionAlive = await Effect.runPromise(sessionExistsAsyncEffect(conversation.tmuxSession));
+  const sessionAlive = await Effect.runPromise(sessionExists(conversation.tmuxSession));
   return { ...conversation, sessionAlive };
 }
 

@@ -4,14 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
   spawnRun: vi.fn(),
-  saveAgentStateEffect: vi.fn(),
-  getAgentStateEffect: vi.fn(),
-  listSessionNamesAsyncEffect: vi.fn(),
-  isPaneDeadAsyncEffect: vi.fn(),
-  killSessionAsyncEffect: vi.fn(),
+  saveAgentStateProgram: vi.fn(),
+  getAgentStateProgram: vi.fn(),
+  listSessionNames: vi.fn(),
+  isPaneDead: vi.fn(),
+  killSession: vi.fn(),
+  killSessionSync: vi.fn(),
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   listStashes: vi.fn(),
   dropStash: vi.fn(),
   createNamedStash: vi.fn(),
@@ -19,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   formatTier1Summary: vi.fn(),
   archiveFeedbackFiles: vi.fn(),
   notifyPipeline: vi.fn(),
+  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -27,24 +32,30 @@ vi.mock('child_process', () => ({
 
 vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
-  saveAgentStateEffect: mocks.saveAgentStateEffect,
-  getAgentStateEffect: mocks.getAgentStateEffect,
+  saveAgentState: mocks.saveAgentStateProgram,
+  saveAgentStateProgram: mocks.saveAgentStateProgram,
+  getAgentState: mocks.getAgentStateProgram,
+  getAgentStateProgram: mocks.getAgentStateProgram,
   messageAgent: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', () => ({
-  listSessionNamesAsyncEffect: mocks.listSessionNamesAsyncEffect,
-  isPaneDeadAsyncEffect: mocks.isPaneDeadAsyncEffect,
-  killSessionAsyncEffect: mocks.killSessionAsyncEffect,
+  listSessionNames: mocks.listSessionNames,
+  isPaneDead: mocks.isPaneDead,
+  killSession: mocks.killSession,
+  killSessionSync: mocks.killSession,
 }));
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: mocks.emitActivityEntry,
+  emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatus: mocks.getReviewStatus,
+  getReviewStatusSync: mocks.getReviewStatus,
   setReviewStatus: mocks.setReviewStatus,
+  setReviewStatusSync: mocks.setReviewStatus,
 }));
 
 vi.mock('../../stashes.js', () => ({
@@ -57,6 +68,7 @@ vi.mock('../../stashes.js', () => ({
 
 vi.mock('../../config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
+  loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
 }));
 
@@ -98,26 +110,26 @@ describe('spawnReviewRoleForIssue', () => {
       status: 'running',
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
-    mocks.saveAgentStateEffect.mockReturnValue(Effect.void);
-    mocks.getAgentStateEffect.mockReturnValue(Effect.succeed({ hostOverride: true }));
-    mocks.listSessionNamesAsyncEffect.mockReturnValue(Effect.succeed([]));
+    mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
+    mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
-    mocks.listStashes.mockResolvedValue([]);
-    mocks.createNamedStash.mockResolvedValue(null);
+    mocks.listStashes.mockReturnValue(Effect.succeed([]));
+    mocks.createNamedStash.mockReturnValue(Effect.succeed(null));
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
   });
 
   it('inherits host override from the completed work agent for synthesis and reviewer spawns', async () => {
-    const result = await spawnReviewRoleForIssue({
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
       workspace: '/tmp/pan-review-host-override',
       branch: 'feature/pan-1194',
-    });
+    }));
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateEffect).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',

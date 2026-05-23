@@ -12,7 +12,7 @@ import {
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
   PARENT_MODEL_REF,
-  loadConfig,
+  loadConfigSync,
   getGlobalConfigPath,
   clearConfigCache,
   mergeConfigs,
@@ -27,7 +27,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { MODEL_CAPABILITIES, getModelCapability, hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
 
 /**
  * Deprecation warning in API format
@@ -213,23 +213,23 @@ export interface ApiSettingsConfig {
  * Also detects deprecated model IDs in current overrides and returns warnings.
  */
 export function getDefaultConversationModelApi(): ModelId {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
 
-  if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
+  if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
 
-  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.5');
-  if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
-  if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
-  if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
-  if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
-  if (config.enabledProviders.has('mimo')) return resolveModelId('mimo-v2.5-pro');
-  if (config.enabledProviders.has('nous')) return resolveModelId('qwen/qwen3.6-plus');
-  if (config.enabledProviders.has('dashscope')) return resolveModelId('qwen3-coder-plus');
+  if (config.enabledProviders.has('openai')) return resolveModelIdSync('gpt-5.5');
+  if (config.enabledProviders.has('minimax')) return resolveModelIdSync('minimax-m2.7-highspeed');
+  if (config.enabledProviders.has('google')) return resolveModelIdSync('gemini-3.1-pro-preview');
+  if (config.enabledProviders.has('kimi')) return resolveModelIdSync('kimi-k2.5');
+  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.1');
+  if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
+  if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
+  if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
-    if (fav) return resolveModelId(fav);
+    if (fav) return resolveModelIdSync(fav);
   }
-  return resolveModelId('claude-sonnet-4-6');
+  return resolveModelIdSync('claude-sonnet-4-6');
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
@@ -238,11 +238,11 @@ const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
   review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
 };
-function seededWorkhorses(config: Pick<ReturnType<typeof loadConfig>['config'], 'workhorses'>): WorkhorsesConfig {
+function seededWorkhorses(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'workhorses'>): WorkhorsesConfig {
   return { ...DEFAULT_WORKHORSES, ...(config.workhorses ?? {}) };
 }
 
-function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'roles'>): RolesConfig {
+function seededRoles(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'roles'>): RolesConfig {
   const roles: RolesConfig = {};
   for (const role of ROLE_NAMES) {
     const defaultRole = DEFAULT_ROLES[role];
@@ -260,7 +260,7 @@ function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'role
   return roles;
 }
 
-function toApiTtsConfig(config: ReturnType<typeof loadConfig>['config']['tts']): ApiTtsConfig {
+function toApiTtsConfig(config: ReturnType<typeof loadConfigSync>['config']['tts']): ApiTtsConfig {
   return {
     enabled: config.enabled,
     voice: config.voice,
@@ -360,8 +360,8 @@ function validateModelRef(
     return;
   }
 
-  const resolved = resolveModelId(ref);
-  if (!hasModelCapability(resolved)) {
+  const resolved = resolveModelIdSync(ref);
+  if (!hasModelCapabilitySync(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
@@ -464,7 +464,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
 }
 
 export function loadSettingsApi(): ApiSettingsConfig {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
 
   // Detect deprecated models in current overrides. Overrides are no longer
   // surfaced by GET /api/settings, but warnings help users clean stale config.
@@ -624,11 +624,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
 
-/**
- * Save settings from API format (for PUT /api/settings)
- */
-export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
-  const { config: currentConfig } = loadConfig();
+async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+  const { config: currentConfig } = loadConfigSync();
   const providerAuth = currentConfig.providerAuth ?? {};
   const providerPlan = currentConfig.providerPlan ?? {};
 
@@ -715,10 +712,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
   clearConfigCache();
 }
 
-/**
- * Update specific settings (partial update)
- */
-export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
+async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates
@@ -776,7 +770,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
   };
 
   // Save and return
-  await saveSettingsApi(merged);
+  await Effect.runPromise(saveSettingsApi(merged));
   return merged;
 }
 
@@ -784,19 +778,19 @@ export function getRoleConfig(role: Role): RoleConfig | undefined {
   return loadSettingsApi().roles?.[role];
 }
 
-export async function setRoleConfig(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
-  return updateSettingsApi({ roles: { [role]: roleConfig } });
+async function setRoleConfigPromise(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
+  return Effect.runPromise(updateSettingsApi({ roles: { [role]: roleConfig } }));
 }
 
-export async function updateProviderApiKey(
+async function updateProviderApiKeyPromise(
   provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
-  return updateSettingsApi({
+  return Effect.runPromise(updateSettingsApi({
     api_keys: {
       [provider]: apiKey,
     },
-  });
+  }));
 }
 
 /**
@@ -1048,15 +1042,12 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
   };
 }
 
-/**
- * Save OpenRouter favorites to config.yaml
- */
-export async function saveOpenRouterFavorites(favorites: string[]): Promise<void> {
+async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void> {
   const current = loadSettingsApi();
-  await saveSettingsApi({
+  await Effect.runPromise(saveSettingsApi({
     ...current,
     openrouter: { ...current.openrouter, favorites },
-  });
+  }));
 }
 
 /**
@@ -1082,11 +1073,11 @@ export class SettingsApiError extends Data.TaggedError('SettingsApiError')<{
 }> {}
 
 /** Effect variant of `saveSettingsApi`. */
-export const saveSettingsApiEffect = (
+export const saveSettingsApi = (
   settings: ApiSettingsConfig,
 ): Effect.Effect<void, SettingsApiError> =>
   Effect.tryPromise({
-    try: () => saveSettingsApi(settings),
+    try: () => saveSettingsApiPromise(settings),
     catch: (cause) =>
       new SettingsApiError({
         operation: 'saveSettingsApi',
@@ -1096,11 +1087,11 @@ export const saveSettingsApiEffect = (
   });
 
 /** Effect variant of `updateSettingsApi`. */
-export const updateSettingsApiEffect = (
+export const updateSettingsApi = (
   updates: Partial<ApiSettingsConfig>,
 ): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
   Effect.tryPromise({
-    try: () => updateSettingsApi(updates),
+    try: () => updateSettingsApiPromise(updates),
     catch: (cause) =>
       new SettingsApiError({
         operation: 'updateSettingsApi',
@@ -1110,12 +1101,12 @@ export const updateSettingsApiEffect = (
   });
 
 /** Effect variant of `setRoleConfig`. */
-export const setRoleConfigEffect = (
+export const setRoleConfig = (
   role: Role,
   roleConfig: RoleConfig,
 ): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
   Effect.tryPromise({
-    try: () => setRoleConfig(role, roleConfig),
+    try: () => setRoleConfigPromise(role, roleConfig),
     catch: (cause) =>
       new SettingsApiError({
         operation: 'setRoleConfig',
@@ -1125,11 +1116,11 @@ export const setRoleConfigEffect = (
   });
 
 /** Effect variant of `updateProviderApiKey`. */
-export const updateProviderApiKeyEffect = (
-  ...args: Parameters<typeof updateProviderApiKey>
-): Effect.Effect<Awaited<ReturnType<typeof updateProviderApiKey>>, SettingsApiError> =>
+export const updateProviderApiKey = (
+  ...args: Parameters<typeof updateProviderApiKeyPromise>
+): Effect.Effect<Awaited<ReturnType<typeof updateProviderApiKeyPromise>>, SettingsApiError> =>
   Effect.tryPromise({
-    try: () => updateProviderApiKey(...args),
+    try: () => updateProviderApiKeyPromise(...args),
     catch: (cause) =>
       new SettingsApiError({
         operation: 'updateProviderApiKey',
@@ -1139,11 +1130,11 @@ export const updateProviderApiKeyEffect = (
   });
 
 /** Effect variant of `saveOpenRouterFavorites`. */
-export const saveOpenRouterFavoritesEffect = (
+export const saveOpenRouterFavorites = (
   favorites: string[],
 ): Effect.Effect<void, SettingsApiError> =>
   Effect.tryPromise({
-    try: () => saveOpenRouterFavorites(favorites),
+    try: () => saveOpenRouterFavoritesPromise(favorites),
     catch: (cause) =>
       new SettingsApiError({
         operation: 'saveOpenRouterFavorites',

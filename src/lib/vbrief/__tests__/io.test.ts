@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlan, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -71,17 +71,17 @@ afterEach(() => {
 
 describe('findPlan', () => {
   it('returns null when workspace has no matching spec in .pan/specs/', () => {
-    expect(findPlan(WORKSPACE_PATH)).toBeNull();
+    expect(findPlanSync(WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns null when .pan/specs exists but has no matching spec', () => {
     mkdirSync(join(PROJECT_ROOT, '.pan', 'specs'), { recursive: true });
-    expect(findPlan(WORKSPACE_PATH)).toBeNull();
+    expect(findPlanSync(WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns the plan path when spec exists in .pan/specs/', () => {
     writePlanDoc(makePlanDoc());
-    const result = findPlan(WORKSPACE_PATH);
+    const result = findPlanSync(WORKSPACE_PATH);
     expect(result).not.toBeNull();
     expect(result).toContain('.pan/specs/');
     expect(result).toContain(SPEC_FILENAME);
@@ -93,8 +93,8 @@ describe('findPlan', () => {
     // Workspace spec is no longer preferred — verify the canonical project spec wins.
     writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlan(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlan(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -102,7 +102,7 @@ describe('findPlan', () => {
     doc.plan.id = ISSUE_ID.toLowerCase();
     const draftPath = writeWorkspaceDraft(doc);
 
-    expect(findPlan(WORKSPACE_PATH)).toBe(draftPath);
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
   });
 
   it('ignores workspace drafts for a different issue', () => {
@@ -110,14 +110,14 @@ describe('findPlan', () => {
     doc.plan.id = 'PAN-999';
     writeWorkspaceDraft(doc);
 
-    expect(findPlan(WORKSPACE_PATH)).toBeNull();
+    expect(findPlanSync(WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns null when workspace path does not match feature-<issue-id> pattern', () => {
     const badPath = join(PROJECT_ROOT, 'workspaces', 'not-a-feature');
     mkdirSync(badPath, { recursive: true });
     writePlanDoc(makePlanDoc());
-    expect(findPlan(badPath)).toBeNull();
+    expect(findPlanSync(badPath)).toBeNull();
   });
 });
 
@@ -125,31 +125,31 @@ describe('readPlan', () => {
   it('parses and returns VBriefDocument', () => {
     const doc = makePlanDoc([{ id: 'item-1' }]);
     const planPath = writePlanDoc(doc);
-    const result = readPlan(planPath);
+    const result = readPlanSync(planPath);
     expect(result.plan.id).toBe('TEST');
     expect(result.plan.items).toHaveLength(1);
     expect(result.plan.items[0].id).toBe('item-1');
   });
 
   it('throws for nonexistent file', () => {
-    expect(() => readPlan(join(PROJECT_ROOT, 'nonexistent.json'))).toThrow();
+    expect(() => readPlanSync(join(PROJECT_ROOT, 'nonexistent.json'))).toThrow();
   });
 
   it('throws for invalid JSON', () => {
     const badPath = join(PROJECT_ROOT, 'bad.json');
     writeFileSync(badPath, 'not valid json!!!');
-    expect(() => readPlan(badPath)).toThrow();
+    expect(() => readPlanSync(badPath)).toThrow();
   });
 });
 
 describe('readWorkspacePlan', () => {
   it('returns null when no plan exists', () => {
-    expect(readWorkspacePlan(WORKSPACE_PATH)).toBeNull();
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns VBriefDocument when plan exists', () => {
     writePlanDoc(makePlanDoc([{ id: 'x' }]));
-    const result = readWorkspacePlan(WORKSPACE_PATH);
+    const result = readWorkspacePlanSync(WORKSPACE_PATH);
     expect(result).not.toBeNull();
     expect(result!.plan.items[0].id).toBe('x');
   });
@@ -159,7 +159,7 @@ describe('readWorkspacePlan', () => {
     doc.plan.id = ISSUE_ID.toLowerCase();
     writeWorkspaceDraft(doc);
 
-    const result = readWorkspacePlan(WORKSPACE_PATH);
+    const result = readWorkspacePlanSync(WORKSPACE_PATH);
     expect(result).not.toBeNull();
     expect(result!.plan.items[0].id).toBe('draft-x');
   });
@@ -175,7 +175,7 @@ describe('updateItemStatus', () => {
 
     updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const item = updated.plan.items.find(i => i.id === 'item-1');
     expect(item?.status).toBe('completed');
   });
@@ -184,7 +184,7 @@ describe('updateItemStatus', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
     expect(() => updateItemStatus(WORKSPACE_PATH, 'nonexistent', 'completed')).not.toThrow();
 
-    const after = readWorkspacePlan(WORKSPACE_PATH)!;
+    const after = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(after.plan.items[0].status).toBe('pending');
   });
 
@@ -197,7 +197,7 @@ describe('updateItemStatus', () => {
 
     updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const item2 = updated.plan.items.find(i => i.id === 'item-2');
     expect(item2?.status).toBe('in_progress');
   });
@@ -245,7 +245,7 @@ describe('updateSubItemStatus', () => {
 
     updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'item-1.ac1', 'completed');
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
     expect(sub?.status).toBe('completed');
   });
@@ -256,7 +256,7 @@ describe('updateSubItemStatus', () => {
 
     updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'item-1.ac1', 'completed');
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const other = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac2');
     expect(other?.status).toBe('pending');
   });
@@ -280,7 +280,7 @@ describe('updateSubItemStatus', () => {
       statusOverrides: { 'item-1.ac1': 'completed' },
     }));
 
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
     expect(sub?.status).toBe('completed');
   });
@@ -290,7 +290,7 @@ describe('updateSubItemStatus', () => {
     writePlanDoc(doc);
 
     expect(() => updateSubItemStatus(WORKSPACE_PATH, 'nonexistent', 'item-1.ac1', 'completed')).not.toThrow();
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(updated.plan.items[0].subItems![0].status).toBe('pending');
   });
 
@@ -299,7 +299,7 @@ describe('updateSubItemStatus', () => {
     writePlanDoc(doc);
 
     expect(() => updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'nonexistent', 'completed')).not.toThrow();
-    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     expect(updated.plan.items[0].subItems![0].status).toBe('pending');
   });
 });
@@ -407,7 +407,7 @@ describe('isPlanningComplete', () => {
     'returns true when plan.status is "%s" (valid PanSpecStatus)',
     (planStatus, specStatus) => {
       writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: planStatus } }, specStatus);
-      expect(isPlanningComplete(WORKSPACE_PATH)).toBe(true);
+      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
     },
   );
 
@@ -419,7 +419,7 @@ describe('isPlanningComplete', () => {
       const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
       mkdirSync(specsDir, { recursive: true });
       writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-      expect(isPlanningComplete(WORKSPACE_PATH)).toBe(true);
+      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
     },
   );
 
@@ -429,12 +429,12 @@ describe('isPlanningComplete', () => {
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningComplete(WORKSPACE_PATH)).toBe(false);
+    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns false when plan.status is "cancelled"', () => {
     writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: 'cancelled' } }, 'cancelled');
-    expect(isPlanningComplete(WORKSPACE_PATH)).toBe(false);
+    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns false when plan has no status field', () => {
@@ -443,11 +443,11 @@ describe('isPlanningComplete', () => {
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningComplete(WORKSPACE_PATH)).toBe(false);
+    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns false when no plan exists', () => {
-    expect(isPlanningComplete(WORKSPACE_PATH)).toBe(false);
+    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 
   it('returns false when plan.status is an explicit non-finished value', () => {
@@ -456,6 +456,6 @@ describe('isPlanningComplete', () => {
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningComplete(WORKSPACE_PATH)).toBe(false);
+    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 });

@@ -18,20 +18,20 @@ import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 
 import { LOGS_DIR, PANOPTICON_HOME } from './paths.js';
-import { readPlatformConfig } from './platform-lifecycle.js';
+import { readPlatformConfigSync } from './platform-lifecycle.js';
 import { ProcessSpawnError } from './errors.js';
 
 const SUPERVISOR_PID_PATH = join(PANOPTICON_HOME, 'supervisor.pid');
 const SUPERVISOR_LOG_PATH = join(LOGS_DIR, 'supervisor.log');
 
 /** Compute the supervisor's port from the configured dashboard API port. */
-export function getSupervisorPort(): number {
-  return readPlatformConfig().dashboardApiPort + 1;
+export function getSupervisorPortSync(): number {
+  return readPlatformConfigSync().dashboardApiPort + 1;
 }
 
 /** Public URL the frontend hits for the Force Restart fallback. */
-export function getSupervisorUrl(): string {
-  return `http://127.0.0.1:${getSupervisorPort()}`;
+export function getSupervisorUrlSync(): string {
+  return `http://127.0.0.1:${getSupervisorPortSync()}`;
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -53,7 +53,7 @@ function readSupervisorPid(): number | null {
   }
 }
 
-export function isSupervisorRunning(): boolean {
+export function isSupervisorRunningSync(): boolean {
   const pid = readSupervisorPid();
   return pid !== null && isProcessAlive(pid);
 }
@@ -76,8 +76,8 @@ function resolveSupervisorBundle(): string {
 }
 
 /** Idempotent start. No-op if the supervisor is already running. */
-export function startSupervisorProcess(): void {
-  if (isSupervisorRunning()) return;
+export function startSupervisorProcessSync(): void {
+  if (isSupervisorRunningSync()) return;
 
   // Stale pidfile from a previous crash — clear it so writeFile below succeeds cleanly.
   try {
@@ -102,7 +102,7 @@ export function startSupervisorProcess(): void {
     logFd = openSync('/dev/null', 'w');
   }
 
-  const port = getSupervisorPort();
+  const port = getSupervisorPortSync();
   const child = spawn(process.execPath, [bundle], {
     detached: true,
     stdio: ['ignore', logFd, logFd],
@@ -131,7 +131,7 @@ export function startSupervisorProcess(): void {
   }
 }
 
-export function stopSupervisorProcess(): void {
+export function stopSupervisorProcessSync(): void {
   const pid = readSupervisorPid();
   if (pid && isProcessAlive(pid)) {
     try {
@@ -150,25 +150,25 @@ export function stopSupervisorProcess(): void {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Read the configured supervisor port. Pure. */
-export const getSupervisorPortEffect = (): Effect.Effect<number> =>
-  Effect.sync(() => getSupervisorPort());
+export const getSupervisorPort = (): Effect.Effect<number> =>
+  Effect.sync(() => getSupervisorPortSync());
 
 /** Public URL the frontend hits for the Force Restart fallback. Pure. */
-export const getSupervisorUrlEffect = (): Effect.Effect<string> =>
-  Effect.sync(() => getSupervisorUrl());
+export const getSupervisorUrl = (): Effect.Effect<string> =>
+  Effect.sync(() => getSupervisorUrlSync());
 
 /** Liveness probe — true if the supervisor pid file maps to a live process. */
-export const isSupervisorRunningEffect = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSupervisorRunning());
+export const isSupervisorRunning = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSupervisorRunningSync());
 
 /**
  * Idempotently start the supervisor sidecar. Fails with ProcessSpawnError
  * if the supervisor bundle could not be resolved or the child failed to
  * detach. Successful no-op when already running.
  */
-export const startSupervisorProcessEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+export const startSupervisorProcess = (): Effect.Effect<void, ProcessSpawnError> =>
   Effect.try({
-    try: () => startSupervisorProcess(),
+    try: () => startSupervisorProcessSync(),
     catch: (cause) =>
       new ProcessSpawnError({
         command: process.execPath,
@@ -179,5 +179,5 @@ export const startSupervisorProcessEffect = (): Effect.Effect<void, ProcessSpawn
   });
 
 /** Stop the supervisor sidecar and remove its pid file. */
-export const stopSupervisorProcessEffect = (): Effect.Effect<void> =>
-  Effect.sync(() => stopSupervisorProcess());
+export const stopSupervisorProcess = (): Effect.Effect<void> =>
+  Effect.sync(() => stopSupervisorProcessSync());

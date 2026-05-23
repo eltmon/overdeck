@@ -38,7 +38,7 @@ export interface ParsedIssueId {
  * @param projectConfig - Optional project config for custom patterns
  * @returns ParsedIssueId or null if no format matches
  */
-export function parseIssueId(issueId: string, projectConfig?: ProjectConfig): ParsedIssueId | null {
+export function parseIssueIdSync(issueId: string, projectConfig?: ProjectConfig): ParsedIssueId | null {
   // Standard format first (most common): PREFIX-NUMBER
   const standardMatch = issueId.match(/^([A-Za-z]+)-(\d+)$/);
   if (standardMatch) {
@@ -86,8 +86,8 @@ export function parseIssueId(issueId: string, projectConfig?: ProjectConfig): Pa
  * Extract just the team/project prefix from an issue ID.
  * Handles standard (MIN-123), Rally (F29698), and custom formats.
  */
-export function extractPrefix(issueId: string): string | null {
-  const parsed = parseIssueId(issueId);
+export function extractPrefixSync(issueId: string): string | null {
+  const parsed = parseIssueIdSync(issueId);
   return parsed?.prefix ?? null;
 }
 
@@ -95,8 +95,8 @@ export function extractPrefix(issueId: string): string | null {
  * Extract the numeric portion of an issue ID.
  * Handles standard (MIN-123), Rally (F29698), and custom formats.
  */
-export function extractNumber(issueId: string): number | null {
-  const parsed = parseIssueId(issueId);
+export function extractNumberSync(issueId: string): number | null {
+  const parsed = parseIssueIdSync(issueId);
   return parsed?.number ?? null;
 }
 
@@ -104,8 +104,8 @@ export function extractNumber(issueId: string): number | null {
  * Get the normalized (lowercase, filesystem-safe) form of an issue ID.
  * Standard IDs keep the dash: "min-123". Rally IDs stay concatenated: "f29698".
  */
-export function normalizeIssueId(issueId: string): string {
-  const parsed = parseIssueId(issueId);
+export function normalizeIssueIdSync(issueId: string): string {
+  const parsed = parseIssueIdSync(issueId);
   return parsed?.normalized ?? issueId.toLowerCase();
 }
 
@@ -121,7 +121,7 @@ export function normalizeIssueId(issueId: string): string {
  *   resolveIssueId("pan-123")       → "PAN-123"
  *   resolveIssueId("agent-pan-123") → "PAN-123"
  */
-export function resolveIssueId(input: string): string {
+export function resolveIssueIdSync(input: string): string {
   const stripped = input.replace(/^agent-/i, '');
   return stripped.toUpperCase();
 }
@@ -141,7 +141,7 @@ export function resolveIssueId(input: string): string {
  *
  * Pure-sync, safe to call from CLI entry points. Reads filesystem only.
  */
-export function resolveBareNumericId(input: string, panopticonHome?: string): string | null {
+export function resolveBareNumericIdSync(input: string, panopticonHome?: string): string | null {
   if (/^\d+$/.test(input)) {
     const home = panopticonHome ?? `${process.env.HOME}/.panopticon`;
     const agentsDir = `${home}/agents`;
@@ -176,7 +176,7 @@ export function resolveBareNumericId(input: string, panopticonHome?: string): st
       return null;
     }
   }
-  return resolveIssueId(input);
+  return resolveIssueIdSync(input);
 }
 
 /**
@@ -184,7 +184,7 @@ export function resolveBareNumericId(input: string, panopticonHome?: string): st
  * Returns null for non-standard formats like Rally IDs.
  * Use extractPrefix() for unified handling of all formats.
  */
-export function extractStandardPrefix(issueId: string): string | null {
+export function extractStandardPrefixSync(issueId: string): string | null {
   const match = issueId.match(/^([A-Za-z]+)-\d+$/i);
   return match ? match[1].toUpperCase() : null;
 }
@@ -194,7 +194,7 @@ export function extractStandardPrefix(issueId: string): string | null {
  * Returns null for non-standard formats like Rally IDs.
  * Use extractNumber() for unified handling of all formats.
  */
-export function extractStandardNumber(issueId: string): number | null {
+export function extractStandardNumberSync(issueId: string): number | null {
   const match = issueId.match(/^([A-Za-z]+)-(\d+)$/i);
   return match ? parseInt(match[2], 10) : null;
 }
@@ -205,41 +205,41 @@ export function extractStandardNumber(issueId: string): number | null {
 // (it's used from CLI entry points where sync FS is acceptable).
 
 /** Parse an issue id into prefix/number/format. Pure. */
-export const parseIssueIdEffect = (
+export const parseIssueId = (
   issueId: string,
   projectConfig?: ProjectConfig,
 ): Effect.Effect<ParsedIssueId | null> =>
-  Effect.sync(() => parseIssueId(issueId, projectConfig));
+  Effect.sync(() => parseIssueIdSync(issueId, projectConfig));
 
 /** Extract the team/project prefix. Pure. */
-export const extractPrefixEffect = (issueId: string): Effect.Effect<string | null> =>
-  Effect.sync(() => extractPrefix(issueId));
+export const extractPrefix = (issueId: string): Effect.Effect<string | null> =>
+  Effect.sync(() => extractPrefixSync(issueId));
 
 /** Extract the numeric portion. Pure. */
-export const extractNumberEffect = (issueId: string): Effect.Effect<number | null> =>
-  Effect.sync(() => extractNumber(issueId));
+export const extractNumber = (issueId: string): Effect.Effect<number | null> =>
+  Effect.sync(() => extractNumberSync(issueId));
 
 /** Lowercase filesystem-safe form. Pure. */
-export const normalizeIssueIdEffect = (issueId: string): Effect.Effect<string> =>
-  Effect.sync(() => normalizeIssueId(issueId));
+export const normalizeIssueId = (issueId: string): Effect.Effect<string> =>
+  Effect.sync(() => normalizeIssueIdSync(issueId));
 
 /** Resolve either a raw issue id or an agent session name to canonical id. Pure. */
-export const resolveIssueIdEffect = (input: string): Effect.Effect<string> =>
-  Effect.sync(() => resolveIssueId(input));
+export const resolveIssueId = (input: string): Effect.Effect<string> =>
+  Effect.sync(() => resolveIssueIdSync(input));
 
 /** Resolve a bare numeric id by probing local agent state (sync FS). */
-export const resolveBareNumericIdEffect = (
+export const resolveBareNumericId = (
   input: string,
   panopticonHome?: string,
 ): Effect.Effect<string | null> =>
-  Effect.sync(() => resolveBareNumericId(input, panopticonHome));
+  Effect.sync(() => resolveBareNumericIdSync(input, panopticonHome));
 
 /** Extract prefix from a standard `PREFIX-NUMBER` id only. Pure. */
-export const extractStandardPrefixEffect = (
+export const extractStandardPrefix = (
   issueId: string,
-): Effect.Effect<string | null> => Effect.sync(() => extractStandardPrefix(issueId));
+): Effect.Effect<string | null> => Effect.sync(() => extractStandardPrefixSync(issueId));
 
 /** Extract number from a standard `PREFIX-NUMBER` id only. Pure. */
-export const extractStandardNumberEffect = (
+export const extractStandardNumber = (
   issueId: string,
-): Effect.Effect<number | null> => Effect.sync(() => extractStandardNumber(issueId));
+): Effect.Effect<number | null> => Effect.sync(() => extractStandardNumberSync(issueId));

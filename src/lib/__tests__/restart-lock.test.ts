@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,62 +33,62 @@ describe('restart lock', () => {
   });
 
   it('acquires a fresh lock and auto-creates the parent directory', async () => {
-    const handle = await acquireRestartLock('test caller');
+    const handle = await Effect.runPromise(acquireRestartLock('test caller'));
 
     expect(handle).not.toBeNull();
     expect(existsSync(lockPath())).toBe(true);
-    expect(await readRestartLockHolder()).toMatchObject({ pid: process.pid, caller: 'test caller' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toMatchObject({ pid: process.pid, caller: 'test caller' });
   });
 
   it('returns null when a fresh live lock is already held by a different PID', async () => {
     writeLock({ pid: 1, ts: Date.now(), caller: 'first caller' });
 
-    expect(await acquireRestartLock('second caller')).toBeNull();
+    expect(await Effect.runPromise(acquireRestartLock('second caller'))).toBeNull();
   });
 
   it('overwrites a lock that is stale by time', async () => {
     writeLock({ pid: process.pid, ts: Date.now() - 5 * 60 * 1000 - 1, caller: 'old caller' });
 
-    const handle = await acquireRestartLock('new caller');
+    const handle = await Effect.runPromise(acquireRestartLock('new caller'));
 
     expect(handle).not.toBeNull();
-    expect(await readRestartLockHolder()).toMatchObject({ pid: process.pid, caller: 'new caller' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toMatchObject({ pid: process.pid, caller: 'new caller' });
   });
 
   it('overwrites a lock whose PID is dead', async () => {
     writeLock({ pid: 999_999_999, ts: Date.now(), caller: 'dead caller' });
 
-    const handle = await acquireRestartLock('new caller');
+    const handle = await Effect.runPromise(acquireRestartLock('new caller'));
 
     expect(handle).not.toBeNull();
-    expect(await readRestartLockHolder()).toMatchObject({ pid: process.pid, caller: 'new caller' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toMatchObject({ pid: process.pid, caller: 'new caller' });
   });
 
   it('overwrites a malformed lock instead of treating it as held forever', async () => {
     mkdirSync(testHome, { recursive: true });
     writeFileSync(lockPath(), '', 'utf8');
 
-    const handle = await acquireRestartLock('new caller');
+    const handle = await Effect.runPromise(acquireRestartLock('new caller'));
 
     expect(handle).not.toBeNull();
-    expect(await readRestartLockHolder()).toMatchObject({ pid: process.pid, caller: 'new caller' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toMatchObject({ pid: process.pid, caller: 'new caller' });
   });
 
   it('release deletes the lockfile and is idempotent', async () => {
-    const handle = await acquireRestartLock('test caller');
+    const handle = await Effect.runPromise(acquireRestartLock('test caller'));
     expect(handle).not.toBeNull();
 
     await handle?.release();
     await handle?.release();
 
     expect(existsSync(lockPath())).toBe(false);
-    expect(await readRestartLockHolder()).toBeNull();
+    expect(await Effect.runPromise(readRestartLockHolder())).toBeNull();
   });
 
   it('reads the lock holder from disk', async () => {
     writeLock({ pid: process.pid, ts: 123, caller: 'reader' });
 
-    expect(await readRestartLockHolder()).toEqual({ pid: process.pid, ts: 123, caller: 'reader' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toEqual({ pid: process.pid, ts: 123, caller: 'reader' });
     expect(readFileSync(lockPath(), 'utf8')).toContain('reader');
   });
 });

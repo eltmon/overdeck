@@ -35,9 +35,11 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
     sessionExistsAsync: vi.fn().mockResolvedValue(false),
     killSessionAsync: vi.fn().mockResolvedValue(undefined),
     listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
-    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    sessionExists: vi.fn(() => Effect.succeed(false)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(false)),
+    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSessionSync: vi.fn(() => Effect.succeed(undefined)),
+    listSessionNames: vi.fn(() => Effect.succeed([])),
   };
 });
 
@@ -72,28 +74,28 @@ vi.mock('@linear/sdk', () => ({
 
 import { Effect } from 'effect';
 import {
-  approve as approveEffect,
-  closeOut as closeOutEffect,
-  deepWipe as deepWipeEffect,
-  close as closeEffect,
-  resetToTodo as resetToTodoEffect,
+  approve as approveProgram,
+  closeOut as closeOutProgram,
+  deepWipe as deepWipeProgram,
+  close as closeProgram,
+  resetToTodo as resetToTodoProgram,
   __testInternals,
 } from '../../../../src/lib/lifecycle/workflows.js';
 
 // Workflows now return Effects; wrap to keep legacy await-style tests working.
-const approve = (...args: Parameters<typeof approveEffect>) => Effect.runPromise(approveEffect(...args));
-const closeOut = (...args: Parameters<typeof closeOutEffect>) => Effect.runPromise(closeOutEffect(...args));
-const deepWipe = (...args: Parameters<typeof deepWipeEffect>) => Effect.runPromise(deepWipeEffect(...args));
-const close = (...args: Parameters<typeof closeEffect>) => Effect.runPromise(closeEffect(...args));
-const resetToTodo = (...args: Parameters<typeof resetToTodoEffect>) => Effect.runPromise(resetToTodoEffect(...args));
+const approve = (...args: Parameters<typeof approveProgram>) => Effect.runPromise(approveProgram(...args));
+const closeOut = (...args: Parameters<typeof closeOutProgram>) => Effect.runPromise(closeOutProgram(...args));
+const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runPromise(deepWipeProgram(...args));
+const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
+const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
-import { findSpecByIssue as findSpecByIssueEffect, writeSpecForIssue as writeSpecForIssueEffect } from '../../../../src/lib/pan-dir/specs.js';
+import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
 const findSpecByIssue = (projectRoot: string, issueId: string) =>
-  Effect.runPromise(findSpecByIssueEffect(projectRoot, issueId) as Effect.Effect<any, any, never>);
+  Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
-  Effect.runPromise(writeSpecForIssueEffect(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
+  Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 
 function makeVBrief(issueId: string, status = 'running'): VBriefDocument {

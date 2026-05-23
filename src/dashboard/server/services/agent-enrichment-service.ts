@@ -13,9 +13,9 @@
  */
 
 import { Effect } from 'effect'
-import { listRunningAgentsEffect, type AgentState } from '../../../lib/agents.js'
+import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
-import { getReviewStatus } from '../../../lib/review-status.js'
+import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
@@ -56,7 +56,7 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
 async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   let runningAgents: RunningAgent[]
   try {
-    runningAgents = await Effect.runPromise(listRunningAgentsEffect())
+    runningAgents = await Effect.runPromise(listRunningAgents())
   } catch {
     return
   }
@@ -67,8 +67,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // Stopped agents have no changing state — their enrichment is static.
   const activeAgents = runningAgents.filter(a => a.tmuxActive)
 
-  await withConcurrencyLimit(
-    activeAgents.map((agent) => async () => {
+  await Effect.runPromise(withConcurrencyLimit(
+    activeAgents.map((agent) => Effect.promise(async () => {
       const { id: agentId, issueId, startedAt } = agent
 
       // If this agent hasn't been seen since server start, emit agent.created so the
@@ -133,7 +133,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       // Determine if the agent's issue has an active specialist
       let hasActiveSpecialist = false
       if (issueId) {
-        const reviewStatus = getReviewStatus(issueId)
+        const reviewStatus = getReviewStatusSync(issueId)
         hasActiveSpecialist =
           reviewStatus?.reviewStatus === 'reviewing' ||
           reviewStatus?.testStatus === 'testing' ||
@@ -183,9 +183,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       } catch {
         // Non-fatal — event store may not be initialized yet at startup
       }
-    }),
+    })),
     4,
-  )
+  ))
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map(a => a.id))

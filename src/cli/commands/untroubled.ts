@@ -1,11 +1,11 @@
 import chalk from 'chalk';
-import { clearAgentTroubled, getAgentState } from '../../lib/agents.js';
-import { resolveIssueId } from '../../lib/issue-id.js';
+import { clearAgentTroubledSync, getAgentStateSync } from '../../lib/agents.js';
+import { resolveIssueIdSync } from '../../lib/issue-id.js';
 
 export async function untroubledCommand(id: string): Promise<void> {
-  const issueId = resolveIssueId(id);
+  const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const state = getAgentState(agentId);
+  const state = getAgentStateSync(agentId);
 
   if (!state) {
     console.error(chalk.red(`Agent ${agentId} not found.`));
@@ -14,7 +14,7 @@ export async function untroubledCommand(id: string): Promise<void> {
 
   try {
     const wasTroubled = state.troubled === true || (state.consecutiveFailures ?? 0) > 0;
-    clearAgentTroubled(agentId);
+    clearAgentTroubledSync(agentId);
 
     if (wasTroubled) {
       console.log(chalk.green(`Cleared troubled state for agent: ${agentId}`));

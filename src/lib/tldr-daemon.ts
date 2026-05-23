@@ -68,7 +68,7 @@ function readLogLines(logFile: string, startByte?: number, startLine = 0): { lin
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
  */
-export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
+export function getTldrMetricsSync(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
   const tldrDir = join(workspacePath, '.tldr');
   const interceptionsLog = join(tldrDir, 'interceptions.log');
   const bypassesLog = join(tldrDir, 'bypasses.log');
@@ -138,13 +138,13 @@ export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): 
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
  */
-export function captureTldrMetrics(workspacePath: string): TldrSessionMetrics | null {
+export function captureTldrMetricsSync(workspacePath: string): TldrSessionMetrics | null {
   const tldrDir = join(workspacePath, '.tldr');
   if (!existsSync(tldrDir)) {
     return null;
   }
 
-  const metrics = getTldrMetrics(workspacePath, true);
+  const metrics = getTldrMetricsSync(workspacePath, true);
 
   // Advance checkpoint to current byte offsets without rescanning historical logs.
   const interceptionsLog = join(tldrDir, 'interceptions.log');
@@ -461,7 +461,7 @@ const daemonRegistry = new Map<string, TldrDaemonService>();
  * @param workspacePath - Path to the workspace
  * @param venvPath - Path to the Python venv
  */
-export function getTldrDaemonService(workspacePath: string, venvPath: string): TldrDaemonService {
+export function getTldrDaemonServiceSync(workspacePath: string, venvPath: string): TldrDaemonService {
   const existing = daemonRegistry.get(workspacePath);
   if (existing) {
     return existing;
@@ -477,52 +477,52 @@ export function getTldrDaemonService(workspacePath: string, venvPath: string): T
  *
  * @param workspacePath - Path to the workspace
  */
-export function removeTldrDaemonService(workspacePath: string): void {
+export function removeTldrDaemonServiceSync(workspacePath: string): void {
   daemonRegistry.delete(workspacePath);
 }
 
 /**
  * List all registered daemon services
  */
-export function listTldrDaemonServices(): TldrDaemonService[] {
+export function listTldrDaemonServicesSync(): TldrDaemonService[] {
   return Array.from(daemonRegistry.values());
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Read per-session TLDR metrics from log files in a workspace. */
-export const getTldrMetricsEffect = (
+export const getTldrMetrics = (
   workspacePath: string,
   sinceCheckpoint = false,
 ): Effect.Effect<TldrSessionMetrics, FsError> =>
   Effect.try({
-    try: () => getTldrMetrics(workspacePath, sinceCheckpoint),
+    try: () => getTldrMetricsSync(workspacePath, sinceCheckpoint),
     catch: (cause) =>
       new FsError({ path: workspacePath, operation: 'getTldrMetrics', cause }),
   });
 
 /** Capture-and-checkpoint TLDR metrics; null when nothing new is logged. */
-export const captureTldrMetricsEffect = (
+export const captureTldrMetrics = (
   workspacePath: string,
 ): Effect.Effect<TldrSessionMetrics | null, FsError> =>
   Effect.try({
-    try: () => captureTldrMetrics(workspacePath),
+    try: () => captureTldrMetricsSync(workspacePath),
     catch: (cause) =>
       new FsError({ path: workspacePath, operation: 'captureTldrMetrics', cause }),
   });
 
 /** Get-or-create the registry entry for a workspace's TLDR daemon. */
-export const getTldrDaemonServiceEffect = (
+export const getTldrDaemonService = (
   workspacePath: string,
   venvPath: string,
 ): Effect.Effect<TldrDaemonService> =>
-  Effect.sync(() => getTldrDaemonService(workspacePath, venvPath));
+  Effect.sync(() => getTldrDaemonServiceSync(workspacePath, venvPath));
 
 /** Remove a daemon service from the registry. */
-export const removeTldrDaemonServiceEffect = (
+export const removeTldrDaemonService = (
   workspacePath: string,
-): Effect.Effect<void> => Effect.sync(() => removeTldrDaemonService(workspacePath));
+): Effect.Effect<void> => Effect.sync(() => removeTldrDaemonServiceSync(workspacePath));
 
 /** Snapshot every registered daemon service. */
-export const listTldrDaemonServicesEffect = (): Effect.Effect<readonly TldrDaemonService[]> =>
-  Effect.sync(() => listTldrDaemonServices());
+export const listTldrDaemonServices = (): Effect.Effect<readonly TldrDaemonService[]> =>
+  Effect.sync(() => listTldrDaemonServicesSync());

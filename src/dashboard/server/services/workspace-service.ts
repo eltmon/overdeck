@@ -12,7 +12,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Context } from 'effect';
 
 const execAsync = promisify(exec);
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { WorkspaceNotFound, WorkspaceCreateError } from './typed-errors.js';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export const WorkspaceServiceLive = Layer.effect(
   Effect.sync(() => {
     function getWorkspacePath(issueId: string): { projectPath: string; workspacePath: string; branch: string } {
       const issueLower = issueId.toLowerCase();
-      const project = resolveProjectFromIssue(issueId);
+      const project = resolveProjectFromIssueSync(issueId);
       const projectPath = project?.projectPath ?? process.cwd();
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
       const branch = `feature/${issueLower}`;
@@ -120,10 +120,10 @@ export const WorkspaceServiceLive = Layer.effect(
             }
 
             const { createWorkspace } = await import('../../../lib/workspace-manager.js');
-            const { loadProjectsConfig } = await import('../../../lib/projects.js');
+            const { loadProjectsConfigSync } = await import('../../../lib/projects.js');
 
-            const { projects } = loadProjectsConfig();
-            const project = resolveProjectFromIssue(issueId);
+            const { projects } = loadProjectsConfigSync();
+            const project = resolveProjectFromIssueSync(issueId);
             if (!project) {
               throw new WorkspaceCreateError({
                 id: issueId,
@@ -135,10 +135,10 @@ export const WorkspaceServiceLive = Layer.effect(
               ([, p]) => p.path === project.projectPath,
             )?.[0] ?? project.projectName;
 
-            const result = await createWorkspace({
+            const result = await Effect.runPromise(createWorkspace({
               projectConfig: { name: projectName, path: project.projectPath },
               featureName: issueLower,
-            });
+            }));
 
             if (!result.success) {
               throw new WorkspaceCreateError({
@@ -170,15 +170,15 @@ export const WorkspaceServiceLive = Layer.effect(
             }
 
             const { removeWorkspace } = await import('../../../lib/workspace-manager.js');
-            const project = resolveProjectFromIssue(issueId);
+            const project = resolveProjectFromIssueSync(issueId);
             if (!project) {
               throw new WorkspaceCreateError({ id: issueId, message: 'No project found' });
             }
 
-            const result = await removeWorkspace({
+            const result = await Effect.runPromise(removeWorkspace({
               projectConfig: { name: project.projectName, path: project.projectPath },
               featureName: issueLower,
-            });
+            }));
 
             if (!result.success) {
               throw new WorkspaceCreateError({
@@ -203,7 +203,7 @@ export const WorkspaceServiceLive = Layer.effect(
             const { workspacePath } = getWorkspacePath(issueId);
             const issueLower = issueId.toLowerCase();
             const { stopWorkspaceDocker } = await import('../../../lib/workspace-manager.js');
-            await stopWorkspaceDocker(workspacePath, issueLower);
+            await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
           },
           catch: () => undefined, // non-fatal
         }).pipe(Effect.ignore),
@@ -306,10 +306,10 @@ export const WorkspaceServiceLive = Layer.effect(
               // implementation re-ran the full workspace-create flow (worktrees,
               // bun install, etc.), which is the wrong granularity for
               // "compose file is missing".
-              const { ensureDevcontainer } = await import(
+              const { ensureDevcontainerSync } = await import(
                 '../../../lib/workspace/ensure-devcontainer.js'
               );
-              const ensure = ensureDevcontainer({ workspacePath, issueId });
+              const ensure = ensureDevcontainerSync({ workspacePath, issueId });
               if (!ensure.step.success) {
                 throw new WorkspaceCreateError({
                   id: issueId,

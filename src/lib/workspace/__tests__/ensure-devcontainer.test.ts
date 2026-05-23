@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
-  renderDevcontainer,
-  createWorkspacePlaceholders,
+  renderDevcontainerSync,
+  createWorkspacePlaceholdersSync,
 } from '../devcontainer-renderer.js';
 import type { ProjectConfig } from '../../workspace-config.js';
 
@@ -45,7 +45,7 @@ function buildProjectConfig(projectPath: string): ProjectConfig {
 describe('createWorkspacePlaceholders', () => {
   it('produces the canonical placeholder set with HOME populated', () => {
     const cfg = buildProjectConfig('/tmp/x');
-    const ph = createWorkspacePlaceholders(cfg, 'min-846', '/tmp/x/workspaces/feature-min-846');
+    const ph = createWorkspacePlaceholdersSync(cfg, 'min-846', '/tmp/x/workspaces/feature-min-846');
     expect(ph.FEATURE_NAME).toBe('min-846');
     expect(ph.FEATURE_FOLDER).toBe('feature-min-846');
     expect(ph.BRANCH_NAME).toBe('feature/min-846');
@@ -56,7 +56,7 @@ describe('createWorkspacePlaceholders', () => {
 
   it('lets callers override individual placeholder fields', () => {
     const cfg = buildProjectConfig('/tmp/x');
-    const ph = createWorkspacePlaceholders(cfg, 'min-1', '/tmp/x/ws', { DOMAIN: 'override.test' });
+    const ph = createWorkspacePlaceholdersSync(cfg, 'min-1', '/tmp/x/ws', { DOMAIN: 'override.test' });
     expect(ph.DOMAIN).toBe('override.test');
   });
 });
@@ -73,7 +73,7 @@ describe('renderDevcontainer', () => {
   afterEach(() => cleanup());
 
   it('creates .devcontainer/, processes templates, and copies non-template files', () => {
-    const result = renderDevcontainer({
+    const result = renderDevcontainerSync({
       workspacePath,
       projectConfig: buildProjectConfig(projectPath),
       featureName: 'min-1',
@@ -85,7 +85,7 @@ describe('renderDevcontainer', () => {
   });
 
   it('substitutes placeholders into rendered files', () => {
-    renderDevcontainer({
+    renderDevcontainerSync({
       workspacePath,
       projectConfig: buildProjectConfig(projectPath),
       featureName: 'min-1',
@@ -99,7 +99,7 @@ describe('renderDevcontainer', () => {
   });
 
   it('is idempotent — second render produces identical files', () => {
-    renderDevcontainer({
+    renderDevcontainerSync({
       workspacePath,
       projectConfig: buildProjectConfig(projectPath),
       featureName: 'min-1',
@@ -108,7 +108,7 @@ describe('renderDevcontainer', () => {
       join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
       'utf-8',
     );
-    renderDevcontainer({
+    renderDevcontainerSync({
       workspacePath,
       projectConfig: buildProjectConfig(projectPath),
       featureName: 'min-1',
@@ -123,7 +123,7 @@ describe('renderDevcontainer', () => {
   it('throws when the project has no compose_template configured', () => {
     const cfg: ProjectConfig = { name: 'project', path: projectPath, workspace: {} };
     expect(() =>
-      renderDevcontainer({ workspacePath, projectConfig: cfg, featureName: 'min-1' }),
+      renderDevcontainerSync({ workspacePath, projectConfig: cfg, featureName: 'min-1' }),
     ).toThrow(/compose_template/);
   });
 });

@@ -18,12 +18,12 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
 import {
-  renderDevcontainer,
+  renderDevcontainerSync,
 } from '../../lib/workspace/devcontainer-renderer.js';
 import {
   extractTeamPrefix,
-  findProjectByTeam,
-  loadProjectsConfig,
+  findProjectByTeamSync,
+  loadProjectsConfigSync,
 } from '../../lib/projects.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 
@@ -78,7 +78,7 @@ export async function workspaceRenderDevcontainerCommand(
   }
 
   try {
-    const result = renderDevcontainer({
+    const result = renderDevcontainerSync({
       workspacePath,
       projectConfig: project,
       featureName: bareName,
@@ -119,7 +119,7 @@ function resolveProjectConfig(
 ): ProjectConfig | null {
   // 1. Explicit --project flag wins.
   if (options.project) {
-    const { projects } = loadProjectsConfig();
+    const { projects } = loadProjectsConfigSync();
     const named = projects[options.project];
     if (named) return { ...named, name: options.project };
     console.error(chalk.yellow(`! No project named "${options.project}" in projects.yaml`));
@@ -129,13 +129,13 @@ function resolveProjectConfig(
   // 2. Issue-id-style prefix (e.g. "min-846" → MIN → mind-your-now).
   const prefix = extractTeamPrefix(featureName);
   if (prefix) {
-    const project = findProjectByTeam(prefix);
+    const project = findProjectByTeamSync(prefix);
     if (project) return project;
   }
 
   // 3. cwd inside a configured project tree.
   const cwd = process.cwd();
-  const { projects } = loadProjectsConfig();
+  const { projects } = loadProjectsConfigSync();
   for (const [key, p] of Object.entries(projects)) {
     if (cwd === p.path || cwd.startsWith(p.path + '/')) {
       return { ...p, name: key };

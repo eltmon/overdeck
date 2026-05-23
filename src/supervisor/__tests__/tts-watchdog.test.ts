@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTtsWatchdogConfig, TtsWatchdog } from '../tts-watchdog.js';
 import type { NormalizedTtsDaemonConfig } from '../../lib/config-yaml.js';
@@ -24,9 +25,12 @@ const mocks = vi.hoisted(() => ({
   startDaemon: vi.fn(),
 }));
 
-vi.mock('../../lib/config-yaml.js', () => ({
-  loadConfigAsyncNoMigration: async () => ({ config: { tts: mocks.ttsConfig } }),
-}));
+vi.mock('../../lib/config-yaml.js', async () => {
+  const { Effect: EffectHoisted } = await import('effect');
+  return {
+    loadConfigNoMigration: () => EffectHoisted.succeed({ config: { tts: mocks.ttsConfig } }),
+  };
+});
 
 vi.mock('../../lib/tts-daemon.js', () => ({
   getTtsDaemonStatus: mocks.getStatus,
@@ -63,13 +67,13 @@ describe('TtsWatchdog', () => {
     mocks.ttsConfig.enabled = true;
     mocks.ttsConfig.daemonAutoStart = false;
     mocks.getStatus.mockReset();
-    mocks.hasState.mockReset().mockResolvedValue(false);
-    mocks.isManuallyStopped.mockReset().mockResolvedValue(false);
-    mocks.startDaemon.mockReset().mockResolvedValue({ ok: true, pid: 1234, alreadyRunning: false });
+    mocks.hasState.mockReset().mockReturnValue(Effect.succeed(false));
+    mocks.isManuallyStopped.mockReset().mockReturnValue(Effect.succeed(false));
+    mocks.startDaemon.mockReset().mockReturnValue(Effect.succeed({ ok: true, pid: 1234, alreadyRunning: false }));
   });
 
   it('does not restart after an intentional stop while activity TTS remains enabled', async () => {
-    mocks.isManuallyStopped.mockResolvedValue(true);
+    mocks.isManuallyStopped.mockReturnValue(Effect.succeed(true));
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
       log: vi.fn(),
@@ -83,8 +87,8 @@ describe('TtsWatchdog', () => {
   });
 
   it('does not restart a live daemon that is still initializing', async () => {
-    mocks.hasState.mockResolvedValue(true);
-    mocks.getStatus.mockResolvedValue({
+    mocks.hasState.mockReturnValue(Effect.succeed(true));
+    mocks.getStatus.mockReturnValue(Effect.succeed({
       ok: false,
       running: true,
       managed: true,
@@ -94,7 +98,7 @@ describe('TtsWatchdog', () => {
       daemonHost: '127.0.0.1',
       daemonPort: 8787,
       error: 'daemon starting',
-    });
+    }));
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
       log: vi.fn(),
@@ -108,8 +112,8 @@ describe('TtsWatchdog', () => {
 
   it('restarts an unexpectedly stopped daemon when state still exists', async () => {
     mocks.ttsConfig.enabled = false;
-    mocks.hasState.mockResolvedValue(true);
-    mocks.getStatus.mockResolvedValue({ ok: false, running: false, pid: null, phase: 'stopped', daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
+    mocks.hasState.mockReturnValue(Effect.succeed(true));
+    mocks.getStatus.mockReturnValue(Effect.succeed({ ok: false, running: false, pid: null, phase: 'stopped', daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' }));
     const log = vi.fn();
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
@@ -125,7 +129,7 @@ describe('TtsWatchdog', () => {
 
   it('respects a manual stop even when daemon auto-start is enabled', async () => {
     mocks.ttsConfig.daemonAutoStart = true;
-    mocks.isManuallyStopped.mockResolvedValue(true);
+    mocks.isManuallyStopped.mockReturnValue(Effect.succeed(true));
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
       log: vi.fn(),
@@ -140,9 +144,9 @@ describe('TtsWatchdog', () => {
   it('does not schedule another poll when stopped during an in-flight tick', async () => {
     vi.useFakeTimers();
     let resolveManualStop!: (value: boolean) => void;
-    mocks.isManuallyStopped.mockReturnValue(new Promise<boolean>((resolve) => {
+    mocks.isManuallyStopped.mockReturnValue(Effect.promise(() => new Promise<boolean>((resolve) => {
       resolveManualStop = resolve;
-    }));
+    })));
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 100, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
       log: vi.fn(),

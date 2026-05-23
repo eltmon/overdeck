@@ -80,7 +80,7 @@ function ensureLogDir(): void {
  *
  * @param event - Handoff event to log
  */
-export function logHandoffEvent(event: HandoffEvent): void {
+export function logHandoffEventSync(event: HandoffEvent): void {
   ensureLogDir();
 
   const line = JSON.stringify(event) + '\n';
@@ -145,7 +145,7 @@ export function createHandoffEvent(
  * @param limit - Maximum number of events to return (most recent first)
  * @returns Array of handoff events
  */
-export function readHandoffEvents(limit?: number): HandoffEvent[] {
+export function readHandoffEventsSync(limit?: number): HandoffEvent[] {
   ensureLogDir();
 
   if (!existsSync(HANDOFF_LOG_FILE)) {
@@ -173,8 +173,8 @@ export function readHandoffEvents(limit?: number): HandoffEvent[] {
  * @param issueId - Issue ID
  * @returns Array of handoff events for the issue
  */
-export function readIssueHandoffEvents(issueId: string): HandoffEvent[] {
-  const allEvents = readHandoffEvents();
+export function readIssueHandoffEventsSync(issueId: string): HandoffEvent[] {
+  const allEvents = readHandoffEventsSync();
   return allEvents.filter(e => e.issueId === issueId);
 }
 
@@ -184,8 +184,8 @@ export function readIssueHandoffEvents(issueId: string): HandoffEvent[] {
  * @param agentId - Agent ID
  * @returns Array of handoff events for the agent
  */
-export function readAgentHandoffEvents(agentId: string): HandoffEvent[] {
-  const allEvents = readHandoffEvents();
+export function readAgentHandoffEventsSync(agentId: string): HandoffEvent[] {
+  const allEvents = readHandoffEventsSync();
   return allEvents.filter(e => e.agentId === agentId);
 }
 
@@ -216,7 +216,7 @@ export function getHandoffStats(): {
   pendingVerification: number;   // Handoffs that haven't been verified yet
   verifiedCount: number;         // Total handoffs that have been verified
 } {
-  const events = readHandoffEvents();
+  const events = readHandoffEventsSync();
   const today = new Date().toISOString().split('T')[0];
 
   const stats = {
@@ -284,7 +284,7 @@ export function getHandoffStats(): {
  * @param timestamp - Original handoff timestamp
  * @param outcome - Recovery outcome
  */
-export function updateHandoffOutcome(
+export function updateHandoffOutcomeSync(
   agentId: string,
   timestamp: string,
   outcome: {
@@ -327,8 +327,8 @@ export function updateHandoffOutcome(
  *
  * @returns Array of handoff events that need outcome verification
  */
-export function getPendingVerificationHandoffs(): HandoffEvent[] {
-  const events = readHandoffEvents();
+export function getPendingVerificationHandoffsSync(): HandoffEvent[] {
+  const events = readHandoffEventsSync();
   return events.filter(e => e.success && !e.outcome?.verified);
 }
 
@@ -348,7 +348,7 @@ const ensureLogDirAsync = (): Effect.Effect<void, FsError> => {
 };
 
 /** Effect variant of `logHandoffEvent`. */
-export const logHandoffEventEffect = (event: HandoffEvent): Effect.Effect<void, FsError> =>
+export const logHandoffEvent = (event: HandoffEvent): Effect.Effect<void, FsError> =>
   Effect.gen(function* () {
     yield* ensureLogDirAsync();
     const line = JSON.stringify(event) + '\n';
@@ -359,7 +359,7 @@ export const logHandoffEventEffect = (event: HandoffEvent): Effect.Effect<void, 
   });
 
 /** Effect variant of `readHandoffEvents`. */
-export const readHandoffEventsEffect = (limit?: number): Effect.Effect<HandoffEvent[], FsError> =>
+export const readHandoffEvents = (limit?: number): Effect.Effect<HandoffEvent[], FsError> =>
   Effect.gen(function* () {
     yield* ensureLogDirAsync();
     if (!existsSync(HANDOFF_LOG_FILE)) return [];
@@ -376,19 +376,19 @@ export const readHandoffEventsEffect = (limit?: number): Effect.Effect<HandoffEv
   });
 
 /** Effect variant of `readIssueHandoffEvents`. */
-export const readIssueHandoffEventsEffect = (
+export const readIssueHandoffEvents = (
   issueId: string,
 ): Effect.Effect<HandoffEvent[], FsError> =>
-  readHandoffEventsEffect().pipe(Effect.map((events) => events.filter((e) => e.issueId === issueId)));
+  readHandoffEvents().pipe(Effect.map((events) => events.filter((e) => e.issueId === issueId)));
 
 /** Effect variant of `readAgentHandoffEvents`. */
-export const readAgentHandoffEventsEffect = (
+export const readAgentHandoffEvents = (
   agentId: string,
 ): Effect.Effect<HandoffEvent[], FsError> =>
-  readHandoffEventsEffect().pipe(Effect.map((events) => events.filter((e) => e.agentId === agentId)));
+  readHandoffEvents().pipe(Effect.map((events) => events.filter((e) => e.agentId === agentId)));
 
 /** Effect variant of `updateHandoffOutcome`. */
-export const updateHandoffOutcomeEffect = (
+export const updateHandoffOutcome = (
   agentId: string,
   timestamp: string,
   outcome: {
@@ -430,7 +430,7 @@ export const updateHandoffOutcomeEffect = (
   });
 
 /** Effect variant of `getPendingVerificationHandoffs`. */
-export const getPendingVerificationHandoffsEffect = (): Effect.Effect<HandoffEvent[], FsError> =>
-  readHandoffEventsEffect().pipe(
+export const getPendingVerificationHandoffs = (): Effect.Effect<HandoffEvent[], FsError> =>
+  readHandoffEvents().pipe(
     Effect.map((events) => events.filter((e) => e.success && !e.outcome?.verified)),
   );

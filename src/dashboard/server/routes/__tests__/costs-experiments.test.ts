@@ -33,10 +33,10 @@ async function runRoute(
 
 /** Replicate the exact handler logic from costs.ts for testability */
 function makeExperimentsHandler() {
-  return httpHandler(Effect.try({
+  return Effect.try({
     try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-  }));
+  });
 }
 
 afterEach(() => {

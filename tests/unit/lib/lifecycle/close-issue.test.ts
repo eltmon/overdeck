@@ -12,11 +12,13 @@ vi.mock('util', () => ({
 vi.mock('../../../../src/lib/agents.js', async () => {
   const { Effect } = await import('effect');
   return {
+    getAgentState: vi.fn(() => Effect.succeed(null)),
     getAgentStateAsync: vi.fn().mockResolvedValue(null),
-    getAgentStateEffect: vi.fn(() => Effect.succeed(null)),
+    getAgentStateProgram: vi.fn(() => Effect.succeed(null)),
     markAgentStoppedState: vi.fn((state: unknown) => state),
+    saveAgentState: vi.fn(() => Effect.succeed(undefined)),
     saveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
-    saveAgentStateEffect: vi.fn(() => Effect.succeed(undefined)),
+    saveAgentStateProgram: vi.fn(() => Effect.succeed(undefined)),
   };
 });
 
@@ -29,10 +31,10 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
 }));
 
 import { Effect } from 'effect';
-import { closeIssue as closeIssueEffect } from '../../../../src/lib/lifecycle/close-issue.js';
+import { closeIssue as closeIssueProgram } from '../../../../src/lib/lifecycle/close-issue.js';
 
-const closeIssue = (...args: Parameters<typeof closeIssueEffect>) =>
-  Effect.runPromise(closeIssueEffect(...args));
+const closeIssue = (...args: Parameters<typeof closeIssueProgram>) =>
+  Effect.runPromise(closeIssueProgram(...args));
 
 describe('close-issue', () => {
   beforeEach(() => {

@@ -18,7 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
-import { killSessionAsyncEffect, sessionExistsAsyncEffect, listSessionNamesAsyncEffect } from '../tmux.js';
+import { killSession, sessionExists, listSessionNames } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
@@ -53,9 +53,9 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     `planning-${issueLower}`,
   ];
   for (const session of exactPatterns) {
-    if (await Effect.runPromise(sessionExistsAsyncEffect(session))) {
+    if (await Effect.runPromise(sessionExists(session))) {
       try {
-        await Effect.runPromise(killSessionAsyncEffect(session));
+        await Effect.runPromise(killSession(session));
         killed++;
       } catch {
         // session may have died between check and kill
@@ -75,7 +75,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   //   - review-<ISSUE>-<timestamp>-<role>          (legacy)
   //   - specialist-<projectKey>-<ISSUE>-<role>     (canonical PAN-830/915)
   try {
-    const allSessions = await Effect.runPromise(listSessionNamesAsyncEffect());
+    const allSessions = await Effect.runPromise(listSessionNames());
     const escapedLower = issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedUpper = issueLower.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const issuePart = `(${escapedLower}|${escapedUpper})`;
@@ -87,7 +87,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     const matchedSessions = allSessions.filter(s => patterns.some(p => p.test(s)));
     for (const session of matchedSessions) {
       try {
-        await Effect.runPromise(killSessionAsyncEffect(session));
+        await Effect.runPromise(killSession(session));
         killed++;
       } catch {
         // session may have died between check and kill
@@ -128,8 +128,8 @@ async function stopTldrDaemonImpl(workspacePath: string): Promise<StepResult> {
     return stepSkipped(step, ['No .venv found']);
   }
   try {
-    const { getTldrDaemonService } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonService(workspacePath, venvPath);
+    const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
     await tldrService.stop();
     return stepOk(step, ['Stopped TLDR daemon']);
   } catch {
@@ -161,7 +161,7 @@ async function stopDockerImpl(
   const step = 'teardown:docker';
   try {
     const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-    await stopWorkspaceDocker(workspacePath, issueLower);
+    await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
     return stepOk(step, ['Stopped Docker containers']);
   } catch {
     return stepSkipped(step, ['Docker cleanup skipped (not running or failed)']);
@@ -393,7 +393,7 @@ async function removeWorktreeImpl(
 
   // Guard: never delete workspace (and its `.devcontainer/`) while containers
   // still reference compose paths inside it.
-  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+  const orphanedContainers = await Effect.runPromise(getContainersReferencingWorkspacePath(workspacePath));
   if (orphanedContainers.length > 0) {
     return stepFailed(
       step,
@@ -593,7 +593,7 @@ function removeTunnelConfig(
   return Effect.tryPromise({
     try: async () => {
       const { removeTunnelIngress } = await import('../tunnel.js');
-      const result = await removeTunnelIngress(tunnelConfig, placeholders as any);
+      const result = await Effect.runPromise(removeTunnelIngress(tunnelConfig, placeholders as any));
       return stepOk('teardown:tunnel', result.steps || ['Removed tunnel ingress']);
     },
     catch: (err) => err,
@@ -614,7 +614,7 @@ function removeHumeEviConfig(
   return Effect.tryPromise({
     try: async () => {
       const { deleteHumeConfig } = await import('../hume.js');
-      const result = await deleteHumeConfig(humeConfig, placeholders as any);
+      const result = await Effect.runPromise(deleteHumeConfig(humeConfig, placeholders as any));
       return stepOk('teardown:hume', result.steps || ['Removed Hume EVI config']);
     },
     catch: (err) => err,
@@ -736,7 +736,7 @@ function pruneCheckpointRefs(projectPath: string, issueLower: string): Effect.Ef
       const step = 'teardown:checkpoint-refs';
       const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
       const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
-      const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
+      const pruned = await Effect.runPromise(pruneCheckpointRefsForAgents(projectPath, agentIds));
       return stepOk(step, [`Pruned ${pruned} checkpoint ref(s) for ${agentIds.join(', ')}`]);
     },
     catch: (err) => err,

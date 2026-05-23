@@ -12,7 +12,7 @@ import {
   handlePullRequestReview,
   handlePullRequestReviewThread,
   handleStatus,
-  isTrackedRepository,
+  isTrackedRepositorySync,
 } from '../../../../src/lib/webhook-handlers.js';
 import { runWebhookHandler, verifySignature, _resetWebhookSecretForTests } from '../../../../src/dashboard/server/routes/webhooks.ts';
 
@@ -32,11 +32,12 @@ vi.mock('../../../../src/lib/webhook-handlers.js', () => ({
   handlePullRequestReviewThread: vi.fn(),
   handleStatus: vi.fn(),
   isTrackedRepository: vi.fn(() => true),
+  isTrackedRepositorySync: vi.fn(() => true),
 }));
 
 const mockExistsSync = existsSync as unknown as ReturnType<typeof vi.fn>;
 const mockReadFile = readFile as unknown as ReturnType<typeof vi.fn>;
-const mockIsTrackedRepository = isTrackedRepository as unknown as ReturnType<typeof vi.fn>;
+const mockIsTrackedRepository = isTrackedRepositorySync as unknown as ReturnType<typeof vi.fn>;
 
 describe('verifySignature', () => {
   it('returns true for a valid HMAC-SHA256 signature', () => {

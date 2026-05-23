@@ -2,11 +2,11 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
-import { listRunningAgents, getAgentDir, type AgentState } from '../../lib/agents.js';
+import { listRunningAgentsSync, getAgentDir, type AgentState } from '../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { isNoResumeValueEnabled } from '../../lib/cloister/no-resume-mode.js';
-import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
+import { getTldrMetricsSync, getTldrDaemonServiceSync } from '../../lib/tldr-daemon.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   getWorkspaceStackHealth,
@@ -55,7 +55,7 @@ async function isBootNoResumeModeActive(): Promise<boolean> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 250);
   try {
-    const response = await fetch(`${getDashboardApiUrl()}/api/no-resume-mode`, { signal: controller.signal });
+    const response = await fetch(`${getDashboardApiUrlSync()}/api/no-resume-mode`, { signal: controller.signal });
     if (!response.ok) return false;
     const payload = await response.json() as { active?: unknown };
     return payload.active === true;
@@ -97,10 +97,10 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  const restartStatus = await readRestartStatus();
+  const restartStatus = await Effect.runPromise(readRestartStatus());
 
   // Filter out invalid agent states (missing required fields)
-  const agents = listRunningAgents().filter(agent =>
+  const agents = listRunningAgentsSync().filter(agent =>
     agent.id && agent.issueId && agent.workspace
   );
   const noResumeModeActive = await isBootNoResumeModeActive();
@@ -129,8 +129,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   if (options.json) {
     // Add shadow mode info and optional context % to JSON output
     const agentsWithShadow = await Promise.all(agents.map(async agent => {
-      const shadowed = agent.issueId ? await isShadowed(agent.issueId) : false;
-      const shadowState = shadowed && agent.issueId ? await getShadowState(agent.issueId) : null;
+      const shadowed = agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false;
+      const shadowState = shadowed && agent.issueId ? await Effect.runPromise(getShadowState(agent.issueId)) : null;
       return {
         ...agent,
         shadowMode: shadowed,
@@ -165,8 +165,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000 / 60);
 
     // Check shadow mode (only if issueId exists)
-    const shadowed = agent.issueId ? await isShadowed(agent.issueId) : false;
-    const shadowState = shadowed && agent.issueId ? await getShadowState(agent.issueId) : null;
+    const shadowed = agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false;
+    const shadowState = shadowed && agent.issueId ? await Effect.runPromise(getShadowState(agent.issueId)) : null;
 
     const gatingReason = formatGatingReason(agent, noResumeModeActive);
 
@@ -201,7 +201,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Show TLDR session metrics if a .tldr/ dir exists in the workspace
     try {
-      const tldr = getTldrMetrics(agent.workspace);
+      const tldr = getTldrMetricsSync(agent.workspace);
       if (tldr.interceptions > 0 || tldr.bypasses > 0) {
         const savedK = Math.round(tldr.estimatedTokensSaved / 1000);
         const bypassStr = tldr.bypasses > 0 ? ` (${tldr.bypasses} bypassed)` : '';
@@ -223,7 +223,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // Show legend
   const shadowChecks = await Promise.all(
-    agents.map(async agent => agent.issueId ? await isShadowed(agent.issueId) : false)
+    agents.map(async agent => agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false),
   );
   const anyShadowed = shadowChecks.some(Boolean);
   if (anyShadowed) {
@@ -312,7 +312,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
 
   const mainVenvPath = join(projectRoot, '.venv');
   if (existsSync(mainVenvPath)) {
-    const service = getTldrDaemonService(projectRoot, mainVenvPath);
+    const service = getTldrDaemonServiceSync(projectRoot, mainVenvPath);
     const status = await service.getStatus();
     const { fileCount, edgeCount, ageMs } = readTldrIndexData(projectRoot);
     mainEntries.push({ label: `Main (${projectName})`, running: status.running, fileCount, edgeCount, ageMs });
@@ -326,7 +326,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
       const wsPath = join(workspacesDir, ws.name);
       const wsVenvPath = join(wsPath, '.venv');
       if (existsSync(wsVenvPath)) {
-        const service = getTldrDaemonService(wsPath, wsVenvPath);
+        const service = getTldrDaemonServiceSync(wsPath, wsVenvPath);
         const status = await service.getStatus();
         const { fileCount, edgeCount, ageMs } = readTldrIndexData(wsPath);
         workspaceEntries.push({ label: ws.name, running: status.running, fileCount, edgeCount, ageMs });

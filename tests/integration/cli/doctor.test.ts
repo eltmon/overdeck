@@ -13,6 +13,12 @@ vi.mock('../../../src/lib/config.js', () => ({
     trackers: { primary: 'linear' },
     dashboard: { port: 3001, api_port: 3002 },
   }),
+  loadConfigSync: vi.fn().mockReturnValue({
+    panopticon: { version: '1.0.0' },
+    sync: { backup_before_sync: true },
+    trackers: { primary: 'linear' },
+    dashboard: { port: 3001, api_port: 3002 },
+  }),
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -38,8 +44,8 @@ describe('doctor command', () => {
     });
 
     it('should validate config structure', async () => {
-      const { loadConfig } = await import('../../../src/lib/config.js');
-      const config = loadConfig();
+      const { loadConfigSync } = await import('../../../src/lib/config.js');
+      const config = loadConfigSync();
 
       expect(config).toHaveProperty('panopticon');
       expect(config).toHaveProperty('sync');

@@ -4,57 +4,57 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  recordCost,
+  recordCostSync,
   checkCostLimits,
   getAgentCost,
   getIssueCost,
   getDailyTotal,
   getCostSummary,
-  resetCostTracking,
+  resetCostTrackingSync,
 } from '../../src/lib/cloister/cost-monitor.js';
 
 describe('cost-monitor', () => {
   beforeEach(() => {
     // Reset tracking before each test
-    resetCostTracking();
+    resetCostTrackingSync();
   });
 
   describe('recordCost', () => {
     it('should record agent cost', () => {
-      recordCost('agent-1', 1.5);
+      recordCostSync('agent-1', 1.5);
       expect(getAgentCost('agent-1')).toBe(1.5);
     });
 
     it('should record issue cost', () => {
-      recordCost('agent-1', 2.0, 'issue-1');
+      recordCostSync('agent-1', 2.0, 'issue-1');
       expect(getIssueCost('issue-1')).toBe(2.0);
     });
 
     it('should accumulate costs for same agent', () => {
-      recordCost('agent-1', 1.0);
-      recordCost('agent-1', 0.5);
-      recordCost('agent-1', 0.25);
+      recordCostSync('agent-1', 1.0);
+      recordCostSync('agent-1', 0.5);
+      recordCostSync('agent-1', 0.25);
       expect(getAgentCost('agent-1')).toBe(1.75);
     });
 
     it('should accumulate costs for same issue', () => {
-      recordCost('agent-1', 1.0, 'issue-1');
-      recordCost('agent-2', 2.0, 'issue-1');
-      recordCost('agent-3', 0.5, 'issue-1');
+      recordCostSync('agent-1', 1.0, 'issue-1');
+      recordCostSync('agent-2', 2.0, 'issue-1');
+      recordCostSync('agent-3', 0.5, 'issue-1');
       expect(getIssueCost('issue-1')).toBe(3.5);
     });
 
     it('should update daily total', () => {
-      recordCost('agent-1', 1.0);
-      recordCost('agent-2', 2.0);
-      recordCost('agent-3', 0.5);
+      recordCostSync('agent-1', 1.0);
+      recordCostSync('agent-2', 2.0);
+      recordCostSync('agent-3', 0.5);
       expect(getDailyTotal()).toBe(3.5);
     });
   });
 
   describe('checkCostLimits', () => {
     it('should not alert when under threshold', () => {
-      recordCost('agent-1', 1.0);
+      recordCostSync('agent-1', 1.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -65,7 +65,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn at 80% threshold for agent', () => {
-      recordCost('agent-1', 8.0);
+      recordCostSync('agent-1', 8.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -81,7 +81,7 @@ describe('cost-monitor', () => {
     });
 
     it('should alert at 100% limit for agent', () => {
-      recordCost('agent-1', 10.0);
+      recordCostSync('agent-1', 10.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -96,7 +96,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn for multiple limit types when exceeded', () => {
-      recordCost('agent-1', 10.0, 'issue-1');
+      recordCostSync('agent-1', 10.0, 'issue-1');
       const alerts = checkCostLimits('agent-1', 'issue-1', {
         per_agent_usd: 10.0,
         per_issue_usd: 10.0,
@@ -111,7 +111,7 @@ describe('cost-monitor', () => {
     });
 
     it('should not check disabled limits (set to 0)', () => {
-      recordCost('agent-1', 100.0);
+      recordCostSync('agent-1', 100.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 0,
         per_issue_usd: 0,
@@ -132,9 +132,9 @@ describe('cost-monitor', () => {
     });
 
     it('should return sorted top agents', () => {
-      recordCost('agent-1', 5.0);
-      recordCost('agent-2', 10.0);
-      recordCost('agent-3', 2.0);
+      recordCostSync('agent-1', 5.0);
+      recordCostSync('agent-2', 10.0);
+      recordCostSync('agent-3', 2.0);
 
       const summary = getCostSummary();
       expect(summary.topAgents).toHaveLength(3);
@@ -144,7 +144,7 @@ describe('cost-monitor', () => {
 
     it('should limit to top 10 agents', () => {
       for (let i = 1; i <= 15; i++) {
-        recordCost(`agent-${i}`, i * 1.0);
+        recordCostSync(`agent-${i}`, i * 1.0);
       }
 
       const summary = getCostSummary();
@@ -154,10 +154,10 @@ describe('cost-monitor', () => {
 
   describe('resetCostTracking', () => {
     it('should clear all cost data', () => {
-      recordCost('agent-1', 5.0, 'issue-1');
-      recordCost('agent-2', 3.0, 'issue-2');
+      recordCostSync('agent-1', 5.0, 'issue-1');
+      recordCostSync('agent-2', 3.0, 'issue-2');
 
-      resetCostTracking();
+      resetCostTrackingSync();
 
       expect(getAgentCost('agent-1')).toBe(0);
       expect(getIssueCost('issue-1')).toBe(0);

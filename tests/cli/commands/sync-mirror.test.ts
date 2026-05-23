@@ -6,6 +6,7 @@
  * the layered context into harness CLAUDE.md files via syncContextLayers().
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Module-level mocks (hoisted before imports) ────────────────────────────
@@ -31,53 +32,75 @@ const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
 const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
 const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
 const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
-const mockCleanupAgentDirectories = vi.fn().mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
+const mockCleanupAgentDirectories = vi.fn().mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
+  planSyncSync: mockPlanSync,
   executeSync: mockExecuteSync,
+  executeSyncSync: mockExecuteSync,
   syncContextLayers: mockSyncContextLayers,
+  syncContextLayersSync: mockSyncContextLayers,
   refreshCache: mockRefreshCache,
+  refreshCacheSync: mockRefreshCache,
   migrateStalePersonalContent: mockMigrateStalePersonalContent,
+  migrateStalePersonalContentSync: mockMigrateStalePersonalContent,
   removeLegacySkills070: mockRemoveLegacySkills070,
+  removeLegacySkills070Sync: mockRemoveLegacySkills070,
   planHooksSync: mockPlanHooksSync,
+  planHooksSyncSync: mockPlanHooksSync,
   syncHooks: mockSyncHooks,
+  syncHooksSync: mockSyncHooks,
   syncStatusline: mockSyncStatusline,
+  syncStatuslineSync: mockSyncStatusline,
   mirrorProjectSkills: mockMirrorProjectSkills,
+  mirrorProjectSkillsSync: mockMirrorProjectSkills,
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
+  syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: mockLoadConfig,
+  loadConfigSync: mockLoadConfig,
   checkDevrootDeprecation: mockCheckDevrootDeprecation,
   getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
+  getDashboardApiUrlSync: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
   listProjects: mockListProjects,
+  listProjectsSync: mockListProjects,
 }));
 
 vi.mock('../../../src/lib/config-migration.js', () => ({
   cleanupLegacyRuntimeSymlinks: mockCleanupLegacyRuntimeSymlinks,
+  cleanupLegacyRuntimeSymlinksSync: mockCleanupLegacyRuntimeSymlinks,
   migrateSyncTargets: mockMigrateSyncTargets,
+  migrateSyncTargetsSync: mockMigrateSyncTargets,
 }));
 
 vi.mock('../../../src/lib/workspace-manager.js', () => ({
   migratePanopticonToPan: mockMigratePanopticonToPan,
+  migratePanopticonToPanSync: mockMigratePanopticonToPan,
 }));
 
 vi.mock('../../../src/lib/multi-tool-sync.js', () => ({
   runMultiToolSync: mockRunMultiToolSync,
+  runMultiToolSyncSync: mockRunMultiToolSync,
   resolveAlsoSyncTools: mockResolveAlsoSyncTools,
+  resolveAlsoSyncToolsSync: mockResolveAlsoSyncTools,
 }));
 
 vi.mock('../../../src/lib/claude-mcp.js', () => ({
   ensurePlaywrightIsolation: mockEnsurePlaywrightIsolation,
+  ensurePlaywrightIsolationSync: mockEnsurePlaywrightIsolation,
   ensureExcalidrawMcp: mockEnsureExcalidrawMcp,
+  ensureExcalidrawMcpSync: mockEnsureExcalidrawMcp,
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
   createBackup: mockCreateBackup,
+  createBackupSync: mockCreateBackup,
 }));
 
 vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
@@ -115,7 +138,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockListProjects.mockReturnValue([]);
     mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
     mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [] });
-    mockCleanupAgentDirectories.mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
+    mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
   });
 
   it('mirrors project skills from the current working directory', async () => {

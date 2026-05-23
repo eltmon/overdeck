@@ -40,29 +40,36 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   const actual = await vi.importActual('../../../src/lib/tmux.js');
   return {
     ...actual as object,
-    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
-    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-    killSessionAsyncEffect: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
-    setOptionAsyncEffect: vi.fn(() => Effect.void),
-    isPaneDeadAsyncEffect: vi.fn(() => Effect.succeed(false)),
-    listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    listSessionNames: vi.fn(() => Effect.succeed([])),
+    sessionExists: vi.fn(() => Effect.succeed(false)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(false)),
+    killSession: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
+    killSessionSync: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
+    setOption: vi.fn(() => Effect.void),
+    isPaneDead: vi.fn(() => Effect.succeed(false)),
+    listPaneValues: vi.fn(() => Effect.succeed([])),
   };
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: mockGetAgentState,
+  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
+  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
   messageAgent: mockMessageAgent,
-  saveAgentStateEffect: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+  saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+  saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+  saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
+  loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
+  notifyPipelineSync: mockNotifyPipeline,
 }));
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
@@ -79,8 +86,8 @@ describe('killAllReviewSessions', () => {
   });
 
   it('kills current role-primitive review sessions', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'agent-pan-999-review',
       'agent-pan-999-review-security',
       'agent-pan-999-review-correctness',
@@ -88,7 +95,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999-work',
     ]));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-999-review',
@@ -100,14 +107,14 @@ describe('killAllReviewSessions', () => {
   });
 
   it('kills coordinator sessions', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'review-coordinator-PAN-999-1234567890000',
       'review-coordinator-PAN-888-1234567890001',
       'agent-pan-999',
     ]));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toContain('review-coordinator-PAN-999-1234567890000');
     expect(result.killed).toContain('review-coordinator-PAN-888-1234567890001');
@@ -116,14 +123,14 @@ describe('killAllReviewSessions', () => {
   });
 
   it('kills canonical reviewer sessions (PAN-830 naming)', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'specialist-panopticon-cli-PAN-999-review-correctness',
       'specialist-panopticon-cli-PAN-999-review-security',
       'agent-pan-999',
     ]));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-correctness');
     expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-security');
@@ -131,13 +138,13 @@ describe('killAllReviewSessions', () => {
   });
 
   it('kills legacy timestamp-based reviewer sessions', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'review-PAN-999-1713456789000-correctness',
       'review-PAN-999-1713456789000-security',
     ]));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toContain('review-PAN-999-1713456789000-correctness');
     expect(result.killed).toContain('review-PAN-999-1713456789000-security');
@@ -145,13 +152,13 @@ describe('killAllReviewSessions', () => {
   });
 
   it('returns empty when no review sessions exist', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'agent-pan-999',
       'panopticon-dashboard',
     ]));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toHaveLength(0);
@@ -159,13 +166,13 @@ describe('killAllReviewSessions', () => {
   });
 
   it('reports failed kills without throwing', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'review-coordinator-PAN-999-1234567890000',
     ]));
     mockKillSessionAsync.mockRejectedValueOnce(new Error('session not found'));
 
-    const result = await killAllReviewSessions();
+    const result = await Effect.runPromise(killAllReviewSessions());
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
@@ -181,22 +188,22 @@ describe('killAllReviewerSessions', () => {
   });
 
   it('kills the parent review orchestrator before convoy sessions exist', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'agent-pan-1080-review',
       'agent-pan-1080',
       'agent-pan-999-review',
     ]));
 
-    const result = await killAllReviewerSessions('panopticon-cli', 'PAN-1080');
+    const result = await Effect.runPromise(killAllReviewerSessions('panopticon-cli', 'PAN-1080'));
 
     expect(result.killed).toEqual(['agent-pan-1080-review']);
     expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-1080-review');
   });
 
   it('kills the parent review orchestrator and full convoy sessions', async () => {
-    const { listSessionNamesAsyncEffect } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsyncEffect).mockReturnValue(Effect.succeed([
+    const { listSessionNames } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'agent-pan-1080-review',
       'agent-pan-1080-review-security',
       'agent-pan-1080-review-correctness',
@@ -206,7 +213,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-1080',
     ]));
 
-    const result = await killAllReviewerSessions('panopticon-cli', 'PAN-1080');
+    const result = await Effect.runPromise(killAllReviewerSessions('panopticon-cli', 'PAN-1080'));
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-1080-review',
@@ -359,7 +366,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     );
 
     const guardMatch = agentSrc.match(
-      /export async function spawnReviewRoleForIssue[\s\S]*?archiveFeedbackFiles/,
+      /async function spawnReviewRoleForIssuePromise[\s\S]*?archiveFeedbackFiles/,
     );
     expect(guardMatch).not.toBeNull();
     const guardBlock = guardMatch![0];
@@ -388,7 +395,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     const spawnBlock = spawnMatch![0];
 
     expect(spawnBlock).toMatch(/run\.reviewRunId = runId/);
-    expect(spawnBlock).toContain('saveAgentStateEffect(run)');
+    expect(spawnBlock).toContain('saveAgentState(run)');
   });
 });
 
@@ -510,13 +517,13 @@ describe('convoy orchestration', () => {
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
-    const prompt = await buildConvoyPrompt({
+    const prompt = await Effect.runPromise(buildConvoyPrompt({
       issueId: 'PAN-1059',
       subRole: 'security',
       outputPath: '/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md',
       synthesisAgentId: 'agent-pan-1059-review',
       contextManifestPath: '/workspace/.pan/review/run-1/context.json',
-    });
+    }));
 
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
     expect(prompt).toContain('/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
@@ -531,13 +538,13 @@ describe('convoy orchestration', () => {
   });
 
   it('uses run-scoped output paths by default', async () => {
-    const result = await spawnReviewSubRoleForIssue({
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: '/tmp/pan-review-agent-default',
       subRole: 'security',
       runId: 'agent-pan-1059-review-abcdef12',
       contextManifestPath: '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/context.json',
-    });
+    }));
 
     expect(result.success).toBe(true);
     const expectedOutput = '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/security.md';
@@ -551,14 +558,14 @@ describe('convoy orchestration', () => {
   });
 
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
-    const result = await spawnReviewSubRoleForIssue({
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: '/workspace',
       subRole: 'security',
       runId: 'agent-pan-1059-review-abcdef12',
       outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/context.json',
-    });
+    }));
 
     expect(result).toMatchObject({
       success: true,

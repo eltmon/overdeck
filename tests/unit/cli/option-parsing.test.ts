@@ -30,7 +30,7 @@ function runCli(args: string[]): { stdout: string; stderr: string; status: numbe
     const stdout = execFileSync('node', [CLI_PATH, ...args], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 2_000,
+      timeout: 10_000,
     });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {

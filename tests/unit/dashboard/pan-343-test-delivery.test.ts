@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for PAN-343: test-agent delivery failure silently treated as success.
  * Updated for PAN-369: retry logic, dispatch_failed status.
@@ -36,6 +37,7 @@ const mockResolveProjectFromIssue = vi.fn();
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -46,7 +48,9 @@ const mockSetReviewStatus = vi.fn();
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -91,7 +95,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-343-test' });
     const notify = makeNotify();
 
-    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).toHaveBeenCalledWith(ISSUE, 'test', expect.objectContaining({
       workspace: WS,
@@ -109,7 +113,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnRun.mockRejectedValue(new Error('Role run agent-pan-343-test already running'));
     const notify = makeNotify();
 
-    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
@@ -121,7 +125,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnRun.mockRejectedValue(new Error('spawn failed'));
     const notify = makeNotify();
 
-    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
@@ -135,7 +139,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     setupNoProject();
     const notify = makeNotify();
 
-    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
@@ -150,7 +154,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     mockSpawnRun.mockRejectedValue(new Error('role runner unavailable'));
     const notify = makeNotify();
 
-    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     // Core PAN-343 invariant: exception must NOT advance the pipeline
     expect(notify).not.toHaveBeenCalled();
@@ -171,7 +175,11 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     const notify = makeNotify();
 
     // The nested catch must prevent this from propagating
-    await expect(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify)).resolves.toBeUndefined();
+    await expect(Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify))).resolves.toMatchObject({
+      delivered: false,
+      notified: false,
+      reason: 'spawn-failed',
+    });
     expect(notify).not.toHaveBeenCalled();
   });
 });

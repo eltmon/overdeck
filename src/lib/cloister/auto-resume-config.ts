@@ -1,4 +1,4 @@
-import { getProject, resolveProjectFromIssue } from '../projects.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export interface AutoResumeConfig {
   maxConsecutiveFailures: number;
@@ -59,9 +59,9 @@ export function normalizeAutoResumeConfig(
 export function resolveAutoResumeConfigForIssue(issueId: string | undefined): AutoResumeConfig {
   if (!issueId) return DEFAULT_AUTO_RESUME_CONFIG;
 
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return DEFAULT_AUTO_RESUME_CONFIG;
 
-  const project = getProject(resolved.projectKey);
+  const project = getProjectSync(resolved.projectKey);
   return normalizeAutoResumeConfig(project?.autoResume, `projects.${resolved.projectKey}.autoResume`);
 }

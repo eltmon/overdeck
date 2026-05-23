@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
-import { listSessionNames } from '../../lib/tmux.js';
+import { listSessionNamesSync } from '../../lib/tmux.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
@@ -284,7 +284,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check tmux sessions
   try {
-    const agentSessions = listSessionNames().filter((s) => s.includes('agent-')).length;
+    const agentSessions = listSessionNamesSync().filter((s) => s.includes('agent-')).length;
     checks.push({
       name: 'Running Agents',
       status: 'ok',
@@ -300,7 +300,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check smee-client webhook relay
   try {
-    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
+    const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.panopticon', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
@@ -309,7 +309,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
         message: 'Not configured (optional)',
         fix: 'Create ~/.panopticon/github-app/smee-url with your smee.io channel URL',
       });
-    } else if (isSmeeProcessRunning()) {
+    } else if (isSmeeProcessRunningSync()) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'ok',

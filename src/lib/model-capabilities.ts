@@ -63,7 +63,7 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
  * @param modelId - Model ID to resolve (may be deprecated)
  * @returns Current model ID
  */
-export function resolveModelId(modelId: string): ModelId {
+export function resolveModelIdSync(modelId: string): ModelId {
   return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
 }
 
@@ -881,7 +881,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
 /**
  * Get capability profile for a model
  */
-export function getModelCapability(model: ModelId): ModelCapability {
+export function getModelCapabilitySync(model: ModelId): ModelCapability {
   const capability = MODEL_CAPABILITIES[model as CapabilityModelId];
   if (!capability) {
     throw new Error(`No capability profile registered for model: ${model}`);
@@ -889,14 +889,14 @@ export function getModelCapability(model: ModelId): ModelCapability {
   return capability;
 }
 
-export function hasModelCapability(model: ModelId): boolean {
+export function hasModelCapabilitySync(model: ModelId | string): boolean {
   return model in MODEL_CAPABILITIES;
 }
 
 /**
  * Get all models sorted by a specific skill (descending)
  */
-export function getModelsBySkill(skill: SkillDimension): ModelId[] {
+export function getModelsBySkillSync(skill: SkillDimension): ModelId[] {
   return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
     (a, b) => MODEL_CAPABILITIES[b].skills[skill] - MODEL_CAPABILITIES[a].skills[skill]
   );
@@ -905,7 +905,7 @@ export function getModelsBySkill(skill: SkillDimension): ModelId[] {
 /**
  * Get all models for a provider
  */
-export function getModelsForProvider(
+export function getModelsForProviderSync(
   provider: ModelCapability['provider']
 ): ModelId[] {
   return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).filter(
@@ -916,7 +916,7 @@ export function getModelsForProvider(
 /**
  * Get cheapest models (sorted by cost ascending)
  */
-export function getCheapestModels(): ModelId[] {
+export function getCheapestModelsSync(): ModelId[] {
   return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
     (a, b) => MODEL_CAPABILITIES[a].costPer1MTokens - MODEL_CAPABILITIES[b].costPer1MTokens
   );
@@ -926,15 +926,15 @@ export function getCheapestModels(): ModelId[] {
  * Calculate cost efficiency score for a skill
  * Higher = better value (skill score / cost)
  */
-export function getValueScore(model: ModelId, skill: SkillDimension): number {
-  const cap = getModelCapability(model);
+export function getValueScoreSync(model: ModelId, skill: SkillDimension): number {
+  const cap = getModelCapabilitySync(model);
   return cap.skills[skill] / Math.log10(cap.costPer1MTokens + 1);
 }
 
 /**
  * Get all skill dimensions
  */
-export function getAllSkillDimensions(): SkillDimension[] {
+export function getAllSkillDimensionsSync(): SkillDimension[] {
   return [
     'code-generation',
     'code-review',
@@ -954,34 +954,34 @@ export function getAllSkillDimensions(): SkillDimension[] {
 // All capability queries are pure lookups — additive Effect.sync wrappers.
 
 /** Resolve a (possibly-deprecated) model id to its canonical id. Pure. */
-export const resolveModelIdEffect = (modelId: string): Effect.Effect<ModelId> =>
-  Effect.sync(() => resolveModelId(modelId));
+export const resolveModelId = (modelId: string): Effect.Effect<ModelId> =>
+  Effect.sync(() => resolveModelIdSync(modelId));
 
 /** Look up a model's capability matrix. Pure. */
-export const getModelCapabilityEffect = (
+export const getModelCapability = (
   model: ModelId,
-): Effect.Effect<ModelCapability> => Effect.sync(() => getModelCapability(model));
+): Effect.Effect<ModelCapability> => Effect.sync(() => getModelCapabilitySync(model));
 
 /** List models ranked best-first for a given skill. Pure. */
-export const getModelsBySkillEffect = (
+export const getModelsBySkill = (
   skill: SkillDimension,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsBySkill(skill));
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsBySkillSync(skill));
 
 /** List models for a specific provider. Pure. */
-export const getModelsForProviderEffect = (
+export const getModelsForProvider = (
   provider: ModelCapability['provider'],
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsForProvider(provider));
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsForProviderSync(provider));
 
 /** List the cheapest models ranked best-first. Pure. */
-export const getCheapestModelsEffect = (): Effect.Effect<ModelId[]> =>
-  Effect.sync(() => getCheapestModels());
+export const getCheapestModels = (): Effect.Effect<ModelId[]> =>
+  Effect.sync(() => getCheapestModelsSync());
 
 /** Compute the cost-adjusted value score for a model + skill. Pure. */
-export const getValueScoreEffect = (
+export const getValueScore = (
   model: ModelId,
   skill: SkillDimension,
-): Effect.Effect<number> => Effect.sync(() => getValueScore(model, skill));
+): Effect.Effect<number> => Effect.sync(() => getValueScoreSync(model, skill));
 
 /** Enumerate all known skill dimensions. Pure. */
-export const getAllSkillDimensionsEffect = (): Effect.Effect<SkillDimension[]> =>
-  Effect.sync(() => getAllSkillDimensions());
+export const getAllSkillDimensions = (): Effect.Effect<SkillDimension[]> =>
+  Effect.sync(() => getAllSkillDimensionsSync());

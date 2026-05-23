@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -202,7 +203,7 @@ export class SupervisorWatchdog {
       await this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
       await this.log(error);
-      await writeRestartStatus({
+      await Effect.runPromise(writeRestartStatus({
         ts: new Date(startedAt).toISOString(),
         trigger: 'watchdog',
         success: false,
@@ -210,11 +211,11 @@ export class SupervisorWatchdog {
         durationMs: this.now() - startedAt,
         attempts: this.state.restartAttempts.length,
         gaveUp: true,
-      });
+      }));
       return;
     }
 
-    const lock = await acquireRestartLock('supervisor watchdog');
+    const lock = await Effect.runPromise(acquireRestartLock('supervisor watchdog'));
     if (!lock) {
       await this.log('watchdog restart skipped: restart lock held');
       return;
@@ -241,14 +242,14 @@ export class SupervisorWatchdog {
       await lock.release();
     }
 
-    await writeRestartStatus({
+    await Effect.runPromise(writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',
       success: restartError === null,
       error: restartError ?? undefined,
       durationMs: this.now() - startedAt,
       attempts: this.state.restartAttempts.length,
-    });
+    }));
     if (restartError) {
       await this.log(`watchdog restart failed: ${restartError}`);
     }

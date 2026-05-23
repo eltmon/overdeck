@@ -4,17 +4,17 @@
     "created": "2026-05-22T20:33:14.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1381: Dashboard: review/test/ship specialist agents have no 'Restart' context-menu action (and Start can't override model)",
-    "updated": "2026-05-22T20:35:40.935Z"
+    "updated": "2026-05-22T22:35:24.560Z"
   },
   "plan": {
     "id": "pan-1381",
     "title": "Dashboard: review/test/ship specialist agents have no 'Restart' context-menu action (and Start can't override model)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "13b7ee49-eb68-4103-b114-4e6422ee4b0a",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 26,
     "created": "2026-05-22T20:33:14.000Z",
-    "updated": "2026-05-22T20:35:40.935Z",
+    "updated": "2026-05-22T22:35:24.560Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1381",
@@ -249,8 +249,71 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-22-PAN-1381-dashboard-review-test-ship-specialist-agents-have-no-restart-context-menu-action-and-start-can-t-override-model.vbrief.json"
+      "canonicalFilename": "2026-05-22-PAN-1381-dashboard-review-test-ship-specialist-agents-have-no-restart-context-menu-action-and-start-can-t-override-model.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1381",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-22T22:02:00.490Z",
+        "work": {
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:02:00.490Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "notes": "All convoy reviewers passed with no findings",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:02:00.490Z",
+              "notes": "All convoy reviewers passed with no findings"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-22T22:02:00.490Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-22T22:02:00.490Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-22T22:02:00.490Z"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1383"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

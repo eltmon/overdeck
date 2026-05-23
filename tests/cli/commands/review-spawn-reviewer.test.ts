@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockResolveProjectFromIssue, mockSpawnReviewSubRoleForIssue } = vi.hoisted(() => ({
@@ -7,6 +8,7 @@ const { mockResolveProjectFromIssue, mockSpawnReviewSubRoleForIssue } = vi.hoist
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
@@ -21,11 +23,11 @@ describe('reviewSpawnReviewerCommand', () => {
       projectPath: '/repo',
       projectKey: 'panopticon',
     });
-    mockSpawnReviewSubRoleForIssue.mockResolvedValue({
+    mockSpawnReviewSubRoleForIssue.mockReturnValue(Effect.succeed({
       success: true,
       message: 'Review security spawned: agent-pan-1059-review-security',
       sessionId: 'agent-pan-1059-review-security',
-    });
+    }));
   });
 
   it('forwards explicit orchestration paths to the sub-role spawner', async () => {

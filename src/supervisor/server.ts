@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Panopticon Supervisor — small external watchdog that survives dashboard crashes.
  *
@@ -22,14 +23,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
-import { readPlatformConfig } from '../lib/platform-lifecycle.js';
+import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
 import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
 import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.PANOPTICON_SUPERVISOR_PORT || 3012);
 const PAN_BINARY = process.env.PANOPTICON_PAN_BINARY || 'pan';
 const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log');
-const platformConfig = readPlatformConfig();
+const platformConfig = readPlatformConfigSync();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
 const ttsWatchdogConfig = readTtsWatchdogConfig(process.env);
 
@@ -72,7 +73,7 @@ function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: n
 }
 
 async function heldRestartMessage(): Promise<string> {
-  const holder = await readRestartLockHolder();
+  const holder = await Effect.runPromise(readRestartLockHolder());
   const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
   return `restart in progress (${heldBy})`;
 }
@@ -80,7 +81,7 @@ async function heldRestartMessage(): Promise<string> {
 async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promise<SpawnRestartResult> {
   let lock: RestartLockHandle | null = null;
   if (!options.restartLockHeld) {
-    lock = await acquireRestartLock('supervisor restart');
+    lock = await Effect.runPromise(acquireRestartLock('supervisor restart'));
     if (!lock) return { pid: null, error: await heldRestartMessage() };
   }
 

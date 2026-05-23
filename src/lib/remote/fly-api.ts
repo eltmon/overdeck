@@ -213,7 +213,7 @@ export class FlyApiClient {
 }
 
 /** Create a FlyApiClient from env or explicit token */
-export function createFlyApiClient(token?: string): FlyApiClient {
+export function createFlyApiClientSync(token?: string): FlyApiClient {
   const tok = token ?? process.env.FLY_API_TOKEN;
   if (!tok) {
     throw new Error(
@@ -240,11 +240,11 @@ const toFlyApiError = (cause: unknown): FlyApiError =>
       );
 
 /** Build a FlyApiClient from env or explicit token (Effect variant). */
-export const createFlyApiClientEffect = (
+export const createFlyApiClient = (
   token?: string,
 ): Effect.Effect<FlyApiClient, ConfigError> =>
   Effect.try({
-    try: () => createFlyApiClient(token),
+    try: () => createFlyApiClientSync(token),
     catch: (cause) =>
       new ConfigError({
         message:
@@ -254,7 +254,7 @@ export const createFlyApiClientEffect = (
   });
 
 /** Create a machine in an app (Effect variant). */
-export const createMachineEffect = (
+export const createMachine = (
   client: FlyApiClient,
   appName: string,
   name: string,
@@ -266,7 +266,7 @@ export const createMachineEffect = (
   });
 
 /** Destroy a machine (Effect variant). */
-export const destroyMachineEffect = (
+export const destroyMachine = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -277,7 +277,7 @@ export const destroyMachineEffect = (
   });
 
 /** Start a stopped machine (Effect variant). */
-export const startMachineEffect = (
+export const startMachine = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -288,7 +288,7 @@ export const startMachineEffect = (
   });
 
 /** Stop a running machine (Effect variant). */
-export const stopMachineEffect = (
+export const stopMachine = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -301,7 +301,7 @@ export const stopMachineEffect = (
   });
 
 /** Get a machine by ID (Effect variant). */
-export const getMachineEffect = (
+export const getMachine = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -312,7 +312,7 @@ export const getMachineEffect = (
   });
 
 /** List all machines in an app (Effect variant). */
-export const listMachinesEffect = (
+export const listMachines = (
   client: FlyApiClient,
   appName: string,
 ): Effect.Effect<FlyMachine[], FlyApiError> =>
@@ -322,7 +322,7 @@ export const listMachinesEffect = (
   });
 
 /** Execute a command inside a running machine (Effect variant). */
-export const execCommandEffect = (
+export const execCommand = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -335,7 +335,7 @@ export const execCommandEffect = (
   });
 
 /** Wait for a machine to reach a target state (Effect variant). */
-export const waitForStateEffect = (
+export const waitForState = (
   client: FlyApiClient,
   appName: string,
   machineId: string,
@@ -348,7 +348,7 @@ export const waitForStateEffect = (
   });
 
 /** Create a Fly app if it doesn't exist (Effect variant). */
-export const ensureAppEffect = (
+export const ensureApp = (
   client: FlyApiClient,
   appName: string,
   orgSlug: string,

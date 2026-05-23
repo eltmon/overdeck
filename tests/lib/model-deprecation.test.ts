@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MODEL_DEPRECATIONS, resolveModelId } from '../../src/lib/model-capabilities.js';
+import { MODEL_DEPRECATIONS, resolveModelIdSync } from '../../src/lib/model-capabilities.js';
 import { validateSettingsApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
@@ -29,26 +29,26 @@ describe('Model Deprecation System', () => {
 
   describe('resolveModelId()', () => {
     it('should resolve deprecated model IDs to current ones', () => {
-      expect(resolveModelId('claude-opus-4-5')).toBe('claude-opus-4-7');
-      expect(resolveModelId('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
+      expect(resolveModelIdSync('claude-opus-4-5')).toBe('claude-opus-4-7');
+      expect(resolveModelIdSync('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
     });
 
     it('should return current model IDs unchanged', () => {
-      expect(resolveModelId('claude-opus-4-6')).toBe('claude-opus-4-6');
-      expect(resolveModelId('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
-      expect(resolveModelId('claude-haiku-4-5')).toBe('claude-haiku-4-5');
-      expect(resolveModelId('kimi-k2.5')).toBe('kimi-k2.5');
+      expect(resolveModelIdSync('claude-opus-4-6')).toBe('claude-opus-4-6');
+      expect(resolveModelIdSync('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
+      expect(resolveModelIdSync('claude-haiku-4-5')).toBe('claude-haiku-4-5');
+      expect(resolveModelIdSync('kimi-k2.5')).toBe('kimi-k2.5');
     });
 
     it('should handle unknown model IDs gracefully', () => {
       const unknownId = 'nonexistent-model';
-      expect(resolveModelId(unknownId)).toBe(unknownId);
+      expect(resolveModelIdSync(unknownId)).toBe(unknownId);
     });
 
     it('should be idempotent', () => {
       const deprecated = 'claude-sonnet-4-5';
-      const resolved = resolveModelId(deprecated);
-      expect(resolveModelId(resolved)).toBe(resolved);
+      const resolved = resolveModelIdSync(deprecated);
+      expect(resolveModelIdSync(resolved)).toBe(resolved);
     });
   });
 

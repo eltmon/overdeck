@@ -51,12 +51,14 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
+  resolveGitHubIssueSync: (...args: unknown[]) => mockResolveGitHubIssue(...args),
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 
 // Stub modules imported at issues.ts module scope that are unused by this test.
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   extractTeamPrefix: vi.fn(),
   findProjectByTeam: vi.fn(),
 }));

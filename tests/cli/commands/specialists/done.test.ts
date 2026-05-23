@@ -11,7 +11,9 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
   return {
     ...actual,
     setReviewStatus: mockSetReviewStatus,
+    setReviewStatusSync: mockSetReviewStatus,
     getReviewStatus: vi.fn(),
+    getReviewStatusSync: vi.fn(),
   };
 });
 

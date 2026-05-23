@@ -100,13 +100,9 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
     }
   }
   return null;
-}
-
-export async function readRestartLockHolder(): Promise<RestartLockHolder | null> {
+}async function readRestartLockHolderPromise(): Promise<RestartLockHolder | null> {
   return readHolderFromPath(restartLockPath());
-}
-
-export async function acquireRestartLock(caller: string): Promise<RestartLockHandle | null> {
+}async function acquireRestartLockPromise(caller: string): Promise<RestartLockHandle | null> {
   const path = restartLockPath();
   await mkdir(dirname(path), { recursive: true });
 
@@ -151,9 +147,9 @@ export class RestartLockError extends Data.TaggedError('RestartLockError')<{
 }> {}
 
 /** Effect variant of `readRestartLockHolder`. */
-export const readRestartLockHolderEffect = (): Effect.Effect<RestartLockHolder | null, RestartLockError> =>
+export const readRestartLockHolder = (): Effect.Effect<RestartLockHolder | null, RestartLockError> =>
   Effect.tryPromise({
-    try: () => readRestartLockHolder(),
+    try: () => readRestartLockHolderPromise(),
     catch: (cause) =>
       new RestartLockError({
         operation: 'readRestartLockHolder',
@@ -163,11 +159,11 @@ export const readRestartLockHolderEffect = (): Effect.Effect<RestartLockHolder |
   });
 
 /** Effect variant of `acquireRestartLock`. */
-export const acquireRestartLockEffect = (
+export const acquireRestartLock = (
   caller: string,
 ): Effect.Effect<RestartLockHandle | null, RestartLockError> =>
   Effect.tryPromise({
-    try: () => acquireRestartLock(caller),
+    try: () => acquireRestartLockPromise(caller),
     catch: (cause) =>
       new RestartLockError({
         operation: 'acquireRestartLock',

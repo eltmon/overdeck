@@ -9,10 +9,10 @@
  */
 
 import chalk from 'chalk';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { resetSessionCommand } from './reset-session.js';
 
-const DASHBOARD_URL = getDashboardApiUrl();
+const DASHBOARD_URL = getDashboardApiUrlSync();
 
 export interface ResetReviewOptions {
   session?: boolean;

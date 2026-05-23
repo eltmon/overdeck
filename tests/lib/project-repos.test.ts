@@ -4,6 +4,7 @@ import type { ProjectConfig, ResolvedProject } from '../../src/lib/projects.js';
 const projectsMocks = vi.hoisted(() => ({
   getProject: vi.fn(),
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/projects.js', async () => {
@@ -11,29 +12,31 @@ vi.mock('../../src/lib/projects.js', async () => {
   return {
     ...actual,
     getProject: projectsMocks.getProject,
+    getProjectSync: projectsMocks.getProject,
     resolveProjectFromIssue: projectsMocks.resolveProjectFromIssue,
+    resolveProjectFromIssueSync: projectsMocks.resolveProjectFromIssueSync,
   };
 });
 
 import {
-  inferProjectForge,
-  normalizeForge,
-  resolveConfiguredRepos,
-  resolveProjectReposForIssue,
+  inferProjectForgeSync,
+  normalizeForgeSync,
+  resolveConfiguredReposSync,
+  resolveProjectReposForIssueSync,
 } from '../../src/lib/project-repos.js';
 
 describe('project-repos', () => {
   it('normalizes forge values from config-friendly strings', () => {
-    expect(normalizeForge('github')).toBe('github');
-    expect(normalizeForge('git@gitlab.com:foo/bar.git')).toBe('gitlab');
-    expect(normalizeForge('https://github.com/foo/bar')).toBe('github');
-    expect(normalizeForge('unknown')).toBeNull();
+    expect(normalizeForgeSync('github')).toBe('github');
+    expect(normalizeForgeSync('git@gitlab.com:foo/bar.git')).toBe('gitlab');
+    expect(normalizeForgeSync('https://github.com/foo/bar')).toBe('github');
+    expect(normalizeForgeSync('unknown')).toBeNull();
   });
 
   it('infers a project-level forge when only one forge is configured', () => {
-    expect(inferProjectForge({ github_repo: 'owner/repo', gitlab_repo: undefined })).toBe('github');
-    expect(inferProjectForge({ github_repo: undefined, gitlab_repo: 'group/repo' })).toBe('gitlab');
-    expect(inferProjectForge({ github_repo: 'owner/repo', gitlab_repo: 'group/repo' })).toBeNull();
+    expect(inferProjectForgeSync({ github_repo: 'owner/repo', gitlab_repo: undefined })).toBe('github');
+    expect(inferProjectForgeSync({ github_repo: undefined, gitlab_repo: 'group/repo' })).toBe('gitlab');
+    expect(inferProjectForgeSync({ github_repo: 'owner/repo', gitlab_repo: 'group/repo' })).toBeNull();
   });
 
   it('resolves polyrepo repos from configured metadata', () => {
@@ -53,7 +56,7 @@ describe('project-repos', () => {
       },
     };
 
-    const repos = resolveConfiguredRepos('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
+    const repos = resolveConfiguredReposSync('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
     expect(repos).toHaveLength(3);
     expect(repos[0]).toMatchObject({
       repoKey: 'fe',
@@ -77,7 +80,7 @@ describe('project-repos', () => {
       },
     };
 
-    const repos = resolveConfiguredRepos('panopticon', '/tmp/panopticon', projectConfig, 'PAN-632');
+    const repos = resolveConfiguredReposSync('panopticon', '/tmp/panopticon', projectConfig, 'PAN-632');
     expect(repos).toEqual([
       expect.objectContaining({
         repoKey: 'panopticon',
@@ -105,10 +108,10 @@ describe('project-repos', () => {
         repos: [{ name: 'api', path: 'api', remote: 'gitlab' }],
       },
     };
-    projectsMocks.resolveProjectFromIssue.mockReturnValue(resolvedProject);
+    projectsMocks.resolveProjectFromIssueSync.mockReturnValue(resolvedProject);
     projectsMocks.getProject.mockReturnValue(projectConfig);
 
-    const repos = resolveProjectReposForIssue('MIN-632');
+    const repos = resolveProjectReposForIssueSync('MIN-632');
     expect(repos).toHaveLength(1);
     expect(repos?.[0]).toMatchObject({
       projectKey: 'mind-your-now',

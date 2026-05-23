@@ -63,7 +63,7 @@ const getDiffsRoute = HttpRouter.add(
         let checkpointTurns: string[] = []
         if (workspace) {
           try {
-            checkpointTurns = await listCheckpoints(workspace, agentId)
+            checkpointTurns = await Effect.runPromise(listCheckpoints(workspace, agentId))
           } catch {
             // Workspace might not exist yet
           }
@@ -112,7 +112,7 @@ const getTurnDiffRoute = HttpRouter.add(
           return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
         }
 
-        const checkpoints = await listCheckpoints(workspace, agentId)
+        const checkpoints = await Effect.runPromise(listCheckpoints(workspace, agentId))
         const turnIdx = checkpoints.indexOf(turnId)
         if (turnIdx < 0) {
           return jsonResponse({ error: 'Checkpoint not found' }, { status: 404 })
@@ -121,7 +121,7 @@ const getTurnDiffRoute = HttpRouter.add(
         const fromTurnId = turnIdx > 0 ? checkpoints[turnIdx - 1] : turnId
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const diff = await diffCheckpoints(workspace, agentId, fromTurnId, turnId, filePath)
+        const diff = await Effect.runPromise(diffCheckpoints(workspace, agentId, fromTurnId, turnId, filePath))
 
         return jsonResponse({ agentId, turnId, fromTurnId, diff })
       } catch (error: unknown) {
@@ -165,7 +165,7 @@ const getFullDiffRoute = HttpRouter.add(
           return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
         }
 
-        const checkpoints = await listCheckpoints(workspace, agentId)
+        const checkpoints = await Effect.runPromise(listCheckpoints(workspace, agentId))
         if (checkpoints.length < 2) {
           return jsonResponse({ agentId, diff: '', files: [], turnCount: checkpoints.length })
         }
@@ -174,8 +174,8 @@ const getFullDiffRoute = HttpRouter.add(
         const lastTurn = checkpoints[checkpoints.length - 1]!
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn)
-        const diff = filePath ? await diffCheckpoints(workspace, agentId, firstTurn, lastTurn, filePath) : undefined
+        const files = await Effect.runPromise(diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn))
+        const diff = filePath ? await Effect.runPromise(diffCheckpoints(workspace, agentId, firstTurn, lastTurn, filePath)) : undefined
 
         return jsonResponse({
           agentId,
@@ -226,8 +226,8 @@ const getVsMainDiffRoute = HttpRouter.add(
 
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await diffAgainstMainFiles(workspace)
-        const diff = filePath ? await diffAgainstMain(workspace, filePath) : undefined
+        const files = await Effect.runPromise(diffAgainstMainFiles(workspace))
+        const diff = filePath ? await Effect.runPromise(diffAgainstMain(workspace, filePath)) : undefined
 
         return jsonResponse({ agentId, ...(diff !== undefined && { diff }), files })
       } catch (error: unknown) {
@@ -275,14 +275,14 @@ const postTestCheckpointRoute = HttpRouter.add(
         const turnId = `test-turn-${Date.now()}`
 
         // Capture checkpoint
-        await captureCheckpoint(workspace, agentId, turnId)
+        await Effect.runPromise(captureCheckpoint(workspace, agentId, turnId))
 
         // Get file changes from previous checkpoint (if any)
-        const checkpoints = await listCheckpoints(workspace, agentId)
+        const checkpoints = await Effect.runPromise(listCheckpoints(workspace, agentId))
         const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2]! : null
         let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = []
         if (prevCheckpoint) {
-          files = await diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId)
+          files = await Effect.runPromise(diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId))
         }
 
         // Emit event

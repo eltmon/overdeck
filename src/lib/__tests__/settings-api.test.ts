@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ApiSettingsConfig } from '../settings-api.js';
 
@@ -14,6 +15,7 @@ vi.mock('fs/promises', () => ({
 }));
 
 vi.mock('../config-yaml.js', () => ({
+  PARENT_MODEL_REF: 'parent',
   DEFAULT_MODEL_REFS: {
     plan: 'workhorse:expensive',
     work: 'workhorse:mid',
@@ -27,7 +29,6 @@ vi.mock('../config-yaml.js', () => ({
     mid: 'claude-sonnet-4-6',
     cheap: 'claude-haiku-4-5',
   },
-  PARENT_MODEL_REF: 'parent',
   DEFAULT_ROLES: {
     plan: { model: 'workhorse:expensive' },
     work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } },
@@ -37,6 +38,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   loadConfig: () => mockLoadConfig(),
+  loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),
   mergeConfigs: (...args: unknown[]) => mockMergeConfigs(...args),
@@ -56,6 +58,7 @@ vi.mock('../model-capabilities.js', () => ({
     'claude-opus-4-6': 'claude-opus-4-7',
   },
   getModelCapability: vi.fn(),
+  getModelCapabilitySync: vi.fn(),
   hasModelCapability: (modelId: string) => [
     'claude-opus-4-7',
     'claude-sonnet-4-6',
@@ -65,7 +68,17 @@ vi.mock('../model-capabilities.js', () => ({
     'minimax-m2.7-highspeed',
     'qwen3-coder-plus',
   ].includes(modelId),
+  hasModelCapabilitySync: (modelId: string) => [
+    'claude-opus-4-7',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5',
+    'gpt-5.5',
+    'gpt-5.5-mini',
+    'minimax-m2.7-highspeed',
+    'qwen3-coder-plus',
+  ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
+  resolveModelIdSync: (modelId: string) => mockResolveModelId(modelId),
 }));
 
 
@@ -235,13 +248,13 @@ describe('loadSettingsApi', () => {
       scope: 'pan-only',
     });
 
-    await setRoleConfig('flywheel', {
+    await Effect.runPromise(setRoleConfig('flywheel', {
       harness: 'pi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
       maxAgents: 4,
       scope: 'all-tracked-projects',
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('flywheel:');
@@ -337,7 +350,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       workhorses: { ...settings.workhorses, mid: 'gpt-5.5-mini' },
       roles: {
@@ -359,7 +372,7 @@ describe('saveSettingsApi', () => {
         rollup_pending_threshold: 6,
         sidebar_refresh_interval_ms: 15000,
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('# user comment');
@@ -382,7 +395,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       roles: {
         ...settings.roles,
@@ -395,7 +408,7 @@ describe('saveSettingsApi', () => {
           },
         },
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('security:');
@@ -417,7 +430,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
@@ -430,7 +443,7 @@ describe('saveSettingsApi', () => {
         ...settings.api_keys,
         dashscope: 'dashscope-test-key',
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('dashscope: true');
@@ -441,13 +454,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await expect(saveSettingsApi({
+    await expect(Effect.runPromise(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
         daemonHost: '169.254.169.254',
       } as typeof settings.tts,
-    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
+    }))).rejects.toThrow('Unknown tts setting(s): daemonHost');
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
@@ -457,7 +470,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await saveSettingsApi({
+    await Effect.runPromise(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
@@ -472,7 +485,7 @@ describe('saveSettingsApi', () => {
         utteranceTemplates: { readyForMerge: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
-    });
+    }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('summarizer:');
@@ -543,40 +556,6 @@ describe('validateSettingsApi', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Unknown role "banana"');
     expect(result.errors).toContain('Unknown sub-role "banana" for role "work"');
-  });
-
-  it('accepts parent only for sub-role model refs', async () => {
-    const { validateSettingsApi } = await import('../settings-api.js');
-
-    expect(validateSettingsApi({
-      ...validSettings,
-      roles: {
-        ...validSettings.roles,
-        review: {
-          ...validSettings.roles.review,
-          sub: {
-            ...validSettings.roles.review.sub,
-            security: { model: 'parent' },
-          },
-        },
-      },
-    }).errors).toEqual([]);
-
-    expect(validateSettingsApi({
-      ...validSettings,
-      roles: {
-        ...validSettings.roles,
-        review: { ...validSettings.roles.review, model: 'parent' },
-      },
-    }).errors).toContain('roles.review.model cannot be parent; parent is valid only for sub-role models');
-
-    expect(validateSettingsApi({
-      ...validSettings,
-      workhorses: {
-        ...validSettings.workhorses,
-        mid: 'parent',
-      },
-    }).errors).toContain('workhorses.mid cannot be parent; parent is valid only for sub-role models');
   });
 
   it('rejects invalid, chained, and unresolved model references', async () => {

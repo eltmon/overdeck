@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,11 +24,11 @@ describe('restart status', () => {
   });
 
   it('returns null when the status file is missing', async () => {
-    expect(await readRestartStatus()).toBeNull();
+    expect(await Effect.runPromise(readRestartStatus())).toBeNull();
   });
 
   it('writes and reads the latest restart status', async () => {
-    await writeRestartStatus({
+    await Effect.runPromise(writeRestartStatus({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,
@@ -35,9 +36,9 @@ describe('restart status', () => {
       durationMs: 1234,
       attempts: 3,
       gaveUp: true,
-    });
+    }));
 
-    expect(await readRestartStatus()).toEqual({
+    expect(await Effect.runPromise(readRestartStatus())).toEqual({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,

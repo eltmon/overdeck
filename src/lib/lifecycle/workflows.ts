@@ -27,8 +27,8 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
-import { loadCloisterConfigEffect } from '../cloister/config.js';
-import { extractNumber, extractPrefix } from '../issue-id.js';
+import { loadCloisterConfig } from '../cloister/config.js';
+import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -188,7 +188,7 @@ export function closeOut(
     }
 
     // 4+5. Teardown workspace + agent state
-    const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfigEffect()))).close_out;
+    const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
       deleteBranches: closeOutConfig?.delete_feature_branch ?? false,
@@ -347,13 +347,13 @@ async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
     const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
-    const result = await transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionVBriefOnMain(
       ctx.projectPath,
       ctx.issueId,
       'completed',
       'completed',
       `scope: complete ${ctx.issueId.toUpperCase()} vBRIEF`,
-    );
+    ));
     const details = [
       result.moved ? 'Updated vBRIEF lifecycle to completed' : 'vBRIEF lifecycle already completed',
       result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
@@ -361,7 +361,8 @@ async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
     if (result.committed) details.push('Committed vBRIEF completion on main');
     return stepOk(step, details);
   } catch (err) {
-    const message = (err as Error).message;
+    const cause = (err as { cause?: unknown }).cause ?? err;
+    const message = cause instanceof Error ? cause.message : String(cause);
     if (message.includes('No vBRIEF found')) {
       return stepSkipped(step, [`No vBRIEF found for ${ctx.issueId}`]);
     }
@@ -553,8 +554,8 @@ async function resetIssueToTodoImpl(ctx: LifecycleContext): Promise<StepResult> 
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
-      const issueNum = extractNumber(ctx.issueId);
-      const teamKey = extractPrefix(ctx.issueId);
+      const issueNum = extractNumberSync(ctx.issueId);
+      const teamKey = extractPrefixSync(ctx.issueId);
       if (issueNum === null || teamKey === null) {
         return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
       }
@@ -667,8 +668,8 @@ async function resetIssueToCanceledImpl(ctx: LifecycleContext): Promise<StepResu
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
-      const issueNum = extractNumber(ctx.issueId);
-      const teamKey = extractPrefix(ctx.issueId);
+      const issueNum = extractNumberSync(ctx.issueId);
+      const teamKey = extractPrefixSync(ctx.issueId);
       if (issueNum === null || teamKey === null) {
         return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
       }

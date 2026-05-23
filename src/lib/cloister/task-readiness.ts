@@ -9,7 +9,7 @@
  */
 
 import { Effect } from 'effect';
-import { readWorkspacePlan, readWorkspacePlanEffect, type VBriefReadError } from '../vbrief/io.js';
+import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from '../vbrief/io.js';
 import type { VBriefItemStatus } from '../vbrief/types.js';
 
 const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
@@ -20,8 +20,8 @@ const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
  *
  * When no plan exists for the workspace, returns true (no-op for legacy flows).
  */
-export function isTaskReady(itemId: string, workspacePath: string): boolean {
-  const doc = readWorkspacePlan(workspacePath);
+export function isTaskReadySync(itemId: string, workspacePath: string): boolean {
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return true; // No plan → all tasks ready
 
   // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in vBRIEF)
@@ -53,8 +53,8 @@ export function isTaskReady(itemId: string, workspacePath: string): boolean {
  *
  * Returns [] when no plan exists.
  */
-export function getUnblockedItems(workspacePath: string, justCompletedId: string): string[] {
-  const doc = readWorkspacePlan(workspacePath);
+export function getUnblockedItemsSync(workspacePath: string, justCompletedId: string): string[] {
+  const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return [];
 
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
@@ -95,16 +95,16 @@ export function getUnblockedItems(workspacePath: string, justCompletedId: string
 // ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
 
 /**
- * Effect variant of {@link isTaskReady}. Reads the workspace plan asynchronously
+ * Effect variant of {@link isTaskReadySync}. Reads the workspace plan asynchronously
  * via the typed Effect API. Returns `true` when the plan is missing or the item
  * is unknown (gracefully degrades for legacy flows).
  */
-export const isTaskReadyEffect = (
+export const isTaskReady = (
   itemId: string,
   workspacePath: string,
 ): Effect.Effect<boolean, VBriefReadError> =>
   Effect.gen(function* () {
-    const doc = yield* readWorkspacePlanEffect(workspacePath);
+    const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return true;
 
     const itemExists = doc.plan.items.some((i) => i.id === itemId);
@@ -125,15 +125,15 @@ export const isTaskReadyEffect = (
   });
 
 /**
- * Effect variant of {@link getUnblockedItems}. Returns the list of item IDs
+ * Effect variant of {@link getUnblockedItemsSync}. Returns the list of item IDs
  * that are newly unblocked after `justCompletedId` reaches a terminal status.
  */
-export const getUnblockedItemsEffect = (
+export const getUnblockedItems = (
   workspacePath: string,
   justCompletedId: string,
 ): Effect.Effect<string[], VBriefReadError> =>
   Effect.gen(function* () {
-    const doc = yield* readWorkspacePlanEffect(workspacePath);
+    const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return [];
 
     const itemById = new Map(doc.plan.items.map((i) => [i.id, i]));

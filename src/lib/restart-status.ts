@@ -21,17 +21,13 @@ function restartStatusPath(): string {
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
-}
-
-export async function writeRestartStatus(entry: RestartStatus): Promise<void> {
+}async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   const path = restartStatusPath();
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
   await rename(tmp, path);
-}
-
-export async function readRestartStatus(): Promise<RestartStatus | null> {
+}async function readRestartStatusPromise(): Promise<RestartStatus | null> {
   try {
     const parsed = JSON.parse(await readFile(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
     if (
@@ -72,11 +68,11 @@ export class RestartStatusError extends Data.TaggedError('RestartStatusError')<{
 }> {}
 
 /** Effect variant of `writeRestartStatus`. */
-export const writeRestartStatusEffect = (
+export const writeRestartStatus = (
   entry: RestartStatus,
 ): Effect.Effect<void, RestartStatusError> =>
   Effect.tryPromise({
-    try: () => writeRestartStatus(entry),
+    try: () => writeRestartStatusPromise(entry),
     catch: (cause) =>
       new RestartStatusError({
         operation: 'writeRestartStatus',
@@ -86,9 +82,9 @@ export const writeRestartStatusEffect = (
   });
 
 /** Effect variant of `readRestartStatus`. */
-export const readRestartStatusEffect = (): Effect.Effect<RestartStatus | null, RestartStatusError> =>
+export const readRestartStatus = (): Effect.Effect<RestartStatus | null, RestartStatusError> =>
   Effect.tryPromise({
-    try: () => readRestartStatus(),
+    try: () => readRestartStatusPromise(),
     catch: (cause) =>
       new RestartStatusError({
         operation: 'readRestartStatus',

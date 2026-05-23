@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for checkFailedMergeRetry — CI failure notification state machine.
  * Tests for checkPostReviewCommits — ciRetryMap.delete on new-commit detection.
@@ -29,6 +30,7 @@ const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
   MAX_AUTO_REQUEUE: 25,
 }));
@@ -36,23 +38,25 @@ vi.mock('../../../src/lib/review-status.js', () => ({
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
   return {
-    sessionExists: (...args: unknown[]) => mockSessionExists(...args),
-    sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
-    sessionExistsAsyncEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
+    sessionExists: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
+    sessionExistsSync: (...args: unknown[]) => mockSessionExists(...args),
+    sendKeys: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
+    sendKeysProgram: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
     buildTmuxCommandString: vi.fn(),
-    capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
-    createSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
-    isPaneDeadAsyncEffect: vi.fn(() => Effect.succeed(false)),
+    capturePane: vi.fn(() => Effect.succeed('')),
+    createSession: vi.fn(() => Effect.succeed(undefined)),
+    isPaneDead: vi.fn(() => Effect.succeed(false)),
     killSession: vi.fn(),
-    killSessionAsyncEffect: vi.fn(() => Effect.succeed(undefined)),
+  killSessionSync: vi.fn(),
+    killSession: vi.fn(() => Effect.succeed(undefined)),
     listPaneValues: vi.fn(),
-    listPaneValuesAsyncEffect: vi.fn(() => Effect.succeed([])),
-    listSessionNamesAsyncEffect: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listSessionNames: vi.fn(() => Effect.succeed([])),
   };
 });
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
-  writeFeedbackFile: (...args: unknown[]) => mockWriteFeedbackFile(...args),
+  writeFeedbackFile: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockWriteFeedbackFile(...args))),
 }));
 
 // Stub out heavy transitive dependencies that deacon imports at module level.
@@ -67,17 +71,23 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
-  listRunningAgents: vi.fn().mockResolvedValue([]),
+  listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: vi.fn().mockReturnValue(null),
+  getAgentStateSync: vi.fn().mockReturnValue(null),
   saveAgentState: vi.fn(),
+  saveAgentStateSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
+  resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
   findProjectByPath: vi.fn().mockReturnValue(null),
+  findProjectByPathSync: vi.fn().mockReturnValue(null),
 }));
 
 // ── Test constants ──────────────────────────────────────────────────────────

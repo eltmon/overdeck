@@ -198,6 +198,49 @@ beforeAll(async () => {
   vite = await createServer({
     root: frontendRoot,
     plugins: [{
+      name: 'styleguide-mock-ws-transport',
+      enforce: 'pre',
+      transform(_code: string, id: string) {
+        if (!id.endsWith('/src/lib/wsTransport.ts')) return null;
+        return {
+          code: `
+            import { Effect, Stream } from 'effect';
+
+            function cachedSnapshot() {
+              const raw = localStorage.getItem('pan-snapshot-cache-v1');
+              return raw ? JSON.parse(raw).data : null;
+            }
+
+            const client = new Proxy({}, {
+              get(_target, prop) {
+                const method = String(prop);
+                if (method === 'pan.getSnapshot') return () => Effect.succeed(cachedSnapshot());
+                if (method === 'pan.replayEvents') return () => Effect.succeed([]);
+                if (method.startsWith('pan.subscribe')) return () => Stream.empty;
+                return () => Effect.succeed(null);
+              },
+            });
+
+            export class WsTransport {
+              async request(execute) { return Effect.runPromise(execute(client)); }
+              async requestStream(connect, listener) {
+                await Effect.runPromise(Stream.runForEach(connect(client), (value) => Effect.sync(() => listener(value))));
+              }
+              subscribe() { return () => undefined; }
+              dispose() {}
+            }
+
+            let transport = new WsTransport();
+            export function getTransport() { return transport; }
+            export function resetTransport() { transport = new WsTransport(); }
+            export function ensureDashboardSession() { return Promise.resolve(); }
+            export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json' }; }
+            export function subscribeFlywheelStatus() { return () => undefined; }
+          `,
+          map: null,
+        };
+      },
+    }, {
       name: 'styleguide-empty-index-css',
       enforce: 'pre',
       transform(_code: string, id: string) {
@@ -233,7 +276,7 @@ describe('styleguide rendered surface conformance', () => {
     await board.context.close();
 
     const commandDeck = await openRoute('/command-deck');
-    await commandDeck.page.locator('[data-component="project-node"][data-project-name="Panopticon"]').click();
+    await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
     await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count()).toBe(1);
     await expect.poll(() => commandDeck.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await commandDeck.context.close();

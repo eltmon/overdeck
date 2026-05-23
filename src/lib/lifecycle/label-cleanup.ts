@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
-import { extractNumber, extractPrefix } from '../issue-id.js';
+import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
@@ -110,8 +110,8 @@ async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promi
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNum = extractNumber(ctx.issueId);
-    const teamKey = extractPrefix(ctx.issueId);
+    const issueNum = extractNumberSync(ctx.issueId);
+    const teamKey = extractPrefixSync(ctx.issueId);
     if (issueNum === null || teamKey === null) {
       return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
     }

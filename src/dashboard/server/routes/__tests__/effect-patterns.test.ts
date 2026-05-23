@@ -32,40 +32,34 @@ async function runRoute(
 
 describe('Effect.promise async FS pattern', () => {
   it('returns 200 when async operation succeeds', async () => {
-    const effect = httpHandler(
-      Effect.promise(async () => {
-        // Simulate async FS read
-        const data = await Promise.resolve({ value: 42 });
-        return jsonResponse(data);
-      })
-    );
+    const effect = Effect.promise(async () => {
+      // Simulate async FS read
+      const data = await Promise.resolve({ value: 42 });
+      return jsonResponse(data);
+    });
     const { status, body } = await runRoute(effect);
     expect(status).toBe(200);
     expect((body as { value: number }).value).toBe(42);
   });
 
   it('maps async rejection to 500 via httpHandler catchCause', async () => {
-    const effect = httpHandler(
-      Effect.promise(async () => {
-        throw new Error('async FS failure');
-      }) as Effect.Effect<HttpServerResponse, never, never>
-    );
+    const effect = Effect.promise(async () => {
+      throw new Error('async FS failure');
+    }) as Effect.Effect<HttpServerResponse, never, never>;
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
     expect((body as { error: string }).error).toContain('async FS failure');
   });
 
   it('inline try/catch returns error response without failing Effect', async () => {
-    const effect = httpHandler(
-      Effect.promise(async () => {
-        try {
-          throw new Error('handled error');
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return jsonResponse({ error: msg }, { status: 500 });
-        }
-      })
-    );
+    const effect = Effect.promise(async () => {
+      try {
+        throw new Error('handled error');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ error: msg }, { status: 500 });
+      }
+    });
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
     expect((body as { error: string }).error).toBe('handled error');
@@ -120,14 +114,14 @@ describe('EventStoreService.append via yield*', () => {
 
     const testLayer = Layer.succeed(EventStoreService, mockEventStore as any);
 
-    const routeEffect = Effect.gen(function* () {
+    const routeProgram = Effect.gen(function* () {
       const eventStore = yield* EventStoreService;
       yield* eventStore.append({ type: 'test.event', timestamp: new Date().toISOString(), payload: {} });
       return jsonResponse({ ok: true });
     });
 
     const response = await Effect.runPromise(
-      Effect.provide(httpHandler(routeEffect), testLayer)
+      Effect.provide(httpHandler(routeProgram), testLayer)
     );
     const body = response.body as { body: Uint8Array } | null;
     const text = body?.body ? new TextDecoder().decode(body.body) : '{}';

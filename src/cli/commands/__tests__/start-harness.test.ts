@@ -7,6 +7,7 @@ const readlineMocks = vi.hoisted(() => ({
 
 const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   clearAgentPaused: vi.fn(),
 }))
 
@@ -24,6 +25,7 @@ vi.mock('readline/promises', () => ({
 vi.mock('../../../lib/agents.js', () => ({
   spawnAgent: vi.fn(async () => ({ id: 'agent-x', issueId: 'PAN-X', workspace: '/tmp', model: 'm', startedAt: new Date().toISOString() })),
   getAgentState: agentMocks.getAgentState,
+  getAgentStateSync: agentMocks.getAgentState,
   clearAgentPaused: agentMocks.clearAgentPaused,
   getProviderAuthMode: vi.fn(async () => 'subscription'),
   getProviderEnvForModel: vi.fn(async () => ({})),

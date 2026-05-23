@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -72,11 +73,11 @@ describe('writeAutoStartVBrief', () => {
       const projectRoot = join(root, 'project');
       const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1071');
 
-      const result = await writeAutoStartVBrief(projectRoot, workspacePath, {
+      const result = await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspacePath, {
         issueId: 'PAN-1071',
         title: 'Auto start work agents',
         body: '- [ ] Start from an issue body',
-      });
+      }));
 
       const workspaceDoc = JSON.parse(await readFile(result.workspaceSpecPath, 'utf-8'));
       const projectDoc = JSON.parse(await readFile(result.projectSpecPath, 'utf-8'));

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChildEnv, buildChildEnvWithoutTmux } from '../../src/lib/child-env.js';
+import { buildChildEnvSync, buildChildEnvWithoutTmuxSync } from '../../src/lib/child-env.js';
 
 describe('buildChildEnv', () => {
   it('strips tmux/screen artifacts and provider keys', () => {
@@ -14,7 +14,7 @@ describe('buildChildEnv', () => {
       OPENAI_API_KEY: 'sk-xxx',
       HOME: '/home/test',
     };
-    const result = buildChildEnv(base as NodeJS.ProcessEnv, { CUSTOM: 'value' });
+    const result = buildChildEnvSync(base as NodeJS.ProcessEnv, { CUSTOM: 'value' });
 
     expect(result.PATH).toBe('/usr/bin');
     expect(result.HOME).toBe('/home/test');
@@ -31,13 +31,13 @@ describe('buildChildEnv', () => {
 
   it('overrides strip keys when explicitly provided', () => {
     const base = { PATH: '/usr/bin', TMUX: 'yes' };
-    const result = buildChildEnv(base as NodeJS.ProcessEnv, { TMUX: 'allowed' });
+    const result = buildChildEnvSync(base as NodeJS.ProcessEnv, { TMUX: 'allowed' });
     expect(result.TMUX).toBe('allowed');
   });
 
   it('ignores undefined values in baseEnv', () => {
     const base = { PATH: '/usr/bin', FOO: undefined };
-    const result = buildChildEnv(base as NodeJS.ProcessEnv);
+    const result = buildChildEnvSync(base as NodeJS.ProcessEnv);
     expect(result).not.toHaveProperty('FOO');
   });
 });
@@ -49,7 +49,7 @@ describe('buildChildEnvWithoutTmux', () => {
       TMUX: 'yes',
       ANTHROPIC_BASE_URL: 'http://proxy',
     };
-    const result = buildChildEnvWithoutTmux(base as NodeJS.ProcessEnv);
+    const result = buildChildEnvWithoutTmuxSync(base as NodeJS.ProcessEnv);
     expect(result.TMUX).toBeUndefined();
     expect(result.ANTHROPIC_BASE_URL).toBe('http://proxy');
   });

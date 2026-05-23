@@ -112,7 +112,7 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
 // ─── Per-tool installers ──────────────────────────────────────────────────────
 
 async function installTmux(): Promise<InstallResult> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
     await execAsync("brew install tmux", { timeout: 120000 });
   } else {
@@ -124,7 +124,7 @@ async function installTmux(): Promise<InstallResult> {
 }
 
 async function installTtyd(): Promise<InstallResult> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   const binDir = join(homedir(), "bin");
   mkdirSync(binDir, { recursive: true });
   const ttydPath = join(binDir, "ttyd");
@@ -150,7 +150,7 @@ async function installTtyd(): Promise<InstallResult> {
 }
 
 async function installMkcert(): Promise<InstallResult> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
     await execAsync("brew install mkcert", { timeout: 120000 });
     await execAsync("mkcert -install", { timeout: 30000 });
@@ -179,7 +179,7 @@ async function installMkcert(): Promise<InstallResult> {
 }
 
 async function installBeads(): Promise<InstallResult> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
     try {
       await execAsync("brew install gastownhall/beads/bd", {
@@ -207,7 +207,7 @@ async function installBeads(): Promise<InstallResult> {
 }
 
 async function installOx(): Promise<InstallResult> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   const arch = process.arch === "x64" ? "amd64" : process.arch;
   const platform = plat === "darwin" ? "darwin" : "linux";
   const binDir = join(homedir(), ".local", "bin");

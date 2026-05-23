@@ -52,22 +52,22 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
-import { createSessionAsyncEffect, killSessionAsyncEffect, listSessionNamesAsyncEffect, resizeWindowAsyncEffect, sendKeysEffect, sessionExistsAsyncEffect } from '../../../lib/tmux.js';
-import { generateLauncherScript } from '../../../lib/launcher-generator.js';
-import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
-import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
+import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
+import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
+import { listProjectsSync, resolveProjectFromIssueSync, findProjectByTeamSync, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
   getLinearApiKey as getLinearApiKeyShared,
   getGitHubConfig as getGitHubConfigShared,
   getRallyConfig as getRallyConfigShared,
 } from '../services/tracker-config.js';
-import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
-import { loadConfig as loadPanConfig } from '../../../lib/config.js';
-import { checkAgentHealthEffect, determineHealthStatusEffect } from '../../lib/health-filtering.js';
-import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
-import { findPlanEffect, readPlanEffect } from '../../../lib/vbrief/io.js';
+import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
+import { checkAgentHealth, determineHealthStatus } from '../../lib/health-filtering.js';
+import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { extractPrefixSync } from '../../../lib/issue-id.js';
+import { findPlan, readPlan } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
@@ -158,7 +158,7 @@ async function saveProjectMappings(mappings: ProjectMapping[]): Promise<void> {
 async function getProjectPath(issuePrefix?: string): Promise<string> {
   if (issuePrefix) {
     const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssue(issueId);
+    const resolved = resolveProjectFromIssueSync(issueId);
     if (resolved) return resolved.projectPath;
     const mappings = await getProjectMappings();
     const mapping = mappings.find(m => m.linearPrefix === issuePrefix);
@@ -210,13 +210,13 @@ const pendingConfirmations = new Map<string, ConfirmationRequest>();
 
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
 
-const checkPlanStatusEffect = (
+const checkPlanStatus = (
   workspacePath: string,
   matchStatus: (status: string) => boolean,
 ): Effect.Effect<boolean, unknown> => Effect.gen(function* () {
-  const planPath = yield* findPlanEffect(workspacePath);
+  const planPath = yield* findPlan(workspacePath);
   if (!planPath) return false;
-  const status = yield* readPlanEffect(planPath).pipe(
+  const status = yield* readPlan(planPath).pipe(
     Effect.map(doc => doc.plan?.status),
     Effect.catch(() => Effect.succeed(undefined)),
   );
@@ -459,14 +459,14 @@ const getHealthAgentsRoute = HttpRouter.add(
 
       // Fetch the live tmux session set ONCE for the whole request — per-agent
       // liveness checks used to fork once per agent dir (~150 forks per poll).
-      const liveSessions = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
+      const liveSessions = new Set(await Effect.runPromise(listSessionNames()));
 
       const agents = await Promise.all(
         agentNames.map(async name => {
           const stateFile = join(agentsDir, name, 'state.json');
           const healthFile = join(agentsDir, name, 'health.json');
 
-          const healthStatus = await Effect.runPromise(determineHealthStatusEffect(name, stateFile, liveSessions));
+          const healthStatus = await Effect.runPromise(determineHealthStatus(name, stateFile, liveSessions));
           if (!healthStatus) return null;
 
           // Only read health.json for agents that survive the status filter —
@@ -519,7 +519,7 @@ const postHealthAgentPingRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
     try {
-        const health = await Effect.runPromise(checkAgentHealthEffect(id));
+        const health = await Effect.runPromise(checkAgentHealth(id));
 
         if (!health.alive) {
           return jsonResponse({ success: false, status: 'dead' });
@@ -582,7 +582,7 @@ const getTrackerStatusRoute = HttpRouter.add(
       }> = [];
 
       // Only report trackers that have at least one project using them
-      const projects = listProjects();
+      const projects = listProjectsSync();
       const cfgs = projects.map(p => p.config as unknown as Record<string, unknown>);
       const trackerHasProjects: Record<string, boolean> = {
         linear: cfgs.some(c => !!c.linear_project),
@@ -818,8 +818,8 @@ const getVersionRoute = HttpRouter.add(
     // is healthy, then use it as a fallback when the dashboard is dead.
     let supervisorUrl: string | null = null;
     try {
-      const { getSupervisorUrl } = await import('../../../lib/supervisor.js');
-      supervisorUrl = getSupervisorUrl();
+      const { getSupervisorUrlSync } = await import('../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrlSync();
     } catch {
       // supervisor module not available in this build — benign
     }
@@ -834,7 +834,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
   '/api/registered-projects',
   Effect.try({
     try: () => {
-      const projects = listProjects();
+      const projects = listProjectsSync();
       return jsonResponse(
         projects.map(p => ({
           key: p.key,
@@ -890,7 +890,7 @@ const postConfirmationRespondRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
     try {
         const response = confirmed ? 'y' : 'n';
-        await Effect.runPromise(sendKeysEffect(confirmationRequest.sessionName, response));
+        await Effect.runPromise(sendKeys(confirmationRequest.sessionName, response));
         pendingConfirmations.delete(id);
         return jsonResponse({ success: true, confirmed });
       }    catch (error: unknown) {
@@ -971,7 +971,7 @@ const getPlanningStatusRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1000,24 +1000,24 @@ const getPlanningStatusRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExistsAsyncEffect(sessionName));
+            sessionExists = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
         const hasContinueFile = existsSync(panContinueFile);
-        const hasPlanningState = hasContinueFile || await Effect.runPromise(findPlanEffect(workspacePath)) !== null;
+        const hasPlanningState = hasContinueFile || await Effect.runPromise(findPlan(workspacePath)) !== null;
         const hasPromptFile = hasPlanningState;
         // hasCompletionMarker means `plan.status === 'proposed'` (gates the
         // dashboard Done button which should hide once the user has approved).
         // planningCompleted means `plan.status` indicates planning has finished
         // (any of proposed/approved/pending/running/completed/blocked).
         const hasCompletionMarker = existsSync(panDir)
-          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => status === 'proposed'))
+          ? await Effect.runPromise(checkPlanStatus(workspacePath, status => status === 'proposed'))
           : false;
         const planningCompleted = existsSync(panDir)
-          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => PLANNING_FINISHED_STATUSES.has(status)))
+          ? await Effect.runPromise(checkPlanStatus(workspacePath, status => PLANNING_FINISHED_STATUSES.has(status)))
           : false;
 
         return jsonResponse({
@@ -1078,7 +1078,7 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
         if (!projectPath) {
           const teamPrefix = extractTeamPrefix(issueId);
-          const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+          const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
           projectPath = projectConfig?.path || '';
         }
 
@@ -1116,12 +1116,12 @@ const postPlanningMessageRoute = HttpRouter.add(
         let sessionExists = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExistsAsyncEffect(sessionName));
+            sessionExists = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
         if (sessionExists) {
-          await Effect.runPromise(sendKeysEffect(sessionName, message, 'planning user message'));
+          await Effect.runPromise(sendKeys(sessionName, message, 'planning user message'));
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
@@ -1201,14 +1201,14 @@ Continue the PLANNING session. Do NOT implement anything.
           await rename(outputFile, backupPath);
         }
 
-        const { getAgentCommand } = await import('../../../lib/settings.js');
+        const { getAgentCommandSync } = await import('../../../lib/settings.js');
         let msgPlanningModel = 'claude-sonnet-4-6';
         try {
-          const { loadConfig, resolveModel } = await import('../../../lib/config-yaml.js');
-          msgPlanningModel = resolveModel('plan', undefined, loadConfig().config);
+          const { loadConfigSync, resolveModel } = await import('../../../lib/config-yaml.js');
+          msgPlanningModel = resolveModel('plan', undefined, loadConfigSync().config);
         } catch { /* fall back to default */ }
-        const msgAgentCmd = getAgentCommand(msgPlanningModel);
-        const msgPermissionFlags = getClaudePermissionFlagsString();
+        const msgAgentCmd = getAgentCommandSync(msgPlanningModel);
+        const msgPermissionFlags = getClaudePermissionFlagsStringSync();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
             ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
@@ -1219,7 +1219,7 @@ Continue the PLANNING session. Do NOT implement anything.
 
         await writeFile(
           launcherScript,
-          generateLauncherScript({
+          generateLauncherScriptSync({
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
@@ -1228,10 +1228,10 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
-        await Effect.runPromise(createSessionAsyncEffect(sessionName, agentCwd, `bash '${launcherScript}'`));
+        await Effect.runPromise(createSession(sessionName, agentCwd, `bash '${launcherScript}'`));
 
         try {
-          await Effect.runPromise(resizeWindowAsyncEffect(sessionName, 200, 50));
+          await Effect.runPromise(resizeWindow(sessionName, 200, 50));
         } catch {}
 
         await Effect.runPromise(eventStore.append({
@@ -1272,7 +1272,7 @@ const deletePlanningSessionRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        await Effect.runPromise(killSessionAsyncEffect(sessionName));
+        await Effect.runPromise(killSession(sessionName));
         return jsonResponse({ success: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1297,7 +1297,7 @@ const getTldrStatusRoute = HttpRouter.add(
   '/api/services/tldr/status',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { getTldrDaemonServiceSync } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1313,7 +1313,7 @@ const getTldrStatusRoute = HttpRouter.add(
       }> = [];
 
       if (existsSync(venvPath)) {
-        const service = getTldrDaemonService(projectRoot, venvPath);
+        const service = getTldrDaemonServiceSync(projectRoot, venvPath);
         const status = await service.getStatus();
         const indexStats = getIndexStats(projectRoot, true);
 
@@ -1338,7 +1338,7 @@ const getTldrStatusRoute = HttpRouter.add(
           const wsVenvPath = join(wsPath, '.venv');
 
           if (existsSync(wsVenvPath)) {
-            const service = getTldrDaemonService(wsPath, wsVenvPath);
+            const service = getTldrDaemonServiceSync(wsPath, wsVenvPath);
             const status = await service.getStatus();
             const indexStats = getIndexStats(wsPath, false);
 
@@ -1369,7 +1369,7 @@ const postTldrStartRoute = HttpRouter.add(
   '/api/services/tldr/start',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { getTldrDaemonServiceSync } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1380,7 +1380,7 @@ const postTldrStartRoute = HttpRouter.add(
         );
       }
 
-      const service = getTldrDaemonService(projectRoot, venvPath);
+      const service = getTldrDaemonServiceSync(projectRoot, venvPath);
       await service.start();
       return jsonResponse({ success: true, message: 'TLDR daemon started' });
     }    catch (error: unknown) {
@@ -1397,7 +1397,7 @@ const postTldrStopRoute = HttpRouter.add(
   '/api/services/tldr/stop',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
+      const { getTldrDaemonServiceSync } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -1408,7 +1408,7 @@ const postTldrStopRoute = HttpRouter.add(
         );
       }
 
-      const service = getTldrDaemonService(projectRoot, venvPath);
+      const service = getTldrDaemonServiceSync(projectRoot, venvPath);
       await service.stop();
       return jsonResponse({ success: true, message: 'TLDR daemon stopped' });
     }    catch (error: unknown) {
@@ -1545,7 +1545,7 @@ const postShadowMonitorRoute = HttpRouter.add(
     // /api/shadow/:issueId/monitor → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -1559,13 +1559,13 @@ const postShadowMonitorRoute = HttpRouter.add(
         const {
           gatherArtifacts,
           generateBasicInference,
-          updateInferenceDocument,
+          updateInferenceDocumentSync,
         } = await import('../../../lib/shadow-engineering/index.js');
 
         const config = { issueId, workspacePath, projectPath };
-        const artifacts = await gatherArtifacts(config);
+        const artifacts = await Effect.runPromise(gatherArtifacts(config));
         const inference = generateBasicInference(config, artifacts);
-        updateInferenceDocument(workspacePath, inference);
+        updateInferenceDocumentSync(workspacePath, inference);
 
         return jsonResponse({ success: true, inference });
       } catch (error: unknown) {
@@ -1591,7 +1591,7 @@ const postShadowObserveRoute = HttpRouter.add(
     // /api/shadow/:issueId/observe → parts[3] = issueId
     const issueId = parts[3] || '';
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
 
     const body = yield* readJsonBody;
     const { mode } = body as { mode?: string };
@@ -1624,7 +1624,7 @@ const postShadowObserveRoute = HttpRouter.add(
           mode: ((mode || 'watch') as 'watch' | 'propose'),
         };
 
-        const commentsPosted = await runObserverCycle(config);
+        const commentsPosted = await Effect.runPromise(runObserverCycle(config));
         return jsonResponse({ success: true, commentsPosted });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

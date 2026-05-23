@@ -205,7 +205,7 @@ export function removeDnsmasqEntry(hostname: string): boolean {
 }
 
 export async function restartDnsmasq(): Promise<boolean> {
-  const plat = Effect.runSync(detectPlatform());
+  const plat = await Effect.runPromise(detectPlatform());
   try {
     if (plat === 'darwin') {
       await execAsync('brew services restart dnsmasq');

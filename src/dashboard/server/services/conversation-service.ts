@@ -11,7 +11,7 @@ import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
-import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
+import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 /** Detect AI provider from model name */
@@ -442,9 +442,9 @@ export async function parseConversationMessages(
 
       // Accumulate cost from usage data
       if (msg.usage && msg.model) {
-        const pricing = getPricing(providerFromModel(msg.model), msg.model);
+        const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
         if (pricing) {
-          totalCost += calculateCost({
+          totalCost += calculateCostSync({
             inputTokens: msg.usage.input_tokens ?? 0,
             outputTokens: msg.usage.output_tokens ?? 0,
             cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,

@@ -21,7 +21,7 @@ class DatabaseError extends Data.TaggedError('DatabaseError')<{
   readonly cause?: unknown;
 }> {}
 
-const getSettingEffect = (key: string): Effect.Effect<string | null, DatabaseError> =>
+const getSettingProgram = (key: string): Effect.Effect<string | null, DatabaseError> =>
   Effect.try({
     try: () => {
       const db = getDatabase();
@@ -33,7 +33,7 @@ const getSettingEffect = (key: string): Effect.Effect<string | null, DatabaseErr
     catch: (cause) => new DatabaseError({ operation: `getSetting(${key})`, cause }),
   });
 
-const setSettingEffect = (key: string, value: string): Effect.Effect<void, DatabaseError> =>
+const setSettingProgram = (key: string, value: string): Effect.Effect<void, DatabaseError> =>
   Effect.try({
     try: () => {
       const db = getDatabase();
@@ -47,11 +47,11 @@ const setSettingEffect = (key: string, value: string): Effect.Effect<void, Datab
   });
 
 export function getSetting(key: string): string | null {
-  return Effect.runSync(getSettingEffect(key));
+  return Effect.runSync(getSettingProgram(key));
 }
 
 export function setSetting(key: string, value: string): void {
-  Effect.runSync(setSettingEffect(key, value));
+  Effect.runSync(setSettingProgram(key, value));
 }
 
 // ============== Deacon global pause ==============
@@ -60,7 +60,7 @@ export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
 
 export function isDeaconGloballyPaused(): boolean {
   return Effect.runSync(
-    getSettingEffect(DEACON_GLOBAL_PAUSE_KEY).pipe(
+    getSettingProgram(DEACON_GLOBAL_PAUSE_KEY).pipe(
       Effect.map((v) => v === 'true'),
       Effect.catchTag('DatabaseError', (err) => {
         console.warn('[app-settings] Failed to read deacon pause flag:', err.cause);
@@ -81,7 +81,7 @@ export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 
 export function isFlywheelGloballyPaused(): boolean {
   return Effect.runSync(
-    getSettingEffect(FLYWHEEL_GLOBAL_PAUSE_KEY).pipe(
+    getSettingProgram(FLYWHEEL_GLOBAL_PAUSE_KEY).pipe(
       Effect.map((v) => v === 'true'),
       Effect.catchTag('DatabaseError', (err) => {
         console.warn('[app-settings] Failed to read flywheel pause flag:', err.cause);
@@ -97,7 +97,7 @@ export function setFlywheelGloballyPaused(paused: boolean): void {
 
 export function getFlywheelActiveRunId(): string | null {
   return Effect.runSync(
-    getSettingEffect(FLYWHEEL_ACTIVE_RUN_ID_KEY).pipe(
+    getSettingProgram(FLYWHEEL_ACTIVE_RUN_ID_KEY).pipe(
       Effect.map((v) => (v && v.trim() ? v : null)),
       Effect.catchTag('DatabaseError', (err) => {
         console.warn('[app-settings] Failed to read flywheel active run id:', err.cause);

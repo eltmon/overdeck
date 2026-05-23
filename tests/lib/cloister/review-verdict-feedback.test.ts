@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -22,10 +23,12 @@ vi.mock('../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
+  getReviewStatusSync: mockGetReviewStatus,
 }));
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -37,11 +40,11 @@ describe('deliverReviewVerdictFeedback', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
     mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059' });
-    mockWriteFeedbackFile.mockResolvedValue({
+    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
-    });
+    }));
   });
 
   it('posts synthesis to the PR, writes feedback, and messages the work agent', async () => {
@@ -51,12 +54,12 @@ describe('deliverReviewVerdictFeedback', () => {
     await writeFile(join(reviewDir, 'synthesis.md'), '## Verdict\n\nRequest changes for correctness.');
 
     const { deliverReviewVerdictFeedback } = await import('../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await deliverReviewVerdictFeedback({
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId: 'pan-1059',
       verdict: 'blocked',
       notes: 'correctness blocker',
       workspacePath: workspace,
-    });
+    }));
 
     expect(result.prCommentPosted).toBe(true);
     expect(result.agentMessageSent).toBe(true);

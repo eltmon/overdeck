@@ -8,7 +8,7 @@
 
 import { Effect } from 'effect';
 import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
-import { resolveModelId } from './model-capabilities.js';
+import { resolveModelIdSync } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
@@ -189,18 +189,18 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
-export function isOpenRouterModel(modelId: string): boolean {
+export function isOpenRouterModelSync(modelId: string): boolean {
   return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus';
 }
 
 /**
  * Get the provider for a model ID
  */
-export function getModelProvider(modelId: ModelId | string): ModelProvider {
-  if (isOpenRouterModel(modelId)) return 'openrouter';
+export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
+  if (isOpenRouterModelSync(modelId)) return 'openrouter';
   const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
   if (direct) return direct;
-  const resolved = resolveModelId(modelId);
+  const resolved = resolveModelIdSync(modelId);
   const resolvedProvider = (MODEL_PROVIDERS as Record<string, ModelProvider>)[resolved];
   if (resolvedProvider) return resolvedProvider;
 
@@ -216,14 +216,14 @@ export function getModelProvider(modelId: ModelId | string): ModelProvider {
 /**
  * Check if a model requires an external API key
  */
-export function requiresExternalKey(modelId: ModelId | string): boolean {
-  return getModelProvider(modelId) !== 'anthropic';
+export function requiresExternalKeySync(modelId: ModelId | string): boolean {
+  return getModelProviderSync(modelId) !== 'anthropic';
 }
 
 /**
  * Get all models for a specific provider
  */
-export function getModelsByProvider(provider: ModelProvider): ModelId[] {
+export function getModelsByProviderSync(provider: ModelProvider): ModelId[] {
   return Object.entries(MODEL_PROVIDERS)
     .filter(([_, p]) => p === provider)
     .map(([modelId]) => modelId as ModelId);
@@ -305,16 +305,16 @@ function getBestAnthropicAtTier(
  * @param userTier       User's subscription tier (for OAuth users)
  * @returns              Best available model (possibly downgraded)
  */
-export function applyTierAwareFallback(
+export function applyTierAwareFallbackSync(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>,
   userTier?: SubscriptionPlan
 ): ModelId {
-  const provider = getModelProvider(modelId);
+  const provider = getModelProviderSync(modelId);
 
   // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
-    const fallback = getFallbackModel(modelId);
+    const fallback = getFallbackModelSync(modelId);
     if (isProviderEnabled('anthropic', enabledProviders)) {
       console.warn(
         `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
@@ -343,7 +343,7 @@ export function applyTierAwareFallback(
   }
 
   // Case 4: User tier too low — find best available model at user's tier in same provider
-  const providerModels = getModelsByProvider(provider);
+  const providerModels = getModelsByProviderSync(provider);
   const candidates = providerModels.filter((m) => {
     const mRank = MODEL_TIER_RANK[m] ?? 0;
     return mRank <= userRank;
@@ -384,11 +384,11 @@ export function applyTierAwareFallback(
  * @param enabledProviders Set of enabled provider names
  * @returns Original model if provider enabled, otherwise Anthropic fallback
  */
-export function applyFallback(
+export function applyFallbackSync(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>
 ): ModelId {
-  return applyTierAwareFallback(modelId, enabledProviders, undefined);
+  return applyTierAwareFallbackSync(modelId, enabledProviders, undefined);
 }
 
 /**
@@ -397,9 +397,9 @@ export function applyFallback(
  * @param modelId Model to get fallback for
  * @returns Anthropic fallback model
  */
-export function getFallbackModel(modelId: ModelId): AnthropicModel {
+export function getFallbackModelSync(modelId: ModelId): AnthropicModel {
   // Anthropic models fallback to themselves
-  if (getModelProvider(modelId) === 'anthropic') {
+  if (getModelProviderSync(modelId) === 'anthropic') {
     return modelId as AnthropicModel;
   }
 
@@ -412,7 +412,7 @@ export function getFallbackModel(modelId: ModelId): AnthropicModel {
  * @param apiKeys API keys object from settings
  * @returns Set of enabled provider names
  */
-export function detectEnabledProviders(apiKeys: {
+export function detectEnabledProvidersSync(apiKeys: {
   openai?: string;
   google?: string;
   kimi?: string;
@@ -460,12 +460,12 @@ export function detectEnabledProviders(apiKeys: {
  * @param enabledProviders Set of enabled provider names
  * @returns Filtered list of models
  */
-export function filterAvailableModels(
+export function filterAvailableModelsSync(
   models: ModelId[],
   enabledProviders: Set<ModelProvider>
 ): ModelId[] {
   return models.filter((modelId) => {
-    const provider = getModelProvider(modelId);
+    const provider = getModelProviderSync(modelId);
     return isProviderEnabled(provider, enabledProviders);
   });
 }
@@ -476,7 +476,7 @@ export function filterAvailableModels(
  * @param enabledProviders Set of enabled provider names
  * @returns List of available model IDs
  */
-export function getAvailableModels(enabledProviders: Set<ModelProvider>): ModelId[] {
+export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): ModelId[] {
   return Object.keys(MODEL_PROVIDERS).filter((modelId) => {
     const provider = MODEL_PROVIDERS[modelId as ModelId];
     return isProviderEnabled(provider, enabledProviders);
@@ -487,55 +487,55 @@ export function getAvailableModels(enabledProviders: Set<ModelProvider>): ModelI
 // Pure-sync provider/fallback resolution — additive Effect.sync wrappers.
 
 /** True if the model id is an OpenRouter id. Pure. */
-export const isOpenRouterModelEffect = (modelId: string): Effect.Effect<boolean> =>
-  Effect.sync(() => isOpenRouterModel(modelId));
+export const isOpenRouterModel = (modelId: string): Effect.Effect<boolean> =>
+  Effect.sync(() => isOpenRouterModelSync(modelId));
 
 /** Resolve the provider for a model id. Pure. */
-export const getModelProviderEffect = (
+export const getModelProvider = (
   modelId: ModelId | string,
-): Effect.Effect<ModelProvider> => Effect.sync(() => getModelProvider(modelId));
+): Effect.Effect<ModelProvider> => Effect.sync(() => getModelProviderSync(modelId));
 
 /** Whether the model requires an external (non-Anthropic) API key. Pure. */
-export const requiresExternalKeyEffect = (
+export const requiresExternalKey = (
   modelId: ModelId | string,
-): Effect.Effect<boolean> => Effect.sync(() => requiresExternalKey(modelId));
+): Effect.Effect<boolean> => Effect.sync(() => requiresExternalKeySync(modelId));
 
 /** Models for a specific provider. Pure. */
-export const getModelsByProviderEffect = (
+export const getModelsByProvider = (
   provider: ModelProvider,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsByProvider(provider));
+): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsByProviderSync(provider));
 
 /** Tier-aware fallback resolution. Pure. */
-export const applyTierAwareFallbackEffect = (
+export const applyTierAwareFallback = (
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>,
   userTier?: SubscriptionPlan,
 ): Effect.Effect<ModelId> =>
-  Effect.sync(() => applyTierAwareFallback(modelId, enabledProviders, userTier));
+  Effect.sync(() => applyTierAwareFallbackSync(modelId, enabledProviders, userTier));
 
 /** Provider-disabled fallback resolution. Pure. */
-export const applyFallbackEffect = (
+export const applyFallback = (
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>,
-): Effect.Effect<ModelId> => Effect.sync(() => applyFallback(modelId, enabledProviders));
+): Effect.Effect<ModelId> => Effect.sync(() => applyFallbackSync(modelId, enabledProviders));
 
 /** Map a non-Anthropic model to its Anthropic equivalent. Pure. */
-export const getFallbackModelEffect = (modelId: ModelId): Effect.Effect<AnthropicModel> =>
-  Effect.sync(() => getFallbackModel(modelId));
+export const getFallbackModel = (modelId: ModelId): Effect.Effect<AnthropicModel> =>
+  Effect.sync(() => getFallbackModelSync(modelId));
 
 /** Detect enabled providers from configured API keys. Pure. */
-export const detectEnabledProvidersEffect = (
-  apiKeys: Parameters<typeof detectEnabledProviders>[0],
-): Effect.Effect<Set<ModelProvider>> => Effect.sync(() => detectEnabledProviders(apiKeys));
+export const detectEnabledProviders = (
+  apiKeys: Parameters<typeof detectEnabledProvidersSync>[0],
+): Effect.Effect<Set<ModelProvider>> => Effect.sync(() => detectEnabledProvidersSync(apiKeys));
 
 /** Filter a model list to the ones whose providers are enabled. Pure. */
-export const filterAvailableModelsEffect = (
+export const filterAvailableModels = (
   models: ModelId[],
   enabledProviders: Set<ModelProvider>,
 ): Effect.Effect<ModelId[]> =>
-  Effect.sync(() => filterAvailableModels(models, enabledProviders));
+  Effect.sync(() => filterAvailableModelsSync(models, enabledProviders));
 
 /** All available models across enabled providers. Pure. */
-export const getAvailableModelsEffect = (
+export const getAvailableModels = (
   enabledProviders: Set<ModelProvider>,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getAvailableModels(enabledProviders));
+): Effect.Effect<ModelId[]> => Effect.sync(() => getAvailableModelsSync(enabledProviders));

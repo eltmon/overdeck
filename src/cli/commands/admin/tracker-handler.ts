@@ -128,7 +128,7 @@ interface CleanupOptions {
 }
 
 export async function listStatesCommand(options: ListOptions): Promise<void> {
-  const apiKey = Effect.runSync(getLinearApiKey());
+  const apiKey = await Effect.runPromise(getLinearApiKey());
   if (!apiKey) {
     console.error(chalk.red('LINEAR_API_KEY not found in ~/.panopticon.env or environment'));
     process.exit(1);
@@ -174,7 +174,7 @@ export async function listStatesCommand(options: ListOptions): Promise<void> {
 }
 
 export async function cleanupStatesCommand(options: CleanupOptions): Promise<void> {
-  const apiKey = Effect.runSync(getLinearApiKey());
+  const apiKey = await Effect.runPromise(getLinearApiKey());
   if (!apiKey) {
     console.error(chalk.red('LINEAR_API_KEY not found in ~/.panopticon.env or environment'));
     process.exit(1);

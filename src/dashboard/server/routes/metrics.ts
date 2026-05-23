@@ -16,7 +16,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { listRunningAgentsEffect } from '../../../lib/agents.js';
+import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 
 // ─── Cached review statuses ───────────────────────────────────────────────────
@@ -35,7 +35,7 @@ function getReviewStatusesCached(): ReturnType<typeof loadReviewStatuses> {
   _cachedReviewStatusesAt = now;
   return _cachedReviewStatuses;
 }
-import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
+import { listGitOperationsSync, type GitOperation } from '../../../lib/git-activity.js';
 import { httpHandler } from './http-handler.js';
 
 // ─── Exported helper: safe agentId→issueId map ───────────────────────────────
@@ -93,7 +93,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
     const topAgents = costSummary.topAgents.slice(0, 5);
     const topIssues = costSummary.topIssues.slice(0, 5);
 
-    const runningAgents = yield* listRunningAgentsEffect();
+    const runningAgents = yield* listRunningAgents();
     const stuckCount = computeStuckCount(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
@@ -143,7 +143,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
     const status = service.getStatus();
-    const runningAgents = yield* listRunningAgentsEffect();
+    const runningAgents = yield* listRunningAgents();
     const current = computeStuckCount(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
@@ -285,7 +285,7 @@ const getGitActivityRoute = HttpRouter.add(
 
     const { since, issueId, limit } = parseGitActivityParams(params);
 
-    const ops = listGitOperations({ since, issueId, limit });
+    const ops = listGitOperationsSync({ since, issueId, limit });
     const entries = ops.map(mapGitOperationToActivityEntry);
     return jsonResponse(entries);
   }))

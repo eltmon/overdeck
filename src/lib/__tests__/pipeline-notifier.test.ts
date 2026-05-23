@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../internal-token.js', () => ({
   INTERNAL_TOKEN_HEADER: 'x-panopticon-internal-token',
   getInternalToken: vi.fn(() => 'test-token'),
+  getInternalTokenSync: vi.fn(() => 'test-token'),
 }));
 
 const originalFetch = globalThis.fetch;
@@ -32,9 +33,9 @@ afterEach(() => {
 
 describe('notifyPipeline', () => {
   it('forwards lifecycle events across the process boundary', async () => {
-    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
 
-    notifyPipeline({ type: 'review.approved', issueId: 'PAN-1381' });
+    notifyPipelineSync({ type: 'review.approved', issueId: 'PAN-1381' });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://dashboard.test/api/internal/pipeline/notify',

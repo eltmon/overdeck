@@ -3,6 +3,7 @@
  * Covers the new step 0 logic in src/lib/cloister/merge-agent.ts.
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'path';
 
@@ -64,11 +65,15 @@ vi.mock('fs', async (importOriginal) => {
 
 // ── Other dependency mocks ────────────────────────────────────────────────────
 vi.mock('../../../src/lib/tmux.js', () => ({
+  sendKeys: vi.fn(() => Effect.void),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
-  sessionExists: vi.fn().mockReturnValue(false),
+  sessionExists: vi.fn(() => Effect.succeed(false)),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
+  listSessionNames: vi.fn(() => Effect.succeed([])),
   listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-  killSession: vi.fn(),
+  killSession: vi.fn(() => Effect.void),
+  killSessionSync: vi.fn(() => Effect.void),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -85,7 +90,9 @@ vi.mock('../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: false }),
+  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: false }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
+  resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
@@ -96,7 +103,9 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+  resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
+  loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
 
 vi.mock('../../../src/lib/cloister/validation.js', () => ({
@@ -111,6 +120,7 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/memory/cli.js', () => ({

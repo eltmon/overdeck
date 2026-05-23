@@ -19,7 +19,7 @@ export const WORKSPACES_DIR = join(homedir(), '.panopticon', 'workspaces');
 /**
  * Save workspace metadata to ~/.panopticon/workspaces/{issueId}.yaml
  */
-export function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
+export function saveWorkspaceMetadataSync(metadata: RemoteWorkspaceMetadata): void {
   if (!existsSync(WORKSPACES_DIR)) {
     mkdirSync(WORKSPACES_DIR, { recursive: true });
   }
@@ -31,7 +31,7 @@ export function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
 /**
  * Load workspace metadata from ~/.panopticon/workspaces/{issueId}.yaml
  */
-export function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
+export function loadWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetadata | null {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
 
@@ -50,7 +50,7 @@ export function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata 
 /**
  * List all workspace metadata files
  */
-export function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
+export function listWorkspaceMetadataSync(): RemoteWorkspaceMetadata[] {
   if (!existsSync(WORKSPACES_DIR)) {
     return [];
   }
@@ -74,14 +74,14 @@ export function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
  * Check if a workspace exists (local or remote)
  * Returns metadata if remote workspace exists, null otherwise
  */
-export function findRemoteWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
-  return loadWorkspaceMetadata(issueId);
+export function findRemoteWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetadata | null {
+  return loadWorkspaceMetadataSync(issueId);
 }
 
 /**
  * Delete workspace metadata
  */
-export function deleteWorkspaceMetadata(issueId: string): boolean {
+export function deleteWorkspaceMetadataSync(issueId: string): boolean {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
 
@@ -108,11 +108,11 @@ const toMetadataFsError = (op: string, path: string, cause: unknown): FsError =>
   new FsError({ path, operation: op, cause });
 
 /** Save workspace metadata (Effect variant). */
-export const saveWorkspaceMetadataEffect = (
+export const saveWorkspaceMetadata = (
   metadata: RemoteWorkspaceMetadata,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => saveWorkspaceMetadata(metadata),
+    try: () => saveWorkspaceMetadataSync(metadata),
     catch: (cause) =>
       toMetadataFsError(
         'saveWorkspaceMetadata',
@@ -122,24 +122,24 @@ export const saveWorkspaceMetadataEffect = (
   });
 
 /** Load workspace metadata (Effect variant — pure, never fails). */
-export const loadWorkspaceMetadataEffect = (
+export const loadWorkspaceMetadata = (
   issueId: string,
 ): Effect.Effect<RemoteWorkspaceMetadata | null> =>
-  Effect.sync(() => loadWorkspaceMetadata(issueId));
+  Effect.sync(() => loadWorkspaceMetadataSync(issueId));
 
 /** List all workspace metadata files (Effect variant — pure, never fails). */
-export const listWorkspaceMetadataEffect = (): Effect.Effect<
+export const listWorkspaceMetadata = (): Effect.Effect<
   RemoteWorkspaceMetadata[]
-> => Effect.sync(() => listWorkspaceMetadata());
+> => Effect.sync(() => listWorkspaceMetadataSync());
 
 /** Find a remote workspace by id (Effect variant — pure, never fails). */
-export const findRemoteWorkspaceMetadataEffect = (
+export const findRemoteWorkspaceMetadata = (
   issueId: string,
 ): Effect.Effect<RemoteWorkspaceMetadata | null> =>
-  Effect.sync(() => findRemoteWorkspaceMetadata(issueId));
+  Effect.sync(() => findRemoteWorkspaceMetadataSync(issueId));
 
 /** Delete workspace metadata (Effect variant — returns whether a file was removed). */
-export const deleteWorkspaceMetadataEffect = (
+export const deleteWorkspaceMetadata = (
   issueId: string,
 ): Effect.Effect<boolean> =>
-  Effect.sync(() => deleteWorkspaceMetadata(issueId));
+  Effect.sync(() => deleteWorkspaceMetadataSync(issueId));

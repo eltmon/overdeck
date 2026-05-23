@@ -12,7 +12,7 @@ import {
 import type { ProjectConfig } from '../../projects.js';
 import {
   evaluateWorkspaceStackHealth,
-  getWorkspaceStackHealth as getWorkspaceStackHealthEffect,
+  getWorkspaceStackHealth as getWorkspaceStackHealthProgram,
   inferIssueIdFromStackContainerName,
   recordWorkspaceStackHealthTransition,
   resetWorkspaceStackHealthTransitionsForTests,
@@ -20,10 +20,10 @@ import {
 } from '../stack-health.js';
 
 // Wrap the Effect-returning getWorkspaceStackHealth for legacy await-style tests.
-const getWorkspaceStackHealth: typeof getWorkspaceStackHealthEffect extends (...a: infer A) => infer R
+const getWorkspaceStackHealth: typeof getWorkspaceStackHealthProgram extends (...a: infer A) => infer R
   ? R extends Effect.Effect<infer V, infer E> ? (...a: A) => Promise<V> : never : never =
-  ((...args: Parameters<typeof getWorkspaceStackHealthEffect>) =>
-    Effect.runPromise(getWorkspaceStackHealthEffect(...args))) as any;
+  ((...args: Parameters<typeof getWorkspaceStackHealthProgram>) =>
+    Effect.runPromise(getWorkspaceStackHealthProgram(...args))) as any;
 
 const dockerProject: ProjectConfig = {
   name: 'Panopticon',

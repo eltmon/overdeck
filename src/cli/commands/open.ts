@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import type { EditorId } from '@panctl/contracts';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 
 type Editor = (typeof import('@panctl/contracts'))['EDITORS'][number];
 
@@ -44,7 +44,7 @@ function detectFirstAvailableEditor(editors: readonly Editor[]): { id: EditorId;
 export async function openCommand(issueId: string, options: { editor?: string }) {
   const editors = await loadEditors();
   const issueLower = issueId.toLowerCase();
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) {
     console.error(`No project found for issue ${issueId}`);
     process.exit(1);

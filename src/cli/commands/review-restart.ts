@@ -10,10 +10,10 @@
  */
 
 import chalk from 'chalk';
-import { getDashboardApiUrl } from '../../lib/config.js';
-import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 
-const DASHBOARD_URL = getDashboardApiUrl();
+const DASHBOARD_URL = getDashboardApiUrlSync();
 
 export interface ReviewRestartOptions {
   model?: string;
@@ -26,7 +26,7 @@ export async function reviewRestartCommand(
 ): Promise<void> {
   const issueId = id.toUpperCase();
 
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) {
     console.error(chalk.red(`\nError: cannot resolve project for ${issueId}`));
     process.exit(1);

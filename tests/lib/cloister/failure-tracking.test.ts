@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -57,7 +58,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
 
   async function saveStoppedAgent(agentId: string, issueId = 'PAN-1141') {
     const agents = await loadAgents();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId,
       workspace: workspaceFor(agentId),
@@ -76,7 +77,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
       return {
         ...actual,
         resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
-        listRunningAgents: vi.fn().mockResolvedValue([]),
+        listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
+        listRunningAgentsSync: vi.fn(() => []),
       };
     });
     vi.doMock('../../../src/lib/review-status.js', () => ({
@@ -86,19 +89,31 @@ describe('agent failure tracking and auto-resume backoff', () => {
         verificationStatus: 'passed',
         readyForMerge: false,
       }),
+      getReviewStatusSync: vi.fn().mockReturnValue({
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        readyForMerge: false,
+      }),
       loadReviewStatuses: vi.fn().mockReturnValue({}),
       setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
+      setReviewStatusSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
-      getShadowState: vi.fn().mockResolvedValue(null),
+      getShadowState: vi.fn(() => Effect.succeed(null)),
     }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
+      logDeaconEventSync: vi.fn(),
       logAgentLifecycle: vi.fn(),
+      logAgentLifecycleSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
@@ -117,11 +132,13 @@ describe('agent failure tracking and auto-resume backoff', () => {
       createSessionAsync: vi.fn(),
       isPaneDeadAsync: vi.fn().mockResolvedValue(false),
       killSession: vi.fn(),
+  killSessionSync: vi.fn(),
       killSessionAsync: vi.fn().mockResolvedValue(undefined),
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
       sessionExists: vi.fn().mockReturnValue(false),
+      sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
       sendKeysAsync: vi.fn().mockResolvedValue(undefined),
     }));
@@ -135,7 +152,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-resume-fails';
     resumeAgentMock.mockResolvedValue({ success: false, error: 'tmux crashed' });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -147,7 +164,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     });
 
     const resumed = await autoResumeStoppedWorkAgents();
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
@@ -160,8 +177,8 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-orphan';
     const agents = await saveStoppedAgent(agentId);
 
-    agents.recordAgentFailure(agentId, 'orphaned: tmux session missing (patrol)');
-    const state = agents.getAgentState(agentId);
+    agents.recordAgentFailureSync(agentId, 'orphaned: tmux session missing (patrol)');
+    const state = agents.getAgentStateSync(agentId);
 
     expect(state?.consecutiveFailures).toBe(1);
     expect(state?.lastFailureReason).toBe('orphaned: tmux session missing (patrol)');
@@ -171,14 +188,14 @@ describe('agent failure tracking and auto-resume backoff', () => {
   it('resets the counter when an agent reaches running status', async () => {
     const agentId = 'agent-pan-1141-running-reset';
     const agents = await saveStoppedAgent(agentId);
-    agents.recordAgentFailure(agentId, 'resume failed');
+    agents.recordAgentFailureSync(agentId, 'resume failed');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.consecutiveFailures).toBe(1);
     agents.__testInternals.markAgentRunning(state!);
-    agents.saveAgentState(state!);
+    agents.saveAgentStateSync(state!);
 
-    const updated = agents.getAgentState(agentId);
+    const updated = agents.getAgentStateSync(agentId);
     expect(updated?.status).toBe('running');
     expect(updated?.consecutiveFailures).toBe(0);
     expect(updated?.firstFailureInRunAt).toBeUndefined();
@@ -191,14 +208,14 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-backoff';
     const agents = await saveStoppedAgent(agentId);
 
-    agents.recordAgentFailure(agentId, 'first failure');
-    expect(agents.getAgentState(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 5_000).toISOString());
+    agents.recordAgentFailureSync(agentId, 'first failure');
+    expect(agents.getAgentStateSync(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 5_000).toISOString());
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 5_000));
-    agents.recordAgentFailure(agentId, 'second failure');
-    expect(agents.getAgentState(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 35_000).toISOString());
+    agents.recordAgentFailureSync(agentId, 'second failure');
+    expect(agents.getAgentStateSync(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 35_000).toISOString());
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 35_000));
-    agents.recordAgentFailure(agentId, 'third failure');
-    expect(agents.getAgentState(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 155_000).toISOString());
+    agents.recordAgentFailureSync(agentId, 'third failure');
+    expect(agents.getAgentStateSync(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 155_000).toISOString());
 
     resumeAgentMock.mockResolvedValue({ success: true });
     const { autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
@@ -211,7 +228,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-backoff-boundary';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
-    agents.saveAgentState({
+    agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
       workspace: workspaceFor(agentId),
@@ -233,13 +250,13 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-troubled';
     const agents = await saveStoppedAgent(agentId);
 
-    agents.recordAgentFailure(agentId, 'first');
+    agents.recordAgentFailureSync(agentId, 'first');
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 60_000));
-    agents.recordAgentFailure(agentId, 'second');
+    agents.recordAgentFailureSync(agentId, 'second');
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 120_000));
-    agents.recordAgentFailure(agentId, 'third');
+    agents.recordAgentFailureSync(agentId, 'third');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.consecutiveFailures).toBe(3);
     expect(state?.troubled).toBe(true);
     expect(state?.troubledAt).toBe(new Date(BASE_TIME.getTime() + 120_000).toISOString());
@@ -249,13 +266,13 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-pan-1141-window-slide';
     const agents = await saveStoppedAgent(agentId);
 
-    agents.recordAgentFailure(agentId, 'first');
+    agents.recordAgentFailureSync(agentId, 'first');
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 11 * 60_000));
-    agents.recordAgentFailure(agentId, 'second');
+    agents.recordAgentFailureSync(agentId, 'second');
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 12 * 60_000));
-    agents.recordAgentFailure(agentId, 'third');
+    agents.recordAgentFailureSync(agentId, 'third');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.consecutiveFailures).toBe(2);
     expect(state?.firstFailureInRunAt).toBe(new Date(BASE_TIME.getTime() + 11 * 60_000).toISOString());
     expect(state?.troubled).toBeUndefined();
@@ -266,18 +283,18 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const agentId = 'agent-cus-1-overrides';
     const agents = await saveStoppedAgent(agentId, 'CUS-1');
 
-    agents.recordAgentFailure(agentId, 'first');
-    expect(agents.getAgentState(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 2_000).toISOString());
+    agents.recordAgentFailureSync(agentId, 'first');
+    expect(agents.getAgentStateSync(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 2_000).toISOString());
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 2_000));
-    agents.recordAgentFailure(agentId, 'second');
-    expect(agents.getAgentState(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 6_000).toISOString());
+    agents.recordAgentFailureSync(agentId, 'second');
+    expect(agents.getAgentStateSync(agentId)?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 6_000).toISOString());
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 6_000));
-    agents.recordAgentFailure(agentId, 'third');
-    expect(agents.getAgentState(agentId)?.troubled).toBeUndefined();
+    agents.recordAgentFailureSync(agentId, 'third');
+    expect(agents.getAgentStateSync(agentId)?.troubled).toBeUndefined();
     vi.setSystemTime(new Date(BASE_TIME.getTime() + 10_000));
-    agents.recordAgentFailure(agentId, 'fourth');
+    agents.recordAgentFailureSync(agentId, 'fourth');
 
-    const state = agents.getAgentState(agentId);
+    const state = agents.getAgentStateSync(agentId);
     expect(state?.consecutiveFailures).toBe(4);
     expect(state?.troubled).toBe(true);
   });

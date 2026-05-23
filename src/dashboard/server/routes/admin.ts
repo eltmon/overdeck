@@ -13,8 +13,8 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 
 // ─── Route: GET /api/admin/tldr/:issueId ──────────────────────────────────────
 
@@ -25,7 +25,7 @@ const getAdminTldrRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const project = resolveProjectFromIssue(issueId);
+    const project = resolveProjectFromIssueSync(issueId);
     const projectPath = project?.projectPath ?? process.cwd();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
     const venvPath = join(workspacePath, '.venv');
@@ -39,7 +39,7 @@ const getAdminTldrRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const service = getTldrDaemonService(workspacePath, venvPath);
+      const service = getTldrDaemonServiceSync(workspacePath, venvPath);
       const status = await service.getStatus();
       return jsonResponse({
         available: true,
