@@ -75,6 +75,17 @@ function invalidLongDoc(): string {
   ].join('\n\n');
 }
 
+function docWithSuggestedSkillsHeading(heading: string): string {
+  return [
+    '## Current objective',
+    'Continue implementing the handoff fork workflow for PAN-1358 with enough detail to satisfy the validation length requirement.',
+    '## Current state',
+    'The source agent has written a curated transfer document that references project artifacts without duplicating full PRD or plan content.',
+    heading,
+    '- /pan-workflow: use when checking Panopticon bead sequencing and completion flow.',
+  ].join('\n\n');
+}
+
 async function createSourceConversation(home: string, overrides: Partial<Conversation> = {}): Promise<Conversation> {
   process.env.PANOPTICON_HOME = home;
   process.env.HOME = home;
@@ -116,19 +127,45 @@ afterEach(() => {
   }
 });
 
-describe('handoff fork handshake', () => {
-  it('validates the required handoff document shape', () => {
-    expect(validateHandoffDoc(validDoc())).toEqual({ ok: true });
+describe('validateHandoffDoc', () => {
+  it('rejects an empty document', () => {
+    expect(validateHandoffDoc('')).toEqual({
+      ok: false,
+      reason: 'handoff document must be at least 200 characters',
+    });
+  });
+
+  it('rejects a short document', () => {
     expect(validateHandoffDoc('## Suggested skills\nshort')).toEqual({
       ok: false,
       reason: 'handoff document must be at least 200 characters',
     });
-    expect(validateHandoffDoc(validDoc().replace('## Suggested skills', '### Suggested skills'))).toEqual({
+  });
+
+  it('rejects a document missing the Suggested skills heading', () => {
+    expect(validateHandoffDoc(invalidLongDoc())).toEqual({
       ok: false,
       reason: 'handoff document must contain a ## Suggested skills section',
     });
   });
 
+  it('accepts a document with capitalized Suggested Skills heading', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('## Suggested Skills'))).toEqual({ ok: true });
+  });
+
+  it('accepts a document with lowercase suggested skills heading', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('## suggested skills'))).toEqual({ ok: true });
+  });
+
+  it('rejects a Suggested skills heading below H2 depth', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('### Suggested skills'))).toEqual({
+      ok: false,
+      reason: 'handoff document must contain a ## Suggested skills section',
+    });
+  });
+});
+
+describe('handoff fork handshake', () => {
   it('delivers the rendered handoff prompt and returns the validated document', async () => {
     const home = join(tmpdir(), `pan-handoff-request-${Date.now()}`);
     process.env.PANOPTICON_HOME = home;
