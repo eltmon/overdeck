@@ -3095,6 +3095,10 @@
     "mtime": 1779511306.0738437,
     "hash": "ccc384b799d17e70dd9e237860d9c940"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/filePathDisplay.test.ts": {
+    "mtime": 1779526198.1879041,
+    "hash": "eef50c16948dd8ca442004699667f6ff"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/App.tsx": {
     "mtime": 1779511306.0576081,
     "hash": "3b5e4dadc96900bc81ace305a93ef93f"
@@ -3110,6 +3114,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/main.tsx": {
     "mtime": 1779511306.0720508,
     "hash": "149d21cdc0abbb2945adda49c6c4f8d0"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/filePathDisplay.ts": {
+    "mtime": 1779526021.8378224,
+    "hash": "37f9a1810565cc6cf8597bd616271bc7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/test-setup.ts": {
     "mtime": 1779511306.0732687,
