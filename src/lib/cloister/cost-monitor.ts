@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
 import { PANOPTICON_HOME } from '../paths.js';
-import { loadCloisterConfig, type CostLimitsConfig } from './config.js';
+import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
 
 /**
  * Cost alert level
@@ -156,7 +156,7 @@ function checkDailyReset(): void {
  * @param cost - Cost in USD
  * @param issueId - Optional issue ID
  */
-export function recordCost(agentId: string, cost: number, issueId?: string): void {
+export function recordCostSync(agentId: string, cost: number, issueId?: string): void {
   checkDailyReset();
 
   // Update per-agent cost
@@ -187,7 +187,7 @@ export function recordCost(agentId: string, cost: number, issueId?: string): voi
 export function checkCostLimits(
   agentId: string,
   issueId: string | undefined,
-  config: CostLimitsConfig = loadCloisterConfig().cost_limits || {
+  config: CostLimitsConfig = loadCloisterConfigSync().cost_limits || {
     per_agent_usd: 10.0,
     per_issue_usd: 25.0,
     daily_total_usd: 100.0,
@@ -347,7 +347,7 @@ export function getCostSummary(): {
 /**
  * Reset cost tracking (for testing)
  */
-export function resetCostTracking(): void {
+export function resetCostTrackingSync(): void {
   costData = {
     perAgent: new Map(),
     perIssue: new Map(),
@@ -399,7 +399,7 @@ const saveCostDataAsync = (data: CostData): Effect.Effect<void, FsError> =>
   });
 
 /** Effect variant of `recordCost`. */
-export const recordCostEffect = (
+export const recordCost = (
   agentId: string,
   cost: number,
   issueId?: string,
@@ -426,7 +426,7 @@ export const recordCostEffect = (
   });
 
 /** Effect variant of `resetCostTracking`. */
-export const resetCostTrackingEffect = (): Effect.Effect<void, FsError> =>
+export const resetCostTracking = (): Effect.Effect<void, FsError> =>
   Effect.gen(function* () {
     costData = {
       perAgent: new Map(),

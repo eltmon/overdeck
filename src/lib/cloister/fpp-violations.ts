@@ -13,7 +13,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
-import { checkHook } from '../hooks.js';
+import { checkHookSync } from '../hooks.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentHealth } from './health.js';
 import { PANOPTICON_HOME } from '../paths.js';
@@ -173,9 +173,9 @@ export function checkAgentForViolations(
     : 0;
 
   // Check for work on hook
-  let hookStatus: ReturnType<typeof checkHook>;
+  let hookStatus: ReturnType<typeof checkHookSync>;
   try {
-    hookStatus = checkHook(agentId);
+    hookStatus = checkHookSync(agentId);
   } catch (error) {
     console.error(`Failed to check hook for ${agentId}:`, error);
     return null;
@@ -241,7 +241,7 @@ export function sendNudge(violation: FPPViolation): boolean {
  * @param agentId - Agent ID
  * @param type - Violation type
  */
-export function resolveViolation(agentId: string, type: FPPViolationType): void {
+export function resolveViolationSync(agentId: string, type: FPPViolationType): void {
   const key = `${agentId}-${type}`;
   const violation = activeViolations.get(key);
 
@@ -290,7 +290,7 @@ export function hasExceededMaxNudges(
  *
  * @param hoursOld - Clear violations resolved this many hours ago
  */
-export function clearOldViolations(hoursOld: number = 24): void {
+export function clearOldViolationsSync(hoursOld: number = 24): void {
   const cutoff = Date.now() - hoursOld * 60 * 60 * 1000;
   let changed = false;
 
@@ -343,7 +343,7 @@ const saveViolationsAsync = (violations: Map<string, FPPViolation>): Effect.Effe
   });
 
 /** Effect variant of `resolveViolation`. */
-export const resolveViolationEffect = (
+export const resolveViolation = (
   agentId: string,
   type: FPPViolationType,
 ): Effect.Effect<void, FsError> =>
@@ -358,7 +358,7 @@ export const resolveViolationEffect = (
   });
 
 /** Effect variant of `clearOldViolations`. */
-export const clearOldViolationsEffect = (hoursOld: number = 24): Effect.Effect<void, FsError> =>
+export const clearOldViolations = (hoursOld: number = 24): Effect.Effect<void, FsError> =>
   Effect.gen(function* () {
     const cutoff = Date.now() - hoursOld * 60 * 60 * 1000;
     let changed = false;

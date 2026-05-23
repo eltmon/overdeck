@@ -14,13 +14,14 @@ vi.mock('fs', async () => {
 // Mock projects module
 vi.mock('../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  loadProjectsConfigSync: vi.fn(),
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
-import { resolveTrackerType } from '../../src/lib/tracker-utils.js';
-import { loadProjectsConfig } from '../../src/lib/projects.js';
+import { resolveTrackerTypeSync } from '../../src/lib/tracker-utils.js';
+import { loadProjectsConfigSync } from '../../src/lib/projects.js';
 
-const mockLoadProjectsConfig = vi.mocked(loadProjectsConfig);
+const mockLoadProjectsConfig = vi.mocked(loadProjectsConfigSync);
 
 describe('resolveTrackerType', () => {
   beforeEach(() => {
@@ -41,7 +42,7 @@ describe('resolveTrackerType', () => {
       },
     });
 
-    expect(resolveTrackerType('PAN-123')).toBe('github');
+    expect(resolveTrackerTypeSync('PAN-123')).toBe('github');
   });
 
   it('returns "rally" for issues matching a rally-only project', () => {
@@ -55,7 +56,7 @@ describe('resolveTrackerType', () => {
       },
     });
 
-    expect(resolveTrackerType('ACME-42')).toBe('rally');
+    expect(resolveTrackerTypeSync('ACME-42')).toBe('rally');
   });
 
   it('returns "linear" for issues matching a project with issue_prefix', () => {
@@ -69,7 +70,7 @@ describe('resolveTrackerType', () => {
       },
     });
 
-    expect(resolveTrackerType('MIN-456')).toBe('linear');
+    expect(resolveTrackerTypeSync('MIN-456')).toBe('linear');
   });
 
   it('returns "rally" for issues with issue_prefix when rally_project is configured', () => {
@@ -84,7 +85,7 @@ describe('resolveTrackerType', () => {
       },
     });
 
-    expect(resolveTrackerType('HYB-10')).toBe('rally');
+    expect(resolveTrackerTypeSync('HYB-10')).toBe('rally');
   });
 
   it('returns "linear" as fallback for unknown prefixes', () => {
@@ -99,7 +100,7 @@ describe('resolveTrackerType', () => {
       },
     });
 
-    expect(resolveTrackerType('UNKNOWN-99')).toBe('linear');
+    expect(resolveTrackerTypeSync('UNKNOWN-99')).toBe('linear');
   });
 
   it('handles projects.yaml load failure gracefully', () => {
@@ -107,6 +108,6 @@ describe('resolveTrackerType', () => {
       throw new Error('File not found');
     });
 
-    expect(resolveTrackerType('ANYTHING-1')).toBe('linear');
+    expect(resolveTrackerTypeSync('ANYTHING-1')).toBe('linear');
   });
 });

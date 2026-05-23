@@ -4,7 +4,6 @@ import {
   DEFAULT_MODEL_REFS,
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
-  PARENT_MODEL_REF,
   derefWorkhorse,
   mergeConfigs,
   resolveModel,
@@ -44,10 +43,6 @@ describe('role model configuration', () => {
     expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'test', 'work']);
   });
 
-  it('exports the parent model sentinel', () => {
-    expect(PARENT_MODEL_REF).toBe('parent');
-  });
-
   it('dereferences workhorse refs and passes literal model ids through', () => {
     const config = roleConfig();
 
@@ -76,28 +71,6 @@ describe('role model configuration', () => {
 
     expect(resolveModel('review', 'security', config)).toBe('claude-haiku-4-5');
     expect(resolveModel('review', 'requirements', config)).toBe('glm-5.1');
-  });
-
-  it('resolves parent sub-role refs through the parent role model', () => {
-    const config = roleConfig();
-    config.roles!.review!.sub!.security.model = PARENT_MODEL_REF;
-
-    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-7');
-  });
-
-  it('resolves parent sub-role refs through default role refs when the role model is absent', () => {
-    const config = {
-      workhorses: WORKHORSES,
-      roles: {
-        review: {
-          sub: {
-            security: { model: PARENT_MODEL_REF },
-          },
-        },
-      },
-    } as Pick<NormalizedConfig, 'workhorses' | 'roles'>;
-
-    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-7');
   });
 
   it('rejects unknown workhorse slots with the offending field path', () => {
@@ -149,37 +122,6 @@ describe('role model configuration', () => {
     expect(config.roles?.review?.harness).toBe('claude-code');
     expect(config.roles?.review?.sub?.performance?.model).toBe('workhorse:mid');
     expect(resolveModel('review', 'performance', config)).toBe('claude-sonnet-4-6');
-  });
-
-  it('accepts parent sub-role refs during config-load validation', () => {
-    const { config } = mergeConfigs({
-      roles: {
-        review: {
-          model: 'workhorse:mid',
-          sub: {
-            security: { model: PARENT_MODEL_REF },
-          },
-        },
-      },
-    });
-
-    expect(config.roles?.review?.sub?.security?.model).toBe(PARENT_MODEL_REF);
-    expect(resolveModel('review', 'security', config)).toBe('claude-sonnet-4-6');
-  });
-
-  it('rejects parent refs for role-level models and workhorse slots', () => {
-    expect(() => mergeConfigs({
-      roles: { review: { model: PARENT_MODEL_REF } },
-    })).toThrow('config.yaml: roles.review.model cannot be parent; parent is a resolve-only sub-role sentinel');
-
-    expect(() => mergeConfigs({
-      workhorses: { mid: PARENT_MODEL_REF },
-    })).toThrow('config.yaml: workhorses.mid cannot be parent; parent is valid only for sub-role models');
-  });
-
-  it('fails fast when dereferencing the parent sentinel directly', () => {
-    expect(() => derefWorkhorse(PARENT_MODEL_REF, roleConfig(), 'roles.review.sub.security.model'))
-      .toThrow('config.yaml: roles.review.sub.security.model cannot be parent; parent is a resolve-only sub-role sentinel');
   });
 
   it('seeds default workhorses and roles when config omits both sections', () => {

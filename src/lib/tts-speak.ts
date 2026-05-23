@@ -36,9 +36,17 @@ export interface TtsSpeakPayload {
   embedding?: number[];
 }
 
+type PromiseOrProgram<T> = Promise<T> | Effect.Effect<T, unknown, never>;
+
+async function runPromiseOrProgram<T>(value: PromiseOrProgram<T>): Promise<T> {
+  return typeof (value as { pipe?: unknown }).pipe === 'function'
+    ? Effect.runPromise(value as Effect.Effect<T, unknown, never>)
+    : value as Promise<T>;
+}
+
 export interface ResolveAndSpeakDeps {
   config: NormalizedTtsDaemonConfig;
-  findVoiceById?: (id: string) => Promise<TtsVoice | undefined>;
+  findVoiceById?: (id: string) => PromiseOrProgram<TtsVoice | undefined>;
   fetch?: FetchLike;
   timeoutMs?: number;
 }
@@ -66,7 +74,7 @@ function resolveVoiceId(options: ResolveAndSpeakOptions, config: NormalizedTtsDa
   return config.voice;
 }
 
-export function buildTtsSpeakPayload(
+export function buildTtsSpeakPayloadSync(
   voice: TtsVoice,
   text: string,
   config: NormalizedTtsDaemonConfig,
@@ -132,7 +140,7 @@ async function postSpeakPayload(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${config.daemonHost}:${config.daemonPort}/speak`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...await Effect.runPromise(getTtsDaemonAuthHeaders()) },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -142,9 +150,7 @@ async function postSpeakPayload(
   } finally {
     clearTimeout(timeout);
   }
-}
-
-export async function resolveAndSpeak(
+}async function resolveAndSpeakPromise(
   options: ResolveAndSpeakOptions,
   deps: ResolveAndSpeakDeps,
 ): Promise<TtsSpeakResult> {
@@ -170,33 +176,33 @@ export async function resolveAndSpeak(
   const voiceId = resolveVoiceId(options, config).trim();
   if (!voiceId) return 'no-voice';
 
-  const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
+  const voice = await runPromiseOrProgram((deps.findVoiceById ?? findVoiceById)(voiceId));
   if (!voice) return 'no-voice';
 
-  return postSpeakPayload(buildTtsSpeakPayload(voice, text, config), config, deps);
+  return postSpeakPayload(buildTtsSpeakPayloadSync(voice, text, config), config, deps);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Build a TTS speak payload from a voice + text. Pure. */
-export const buildTtsSpeakPayloadEffect = (
+export const buildTtsSpeakPayload = (
   voice: TtsVoice,
   text: string,
   config: NormalizedTtsDaemonConfig,
 ): Effect.Effect<TtsSpeakPayload> =>
-  Effect.sync(() => buildTtsSpeakPayload(voice, text, config));
+  Effect.sync(() => buildTtsSpeakPayloadSync(voice, text, config));
 
 /**
  * Resolve a voice and post a speak request to the TTS daemon. Wraps the
  * Promise variant. Network failures collapse to `'daemon-unavailable'` in
  * the success channel; only synchronous mis-use surfaces as TrackerError.
  */
-export const resolveAndSpeakEffect = (
+export const resolveAndSpeak = (
   options: ResolveAndSpeakOptions,
   deps: ResolveAndSpeakDeps,
 ): Effect.Effect<TtsSpeakResult, TrackerError> =>
   Effect.tryPromise({
-    try: () => resolveAndSpeak(options, deps),
+    try: () => resolveAndSpeakPromise(options, deps),
     catch: (cause) =>
       new TrackerError({
         tracker: 'tts',

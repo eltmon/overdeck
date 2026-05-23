@@ -27,9 +27,9 @@ vi.mock('../../paths.js', () => ({
 }))
 
 import { RuntimeRegistry, setGlobalRegistry, getGlobalRegistry } from '../index.js'
-import type { AgentRuntime } from '../types.js'
+import type { AgentRuntimeSync } from '../types.js'
 
-function stubRuntime(name: 'claude-code' | 'pi'): AgentRuntime {
+function stubRuntime(name: 'claude-code' | 'pi'): AgentRuntimeSync {
   return {
     name,
     getSessionPath: () => null,

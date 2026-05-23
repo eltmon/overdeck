@@ -264,7 +264,7 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
-export function loadConfig(): PanopticonConfig {
+export function loadConfigSync(): PanopticonConfig {
   if (!existsSync(CONFIG_FILE)) {
     return DEFAULT_CONFIG;
   }
@@ -279,12 +279,12 @@ export function loadConfig(): PanopticonConfig {
   }
 }
 
-export function saveConfig(config: PanopticonConfig): void {
+export function saveConfigSync(config: PanopticonConfig): void {
   const content = stringify(config as any);
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-export async function loadConfigAsync(): Promise<PanopticonConfig> {
+async function loadConfigFromFile(): Promise<PanopticonConfig> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
@@ -298,12 +298,12 @@ export async function loadConfigAsync(): Promise<PanopticonConfig> {
   }
 }
 
-export async function saveConfigAsync(config: PanopticonConfig): Promise<void> {
+async function saveConfigToFile(config: PanopticonConfig): Promise<void> {
   const content = stringify(config as any);
   await fs.writeFile(CONFIG_FILE, content, 'utf8');
 }
 
-export function getDefaultConfig(): PanopticonConfig {
+export function getDefaultConfigSync(): PanopticonConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
@@ -311,9 +311,9 @@ export function getDefaultConfig(): PanopticonConfig {
  * Get the dashboard API base URL from config.
  * Reads from DASHBOARD_URL env var first, then config file, then defaults.
  */
-export function getDashboardApiUrl(): string {
+export function getDashboardApiUrlSync(): string {
   if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL;
-  const config = loadConfig();
+  const config = loadConfigSync();
   const port = config.dashboard?.api_port || 3011;
   return `http://localhost:${port}`;
 }
@@ -323,8 +323,8 @@ export function getDashboardApiUrl(): string {
  * Returns null if devroot is disabled (set to null or empty string).
  * Resolves ~ to home directory and validates the directory exists.
  */
-export function getDevrootPath(): string | null {
-  const config = loadConfig();
+export function getDevrootPathSync(): string | null {
+  const config = loadConfigSync();
   const devroot = config.sync?.devroot;
 
   if (!devroot) return null;
@@ -345,7 +345,7 @@ export function getDevrootPath(): string | null {
  * run so users with the old default migrate to the layered context model.
  */
 export function checkDevrootDeprecation(): string | null {
-  const devroot = loadConfig().sync?.devroot;
+  const devroot = loadConfigSync().sync?.devroot;
   if (!devroot) return null;
   const oldLocation = `${devroot.replace(/\/+$/, '')}/.claude/`;
   return [
@@ -362,9 +362,9 @@ export function checkDevrootDeprecation(): string | null {
  * Tries config first, then walks up from projectPath looking for .claude/ directory.
  * Returns the project path itself as last resort.
  */
-export function findDevrootForProject(projectPath: string): string {
+export function findDevrootForProjectSync(projectPath: string): string {
   // 1. Explicit config takes priority
-  const configured = getDevrootPath();
+  const configured = getDevrootPathSync();
   if (configured) return configured;
 
   // 2. Walk up from project path to find nearest .claude/ directory
@@ -397,12 +397,12 @@ function resolveConversationsConfig(config: PanopticonConfig): ConversationsConf
   };
 }
 
-export function getConversationsConfig(): ConversationsConfig {
-  return resolveConversationsConfig(loadConfig());
+export function getConversationsConfigSync(): ConversationsConfig {
+  return resolveConversationsConfig(loadConfigSync());
 }
 
-export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfigAsync());
+async function readConversationsConfig(): Promise<ConversationsConfig> {
+  return resolveConversationsConfig(await loadConfigFromFile());
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -410,68 +410,46 @@ export async function getConversationsConfigAsync(): Promise<ConversationsConfig
 // (preferred in dashboard-reachable code) wrap the existing Promise functions
 // via Effect.tryPromise; the sync paths route through Effect.try.
 
-/** Load config.toml (sync). Surfaces FsError on read/parse failure. */
-export const loadConfigEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
-  Effect.try({
-    try: () => loadConfig(),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'load-config', cause }),
-  });
-
-/** Persist config.toml (sync). Surfaces FsError on write failure. */
-export const saveConfigEffect = (
-  config: PanopticonConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveConfig(config),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'save-config', cause }),
-  });
-
 /** Load config.toml (async; dashboard-safe). */
-export const loadConfigAsyncEffect = (): Effect.Effect<PanopticonConfig, FsError> =>
+export const loadConfig = (): Effect.Effect<PanopticonConfig, FsError> =>
   Effect.tryPromise({
-    try: () => loadConfigAsync(),
+    try: () => loadConfigFromFile(),
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
   });
 
 /** Persist config.toml (async; dashboard-safe). */
-export const saveConfigAsyncEffect = (
+export const saveConfig = (
   config: PanopticonConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
-    try: () => saveConfigAsync(config),
+    try: () => saveConfigToFile(config),
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
   });
 
 /** Default config template. Pure. */
-export const getDefaultConfigEffect = (): Effect.Effect<PanopticonConfig> =>
-  Effect.sync(() => getDefaultConfig());
+export const getDefaultConfig = (): Effect.Effect<PanopticonConfig> =>
+  Effect.sync(() => getDefaultConfigSync());
 
 /** Compute the dashboard's external API URL. Pure (reads env). */
-export const getDashboardApiUrlEffect = (): Effect.Effect<string> =>
-  Effect.sync(() => getDashboardApiUrl());
+export const getDashboardApiUrl = (): Effect.Effect<string> =>
+  Effect.sync(() => getDashboardApiUrlSync());
 
 /** Resolve the configured devroot path. Pure (reads config). */
-export const getDevrootPathEffect = (): Effect.Effect<string | null> =>
-  Effect.sync(() => getDevrootPath());
+export const getDevrootPath = (): Effect.Effect<string | null> =>
+  Effect.sync(() => getDevrootPathSync());
 
 /** Compute the devroot for a project path. Pure. */
-export const findDevrootForProjectEffect = (
+export const findDevrootForProject = (
   projectPath: string,
-): Effect.Effect<string> => Effect.sync(() => findDevrootForProject(projectPath));
-
-/** Resolve conversations sub-config (sync). */
-export const getConversationsConfigEffect = (): Effect.Effect<ConversationsConfig> =>
-  Effect.sync(() => getConversationsConfig());
+): Effect.Effect<string> => Effect.sync(() => findDevrootForProjectSync(projectPath));
 
 /** Resolve conversations sub-config (async). */
-export const getConversationsConfigAsyncEffect =
+export const getConversationsConfig =
   (): Effect.Effect<ConversationsConfig, FsError> =>
     Effect.tryPromise({
-      try: () => getConversationsConfigAsync(),
+      try: () => readConversationsConfig(),
       catch: (cause) =>
         new FsError({
           path: CONFIG_FILE,

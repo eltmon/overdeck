@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import ora from 'ora';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { loadConfig } from '../../../lib/config.js';
+import { loadConfigSync } from '../../../lib/config.js';
 import { createFlyProvider, type VmInfo } from '../../../lib/remote/index.js';
 
 const execAsync = promisify(exec);
@@ -22,7 +22,7 @@ interface InitOptions {
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
-  const config = loadConfig();
+  const config = loadConfigSync();
 
   if (!config.remote?.enabled) {
     console.log('');

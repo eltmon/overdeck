@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -58,7 +59,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should remove hooks whose absolute path does not exist', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -69,7 +70,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.copied).toContain(join(workspaceDir, '.claude', 'settings.json'));
     expect(result.errors.some((e) => e.includes('Removed broken hook'))).toBe(true);
@@ -79,7 +80,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should preserve hooks whose absolute path exists', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const hookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -94,7 +95,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -104,7 +105,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should not validate relative hook paths', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -115,7 +116,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -125,7 +126,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should not validate shell commands with pipes', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -136,7 +137,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -146,7 +147,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should handle mixed valid and invalid hooks', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const validHookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -163,7 +164,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -175,7 +176,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should remove empty hook categories after filtering', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -185,7 +186,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(2);
 
@@ -194,7 +195,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should detect broken script path inside wrapper command', async () => {
-    const { copyPanopticonSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -205,7 +206,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspace(workspaceDir);
+    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -241,7 +242,7 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
-    await stopWorkspaceDocker(workspaceDir, 'pan-1140');
+    await Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'));
 
     const composeCall = mockExecAsync.mock.calls.find(([command]) => String(command).startsWith('docker compose'));
     expect(composeCall?.[0]).toContain('-p "panopticon-feature-pan-1140" down -v --remove-orphans');
@@ -255,7 +256,7 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
-    await expect(stopWorkspaceDocker(workspaceDir, 'pan-1140')).rejects.toThrow(
+    await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
       'declares COMPOSE_PROJECT_NAME=victim-project, expected panopticon-feature-pan-1140',
     );
     expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());

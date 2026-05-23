@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -118,7 +119,7 @@ describe('forge adapters', () => {
     vi.useFakeTimers();
     isGitHubAppConfiguredMock.mockReturnValue(true);
     getPullRequestStateMock
-      .mockResolvedValueOnce({
+      .mockReturnValueOnce(Effect.succeed({
         owner: 'org',
         repo: 'repo',
         number: 42,
@@ -131,8 +132,8 @@ describe('forge adapters', () => {
         baseBranch: 'main',
         checksPending: true,
         checksFailed: false,
-      })
-      .mockResolvedValueOnce({
+      }))
+      .mockReturnValueOnce(Effect.succeed({
         owner: 'org',
         repo: 'repo',
         number: 42,
@@ -145,8 +146,8 @@ describe('forge adapters', () => {
         baseBranch: 'main',
         checksPending: false,
         checksFailed: false,
-      });
-    mergePullRequestWithAppMock.mockResolvedValue({ merged: true });
+      }));
+    mergePullRequestWithAppMock.mockReturnValue(Effect.succeed({ merged: true }));
 
     const mergePromise = getForgeAdapter('github').mergeReviewArtifact({
       forge: 'github',
@@ -164,7 +165,7 @@ describe('forge adapters', () => {
 
   it('treats already merged GitHub PRs as success', async () => {
     isGitHubAppConfiguredMock.mockReturnValue(true);
-    getPullRequestStateMock.mockResolvedValue({
+    getPullRequestStateMock.mockReturnValue(Effect.succeed({
       owner: 'org',
       repo: 'repo',
       number: 42,
@@ -177,7 +178,7 @@ describe('forge adapters', () => {
       baseBranch: 'main',
       checksPending: false,
       checksFailed: false,
-    });
+    }));
 
     await expect(
       getForgeAdapter('github').mergeReviewArtifact({

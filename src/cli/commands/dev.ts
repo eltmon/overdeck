@@ -127,9 +127,9 @@ function waitForPortFree(port: number, timeoutMs = 5000): Promise<void> {
 async function startSidecars(): Promise<void> {
   // CLIProxy
   try {
-    const { startCliproxy, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
+    const { startCliproxySync, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
     console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-    startCliproxy();
+    startCliproxySync();
     console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
@@ -137,21 +137,21 @@ async function startSidecars(): Promise<void> {
 
   // smee
   try {
-    const { startSmeeProcess } = await import('../../lib/smee.js');
+    const { startSmeeProcessSync } = await import('../../lib/smee.js');
     console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-    startSmeeProcess();
+    startSmeeProcessSync();
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
   }
 
   // TLDR
   try {
-    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+    const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
     const projectRoot = process.cwd();
     const venvPath = join(projectRoot, '.venv');
     if (existsSync(venvPath)) {
       console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-      const tldrService = getTldrDaemonService(projectRoot, venvPath);
+      const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
       await tldrService.start(true);
       console.log(chalk.green('✓ TLDR daemon started'));
     } else {
@@ -163,9 +163,9 @@ async function startSidecars(): Promise<void> {
 
   // Supervisor
   try {
-    const { startSupervisorProcess, getSupervisorPort } = await import('../../lib/supervisor.js');
-    startSupervisorProcess();
-    console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
+    const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../../lib/supervisor.js');
+    startSupervisorProcessSync();
+    console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
   }
@@ -207,18 +207,18 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // ── Traefik ────────────────────────────────────────────────────────────────
   if (config.traefikEnabled && !options.skipTraefik) {
     try {
-      const { generatePanopticonTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } =
+      const { generatePanopticonTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } =
         await import('../../lib/traefik.js');
 
-      cleanupStaleTlsSections();
-      if (generatePanopticonTraefikConfig('dev')) {
+      cleanupStaleTlsSectionsSync();
+      if (generatePanopticonTraefikConfigSync('dev')) {
         console.log(chalk.dim('  Regenerated Traefik config for dev mode'));
       }
-      const generatedDomains = ensureProjectCerts();
+      const generatedDomains = ensureProjectCertsSync();
       for (const domain of generatedDomains) {
         console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
       }
-      if (generateTlsConfig()) {
+      if (generateTlsConfigSync()) {
         console.log(chalk.dim('  Generated TLS config (tls.yml)'));
       }
     } catch {
@@ -386,20 +386,20 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
     // Stop sidecars
     try {
-      const { stopSmeeProcess } = await import('../../lib/smee.js');
-      stopSmeeProcess();
+      const { stopSmeeProcessSync } = await import('../../lib/smee.js');
+      stopSmeeProcessSync();
     } catch {
       // ignore
     }
     try {
-      const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
-      stopSupervisorProcess();
+      const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
+      stopSupervisorProcessSync();
     } catch {
       // ignore
     }
     try {
-      const { stopCliproxy } = await import('../../lib/cliproxy.js');
-      stopCliproxy();
+      const { stopCliproxySync } = await import('../../lib/cliproxy.js');
+      stopCliproxySync();
     } catch {
       // ignore
     }

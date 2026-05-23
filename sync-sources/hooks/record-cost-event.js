@@ -3006,6 +3006,15 @@ const failCause = exitFailCause;
 /** @internal */
 const fail = exitFail;
 /** @internal */
+const sync$1 = /* @__PURE__ */ makePrimitive({
+	op: "Sync",
+	[evaluate](fiber) {
+		const value = this[args]();
+		const cont = fiber.getCont(contA);
+		return cont ? cont[contA](value, fiber) : fiber.yieldWith(exitSucceed(value));
+	}
+});
+/** @internal */
 const suspend = /* @__PURE__ */ makePrimitive({
 	op: "Suspend",
 	[evaluate](_fiber) {
@@ -3215,6 +3224,44 @@ const TaggedError = TaggedError$1;
 * @category Creating Effects
 */
 const succeed = succeed$1;
+/**
+* Creates an `Effect` that represents a synchronous side-effectful computation.
+*
+* **When to Use**
+*
+* Use `sync` when you are sure the operation will not fail.
+*
+* **Details**
+*
+* The provided function (`thunk`) must not throw errors; if it does, the error
+* will be treated as a "defect".
+*
+* This defect is not a standard error but indicates a flaw in the logic that
+* was expected to be error-free. You can think of it similar to an unexpected
+* crash in the program, which can be further managed or logged using tools like
+* {@link catchAllDefect}.
+*
+* @see {@link try_ | try} for a version that can handle failures.
+*
+* @example
+* ```ts
+* // Title: Logging a Message
+* import { Effect } from "effect"
+*
+* const log = (message: string) =>
+*   Effect.sync(() => {
+*     console.log(message) // side effect
+*   })
+*
+* //      ┌─── Effect<void, never, never>
+* //      ▼
+* const program = log("Hello, World!")
+* ```
+*
+* @since 2.0.0
+* @category Creating Effects
+*/
+const sync = sync$1;
 const void_ = void_$1;
 const try_ = try_$1;
 /**
@@ -3394,7 +3441,8 @@ function encodeClaudeProjectDir(cwdPath) {
 }
 TaggedError("VcsError");
 TaggedError("VcsTimeoutError");
-TaggedError("FsError");
+/** A filesystem operation (read, write, mkdir, unlink, stat) failed. */
+var FsError = class extends TaggedError("FsError") {};
 TaggedError("FsNotFoundError");
 TaggedError("GitError");
 TaggedError("MergeConflictError");
@@ -3411,6 +3459,12 @@ TaggedError("ProcessSpawnError");
 TaggedError("ProcessTimeoutError");
 //#endregion
 //#region ../../src/lib/cost.ts
+/**
+* Cost Tracking System
+*
+* Track AI usage costs per feature, issue, and project.
+* Supports multiple AI providers with configurable pricing.
+*/
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
@@ -3631,7 +3685,7 @@ const DEFAULT_PRICING = [
 /**
 * Calculate cost for token usage
 */
-function calculateCost(usage, pricing) {
+function calculateCostSync(usage, pricing) {
 	let cost = 0;
 	let inputMultiplier = 1;
 	let outputMultiplier = 1;
@@ -3652,12 +3706,16 @@ function calculateCost(usage, pricing) {
 /**
 * Get pricing for a model
 */
-function getPricing(provider, model) {
+function getPricingSync(provider, model) {
 	let pricing = DEFAULT_PRICING.find((p) => p.provider === provider && p.model === model);
 	if (!pricing) pricing = DEFAULT_PRICING.find((p) => p.provider === provider && model.startsWith(p.model));
 	return pricing || null;
 }
 join(COSTS_DIR, "budgets.json");
+/** Compute the cost of one token-usage record at given pricing. Pure. */
+const calculateCost = (usage, pricing) => sync(() => calculateCostSync(usage, pricing));
+/** Look up pricing for a (provider, model) pair. Pure. */
+const getPricing = (provider, model) => sync(() => getPricingSync(provider, model));
 function parseArrayColumn(value) {
 	if (!value) return [];
 	try {
@@ -11426,7 +11484,7 @@ var import_dist = (/* @__PURE__ */ __commonJSMin(((exports) => {
 * @param projectConfig - Optional project config for custom patterns
 * @returns ParsedIssueId or null if no format matches
 */
-function parseIssueId(issueId, projectConfig) {
+function parseIssueIdSync(issueId, projectConfig) {
 	const standardMatch = issueId.match(/^([A-Za-z]+)-(\d+)$/);
 	if (standardMatch) return {
 		raw: issueId,
@@ -11459,8 +11517,8 @@ function parseIssueId(issueId, projectConfig) {
 * Extract just the team/project prefix from an issue ID.
 * Handles standard (MIN-123), Rally (F29698), and custom formats.
 */
-function extractPrefix(issueId) {
-	return parseIssueId(issueId)?.prefix ?? null;
+function extractPrefixSync(issueId) {
+	return parseIssueIdSync(issueId)?.prefix ?? null;
 }
 //#endregion
 //#region ../../src/lib/projects.ts
@@ -11471,7 +11529,7 @@ function extractPrefix(issueId) {
 */
 const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, "projects.yaml");
 let _projectsCache = null;
-function loadProjectsConfig() {
+function loadProjectsConfigSync() {
 	if (!existsSync(PROJECTS_CONFIG_FILE)) return { projects: {} };
 	try {
 		const mtime = statSync(PROJECTS_CONFIG_FILE).mtimeMs;
@@ -11490,8 +11548,8 @@ function loadProjectsConfig() {
 /**
 * Get a list of all registered projects
 */
-function listProjects() {
-	const config = loadProjectsConfig();
+function listProjectsSync() {
+	const config = loadProjectsConfigSync();
 	return Object.entries(config.projects).map(([key, projectConfig]) => ({
 		key,
 		config: projectConfig
@@ -11513,8 +11571,8 @@ const DEFAULT_EVENTS_SUBDIR = ".pan/events";
 * Returns null if no matching project is found.
 */
 function resolveWalDir(issueId) {
-	const projects = listProjects();
-	const issuePrefix = extractPrefix(issueId);
+	const projects = listProjectsSync();
+	const issuePrefix = extractPrefixSync(issueId);
 	if (!issuePrefix) return null;
 	for (const { key, config } of projects) {
 		const projectKey = key.toUpperCase();
@@ -11531,7 +11589,7 @@ function resolveWalDir(issueId) {
 * Returns true if the event was written, false if no matching project was found.
 * Never throws — WAL writes are best-effort.
 */
-function appendToWal(event) {
+function appendToWalSync(event) {
 	try {
 		const walDir = resolveWalDir(event.issueId);
 		if (!walDir) return false;
@@ -11578,7 +11636,7 @@ function ensureEventsFile() {
 * 2. Event timestamps provide ordering
 * 3. Aggregation is commutative (order doesn't affect totals)
 */
-function appendCostEvent(event) {
+function appendCostEventSync(event) {
 	ensureEventsFile();
 	if (!event.ts || !event.agentId || !event.issueId || !event.model) throw new Error("Missing required event fields: ts, agentId, issueId, model");
 	const line = JSON.stringify(event) + "\n";
@@ -11589,11 +11647,24 @@ function appendCostEvent(event) {
 		console.error("[cost-events] SQLite write failed (continuing with JSONL):", err);
 	}
 	try {
-		appendToWal(event);
+		appendToWalSync(event);
 	} catch (err) {
 		console.error("[cost-events] WAL write failed (continuing):", err);
 	}
 }
+/**
+* Effect variant of appendCostEvent. Failures surface as typed FsError on the
+* error channel instead of thrown exceptions. SQLite and WAL best-effort
+* writes preserve the same semantics as the sync variant.
+*/
+const appendCostEvent = (event) => try_({
+	try: () => appendCostEventSync(event),
+	catch: (cause) => new FsError({
+		path: getEventsFile(),
+		operation: "appendCostEvent",
+		cause
+	})
+});
 //#endregion
 //#region ../../src/lib/tldr-daemon.ts
 /**
@@ -11634,7 +11705,7 @@ function readLogLines(logFile, startByte, startLine = 0) {
 * @param workspacePath - Workspace root (where .tldr/ lives)
 * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
 */
-function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
+function getTldrMetricsSync(workspacePath, sinceCheckpoint = false) {
 	const tldrDir = join(workspacePath, ".tldr");
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
@@ -11683,10 +11754,10 @@ function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 * @param workspacePath - Workspace root (where .tldr/ lives)
 * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
 */
-function captureTldrMetrics(workspacePath) {
+function captureTldrMetricsSync(workspacePath) {
 	const tldrDir = join(workspacePath, ".tldr");
 	if (!existsSync(tldrDir)) return null;
-	const metrics = getTldrMetrics(workspacePath, true);
+	const metrics = getTldrMetricsSync(workspacePath, true);
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
@@ -11708,6 +11779,15 @@ function captureTldrMetrics(workspacePath) {
 	return metrics;
 }
 promisify(exec);
+/** Capture-and-checkpoint TLDR metrics; null when nothing new is logged. */
+const captureTldrMetrics = (workspacePath) => try_({
+	try: () => captureTldrMetricsSync(workspacePath),
+	catch: (cause) => new FsError({
+		path: workspacePath,
+		operation: "captureTldrMetrics",
+		cause
+	})
+});
 //#endregion
 //#region record-cost-event.ts
 /**

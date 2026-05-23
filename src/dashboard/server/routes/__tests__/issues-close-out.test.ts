@@ -23,6 +23,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     resolveProjectFromIssue: resolveProjectFromIssueMock,
+    resolveProjectFromIssueSync: resolveProjectFromIssueMock,
   };
 });
 
@@ -31,6 +32,7 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: resolveGitHubIssueMock,
+    resolveGitHubIssueSync: resolveGitHubIssueMock,
   };
 });
 

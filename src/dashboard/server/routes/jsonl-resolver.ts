@@ -24,7 +24,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect } from 'effect';
-import { getAgentRuntimeStateEffect } from '../../../lib/agents.js';
+import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
@@ -71,7 +71,7 @@ async function pickFreshestSessionId(
   // project dir. Avoids fanning out across every Claude project.
   let candidatePaths: Array<{ id: string; path: string }> = [];
   try {
-    const workspace = await getAgentWorkspace(agentId);
+    const workspace = await Effect.runPromise(getAgentWorkspace(agentId));
     if (workspace) {
       const projectDir = join(projectsRoot, encodeClaudeProjectDir(workspace));
       candidatePaths = candidates.map((id) => ({ id, path: join(projectDir, `${id}.jsonl`) }));
@@ -139,7 +139,7 @@ export async function resolveClaudeSessionId(
 
   // 3. runtime state claudeSessionId (in-process mirror)
   try {
-    const lookup = opts.getRuntimeStateAsync ?? ((id: string) => Effect.runPromise(getAgentRuntimeStateEffect(id)));
+    const lookup = opts.getRuntimeStateAsync ?? ((id: string) => Effect.runPromise(getAgentRuntimeState(id)));
     const runtimeState = await lookup(agentId);
     if (runtimeState?.claudeSessionId) return runtimeState.claudeSessionId;
   } catch { /* non-fatal */ }

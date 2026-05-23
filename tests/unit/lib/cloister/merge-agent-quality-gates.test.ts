@@ -1,10 +1,13 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'path';
 
 // Mock dependencies before importing the module under test
 vi.mock('../../../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  loadProjectsConfigSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   findProjectByTeam: vi.fn(),
 }));
 
@@ -17,6 +20,7 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
   sessionExists: vi.fn(),
+  sessionExistsSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/activity-log.js', () => ({
@@ -24,10 +28,10 @@ vi.mock('../../../../src/lib/activity-log.js', () => ({
 }));
 
 import { runProjectQualityGates } from '../../../../src/lib/cloister/merge-agent.js';
-import { loadProjectsConfig } from '../../../../src/lib/projects.js';
+import { loadProjectsConfigSync } from '../../../../src/lib/projects.js';
 import { runQualityGates } from '../../../../src/lib/cloister/validation.js';
 
-const mockLoadProjectsConfig = vi.mocked(loadProjectsConfig);
+const mockLoadProjectsConfig = vi.mocked(loadProjectsConfigSync);
 const mockRunQualityGates = vi.mocked(runQualityGates);
 
 const PROJECT_PATH = '/home/user/projects/myapp';
@@ -36,7 +40,7 @@ const PASSING_GATE_RESULT = [{ name: 'lint', passed: true, required: true, outpu
 describe('runProjectQualityGates — polyrepo path filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRunQualityGates.mockResolvedValue(PASSING_GATE_RESULT as any);
+    mockRunQualityGates.mockReturnValue(Effect.succeed(PASSING_GATE_RESULT) as any);
   });
 
   it('runs all gates in monorepo context (repoRelPath is empty)', async () => {

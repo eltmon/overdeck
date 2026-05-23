@@ -59,23 +59,30 @@ vi.mock('../../agents.js', async () => {
   };
   return {
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   getAgentDir: vi.fn(),
   getAgentState: vi.fn(),
-  getAgentStateEffect: effectMock(null),
+  getAgentStateSync: vi.fn(),
+  getAgentStateProgram: effectMock(null),
   saveAgentState: vi.fn(),
-  saveAgentStateEffect: effectMock(undefined),
+  saveAgentStateSync: vi.fn(),
+  saveAgentStateProgram: effectMock(undefined),
   saveSessionId: vi.fn(),
   resumeAgent: vi.fn(),
-  recordAgentFailureEffect: effectMock(null),
+  recordAgentFailureProgram: effectMock(null),
   };
 });
 
 vi.mock('../../review-status.js', () => ({
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', async () => {
@@ -100,17 +107,19 @@ vi.mock('../../tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
-  isPaneDeadAsyncEffect: effectMock(false),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
+  isPaneDead: effectMock(false),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSessionSync: vi.fn(),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
-  sendKeysEffect: effectMock(undefined),
+  sessionExistsSync: vi.fn(() => false),
+  sessionExists: effectMock(false),
+  sendKeysProgram: effectMock(undefined),
   };
 });
 
@@ -122,12 +131,15 @@ vi.mock('../specialists.js', () => ({
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({})),
+  loadCloisterConfigSync: vi.fn(() => ({})),
 }));
 
 // ── Patrol-specific mocks ───────────────────────────────────────────────────
 vi.mock('../../projects.js', () => ({
   listProjects: vi.fn(() => [{ config: { path: '/tmp/proj' } }]),
+  listProjectsSync: vi.fn(() => [{ config: { path: '/tmp/proj' } }]),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/proj' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/proj' })),
   getProject: vi.fn(),
 }));
 
@@ -141,14 +153,18 @@ vi.mock('../merge-agent.js', async (importOriginal) => {
 const resolveGitHubIssueMock = vi.hoisted(() => vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli' })));
 vi.mock('../../tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../tracker-utils.js')>();
-  return { ...actual, resolveGitHubIssue: resolveGitHubIssueMock };
+  return { ...actual, resolveGitHubIssue: resolveGitHubIssueMock, resolveGitHubIssueSync: resolveGitHubIssueMock };
 });
 
-const readContinueStateEffectMock = vi.hoisted(() => vi.fn());
+const readContinueStateProgramMock = vi.hoisted(() => vi.fn());
 vi.mock('../../vbrief/continue-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../vbrief/continue-state.js')>();
   const { Effect } = await import('effect');
-  return { ...actual, readContinueStateEffect: (...args: unknown[]) => Effect.promise(() => readContinueStateEffectMock(...args)) };
+  return {
+    ...actual,
+    readContinueState: (...args: unknown[]) => Effect.promise(() => readContinueStateProgramMock(...args)),
+    readContinueStateProgram: (...args: unknown[]) => Effect.promise(() => readContinueStateProgramMock(...args)),
+  };
 });
 
 import { detectMergedSwarmSlots } from '../deacon.js';
@@ -188,7 +204,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
 
   it('fires postMergeLifecycle for each running slot whose PR has merged', async () => {
     setWorkspaceDirs(['feature-pan-1148']);
-    readContinueStateEffectMock.mockResolvedValue({
+    readContinueStateProgramMock.mockResolvedValue({
       swarmRuntime: { slots: [runningSlot(1), runningSlot(2)] },
     });
     setMergedPrs([
@@ -210,7 +226,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
 
   it('does not fire when a running slot has no merged PR', async () => {
     setWorkspaceDirs(['feature-pan-1300']);
-    readContinueStateEffectMock.mockResolvedValue({
+    readContinueStateProgramMock.mockResolvedValue({
       swarmRuntime: { slots: [runningSlot(1)] },
     });
     setMergedPrs([]); // gh reports nothing merged into the feature branch
@@ -223,7 +239,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
 
   it('skips workspaces with no swarm runtime — never queries GitHub', async () => {
     setWorkspaceDirs(['feature-pan-1301']);
-    readContinueStateEffectMock.mockResolvedValue({ version: '1', issueId: 'PAN-1301' });
+    readContinueStateProgramMock.mockResolvedValue({ version: '1', issueId: 'PAN-1301' });
 
     const actions = await detectMergedSwarmSlots();
 
@@ -234,7 +250,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
 
   it('ignores already-terminal slots — only running slots can have a lost callback', async () => {
     setWorkspaceDirs(['feature-pan-1302']);
-    readContinueStateEffectMock.mockResolvedValue({
+    readContinueStateProgramMock.mockResolvedValue({
       swarmRuntime: { slots: [{ ...runningSlot(1), status: 'merged' }, { ...runningSlot(2), status: 'pending' }] },
     });
 
@@ -250,7 +266,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
 
     const actions = await detectMergedSwarmSlots();
 
-    expect(readContinueStateEffectMock).not.toHaveBeenCalled();
+    expect(readContinueStateProgramMock).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -258,7 +274,7 @@ describe('detectMergedSwarmSlots — swarm slot-merge safety-net', () => {
     // Distinct issue id — the cooldown map is module-level and persists across
     // tests in this file.
     setWorkspaceDirs(['feature-pan-2000']);
-    readContinueStateEffectMock.mockResolvedValue({
+    readContinueStateProgramMock.mockResolvedValue({
       swarmRuntime: { slots: [{ ...runningSlot(1), sessionName: 'agent-pan-2000-slot-1' }] },
     });
     setMergedPrs([

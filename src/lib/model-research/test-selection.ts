@@ -6,8 +6,8 @@
  */
 
 import {
-  selectModel,
-  selectAllModels,
+  selectModelSync,
+  selectAllModelsSync,
   formatSelectionResults,
 } from '../smart-model-selector.js';
 import { MODEL_CAPABILITIES } from '../model-capabilities.js';
@@ -23,7 +23,7 @@ console.log('══════════════════════�
 console.log('Test 1: Anthropic Only (no external API keys)');
 console.log('─'.repeat(60));
 const anthropicOnly: ModelId[] = ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'];
-const anthropicResults = selectAllModels(anthropicOnly);
+const anthropicResults = selectAllModelsSync(anthropicOnly);
 
 for (const [workType, result] of Object.entries(anthropicResults)) {
   console.log(`  ${workType}: ${result.model}`);
@@ -34,7 +34,7 @@ console.log('\n');
 console.log('Test 2: All Models Available');
 console.log('─'.repeat(60));
 const allModels = Object.keys(MODEL_CAPABILITIES) as ModelId[];
-const allResults = selectAllModels(allModels);
+const allResults = selectAllModelsSync(allModels);
 
 for (const [workType, result] of Object.entries(allResults)) {
   console.log(`  ${workType}: ${result.model}`);
@@ -44,7 +44,7 @@ console.log('\n');
 // Test 3: Detailed selection for a specific work type
 console.log('Test 3: Detailed Selection - review-security');
 console.log('─'.repeat(60));
-const securityResult = selectModel('review-security', allModels);
+const securityResult = selectModelSync('review-security', allModels);
 
 console.log(`  Selected: ${securityResult.model}`);
 console.log(`  Reason: ${securityResult.reason}`);
@@ -68,7 +68,7 @@ const anthropicKimi: ModelId[] = [
   'claude-haiku-4-5',
   'kimi-k2.5',
 ];
-const akResults = selectAllModels(anthropicKimi);
+const akResults = selectAllModelsSync(anthropicKimi);
 
 for (const [workType, result] of Object.entries(akResults)) {
   console.log(`  ${workType}: ${result.model}`);
@@ -85,7 +85,7 @@ const anthropicGoogle: ModelId[] = [
   'gemini-3.1-pro-preview',
   'gemini-3-flash-preview',
 ];
-const agResults = selectAllModels(anthropicGoogle);
+const agResults = selectAllModelsSync(anthropicGoogle);
 
 for (const [workType, result] of Object.entries(agResults)) {
   console.log(`  ${workType}: ${result.model}`);

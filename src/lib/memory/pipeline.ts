@@ -1,10 +1,11 @@
 import { createHash } from 'crypto';
 import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
+import { Effect } from 'effect';
 import {
-  claimTranscriptRangeAsync,
-  commitTranscriptRangeAsync,
-  releaseTranscriptRangeAsync,
-  getTranscriptCheckpointAsync,
+  claimTranscriptRange,
+  commitTranscriptRange,
+  releaseTranscriptRange,
+  getTranscriptCheckpoint,
 } from './checkpoint-client.js';
 import type {
   ClaimTranscriptRangeResult,
@@ -228,7 +229,7 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
     return { status: 'failed', observation: null, reason: 'pipeline-error' };
   } finally {
     if (claimedRange && !checkpointCommitted) {
-      const release = input.releaseRange ?? releaseTranscriptRangeAsync;
+      const release = input.releaseRange ?? ((sessionId, expectedFromOffset, toOffset) => Effect.runPromise(releaseTranscriptRange(sessionId, expectedFromOffset, toOffset)));
       await release(input.sessionId, claimedRange.fromOffset, claimedRange.toOffset);
     }
   }
@@ -249,8 +250,8 @@ async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<
   | { status: 'failed'; reason: 'claim-failed' }
 > {
   try {
-    const claim = input.claimRange ?? claimTranscriptRangeAsync;
-    const fromOffset = input.fromOffset ?? (await getTranscriptCheckpointAsync(input.sessionId))?.lastOffset ?? 0;
+    const claim = input.claimRange ?? ((input) => Effect.runPromise(claimTranscriptRange(input)));
+    const fromOffset = input.fromOffset ?? (await Effect.runPromise(getTranscriptCheckpoint(input.sessionId)))?.lastOffset ?? 0;
     return {
       status: 'claimed',
       result: await claim({
@@ -290,7 +291,7 @@ async function safeCommit(
   | { status: 'failed' }
 > {
   try {
-    const commit = input.commitRange ?? commitTranscriptRangeAsync;
+    const commit = input.commitRange ?? ((input) => Effect.runPromise(commitTranscriptRange(input)));
     const result = await commit({
       sessionId: input.sessionId,
       expectedFromOffset: claimed.fromOffset,

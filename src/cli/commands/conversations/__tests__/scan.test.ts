@@ -15,16 +15,19 @@ import { tmpdir } from 'os';
 
 const mockWatchDirs: string[] = [];
 
+const mockGetConversationsConfig = () => ({
+  watchDirs: mockWatchDirs,
+  scanMaxParallel: null,
+  embeddings: false,
+  embeddingProvider: 'openai',
+  embeddingModel: 'text-embedding-3-small',
+  embeddingAutoOnDeep: false,
+  enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
+});
+
 vi.mock('../../../../lib/config-yaml.js', () => ({
-  getConversationsConfig: () => ({
-    watchDirs: mockWatchDirs,
-    scanMaxParallel: null,
-    embeddings: false,
-    embeddingProvider: 'openai',
-    embeddingModel: 'text-embedding-3-small',
-    embeddingAutoOnDeep: false,
-    enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
-  }),
+  getConversationsConfig: mockGetConversationsConfig,
+  getConversationsConfigSync: mockGetConversationsConfig,
 }));
 
 // ─── Mock chalk to avoid terminal color codes in assertions ──────────────────

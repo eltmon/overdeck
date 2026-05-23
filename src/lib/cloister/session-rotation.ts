@@ -13,10 +13,10 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
-import { getAgentState } from '../agents.js';
+import { getAgentStateSync } from '../agents.js';
 import type { SpecialistAgentName } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
-import { killSessionAsyncEffect } from '../tmux.js';
+import { killSession } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -84,19 +84,7 @@ export function needsSessionRotation(agentId: string): boolean {
 
   const totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
   return totalTokens >= SESSION_ROTATION_THRESHOLD;
-}
-
-/**
- * Build tiered memory file for merge-agent
- *
- * Extracts merge history from git and creates a memory file with
- * tiered detail levels (summary → detailed → full diffs).
- *
- * @param workingDir - Git repository directory
- * @param tiers - Memory tier configuration
- * @returns Memory content as string
- */
-export async function buildMergeAgentMemory(
+}async function buildMergeAgentMemoryPromise(
   workingDir: string,
   tiers: MemoryTiers = DEFAULT_MEMORY_TIERS
 ): Promise<string> {
@@ -191,18 +179,7 @@ export async function buildMergeAgentMemory(
   }
 
   return memory;
-}
-
-/**
- * Rotate a specialist agent's session
- *
- * Kills current session, builds memory file, and starts fresh session with memory.
- *
- * @param specialistName - Specialist name
- * @param workingDir - Working directory (for building memory)
- * @returns Rotation result
- */
-export async function rotateSpecialistSession(
+}async function rotateSpecialistSessionPromise(
   specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult> {
@@ -217,7 +194,7 @@ export async function rotateSpecialistSession(
     };
   }
 
-  const agentState = getAgentState(agentId);
+  const agentState = getAgentStateSync(agentId);
   if (!agentState?.sessionId) {
     return {
       success: false,
@@ -234,7 +211,7 @@ export async function rotateSpecialistSession(
     let memoryFile: string | undefined;
 
     if (specialistName === 'merge-agent' && workingDir) {
-      memoryContent = await buildMergeAgentMemory(workingDir);
+      memoryContent = await Effect.runPromise(buildMergeAgentMemory(workingDir));
       memoryFile = join(PANOPTICON_HOME, `merge-agent-memory-${Date.now()}.md`);
       writeFileSync(memoryFile, memoryContent);
       console.log(`Built memory file: ${memoryFile}`);
@@ -243,7 +220,7 @@ export async function rotateSpecialistSession(
     // Kill current session
     const tmuxSession = getTmuxSessionName(specialistName);
     try {
-      await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
+      await Effect.runPromise(killSession(tmuxSession));
       console.log(`Killed session: ${tmuxSession}`);
     } catch (error) {
       // Session might already be dead
@@ -277,16 +254,7 @@ export async function rotateSpecialistSession(
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-/**
- * Check if rotation is needed and perform it
- *
- * @param specialistName - Specialist name
- * @param workingDir - Working directory
- * @returns Rotation result if rotated, null if not needed
- */
-export async function checkAndRotateIfNeeded(
+}async function checkAndRotateIfNeededPromise(
   specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult | null> {
@@ -297,7 +265,7 @@ export async function checkAndRotateIfNeeded(
   }
 
   console.log(`🔔 Session rotation needed for ${specialistName}`);
-  return rotateSpecialistSession(specialistName, workingDir);
+  return (await Effect.runPromise(rotateSpecialistSession(specialistName, workingDir)));
 }
 
 // ─── PAN-1249: additive Effect variants ───────────────────────────────────────
@@ -307,31 +275,31 @@ export async function checkAndRotateIfNeeded(
  * function swallows git errors and returns a fallback string, so this Effect
  * never fails.
  */
-export function buildMergeAgentMemoryEffect(
+export function buildMergeAgentMemory(
   workingDir: string,
   tiers: MemoryTiers = DEFAULT_MEMORY_TIERS,
 ): Effect.Effect<string> {
-  return Effect.promise(() => buildMergeAgentMemory(workingDir, tiers));
+  return Effect.promise(() => buildMergeAgentMemoryPromise(workingDir, tiers));
 }
 
 /**
  * Effect-typed variant of {@link rotateSpecialistSession}. Never fails — the
  * Promise version returns `{ success: false, error }` instead of throwing.
  */
-export function rotateSpecialistSessionEffect(
+export function rotateSpecialistSession(
   specialistName: SpecialistAgentName,
   workingDir?: string,
 ): Effect.Effect<SessionRotationResult> {
-  return Effect.promise(() => rotateSpecialistSession(specialistName, workingDir));
+  return Effect.promise(() => rotateSpecialistSessionPromise(specialistName, workingDir));
 }
 
 /**
  * Effect-typed variant of {@link checkAndRotateIfNeeded}. Resolves to `null`
  * when no rotation was needed (mirrors the Promise contract).
  */
-export function checkAndRotateIfNeededEffect(
+export function checkAndRotateIfNeeded(
   specialistName: SpecialistAgentName,
   workingDir?: string,
 ): Effect.Effect<SessionRotationResult | null> {
-  return Effect.promise(() => checkAndRotateIfNeeded(specialistName, workingDir));
+  return Effect.promise(() => checkAndRotateIfNeededPromise(specialistName, workingDir));
 }

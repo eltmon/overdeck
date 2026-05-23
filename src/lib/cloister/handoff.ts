@@ -10,11 +10,11 @@ import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
 import type { AgentState } from '../agents.js';
-import { getAgentState, saveAgentState, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
+import { getAgentStateSync, saveAgentStateSync, stopAgentSync, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
-import { sessionExists } from '../tmux.js';
-import { requireModelOverride } from '../model-validation.js';
+import { sessionExistsSync } from '../tmux.js';
+import { requireModelOverrideSync } from '../model-validation.js';
 
 /**
  * Handoff method type
@@ -43,24 +43,12 @@ export interface HandoffOptions {
   waitForIdle?: boolean; // Wait for agent to be idle before killing (default: true)
   idleTimeoutMs?: number; // How long to wait for idle (default: 30000)
   additionalInstructions?: string; // Extra instructions for new agent
-}
-
-/**
- * Perform a model handoff for an agent
- *
- * Auto-selects handoff method based on agent type:
- * - All agents: Use kill-spawn / role respawn
- *
- * @param agentId - Agent to hand off
- * @param options - Handoff options
- * @returns Handoff result
- */
-export async function performHandoff(
+}async function performHandoffPromise(
   agentId: string,
   options: HandoffOptions
 ): Promise<HandoffResult> {
   // Get current agent state
-  const state = getAgentState(agentId);
+  const state = getAgentStateSync(agentId);
   if (!state) {
     return {
       success: false,
@@ -71,7 +59,7 @@ export async function performHandoff(
 
   let targetModel: string;
   try {
-    targetModel = requireModelOverride(options.targetModel);
+    targetModel = requireModelOverrideSync(options.targetModel);
   } catch (error) {
     return {
       success: false,
@@ -130,10 +118,10 @@ async function performKillAndSpawn(
     }
 
     // Step 3: Capture handoff context
-    const context = await captureHandoffContext(state, options.targetModel, options.reason);
+    const context = await Effect.runPromise(captureHandoffContext(state, options.targetModel, options.reason));
 
     // Step 4: Kill current agent
-    stopAgent(state.id);
+    stopAgentSync(state.id);
 
     // Step 5: Build handoff prompt
     const prompt = buildHandoffPrompt(context, options.additionalInstructions);
@@ -158,7 +146,7 @@ async function performKillAndSpawn(
 
     // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.
     newState.costSoFar = state.costSoFar || 0;
-    saveAgentState(newState);
+    saveAgentStateSync(newState);
 
     return {
       success: true,
@@ -187,7 +175,7 @@ async function waitForIdle(agentId: string, timeoutMs: number): Promise<boolean>
 
   while (Date.now() - startTime < timeoutMs) {
     // Check if agent session still exists
-    if (!sessionExists(agentId)) {
+    if (!sessionExistsSync(agentId)) {
       return true; // Agent is gone, consider it idle
     }
 
@@ -228,7 +216,7 @@ export function shouldHandoff(agentId: string): boolean {
 // of them surface here. The Effect variant collapses these into a single typed
 // error channel so callers can `Effect.catchTag` the relevant case.
 
-/** Tagged error for `performHandoffEffect` failures. */
+/** Tagged error for `performHandoffProgram` failures. */
 export class HandoffError extends Data.TaggedError('HandoffError')<{
   readonly agentId: string;
   readonly stage: string;
@@ -242,12 +230,12 @@ export class HandoffError extends Data.TaggedError('HandoffError')<{
  * the same `HandoffResult` shape as the sync variant — including `success:
  * false` results when the agent isn't found or the model override is invalid.
  */
-export const performHandoffEffect = (
+export const performHandoff = (
   agentId: string,
   options: HandoffOptions,
 ): Effect.Effect<HandoffResult, HandoffError> =>
   Effect.tryPromise({
-    try: () => performHandoff(agentId, options),
+    try: () => performHandoffPromise(agentId, options),
     catch: (cause) =>
       new HandoffError({
         agentId,

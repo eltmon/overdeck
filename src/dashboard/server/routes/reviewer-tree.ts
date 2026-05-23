@@ -27,7 +27,7 @@ import {
   type ReviewerRole,
 } from '../../../lib/cloister/specialists.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
-import { capturePaneAsyncEffect } from '../../../lib/tmux.js';
+import { capturePane } from '../../../lib/tmux.js';
 
 const CONVOY_REVIEWER_ROLES: readonly ReviewerRole[] = [
   'correctness',
@@ -48,7 +48,7 @@ const API_ERROR_PATTERNS = [
 
 async function detectApiError(sessionId: string): Promise<boolean> {
   try {
-    const pane = await Effect.runPromise(capturePaneAsyncEffect(sessionId, 15));
+    const pane = await Effect.runPromise(capturePane(sessionId, 15));
     return API_ERROR_PATTERNS.some(p => p.test(pane));
   } catch {
     return false;

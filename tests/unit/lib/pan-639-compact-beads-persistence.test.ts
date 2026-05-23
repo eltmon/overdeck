@@ -32,10 +32,10 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Effect } from 'effect';
-import { compactBeads as compactBeadsEffect, type CompactBeadsOptions } from '../../../src/lib/lifecycle/compact-beads.js';
+import { compactBeads as compactBeadsProgram, type CompactBeadsOptions } from '../../../src/lib/lifecycle/compact-beads.js';
 
-const compactBeads = (...args: Parameters<typeof compactBeadsEffect>) =>
-  Effect.runPromise(compactBeadsEffect(...args));
+const compactBeads = (...args: Parameters<typeof compactBeadsProgram>) =>
+  Effect.runPromise(compactBeadsProgram(...args));
 
 describe('PAN-639: compact-beads git persistence', () => {
   beforeEach(() => {

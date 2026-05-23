@@ -11,7 +11,7 @@ import { GitHubTracker } from './github.js';
 import { GitLabTracker } from './gitlab.js';
 import { RallyTracker } from './rally.js';
 import type { TrackersConfig } from '../config.js';
-import { loadConfig as loadYamlConfig } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 
 // Configuration for a single tracker
 export interface TrackerConfig {

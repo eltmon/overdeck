@@ -35,6 +35,7 @@ vi.mock('../../../src/lib/remote/fly-api.js', () => ({
   FlyApiClient: vi.fn(() => mockApi),
   FlyApiError: class FlyApiError extends Error { constructor(m: string, public statusCode: number, public body: string) { super(m); } },
   createFlyApiClient: vi.fn(() => mockApi),
+  createFlyApiClientSync: vi.fn(() => mockApi),
 }));
 
 // Mock fs so resolveVm can't find workspace metadata

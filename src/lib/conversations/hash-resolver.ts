@@ -17,7 +17,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../paths.js';
-import { listProjects } from '../projects.js';
+import { listProjectsSync } from '../projects.js';
 import { FsError } from '../errors.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ async function collectCandidatePaths(watchDirs: string[]): Promise<string[]> {
 
 function projectCandidateRoots(): string[] {
   const roots: string[] = [];
-  for (const { config } of listProjects()) {
+  for (const { config } of listProjectsSync()) {
     roots.push(config.path);
     if (config.workspace?.workspaces_dir) roots.push(config.workspace.workspaces_dir);
   }
@@ -188,7 +188,7 @@ async function addCandidateRoot(candidates: Set<string>, dir: string): Promise<v
  * fails in practice — FsError is declared for forward-compatibility if the
  * impl ever begins propagating IO failures.
  */
-export function resolveJsonlEffect(
+export function resolveJsonl(
   resolver: HashResolver,
   jsonlPath: string,
   cwdFromFirstMessage: string | null,

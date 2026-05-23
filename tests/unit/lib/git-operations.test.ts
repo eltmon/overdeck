@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for git/operations.ts — gitFetch, gitForcePush, gitMerge (PAN-653).
  *
@@ -52,6 +53,7 @@ vi.mock('child_process', () => {
 const mockAppend = vi.fn();
 vi.mock('../../../src/lib/git-activity.js', () => ({
   appendGitOperation: (...args: unknown[]) => mockAppend(...args),
+  appendGitOperationSync: (...args: unknown[]) => mockAppend(...args),
 }));
 
 // ── Import module under test (after mocks) ────────────────────────────────────
@@ -73,6 +75,7 @@ function mockRevParse(sha: string) {
 describe('gitPush', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockReset();
   });
 
   it('throws MainDivergedError and records main_diverged when merge-base exits with code 1', async () => {
@@ -83,8 +86,8 @@ describe('gitPush', () => {
     const notAncestorErr = Object.assign(new Error(''), { code: 1 });
     execMock.mockRejectedValueOnce(notAncestorErr);
 
-    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
-      .rejects.toBeInstanceOf(MainDivergedError);
+    await expect(Effect.runPromise(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' })))
+      .rejects.toMatchObject({ operation: 'main-diverged', cause: expect.any(MainDivergedError) });
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'main_diverged',
       status: 'aborted',
@@ -100,8 +103,8 @@ describe('gitPush', () => {
     const badObjectErr = Object.assign(new Error('fatal: not a commit'), { code: 128 });
     execMock.mockRejectedValueOnce(badObjectErr);
 
-    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
-      .rejects.toThrow('fatal: not a commit');
+    await expect(Effect.runPromise(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' })))
+      .rejects.toMatchObject({ stderr: 'fatal: not a commit', cause: badObjectErr });
     expect(mockAppend).not.toHaveBeenCalledWith(expect.objectContaining({
       operation: 'main_diverged',
     }));
@@ -113,12 +116,13 @@ describe('gitPush', () => {
 describe('gitFetch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockReset();
   });
 
   it('calls git fetch and records a success operation', async () => {
     execMock.mockResolvedValueOnce({ stdout: '' }); // git fetch origin branch
 
-    await gitFetch('/repo', 'origin', 'main', { issueId: 'PAN-1' });
+    await Effect.runPromise(gitFetch('/repo', 'origin', 'main', { issueId: 'PAN-1' }));
 
     expect(execMock).toHaveBeenCalledWith(expect.stringContaining('git fetch origin main'));
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
@@ -132,7 +136,8 @@ describe('gitFetch', () => {
     const fetchErr = new Error('network error');
     execMock.mockRejectedValueOnce(fetchErr);
 
-    await expect(gitFetch('/repo', 'origin', 'main')).rejects.toThrow('network error');
+    await expect(Effect.runPromise(gitFetch('/repo', 'origin', 'main')))
+      .rejects.toMatchObject({ stderr: 'network error', cause: fetchErr });
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'fetch',
       status: 'failure',
@@ -141,7 +146,7 @@ describe('gitFetch', () => {
 
   it('fetches the whole remote when no branch is specified', async () => {
     execMock.mockResolvedValueOnce({ stdout: '' });
-    await gitFetch('/repo');
+    await Effect.runPromise(gitFetch('/repo'));
     expect(execMock).toHaveBeenCalledWith(expect.stringMatching(/git fetch origin$/));
   });
 });
@@ -151,6 +156,7 @@ describe('gitFetch', () => {
 describe('gitForcePush', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockReset();
   });
 
   it('calls git push --force-with-lease and records success', async () => {
@@ -159,7 +165,7 @@ describe('gitForcePush', () => {
     execMock.mockResolvedValueOnce({ stdout: '' });   // git push --force-with-lease
     mockRevParse(AFTER_SHA);   // HEAD after push (gitRevParse)
 
-    await gitForcePush('/repo', 'origin', 'main', { issueId: 'PAN-2' });
+    await Effect.runPromise(gitForcePush('/repo', 'origin', 'main', { issueId: 'PAN-2' }));
 
     expect(execMock).toHaveBeenCalledWith(
       expect.stringContaining('--force-with-lease origin main')
@@ -180,7 +186,8 @@ describe('gitForcePush', () => {
     const pushErr = new Error('rejected by remote');
     execMock.mockRejectedValueOnce(pushErr);
 
-    await expect(gitForcePush('/repo')).rejects.toThrow('rejected by remote');
+    await expect(Effect.runPromise(gitForcePush('/repo')))
+      .rejects.toMatchObject({ stderr: 'rejected by remote', cause: pushErr });
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'force_push',
       status: 'failure',
@@ -193,6 +200,7 @@ describe('gitForcePush', () => {
 describe('gitMerge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockReset();
   });
 
   it('calls git merge and records success', async () => {
@@ -200,7 +208,7 @@ describe('gitMerge', () => {
     execMock.mockResolvedValueOnce({ stdout: '' });   // git merge feature-branch
     mockRevParse(AFTER_SHA);   // HEAD after merge
 
-    await gitMerge('/repo', 'feature-branch', { issueId: 'PAN-3' });
+    await Effect.runPromise(gitMerge('/repo', 'feature-branch', { issueId: 'PAN-3' }));
 
     expect(execMock).toHaveBeenCalledWith(expect.stringContaining('git merge feature-branch'));
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
@@ -217,7 +225,7 @@ describe('gitMerge', () => {
     execMock.mockResolvedValueOnce({ stdout: '' });
     mockRevParse(AFTER_SHA);
 
-    await gitMerge('/repo', 'feature-branch', { noFf: true });
+    await Effect.runPromise(gitMerge('/repo', 'feature-branch', { noFf: true }));
     expect(execMock).toHaveBeenCalledWith(expect.stringContaining('--no-ff feature-branch'));
   });
 
@@ -226,7 +234,8 @@ describe('gitMerge', () => {
     const mergeErr = new Error('CONFLICT (content): Merge conflict in file.ts');
     execMock.mockRejectedValueOnce(mergeErr);
 
-    await expect(gitMerge('/repo', 'feature-branch')).rejects.toThrow('CONFLICT');
+    await expect(Effect.runPromise(gitMerge('/repo', 'feature-branch')))
+      .rejects.toMatchObject({ stderr: 'CONFLICT (content): Merge conflict in file.ts', cause: mergeErr });
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'merge',
       status: 'failure',

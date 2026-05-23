@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { extractTeamPrefix, loadProjectsConfig, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
+import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -19,7 +19,7 @@ interface ExtendedProjectConfig extends FullProjectConfig {
  * Load all projects with their full configuration (including workspace)
  */
 function loadFullProjects(): ExtendedProjectConfig[] {
-  const config = loadProjectsConfig();
+  const config = loadProjectsConfigSync();
   // The loaded config has full workspace config, just not typed properly
   const projects = config.projects as Record<string, FullProjectConfig>;
   return Object.entries(projects).map(([key, projectConfig]) => ({

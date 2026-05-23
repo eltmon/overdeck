@@ -124,7 +124,7 @@ export function resolveVBriefRoot(projectRoot: string, vbriefDirname?: string): 
  *
  * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureVBriefDirs(projectRoot: string, vbriefDirname?: string): string {
+export function ensureVBriefDirsSync(projectRoot: string, vbriefDirname?: string): string {
   const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
   for (const dir of VBRIEF_LIFECYCLE_DIRS) {
@@ -140,7 +140,7 @@ export function ensureVBriefDirs(projectRoot: string, vbriefDirname?: string): s
  * routes can create the vBRIEF lifecycle directories without blocking the
  * Node.js event loop. Idempotent.
  */
-export const ensureVBriefDirsEffect = (
+export const ensureVBriefDirs = (
   projectRoot: string,
   vbriefDirname?: string,
 ): Effect.Effect<string, FsError> =>

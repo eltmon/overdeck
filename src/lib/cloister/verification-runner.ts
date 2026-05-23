@@ -15,12 +15,12 @@ import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { getReviewStatus, setReviewStatus } from '../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { messageAgent } from '../agents.js';
-import { findProjectByPath } from '../projects.js';
-import { getVBriefACStatus } from '../vbrief/beads.js';
+import { findProjectByPathSync } from '../projects.js';
+import { getVBriefACStatusSync } from '../vbrief/beads.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
@@ -56,7 +56,7 @@ interface SyncResult {
 
 async function resolveGitDirs(
   workspacePath: string,
-  projectConfig: ReturnType<typeof findProjectByPath>,
+  projectConfig: ReturnType<typeof findProjectByPathSync>,
 ): Promise<{ gitDirs: string[]; isPolyrepo: boolean }> {
   const isPolyrepoConfig = projectConfig?.workspace?.type === 'polyrepo';
 
@@ -154,7 +154,7 @@ function buildSyncFailureFeedback(
 
 function getSyncTargetBranch(
   workspacePath: string,
-  projectConfig: ReturnType<typeof findProjectByPath>,
+  projectConfig: ReturnType<typeof findProjectByPathSync>,
   repoName?: string,
 ): string {
   if (!projectConfig) return 'main';
@@ -182,37 +182,27 @@ function getSyncTargetBranch(
     projectConfig.workspace?.default_branch ||
     'main'
   );
-}
-
-/**
- * Run the full verification gate for an issue.
- *
- * Loads quality gates from projects.yaml for the workspace's project, falling
- * back to DEFAULT_GATES (typecheck, lint, test) when no config exists.
- * Handles circuit breaking, status updates, feedback writing, and agent messaging.
- * Returns a discriminated union so callers need no try/catch.
- */
-export async function runVerificationForIssue(
+}async function runVerificationForIssuePromise(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
-  const currentCycles = getReviewStatus(issueId)?.verificationCycleCount ?? 0;
+  const currentCycles = getReviewStatusSync(issueId)?.verificationCycleCount ?? 0;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
     const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded — skipping verification`;
     console.log(`[${logPrefix}] ${reason} for ${issueId}`);
-    setReviewStatus(issueId, { verificationStatus: 'skipped' });
+    setReviewStatusSync(issueId, { verificationStatus: 'skipped' });
     return { outcome: 'skipped', reason };
   }
 
-  setReviewStatus(issueId, { verificationStatus: 'running' });
+  setReviewStatusSync(issueId, { verificationStatus: 'running' });
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
 
   try {
-    const projectConfig = findProjectByPath(workspacePath);
+    const projectConfig = findProjectByPathSync(workspacePath);
     const { gitDirs, isPolyrepo } = await resolveGitDirs(workspacePath, projectConfig);
 
     // === Sync target branch ===
@@ -236,7 +226,7 @@ export async function runVerificationForIssue(
           const failedCheck = 'sync-target-branch';
           const { summary, feedbackBody } = buildSyncFailureFeedback(issueId, failures, isPolyrepo, newCycleCount);
 
-          setReviewStatus(issueId, {
+          setReviewStatusSync(issueId, {
             reviewStatus: 'pending',
             verificationStatus: 'failed',
             verificationNotes: summary,
@@ -245,14 +235,14 @@ export async function runVerificationForIssue(
           });
 
           try {
-            const fileResult = await writeFeedbackFile({
+            const fileResult = await Effect.runPromise(writeFeedbackFile({
               issueId,
               workspacePath,
               specialist: 'verification-gate',
               outcome: 'failed',
               summary: `Sync FAILED${isPolyrepo ? ` in ${failures.length} repo(s)` : ''} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
               markdownBody: feedbackBody,
-            });
+            }));
             if (fileResult.success) {
               const agentId = `agent-${issueId.toLowerCase()}`;
               const hasConflicts = failures.some(f => f.hasConflicts);
@@ -335,11 +325,11 @@ export async function runVerificationForIssue(
       console.log(`[${logPrefix}] Polyrepo workspace — per-repo dependencies managed by quality gates`);
     }
 
-    const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
+    const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
-    });
+    }));
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
 
@@ -351,7 +341,7 @@ export async function runVerificationForIssue(
         rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
       const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms):\n\n${truncatedOutput}`;
 
-      setReviewStatus(issueId, {
+      setReviewStatusSync(issueId, {
         reviewStatus: 'pending',
         verificationStatus: 'failed',
         verificationNotes: summary,
@@ -362,14 +352,14 @@ export async function runVerificationForIssue(
       const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until \`pan review request\` has completed successfully.`;
 
       try {
-        const fileResult = await writeFeedbackFile({
+        const fileResult = await Effect.runPromise(writeFeedbackFile({
           issueId,
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
           summary: `Verification FAILED at ${failedCheck} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
           markdownBody: feedbackBody,
-        });
+        }));
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
           const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
@@ -386,15 +376,15 @@ export async function runVerificationForIssue(
     // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
     // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
     // actionable feedback rather than falling through to a generic infrastructure error.
-    let acStatus: ReturnType<typeof getVBriefACStatus>;
+    let acStatus: ReturnType<typeof getVBriefACStatusSync>;
     try {
-      acStatus = getVBriefACStatus(workspacePath);
+      acStatus = getVBriefACStatusSync(workspacePath);
     } catch (vbriefErr: any) {
       if (vbriefErr instanceof VBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
-        setReviewStatus(issueId, {
+        setReviewStatusSync(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
           verificationNotes: summary,
@@ -403,14 +393,14 @@ export async function runVerificationForIssue(
         });
         const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in vBRIEF spec BEFORE resubmitting\n\n1. Open the vBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
         try {
-          const fileResult = await writeFeedbackFile({
+          const fileResult = await Effect.runPromise(writeFeedbackFile({
             issueId,
             workspacePath,
             specialist: 'verification-gate',
             outcome: 'failed',
             summary: `vBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
             markdownBody: feedbackBody,
-          });
+          }));
           if (fileResult.success) {
             const agentId = `agent-${issueId.toLowerCase()}`;
             const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
@@ -439,7 +429,7 @@ export async function runVerificationForIssue(
         .join('\n\n');
       const summary = `Acceptance criteria check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} AC incomplete:\n\n${incompleteList}`;
 
-      setReviewStatus(issueId, {
+      setReviewStatusSync(issueId, {
         reviewStatus: 'pending',
         verificationStatus: 'failed',
         verificationNotes: summary,
@@ -450,14 +440,14 @@ export async function runVerificationForIssue(
       const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Update plan.vbrief.json subItem statuses to 'completed'\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
       try {
-        const fileResult = await writeFeedbackFile({
+        const fileResult = await Effect.runPromise(writeFeedbackFile({
           issueId,
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
           summary: `AC check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} incomplete (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
           markdownBody: feedbackBody,
-        });
+        }));
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
           const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
@@ -479,7 +469,7 @@ export async function runVerificationForIssue(
       lastVerifiedCommit = stdout.trim();
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
 
-    setReviewStatus(issueId, {
+    setReviewStatusSync(issueId, {
       verificationStatus: 'passed',
       verificationNotes: undefined,
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
@@ -490,7 +480,7 @@ export async function runVerificationForIssue(
     // its redundant vitest run on this exact commit. Non-fatal on failure.
     void (async () => {
       try {
-        const project = findProjectByPath(workspacePath);
+        const project = findProjectByPathSync(workspacePath);
         const repo = project?.github_repo;
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
@@ -503,7 +493,7 @@ export async function runVerificationForIssue(
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {
-    setReviewStatus(issueId, {
+    setReviewStatusSync(issueId, {
       reviewStatus: 'pending',
       verificationStatus: 'failed',
       verificationNotes: `Verification infrastructure error: ${verifyErr.message}`,
@@ -522,12 +512,12 @@ export async function runVerificationForIssue(
  * into a discriminated `VerificationRunnerOutcome` union (`{ outcome: 'error' }`),
  * so the Effect error channel stays empty.
  */
-export function runVerificationForIssueEffect(
+export function runVerificationForIssue(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Effect.Effect<VerificationRunnerOutcome> {
-  return Effect.promise(() => runVerificationForIssue(issueId, workspacePath, workspaceInfo, logPrefix, options));
+  return Effect.promise(() => runVerificationForIssuePromise(issueId, workspacePath, workspaceInfo, logPrefix, options));
 }

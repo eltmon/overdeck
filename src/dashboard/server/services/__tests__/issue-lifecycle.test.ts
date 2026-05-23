@@ -8,7 +8,9 @@ const mockResolveGitHubIssue = vi.fn();
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerType: mockResolveTrackerType,
+  resolveTrackerTypeSync: mockResolveTrackerType,
   resolveGitHubIssue: mockResolveGitHubIssue,
+  resolveGitHubIssueSync: mockResolveGitHubIssue,
 }));
 
 // ─── Mock tracker clients (provide as Effect Layers) ─────────────────────────
@@ -25,13 +27,13 @@ const mockRallyUpdateState = vi.fn();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -126,7 +128,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearGetIssue).toHaveBeenCalledWith('MIN-1');
       expect(mockLinearGetTeamStates).toHaveBeenCalledWith('team-1');
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inprogress');
@@ -141,7 +143,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_planning');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inplanning');
     });
 
@@ -154,7 +156,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_review');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inreview');
     });
 
@@ -175,7 +177,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('MIN-1', 'verifying_on_main');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-verifying');
     });
 
@@ -188,7 +190,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('MIN-1', 'closed');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-done');
     });
   });
@@ -214,7 +216,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('APP-42', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'planned');
     });
@@ -228,7 +230,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('APP-42', 'in_review');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
     });
@@ -254,7 +256,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('APP-42', 'verifying_on_main');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubEnsureLabel).toHaveBeenCalledWith('acme', 'myapp', 'verifying-on-main', 'fbca04', 'Merged — awaiting verification on main');
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'verifying-on-main');
       expect(mockGitHubEnsureLabel.mock.invocationCallOrder[0]).toBeLessThan(mockGitHubAddLabel.mock.invocationCallOrder[0]);
@@ -272,7 +274,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('APP-42', 'closed');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('acme', 'myapp', 42);
     });
   });
@@ -291,7 +293,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.transitionTo('US1234', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockRallyUpdateState).toHaveBeenCalledWith('US1234', 'in_progress');
     });
   });
@@ -311,7 +313,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.addLabel('APP-5', 'some-label');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 5, 'some-label');
     });
 
@@ -324,7 +326,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.addLabel('MIN-1', 'some-label');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).not.toHaveBeenCalled();
     });
   });
@@ -339,7 +341,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.close('MIN-1');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-done');
     });
 
@@ -357,7 +359,7 @@ describe('IssueLifecycle Effect service', () => {
         yield* lifecycle.close('APP-10');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('acme', 'myapp', 10);
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 10, 'in-progress');
     });

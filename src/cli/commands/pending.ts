@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { listRunningAgents } from '../../lib/agents.js';
+import { listRunningAgentsSync } from '../../lib/agents.js';
 import { getAllReviewStatusesFromDb } from '../../lib/database/review-status-db.js';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -15,7 +15,7 @@ export async function pendingCommand(): Promise<void> {
     return;
   }
 
-  const agents = listRunningAgents();
+  const agents = listRunningAgentsSync();
   const agentByIssue = new Map(agents.map(a => [a.issueId.toLowerCase(), a]));
 
   console.log(chalk.bold('\nPending Reviews\n'));

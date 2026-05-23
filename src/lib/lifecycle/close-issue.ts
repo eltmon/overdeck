@@ -18,8 +18,8 @@ import { Effect } from 'effect';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
-import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
-import { getAgentStateEffect, markAgentStoppedState, saveAgentStateEffect } from '../agents.js';
+import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from '../issue-id.js';
+import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -48,11 +48,11 @@ export interface CloseIssueOptions {
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
 async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
-  const agentId = `agent-${normalizeIssueId(issueId)}`;
-  const state = await Effect.runPromise(getAgentStateEffect(agentId));
+  const agentId = `agent-${normalizeIssueIdSync(issueId)}`;
+  const state = await Effect.runPromise(getAgentState(agentId));
   if (!state) return;
   markAgentStoppedState(state);
-  await Effect.runPromise(saveAgentStateEffect(state));
+  await Effect.runPromise(saveAgentState(state));
 }
 
 export function closeIssue(
@@ -309,8 +309,8 @@ async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Pro
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNumber = extractNumber(ctx.issueId);
-    const issuePrefix = extractPrefix(ctx.issueId);
+    const issueNumber = extractNumberSync(ctx.issueId);
+    const issuePrefix = extractPrefixSync(ctx.issueId);
     if (issueNumber === null || issuePrefix === null) {
       return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
     }
@@ -484,8 +484,8 @@ async function applyLabelLinearImpl(ctx: LifecycleContext, apiKey: string): Prom
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNum = extractNumber(ctx.issueId);
-    const teamKey = extractPrefix(ctx.issueId);
+    const issueNum = extractNumberSync(ctx.issueId);
+    const teamKey = extractPrefixSync(ctx.issueId);
     if (issueNum === null || teamKey === null) {
       return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
     }

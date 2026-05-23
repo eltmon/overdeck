@@ -6,9 +6,9 @@
  */
 
 import { Data, Effect } from 'effect';
-import { setReviewStatus } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { spawnRun } from '../agents.js';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 
 function dashboardApiUrl(): string {
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
@@ -54,18 +54,7 @@ Boundaries:
 - Do NOT edit code, tests, fixtures, snapshots, or configuration.
 - Do NOT commit, push, merge, close issues, or call any merge endpoint.
 - Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists.`;
-}
-
-/**
- * Spawn a role-based test run for the given issue, then notify the work agent
- * when delivery succeeds.
- *
- * @param issueId     - Issue identifier (e.g. "PAN-343")
- * @param workspace   - Absolute path to the workspace directory, when known
- * @param branch      - Feature branch name (e.g. "feature/pan-343"), when known
- * @param notifyAgent - Optional callback that sends a message to the work agent
- */
-export async function dispatchTestAgentAndNotify(
+}async function dispatchTestAgentAndNotifyPromise(
   issueId: string,
   workspace?: string,
   branch?: string,
@@ -74,10 +63,10 @@ export async function dispatchTestAgentAndNotify(
   let testTaskDelivered = false;
 
   try {
-    const resolved = resolveProjectFromIssue(issueId);
+    const resolved = resolveProjectFromIssueSync(issueId);
     if (!resolved) {
       console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role`);
-      setReviewStatus(issueId, {
+      setReviewStatusSync(issueId, {
         testStatus: 'dispatch_failed',
         testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
       });
@@ -90,19 +79,19 @@ export async function dispatchTestAgentAndNotify(
       prompt,
     });
 
-    setReviewStatus(issueId, { testStatus: 'testing' });
+    setReviewStatusSync(issueId, { testStatus: 'testing' });
     testTaskDelivered = true;
     console.log(`[test-dispatch] Started test role for ${issueId} (${run.id})`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('already running')) {
-      setReviewStatus(issueId, { testStatus: 'testing' });
+      setReviewStatusSync(issueId, { testStatus: 'testing' });
       testTaskDelivered = true;
       console.log(`[test-dispatch] Test role already running for ${issueId}`);
     } else {
       console.error(`[test-dispatch] Failed to dispatch test role for ${issueId}:`, err);
       try {
-        setReviewStatus(issueId, {
+        setReviewStatusSync(issueId, {
           testStatus: 'dispatch_failed',
           testNotes: `Dispatch failed: ${msg}`,
         });
@@ -149,18 +138,18 @@ export interface DispatchTestAgentResult {
  * `notifyAgent` step is allowed to fail without failing the outer Effect — its
  * outcome is reported via {@link DispatchTestAgentResult.notified}.
  */
-export const dispatchTestAgentAndNotifyEffect = (
+export const dispatchTestAgentAndNotify = (
   issueId: string,
   workspace?: string,
   branch?: string,
   notifyAgent?: (agentId: string, msg: string) => Promise<void>,
 ): Effect.Effect<DispatchTestAgentResult> =>
   Effect.gen(function* () {
-    const resolved = yield* Effect.sync(() => resolveProjectFromIssue(issueId));
+    const resolved = yield* Effect.sync(() => resolveProjectFromIssueSync(issueId));
     if (!resolved) {
       yield* Effect.sync(() => {
         console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role`);
-        setReviewStatus(issueId, {
+        setReviewStatusSync(issueId, {
           testStatus: 'dispatch_failed',
           testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
         });
@@ -170,7 +159,7 @@ export const dispatchTestAgentAndNotifyEffect = (
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
 
-    const spawnEffect: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
+    const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
       try: () => spawnRun(issueId, 'test', { workspace, prompt }),
       catch: (cause) => {
         const msg = cause instanceof Error ? cause.message : String(cause);
@@ -182,7 +171,7 @@ export const dispatchTestAgentAndNotifyEffect = (
           // "already running" is non-fatal — treat as delivered.
           if (err.message.includes('already running')) {
             return Effect.sync((): DispatchTestAgentResult => {
-              setReviewStatus(issueId, { testStatus: 'testing' });
+              setReviewStatusSync(issueId, { testStatus: 'testing' });
               console.log(`[test-dispatch] Test role already running for ${issueId}`);
               return {
                 delivered: true,
@@ -194,7 +183,7 @@ export const dispatchTestAgentAndNotifyEffect = (
           return Effect.sync((): DispatchTestAgentResult => {
             console.error(`[test-dispatch] Failed to dispatch test role for ${issueId}: ${err.message}`);
             try {
-              setReviewStatus(issueId, {
+              setReviewStatusSync(issueId, {
                 testStatus: 'dispatch_failed',
                 testNotes: `Dispatch failed: ${err.message}`,
               });
@@ -210,7 +199,7 @@ export const dispatchTestAgentAndNotifyEffect = (
         },
         onSuccess: (run) =>
           Effect.sync((): DispatchTestAgentResult => {
-            setReviewStatus(issueId, { testStatus: 'testing' });
+            setReviewStatusSync(issueId, { testStatus: 'testing' });
             console.log(`[test-dispatch] Started test role for ${issueId} (${run.id})`);
             return {
               delivered: true,
@@ -221,7 +210,7 @@ export const dispatchTestAgentAndNotifyEffect = (
       }),
     );
 
-    const spawnResult: DispatchTestAgentResult = yield* spawnEffect;
+    const spawnResult: DispatchTestAgentResult = yield* spawnProgram;
 
     if (spawnResult.delivered && notifyAgent) {
       const notified = yield* Effect.tryPromise({

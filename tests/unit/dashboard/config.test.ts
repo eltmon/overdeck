@@ -13,6 +13,7 @@ import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src
 // so env var presence/absence is fully controlled by the test.
 vi.mock('../../../src/lib/env-loader.js', () => ({
   loadPanopticonEnv: () => ({ loaded: [], skipped: [] }),
+  loadPanopticonEnvSync: () => ({ loaded: [], skipped: [] }),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

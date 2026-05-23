@@ -1,8 +1,8 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { listSessionNamesAsyncEffect } from './tmux.js';
-import { resolveProjectFromIssue } from './projects.js';
+import { listSessionNames } from './tmux.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import type { ReviewStatus } from './review-status.js';
 
 export interface EnrichedReviewStatus extends ReviewStatus {
@@ -39,21 +39,13 @@ function mostRecentByTimestamp(
     }
   }
   return latest?.name;
-}
-
-/**
- * Discover active parallel review tmux sessions for an issue and, for each,
- * check whether the reviewer's output file has been written (done) or not (running).
- * Used at both REST-endpoint response time and domain-event emission time so the
- * frontend Zustand store carries the session list for the TerminalTabs component.
- */
-export async function enrichReviewStatus(
+}async function enrichReviewStatusPromise(
   issueId: string,
   status: ReviewStatus,
 ): Promise<EnrichedReviewStatus> {
   let allSessions: string[] = [];
   try {
-    allSessions = [...await Effect.runPromise(listSessionNamesAsyncEffect())];
+    allSessions = [...await Effect.runPromise(listSessionNames())];
   } catch {
     return status;
   }
@@ -96,7 +88,7 @@ export function enrichReviewStatusFromSessions(
 
   // PAN-830 canonical pattern: specialist-<projectKey>-<issueId>-review-<role>
   // (issueId case is preserved from caller — match case-insensitively)
-  const resolved = resolveProjectFromIssue(issueId);
+  const resolved = resolveProjectFromIssueSync(issueId);
   const projectKey = resolved?.projectKey ?? null;
   const canonicalSessions = projectKey
     ? allSessions.filter(s => {
@@ -176,12 +168,12 @@ export class ReviewEnrichmentError extends Data.TaggedError('ReviewEnrichmentErr
 
 /** Effect variant of `enrichReviewStatus`. Falls back to the unenriched status
  *  if tmux is unreachable, mirroring the sync swallow-and-continue behaviour. */
-export const enrichReviewStatusEffect = (
+export const enrichReviewStatus = (
   issueId: string,
   status: ReviewStatus,
 ): Effect.Effect<EnrichedReviewStatus, ReviewEnrichmentError> =>
   Effect.tryPromise({
-    try: () => enrichReviewStatus(issueId, status),
+    try: () => enrichReviewStatusPromise(issueId, status),
     catch: (cause) =>
       new ReviewEnrichmentError({
         issueId,

@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
-import { shellQuoteModelId } from './model-validation.js';
+import { shellQuoteModelIdSync } from './model-validation.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -176,7 +176,7 @@ function buildChannelsArgs(config: LauncherConfig): string {
  * and baseCommand strings — the generator does NOT call helper functions
  * internally (keeps coupling low, tests simple).
  */
-export function generateLauncherScript(config: LauncherConfig): string {
+export function generateLauncherScriptSync(config: LauncherConfig): string {
   const lines: string[] = [];
 
   // Shebang
@@ -331,7 +331,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
  * Generate the outer `script -qfaec` wrapper for launchers that need tty logging.
  * Returns null if useScriptWrapper is false.
  */
-export function generateLauncherWrapper(config: LauncherConfig): string | null {
+export function generateLauncherWrapperSync(config: LauncherConfig): string | null {
   if (!config.useScriptWrapper || !config.scriptLogFile) {
     return null;
   }
@@ -476,7 +476,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelId(config.model)}`;
+    cmd += ` --model ${shellQuoteModelIdSync(config.model)}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -542,7 +542,7 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelId(config.model));
+    tokens.push('--model', shellQuoteModelIdSync(config.model));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {
@@ -584,11 +584,11 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
 // Pure-sync launcher emission — additive Effect.sync wrappers.
 
 /** Build the bash launcher script body for a Cloister role spawn. Pure. */
-export const generateLauncherScriptEffect = (
+export const generateLauncherScript = (
   config: LauncherConfig,
-): Effect.Effect<string> => Effect.sync(() => generateLauncherScript(config));
+): Effect.Effect<string> => Effect.sync(() => generateLauncherScriptSync(config));
 
 /** Build an optional launcher wrapper (returns null when not needed). Pure. */
-export const generateLauncherWrapperEffect = (
+export const generateLauncherWrapper = (
   config: LauncherConfig,
-): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapper(config));
+): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));

@@ -63,7 +63,7 @@ export interface EmitTtsOptions {
  * The event is persisted to SQLite immediately and PubSub notifies all
  * WebSocket subscribers so the ActivityPanel updates in real-time.
  */
-export function emitActivityEntry(options: EmitActivityOptions): void {
+export function emitActivityEntrySync(options: EmitActivityOptions): void {
   try {
     const store = getEventStore();
     const entry = {
@@ -88,7 +88,7 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
  * Emit a detailed activity log entry — auto-generated from domain state changes.
  * Use for fine-grained visibility into agent lifecycle, plan changes, pipeline transitions.
  */
-export function emitActivityDetailed(options: EmitDetailedOptions): void {
+export function emitActivityDetailedSync(options: EmitDetailedOptions): void {
   try {
     const store = getEventStore();
     const entry = {
@@ -120,7 +120,7 @@ function normalizeForSpeech(utterance: string): string {
  * Emit a TTS activity log entry — upleveled utterance for text-to-speech.
  * Keep utterances short (<140 chars), human-friendly, and speakable.
  */
-export function emitActivityTts(options: EmitTtsOptions): void {
+export function emitActivityTtsSync(options: EmitTtsOptions): void {
   try {
     const store = getEventStore();
     const entry = {
@@ -145,7 +145,7 @@ export function emitActivityTts(options: EmitTtsOptions): void {
  * Emit a dashboard lifecycle event (started, completed, failed).
  * Used by pending-lifecycle.ts and the ship-role merge path.
  */
-export function emitDashboardLifecycle(
+export function emitDashboardLifecycleSync(
   status: 'started' | 'completed' | 'failed',
   options: {
     reason: string;
@@ -204,22 +204,22 @@ export function emitDashboardLifecycle(
  * underlying append is fire-and-forget and silently swallows any event-store
  * errors to match the Promise contract.
  */
-export const emitActivityEntryEffect = (
+export const emitActivityEntry = (
   options: EmitActivityOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityEntry(options));
+): Effect.Effect<void> => Effect.sync(() => emitActivityEntrySync(options));
 
 /** Effect-native variant of emitActivityDetailed. */
-export const emitActivityDetailedEffect = (
+export const emitActivityDetailed = (
   options: EmitDetailedOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityDetailed(options));
+): Effect.Effect<void> => Effect.sync(() => emitActivityDetailedSync(options));
 
 /** Effect-native variant of emitActivityTts. */
-export const emitActivityTtsEffect = (
+export const emitActivityTts = (
   options: EmitTtsOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityTts(options));
+): Effect.Effect<void> => Effect.sync(() => emitActivityTtsSync(options));
 
 /** Effect-native variant of emitDashboardLifecycle. */
-export const emitDashboardLifecycleEffect = (
+export const emitDashboardLifecycle = (
   status: 'started' | 'completed' | 'failed',
   options: {
     reason: string;
@@ -228,4 +228,4 @@ export const emitDashboardLifecycleEffect = (
     durationMs?: number;
     error?: string;
   },
-): Effect.Effect<void> => Effect.sync(() => emitDashboardLifecycle(status, options));
+): Effect.Effect<void> => Effect.sync(() => emitDashboardLifecycleSync(status, options));

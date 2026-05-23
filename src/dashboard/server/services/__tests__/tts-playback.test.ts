@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NormalizedTtsDaemonConfig } from '../../../../lib/config-yaml.js';
 
@@ -55,7 +56,7 @@ describe('TtsPlaybackService', () => {
 
     mocks.getTtsRuntimeConfig.mockImplementation(() => config);
     mocks.initEventStore.mockResolvedValue({ subscribe });
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
   });
 
   afterEach(() => {
@@ -113,8 +114,8 @@ describe('TtsPlaybackService', () => {
 
   it('serializes activity.tts playback instead of firing concurrent daemon calls', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
-    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockImplementationOnce(() => Effect.promise(() => new Promise((resolve) => { resolveFirst = resolve; })));
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
     await startTtsPlayback();
 
     subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
@@ -127,8 +128,8 @@ describe('TtsPlaybackService', () => {
 
   it('drops routine info events when the queue is full', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
-    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockImplementationOnce(() => Effect.promise(() => new Promise((resolve) => { resolveFirst = resolve; })));
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
     await startTtsPlayback();
 
     subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
@@ -145,8 +146,8 @@ describe('TtsPlaybackService', () => {
 
   it('does not evict important queued speech for equal-priority incoming speech', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
-    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockImplementationOnce(() => Effect.promise(() => new Promise((resolve) => { resolveFirst = resolve; })));
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
     await startTtsPlayback();
 
     subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
@@ -165,8 +166,8 @@ describe('TtsPlaybackService', () => {
 
   it('admits higher-priority speech over lower-priority queued speech', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
-    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockImplementationOnce(() => Effect.promise(() => new Promise((resolve) => { resolveFirst = resolve; })));
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
     await startTtsPlayback();
 
     subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
@@ -185,8 +186,8 @@ describe('TtsPlaybackService', () => {
 
   it('clears queued playback on stop', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
-    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    mocks.resolveAndSpeak.mockImplementationOnce(() => Effect.promise(() => new Promise((resolve) => { resolveFirst = resolve; })));
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('spoken'));
     await startTtsPlayback();
 
     subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
@@ -218,7 +219,7 @@ describe('TtsPlaybackService', () => {
 
   it('logs and continues when the daemon is unavailable', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    mocks.resolveAndSpeak.mockResolvedValue('daemon-unavailable');
+    mocks.resolveAndSpeak.mockReturnValue(Effect.succeed('daemon-unavailable'));
     await startTtsPlayback();
 
     subscribers[0]({

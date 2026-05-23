@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FlyApiClient, FlyApiError, createFlyApiClient } from '../../../src/lib/remote/fly-api.js';
+import { FlyApiClient, FlyApiError, createFlyApiClientSync } from '../../../src/lib/remote/fly-api.js';
 
 // Mock global fetch
 const fetchMock = vi.fn();
@@ -190,18 +190,18 @@ describe('createFlyApiClient', () => {
 
   it('reads token from FLY_API_TOKEN env var', () => {
     process.env.FLY_API_TOKEN = 'env-token';
-    const client = createFlyApiClient();
+    const client = createFlyApiClientSync();
     expect(client).toBeInstanceOf(FlyApiClient);
   });
 
   it('uses explicit token over env var', () => {
     process.env.FLY_API_TOKEN = 'env-token';
-    const client = createFlyApiClient('explicit-token');
+    const client = createFlyApiClientSync('explicit-token');
     expect(client).toBeInstanceOf(FlyApiClient);
   });
 
   it('throws if no token available', () => {
     delete process.env.FLY_API_TOKEN;
-    expect(() => createFlyApiClient()).toThrow('Fly API token not found');
+    expect(() => createFlyApiClientSync()).toThrow('Fly API token not found');
   });
 });

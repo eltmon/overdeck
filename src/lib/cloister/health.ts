@@ -4,7 +4,7 @@
  * Evaluates agent health based on heartbeats and activity timestamps.
  */
 
-import type { HealthState, Heartbeat, AgentRuntime } from '../runtimes/types.js';
+import type { HealthState, Heartbeat, AgentRuntimeSync } from '../runtimes/types.js';
 import type { HealthThresholds } from './config.js';
 import { getHealthThresholdsMs } from './config.js';
 
@@ -63,7 +63,7 @@ export function evaluateHealthState(
  */
 export function getAgentHealth(
   agentId: string,
-  runtime: AgentRuntime,
+  runtime: AgentRuntimeSync,
   thresholds?: { stale: number; warning: number; stuck: number }
 ): AgentHealth {
   const thresholdsMs = thresholds || getHealthThresholdsMs();
@@ -124,7 +124,7 @@ export function getAgentHealth(
  */
 export function getMultipleAgentHealth(
   agentIds: string[],
-  runtime: AgentRuntime,
+  runtime: AgentRuntimeSync,
   thresholds?: { stale: number; warning: number; stuck: number }
 ): AgentHealth[] {
   return agentIds.map((agentId) => getAgentHealth(agentId, runtime, thresholds));

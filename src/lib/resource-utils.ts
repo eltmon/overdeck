@@ -1,18 +1,18 @@
 import { Effect } from 'effect';
 
-export function parseIssueIdFromText(value: string): string | null {
+export function parseIssueIdFromTextSync(value: string): string | null {
   const match = value.match(/\b([A-Za-z]+-\d+|F\d+|US\d+|DE\d+|TA\d+|TC\d+)\b/i);
   return match ? match[1]!.toUpperCase() : null;
 }
 
-export function parseContainerServiceName(fullName: string): string {
+export function parseContainerServiceNameSync(fullName: string): string {
   const parts = fullName.split('-');
   if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]!)) {
     parts.pop();
   }
   const withoutInstance = parts.join('-');
 
-  const issueId = parseIssueIdFromText(fullName);
+  const issueId = parseIssueIdFromTextSync(fullName);
   if (issueId) {
     const issueIdLower = issueId.toLowerCase();
     const idx = fullName.toLowerCase().indexOf(issueIdLower);
@@ -35,11 +35,11 @@ export function parseContainerServiceName(fullName: string): string {
 // Pure-sync string parsing — additive Effect.sync wrappers.
 
 /** Extract an issue id from arbitrary text. Pure. */
-export const parseIssueIdFromTextEffect = (
+export const parseIssueIdFromText = (
   value: string,
-): Effect.Effect<string | null> => Effect.sync(() => parseIssueIdFromText(value));
+): Effect.Effect<string | null> => Effect.sync(() => parseIssueIdFromTextSync(value));
 
 /** Derive a service name from a docker-compose-style container name. Pure. */
-export const parseContainerServiceNameEffect = (
+export const parseContainerServiceName = (
   fullName: string,
-): Effect.Effect<string> => Effect.sync(() => parseContainerServiceName(fullName));
+): Effect.Effect<string> => Effect.sync(() => parseContainerServiceNameSync(fullName));

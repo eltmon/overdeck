@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { appendFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -5,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { findLastCompactBoundary } from './conversation-service.js';
 import { generateSmartSummary } from '../../../lib/conversations/smart-compaction.js';
 import { generateFallbackSummary } from '../../../lib/conversations/summary-fork.js';
-import { loadConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../../lib/agents.js';
 import { getEventStore } from '../event-store.js';
 
@@ -30,7 +31,7 @@ export interface MaybeCompactBeforeRespawnOptions {
 }
 
 export function getConversationCompactionSettings() {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   return {
     model: config.conversations.compactionModel,
     manualCompactMode: config.conversations.manualCompactMode,
@@ -108,12 +109,12 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
   let summary: string;
   let summaryModel: string | null;
   try {
-    const result = await generateSmartSummary({ jsonlPath: sessionFile, model: settings.model, richMode: settings.richCompaction });
+    const result = await Effect.runPromise(generateSmartSummary({ jsonlPath: sessionFile, model: settings.model, richMode: settings.richCompaction }));
     summary = result.summary;
     summaryModel = result.summaryModel;
   } catch (error) {
     console.warn(`[conversation-compaction] Smart summary failed, falling back to heuristic:`, error);
-    summary = await generateFallbackSummary(sessionFile);
+    summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
     summaryModel = null;
   }
 

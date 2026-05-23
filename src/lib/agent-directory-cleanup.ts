@@ -18,8 +18,8 @@ import { existsSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
-import { listSessionNamesAsyncEffect } from './tmux.js';
-import { parseIssueId } from './issue-id.js';
+import { listSessionNames } from './tmux.js';
+import { parseIssueIdSync } from './issue-id.js';
 import { FsError } from './errors.js';
 
 /**
@@ -54,7 +54,7 @@ export function isValidAgentDirectoryName(name: string): boolean {
   if (suffix !== suffix.toLowerCase()) return false;
 
   // Direct agent-<issueId> directories (work agents, role orchestrators without suffix)
-  if (parseIssueId(suffix) !== null) return true;
+  if (parseIssueIdSync(suffix) !== null) return true;
 
   // Specialist directories: agent-<issueId>-<role> or agent-<issueId>-<role>-<subRole>
   // e.g. agent-pan-457-review-correctness, agent-pan-457-test, agent-pan-457-ship
@@ -62,7 +62,7 @@ export function isValidAgentDirectoryName(name: string): boolean {
   const parts = suffix.split('-');
   for (let i = 2; i <= parts.length; i++) {
     const candidate = parts.slice(0, i).join('-');
-    if (parseIssueId(candidate) !== null) {
+    if (parseIssueIdSync(candidate) !== null) {
       const remainder = parts.slice(i).join('-');
       if (remainder && /^[a-z0-9-]+$/.test(remainder)) return true;
     }
@@ -91,7 +91,7 @@ export function getPlanningIssueId(name: string): string | null {
 
   const issueId = match[1]!;
   if (issueId !== issueId.toLowerCase()) return null;
-  if (parseIssueId(issueId) === null) return null;
+  if (parseIssueIdSync(issueId) === null) return null;
 
   return issueId;
 }
@@ -100,22 +100,7 @@ export interface OrphanedAgentDir {
   name: string;
   path: string;
   hasRunningSession: boolean;
-}
-
-/**
- * Scan the agents directory and return all orphaned directories,
- * annotated with whether they have a running tmux session.
- *
- * Orphaned directories include:
- *   - All legacy naming patterns (work-*, review-*, test-*, merge-*, conv-*, etc.)
- *   - planning-* directories whose tmux session is no longer running
- *   - agent-* directories with invalid names (bare numeric, uppercase, doubled prefix, etc.)
- *
- * Preserved directories (never orphaned):
- *   - agent-* directories with valid issue IDs
- *   - planning-* directories with a running tmux session
- */
-export async function findOrphanedAgentDirs(
+}async function findOrphanedAgentDirsPromise(
   agentsDir: string = AGENTS_DIR,
 ): Promise<OrphanedAgentDir[]> {
   if (!existsSync(agentsDir)) {
@@ -125,7 +110,7 @@ export async function findOrphanedAgentDirs(
   const entries = readdirSync(agentsDir, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
-  const sessionNames = await Effect.runPromise(listSessionNamesAsyncEffect());
+  const sessionNames = await Effect.runPromise(listSessionNames());
   const sessionSet = new Set(sessionNames);
 
   const orphaned: OrphanedAgentDir[] = [];
@@ -160,30 +145,14 @@ export interface CleanupResult {
   wouldRemove: string[];
   /** Total orphaned directories found */
   totalOrphaned: number;
-}
-
-/**
- * Clean up orphaned (non-standard or stale) agent directories.
- *
- * Safety guarantees:
- *   - Directories with a running tmux session are NEVER touched.
- *   - Valid agent-<issueId> directories are NEVER touched.
- *   - planning-<issueId> directories are only touched when their tmux session
- *     is no longer running (stale planning state).
- *   - In dry-run mode, no filesystem changes are made.
- *
- * @param options.dryRun     Preview what would be removed without deleting anything.
- * @param options.force      Skip interactive confirmation (useful in scripts).
- * @param options.agentsDir  Override the default ~/.panopticon/agents/ path.
- */
-export async function cleanupAgentDirectories(options: {
+}async function cleanupAgentDirectoriesPromise(options: {
   dryRun?: boolean;
   force?: boolean;
   agentsDir?: string;
 } = {}): Promise<CleanupResult> {
   const { dryRun = false, force = false, agentsDir = AGENTS_DIR } = options;
 
-  const orphaned = await findOrphanedAgentDirs(agentsDir);
+  const orphaned = await Effect.runPromise(findOrphanedAgentDirs(agentsDir));
   const protectedDirs = orphaned.filter((d) => d.hasRunningSession);
   const removable = orphaned.filter((d) => !d.hasRunningSession);
 
@@ -228,11 +197,11 @@ export async function cleanupAgentDirectories(options: {
  * failures bubble up as FsError too (treats tmux as part of the filesystem
  * for purposes of this check).
  */
-export const findOrphanedAgentDirsEffect = (
+export const findOrphanedAgentDirs = (
   agentsDir: string = AGENTS_DIR,
 ): Effect.Effect<readonly OrphanedAgentDir[], FsError> =>
   Effect.tryPromise({
-    try: () => findOrphanedAgentDirs(agentsDir),
+    try: () => findOrphanedAgentDirsPromise(agentsDir),
     catch: (cause) =>
       new FsError({ path: agentsDir, operation: 'findOrphanedAgentDirs', cause }),
   });
@@ -242,13 +211,13 @@ export const findOrphanedAgentDirsEffect = (
  * orphan scan fails. Individual rm failures are still swallowed internally so
  * a partial cleanup is the worst case (matches the Promise contract).
  */
-export const cleanupAgentDirectoriesEffect = (options: {
+export const cleanupAgentDirectories = (options: {
   dryRun?: boolean;
   force?: boolean;
   agentsDir?: string;
 } = {}): Effect.Effect<CleanupResult, FsError> =>
   Effect.tryPromise({
-    try: () => cleanupAgentDirectories(options),
+    try: () => cleanupAgentDirectoriesPromise(options),
     catch: (cause) =>
       new FsError({
         path: options.agentsDir ?? AGENTS_DIR,

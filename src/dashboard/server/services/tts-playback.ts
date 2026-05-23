@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { resolveAndSpeak } from '../../../lib/tts-speak.js';
 import { initEventStore, type StoredEvent } from '../event-store.js';
 import { getTtsRuntimeConfig } from './tts-runtime-config.js';
@@ -60,13 +61,13 @@ async function speakActivityTts(event: StoredEvent): Promise<void> {
   if (typeof payload.utterance !== 'string' || payload.utterance.trim().length === 0) return;
 
   try {
-    const result = await resolveAndSpeak({
+    const result = await Effect.runPromise(resolveAndSpeak({
       text: payload.utterance,
       source: optionalString(payload.source),
       eventType: optionalString(payload.eventType),
       issueId: optionalString(payload.issueId),
       priority: typeof payload.priority === 'number' ? payload.priority : undefined,
-    }, { config });
+    }, { config }));
 
     if (result === 'daemon-unavailable') {
       console.warn('[tts-playback] TTS daemon unavailable');

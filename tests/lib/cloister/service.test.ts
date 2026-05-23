@@ -19,6 +19,7 @@ import { DEFAULT_CLOISTER_CONFIG } from '../../../src/lib/cloister/config.js';
 // Mock runtime and dependencies
 vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
+  listRunningAgentsSync: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/lib/runtimes/index.js', () => ({

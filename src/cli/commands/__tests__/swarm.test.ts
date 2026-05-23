@@ -14,11 +14,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/config.js', () => ({
   getDashboardApiUrl: () => 'http://dashboard.test',
+  getDashboardApiUrlSync: () => 'http://dashboard.test',
 }));
 
 vi.mock('../../../lib/internal-token.js', () => ({
   INTERNAL_TOKEN_HEADER: 'x-pan-test-token',
   ensureInternalToken: mocks.ensureInternalToken,
+  ensureInternalTokenSync: mocks.ensureInternalToken,
 }));
 
 vi.mock('ora', () => ({

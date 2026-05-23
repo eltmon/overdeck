@@ -16,24 +16,24 @@ const mockUpdate = vi.fn();
 // Suspend so mockQuery is invoked inside the Effect runtime; `Promise.resolve`
 // auto-unwraps mock return values whether they are sync values or Promises
 // (vi.fn().mockResolvedValue / mockRejectedValue return Promises directly).
-const queryEffect = (...args: any[]) => Effect.tryPromise({
+const queryProgram = (...args: any[]) => Effect.tryPromise({
   try: () => Promise.resolve().then(() => mockQuery(...args)),
   catch: (cause) => cause as any,
 });
-const createEffect = (...args: any[]) => Effect.tryPromise({
+const createProgram = (...args: any[]) => Effect.tryPromise({
   try: () => Promise.resolve().then(() => mockCreate(...args)),
   catch: (cause) => cause as any,
 });
-const updateEffect = (...args: any[]) => Effect.tryPromise({
+const updateProgram = (...args: any[]) => Effect.tryPromise({
   try: () => Promise.resolve().then(() => mockUpdate(...args)),
   catch: (cause) => cause as any,
 });
 
 vi.mock('../../../src/lib/tracker/rally-api.js', () => ({
   RallyRestApi: vi.fn().mockImplementation(function () { return {
-    query: queryEffect,
-    create: createEffect,
-    update: updateEffect,
+    query: queryProgram,
+    create: createProgram,
+    update: updateProgram,
     server: 'https://rally1.rallydev.com',
   }; }),
 }));
@@ -56,7 +56,7 @@ async function runFail<A, E>(eff: Effect.Effect<A, E, never>): Promise<unknown> 
  * (auto-runs the Effect, throws the cause on failure). Keeps the legacy test
  * shape `await tracker.X(...)` working unchanged.
  */
-function isEffect(v: unknown): boolean {
+function isEffectValue(v: unknown): boolean {
   if (!v || typeof v !== 'object') return false;
   // Effect 4.x exposes a single internal key `~effect/Effect/args`. Detect by
   // checking for any key in that namespace.
@@ -72,7 +72,7 @@ function wrap(t: RallyTracker): any {
       if (typeof value !== 'function') return value;
       return (...args: any[]) => {
         const result = value.apply(target, args);
-        if (isEffect(result)) {
+        if (isEffectValue(result)) {
           return Effect.runPromise(result as any).catch((err) => {
             // Effect.runPromise wraps the cause in a FiberFailure — unwrap to
             // the original tagged error class instance for `.rejects.toThrow`.

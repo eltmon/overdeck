@@ -27,7 +27,7 @@
  */
 
 import { Effect } from 'effect';
-import { sessionExistsAsyncEffect } from '../../../lib/tmux.js';
+import { sessionExists } from '../../../lib/tmux.js';
 
 const pendingRespawns = new Set<string>();
 
@@ -67,11 +67,11 @@ export async function waitForSessionRespawn(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) return true;
+    if (await Effect.runPromise(sessionExists(sessionName))) return true;
     if (!pendingRespawns.has(sessionName)) {
-      return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
+      return Effect.runPromise(sessionExists(sessionName));
     }
     await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
+  return Effect.runPromise(sessionExists(sessionName));
 }

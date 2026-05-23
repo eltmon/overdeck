@@ -19,11 +19,14 @@ vi.mock('../../../src/lib/database/index.js', () => ({
 const mockNotifyPipeline = vi.fn();
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: (...args: unknown[]) => mockNotifyPipeline(...args),
+  notifyPipelineSync: (...args: unknown[]) => mockNotifyPipeline(...args),
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -39,7 +42,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, setReviewStatus } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -108,8 +111,8 @@ describe('setReviewStatus concurrent updates (default path)', () => {
     // Simulate a TOCTOU race: both callers read the DB, then both write.
     // With the old read-all/write-all approach the second write would delete
     // the row written by the first. With single-row upsert both survive.
-    setReviewStatus('PAN-A', { reviewStatus: 'reviewing' });
-    setReviewStatus('PAN-B', { reviewStatus: 'reviewing' });
+    setReviewStatusSync('PAN-A', { reviewStatus: 'reviewing' });
+    setReviewStatusSync('PAN-B', { reviewStatus: 'reviewing' });
 
     const after = loadReviewStatuses();
     expect(after['PAN-A'].reviewStatus).toBe('reviewing');
@@ -126,7 +129,7 @@ describe('setReviewStatus concurrent updates (default path)', () => {
     }
 
     // Update one row — all others must remain intact
-    setReviewStatus('PAN-MANY-2', { reviewStatus: 'passed', testStatus: 'passed' });
+    setReviewStatusSync('PAN-MANY-2', { reviewStatus: 'passed', testStatus: 'passed' });
 
     const after = loadReviewStatuses();
     for (let i = 0; i < 5; i++) {

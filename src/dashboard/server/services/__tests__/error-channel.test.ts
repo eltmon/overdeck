@@ -21,14 +21,14 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
   return Cause.squash(exit.cause) as E;
 }
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
@@ -95,7 +95,7 @@ describe('Typed errors — Effect channel propagation', () => {
       ),
     );
 
-    const result = await runEffect(program);
+    const result = await runProgram(program);
     expect(result).toBe('handled: github');
   });
 
@@ -106,7 +106,7 @@ describe('Typed errors — Effect channel propagation', () => {
       ),
     );
 
-    const result = await runEffect(program);
+    const result = await runProgram(program);
     expect(result).toBe('workspace missing: PAN-1');
   });
 
@@ -117,7 +117,7 @@ describe('Typed errors — Effect channel propagation', () => {
       Effect.catchTag('TrackerNotConfigured', () => Effect.succeed('should not match')),
     );
 
-    const err = await runEffectFail(program);
+    const err = await runProgramFail(program);
     expect((err as any)._tag).toBe('IssueNotFound');
   });
 
@@ -131,7 +131,7 @@ describe('Typed errors — Effect channel propagation', () => {
       }),
     );
 
-    const result = await runEffect(program);
+    const result = await runProgram(program);
     expect(result).toBe('rate limited: 30s');
   });
 
@@ -147,7 +147,7 @@ describe('Typed errors — Effect channel propagation', () => {
       Effect.catchTag('TrackerNotConfigured', () => fail2),
     );
 
-    const err = await runEffectFail(combined);
+    const err = await runProgramFail(combined);
     expect((err as any)._tag).toBe('IssueNotFound');
   });
 

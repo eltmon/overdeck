@@ -7,9 +7,9 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { getDashboardApiUrl } from '../../lib/config.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
 
-const DASHBOARD_URL = getDashboardApiUrl();
+const DASHBOARD_URL = getDashboardApiUrlSync();
 
 interface SyncMainResponse {
   success: boolean;

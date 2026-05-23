@@ -8,7 +8,7 @@
 import type { ComplexityLevel, BeadsTask, WorkspaceMetadata, ComplexityDetectionResult } from './complexity.js';
 import type { CloisterConfig, ModelSelectionConfig } from './config.js';
 import { detectComplexity, complexityToModel } from './complexity.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfigSync } from './config.js';
 
 /**
  * Model routing result
@@ -28,7 +28,7 @@ export class ModelRouter {
   private config: CloisterConfig;
 
   constructor(config?: CloisterConfig) {
-    this.config = config || loadCloisterConfig();
+    this.config = config || loadCloisterConfigSync();
   }
 
   /**
@@ -131,7 +131,7 @@ export class ModelRouter {
    * Useful when configuration is updated at runtime.
    */
   reloadConfig(): void {
-    this.config = loadCloisterConfig();
+    this.config = loadCloisterConfigSync();
   }
 }
 

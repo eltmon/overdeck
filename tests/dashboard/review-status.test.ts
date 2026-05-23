@@ -6,11 +6,11 @@ import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  setReviewStatus,
-  getReviewStatus,
-  clearReviewStatus,
-  loadReviewStatuses,
-  saveReviewStatuses,
+  setReviewStatusSync,
+  getReviewStatusSync,
+  clearReviewStatusSync,
+  loadReviewStatusesSync,
+  saveReviewStatusesSync,
 } from '../../src/lib/review-status-json.js';
 
 let testDir: string;
@@ -28,7 +28,7 @@ afterEach(() => {
 
 describe('setReviewStatus', () => {
   it('creates a new status with default values', () => {
-    const result = setReviewStatus('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatusSync('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
     expect(result.issueId).toBe('PAN-100');
     expect(result.reviewStatus).toBe('reviewing');
     expect(result.testStatus).toBe('pending');
@@ -37,8 +37,8 @@ describe('setReviewStatus', () => {
   });
 
   it('tracks review status changes in history', () => {
-    setReviewStatus('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
-    const result = setReviewStatus('PAN-101', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatusSync('PAN-101', { reviewStatus: 'passed' }, statusFile);
 
     expect(result.history).toHaveLength(2);
     expect(result.history![0].type).toBe('review');
@@ -48,8 +48,8 @@ describe('setReviewStatus', () => {
   });
 
   it('tracks test status changes in history', () => {
-    setReviewStatus('PAN-102', { testStatus: 'testing' }, statusFile);
-    const result = setReviewStatus('PAN-102', { testStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-102', { testStatus: 'testing' }, statusFile);
+    const result = setReviewStatusSync('PAN-102', { testStatus: 'passed' }, statusFile);
 
     expect(result.history).toHaveLength(2);
     expect(result.history![0].type).toBe('test');
@@ -59,24 +59,24 @@ describe('setReviewStatus', () => {
   });
 
   it('tracks merge status changes in history', () => {
-    setReviewStatus('PAN-103', {
+    setReviewStatusSync('PAN-103', {
       reviewStatus: 'passed',
       testStatus: 'passed',
     }, statusFile);
-    const result = setReviewStatus('PAN-103', { mergeStatus: 'merged' }, statusFile);
+    const result = setReviewStatusSync('PAN-103', { mergeStatus: 'merged' }, statusFile);
 
     expect(result.history!.some(h => h.type === 'merge' && h.status === 'merged')).toBe(true);
   });
 
   it('does not add history entry when status is unchanged', () => {
-    setReviewStatus('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
-    const result = setReviewStatus('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatusSync('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
 
     expect(result.history).toHaveLength(1);
   });
 
   it('includes notes in history entries', () => {
-    const result = setReviewStatus('PAN-105', {
+    const result = setReviewStatusSync('PAN-105', {
       reviewStatus: 'blocked',
       reviewNotes: 'Missing error handling',
     }, statusFile);
@@ -88,11 +88,11 @@ describe('setReviewStatus', () => {
   it('limits history to 10 entries', () => {
     // Create 12 status changes
     for (let i = 0; i < 6; i++) {
-      setReviewStatus('PAN-106', { reviewStatus: 'reviewing' }, statusFile);
-      setReviewStatus('PAN-106', { reviewStatus: 'failed', reviewNotes: `Attempt ${i + 1}` }, statusFile);
+      setReviewStatusSync('PAN-106', { reviewStatus: 'reviewing' }, statusFile);
+      setReviewStatusSync('PAN-106', { reviewStatus: 'failed', reviewNotes: `Attempt ${i + 1}` }, statusFile);
     }
 
-    const result = getReviewStatus('PAN-106', statusFile);
+    const result = getReviewStatusSync('PAN-106', statusFile);
     expect(result!.history).toHaveLength(10);
     // 12 entries total, oldest 2 removed → starts at 3rd entry (reviewing, attempt 2)
     expect(result!.history![0].type).toBe('review');
@@ -103,20 +103,20 @@ describe('setReviewStatus', () => {
 
   it('records timestamps in history entries', () => {
     const before = new Date().toISOString();
-    setReviewStatus('PAN-107', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-107', { reviewStatus: 'reviewing' }, statusFile);
     const after = new Date().toISOString();
 
-    const result = getReviewStatus('PAN-107', statusFile);
+    const result = getReviewStatusSync('PAN-107', statusFile);
     const timestamp = result!.history![0].timestamp;
     expect(timestamp >= before).toBe(true);
     expect(timestamp <= after).toBe(true);
   });
 
   it('tracks mixed review and test transitions', () => {
-    setReviewStatus('PAN-108', { reviewStatus: 'reviewing' }, statusFile);
-    setReviewStatus('PAN-108', { reviewStatus: 'passed' }, statusFile);
-    setReviewStatus('PAN-108', { testStatus: 'testing' }, statusFile);
-    const result = setReviewStatus('PAN-108', { testStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-108', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-108', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-108', { testStatus: 'testing' }, statusFile);
+    const result = setReviewStatusSync('PAN-108', { testStatus: 'passed' }, statusFile);
 
     expect(result.history).toHaveLength(4);
     expect(result.history![0]).toMatchObject({ type: 'review', status: 'reviewing' });
@@ -126,37 +126,37 @@ describe('setReviewStatus', () => {
   });
 
   it('does not auto-derive readyForMerge from review+test pass (PAN-1048: ship role is the gate)', () => {
-    setReviewStatus('PAN-109', { reviewStatus: 'passed' }, statusFile);
-    const result = setReviewStatus('PAN-109', { testStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-109', { reviewStatus: 'passed' }, statusFile);
+    const result = setReviewStatusSync('PAN-109', { testStatus: 'passed' }, statusFile);
     // readyForMerge stays false until the ship role explicitly sets it
     expect(result.readyForMerge).toBe(false);
   });
 
   it('readyForMerge is false when test fails', () => {
-    setReviewStatus('PAN-110', { reviewStatus: 'passed' }, statusFile);
-    const result = setReviewStatus('PAN-110', { testStatus: 'failed' }, statusFile);
+    setReviewStatusSync('PAN-110', { reviewStatus: 'passed' }, statusFile);
+    const result = setReviewStatusSync('PAN-110', { testStatus: 'failed' }, statusFile);
     expect(result.readyForMerge).toBe(false);
   });
 
   it('clears stale merge notes when verification starts', () => {
-    setReviewStatus('PAN-111', {
+    setReviewStatusSync('PAN-111', {
       mergeStatus: 'failed',
       mergeNotes: 'Conflicts in src/example.ts',
     }, statusFile);
 
-    const result = setReviewStatus('PAN-111', { mergeStatus: 'verifying' }, statusFile);
+    const result = setReviewStatusSync('PAN-111', { mergeStatus: 'verifying' }, statusFile);
     expect(result.mergeNotes).toBeUndefined();
   });
 
   it('forces merged issues out of ready state and clears merge notes', () => {
-    setReviewStatus('PAN-112', {
+    setReviewStatusSync('PAN-112', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
       mergeNotes: 'Old conflict notes',
     }, statusFile);
 
-    const result = setReviewStatus('PAN-112', { mergeStatus: 'merged' }, statusFile);
+    const result = setReviewStatusSync('PAN-112', { mergeStatus: 'merged' }, statusFile);
     expect(result.readyForMerge).toBe(false);
     expect(result.mergeNotes).toBeUndefined();
   });
@@ -165,7 +165,7 @@ describe('setReviewStatus', () => {
     // verificationStatus no longer blocks readyForMerge — normalizeReviewStatus only
     // clears it for mergeStatus=merged, reviewStatus!=passed, or testStatus!=passed.
     // The post-rebase gate in triggerMerge() is the authoritative quality gate.
-    const result = setReviewStatus('PAN-113', {
+    const result = setReviewStatusSync('PAN-113', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       verificationStatus: 'failed',
@@ -176,7 +176,7 @@ describe('setReviewStatus', () => {
   });
 
   it('does not auto-derive readyForMerge when verification is pending (PAN-1048: ship role sets it)', () => {
-    const result = setReviewStatus('PAN-113b', {
+    const result = setReviewStatusSync('PAN-113b', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       verificationStatus: 'pending',
@@ -186,7 +186,7 @@ describe('setReviewStatus', () => {
   });
 
   it('blocks readyForMerge when blockerReasons is non-empty (PAN-905)', () => {
-    const result = setReviewStatus('PAN-114', {
+    const result = setReviewStatusSync('PAN-114', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       readyForMerge: true,
@@ -199,7 +199,7 @@ describe('setReviewStatus', () => {
   it('does not auto-derive readyForMerge when blockerReasons is empty (PAN-1048: ship role sets it)', () => {
     // Without an explicit readyForMerge:true, the ship-role invariant holds: blockers=[] alone
     // does not flip the flag. Passing readyForMerge:true explicitly still works (PAN-905 guard).
-    const result = setReviewStatus('PAN-115', {
+    const result = setReviewStatusSync('PAN-115', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       blockerReasons: [],
@@ -212,12 +212,12 @@ describe('setReviewStatus', () => {
     const blockers = [
       { type: 'merge_conflict' as const, summary: 'Conflict with main', detectedAt: '2026-04-28T10:00:00Z' },
     ];
-    setReviewStatus('PAN-116', {
+    setReviewStatusSync('PAN-116', {
       reviewStatus: 'passed',
       blockerReasons: blockers,
     }, statusFile);
 
-    const result = getReviewStatus('PAN-116', statusFile);
+    const result = getReviewStatusSync('PAN-116', statusFile);
     expect(result!.blockerReasons).toHaveLength(1);
     expect(result!.blockerReasons![0].type).toBe('merge_conflict');
   });
@@ -225,12 +225,12 @@ describe('setReviewStatus', () => {
 
 describe('getReviewStatus', () => {
   it('returns null for non-existent issue', () => {
-    expect(getReviewStatus('PAN-999', statusFile)).toBeNull();
+    expect(getReviewStatusSync('PAN-999', statusFile)).toBeNull();
   });
 
   it('returns saved status', () => {
-    setReviewStatus('PAN-200', { reviewStatus: 'passed' }, statusFile);
-    const result = getReviewStatus('PAN-200', statusFile);
+    setReviewStatusSync('PAN-200', { reviewStatus: 'passed' }, statusFile);
+    const result = getReviewStatusSync('PAN-200', statusFile);
     expect(result!.reviewStatus).toBe('passed');
     expect(result!.history).toHaveLength(1);
   });
@@ -238,17 +238,17 @@ describe('getReviewStatus', () => {
 
 describe('clearReviewStatus', () => {
   it('removes a status entry', () => {
-    setReviewStatus('PAN-300', { reviewStatus: 'reviewing' }, statusFile);
-    expect(getReviewStatus('PAN-300', statusFile)).not.toBeNull();
-    clearReviewStatus('PAN-300', statusFile);
-    expect(getReviewStatus('PAN-300', statusFile)).toBeNull();
+    setReviewStatusSync('PAN-300', { reviewStatus: 'reviewing' }, statusFile);
+    expect(getReviewStatusSync('PAN-300', statusFile)).not.toBeNull();
+    clearReviewStatusSync('PAN-300', statusFile);
+    expect(getReviewStatusSync('PAN-300', statusFile)).toBeNull();
   });
 });
 
 describe('stale branch auto-pass', () => {
   it('sets reviewStatus to passed with stale branch notes', () => {
     // Simulates what the stale branch pre-check records when review is a no-op
-    const result = setReviewStatus('PAN-STALE', {
+    const result = setReviewStatusSync('PAN-STALE', {
       reviewStatus: 'passed',
       reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
     }, statusFile);
@@ -260,7 +260,7 @@ describe('stale branch auto-pass', () => {
   });
 
   it('stale branch auto-pass does not set readyForMerge without test pass', () => {
-    const result = setReviewStatus('PAN-STALE2', {
+    const result = setReviewStatusSync('PAN-STALE2', {
       reviewStatus: 'passed',
       reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
     }, statusFile);
@@ -273,7 +273,7 @@ describe('stale branch auto-pass', () => {
 
 describe('loadReviewStatuses', () => {
   it('returns empty object for non-existent file', () => {
-    const result = loadReviewStatuses(join(testDir, 'nonexistent.json'));
+    const result = loadReviewStatusesSync(join(testDir, 'nonexistent.json'));
     expect(result).toEqual({});
   });
 });
@@ -281,11 +281,11 @@ describe('loadReviewStatuses', () => {
 describe('setReviewStatus — regression guard (PAN-338)', () => {
   it('rejects passed→reviewing regression when mergeStatus is not being reset', () => {
     // Set up: issue is in 'passed' state
-    setReviewStatus('PAN-338', { reviewStatus: 'reviewing' }, statusFile);
-    setReviewStatus('PAN-338', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-338', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-338', { reviewStatus: 'passed' }, statusFile);
 
     // Try to regress to 'reviewing' without changing mergeStatus
-    const result = setReviewStatus('PAN-338', {
+    const result = setReviewStatusSync('PAN-338', {
       reviewStatus: 'reviewing',
       testStatus: 'pending',
     }, statusFile);
@@ -296,11 +296,11 @@ describe('setReviewStatus — regression guard (PAN-338)', () => {
 
   it('allows passed→reviewing when mergeStatus is explicitly included in the update', () => {
     // Set up: issue is in 'passed' state
-    setReviewStatus('PAN-338b', { reviewStatus: 'reviewing' }, statusFile);
-    setReviewStatus('PAN-338b', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-338b', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-338b', { reviewStatus: 'passed' }, statusFile);
 
     // Deliberate reopen — includes mergeStatus reset
-    const result = setReviewStatus('PAN-338b', {
+    const result = setReviewStatusSync('PAN-338b', {
       reviewStatus: 'reviewing',
       mergeStatus: 'pending',
     }, statusFile);
@@ -309,15 +309,15 @@ describe('setReviewStatus — regression guard (PAN-338)', () => {
   });
 
   it('allows normal transitions (pending→reviewing→passed) without interference', () => {
-    setReviewStatus('PAN-338c', { reviewStatus: 'reviewing' }, statusFile);
-    const result = setReviewStatus('PAN-338c', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-338c', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatusSync('PAN-338c', { reviewStatus: 'passed' }, statusFile);
 
     expect(result.reviewStatus).toBe('passed');
   });
 
   it('allows regression from states other than passed (e.g. blocked→reviewing)', () => {
-    setReviewStatus('PAN-338d', { reviewStatus: 'blocked' }, statusFile);
-    const result = setReviewStatus('PAN-338d', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-338d', { reviewStatus: 'blocked' }, statusFile);
+    const result = setReviewStatusSync('PAN-338d', { reviewStatus: 'reviewing' }, statusFile);
 
     expect(result.reviewStatus).toBe('reviewing');
   });
@@ -330,36 +330,36 @@ describe('setReviewStatus — regression guard (PAN-338)', () => {
 describe('saveReviewStatuses (JSON path)', () => {
   it('persists batch mutations to the JSON file', () => {
     // Seed two entries
-    setReviewStatus('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
-    setReviewStatus('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatusSync('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
 
     // Load → mutate → save
-    const statuses = loadReviewStatuses(statusFile);
+    const statuses = loadReviewStatusesSync(statusFile);
     statuses['PAN-100'].reviewStatus = 'pending';
     statuses['PAN-101'].reviewStatus = 'pending';
-    saveReviewStatuses(statuses, statusFile);
+    saveReviewStatusesSync(statuses, statusFile);
 
-    const after = loadReviewStatuses(statusFile);
+    const after = loadReviewStatusesSync(statusFile);
     expect(after['PAN-100'].reviewStatus).toBe('pending');
     expect(after['PAN-101'].reviewStatus).toBe('pending');
   });
 
   it('deletes entries absent from the passed map (replace-all semantics)', () => {
-    setReviewStatus('PAN-200', { reviewStatus: 'passed' }, statusFile);
-    setReviewStatus('PAN-201', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-200', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatusSync('PAN-201', { reviewStatus: 'passed' }, statusFile);
 
-    const statuses = loadReviewStatuses(statusFile);
+    const statuses = loadReviewStatusesSync(statusFile);
     delete (statuses as Record<string, unknown>)['PAN-201'];
-    saveReviewStatuses(statuses, statusFile);
+    saveReviewStatusesSync(statuses, statusFile);
 
-    const after = loadReviewStatuses(statusFile);
+    const after = loadReviewStatusesSync(statusFile);
     expect(after['PAN-200']).toBeDefined();
     expect(after['PAN-201']).toBeUndefined();
   });
 
   it('round-trips an empty map (clears all entries)', () => {
-    setReviewStatus('PAN-300', { reviewStatus: 'passed' }, statusFile);
-    saveReviewStatuses({}, statusFile);
-    expect(Object.keys(loadReviewStatuses(statusFile))).toHaveLength(0);
+    setReviewStatusSync('PAN-300', { reviewStatus: 'passed' }, statusFile);
+    saveReviewStatusesSync({}, statusFile);
+    expect(Object.keys(loadReviewStatusesSync(statusFile))).toHaveLength(0);
   });
 });

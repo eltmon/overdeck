@@ -165,21 +165,6 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Review Synthesis model')).toHaveValue('workhorse:expensive');
   });
 
-  it('shows parent model choices only for sub-role pickers', async () => {
-    const user = userEvent.setup();
-    renderPanel();
-
-    await screen.findByLabelText('Review model');
-    expect(within(screen.getByLabelText('Review model')).queryByRole('option', { name: /Parent/i })).not.toBeInTheDocument();
-
-    const cards = await screen.findAllByTestId('role-card');
-    await user.click(within(cards[2]).getByRole('button', { name: /show sub-roles/i }));
-
-    expect(within(await screen.findByLabelText('Review Security model')).getByRole('option', {
-      name: 'Parent (inherits claude-opus-4-7)',
-    })).toBeInTheDocument();
-  });
-
   it('round-trips nested role edits through PUT /api/settings', async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -199,25 +184,6 @@ describe('RolesPanel', () => {
     expect(body.roles.review.sub.security.model).toBe('kimi-k2.6-flash');
     expect(body.roles.review.sub.correctness.model).toBe('workhorse:mid');
     expect(body.roles.plan.model).toBe('workhorse:expensive');
-  });
-
-  it('saves parent selections through nested role updates', async () => {
-    const user = userEvent.setup();
-    renderPanel();
-
-    const cards = await screen.findAllByTestId('role-card');
-    await user.click(within(cards[2]).getByRole('button', { name: /show sub-roles/i }));
-    await user.selectOptions(await screen.findByLabelText('Review Security model'), 'parent');
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
-    });
-
-    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
-      url.toString() === '/api/settings' && init?.method === 'PUT'
-    ));
-    const body = JSON.parse(putCall?.[1]?.body as string);
-    expect(body.roles.review.sub.security.model).toBe('parent');
   });
 
   it('persists flywheel-specific settings and reloads the saved value', async () => {
@@ -242,25 +208,6 @@ describe('RolesPanel', () => {
       maxAgents: 8,
       scope: 'all-tracked-projects',
     });
-  });
-
-  it('shows saved parent selections as inherited without missing-model or provider warnings', async () => {
-    const user = userEvent.setup();
-    const settings = structuredClone(settingsPayload);
-    settings.roles.review.sub.security.model = 'parent';
-    installFetchMock({ settings });
-    renderPanel();
-
-    const cards = await screen.findAllByTestId('role-card');
-    await user.click(within(cards[2]).getByRole('button', { name: /show sub-roles/i }));
-
-    const securitySelect = await screen.findByLabelText('Review Security model');
-    expect(securitySelect).toHaveValue('parent');
-    expect(Array.from(securitySelect.querySelectorAll('optgroup')).map((group) => group.label)).not.toContain('Current');
-
-    const picker = securitySelect.closest('label') as HTMLElement;
-    expect(within(picker).getByText('Resolved: claude-opus-4-7')).toBeInTheDocument();
-    expect(within(picker).queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

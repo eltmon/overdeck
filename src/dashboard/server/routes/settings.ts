@@ -27,11 +27,11 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { getProviderForModel, PROVIDERS } from '../../../lib/providers.js';
+import { getProviderForModelSync, PROVIDERS } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
-import { canUseHarness } from '../../../lib/harness-policy.js';
+import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -154,7 +154,7 @@ const getOpenAIAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/openai-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* Effect.promise(() => getOpenAIAuthStatus());
+    const status = yield* getOpenAIAuthStatus();
     return jsonResponse(status);
   })),
 );
@@ -631,7 +631,7 @@ const putSettingsRoute = HttpRouter.add(
         if (!validation.valid) {
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-        await saveSettingsApi(newSettings);
+        await Effect.runPromise(saveSettingsApi(newSettings));
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
         return jsonResponse({
@@ -675,7 +675,7 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
     const modelIds = favorites.filter((f): f is string => typeof f === 'string');
     return yield* Effect.promise(async () => {
       try {
-        await saveOpenRouterFavorites(modelIds);
+        await Effect.runPromise(saveOpenRouterFavorites(modelIds));
         return jsonResponse({ success: true, favorites: modelIds });
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : String(err));
@@ -699,7 +699,7 @@ const putOpenRouterApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const settings = await updateProviderApiKey('openrouter', apiKey?.trim() || undefined);
+        const settings = await Effect.runPromise(updateProviderApiKey('openrouter', apiKey?.trim() || undefined));
         return jsonResponse({
           success: true,
           apiKey: settings.api_keys.openrouter,
@@ -760,15 +760,15 @@ const getHarnessPolicyRoute = HttpRouter.add(
       const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
       const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
       for (const model of Array.from(new Set(models))) {
-        const providerName = getProviderForModel(model).name;
+        const providerName = getProviderForModelSync(model).name;
         let authMode = authModeByProvider.get(providerName);
         if (!authModeByProvider.has(providerName)) {
           authMode = await getProviderAuthMode(model);
           authModeByProvider.set(providerName, authMode);
         }
         decisions[model] = {
-          'claude-code': canUseHarness('claude-code', model, authMode),
-          pi: canUseHarness('pi', model, authMode),
+          'claude-code': canUseHarnessSync('claude-code', model, authMode),
+          pi: canUseHarnessSync('pi', model, authMode),
         };
       }
       return jsonResponse({ decisions });

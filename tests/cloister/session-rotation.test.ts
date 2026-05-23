@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Tests for session-rotation.ts
  */
@@ -19,6 +20,7 @@ vi.mock('../../src/lib/runtimes/index.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({
@@ -74,10 +76,10 @@ vi.mock('fs', () => ({
 }));
 
 import { getRuntimeForAgent } from '../../src/lib/runtimes/index.js';
-import { getAgentState } from '../../src/lib/agents.js';
+import { getAgentStateSync } from '../../src/lib/agents.js';
 
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
-const mockGetAgentState = vi.mocked(getAgentState);
+const mockGetAgentState = vi.mocked(getAgentStateSync);
 const mockExecSync = execMock;
 
 describe('session-rotation', () => {
@@ -153,7 +155,7 @@ describe('session-rotation', () => {
         throw new Error('Not a git repo');
       });
 
-      const memory = await buildMergeAgentMemory('/tmp/test');
+      const memory = await Effect.runPromise(buildMergeAgentMemory('/tmp/test'));
       expect(memory).toBe('No merge history available.\n');
     });
 
@@ -172,11 +174,11 @@ describe('session-rotation', () => {
         return '';
       });
 
-      const memory = await buildMergeAgentMemory('/tmp/test', {
+      const memory = await Effect.runPromise(buildMergeAgentMemory('/tmp/test', {
         recent_summary: 10,
         recent_detailed: 5,
         recent_full: 2,
-      });
+      }));
 
       expect(memory).toContain('# Merge-Agent Session Memory');
       expect(memory).toContain('abc123');
@@ -187,7 +189,7 @@ describe('session-rotation', () => {
     it('should handle empty merge history', async () => {
       mockExecSync.mockReturnValue('');
 
-      const memory = await buildMergeAgentMemory('/tmp/test');
+      const memory = await Effect.runPromise(buildMergeAgentMemory('/tmp/test'));
       expect(memory).toContain('# Merge-Agent Session Memory');
       expect(memory).toContain('Last 20 merges');
     });
@@ -195,7 +197,7 @@ describe('session-rotation', () => {
     it('should use default tiers when not specified', async () => {
       mockExecSync.mockReturnValue('');
 
-      await buildMergeAgentMemory('/tmp/test');
+      await Effect.runPromise(buildMergeAgentMemory('/tmp/test'));
 
       // Should have called git log with max of default tiers
       expect(mockExecSync).toHaveBeenCalledWith(
@@ -209,7 +211,7 @@ describe('session-rotation', () => {
     it('should return error when no runtime found', async () => {
       mockGetRuntimeForAgent.mockReturnValue(null);
 
-      const result = await rotateSpecialistSession('merge-agent');
+      const result = await Effect.runPromise(rotateSpecialistSession('merge-agent'));
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('No runtime found');
@@ -221,7 +223,7 @@ describe('session-rotation', () => {
       } as any);
       mockGetAgentState.mockReturnValue(null);
 
-      const result = await rotateSpecialistSession('merge-agent');
+      const result = await Effect.runPromise(rotateSpecialistSession('merge-agent'));
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('No session ID found');
@@ -246,7 +248,7 @@ describe('session-rotation', () => {
         return '';
       });
 
-      const result = await rotateSpecialistSession('merge-agent', '/tmp/workspace');
+      const result = await Effect.runPromise(rotateSpecialistSession('merge-agent', '/tmp/workspace'));
 
       expect(result.success).toBe(true);
       expect(result.oldSessionId).toBe('old-session-456');
@@ -274,7 +276,7 @@ describe('session-rotation', () => {
         return '';
       });
 
-      const result = await rotateSpecialistSession('merge-agent', '/tmp/workspace');
+      const result = await Effect.runPromise(rotateSpecialistSession('merge-agent', '/tmp/workspace'));
 
       // Should still succeed even if tmux kill fails
       expect(result.success).toBe(true);
@@ -287,7 +289,7 @@ describe('session-rotation', () => {
         getTokenUsage: () => ({ inputTokens: 40000, outputTokens: 40000 }),
       } as any);
 
-      const result = await checkAndRotateIfNeeded('merge-agent');
+      const result = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent'));
 
       expect(result).toBeNull();
     });
@@ -305,7 +307,7 @@ describe('session-rotation', () => {
       } as any);
       mockExecSync.mockReturnValue('');
 
-      const result = await checkAndRotateIfNeeded('merge-agent', '/tmp/workspace');
+      const result = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', '/tmp/workspace'));
 
       expect(result).not.toBeNull();
       expect(result?.success).toBe(true);

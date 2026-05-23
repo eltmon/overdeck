@@ -13,14 +13,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockAppendGitOperation = vi.fn();
 vi.mock('../../../../src/lib/git-activity.js', () => ({
   appendGitOperation: (...args: unknown[]) => mockAppendGitOperation(...args),
+  appendGitOperationSync: (...args: unknown[]) => mockAppendGitOperation(...args),
 }));
 
 const mockEmitActivityEntry = vi.fn();
 const mockEmitDashboardLifecycle = vi.fn();
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: (...args: unknown[]) => mockEmitActivityEntry(...args),
+  emitActivityEntrySync: (...args: unknown[]) => mockEmitActivityEntry(...args),
   emitDashboardLifecycle: (...args: unknown[]) => mockEmitDashboardLifecycle(...args),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/paths.js', () => ({
@@ -32,11 +35,13 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn().mockResolvedValue([]),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
@@ -48,7 +53,9 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+  resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
+  loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
 
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({

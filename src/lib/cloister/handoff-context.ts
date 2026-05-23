@@ -13,9 +13,9 @@ import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
-import { readContinueState, type ContinueState } from '../vbrief/continue-state.js';
+import { readContinueStateSync, type ContinueState } from '../vbrief/continue-state.js';
 import { readWorkspaceContinue } from '../pan-dir/index.js';
 import { withBdMutex } from '../bd-mutex.js';
 
@@ -77,17 +77,7 @@ export interface HandoffContext {
   // New agent target
   targetModel: string;
   reason: string;
-}
-
-/**
- * Capture full handoff context from an agent
- *
- * @param agentState - Current agent state
- * @param targetModel - Model to hand off to
- * @param reason - Reason for handoff
- * @returns Handoff context
- */
-export async function captureHandoffContext(
+}async function captureHandoffContextPromise(
   agentState: AgentState,
   targetModel: string,
   reason: string
@@ -129,16 +119,15 @@ async function captureFiles(
     // Read the live workspace continue state first, then migration fallbacks.
     let continueState: ContinueState | null = null;
     try {
-      const { Effect: EffectModule } = await import('effect');
-      continueState = await EffectModule.runPromise(readWorkspaceContinue(workspace));
+      continueState = await Effect.runPromise(readWorkspaceContinue(workspace));
     } catch { /* ignore */ }
     if (!continueState) {
-      const resolved = resolveProjectFromIssue(issueId);
+      const resolved = resolveProjectFromIssueSync(issueId);
       if (resolved) {
         for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
           try {
             const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
-            const cs = readContinueState(lifecycleDir, issueId);
+            const cs = readContinueStateSync(lifecycleDir, issueId);
             if (cs) {
               continueState = cs;
               break;
@@ -363,13 +352,13 @@ export class HandoffContextError extends Data.TaggedError('HandoffContextError')
 }> {}
 
 /** Effect variant of `captureHandoffContext`. */
-export const captureHandoffContextEffect = (
+export const captureHandoffContext = (
   agentState: AgentState,
   targetModel: string,
   reason: string,
 ): Effect.Effect<HandoffContext, HandoffContextError> =>
   Effect.tryPromise({
-    try: () => captureHandoffContext(agentState, targetModel, reason),
+    try: () => captureHandoffContextPromise(agentState, targetModel, reason),
     catch: (cause) =>
       new HandoffContextError({
         issueId: agentState.issueId,

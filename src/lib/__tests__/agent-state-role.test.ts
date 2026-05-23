@@ -37,6 +37,12 @@ describe('AgentState role persistence', () => {
             roles: actual.DEFAULT_ROLES,
           },
         }),
+        loadConfigSync: () => ({
+          config: {
+            workhorses: actual.DEFAULT_WORKHORSES,
+            roles: actual.DEFAULT_ROLES,
+          },
+        }),
       };
     });
     const { determineModel } = await import('../agents.js');
@@ -96,9 +102,9 @@ describe('AgentState role persistence', () => {
   });
 
   it('requires role and strips legacy state fields when persisting state.json', async () => {
-    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
 
-    saveAgentState({
+    saveAgentStateSync({
       id: 'agent-pan-role',
       issueId: 'PAN-1048',
       workspace: '/tmp/workspace',
@@ -116,7 +122,7 @@ describe('AgentState role persistence', () => {
       type: 'work',
     } as any);
 
-    const state = getAgentState('agent-pan-role');
+    const state = getAgentStateSync('agent-pan-role');
     expect(state?.role).toBe('work');
     expect((state as any).runtime).toBeUndefined();
     expect((state as any).phase).toBeUndefined();
@@ -134,9 +140,9 @@ describe('AgentState role persistence', () => {
   });
 
   it('accepts flywheel role in persisted state.json', async () => {
-    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
 
-    saveAgentState({
+    saveAgentStateSync({
       id: 'agent-flywheel-orchestrator',
       issueId: 'RUN-1',
       workspace: '/tmp/workspace',
@@ -147,7 +153,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     } as any);
 
-    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+    expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
   it('bases Channels eligibility on work role and claude-code harness', async () => {
@@ -182,25 +188,31 @@ describe('AgentState role persistence', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-cache-gate-'));
     const createSessionAsync = vi.fn();
     const emitActivityEntry = vi.fn();
+    const resolvedProject = {
+      projectKey: 'panopticon',
+      projectName: 'Panopticon',
+      projectPath: workspace,
+      linearTeam: 'PAN',
+    };
+    const projectConfig = { path: workspace, workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } };
     vi.doMock('../projects.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../projects.js')),
-      resolveProjectFromIssue: vi.fn(() => ({
-        projectKey: 'panopticon',
-        projectName: 'Panopticon',
-        projectPath: workspace,
-        linearTeam: 'PAN',
-      })),
-      getProject: vi.fn(() => ({ workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } })),
+      resolveProjectFromIssue: vi.fn(() => resolvedProject),
+      resolveProjectFromIssueSync: vi.fn(() => resolvedProject),
+      getProject: vi.fn(() => projectConfig),
+      getProjectSync: vi.fn(() => projectConfig),
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
     }));
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
     recordDockerContainerLifecycleSnapshot([{
@@ -242,13 +254,15 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
     }));
 
     const { spawnAgent } = await import('../agents.js');
@@ -287,17 +301,19 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
-      sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(false)),
-      sessionExists: vi.fn(() => false),
-      createSessionAsyncEffect: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      capturePaneAsyncEffect: vi.fn(() => Effect.succeed('Claude Code')),
-      setOptionAsyncEffect: vi.fn(() => Effect.void),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+      setOption: vi.fn(() => Effect.void),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({
       writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -335,7 +351,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('treats state.json without a valid role as missing', async () => {
-    const { getAgentState } = await import('../agents.js');
+    const { getAgentStateSync } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'state.json'), JSON.stringify({
@@ -347,7 +363,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    const state = getAgentState('agent-pan-legacy');
+    const state = getAgentStateSync('agent-pan-legacy');
     expect(state).toBeNull();
   });
 
@@ -355,6 +371,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
       killSession: vi.fn(),
+  killSessionSync: vi.fn(),
     }));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { warnOnBareNumericIssueIds } = await import('../agents.js');

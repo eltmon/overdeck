@@ -19,11 +19,12 @@ vi.mock('../../event-store.js', () => ({
 }))
 
 vi.mock('../../../../lib/tmux.js', () => ({
-  capturePaneAsyncEffect: vi.fn(),
+  capturePane: vi.fn(),
 }))
 
 vi.mock('../../../../lib/agents.js', () => ({
-  listRunningAgentsEffect: vi.fn(),
+  listRunningAgents: vi.fn(),
+  listRunningAgentsSync: vi.fn(),
 }))
 
 vi.mock('node:fs/promises', () => ({
@@ -39,13 +40,13 @@ import {
   startAgentOutputService,
   stopAgentOutputService,
 } from '../agent-output-service.js'
-import { capturePaneAsyncEffect } from '../../../../lib/tmux.js'
-import { listRunningAgentsEffect, type AgentState } from '../../../../lib/agents.js'
+import { capturePane } from '../../../../lib/tmux.js'
+import { listRunningAgents, type AgentState } from '../../../../lib/agents.js'
 
 type RunningAgent = AgentState & { tmuxActive: boolean }
 
-const mockCapturePaneAsyncEffect = vi.mocked(capturePaneAsyncEffect)
-const mockListRunningAgentsEffect = vi.mocked(listRunningAgentsEffect)
+const mockCapturePane = vi.mocked(capturePane)
+const mockListRunningAgents = vi.mocked(listRunningAgents)
 
 // ─── diffLines tests ───────────────────────────────────────────────────────────
 
@@ -89,8 +90,8 @@ describe('AgentOutputService', () => {
   beforeEach(() => {
     stopAgentOutputService()
     mockAppendAsync.mockClear()
-    mockCapturePaneAsyncEffect.mockClear()
-    mockListRunningAgentsEffect.mockClear()
+    mockCapturePane.mockClear()
+    mockListRunningAgents.mockClear()
   })
 
   afterEach(() => {
@@ -98,10 +99,10 @@ describe('AgentOutputService', () => {
   })
 
   it('emits agent.output_received when a running agent produces new lines', async () => {
-    mockListRunningAgentsEffect.mockReturnValue(Effect.succeed([
+    mockListRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as RunningAgent,
     ]))
-    mockCapturePaneAsyncEffect
+    mockCapturePane
       .mockReturnValueOnce(Effect.succeed('boot\nworking on PAN-TEST'))
       .mockReturnValueOnce(Effect.succeed('boot\nworking on PAN-TEST\nnew line'))
 
@@ -130,10 +131,10 @@ describe('AgentOutputService', () => {
   })
 
   it('does not emit when output is unchanged', async () => {
-    mockListRunningAgentsEffect.mockReturnValue(Effect.succeed([
+    mockListRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as RunningAgent,
     ]))
-    mockCapturePaneAsyncEffect.mockReturnValue(Effect.succeed('same output'))
+    mockCapturePane.mockReturnValue(Effect.succeed('same output'))
 
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
@@ -146,10 +147,10 @@ describe('AgentOutputService', () => {
   })
 
   it('does not emit for agents without tmuxActive', async () => {
-    mockListRunningAgentsEffect.mockReturnValue(Effect.succeed([
+    mockListRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: false } as unknown as RunningAgent,
     ]))
-    mockCapturePaneAsyncEffect.mockReturnValue(Effect.succeed('some output'))
+    mockCapturePane.mockReturnValue(Effect.succeed('some output'))
 
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
@@ -158,13 +159,13 @@ describe('AgentOutputService', () => {
   })
 
   it('cleans up state for stopped agents', async () => {
-    mockListRunningAgentsEffect
+    mockListRunningAgents
       .mockReturnValueOnce(Effect.succeed([
         { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as RunningAgent,
       ]))
       .mockReturnValueOnce(Effect.succeed([]))
 
-    mockCapturePaneAsyncEffect.mockReturnValue(Effect.succeed('output'))
+    mockCapturePane.mockReturnValue(Effect.succeed('output'))
 
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
@@ -176,15 +177,15 @@ describe('AgentOutputService', () => {
     await pollOnce(state)
     // Agent stopped, state cleaned up
     expect(state.lastOutput.has('agent-pan-test')).toBe(false)
-    expect(mockCapturePaneAsyncEffect).toHaveBeenCalledTimes(1)
+    expect(mockCapturePane).toHaveBeenCalledTimes(1)
     expect(mockAppendAsync).not.toHaveBeenCalled()
   })
 
   it('skips Session not found output', async () => {
-    mockListRunningAgentsEffect.mockReturnValue(Effect.succeed([
+    mockListRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-test', issueId: 'PAN-TEST', tmuxActive: true } as unknown as RunningAgent,
     ]))
-    mockCapturePaneAsyncEffect.mockReturnValue(Effect.succeed('Session not found'))
+    mockCapturePane.mockReturnValue(Effect.succeed('Session not found'))
 
     const state = { timer: null, lastOutput: new Map<string, string>() }
 

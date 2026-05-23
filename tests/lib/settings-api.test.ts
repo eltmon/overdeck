@@ -1,8 +1,9 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { loadConfig } from '../../src/lib/config-yaml.js';
+import { loadConfigSync } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
@@ -27,6 +28,28 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
   return {
     ...actual,
     loadConfig: vi.fn(() => ({
+      config: {
+        preset: 'balanced',
+        enabledProviders: new Set(['anthropic', 'openai']),
+        apiKeys: {
+          openai: 'sk-test-123',
+        },
+        overrides: {},
+        geminiThinkingLevel: 3,
+        tmux: {
+          configMode: 'managed',
+        },
+        conversations: {
+          compactionModel: 'claude-haiku-4-5',
+          manualCompactMode: 'claude-code',
+          richCompaction: false,
+        },
+        trackerKeys: {},
+        tts: makeTtsConfig(),
+      },
+      migration: null,
+    })),
+    loadConfigSync: vi.fn(() => ({
       config: {
         preset: 'balanced',
         enabledProviders: new Set(['anthropic', 'openai']),
@@ -95,7 +118,7 @@ describe('settings-api', () => {
     it('reports anthropic:false when Anthropic is not in enabledProviders (PAN-540 behavior change)', () => {
       // Regression: before PAN-540, Anthropic was always forced on. Now providers
       // are reported as-is. Verify loadSettingsApi does NOT override the persisted value.
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['kimi']),
@@ -115,7 +138,7 @@ describe('settings-api', () => {
     });
 
     it('does not surface legacy model-route overrides in the settings API', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['anthropic']),
@@ -367,14 +390,14 @@ describe('settings-api', () => {
         },
         api_keys: {},
       };
-      await saveSettingsApi(settings);
+      await Effect.runPromise(saveSettingsApi(settings));
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
     });
 
     it('getDefaultConversationModelApi prefers stored defaultConversationModel over provider heuristics', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['openai']),
@@ -419,7 +442,7 @@ describe('settings-api', () => {
       };
 
       // Should not throw
-      await saveSettingsApi(settings);
+      await Effect.runPromise(saveSettingsApi(settings));
 
       // Verify writeFile was called
       expect(writeFile).toHaveBeenCalled();
@@ -442,7 +465,7 @@ describe('settings-api', () => {
 
   describe('getDefaultConversationModelApi', () => {
     it('returns a MiniMax model when only MiniMax is enabled', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['minimax']),
@@ -461,7 +484,7 @@ describe('settings-api', () => {
     });
 
     it('returns an OpenAI model when OpenAI is enabled (takes precedence over MiniMax)', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['openai', 'minimax']),
@@ -481,7 +504,7 @@ describe('settings-api', () => {
     });
 
     it('returns a Google model when only Google is enabled', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['google']),
@@ -501,7 +524,7 @@ describe('settings-api', () => {
     });
 
     it('returns a Kimi model when only Kimi is enabled', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['kimi']),
@@ -521,7 +544,7 @@ describe('settings-api', () => {
     });
 
     it('returns a ZAI model when only ZAI is enabled', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['zai']),
@@ -541,7 +564,7 @@ describe('settings-api', () => {
     });
 
     it('does not return claude-sonnet-4-6 when Anthropic is disabled and Google is enabled', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
           enabledProviders: new Set(['google']),
@@ -585,7 +608,7 @@ describe('OpenRouter favorites', () => {
 
   describe('getOpenRouterFavorites', () => {
     it('returns favorites stored in config', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o', 'openai/o3'] } as any,
         migration: null,
       });
@@ -593,7 +616,7 @@ describe('OpenRouter favorites', () => {
     });
 
     it('returns empty array when no favorites are configured', () => {
-      vi.mocked(loadConfig).mockReturnValueOnce({
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: { ...baseConfig, openrouterFavorites: [] } as any,
         migration: null,
       });
@@ -604,12 +627,12 @@ describe('OpenRouter favorites', () => {
   describe('saveOpenRouterFavorites', () => {
     it('writes config containing the provided favorites', async () => {
       // loadSettingsApi (called inside saveOpenRouterFavorites) + saveSettingsApi each call loadConfig
-      vi.mocked(loadConfig).mockReturnValue({
+      vi.mocked(loadConfigSync).mockReturnValue({
         config: { ...baseConfig, openrouterFavorites: [] } as any,
         migration: null,
       });
 
-      await saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']);
+      await Effect.runPromise(saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']));
 
       const { writeFile } = await import('fs/promises');
       expect(vi.mocked(writeFile)).toHaveBeenCalled();
@@ -619,12 +642,12 @@ describe('OpenRouter favorites', () => {
     });
 
     it('persists an empty array when clearing favorites', async () => {
-      vi.mocked(loadConfig).mockReturnValue({
+      vi.mocked(loadConfigSync).mockReturnValue({
         config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o'] } as any,
         migration: null,
       });
 
-      await saveOpenRouterFavorites([]);
+      await Effect.runPromise(saveOpenRouterFavorites([]));
 
       const { writeFile } = await import('fs/promises');
       const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;

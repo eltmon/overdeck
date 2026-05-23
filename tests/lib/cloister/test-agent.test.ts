@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { detectTestCommand } from '../../../src/lib/cloister/test-agent.js';
+import { detectTestCommandSync } from '../../../src/lib/cloister/test-agent.js';
 
 describe('Test Agent Multi-Runner Detection', () => {
   const testDir = join(process.cwd(), '.test-runner-detection');
@@ -46,7 +46,7 @@ describe('Test Agent Multi-Runner Detection', () => {
 
       writeFileSync(join(testDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('npm test');
     });
@@ -65,7 +65,7 @@ describe('Test Agent Multi-Runner Detection', () => {
 
       writeFileSync(join(testDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('npm test');
     });
@@ -78,7 +78,7 @@ describe('Test Agent Multi-Runner Detection', () => {
 
       writeFileSync(join(testDir, 'jest.config.json'), JSON.stringify(jestConfig, null, 2));
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('npm test');
     });
@@ -96,7 +96,7 @@ export default defineConfig({
 
       writeFileSync(join(testDir, 'vitest.config.ts'), vitestConfig);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('npm test');
     });
@@ -112,7 +112,7 @@ python_files = test_*.py
 
       writeFileSync(join(testDir, 'pytest.ini'), pytestIni);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('pytest');
     });
@@ -126,7 +126,7 @@ python_files = ["test_*.py"]
 
       writeFileSync(join(testDir, 'pyproject.toml'), pyprojectToml);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('pytest');
     });
@@ -144,7 +144,7 @@ setup(
 
       writeFileSync(join(testDir, 'setup.py'), setupPy);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('pytest');
     });
@@ -163,7 +163,7 @@ edition = "2021"
 
       writeFileSync(join(testDir, 'Cargo.toml'), cargoToml);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('cargo test');
     });
@@ -180,7 +180,7 @@ version = "1.0.0"
 
       writeFileSync(join(testDir, 'Cargo.toml'), cargoToml);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('cargo test');
     });
@@ -200,7 +200,7 @@ version = "1.0.0"
 
       writeFileSync(join(testDir, 'pom.xml'), pomXml);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('mvn test');
     });
@@ -217,7 +217,7 @@ version '1.0.0'
 
       writeFileSync(join(testDir, 'build.gradle'), buildGradle);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('gradle test');
     });
@@ -234,7 +234,7 @@ version = "1.0.0"
 
       writeFileSync(join(testDir, 'build.gradle.kts'), buildGradleKts);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('gradle test');
     });
@@ -250,7 +250,7 @@ go 1.21
 
       writeFileSync(join(testDir, 'go.mod'), goMod);
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('go test ./...');
     });
@@ -259,7 +259,7 @@ go 1.21
   describe('No Test Runner', () => {
     it('should return "auto" when no test runner is detected', () => {
       // Empty directory
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('auto');
     });
@@ -268,7 +268,7 @@ go 1.21
       // Create a README but no test files
       writeFileSync(join(testDir, 'README.md'), '# Test Project');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       expect(command).toBe('auto');
     });
@@ -287,7 +287,7 @@ go 1.21
       writeFileSync(join(testDir, 'package.json'), JSON.stringify(packageJson, null, 2));
       writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "test"');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       // Should prefer npm over cargo (package.json has higher priority)
       expect(command).toBe('npm test');
@@ -297,7 +297,7 @@ go 1.21
       writeFileSync(join(testDir, 'pytest.ini'), '[pytest]');
       writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "test"');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       // Should prefer pytest (detected earlier in priority chain)
       expect(command).toBe('pytest');
@@ -307,7 +307,7 @@ go 1.21
       writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "test"');
       writeFileSync(join(testDir, 'pom.xml'), '<project></project>');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       // Should prefer cargo (detected earlier)
       expect(command).toBe('cargo test');
@@ -317,7 +317,7 @@ go 1.21
       writeFileSync(join(testDir, 'pom.xml'), '<project></project>');
       writeFileSync(join(testDir, 'build.gradle'), 'plugins {}');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       // Should prefer maven (detected earlier)
       expect(command).toBe('mvn test');
@@ -327,7 +327,7 @@ go 1.21
       writeFileSync(join(testDir, 'build.gradle'), 'plugins {}');
       writeFileSync(join(testDir, 'go.mod'), 'module test');
 
-      const command = detectTestCommand(testDir);
+      const command = detectTestCommandSync(testDir);
 
       // Should prefer gradle (detected earlier)
       expect(command).toBe('gradle test');

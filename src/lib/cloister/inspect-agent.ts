@@ -21,20 +21,20 @@ import {
   getCurrentHead,
   saveCheckpoint,
 } from './inspect-checkpoints.js';
-import { setReviewStatus } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { withBdMutex } from '../bd-mutex.js';
-import { generateLauncherScript } from '../launcher-generator.js';
+import { generateLauncherScriptSync } from '../launcher-generator.js';
 import {
-  createSessionAsyncEffect,
-  killSessionAsyncEffect,
-  sessionExistsAsyncEffect,
+  createSession,
+  killSession,
+  sessionExists,
 } from '../tmux.js';
-import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
-import { bypassPrefixForAgentFlag } from '../claude-permissions.js';
+import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { bypassPrefixForAgentFlagSync } from '../claude-permissions.js';
 import {
-  getProviderForModel,
-  setupCredentialFileAuth,
-  clearCredentialFileAuth,
+  getProviderForModelSync,
+  setupCredentialFileAuthSync,
+  clearCredentialFileAuthSync,
 } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState } from '../agents.js';
@@ -95,12 +95,7 @@ async function getBeadDescription(beadId: string, workspacePath: string): Promis
       return `Bead ${beadId} (unable to read bead description)`;
     }
   }
-}
-
-/**
- * Build the prompt for the inspect specialist.
- */
-export async function buildInspectPrompt(context: InspectContext): Promise<string> {
+}async function buildInspectPromptPromise(context: InspectContext): Promise<string> {
   const templatePath = join(__dirname, 'prompts', 'inspect-agent.md');
 
   if (!existsSync(templatePath)) {
@@ -113,8 +108,8 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
   const beadDescription = await getBeadDescription(context.beadId, context.workspace);
 
   // Get diff scope
-  const diffBase = await getDiffBase(context.projectKey, context.issueId, context.workspace);
-  const diffStats = await getDiffStats(context.workspace, diffBase);
+  const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
+  const diffStats = await Effect.runPromise(getDiffStats(context.workspace, diffBase));
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
@@ -132,23 +127,7 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
     .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
 
   return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
-}
-
-/**
- * PAN-1048 R1: spawn the inspect sub-role for a bead.
- *
- * Replaces the legacy spawnEphemeralSpecialist call. Inspect is a work
- * sub-role: ephemeral, single-bead-scoped, runs the
- * .claude/agents/inspect.md (or inspect-deep.md) Claude Code subagent
- * definition in its own tmux session, signals back via pan tell. None of
- * the heavy specialist registry/run-log/grace machinery applies here, so
- * we use a minimal launcher path instead of the deleted generic
- * specialist dispatcher.
- *
- * Model resolves through resolveModel('work', 'inspect') (or 'inspect-deep'),
- * so the workhorse cascade and per-sub-role overrides work as designed.
- */
-export async function spawnInspectAgent(
+}async function spawnInspectAgentPromise(
   context: InspectContext,
   opts: { deep?: boolean } = {},
 ): Promise<{
@@ -164,13 +143,13 @@ export async function spawnInspectAgent(
   const tmuxSession = `inspect-${issueLower}-${beadSlug}`;
 
   try {
-    if (await Effect.runPromise(sessionExistsAsyncEffect(tmuxSession))) {
+    if (await Effect.runPromise(sessionExists(tmuxSession))) {
       // Stale session left behind by a previous inspection run — clear it.
-      await Effect.runPromise(killSessionAsyncEffect(tmuxSession)).catch(() => {});
+      await Effect.runPromise(killSession(tmuxSession)).catch(() => {});
     }
 
-    const prompt = await buildInspectPrompt(context);
-    setReviewStatus(context.issueId.toUpperCase(), {
+    const prompt = await Effect.runPromise(buildInspectPrompt(context));
+    setReviewStatusSync(context.issueId.toUpperCase(), {
       inspectStatus: 'inspecting',
       inspectNotes: `Inspecting bead ${context.beadId}`,
     });
@@ -181,11 +160,11 @@ export async function spawnInspectAgent(
 
     // Provider env (BASE_URL/AUTH_TOKEN) for non-Anthropic models routed via cliproxy.
     const providerEnv = await getProviderEnvForModel(model);
-    const provider = getProviderForModel(model as ModelId);
+    const provider = getProviderForModelSync(model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuth(provider, context.workspace);
+      setupCredentialFileAuthSync(provider, context.workspace);
     } else {
-      clearCredentialFileAuth(context.workspace);
+      clearCredentialFileAuthSync(context.workspace);
     }
 
     // Per-agent dir for prompt + launcher artifacts.
@@ -199,7 +178,7 @@ export async function spawnInspectAgent(
     const sessionId = randomUUID();
     writeFileSync(
       launcherScript,
-      generateLauncherScript({
+      generateLauncherScriptSync({
         role: 'work',
         workingDir: context.workspace,
         setTerminalEnv: true,
@@ -217,7 +196,7 @@ export async function spawnInspectAgent(
         // when claude.permissionMode === 'bypass'. Without it, the inspect subagent
         // falls back to Claude Code's default prompting behavior and may hit
         // permission prompts mid-run — exactly what happened in the PAN-1059 incident.
-        baseCommand: `claude${bypassPrefixForAgentFlag()} --agent .claude/agents/${subRole}.md`,
+        baseCommand: `claude${bypassPrefixForAgentFlagSync()} --agent .claude/agents/${subRole}.md`,
         sessionId,
         model,
       }),
@@ -231,7 +210,7 @@ export async function spawnInspectAgent(
       ...providerEnv,
     };
 
-    await Effect.runPromise(createSessionAsyncEffect(
+    await Effect.runPromise(createSession(
       tmuxSession,
       context.workspace,
       `bash '${launcherScript}'`,
@@ -259,13 +238,7 @@ export async function spawnInspectAgent(
       error: message,
     };
   }
-}
-
-/**
- * Handle inspect completion — called when the inspect specialist signals done.
- * Saves checkpoint on PASS.
- */
-export async function onInspectComplete(
+}async function onInspectCompletePromise(
   projectKey: string,
   issueId: string,
   beadId: string,
@@ -273,7 +246,7 @@ export async function onInspectComplete(
   workspacePath: string
 ): Promise<void> {
   if (status === 'passed') {
-    const commitSha = await getCurrentHead(workspacePath);
+    const commitSha = await Effect.runPromise(getCurrentHead(workspacePath));
     saveCheckpoint(projectKey, issueId, beadId, commitSha);
     console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
 
@@ -290,11 +263,11 @@ export async function onInspectComplete(
  * underlying git/bd helpers throw (the legacy Promise version throws on the
  * missing-template path).
  */
-export function buildInspectPromptEffect(
+export function buildInspectPrompt(
   context: InspectContext,
 ): Effect.Effect<string, ProcessSpawnError> {
   return Effect.tryPromise({
-    try: () => buildInspectPrompt(context),
+    try: () => buildInspectPromptPromise(context),
     catch: (cause) =>
       new ProcessSpawnError({
         command: 'inspect-agent',
@@ -309,7 +282,7 @@ export function buildInspectPromptEffect(
  * Effect-typed variant of {@link spawnInspectAgent}. Never fails — the legacy
  * Promise returns `{ success: false, error }` instead of throwing.
  */
-export function spawnInspectAgentEffect(
+export function spawnInspectAgent(
   context: InspectContext,
   opts: { deep?: boolean } = {},
 ): Effect.Effect<{
@@ -319,18 +292,18 @@ export function spawnInspectAgentEffect(
   message: string;
   error?: string;
 }> {
-  return Effect.promise(() => spawnInspectAgent(context, opts));
+  return Effect.promise(() => spawnInspectAgentPromise(context, opts));
 }
 
 /**
  * Effect-typed variant of {@link onInspectComplete}. Never fails.
  */
-export function onInspectCompleteEffect(
+export function onInspectComplete(
   projectKey: string,
   issueId: string,
   beadId: string,
   status: 'passed' | 'failed',
   workspacePath: string,
 ): Effect.Effect<void> {
-  return Effect.promise(() => onInspectComplete(projectKey, issueId, beadId, status, workspacePath));
+  return Effect.promise(() => onInspectCompletePromise(projectKey, issueId, beadId, status, workspacePath));
 }

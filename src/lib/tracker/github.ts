@@ -33,7 +33,7 @@ function parseIssueNumber(id: string): number {
  * Treats HTTP 404 as IssueNotFoundError; everything else becomes
  * GitHubApiError carrying the status code (or 0 for network failures).
  */
-function octokitToEffect<A>(
+function octokitToProgram<A>(
   operation: string,
   resourceId: string,
   thunk: () => Promise<A>,
@@ -112,7 +112,7 @@ export class GitHubTracker implements IssueTracker {
       return Effect.fail(new IssueNotFoundError({ id, tracker: 'github' }));
     }
 
-    return octokitToEffect('getIssue', id, () =>
+    return octokitToProgram('getIssue', id, () =>
       this.octokit.issues.get({
         owner: this.owner,
         repo: this.repo,
@@ -145,7 +145,7 @@ export class GitHubTracker implements IssueTracker {
       updatePayload.assignees = update.assignee ? [update.assignee] : [];
     }
 
-    return octokitToEffect('updateIssue', id, () =>
+    return octokitToProgram('updateIssue', id, () =>
       this.octokit.issues.update({
         owner: this.owner,
         repo: this.repo,

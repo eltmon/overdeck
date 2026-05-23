@@ -10,13 +10,13 @@ import { Effect } from 'effect';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { normalizeReviewStatus } from './review-status-normalize.js';
+import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import type { ReviewStatus } from './review-status.js';
 import { FsError } from './errors.js';
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
-export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
+export function loadReviewStatusesSync(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
   try {
     if (existsSync(filePath)) {
       return JSON.parse(readFileSync(filePath, 'utf-8'));
@@ -27,7 +27,7 @@ export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<strin
   return {};
 }
 
-export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
+export function saveReviewStatusesSync(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
   try {
     const dir = dirname(filePath);
     if (!existsSync(dir)) {
@@ -39,12 +39,12 @@ export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, fileP
   }
 }
 
-export function setReviewStatus(
+export function setReviewStatusSync(
   issueId: string,
   update: Partial<ReviewStatus>,
   filePath = DEFAULT_STATUS_FILE,
 ): ReviewStatus {
-  const statuses = loadReviewStatuses(filePath);
+  const statuses = loadReviewStatusesSync(filePath);
   const existing = statuses[issueId] || {
     issueId,
     reviewStatus: 'pending' as const,
@@ -88,7 +88,7 @@ export function setReviewStatus(
         ? update.readyForMerge
         : merged.readyForMerge ?? false);
 
-  const updated: ReviewStatus = normalizeReviewStatus({
+  const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
     issueId,
     updatedAt: now,
@@ -97,19 +97,19 @@ export function setReviewStatus(
   });
 
   statuses[issueId] = updated;
-  saveReviewStatuses(statuses, filePath);
+  saveReviewStatusesSync(statuses, filePath);
   return updated;
 }
 
-export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
-  const statuses = loadReviewStatuses(filePath);
+export function getReviewStatusSync(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
+  const statuses = loadReviewStatusesSync(filePath);
   return statuses[issueId] || null;
 }
 
-export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
-  const statuses = loadReviewStatuses(filePath);
+export function clearReviewStatusSync(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
+  const statuses = loadReviewStatusesSync(filePath);
   delete statuses[issueId];
-  saveReviewStatuses(statuses, filePath);
+  saveReviewStatusesSync(statuses, filePath);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -118,48 +118,48 @@ export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FIL
 // can distinguish a real failure from an empty-result.
 
 /** Load all statuses from disk. Pure (logs but does not throw). */
-export const loadReviewStatusesEffect = (
+export const loadReviewStatuses = (
   filePath: string = DEFAULT_STATUS_FILE,
 ): Effect.Effect<Record<string, ReviewStatus>> =>
-  Effect.sync(() => loadReviewStatuses(filePath));
+  Effect.sync(() => loadReviewStatusesSync(filePath));
 
 /** Persist all statuses to disk; surfaces FsError on failure. */
-export const saveReviewStatusesEffect = (
+export const saveReviewStatuses = (
   statuses: Record<string, ReviewStatus>,
   filePath: string = DEFAULT_STATUS_FILE,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => saveReviewStatuses(statuses, filePath),
+    try: () => saveReviewStatusesSync(statuses, filePath),
     catch: (cause) =>
       new FsError({ path: filePath, operation: 'save-review-statuses', cause }),
   });
 
 /** Atomically merge + persist a single issue's review status. */
-export const setReviewStatusEffect = (
+export const setReviewStatus = (
   issueId: string,
   update: Partial<ReviewStatus>,
   filePath: string = DEFAULT_STATUS_FILE,
 ): Effect.Effect<ReviewStatus, FsError> =>
   Effect.try({
-    try: () => setReviewStatus(issueId, update, filePath),
+    try: () => setReviewStatusSync(issueId, update, filePath),
     catch: (cause) =>
       new FsError({ path: filePath, operation: 'set-review-status', cause }),
   });
 
 /** Read one issue's status. Pure. */
-export const getReviewStatusEffect = (
+export const getReviewStatus = (
   issueId: string,
   filePath: string = DEFAULT_STATUS_FILE,
 ): Effect.Effect<ReviewStatus | null> =>
-  Effect.sync(() => getReviewStatus(issueId, filePath));
+  Effect.sync(() => getReviewStatusSync(issueId, filePath));
 
 /** Remove one issue's status from disk. */
-export const clearReviewStatusEffect = (
+export const clearReviewStatus = (
   issueId: string,
   filePath: string = DEFAULT_STATUS_FILE,
 ): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => clearReviewStatus(issueId, filePath),
+    try: () => clearReviewStatusSync(issueId, filePath),
     catch: (cause) =>
       new FsError({ path: filePath, operation: 'clear-review-status', cause }),
   });

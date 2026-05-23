@@ -53,13 +53,13 @@ function makeRawIssue(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -92,7 +92,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue('MIN-1');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
       expect((err as any).tracker).toBe('linear');
     });
@@ -110,7 +110,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue(UUID_A);
       }).pipe(Effect.provide(LinearClientLive));
 
-      const issue = await runEffect(program);
+      const issue = await runProgram(program);
       expect(issue.id).toBe(UUID_A);
       expect(issue.identifier).toBe('MIN-5');
       expect(mockSdkIssue).toHaveBeenCalledWith(UUID_A);
@@ -127,7 +127,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue('MIN-1');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const issue = await runEffect(program);
+      const issue = await runProgram(program);
       expect(issue.identifier).toBe('MIN-1');
       expect(mockSdkSearchIssues).toHaveBeenCalledWith('MIN-1', { first: 1 });
     });
@@ -146,7 +146,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue('MIN-7');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const issue = await runEffect(program);
+      const issue = await runProgram(program);
       expect(issue.identifier).toBe('MIN-7');
       expect(issue.labels).toEqual([{ id: 'label-1', name: 'bug' }]);
     });
@@ -161,7 +161,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue(UUID_B);
       }).pipe(Effect.provide(LinearClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
       expect((err as any).id).toBe(UUID_B);
     });
@@ -176,7 +176,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue('MIN-999');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
     });
 
@@ -190,7 +190,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getIssue(UUID_A);
       }).pipe(Effect.provide(LinearClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
       expect((err as any).message).toContain('Network timeout');
     });
@@ -215,7 +215,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getTeamStates('team-1');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const states = await runEffect(program);
+      const states = await runProgram(program);
       expect(states).toHaveLength(2);
       expect(states[0].name).toBe('In Progress');
       expect(states[1].type).toBe('completed');
@@ -231,7 +231,7 @@ describe('LinearClient Effect service', () => {
         yield* client.updateState(UUID_A, 'state-uuid');
       }).pipe(Effect.provide(LinearClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockSdkUpdateIssue).toHaveBeenCalledWith(UUID_A, { stateId: 'state-uuid' });
     });
   });
@@ -245,7 +245,7 @@ describe('LinearClient Effect service', () => {
         yield* client.addComment(UUID_A, 'hello world');
       }).pipe(Effect.provide(LinearClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockSdkCreateComment).toHaveBeenCalledWith({
         issueId: UUID_A,
         body: 'hello world',
@@ -266,7 +266,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.findOrCreateLabel('team-1', 'merged');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const label = await runEffect(program);
+      const label = await runProgram(program);
       expect(label.id).toBe('label-1');
       expect(mockSdkCreateIssueLabel).not.toHaveBeenCalled();
     });
@@ -284,7 +284,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.findOrCreateLabel('team-1', 'merged', '#00c000');
       }).pipe(Effect.provide(LinearClientLive));
 
-      const label = await runEffect(program);
+      const label = await runProgram(program);
       expect(label.id).toBe('label-new');
       expect(mockSdkCreateIssueLabel).toHaveBeenCalledWith({
         teamId: 'team-1',
@@ -321,7 +321,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getComments(UUID_A);
       }).pipe(Effect.provide(LinearClientLive));
 
-      const comments = await runEffect(program);
+      const comments = await runProgram(program);
       expect(comments).toHaveLength(2);
       expect(comments[0]).toEqual({ body: 'Nice work!', author: 'Alice', createdAt: '2025-01-01T00:00:00.000Z' });
       expect(comments[1]).toEqual({ body: 'LGTM', author: 'Bob', createdAt: '2025-01-02T00:00:00.000Z' });
@@ -340,7 +340,7 @@ describe('LinearClient Effect service', () => {
         return yield* client.getComments(UUID_A);
       }).pipe(Effect.provide(LinearClientLive));
 
-      const comments = await runEffect(program);
+      const comments = await runProgram(program);
       expect(comments).toHaveLength(0);
     });
   });

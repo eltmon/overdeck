@@ -134,9 +134,3 @@ export function writeWorkspaceContinue(
     return next
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
-
-/** @deprecated use `readWorkspaceContinue` (now returns an Effect). */
-export const readWorkspaceContinueAsync = readWorkspaceContinue
-
-/** @deprecated use `writeWorkspaceContinue` (now returns an Effect). */
-export const writeWorkspaceContinueAsync = writeWorkspaceContinue

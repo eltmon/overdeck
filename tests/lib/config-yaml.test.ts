@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfig, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath } from '../../src/lib/config-yaml.js';
+import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath } from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -24,7 +24,7 @@ describe('config-yaml', () => {
   describe('loadConfig', () => {
     it.skip('should return default config when no config files exist', () => {
       // Skipped: Cannot isolate from real config file without mocking module-level imports
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config).toBeDefined();
       expect(config.preset).toBe('balanced');
@@ -49,7 +49,7 @@ models:
       // Mock the global config path
       process.env.HOME = testDir;
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.preset).toBe('premium');
       expect(config.enabledProviders.has('openai')).toBe(true);
@@ -77,7 +77,7 @@ models:
 `;
       writeFileSync(testProjectConfig, projectYaml, 'utf-8');
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.preset).toBe('premium');
       expect(config.overrides['issue-agent:exploration']).toBe('claude-opus-4-6');
@@ -92,7 +92,7 @@ api_keys:
 `;
       writeFileSync(testGlobalConfig, yamlContent, 'utf-8');
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.apiKeys.openai).toBe('sk-test-123');
       expect(config.apiKeys.google).toBe('AIza-test-456');
@@ -110,7 +110,7 @@ api_keys:
 `;
       writeFileSync(testGlobalConfig, yamlContent, 'utf-8');
 
-      const config = loadConfig();
+      const config = loadConfigSync();
 
       expect(config.apiKeys.openai).toBe('sk-from-env');
 

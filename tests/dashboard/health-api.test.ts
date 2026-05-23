@@ -20,8 +20,9 @@ const { activeSessions } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
-  sessionExistsAsyncEffect: (name: string) => Effect.succeed(activeSessions.has(name)),
-  capturePaneAsyncEffect: vi.fn(() => Effect.succeed('')),
+  sessionExists: (name: string) => Effect.succeed(activeSessions.has(name)),
+  sessionExistsSync: (name: string) => Effect.succeed(activeSessions.has(name)),
+  capturePane: vi.fn(() => Effect.succeed('')),
   getTmuxConfigMode: vi.fn(() => 'inherit-user'),
   getManagedTmuxSocketName: vi.fn(() => 'panopticon'),
   getManagedTmuxConfigPath: vi.fn(() => '/tmp/panopticon.tmux.conf'),
@@ -31,7 +32,10 @@ vi.mock('../../src/lib/tmux.js', () => ({
   buildTmuxCommandString: vi.fn((args: string[]) => ['tmux', ...args].join(' ')),
 }));
 
-import { determineHealthStatusAsync } from '../../src/dashboard/lib/health-filtering.js';
+import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
+
+const runDetermineHealthStatus = (...args: Parameters<typeof determineHealthStatus>) =>
+  Effect.runPromise(determineHealthStatus(...args));
 
 let testDir: string;
 
@@ -76,7 +80,7 @@ describe('health-api', () => {
     it('should exclude agents with status "stopped"', async () => {
       const agentDir = createAgent('agent-stopped', 'stopped');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-stopped',
         join(agentDir, 'state.json'),
         activeSessions
@@ -88,7 +92,7 @@ describe('health-api', () => {
     it('should exclude agents with status "completed"', async () => {
       const agentDir = createAgent('agent-completed', 'completed');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-completed',
         join(agentDir, 'state.json'),
         activeSessions
@@ -101,7 +105,7 @@ describe('health-api', () => {
       const agentDir = createAgent('agent-no-state');
       // Don't create state.json (status param undefined creates dir only)
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-no-state',
         join(agentDir, 'state.json'),
         activeSessions
@@ -113,7 +117,7 @@ describe('health-api', () => {
     it('should show crashed agents (status "running", no tmux)', async () => {
       const agentDir = createAgent('agent-crashed', 'running');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-crashed',
         join(agentDir, 'state.json'),
         activeSessions
@@ -127,7 +131,7 @@ describe('health-api', () => {
     it('should show crashed agents (status "in_progress", no tmux)', async () => {
       const agentDir = createAgent('agent-crashed-2', 'in_progress');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-crashed-2',
         join(agentDir, 'state.json'),
         activeSessions
@@ -144,7 +148,7 @@ describe('health-api', () => {
       createTmuxSession(agentName);
 
       try {
-        const result = await determineHealthStatusAsync(
+        const result = await runDetermineHealthStatus(
           agentName,
           join(agentDir, 'state.json'),
           activeSessions
@@ -165,7 +169,7 @@ describe('health-api', () => {
       createTmuxSession(agentName);
 
       try {
-        const result = await determineHealthStatusAsync(
+        const result = await runDetermineHealthStatus(
           agentName,
           join(agentDir, 'state.json'),
           activeSessions
@@ -186,7 +190,7 @@ describe('health-api', () => {
       createTmuxSession(agentName);
 
       try {
-        const result = await determineHealthStatusAsync(
+        const result = await runDetermineHealthStatus(
           agentName,
           join(agentDir, 'state.json'),
           activeSessions
@@ -204,7 +208,7 @@ describe('health-api', () => {
       const agentDir = createAgent('agent-corrupted-state');
       writeFileSync(join(agentDir, 'state.json'), 'not valid json{{{');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-corrupted-state',
         join(agentDir, 'state.json'),
         activeSessions
@@ -217,7 +221,7 @@ describe('health-api', () => {
     it('should treat unknown status values as running (crash if no tmux)', async () => {
       const agentDir = createAgent('agent-unknown-status', 'weird_status_value');
 
-      const result = await determineHealthStatusAsync(
+      const result = await runDetermineHealthStatus(
         'agent-unknown-status',
         join(agentDir, 'state.json'),
         activeSessions

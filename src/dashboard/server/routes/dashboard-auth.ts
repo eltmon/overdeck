@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
@@ -61,7 +61,7 @@ export function dashboardSessionCookieHeader(options: { secure?: boolean } = {})
 }
 
 export function hasDashboardInternalTokenHeaders(headers: HeaderMap): boolean {
-  const expected = getInternalToken();
+  const expected = getInternalTokenSync();
   if (!expected) return false;
 
   const internalHeader = getHeaderFromMap(headers, INTERNAL_TOKEN_HEADER);
@@ -132,7 +132,7 @@ export function rejectUnsafeDashboardMutationRequest(
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
-  const expected = getInternalToken();
+  const expected = getInternalTokenSync();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
@@ -145,7 +145,7 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
 export function rejectUnauthorizedDashboardRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
-  const expected = getInternalToken();
+  const expected = getInternalTokenSync();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }

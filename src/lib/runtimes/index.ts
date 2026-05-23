@@ -7,27 +7,27 @@
 
 export * from './types.js';
 export {
+  ClaudeCodeRuntimeSync,
   ClaudeCodeRuntime,
-  ClaudeCodeRuntimeEffect,
+  createClaudeCodeRuntimeSync,
   createClaudeCodeRuntime,
-  createClaudeCodeRuntimeEffect,
 } from './claude-code.js';
 export {
+  PiRuntimeSync,
   PiRuntime,
-  PiRuntimeEffect,
+  createPiRuntimeSync,
   createPiRuntime,
-  createPiRuntimeEffect,
   PiSpawnTimeout,
 } from './pi.js';
 
 import type {
-  AgentRuntime,
+  AgentRuntimeSync,
   RuntimeName,
   RuntimeRegistry as RuntimeRegistryInterface,
 } from './types.js';
-import { getAgentState } from '../agents.js';
-import { createClaudeCodeRuntime } from './claude-code.js';
-import { createPiRuntime } from './pi.js';
+import { getAgentStateSync } from '../agents.js';
+import { createClaudeCodeRuntimeSync } from './claude-code.js';
+import { createPiRuntimeSync } from './pi.js';
 
 /**
  * Runtime registry implementation
@@ -35,26 +35,26 @@ import { createPiRuntime } from './pi.js';
  * Manages multiple runtime adapters and provides lookup by agent ID.
  */
 export class RuntimeRegistry implements RuntimeRegistryInterface {
-  private runtimes: Map<RuntimeName, AgentRuntime> = new Map();
+  private runtimes: Map<RuntimeName, AgentRuntimeSync> = new Map();
 
   /**
    * Register a runtime adapter
    */
-  register(runtime: AgentRuntime): void {
+  register(runtime: AgentRuntimeSync): void {
     this.runtimes.set(runtime.name, runtime);
   }
 
   /**
    * Get a runtime by name
    */
-  get(name: RuntimeName): AgentRuntime | undefined {
+  get(name: RuntimeName): AgentRuntimeSync | undefined {
     return this.runtimes.get(name);
   }
 
   /**
    * Get all registered runtimes
    */
-  getAll(): AgentRuntime[] {
+  getAll(): AgentRuntimeSync[] {
     return Array.from(this.runtimes.values());
   }
 
@@ -66,8 +66,8 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
    * from pre-PAN-636 wire format), we fall back to the claude-code runtime
    * to preserve back-compat (PAN-636 ac2).
    */
-  getRuntimeForAgent(agentId: string): AgentRuntime | null {
-    const state = getAgentState(agentId);
+  getRuntimeForAgent(agentId: string): AgentRuntimeSync | null {
+    const state = getAgentStateSync(agentId);
     if (!state) {
       return null;
     }
@@ -95,8 +95,8 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry = new RuntimeRegistry();
 
     // Register Claude Code (default) and Pi runtimes (PAN-636).
-    globalRegistry.register(createClaudeCodeRuntime());
-    globalRegistry.register(createPiRuntime());
+    globalRegistry.register(createClaudeCodeRuntimeSync());
+    globalRegistry.register(createPiRuntimeSync());
   }
   return globalRegistry;
 }
@@ -113,13 +113,13 @@ export function setGlobalRegistry(registry: RuntimeRegistry): void {
 /**
  * Helper to get a runtime by name from the global registry
  */
-export function getRuntime(name: RuntimeName): AgentRuntime | undefined {
+export function getRuntime(name: RuntimeName): AgentRuntimeSync | undefined {
   return getGlobalRegistry().get(name);
 }
 
 /**
  * Helper to get the runtime for an agent from the global registry
  */
-export function getRuntimeForAgent(agentId: string): AgentRuntime | null {
+export function getRuntimeForAgent(agentId: string): AgentRuntimeSync | null {
   return getGlobalRegistry().getRuntimeForAgent(agentId);
 }

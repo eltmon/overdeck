@@ -244,18 +244,18 @@ describe('ReadModel diff summaries', () => {
 describe('ReadModel checkpoint reconciliation', () => {
   it('caps checkpoint reconciliation before diffing old history while preserving absolute turn counts', async () => {
     const checkpoints = Array.from({ length: 205 }, (_, index) => `turn-${index + 1}`)
-    const listCheckpoints = vi.fn().mockResolvedValue(checkpoints)
+    const listCheckpoints = vi.fn(() => Effect.succeed(checkpoints))
     // Real signatures (PAN-checkpoint-namespacing): both helpers take agentId as the
     // second argument so refs can be scoped per-agent. Mocks must mirror that or the
     // production read-model loop never produces summaries and the test hangs.
-    const diffCheckpointFiles = vi.fn().mockImplementation(async (_workspace: string, _agentId: string, prevTurnId: string, turnId: string) => ([
+    const diffCheckpointFiles = vi.fn((_workspace: string, _agentId: string, prevTurnId: string, turnId: string) => Effect.succeed([
       { path: `${prevTurnId}-to-${turnId}.ts`, additions: 1, deletions: 0 },
     ]))
-    const getCheckpointTimestamp = vi.fn().mockImplementation(async (_workspace: string, _agentId: string, turnId: string) => {
+    const getCheckpointTimestamp = vi.fn((_workspace: string, _agentId: string, turnId: string) => {
       const turnNumber = Number.parseInt(turnId.replace('turn-', ''), 10)
-      return new Date(Date.parse('2026-05-08T05:00:00.000Z') + turnNumber * 1000).toISOString()
+      return Effect.succeed(new Date(Date.parse('2026-05-08T05:00:00.000Z') + turnNumber * 1000).toISOString())
     })
-    const deleteLegacyCheckpointRefs = vi.fn().mockResolvedValue(0)
+    const deleteLegacyCheckpointRefs = vi.fn(() => Effect.succeed(0))
 
     const summaries = await withIsolatedReadModel(
       async (readModel) => {
@@ -275,10 +275,28 @@ describe('ReadModel checkpoint reconciliation', () => {
             deleteLegacyCheckpointRefs,
           }))
           vi.doMock('../../../lib/agent-enrichment.js', () => ({
-            computeAgentEnrichment: vi.fn().mockResolvedValue(undefined),
+            computeAgentEnrichment: vi.fn(() => Effect.succeed(undefined)),
           }))
           vi.doMock('../../../lib/agents.js', () => ({
-            listRunningAgentsEffect: vi.fn(() => Effect.succeed([
+            listRunningAgents: vi.fn(() => Effect.succeed([
+              {
+                id: 'agent-reconcile',
+                issueId: 'PAN-1024',
+                workspace: '/tmp/pan-1024',
+                runtime: 'claude-code',
+                model: 'sonnet',
+                status: 'running',
+                tmuxActive: true,
+                startedAt: '2026-05-08T05:00:00.000Z',
+                lastActivity: '2026-05-08T05:00:00.000Z',
+                branch: 'feature/pan-1024',
+                costSoFar: 0,
+                sessionId: 'session-1',
+                harness: 'claude-code',
+                role: 'work',
+              },
+            ])),
+            listRunningAgentsProgram: vi.fn(() => Effect.succeed([
               {
                 id: 'agent-reconcile',
                 issueId: 'PAN-1024',

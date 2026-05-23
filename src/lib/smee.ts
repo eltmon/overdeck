@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import SmeeClient from 'smee-client';
 import { Effect } from 'effect';
-import { loadConfig } from './config.js';
+import { loadConfigSync } from './config.js';
 import { ProcessSpawnError } from './errors.js';
 
 const SMEE_URL_PATH = join(homedir(), '.panopticon', 'github-app', 'smee-url');
@@ -47,7 +47,7 @@ function getSmeeUrl(): string | null {
 }
 
 function getWebhookTarget(): string {
-  const config = loadConfig();
+  const config = loadConfigSync();
   const port = config.dashboard?.api_port ?? 3011;
   return `http://localhost:${port}/api/webhooks/github`;
 }
@@ -72,13 +72,11 @@ function scheduleRestart(): void {
 
   restartTimeout = setTimeout(() => {
     restartTimeout = null;
-    startSmeeClient().catch((err) => {
+    Effect.runPromise(startSmeeClient()).catch((err) => {
       console.error('[smee] Restart failed:', (err as Error)?.message || String(err));
     });
   }, delay);
-}
-
-export async function startSmeeClient(): Promise<void> {
+}async function startSmeeClientPromise(): Promise<void> {
   if (activeClient) {
     console.log('[smee] Already running');
     return;
@@ -119,9 +117,7 @@ export async function startSmeeClient(): Promise<void> {
     console.error('[smee] Failed to start:', (err as Error)?.message || String(err));
     scheduleRestart();
   }
-}
-
-export async function stopSmeeClient(): Promise<void> {
+}async function stopSmeeClientPromise(): Promise<void> {
   isShuttingDown = true;
 
   if (restartTimeout) {
@@ -142,7 +138,7 @@ export async function stopSmeeClient(): Promise<void> {
   console.log('[smee] Stopped');
 }
 
-export function isSmeeRunning(): boolean {
+export function isSmeeRunningSync(): boolean {
   return activeClient !== null;
 }
 
@@ -172,7 +168,7 @@ function readSmeePid(): number | null {
   }
 }
 
-export function isSmeeProcessRunning(): boolean {
+export function isSmeeProcessRunningSync(): boolean {
   const pid = readSmeePid();
   if (!pid) return false;
   if (isProcessAlive(pid)) return true;
@@ -181,8 +177,8 @@ export function isSmeeProcessRunning(): boolean {
   return false;
 }
 
-export function startSmeeProcess(): void {
-  if (isSmeeProcessRunning()) {
+export function startSmeeProcessSync(): void {
+  if (isSmeeProcessRunningSync()) {
     console.log('[smee] Process already running');
     return;
   }
@@ -221,7 +217,7 @@ export function startSmeeProcess(): void {
   console.log(`[smee] Started process (PID ${child.pid}) relaying to ${target}`);
 }
 
-export function stopSmeeProcess(): void {
+export function stopSmeeProcessSync(): void {
   const pid = readSmeePid();
   if (pid && isProcessAlive(pid)) {
     try {
@@ -243,9 +239,9 @@ export function stopSmeeProcess(): void {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Start the in-process smee client. Library mode. */
-export const startSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+export const startSmeeClient = (): Effect.Effect<void, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => startSmeeClient(),
+    try: () => startSmeeClientPromise(),
     catch: (cause) =>
       new ProcessSpawnError({
         command: 'smee-client',
@@ -256,9 +252,9 @@ export const startSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> 
   });
 
 /** Stop the in-process smee client. Library mode. */
-export const stopSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+export const stopSmeeClient = (): Effect.Effect<void, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => stopSmeeClient(),
+    try: () => stopSmeeClientPromise(),
     catch: (cause) =>
       new ProcessSpawnError({
         command: 'smee-client',
@@ -269,17 +265,17 @@ export const stopSmeeClientEffect = (): Effect.Effect<void, ProcessSpawnError> =
   });
 
 /** Liveness probe — true if the in-process client is connected. */
-export const isSmeeRunningEffect = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSmeeRunning());
+export const isSmeeRunning = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSmeeRunningSync());
 
 /** Start the detached smee subprocess (idempotent). */
-export const startSmeeProcessEffect = (): Effect.Effect<void> =>
-  Effect.sync(() => startSmeeProcess());
+export const startSmeeProcess = (): Effect.Effect<void> =>
+  Effect.sync(() => startSmeeProcessSync());
 
 /** Stop the detached smee subprocess and clean up the pid file. */
-export const stopSmeeProcessEffect = (): Effect.Effect<void> =>
-  Effect.sync(() => stopSmeeProcess());
+export const stopSmeeProcess = (): Effect.Effect<void> =>
+  Effect.sync(() => stopSmeeProcessSync());
 
 /** Probe the smee subprocess via its pidfile. */
-export const isSmeeProcessRunningEffect = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSmeeProcessRunning());
+export const isSmeeProcessRunning = (): Effect.Effect<boolean> =>
+  Effect.sync(() => isSmeeProcessRunningSync());

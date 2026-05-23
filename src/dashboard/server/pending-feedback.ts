@@ -10,10 +10,10 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
-import { messageAgent, getAgentStateEffect, type AgentState } from '../../lib/agents.js';
-import { getReviewStatus, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
+import { messageAgent, getAgentState, type AgentState } from '../../lib/agents.js';
+import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
 import { getPanopticonHome } from '../../lib/paths.js';
-import { emitActivityEntry } from '../../lib/activity-logger.js';
+import { emitActivityEntrySync } from '../../lib/activity-logger.js';
 
 const PENDING_FEEDBACK_FILE = join(getPanopticonHome(), 'pending-feedback-deliveries.json');
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -109,15 +109,15 @@ export async function processPendingFeedbackDeliveries(options?: {
   _deliver?: (agentId: string, message: string) => Promise<void>;
   _getAgentState?: (agentId: string) => Promise<AgentState | null>;
   _loadStatuses?: typeof loadReviewStatuses;
-  _getStatus?: typeof getReviewStatus;
+  _getStatus?: typeof getReviewStatusSync;
 }): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentStateEffect(agentId)));
+  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentState(agentId)));
   const loadStatuses = options?._loadStatuses ?? loadReviewStatuses;
-  const getStatus = options?._getStatus ?? getReviewStatus;
+  const getStatus = options?._getStatus ?? getReviewStatusSync;
 
   if (!existsSync(filePath)) return;
 
@@ -149,7 +149,7 @@ export async function processPendingFeedbackDeliveries(options?: {
 
     try {
       await deliver(delivery.agentId, delivery.message);
-      emitActivityEntry({
+      emitActivityEntrySync({
         source: 'dashboard',
         level: 'warn',
         message: `${delivery.issueId} — replayed missed ${delivery.kind} feedback after restart`,

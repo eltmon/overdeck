@@ -31,7 +31,7 @@ import {
   getRemoteAgentOutput,
   sendToRemoteAgent,
 } from '../../../lib/remote/index.js';
-import { loadConfig as loadPanConfig } from '../../../lib/config.js';
+import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
@@ -202,8 +202,8 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
 
     yield* Effect.tryPromise({
       try: async () => {
-        await fly.startVm(metadata.vmName!);
-        await fly.ssh(metadata.vmName!, 'cd /workspace && docker compose up -d 2>/dev/null || true');
+        await Effect.runPromise(fly.startVm(metadata.vmName!));
+        await Effect.runPromise(fly.ssh(metadata.vmName!, 'cd /workspace && docker compose up -d 2>/dev/null || true'));
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
@@ -233,8 +233,8 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
 
     yield* Effect.tryPromise({
       try: async () => {
-        await fly.ssh(metadata.vmName!, 'docker compose down 2>/dev/null || true');
-        await fly.stopVm(metadata.vmName!);
+        await Effect.runPromise(fly.ssh(metadata.vmName!, 'docker compose down 2>/dev/null || true'));
+        await Effect.runPromise(fly.stopVm(metadata.vmName!));
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });

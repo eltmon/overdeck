@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 /**
  * Specialist Done Command
  *
@@ -13,8 +14,8 @@
 
 import chalk from 'chalk';
 import {
-  setReviewStatus,
-  getReviewStatus,
+  setReviewStatusSync,
+  getReviewStatusSync,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 
@@ -71,10 +72,10 @@ export async function doneCommand(
         // Included in `update` so it lands atomically before setReviewStatus
         // evaluates canSkipTests.
         try {
-          const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+          const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
           const { existsSync } = await import('node:fs');
           const { join } = await import('node:path');
-          const project = resolveProjectFromIssue(normalizedIssueId);
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
             const workspacePath = join(
               project.projectPath,
@@ -83,7 +84,7 @@ export async function doneCommand(
             );
             if (existsSync(workspacePath)) {
               const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-              const { HEAD } = await getWorkspaceGitInfo(workspacePath);
+              const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
               if (HEAD) update.reviewedAtCommit = HEAD;
             }
           }
@@ -160,17 +161,17 @@ export async function doneCommand(
       break;
   }
 
-  const status = setReviewStatus(normalizedIssueId, update);
+  const status = setReviewStatusSync(normalizedIssueId, update);
 
   if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      await deliverReviewVerdictFeedback({
+      await Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: status.prUrl,
-      });
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));

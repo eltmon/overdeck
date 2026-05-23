@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from 'fs';
 import { readFile, access } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfigSync } from './config.js';
 
 /**
  * Detect test command from project structure.
@@ -24,9 +24,9 @@ import { loadCloisterConfig } from './config.js';
  *
  * Returns 'auto' if no test command could be detected.
  */
-export function detectTestCommand(projectPath: string): string {
+export function detectTestCommandSync(projectPath: string): string {
   try {
-    const config = loadCloisterConfig();
+    const config = loadCloisterConfigSync();
     if (config.specialists?.test_agent?.test_command) {
       return config.specialists.test_agent.test_command;
     }
@@ -89,19 +89,19 @@ const fileExists = (path: string): Effect.Effect<boolean> =>
   }).pipe(Effect.orElseSucceed(() => false));
 
 /**
- * Effect variant of {@link detectTestCommand}. Uses `fs/promises` instead of
+ * Effect variant of {@link detectTestCommandSync}. Uses `fs/promises` instead of
  * sync filesystem APIs. Same priority order: config → package.json → file
  * patterns. Errors are swallowed (returns `'auto'`) to match the original
  * permissive contract.
  */
-export const detectTestCommandEffect = (
+export const detectTestCommand = (
   projectPath: string,
 ): Effect.Effect<string> =>
   Effect.gen(function* () {
     // 1. Explicit config
     const fromConfig = yield* Effect.sync(() => {
       try {
-        const config = loadCloisterConfig();
+        const config = loadCloisterConfigSync();
         return config.specialists?.test_agent?.test_command ?? null;
       } catch {
         return null;

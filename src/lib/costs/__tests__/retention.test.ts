@@ -6,9 +6,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { pruneOldEvents, needsPruning, getRetentionStatus, RetentionStats } from '../retention.js';
-import { appendCostEvent, readEvents, CostEvent, getEventsFilePath } from '../events.js';
-import { rebuildCache, loadCache } from '../aggregator.js';
+import { pruneOldEventsSync, needsPruningSync, getRetentionStatusSync, RetentionStats } from '../retention.js';
+import { appendCostEventSync, readEventsSync, CostEvent, getEventsFilePath } from '../events.js';
+import { rebuildCacheSync, loadCacheSync } from '../aggregator.js';
 
 // Redirect process.env.HOME to an isolated temp dir so the running dashboard
 // server (which writes to the real ~/.panopticon/costs) cannot pollute tests.
@@ -38,7 +38,7 @@ describe('Retention Management', () => {
       const recent = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
 
       // Add old event
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -54,7 +54,7 @@ describe('Retention Management', () => {
       });
 
       // Add recent event
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -69,14 +69,14 @@ describe('Retention Management', () => {
         cost: 0.02
       });
 
-      const stats = pruneOldEvents(90);
+      const stats = pruneOldEventsSync(90);
 
       expect(stats.totalEvents).toBe(2);
       expect(stats.eventsRemoved).toBe(1);
       expect(stats.eventsRetained).toBe(1);
 
       // Verify only recent event remains
-      const events = readEvents();
+      const events = readEventsSync();
       expect(events.length).toBe(1);
       expect(events[0].issueId).toBe('TEST-2');
     });
@@ -84,7 +84,7 @@ describe('Retention Management', () => {
     it('should handle no events to prune', () => {
       const recent = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -99,14 +99,14 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      const stats = pruneOldEvents(90);
+      const stats = pruneOldEventsSync(90);
 
       expect(stats.eventsRemoved).toBe(0);
       expect(stats.eventsRetained).toBe(1);
     });
 
     it('should handle empty events file', () => {
-      const stats = pruneOldEvents(90);
+      const stats = pruneOldEventsSync(90);
 
       expect(stats.totalEvents).toBe(0);
       expect(stats.eventsRemoved).toBe(0);
@@ -119,7 +119,7 @@ describe('Retention Management', () => {
       const old1 = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
       const old2 = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old2.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -134,7 +134,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old1.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -149,13 +149,13 @@ describe('Retention Management', () => {
         cost: 0.02
       });
 
-      const stats = pruneOldEvents(90);
+      const stats = pruneOldEventsSync(90);
 
       expect(stats.totalEvents).toBe(2);
       expect(stats.eventsRemoved).toBe(2);
       expect(stats.eventsRetained).toBe(0);
 
-      const events = readEvents();
+      const events = readEventsSync();
       expect(events.length).toBe(0);
     });
 
@@ -165,7 +165,7 @@ describe('Retention Management', () => {
       const recent = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
       // Add events
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -180,7 +180,7 @@ describe('Retention Management', () => {
         cost: 50.0
       });
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -196,13 +196,13 @@ describe('Retention Management', () => {
       });
 
       // Build cache
-      rebuildCache();
+      rebuildCacheSync();
 
       // Prune old events
-      pruneOldEvents(90);
+      pruneOldEventsSync(90);
 
       // Verify cache was rebuilt
-      const cache = loadCache();
+      const cache = loadCacheSync();
       expect(cache.issues['TEST-1']).toBeUndefined(); // Old issue removed
       expect(cache.issues['TEST-2']).toBeDefined(); // Recent issue kept
       expect(cache.issues['TEST-2'].totalCost).toBeCloseTo(25.0, 6);
@@ -213,7 +213,7 @@ describe('Retention Management', () => {
     it('should detect when pruning is needed', () => {
       const old = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -228,13 +228,13 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      expect(needsPruning(90)).toBe(true);
+      expect(needsPruningSync(90)).toBe(true);
     });
 
     it('should detect when pruning is not needed', () => {
       const recent = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -249,14 +249,14 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      expect(needsPruning(90)).toBe(false);
+      expect(needsPruningSync(90)).toBe(false);
     });
 
     it('should return correct retention status', () => {
       const old = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
       const recent = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -271,7 +271,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -286,7 +286,7 @@ describe('Retention Management', () => {
         cost: 0.02
       });
 
-      const status = getRetentionStatus(90);
+      const status = getRetentionStatusSync(90);
 
       expect(status.totalEvents).toBe(2);
       expect(status.oldestEventTs).toBe(old.toISOString());
@@ -296,7 +296,7 @@ describe('Retention Management', () => {
     });
 
     it('should handle empty state in retention status', () => {
-      const status = getRetentionStatus(90);
+      const status = getRetentionStatusSync(90);
 
       expect(status.totalEvents).toBe(0);
       expect(status.oldestEventTs).toBeNull();
@@ -311,7 +311,7 @@ describe('Retention Management', () => {
       const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
       const recent = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -326,7 +326,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -341,7 +341,7 @@ describe('Retention Management', () => {
         cost: 0.02
       });
 
-      const stats = pruneOldEvents(30);
+      const stats = pruneOldEventsSync(30);
 
       expect(stats.eventsRemoved).toBe(1);
       expect(stats.eventsRetained).toBe(1);
@@ -351,7 +351,7 @@ describe('Retention Management', () => {
       const old = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
       const recent = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: old.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -366,7 +366,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-2',
@@ -381,7 +381,7 @@ describe('Retention Management', () => {
         cost: 0.02
       });
 
-      const stats = pruneOldEvents(365);
+      const stats = pruneOldEventsSync(365);
 
       expect(stats.eventsRemoved).toBe(1);
       expect(stats.eventsRetained).toBe(1);
@@ -394,7 +394,7 @@ describe('Retention Management', () => {
       // between Date.now() here and inside pruneOldEvents()
       const exactBoundary = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000 + 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: exactBoundary.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -409,7 +409,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      const stats = pruneOldEvents(90);
+      const stats = pruneOldEventsSync(90);
 
       // Event exactly at boundary should be retained (>= comparison)
       expect(stats.eventsRetained).toBe(1);
@@ -425,7 +425,7 @@ describe('Retention Management', () => {
       ];
 
       for (let i = 0; i < dates.length; i++) {
-        appendCostEvent({
+        appendCostEventSync({
           ts: dates[i].toISOString(),
           type: 'cost',
           agentId: `agent-${i}`,
@@ -441,9 +441,9 @@ describe('Retention Management', () => {
         });
       }
 
-      pruneOldEvents(90);
+      pruneOldEventsSync(90);
 
-      const events = readEvents();
+      const events = readEventsSync();
       expect(events.length).toBe(4);
 
       // Verify chronological order is preserved
@@ -455,7 +455,7 @@ describe('Retention Management', () => {
     it('should handle zero retention days', () => {
       const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
 
-      appendCostEvent({
+      appendCostEventSync({
         ts: recent.toISOString(),
         type: 'cost',
         agentId: 'agent-1',
@@ -470,7 +470,7 @@ describe('Retention Management', () => {
         cost: 0.01
       });
 
-      const stats = pruneOldEvents(0);
+      const stats = pruneOldEventsSync(0);
 
       // With 0 days retention, everything older than today should be pruned
       expect(stats.eventsRemoved).toBeGreaterThanOrEqual(0);

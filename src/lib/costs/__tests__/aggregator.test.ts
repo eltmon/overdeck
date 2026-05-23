@@ -7,17 +7,17 @@ import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  loadCache,
-  saveCache,
-  updateCacheFromEvents,
-  rebuildCache,
-  getCostsByIssue,
-  getCostsForIssue,
-  setIssueBudget,
+  loadCacheSync,
+  saveCacheSync,
+  updateCacheFromEventsSync,
+  rebuildCacheSync,
+  getCostsByIssueSync,
+  getCostsForIssueSync,
+  setIssueBudgetSync,
   getCacheStatus,
   CostCache
 } from '../aggregator.js';
-import { appendCostEvent, CostEvent } from '../events.js';
+import { appendCostEventSync, CostEvent } from '../events.js';
 
 let TEST_ROOT: string;
 const originalHomedir = process.env.HOME;
@@ -40,7 +40,7 @@ afterEach(() => {
 describe('Aggregator Cache Management', () => {
   describe('Cache Loading and Saving', () => {
     it('should create empty cache if none exists', () => {
-      const cache = loadCache();
+      const cache = loadCacheSync();
 
       expect(cache.version).toBe(3);
       expect(cache.status).toBe('live');
@@ -49,7 +49,7 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should save and load cache', () => {
-      const cache = loadCache();
+      const cache = loadCacheSync();
       cache.issues['TEST-1'] = {
         totalCost: 10.5,
         budgetWarning: false,
@@ -71,9 +71,9 @@ describe('Aggregator Cache Management', () => {
         lastUpdated: new Date().toISOString()
       };
 
-      saveCache(cache);
+      saveCacheSync(cache);
 
-      const loaded = loadCache();
+      const loaded = loadCacheSync();
       expect(loaded.issues['TEST-1']).toBeDefined();
       expect(loaded.issues['TEST-1'].totalCost).toBe(10.5);
     });
@@ -85,7 +85,7 @@ describe('Aggregator Cache Management', () => {
         JSON.stringify({ version: 1, status: 'live', issues: {} })
       );
 
-      const cache = loadCache();
+      const cache = loadCacheSync();
 
       // Should create new cache with correct version
       expect(cache.version).toBe(3);
@@ -126,7 +126,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       expect(cache.issues['TEST-1']).toBeDefined();
       expect(cache.issues['TEST-1'].totalCost).toBeCloseTo(0.03, 6);
@@ -166,7 +166,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       expect(cache.issues['TEST-2'].models['claude-sonnet-4']).toBeDefined();
       expect(cache.issues['TEST-2'].models['claude-haiku-4-5']).toBeDefined();
@@ -206,7 +206,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       expect(cache.issues['TEST-3'].providers.anthropic).toBeCloseTo(0.01, 6);
       expect(cache.issues['TEST-3'].providers.openai).toBeCloseTo(0.0125, 6);
@@ -230,7 +230,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       // Should be stored as uppercase
       expect(cache.issues['TEST-4']).toBeDefined();
@@ -258,12 +258,12 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEvents(events);
+      updateCacheFromEventsSync(events);
 
       // Set budget
-      setIssueBudget('TEST-5', 100.0);
+      setIssueBudgetSync('TEST-5', 100.0);
 
-      const cache = loadCache();
+      const cache = loadCacheSync();
       expect(cache.issues['TEST-5'].budget).toBe(100.0);
     });
 
@@ -285,10 +285,10 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEvents(events);
-      setIssueBudget('TEST-6', 100.0);
+      updateCacheFromEventsSync(events);
+      setIssueBudgetSync('TEST-6', 100.0);
 
-      const cache = loadCache();
+      const cache = loadCacheSync();
       expect(cache.issues['TEST-6'].budgetWarning).toBe(true);
     });
 
@@ -310,10 +310,10 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEvents(events);
-      setIssueBudget('TEST-7', 100.0);
+      updateCacheFromEventsSync(events);
+      setIssueBudgetSync('TEST-7', 100.0);
 
-      const cache = loadCache();
+      const cache = loadCacheSync();
       expect(cache.issues['TEST-7'].budgetWarning).toBe(false);
     });
   });
@@ -337,7 +337,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       // Cost should be rounded to 6 decimal places
       const costStr = cache.issues['TEST-8'].totalCost.toString();
@@ -368,7 +368,7 @@ describe('Aggregator Cache Management', () => {
         });
       }
 
-      const cache = updateCacheFromEvents(events);
+      const cache = updateCacheFromEventsSync(events);
 
       // Should accumulate correctly without floating point errors
       expect(cache.issues['TEST-9'].totalCost).toBeCloseTo(0.001, 6);
@@ -402,9 +402,9 @@ describe('Aggregator Cache Management', () => {
       };
 
       // Write to events file - syncCache will pick it up
-      appendCostEvent(event);
+      appendCostEventSync(event);
 
-      const issueData = getCostsForIssue('TEST-10');
+      const issueData = getCostsForIssueSync('TEST-10');
       expect(issueData).toBeDefined();
       expect(issueData?.totalCost).toBeCloseTo(0.01, 6);
     });
@@ -426,10 +426,10 @@ describe('Aggregator Cache Management', () => {
       };
 
       // Write to events file - syncCache will pick it up
-      appendCostEvent(event);
+      appendCostEventSync(event);
 
       // Should find with lowercase query
-      const issueData = getCostsForIssue('test-11');
+      const issueData = getCostsForIssueSync('test-11');
       expect(issueData).toBeDefined();
       expect(issueData?.totalCost).toBeCloseTo(0.01, 6);
     });

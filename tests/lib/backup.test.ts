@@ -56,8 +56,8 @@ describe('backup', () => {
       mkdirSync(sourceDir, { recursive: true });
       writeFileSync(join(sourceDir, 'test.txt'), 'test content');
 
-      const { createBackup } = await import('../../src/lib/backup.js');
-      const backup = createBackup([sourceDir]);
+      const { createBackupSync } = await import('../../src/lib/backup.js');
+      const backup = createBackupSync([sourceDir]);
 
       expect(backup.timestamp).toBeDefined();
       expect(backup.path).toContain(mockBackupsDir);
@@ -69,8 +69,8 @@ describe('backup', () => {
     });
 
     it('should skip non-existent directories', async () => {
-      const { createBackup } = await import('../../src/lib/backup.js');
-      const backup = createBackup(['/nonexistent/path']);
+      const { createBackupSync } = await import('../../src/lib/backup.js');
+      const backup = createBackupSync(['/nonexistent/path']);
 
       expect(backup.targets).toHaveLength(0);
     });
@@ -84,8 +84,8 @@ describe('backup', () => {
       writeFileSync(join(dir1, 'file1.txt'), 'content1');
       writeFileSync(join(dir2, 'file2.txt'), 'content2');
 
-      const { createBackup } = await import('../../src/lib/backup.js');
-      const backup = createBackup([dir1, dir2]);
+      const { createBackupSync } = await import('../../src/lib/backup.js');
+      const backup = createBackupSync([dir1, dir2]);
 
       expect(backup.targets).toContain('dir1');
       expect(backup.targets).toContain('dir2');
@@ -94,8 +94,8 @@ describe('backup', () => {
 
   describe('listBackups', () => {
     it('should return empty array when no backups exist', async () => {
-      const { listBackups } = await import('../../src/lib/backup.js');
-      const backups = listBackups();
+      const { listBackupsSync } = await import('../../src/lib/backup.js');
+      const backups = listBackupsSync();
 
       expect(backups).toEqual([]);
     });
@@ -109,8 +109,8 @@ describe('backup', () => {
       mkdirSync(join(backup1, 'skills'));
       mkdirSync(join(backup2, 'skills'));
 
-      const { listBackups } = await import('../../src/lib/backup.js');
-      const backups = listBackups();
+      const { listBackupsSync } = await import('../../src/lib/backup.js');
+      const backups = listBackupsSync();
 
       expect(backups.length).toBe(2);
       expect(backups[0].timestamp).toBe('2024-01-02T00-00-00'); // Sorted newest first
@@ -123,8 +123,8 @@ describe('backup', () => {
       mkdirSync(join(backup, 'skills'));
       mkdirSync(join(backup, 'commands'));
 
-      const { listBackups } = await import('../../src/lib/backup.js');
-      const backups = listBackups();
+      const { listBackupsSync } = await import('../../src/lib/backup.js');
+      const backups = listBackupsSync();
 
       expect(backups[0].targets).toContain('skills');
       expect(backups[0].targets).toContain('commands');
@@ -133,9 +133,9 @@ describe('backup', () => {
 
   describe('restoreBackup', () => {
     it('should throw error for non-existent backup', async () => {
-      const { restoreBackup } = await import('../../src/lib/backup.js');
+      const { restoreBackupSync } = await import('../../src/lib/backup.js');
 
-      expect(() => restoreBackup('nonexistent', {})).toThrow('Backup not found');
+      expect(() => restoreBackupSync('nonexistent', {})).toThrow('Backup not found');
     });
 
     it('should restore backup to target directories', async () => {
@@ -151,8 +151,8 @@ describe('backup', () => {
       mkdirSync(targetSkills);
       writeFileSync(join(targetSkills, 'existing.md'), 'will be replaced');
 
-      const { restoreBackup } = await import('../../src/lib/backup.js');
-      restoreBackup('2024-01-01T00-00-00', { skills: targetSkills });
+      const { restoreBackupSync } = await import('../../src/lib/backup.js');
+      restoreBackupSync('2024-01-01T00-00-00', { skills: targetSkills });
 
       // Verify restore
       expect(existsSync(join(targetSkills, 'test.md'))).toBe(true);
@@ -165,8 +165,8 @@ describe('backup', () => {
       const backup = join(mockBackupsDir, '2024-01-01T00-00-00');
       mkdirSync(backup);
 
-      const { cleanOldBackups } = await import('../../src/lib/backup.js');
-      const removed = cleanOldBackups(10);
+      const { cleanOldBackupsSync } = await import('../../src/lib/backup.js');
+      const removed = cleanOldBackupsSync(10);
 
       expect(removed).toBe(0);
       expect(existsSync(backup)).toBe(true);
@@ -179,8 +179,8 @@ describe('backup', () => {
         mkdirSync(backup);
       }
 
-      const { cleanOldBackups } = await import('../../src/lib/backup.js');
-      const removed = cleanOldBackups(3);
+      const { cleanOldBackupsSync } = await import('../../src/lib/backup.js');
+      const removed = cleanOldBackupsSync(3);
 
       expect(removed).toBe(2);
 

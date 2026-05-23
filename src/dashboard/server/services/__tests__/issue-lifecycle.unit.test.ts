@@ -16,7 +16,9 @@ const mockResolveGitHubIssue = vi.fn();
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerType: mockResolveTrackerType,
+  resolveTrackerTypeSync: mockResolveTrackerType,
   resolveGitHubIssue: mockResolveGitHubIssue,
+  resolveGitHubIssueSync: mockResolveGitHubIssue,
 }));
 
 // ─── Mock issue-service-singleton (cache patching) ────────────────────────────
@@ -28,13 +30,13 @@ vi.mock('../issue-service-singleton.js', () => ({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -141,7 +143,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-inprogress');
     });
 
@@ -154,7 +156,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'in_progress' }));
     });
 
@@ -177,7 +179,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).not.toHaveBeenCalled();
     });
   });
@@ -195,7 +197,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('org/repo#1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'in-progress');
     });
 
@@ -211,7 +213,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('org/repo#1', 'canceled');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('org', 'repo', 1, 'wontfix');
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('org', 'repo', 1);
     });
@@ -227,7 +229,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('MIN-1', 'canceled');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-canceled');
       expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'canceled' }));
     });
@@ -243,7 +245,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.close('MIN-1');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-1', 'state-done');
     });
 
@@ -256,7 +258,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.close('MIN-1');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockPatchIssue).toHaveBeenCalledWith('MIN-1', expect.objectContaining({ canonicalStatus: 'closed' }));
     });
 
@@ -272,7 +274,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.close('org/repo#42');
       }).pipe(Effect.provide(layer));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('org', 'repo', 42, 'in-review');
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('org', 'repo', 42, 'in-planning');
       expect(mockGitHubCloseIssue).toHaveBeenCalledWith('org', 'repo', 42);
@@ -329,7 +331,7 @@ describe('IssueLifecycle — integration', () => {
         yield* lifecycle.transitionTo('MIN-1', 'in_progress');
       }).pipe(Effect.provide(layer));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
     });
   });

@@ -18,7 +18,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { loadCloisterConfig, saveCloisterConfig } from '../../../lib/cloister/config.js';
+import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
@@ -132,7 +132,7 @@ const getCloisterConfigRoute = HttpRouter.add(
   'GET',
   '/api/cloister/config',
   httpHandler(Effect.try({
-    try: () => jsonResponse(loadCloisterConfig()),
+    try: () => jsonResponse(loadCloisterConfigSync()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -146,7 +146,7 @@ const putCloisterConfigRoute = HttpRouter.add(
     const updates = yield* readJsonBody;
     yield* Effect.try({
       try: () => {
-        saveCloisterConfig(updates);
+        saveCloisterConfigSync(updates);
         getCloisterService().reloadConfig();
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),

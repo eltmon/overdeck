@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,6 +14,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
   activeRunId: null as string | null,
   sessionExists: false,
+  sessionExistsSync: false,
   stoppedAgents: [] as string[],
   pauseFlywheel: vi.fn(async () => {
     flywheelLifecycleMocks.paused = true;
@@ -30,7 +32,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
-  stopAgentEffect: vi.fn(),
+  stopAgentProgram: vi.fn(),
 }));
 
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
@@ -54,35 +56,40 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
 vi.mock('../../../lib/tmux.js', async () => {
   const { Effect } = await import('effect');
   return {
-    sessionExistsAsyncEffect: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
+    sessionExists: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
+    sessionExistsSync: vi.fn(() => Effect.succeed(flywheelLifecycleMocks.sessionExists)),
   };
 });
 
 vi.mock('../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
-  flywheelLifecycleMocks.stopAgentEffect.mockImplementation((agentId: string) => Effect.sync(() => {
+  flywheelLifecycleMocks.stopAgentProgram.mockImplementation((agentId: string) => Effect.sync(() => {
     flywheelLifecycleMocks.stoppedAgents.push(agentId);
   }));
   return {
-    stopAgentEffect: flywheelLifecycleMocks.stopAgentEffect,
+    stopAgent: flywheelLifecycleMocks.stopAgentProgram,
+    stopAgentProgram: flywheelLifecycleMocks.stopAgentProgram,
   };
 });
 
-vi.mock('../../../lib/config-yaml.js', () => ({
-  loadConfig: () => ({
-    config: {
-      roles: {
-        flywheel: {
-          harness: 'pi',
-          model: 'claude-sonnet-4-6',
-          effort: 'low',
-          maxAgents: 3,
-          scope: 'all-tracked-projects',
-        },
+const mockLoadConfig = vi.hoisted(() => () => ({
+  config: {
+    roles: {
+      flywheel: {
+        harness: 'pi',
+        model: 'claude-sonnet-4-6',
+        effort: 'low',
+        maxAgents: 3,
+        scope: 'all-tracked-projects',
       },
-      workhorses: {},
     },
-  }),
+    workhorses: {},
+  },
+}));
+
+vi.mock('../../../lib/config-yaml.js', () => ({
+  loadConfig: mockLoadConfig,
+  loadConfigSync: mockLoadConfig,
   resolveModel: () => 'claude-sonnet-4-6',
 }));
 
@@ -172,7 +179,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
-    flywheelLifecycleMocks.stopAgentEffect.mockClear();
+    flywheelLifecycleMocks.stopAgentProgram.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });

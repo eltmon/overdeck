@@ -11,27 +11,22 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
-import { loadConfig } from './config.js';
+import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
-import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
+import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
-import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue, getIssuePrefix } from './projects.js';
+import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
 export interface CreateRemoteWorkspaceOptions {
   dryRun?: boolean;
   spinner?: { text: string };
-}
-
-/**
- * Create a remote workspace on Fly.io
- */
-export async function createRemoteWorkspace(
+}async function createRemoteWorkspacePromise(
   issueId: string,
   options: CreateRemoteWorkspaceOptions = {}
 ): Promise<RemoteWorkspaceMetadata> {
-  const config = loadConfig();
+  const config = loadConfigSync();
   const remoteConfig = config.remote;
 
   if (!remoteConfig?.enabled) {
@@ -44,7 +39,7 @@ export async function createRemoteWorkspace(
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
 
   // Determine project identifier for VM name
@@ -189,7 +184,7 @@ EOF`));
     location: 'remote',
   };
 
-  saveWorkspaceMetadata(metadata);
+  saveWorkspaceMetadataSync(metadata);
 
   return metadata;
 }
@@ -205,12 +200,12 @@ export class RemoteWorkspaceError extends Data.TaggedError('RemoteWorkspaceError
 }> {}
 
 /** Effect variant of `createRemoteWorkspace`. */
-export const createRemoteWorkspaceEffect = (
+export const createRemoteWorkspace = (
   issueId: string,
   options: CreateRemoteWorkspaceOptions = {},
 ): Effect.Effect<RemoteWorkspaceMetadata, RemoteWorkspaceError> =>
   Effect.tryPromise({
-    try: () => createRemoteWorkspace(issueId, options),
+    try: () => createRemoteWorkspacePromise(issueId, options),
     catch: (cause) =>
       new RemoteWorkspaceError({
         issueId,

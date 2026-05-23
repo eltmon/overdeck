@@ -5,8 +5,8 @@
 export {
   loadReviewStatuses,
   saveReviewStatuses,
-  setReviewStatus,
-  getReviewStatus,
+  setReviewStatusSync,
+  getReviewStatusSync,
   clearReviewStatus,
 } from '../../lib/review-status.js';
 

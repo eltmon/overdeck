@@ -5,7 +5,7 @@ import { Effect, Schema } from 'effect';
 import { FlywheelRunId } from '@panctl/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
-import { getAgentDir, spawnRun, stopAgentEffect } from '../agents.js';
+import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import {
   getFlywheelActiveRunId,
   setFlywheelActiveRunId,
@@ -145,7 +145,7 @@ export async function pauseFlywheel(): Promise<FlywheelPauseResult> {
     } catch { /* non-fatal: resume falls back to fresh if session.id is missing */ }
   }
   setFlywheelGloballyPaused(true);
-  await Effect.runPromise(stopAgentEffect(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
   return { activeRunId };
 }
 

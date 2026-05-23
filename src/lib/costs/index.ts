@@ -6,6 +6,16 @@
 
 // Event log management
 export {
+  appendCostEventSync,
+  readEventsSync,
+  tailEventsSync,
+  readEventsFromLineSync,
+  getLastEventMetadataSync,
+  replaceEventsFileSync,
+  deduplicateEventsSync,
+  eventsFileExists,
+  getEventsFilePath,
+  // Effect variants (PAN-1249)
   appendCostEvent,
   readEvents,
   tailEvents,
@@ -13,16 +23,6 @@ export {
   getLastEventMetadata,
   replaceEventsFile,
   deduplicateEvents,
-  eventsFileExists,
-  getEventsFilePath,
-  // Effect variants (PAN-1249)
-  appendCostEventEffect,
-  readEventsEffect,
-  tailEventsEffect,
-  readEventsFromLineEffect,
-  getLastEventMetadataEffect,
-  replaceEventsFileEffect,
-  deduplicateEventsEffect,
   type CostEvent,
   type EventMetadata,
   type ReadEventsOptions,
@@ -30,6 +30,16 @@ export {
 
 // Aggregation cache management
 export {
+  loadCacheSync,
+  saveCacheSync,
+  updateCacheFromEventsSync,
+  rebuildCacheSync,
+  syncCacheSync,
+  getCostsByIssueSync,
+  getCostsForIssueSync,
+  setIssueBudgetSync,
+  getCacheStatus,
+  // Effect variants (PAN-1249)
   loadCache,
   saveCache,
   updateCacheFromEvents,
@@ -38,16 +48,6 @@ export {
   getCostsByIssue,
   getCostsForIssue,
   setIssueBudget,
-  getCacheStatus,
-  // Effect variants (PAN-1249)
-  loadCacheEffect,
-  saveCacheEffect,
-  updateCacheFromEventsEffect,
-  rebuildCacheEffect,
-  syncCacheEffect,
-  getCostsByIssueEffect,
-  getCostsForIssueEffect,
-  setIssueBudgetEffect,
   type CostCache,
   type IssueStats,
   type ModelStats,
@@ -56,46 +56,42 @@ export {
 
 // Historical data migration
 export {
+  migrateAllSessionsSync,
+  needsMigrationSync,
+  migrateIfNeededSync,
+  // Effect variants (PAN-1249)
   migrateAllSessions,
   needsMigration,
   migrateIfNeeded,
-  // Effect variants (PAN-1249)
-  migrateAllSessionsEffect,
-  needsMigrationEffect,
-  migrateIfNeededEffect,
   type MigrationStats,
 } from './migration.js';
 
 // Cost reconciler — periodic catch-up sweep
 export {
   reconcile,
-  // Effect variants (PAN-1249)
-  reconcileEffect,
   type ReconcileResult,
 } from './reconciler.js';
 
 // Event retention
 export {
+  pruneOldEventsSync,
+  needsPruningSync,
+  getRetentionStatusSync,
+  // Effect variants (PAN-1249)
   pruneOldEvents,
   needsPruning,
   getRetentionStatus,
-  // Effect variants (PAN-1249)
-  pruneOldEventsEffect,
-  needsPruningEffect,
-  getRetentionStatusEffect,
   type RetentionStats,
 } from './retention.js';
 
 // WAL writers / sync (PAN-1249)
 export {
-  appendToWal,
+  appendToWalSync,
   resolveWalDir,
-  appendToWalEffect,
+  appendToWal,
 } from './wal.js';
 export {
   syncWalFromAllProjects,
   syncWalFromDir,
-  syncWalFromAllProjectsEffect,
-  syncWalFromDirEffect,
   type SyncResult,
 } from './sync-wal.js';

@@ -11,6 +11,7 @@ import { Effect } from 'effect';
 // Mock projects module
 vi.mock('../projects.js', () => ({
   findProjectByPath: vi.fn(),
+  findProjectByPathSync: vi.fn(),
   getIssuePrefix: vi.fn(),
 }));
 
@@ -23,13 +24,14 @@ vi.mock('../tracker/factory.js', () => ({
 // Mock config
 vi.mock('../config.js', () => ({
   loadConfig: vi.fn(() => ({ trackers: { linear: { apiKey: 'fake-key' } } })),
+  loadConfigSync: vi.fn(() => ({ trackers: { linear: { apiKey: 'fake-key' } } })),
 }));
 
-import { findProjectByPath, getIssuePrefix } from '../projects.js';
+import { findProjectByPathSync, getIssuePrefix } from '../projects.js';
 import { createTracker, createTrackerFromConfig } from '../tracker/factory.js';
 import { transitionIssueToInReview } from '../agents.js';
 
-const mockFindProjectByPath = vi.mocked(findProjectByPath);
+const mockFindProjectByPath = vi.mocked(findProjectByPathSync);
 const mockGetIssuePrefix = vi.mocked(getIssuePrefix);
 const mockCreateTracker = vi.mocked(createTracker);
 const mockCreateTrackerFromConfig = vi.mocked(createTrackerFromConfig);

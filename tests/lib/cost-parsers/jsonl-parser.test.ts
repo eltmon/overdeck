@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir, homedir } from 'os';
-import { getActiveSessionModel, parseClaudeSession } from '../../../src/lib/cost-parsers/jsonl-parser.js';
+import { getActiveSessionModelSync, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
 
 describe('getActiveSessionModel', () => {
   let tempHome: string;
@@ -34,13 +34,13 @@ describe('getActiveSessionModel', () => {
   it('should return null for workspace with no session files', () => {
     // Use a workspace path that definitely doesn't exist
     const nonExistentWorkspace = '/tmp/nonexistent-workspace-12345';
-    const result = getActiveSessionModel(nonExistentWorkspace);
+    const result = getActiveSessionModelSync(nonExistentWorkspace);
     expect(result).toBeNull();
   });
 
   it('should return null for invalid workspace path', () => {
     const invalidPath = '';
-    const result = getActiveSessionModel(invalidPath);
+    const result = getActiveSessionModelSync(invalidPath);
     expect(result).toBeNull();
   });
 
@@ -74,7 +74,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, sessionContent + '\n');
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBe('claude-sonnet-4-5-20250929');
     } finally {
       // Clean up
@@ -103,7 +103,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, sessionContent + '\n');
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBe('claude-opus-4-6-20251101');
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
@@ -130,7 +130,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, sessionContent + '\n');
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBeNull();
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
@@ -149,7 +149,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, 'not valid json\n');
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBeNull();
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
@@ -184,7 +184,7 @@ describe('getActiveSessionModel', () => {
       writeFileSync(newSessionFile, newContent + '\n');
 
       try {
-        const result = getActiveSessionModel(testWorkspacePath);
+        const result = getActiveSessionModelSync(testWorkspacePath);
         // Should return model from newer file
         expect(result).toBe('claude-sonnet-4-5-20250929');
       } finally {
@@ -216,7 +216,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, content);
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBe('claude-opus-4-6-20251101');
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
@@ -238,7 +238,7 @@ describe('getActiveSessionModel', () => {
     writeFileSync(sessionFile, sessionContent + '\n');
 
     try {
-      const result = getActiveSessionModel(testWorkspacePath);
+      const result = getActiveSessionModelSync(testWorkspacePath);
       expect(result).toBe('claude-sonnet-4-5-20250929');
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
@@ -288,7 +288,7 @@ describe('parseClaudeSession', () => {
   }
 
   it('should return null for non-existent file', () => {
-    const result = parseClaudeSession('/tmp/nonexistent-file.jsonl');
+    const result = parseClaudeSessionSync('/tmp/nonexistent-file.jsonl');
     expect(result).toBeNull();
   });
 
@@ -300,7 +300,7 @@ describe('parseClaudeSession', () => {
     });
     writeFileSync(sessionFile, content + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
     expect(result).toBeNull();
   });
 
@@ -310,7 +310,7 @@ describe('parseClaudeSession', () => {
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 2000, outputTokens: 1000 },
     ]);
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.model).toBe('claude-sonnet-4-6');  // Normalized
@@ -344,7 +344,7 @@ describe('parseClaudeSession', () => {
       { model: 'claude-opus-4-6-20251101', inputTokens: 1000, outputTokens: 500 },
     ]);
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
 
@@ -398,7 +398,7 @@ describe('parseClaudeSession', () => {
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
     ]);
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.modelBreakdown).toBeDefined();
@@ -431,7 +431,7 @@ describe('parseClaudeSession', () => {
     });
     writeFileSync(sessionFile, content + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.usage.cacheReadTokens).toBe(5000);
@@ -455,7 +455,7 @@ describe('parseClaudeSession', () => {
     });
     writeFileSync(sessionFile, content + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.model).toBe('claude-opus-4-6');
@@ -486,7 +486,7 @@ describe('parseClaudeSession', () => {
     ];
     writeFileSync(sessionFile, lines.join('\n') + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.messageCount).toBe(2);  // Should skip invalid line
@@ -503,7 +503,7 @@ describe('parseClaudeSession', () => {
     });
     writeFileSync(sessionFile, content + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.sessionId).toBe('my-session-id');
@@ -520,7 +520,7 @@ describe('parseClaudeSession', () => {
     });
     writeFileSync(sessionFile, content + '\n');
 
-    const result = parseClaudeSession(sessionFile);
+    const result = parseClaudeSessionSync(sessionFile);
 
     expect(result).not.toBeNull();
     expect(result!.model).toBe('claude-sonnet-4');

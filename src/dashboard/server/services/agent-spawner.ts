@@ -153,12 +153,12 @@ export const AgentSpawnerLive = Layer.effect(
           }
 
           // Guard: no agent already running
-          const { getAgentStateEffect, spawnAgent, normalizeAgentId } = await import(
+          const { getAgentState, spawnAgent, normalizeAgentId } = await import(
             '../../../lib/agents.js'
           ) as any;
           const normalizedId = normalizeAgentId(issueId);
 
-          const existing = await Effect.runPromise(getAgentStateEffect(normalizedId));
+          const existing = await Effect.runPromise(getAgentState(normalizedId));
           if (existing?.status === 'running') {
             throw new AgentAlreadyRunning({ id: issueId });
           }
@@ -241,8 +241,8 @@ export const AgentSpawnerLive = Layer.effect(
     kill: (agentId) =>
       Effect.tryPromise({
         try: async () => {
-          const { stopAgentEffect } = await import('../../../lib/agents.js') as any;
-          await Effect.runPromise(stopAgentEffect(agentId));
+          const { stopAgent } = await import('../../../lib/agents.js') as any;
+          await Effect.runPromise(stopAgent(agentId));
         },
         catch: () => undefined,
       }).pipe(Effect.ignore),
@@ -265,9 +265,9 @@ export const AgentSpawnerLive = Layer.effect(
       Effect.tryPromise({
         try: async () => {
           const { deepWipe } = await import('../../../lib/lifecycle/workflows.js');
-          const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+          const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
 
-          const project = resolveProjectFromIssue(issueId);
+          const project = resolveProjectFromIssueSync(issueId);
           const projectPath = project?.projectPath ?? process.cwd();
 
           await Effect.runPromise(deepWipe(

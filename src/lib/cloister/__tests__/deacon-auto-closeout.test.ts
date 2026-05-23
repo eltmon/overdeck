@@ -49,14 +49,18 @@ vi.mock('../../../lib/agents.js', async () => {
   return {
   getAgentDir: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getAgentRuntimeStateSync: vi.fn(),
   getAgentState: vi.fn(),
-  getAgentStateEffect: effectMock(null),
+  getAgentStateSync: vi.fn(),
+  getAgentStateProgram: effectMock(null),
   listRunningAgents: vi.fn(() => []),
-  recordAgentFailureEffect: effectMock(null),
+  listRunningAgentsSync: vi.fn(() => []),
+  recordAgentFailureProgram: effectMock(null),
   resumeAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentState: vi.fn(),
-  saveAgentStateEffect: effectMock(undefined),
+  saveAgentStateSync: vi.fn(),
+  saveAgentStateProgram: effectMock(undefined),
   saveSessionId: vi.fn(),
   };
 });
@@ -64,7 +68,9 @@ vi.mock('../../../lib/agents.js', async () => {
 vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatus: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
+  getReviewStatusSync: vi.fn(() => undefined),
   setReviewStatus: vi.fn(),
+  setReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/stashes.js', () => ({
@@ -95,23 +101,27 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
   return {
   buildTmuxCommandString: vi.fn(() => 'tmux'),
-  capturePaneAsyncEffect: effectMock(''),
-  createSessionAsyncEffect: effectMock(undefined),
-  isPaneDeadAsyncEffect: effectMock(false),
+  capturePane: effectMock(''),
+  createSession: effectMock(undefined),
+  isPaneDead: effectMock(false),
   killSession: vi.fn(),
-  killSessionAsyncEffect: effectMock(undefined),
+  killSessionSync: vi.fn(),
+  killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
-  listPaneValuesAsyncEffect: effectMock([]),
-  listSessionNamesAsyncEffect: effectMock([]),
-  sendKeysEffect: effectMock(undefined),
+  listPaneValues: effectMock([]),
+  listSessionNames: effectMock([]),
+  sendKeysProgram: effectMock(undefined),
   sessionExists: vi.fn(() => false),
-  sessionExistsAsyncEffect: effectMock(false),
+  sessionExistsSync: vi.fn(() => false),
+  sessionExists: effectMock(false),
   };
 });
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
@@ -126,10 +136,15 @@ vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDe
 vi.mock('../../projects.js', () => ({
   getProject: vi.fn(() => null),
   listProjects: vi.fn(() => []),
+  listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
 }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })) }));
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
+}));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../config.js', async () => {
   const { Effect } = await import('effect');
@@ -153,7 +168,8 @@ vi.mock('../config.js', async () => {
   };
   return {
   loadCloisterConfig: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
-  loadCloisterConfigEffect: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
+  loadCloisterConfigSync: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
+  loadCloisterConfigProgram: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
   };
 });
 vi.mock('../specialists.js', () => ({
@@ -163,19 +179,19 @@ vi.mock('../specialists.js', () => ({
 }));
 
 import { autoCloseOut } from '../deacon.js';
-import { loadCloisterConfigEffect } from '../config.js';
-import { loadReviewStatuses, setReviewStatus } from '../../../lib/review-status.js';
-import { resolveProjectFromIssue } from '../../projects.js';
-import { resolveGitHubIssue } from '../../tracker-utils.js';
-import { emitActivityEntry } from '../../activity-logger.js';
+import { loadCloisterConfig } from '../config.js';
+import { loadReviewStatuses, setReviewStatusSync } from '../../../lib/review-status.js';
+import { resolveProjectFromIssueSync } from '../../projects.js';
+import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+import { emitActivityEntrySync } from '../../activity-logger.js';
 import { closeOut } from '../../lifecycle/workflows.js';
 
-const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigEffect);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
-const mockSetReviewStatus = vi.mocked(setReviewStatus);
-const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
-const mockResolveGitHubIssue = vi.mocked(resolveGitHubIssue);
-const mockEmitActivityEntry = vi.mocked(emitActivityEntry);
+const mockSetReviewStatus = vi.mocked(setReviewStatusSync);
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssueSync);
+const mockResolveGitHubIssue = vi.mocked(resolveGitHubIssueSync);
+const mockEmitActivityEntry = vi.mocked(emitActivityEntrySync);
 const mockCloseOut = vi.mocked(closeOut);
 
 function installIssueView(labels: string[], state = 'OPEN') {
@@ -202,7 +218,7 @@ function mergedStatus(issueId: string, updatedAt = oldTimestamp) {
 describe('autoCloseOut', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({});
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 } as any);
@@ -212,7 +228,7 @@ describe('autoCloseOut', () => {
   });
 
   it('returns without side effects when automatic close-out is disabled', async () => {
-    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
 
     const actions = await autoCloseOut(now);

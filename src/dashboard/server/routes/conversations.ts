@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
-import { getClaudePermissionFlagsString, resolvePermissionMode, DSP_FLAG, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, DSP_FLAG, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -25,7 +25,7 @@ import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
-import { getProject } from '../../../lib/projects.js';
+import { getProjectSync } from '../../../lib/projects.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -65,15 +65,15 @@ import {
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
-  sendRawKeystrokeAsyncEffect,
+  sendRawKeystroke,
   MessageDeliveryFailed,
-  capturePaneAsyncEffect,
-  sessionExistsAsyncEffect,
-  killSessionAsyncEffect,
-  createSessionAsyncEffect,
-  setOptionAsyncEffect,
+  capturePane,
+  sessionExists,
+  killSession,
+  createSession,
+  setOption,
   waitForClaudePrompt,
-  listSessionNamesAsyncEffect,
+  listSessionNames,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -84,13 +84,13 @@ import {
   getProviderEnvForModel,
   getProviderAuthMode,
 } from '../../../lib/agents.js';
-import { writeBridgeToken } from '../../../lib/bridge-token.js';
+import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
-import { canUseHarness } from '../../../lib/harness-policy.js';
-import { getProviderForModel } from '../../../lib/providers.js';
+import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { getProviderForModelSync } from '../../../lib/providers.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
-import { generateLauncherScript } from '../../../lib/launcher-generator.js';
+import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
@@ -148,7 +148,7 @@ async function resolveAllowedHarness(requested: unknown, model?: string | null):
   // spawnConversationSession() intentionally launches the default Claude Code
   // command, so persist the matching default harness as the effective value.
   if (!model) return 'claude-code';
-  const decision = canUseHarness(harness, model, await getProviderAuthMode(model));
+  const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
   return decision.allowed ? harness : 'claude-code';
 }
 
@@ -403,7 +403,7 @@ function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const output = await Effect.runPromise(capturePaneAsyncEffect(tmuxSession, 200));
+    const output = await Effect.runPromise(capturePane(tmuxSession, 200));
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
@@ -424,14 +424,14 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
 /**
  * Map a Panopticon model id to the matching Pi-side provider name. Pi has
  * its own provider taxonomy (`pi --list-models`); the IDs differ from our
- * internal {@link getProviderForModel}. Returning `undefined` lets Pi fall
+ * internal {@link getProviderForModelSync}. Returning `undefined` lets Pi fall
  * back to its registry order.
  *
  * Pi conversations rely on the user's own Pi auth (`~/.pi/agent/auth.json`).
  * We only constrain *which* Pi provider Pi uses; we never inject keys.
  */
 function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModel(modelId).name;
+  const provider = getProviderForModelSync(modelId).name;
   switch (provider) {
     case 'openai':
       return 'openai-codex';
@@ -456,7 +456,7 @@ async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promi
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const snapshot = await Effect.runPromise(
-      capturePaneAsyncEffect(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
     );
     if (snapshot.trim().length > 0) {
       console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
@@ -710,13 +710,13 @@ function sanitizeName(name: string): string {
 
 /** Check if a tmux session exists (async, non-blocking) */
 async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(sessionExistsAsyncEffect(sessionName));
+  return Effect.runPromise(sessionExists(sessionName));
 }
 
 async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (await Effect.runPromise(sessionExistsAsyncEffect(sessionName))) return;
+    if (await Effect.runPromise(sessionExists(sessionName))) return;
     await new Promise(r => setTimeout(r, 250));
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
@@ -825,7 +825,7 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  const permissionFlags = getClaudePermissionFlagsString();
+  const permissionFlags = getClaudePermissionFlagsStringSync();
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let providerEnv: Record<string, string> = {};
@@ -850,7 +850,7 @@ async function spawnConversationSession(
     // the imported constants so the lint guard stays tight.
     // NEVER add DSP when the resolved mode is 'auto'. Enterprise users rely
     // on Auto being honored; a silent escalation to bypass is a P0 trust violation.
-    const mode = resolvePermissionMode();
+    const mode = resolvePermissionModeSync();
     if (mode === 'auto') {
       if (!runtimeCommand.includes('--permission-mode')) {
         runtimeCommand = `${runtimeCommand} --permission-mode auto`;
@@ -941,7 +941,7 @@ async function spawnConversationSession(
     !piFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
-    (!model || getProviderForModel(model).name === 'anthropic') &&
+    (!model || getProviderForModelSync(model).name === 'anthropic') &&
     process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
     process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
     process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
@@ -949,7 +949,7 @@ async function spawnConversationSession(
     process.env.PAN_DOCKER !== '1'
   ) {
     channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
-    writeBridgeToken(tmuxSession);
+    writeBridgeTokenSync(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
 
@@ -960,7 +960,7 @@ async function spawnConversationSession(
   const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
   await writeFile(
     launcherTmp,
-    generateLauncherScript({
+    generateLauncherScriptSync({
       role: 'work',
       spawnMode: 'conversation',
       workingDir: cwd,
@@ -986,7 +986,7 @@ async function spawnConversationSession(
 
   // Kill any stale session with the same name
   try {
-    await Effect.runPromise(killSessionAsyncEffect(tmuxSession));
+    await Effect.runPromise(killSession(tmuxSession));
   } catch {
     // ignore missing stale session
   }
@@ -1012,7 +1012,7 @@ async function spawnConversationSession(
   // inherits the parent's env and -e can only SET, not UNSET, so we set
   // provider vars to empty strings to override stale inherited values.
   try {
-    await Effect.runPromise(createSessionAsyncEffect(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+    await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
@@ -1042,8 +1042,8 @@ async function spawnConversationSession(
   }
 
   // Keep session alive when clients disconnect
-  await Effect.runPromise(setOptionAsyncEffect(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOptionAsyncEffect(tmuxSession, 'remain-on-exit', 'on'));
+  await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
+  await Effect.runPromise(setOption(tmuxSession, 'remain-on-exit', 'on'));
 }
 
 /**
@@ -1125,7 +1125,7 @@ const getConversationsRoute = HttpRouter.add(
         // Grace period removed (PAN-826): POST /api/conversations now waits for
         // Claude to be ready before returning 201, so newly-created conversations
         // are always live by the time they appear in the list.
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
         const enriched = await Promise.all(conversations.map(async (conv) => {
           const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
           let isWorking = false;
@@ -1241,7 +1241,7 @@ const postConversationRoute = HttpRouter.add(
         }
         let cwd = join(homedir(), 'Projects');
         if (projectKey) {
-          const projectConfig = getProject(projectKey);
+          const projectConfig = getProjectSync(projectKey);
           if (projectConfig?.path && existsSync(projectConfig.path)) {
             cwd = projectConfig.path;
           } else {
@@ -1380,7 +1380,7 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -1491,7 +1491,7 @@ const postConversationResumeRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else {
-            await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
+            await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000))).catch(() => false);
           }
 
           markConversationActive(name);
@@ -1547,7 +1547,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (requestedHarness === 'pi' || requestedHarness === 'claude-code') {
           if (requestedHarness !== currentHarness) {
             const policyModel = model ?? conv.model ?? '';
-            const decision = canUseHarness(
+            const decision = canUseHarnessSync(
               requestedHarness,
               policyModel,
               await getProviderAuthMode(policyModel),
@@ -1570,7 +1570,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const respawn = markRespawnPending(conv.tmuxSession);
         try {
           // Always kill the existing session first (if alive) so the model change takes effect
-          await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
           if (!(await validateCwdContainment(conv.cwd))) {
             return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -1616,13 +1616,13 @@ const postConversationSwitchModelRoute = HttpRouter.add(
             // the target format and returns its session id.
             if (canResume && sessionFile) {
               try {
-                const result = await convertConversationTranscript({
+                const result = await Effect.runPromise(convertConversationTranscript({
                   fromHarness: currentHarness,
                   toHarness: harness,
                   sourceSessionFile: sessionFile,
                   cwd,
                   tmuxSession,
-                });
+                }));
                 resumeSessionId = result.sessionId;
                 canResume = true;
                 if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
@@ -1647,7 +1647,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(tmuxSession);
           } else {
-            await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
+            await (await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000))).catch(() => false);
           }
 
           markConversationActive(name);
@@ -2047,7 +2047,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         }
 
         // Kill tmux session if still alive
-        await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
@@ -2122,7 +2122,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
         const allConvs = listConversations();
         // Filter to conversations with a live tmux session — use a single
         // listSessionNamesAsync() call instead of N subprocess spawns.
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNamesAsyncEffect()));
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
         const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
         const results: { name: string; model: string | null; status: string }[] = [];
 
@@ -2132,7 +2132,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
           const respawn = markRespawnPending(conv.tmuxSession);
           try {
             // Kill existing tmux session
-            await Effect.runPromise(killSessionAsyncEffect(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+            await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
             // Re-spawn with stored model
             const oldSessionId = conv.claudeSessionId;
@@ -2237,7 +2237,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
   } else {
-    const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
+    const ready = await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000))).catch(() => false);
     if (!ready) {
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }
@@ -2277,7 +2277,7 @@ async function runForkPipeline(
     // directly.
     const forkSessionFile = await resolveSessionFile(conv);
     if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-    await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
+    await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
 
     updateForkStatus(convName, 'spawning');
     await spawnConversationSession(
@@ -2302,7 +2302,7 @@ async function runForkPipeline(
 
   let summary: string;
   if (localSummaryOnly) {
-    summary = await generateFallbackSummary(parentSessionFile);
+    summary = await Effect.runPromise(generateFallbackSummary(parentSessionFile));
   } else {
     const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
     summary = result.summary;
@@ -2385,9 +2385,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
         }
 
-        const { sessionId, sessionFile } = await reserveSummaryForkSession(
+        const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(
           cwd || conv.cwd || process.cwd(),
-        );
+        ));
 
         const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const suffix = randomUUID().slice(0, 4);
@@ -2477,7 +2477,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
         const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
 
         if (action === 'reject-feedback') {
-          await Effect.runPromise(sendRawKeystrokeAsyncEffect(conv.tmuxSession, '4', 'plan-action-reject'));
+          await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
           if (feedback) {
             await new Promise(r => setTimeout(r, 300));
             const settings = loadSettingsApi();
@@ -2492,7 +2492,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
           return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
         }
 
-        await Effect.runPromise(sendRawKeystrokeAsyncEffect(conv.tmuxSession, keystroke, `plan-action-${action}`));
+        await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, keystroke, `plan-action-${action}`));
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -2605,7 +2605,7 @@ const getConversationDiffsRoute = HttpRouter.add(
             try {
               // Resolve base commit once per repo root
               if (!baseCommitCache.has(repoRoot)) {
-                baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+                baseCommitCache.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
               }
               const baseCommit = baseCommitCache.get(repoRoot) ?? null;
 
@@ -2637,7 +2637,7 @@ const getConversationDiffsRoute = HttpRouter.add(
                 }
               } else {
                 // No base commit (repo too new) — fall back to working-tree-vs-HEAD diff
-                diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+                diffs = await Effect.runPromise(diffFilesAgainstHead(repoRoot, filePaths));
               }
               allFiles.push(...diffs);
             } catch {
@@ -2688,9 +2688,9 @@ const getConversationDiffFullRoute = HttpRouter.add(
         const isInRepo = existsSync(join(cwd, '.git'));
 
         if (isInRepo) {
-          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
+          const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
           if (!baseCommit) return jsonResponse({ diff: '' });
-          const diff = await diffPatchSinceCommit(cwd, baseCommit);
+          const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit));
           return jsonResponse({ diff });
         }
 
@@ -2727,7 +2727,7 @@ const getConversationDiffFullRoute = HttpRouter.add(
         const patches: string[] = [];
         for (const [repoRoot, filePaths] of filesByRepo) {
           try {
-            const patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            const patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
             if (patch) patches.push(patch);
           } catch { /* file may have been committed */ }
         }
@@ -2770,9 +2770,9 @@ const getConversationDiffTurnRoute = HttpRouter.add(
           // For in-repo conversations, try single diff since conversation start.
           // Falls through to per-turn JSONL path if no base commit (cwd is in a repo
           // with no commits before the conversation started).
-          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
+          const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
           if (baseCommit) {
-            const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
+            const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit, fileFilter));
             return jsonResponse({ turnId, diff });
           }
         }
@@ -2812,7 +2812,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
         for (const [repoRoot, filePaths] of filesByRepo) {
           try {
             if (!baseCommitByRepo.has(repoRoot)) {
-              baseCommitByRepo.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+              baseCommitByRepo.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
             }
             const baseCommit = baseCommitByRepo.get(repoRoot) ?? null;
             let patch: string;
@@ -2823,7 +2823,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
               );
               patch = stdout;
             } else {
-              patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+              patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
             }
             if (patch) patches.push(patch);
           } catch { /* file may have been committed or repo unavailable */ }

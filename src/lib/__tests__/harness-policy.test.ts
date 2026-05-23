@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarness } from '../harness-policy.js'
+import { canUseHarnessSync } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -22,7 +22,7 @@ const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', unde
 
 describe('canUseHarness', () => {
   it('blocks Pi + Anthropic + subscription with a non-empty human-readable reason', () => {
-    const decision = canUseHarness('pi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const decision = canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toBeTruthy()
     expect(decision.reason!.length).toBeGreaterThan(20)
@@ -31,11 +31,11 @@ describe('canUseHarness', () => {
   })
 
   it('allows Pi + Anthropic + api-key', () => {
-    expect(canUseHarness('pi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
   })
 
   it('allows Pi + Anthropic + undefined authMode (no subscription engaged)', () => {
-    expect(canUseHarness('pi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+    expect(canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
   it.each(['openai', 'google', 'minimax', 'openrouter'] as const)(
@@ -43,7 +43,7 @@ describe('canUseHarness', () => {
     provider => {
       const model = MODEL_BY_PROVIDER[provider]
       for (const authMode of AUTH_MODES) {
-        expect(canUseHarness('pi', model, authMode)).toEqual({ allowed: true })
+        expect(canUseHarnessSync('pi', model, authMode)).toEqual({ allowed: true })
       }
     },
   )
@@ -51,13 +51,13 @@ describe('canUseHarness', () => {
   it.each(PROVIDERS)('allows claude-code + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarness('claude-code', model, authMode)).toEqual({ allowed: true })
+      expect(canUseHarnessSync('claude-code', model, authMode)).toEqual({ allowed: true })
     }
   })
 
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
-      const decision = canUseHarness(harness, 'gpt-5.5', 'api-key')
+      const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')
       expect(decision.allowed).toBe(false)
       expect(decision.reason).toBeTruthy()
       expect(decision.reason!.toLowerCase()).toContain('subscription')
@@ -66,13 +66,13 @@ describe('canUseHarness', () => {
 
   it('allows gpt-5.5 + subscription on every harness', () => {
     for (const harness of HARNESSES) {
-      expect(canUseHarness(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
+      expect(canUseHarnessSync(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
     }
   })
 
   it('allows gpt-5.5 + undefined authMode (no auth context engaged)', () => {
     for (const harness of HARNESSES) {
-      expect(canUseHarness(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
+      expect(canUseHarnessSync(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
     }
   })
 
@@ -90,7 +90,7 @@ describe('canUseHarness', () => {
     expect(cells).toHaveLength(2 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
-      const decision = canUseHarness(cell.harness, model, cell.authMode)
+      const decision = canUseHarnessSync(cell.harness, model, cell.authMode)
       expect(
         decision.allowed,
         `${cell.harness} / ${cell.provider} / ${cell.authMode ?? 'unset'} should be ${cell.allowed ? 'allowed' : 'blocked'}`,

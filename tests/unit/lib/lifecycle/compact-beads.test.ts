@@ -17,10 +17,10 @@ vi.mock('util', async (importOriginal) => {
 });
 
 import { Effect } from 'effect';
-import { compactBeads as compactBeadsEffect } from '../../../../src/lib/lifecycle/compact-beads.js';
+import { compactBeads as compactBeadsProgram } from '../../../../src/lib/lifecycle/compact-beads.js';
 
-const compactBeads = (...args: Parameters<typeof compactBeadsEffect>) =>
-  Effect.runPromise(compactBeadsEffect(...args));
+const compactBeads = (...args: Parameters<typeof compactBeadsProgram>) =>
+  Effect.runPromise(compactBeadsProgram(...args));
 
 describe('compact-beads', () => {
   beforeEach(() => {

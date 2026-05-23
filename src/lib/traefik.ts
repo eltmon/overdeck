@@ -11,8 +11,8 @@ import { join, basename } from 'path';
 import { execSync } from 'child_process';
 import { Effect } from 'effect';
 import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SYNC_SOURCES } from './paths.js';
-import { loadConfig } from './config.js';
-import { loadProjectsConfig } from './projects.js';
+import { loadConfigSync } from './config.js';
+import { loadProjectsConfigSync } from './projects.js';
 import { FsError } from './errors.js';
 
 /**
@@ -49,13 +49,13 @@ export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikR
  * Otherwise the frontend route points to the bundled Node server on the API port,
  * which is the production layout. See template header for the full rationale.
  */
-export function generatePanopticonTraefikConfig(mode?: TraefikRenderMode): boolean {
+export function generatePanopticonTraefikConfigSync(mode?: TraefikRenderMode): boolean {
   const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'panopticon.yml.template');
   if (!existsSync(templatePath)) {
     return false;
   }
 
-  const config = loadConfig();
+  const config = loadConfigSync();
   const resolvedMode = resolveTraefikRenderMode(mode);
   const frontendPort = resolvedMode === 'dev'
     ? config.dashboard.port
@@ -83,7 +83,7 @@ export function generatePanopticonTraefikConfig(mode?: TraefikRenderMode): boole
  * Remove any accidentally-copied .template files from the runtime Traefik dir.
  * Called after copyDirectoryRecursive in pan install.
  */
-export function cleanupTemplateFiles(): void {
+export function cleanupTemplateFilesSync(): void {
   const copiedTemplate = join(TRAEFIK_DYNAMIC_DIR, 'panopticon.yml.template');
   if (existsSync(copiedTemplate)) {
     unlinkSync(copiedTemplate);
@@ -103,7 +103,7 @@ export function cleanupTemplateFiles(): void {
  * Safe to call multiple times (idempotent).
  * Returns true if file was written, false if no certs found.
  */
-export function generateTlsConfig(): boolean {
+export function generateTlsConfigSync(): boolean {
   if (!existsSync(TRAEFIK_CERTS_DIR)) {
     return false;
   }
@@ -166,7 +166,7 @@ export function generateTlsConfig(): boolean {
  *
  * Returns array of domains that had certs generated.
  */
-export function ensureProjectCerts(): string[] {
+export function ensureProjectCertsSync(): string[] {
   // Check mkcert is available
   try {
     execSync('which mkcert', { stdio: 'pipe' });
@@ -174,7 +174,7 @@ export function ensureProjectCerts(): string[] {
     return [];
   }
 
-  const projectsConfig = loadProjectsConfig();
+  const projectsConfig = loadProjectsConfigSync();
   const generated: string[] = [];
 
   for (const [, project] of Object.entries(projectsConfig.projects)) {
@@ -213,7 +213,7 @@ export function ensureProjectCerts(): string[] {
  *
  * Called during `pan up` to clean up configs from older Panopticon versions.
  */
-export function cleanupStaleTlsSections(): void {
+export function cleanupStaleTlsSectionsSync(): void {
   // Clean static config (traefik.yml)
   const staticConfig = join(TRAEFIK_DIR, 'traefik.yml');
   if (existsSync(staticConfig)) {
@@ -240,11 +240,11 @@ export function cleanupStaleTlsSections(): void {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Render the dashboard Traefik config from the template. */
-export const generatePanopticonTraefikConfigEffect = (
+export const generatePanopticonTraefikConfig = (
   mode?: TraefikRenderMode,
 ): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => generatePanopticonTraefikConfig(mode),
+    try: () => generatePanopticonTraefikConfigSync(mode),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_DYNAMIC_DIR,
@@ -254,9 +254,9 @@ export const generatePanopticonTraefikConfigEffect = (
   });
 
 /** Strip stray .template files from the runtime dynamic dir. */
-export const cleanupTemplateFilesEffect = (): Effect.Effect<void, FsError> =>
+export const cleanupTemplateFiles = (): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => cleanupTemplateFiles(),
+    try: () => cleanupTemplateFilesSync(),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_DYNAMIC_DIR,
@@ -266,9 +266,9 @@ export const cleanupTemplateFilesEffect = (): Effect.Effect<void, FsError> =>
   });
 
 /** Generate the TLS dynamic config file from discovered certs. */
-export const generateTlsConfigEffect = (): Effect.Effect<boolean, FsError> =>
+export const generateTlsConfig = (): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => generateTlsConfig(),
+    try: () => generateTlsConfigSync(),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_DYNAMIC_DIR,
@@ -278,9 +278,9 @@ export const generateTlsConfigEffect = (): Effect.Effect<boolean, FsError> =>
   });
 
 /** Ensure wildcard mkcert certs exist for every project's domain. */
-export const ensureProjectCertsEffect = (): Effect.Effect<readonly string[], FsError> =>
+export const ensureProjectCerts = (): Effect.Effect<readonly string[], FsError> =>
   Effect.try({
-    try: () => ensureProjectCerts(),
+    try: () => ensureProjectCertsSync(),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_CERTS_DIR,
@@ -290,9 +290,9 @@ export const ensureProjectCertsEffect = (): Effect.Effect<readonly string[], FsE
   });
 
 /** Strip stale tls: sections from legacy runtime configs. */
-export const cleanupStaleTlsSectionsEffect = (): Effect.Effect<void, FsError> =>
+export const cleanupStaleTlsSections = (): Effect.Effect<void, FsError> =>
   Effect.try({
-    try: () => cleanupStaleTlsSections(),
+    try: () => cleanupStaleTlsSectionsSync(),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_DIR,

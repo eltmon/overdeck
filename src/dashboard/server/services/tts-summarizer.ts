@@ -9,9 +9,9 @@
  * - Emits activity.tts events that pan-tts consumes
  */
 
-import { loadConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { initEventStore, type StoredEvent } from '../event-store.js';
-import { emitActivityTts } from '../../../lib/activity-logger.js';
+import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,7 +121,7 @@ async function callSummarizer(
 // ─── Flush logic ──────────────────────────────────────────────────────────────
 
 async function flush(): Promise<void> {
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   if (!config.ttsSummarizer.enabled) return;
 
   const items = state.buffer.splice(0);
@@ -142,7 +142,7 @@ async function flush(): Promise<void> {
   const priority = hasError ? 0 : hasWarn ? 1 : 2;
 
   try {
-    emitActivityTts({
+    emitActivityTtsSync({
       utterance,
       priority,
       source: 'tts-summarizer',
@@ -184,7 +184,7 @@ function onEvent(event: StoredEvent): void {
 export async function startTtsSummarizer(): Promise<void> {
   if (state.timer !== null) return; // Already running
 
-  const { config } = loadConfig();
+  const { config } = loadConfigSync();
   if (!config.ttsSummarizer.enabled) {
     console.log('[tts-summarizer] Disabled (tts.summarizer.enabled=false)');
     return;

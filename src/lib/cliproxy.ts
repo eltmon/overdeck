@@ -146,7 +146,7 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
  * was written (including "already up-to-date" writes), false if the source
  * was missing or malformed.
  */
-export function bridgeCodexAuthToCliproxy(): boolean {
+export function bridgeCodexAuthToCliproxySync(): boolean {
   const codexPath = getCodexAuthPath();
   if (!existsSync(codexPath)) return false;
 
@@ -204,7 +204,7 @@ export function bridgeCodexAuthToCliproxy(): boolean {
 }
 
 /** Async variant of bridgeCodexAuthToCliproxy — safe for the event loop. */
-export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
+async function bridgeCodexAuthToCliproxyTask(): Promise<boolean> {
   const codexPath = getCodexAuthPath();
   if (!existsSync(codexPath)) return false;
 
@@ -314,7 +314,7 @@ function serializeYamlString(value: string): string {
  * settings. This path is used by getProviderEnvForModel(), which is reachable
  * from dashboard HTTP routes, so all credential/config persistence is async.
  */
-export async function bridgeGeminiAuthToCliproxyAsync(apiKey: string): Promise<boolean> {
+async function bridgeGeminiAuthToCliproxyTask(apiKey: string): Promise<boolean> {
   const normalized = apiKey.trim();
   if (!normalized) return false;
 
@@ -441,7 +441,7 @@ export function isCliproxyInstalled(): boolean {
  * Uses curl + tar because that's already a hard dep of pan install. Throws
  * with a clear message on unsupported platforms.
  */
-export function installCliproxy(force = false): void {
+export function installCliproxySync(force = false): void {
   ensureDirs();
   if (!force && isCliproxyInstalled()) return;
 
@@ -479,7 +479,7 @@ export function installCliproxy(force = false): void {
  * Async variant of installCliproxy — safe for the event loop.
  * Uses execAsync instead of execSync so it won't block the dashboard server.
  */
-export async function installCliproxyAsync(force = false): Promise<void> {
+async function installCliproxyTask(force = false): Promise<void> {
   ensureDirs();
   if (!force && isCliproxyInstalled()) return;
 
@@ -531,7 +531,7 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-export function isCliproxyRunning(): boolean {
+export function isCliproxyRunningSync(): boolean {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
   // Fallback: something may be listening on the port without our pidfile.
@@ -554,17 +554,17 @@ export function isCliproxyRunning(): boolean {
  * instance is already running. Ensures config + auth-dir + codex bridge are
  * up-to-date before spawning.
  */
-export function startCliproxy(): void {
+export function startCliproxySync(): void {
   ensureDirs();
   ensureConfigFile();
   // Best-effort bridge; if the user hasn't logged into Codex yet, cliproxy
   // will still start but subscription auth won't be available until they do.
-  try { bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
+  try { bridgeCodexAuthToCliproxySync(); } catch { /* non-fatal */ }
 
-  if (isCliproxyRunning()) return;
+  if (isCliproxyRunningSync()) return;
 
   if (!isCliproxyInstalled()) {
-    installCliproxy();
+    installCliproxySync();
   }
 
   const bin = getCliproxyBinary();
@@ -589,7 +589,7 @@ export function startCliproxy(): void {
   child.unref();
 }
 
-export function stopCliproxy(): void {
+export function stopCliproxySync(): void {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) {
     try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
@@ -625,7 +625,7 @@ export function getCliproxyClientEnv(): Record<string, string> {
 // ─── Async lifecycle (safe for dashboard server — no execSync) ─────────────────
 
 /** Check whether the cliproxy TCP port is accepting connections. */
-export async function checkCliproxyPortAsync(): Promise<boolean> {
+async function checkCliproxyPortTask(): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = net.connect(CLIPROXY_PORT, CLIPROXY_HOST);
     socket.on('connect', () => {
@@ -641,14 +641,14 @@ export async function checkCliproxyPortAsync(): Promise<boolean> {
 }
 
 /** Async variant of isCliproxyRunning — safe for the event loop. */
-export async function isCliproxyRunningAsync(): Promise<boolean> {
+async function isCliproxyRunningTask(): Promise<boolean> {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
-  return checkCliproxyPortAsync();
+  return checkCliproxyPortTask();
 }
 
 /** Async variant of stopCliproxy — safe for the event loop. */
-export async function stopCliproxyAsync(): Promise<void> {
+async function stopCliproxyTask(): Promise<void> {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) {
     try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
@@ -670,15 +670,15 @@ export async function stopCliproxyAsync(): Promise<void> {
 
 /** Async variant of startCliproxy — safe for the event loop.
  *  Auto-installs cliproxy if missing (non-blocking download). */
-export async function startCliproxyAsync(): Promise<void> {
+async function startCliproxyTask(): Promise<void> {
   ensureDirs();
   ensureConfigFile();
-  try { bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
+  try { bridgeCodexAuthToCliproxySync(); } catch { /* non-fatal */ }
 
-  if (await isCliproxyRunningAsync()) return;
+  if (await isCliproxyRunningTask()) return;
 
   if (!isCliproxyInstalled()) {
-    await installCliproxyAsync();
+    await installCliproxyTask();
   }
 
   const bin = getCliproxyBinary();
@@ -703,10 +703,10 @@ export async function startCliproxyAsync(): Promise<void> {
 }
 
 /** Restart cliproxy asynchronously. Safe for the event loop. */
-export async function restartCliproxyAsync(): Promise<void> {
-  await stopCliproxyAsync();
+async function restartCliproxyTask(): Promise<void> {
+  await stopCliproxyTask();
   await new Promise((r) => setTimeout(r, 500));
-  await startCliproxyAsync();
+  await startCliproxyTask();
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -723,9 +723,9 @@ const cliproxyCatch = (operation: string) => (cause: unknown) =>
  * credentials into cliproxy's auth dir. Fails with FsError if a copy or
  * mkdir throws.
  */
-export const bridgeCodexAuthToCliproxyEffect = (): Effect.Effect<boolean, FsError> =>
+export const bridgeCodexAuthToCliproxy = (): Effect.Effect<boolean, FsError> =>
   Effect.tryPromise({
-    try: () => bridgeCodexAuthToCliproxyAsync(),
+    try: () => bridgeCodexAuthToCliproxyTask(),
     catch: (cause) =>
       new FsError({
         path: getCliproxyAuthDir(),
@@ -738,11 +738,11 @@ export const bridgeCodexAuthToCliproxyEffect = (): Effect.Effect<boolean, FsErro
  * Effect-native bridgeGeminiAuthToCliproxy — writes the supplied API key
  * to cliproxy's gemini credential file. Fails with FsError on write failure.
  */
-export const bridgeGeminiAuthToCliproxyEffect = (
+export const bridgeGeminiAuthToCliproxy = (
   apiKey: string,
 ): Effect.Effect<boolean, FsError> =>
   Effect.tryPromise({
-    try: () => bridgeGeminiAuthToCliproxyAsync(apiKey),
+    try: () => bridgeGeminiAuthToCliproxyTask(apiKey),
     catch: (cause) =>
       new FsError({
         path: getCliproxyAuthDir(),
@@ -756,26 +756,26 @@ export const bridgeGeminiAuthToCliproxyEffect = (
  * from GitHub releases. Fails with CliproxyError on network or extraction
  * failure.
  */
-export const installCliproxyEffect = (
+export const installCliproxy = (
   force = false,
 ): Effect.Effect<void, CliproxyError> =>
   Effect.tryPromise({
-    try: () => installCliproxyAsync(force),
+    try: () => installCliproxyTask(force),
     catch: cliproxyCatch('installCliproxy'),
   });
 
-/** Effect-native isCliproxyRunningAsync — port + pidfile probe, never fails. */
-export const isCliproxyRunningEffect = (): Effect.Effect<boolean, never> =>
-  Effect.promise(() => isCliproxyRunningAsync());
+/** Effect-native isCliproxyRunningTask — port + pidfile probe, never fails. */
+export const isCliproxyRunning = (): Effect.Effect<boolean, never> =>
+  Effect.promise(() => isCliproxyRunningTask());
 
 /** Effect-native checkCliproxyPort — TCP probe of the local port, never fails. */
-export const checkCliproxyPortEffect = (): Effect.Effect<boolean, never> =>
-  Effect.promise(() => checkCliproxyPortAsync());
+export const checkCliproxyPort = (): Effect.Effect<boolean, never> =>
+  Effect.promise(() => checkCliproxyPortTask());
 
 /** Effect-native startCliproxy — spawns the sidecar. Fails with ProcessSpawnError. */
-export const startCliproxyEffect = (): Effect.Effect<void, ProcessSpawnError> =>
+export const startCliproxy = (): Effect.Effect<void, ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => startCliproxyAsync(),
+    try: () => startCliproxyTask(),
     catch: (cause) =>
       new ProcessSpawnError({
         command: getCliproxyBinary(),
@@ -786,15 +786,15 @@ export const startCliproxyEffect = (): Effect.Effect<void, ProcessSpawnError> =>
   });
 
 /** Effect-native stopCliproxy — best-effort SIGTERM via pidfile. */
-export const stopCliproxyEffect = (): Effect.Effect<void, CliproxyError> =>
+export const stopCliproxy = (): Effect.Effect<void, CliproxyError> =>
   Effect.tryPromise({
-    try: () => stopCliproxyAsync(),
+    try: () => stopCliproxyTask(),
     catch: cliproxyCatch('stopCliproxy'),
   });
 
 /** Effect-native restartCliproxy — stop + 500ms wait + start. */
-export const restartCliproxyEffect = (): Effect.Effect<void, ProcessSpawnError | CliproxyError> =>
+export const restartCliproxy = (): Effect.Effect<void, ProcessSpawnError | CliproxyError> =>
   Effect.tryPromise({
-    try: () => restartCliproxyAsync(),
+    try: () => restartCliproxyTask(),
     catch: cliproxyCatch('restartCliproxy'),
   });
