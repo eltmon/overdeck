@@ -319,7 +319,7 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
               style={contentStyle}
             >
               {section.transcript
-                ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} />
+                ? <ChatMarkdown text={section.transcript} isStreaming={section.status === 'running'} cwd={undefined} />
                 : '(no output yet)'}
             </div>
           )}

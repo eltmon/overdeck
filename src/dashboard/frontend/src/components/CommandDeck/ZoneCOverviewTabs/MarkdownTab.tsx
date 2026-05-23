@@ -39,7 +39,7 @@ export function MarkdownTab({ body, isLoading, emptyLabel = 'No content availabl
       data-testid="markdown-tab"
       style={{ padding: 16, fontSize: 13, lineHeight: 1.55 }}
     >
-      <ChatMarkdown text={body} />
+      <ChatMarkdown text={body} cwd={undefined} />
     </div>
   );
 }

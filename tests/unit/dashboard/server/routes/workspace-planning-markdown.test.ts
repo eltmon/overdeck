@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getWorkspacePathForIssue } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { getWorkspacePathForIssue } from '../../../../../src/dashboard/server/workspace-paths.js';
 
 describe('getWorkspacePathForIssue', () => {
   it('builds a workspace path from a valid issue id', () => {

@@ -250,7 +250,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>
-              <ChatMarkdown text={session.transcript!} isStreaming={false} />
+              <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={undefined} />
             </div>
           ) : (
             <div className={styles.sessionPanelEmpty}>
@@ -287,7 +287,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
                       Round {r.round} — {r.status}
                     </div>
-                    <ChatMarkdown text={r.summary} isStreaming={false} />
+                    <ChatMarkdown text={r.summary} isStreaming={false} cwd={undefined} />
                   </div>
                 ) : null)}
               </>
