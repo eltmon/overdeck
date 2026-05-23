@@ -106,7 +106,9 @@ describe('Effect-returning helper composition', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/dashboard/server/routes/workspaces.ts'), 'utf8');
 
     expect(source).not.toMatch(/Effect\.promise\(\(\) => cleanupReviewTempStash\(/);
+    expect(source).not.toMatch(/Effect\.promise\(\(\) => getWorkspaceGitInfo\(/);
     expect(source).toMatch(/yield\* cleanupReviewTempStash\(issueId, wsInfo\.localPath!\)/);
+    expect(source).toMatch(/yield\* getWorkspaceGitInfo\(workspacePath\)/);
   });
 });
 
