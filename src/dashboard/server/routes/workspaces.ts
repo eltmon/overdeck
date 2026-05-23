@@ -3906,12 +3906,12 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       } catch {}
     }
 
-    const reqVerifyOutcome = yield* Effect.promise(() => runVerificationForIssue(
+    const reqVerifyOutcome = yield* runVerificationForIssue(
       issueId,
       workspacePath,
       workspaceInfo,
       'request-review'
-    ));
+    );
     if (reqVerifyOutcome.outcome === 'failed') {
       return jsonResponse({
         success: false,

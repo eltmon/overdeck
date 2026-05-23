@@ -622,6 +622,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(verifyIdx).toBeGreaterThanOrEqual(0);
     expect(dirtyIdx).toBeLessThan(verifyIdx);
     expect(requestReviewBlock).toContain('dirtyWorkspaceError');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
   });
 
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
