@@ -13,6 +13,7 @@ import type { Agent, Issue } from '../../types';
 
 export const ISSUE_SCOPED_PAN_VERBS = [
   'plan',
+  'plan --auto',
   'plan finalize',
   'start',
   'start --auto',
@@ -109,6 +110,9 @@ function renderMenu() {
 function mockFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes('/api/dashboard/session')) {
+      return Response.json({ csrfToken: 'test-csrf-token' });
+    }
     if (url.includes('/planning-state')) {
       return Response.json({ hasPlan: true, hasBeads: true, beadsCount: 7, planningComplete: true });
     }

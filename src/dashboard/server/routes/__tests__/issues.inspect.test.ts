@@ -32,16 +32,17 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
   }),
 }));
 
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 import { issuesRouteLayer } from '../issues.js';
 
 type JsonBody = Record<string, unknown>;
 
 let projectPath: string;
 
-async function postInspect(issueId: string, beadId: string, body?: JsonBody) {
+async function postInspect(issueId: string, beadId: string, body?: JsonBody, headers: Record<string, string> = {}) {
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/beads/${beadId}/inspect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token', ...headers },
     body: body ? JSON.stringify(body) : undefined,
   }));
 
@@ -63,6 +64,8 @@ async function createWorkspace(issueId: string) {
 
 describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
   beforeEach(async () => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    _resetInternalTokenCacheForTests();
     projectPath = await mkdtemp(join(tmpdir(), 'pan-inspect-route-'));
     resolveProjectFromIssueMock.mockReturnValue({
       projectKey: 'panopticon',
@@ -80,6 +83,8 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
     if (projectPath) await rm(projectPath, { recursive: true, force: true });
   });
 
@@ -102,6 +107,25 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
       workspace: join(projectPath, 'workspaces', 'feature-pan-1331'),
       branch: 'feature/pan-1331',
     }, { deep: false });
+  });
+
+  it('rejects unauthenticated inspect requests before spawning', async () => {
+    await createWorkspace('PAN-1331');
+
+    const result = await postInspect('PAN-1331', 'workspace-f1q5', undefined, { [INTERNAL_TOKEN_HEADER]: '' });
+
+    expect(result.status).toBe(401);
+    expect(spawnInspectAgentMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects bead IDs that are not command-safe identifiers', async () => {
+    await createWorkspace('PAN-1331');
+
+    const result = await postInspect('PAN-1331', encodeURIComponent('workspace-f1q5;touch-pwned'));
+
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: 'Invalid bead ID' });
+    expect(spawnInspectAgentMock).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the issue cannot resolve to a project', async () => {

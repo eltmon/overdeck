@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useAlert, useConfirm } from '../DialogProvider';
 import {
@@ -12,16 +12,10 @@ import {
   type PipelinePhase,
 } from '../../lib/issueActions';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
-
-type PlanningState = {
-  hasPlan: boolean;
-  hasBeads: boolean;
-  beadsCount?: number;
-  planningComplete?: boolean;
-};
 
 export type IssueActionDialogState = {
   key: IssueActionKey;
@@ -56,6 +50,7 @@ export type UseIssueActionsResult = IssueActionLayout & {
 
 type PostActionInput = {
   action: IssueActionEntry;
+  body?: Record<string, unknown>;
 };
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
@@ -96,6 +91,8 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { wipeWorkspace: true };
     case 'inspectBead':
       return { deep: false };
+    case 'doneWork':
+      return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
     default:
       return undefined;
   }
@@ -159,18 +156,9 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'plan',
   'autoPlan',
   'startSkipPlanning',
-  'swarm',
-  'tell',
-  'pause',
-  'resumeSession',
   'switchModel',
-  'inspectBead',
   'open',
   'upload',
-  'syncDiscussions',
-  'createWorkspace',
-  'copySettings',
-  'reviewTest',
 ]);
 
 const artifactTabs: Partial<Record<IssueActionKey, string>> = {
@@ -217,78 +205,50 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const issue = useMemo(() => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()), [issueId, issues]);
   const agent = useMemo(() => activeAgentForIssue(agents, issueId), [agents, issueId]);
 
-  const { data: lifecycle } = useQuery<WorkAgentLifecycle | undefined>({
-    queryKey: ['agent-session', agent?.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/agents/${agent!.id}/has-session`);
-      if (!response.ok) return undefined;
-      const data = await response.json() as { lifecycle?: WorkAgentLifecycle };
-      return data.lifecycle;
-    },
-    enabled: !!agent && agent.status === 'stopped',
-    staleTime: 10000,
-  });
+  const lifecycle = agent?.lifecycle;
 
-  const { data: workspace } = useQuery<WorkspaceInfo | undefined>({
-    queryKey: ['workspace', issueId],
-    queryFn: async () => {
-      const response = await fetch(`/api/workspaces/${issueId}`);
-      if (!response.ok) return { exists: !!issue?.workspacePath, issueId, path: issue?.workspacePath };
-      return response.json() as Promise<WorkspaceInfo>;
-    },
-    enabled: !!issueId,
-    refetchInterval: 30000,
-  });
-
-  const { data: planningState } = useQuery<PlanningState | undefined>({
-    queryKey: ['planning-state', issueId],
-    queryFn: async () => {
-      const response = await fetch(`/api/issues/${issueId}/planning-state`);
-      if (!response.ok) return undefined;
-      return response.json() as Promise<PlanningState>;
-    },
-    enabled: !!issueId,
-    staleTime: 15000,
-    refetchInterval: 30000,
-  });
+  const workspace = useMemo<WorkspaceInfo | undefined>(() => {
+    if (!issue?.workspacePath) return undefined;
+    return { exists: true, issueId, path: issue.workspacePath };
+  }, [issue?.workspacePath, issueId]);
 
   const state: IssueActionState = useMemo(() => {
-    const workspaceInfo = workspace ?? { exists: !!issue?.workspacePath, issueId, path: issue?.workspacePath };
+    const workspaceInfo = workspace ?? { exists: false, issueId, path: undefined };
     return {
       reviewStatus: reviewStatus ?? null,
       agent: agent ?? null,
       lifecycle: lifecycle ?? agent?.lifecycle ?? null,
       workspace: workspaceInfo,
-      hasPlan: planningState?.hasPlan ?? issue?.hasPlan ?? false,
-      hasBeads: planningState?.hasBeads ?? issue?.hasBeads ?? false,
-      hasInference: Boolean((workspace as WorkspaceInfo & { hasInference?: boolean } | undefined)?.hasInference),
-      hasTranscripts: Boolean((workspace as WorkspaceInfo & { hasTranscripts?: boolean } | undefined)?.hasTranscripts),
-      hasDiscussions: Boolean((workspace as WorkspaceInfo & { hasDiscussions?: boolean } | undefined)?.hasDiscussions),
+      hasPlan: issue?.hasPlan ?? false,
+      hasBeads: issue?.hasBeads ?? false,
+      hasInference: false,
+      hasTranscripts: false,
+      hasDiscussions: false,
       issueCanonicalState: issue?.state ?? STATUS_LABELS[issue?.status ?? ''] ?? issue?.status ?? null,
       isMerged: reviewStatus?.mergeStatus === 'merged' || issue?.mergeStatus === 'merged',
-      hasPr: Boolean(reviewStatus?.readyForMerge || reviewStatus?.prUrl || workspace?.mrUrl),
-      prUrl: reviewStatus?.prUrl ?? workspace?.mrUrl ?? null,
+      hasPr: Boolean(reviewStatus?.readyForMerge || reviewStatus?.prUrl),
+      prUrl: reviewStatus?.prUrl ?? null,
       hasPendingInput: agent?.hasPendingQuestion === true,
     };
-  }, [agent, issue, issueId, lifecycle, planningState, reviewStatus, workspace]);
+  }, [agent, issue, issueId, lifecycle, reviewStatus, workspace]);
 
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action }: PostActionInput) => {
+    mutationFn: async ({ action, body }: PostActionInput) => {
       if (!action.endpoint) return { success: true };
+      const payload = body ?? bodyForAction(action, issueId, issue);
       const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: bodyForAction(action, issueId, issue) ? JSON.stringify(bodyForAction(action, issueId, issue)) : undefined,
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: payload ? JSON.stringify(payload) : '{}',
       });
       if (!response.ok) throw new Error(await responseError(response, `Failed to run ${action.label}`));
       return response.json().catch(() => ({ success: true }));
     },
     onSuccess: async () => {
       await refreshDashboardState(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      queryClient.invalidateQueries({ queryKey: ['planning-state', issueId] });
     },
     onError: (error: Error) => {
       alert({ message: error.message, variant: 'error' });
@@ -308,6 +268,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     const artifactTab = artifactTabs[action.key];
     if (artifactTab) {
       openIssue(issueId, artifactTab);
+      return;
+    }
+
+    if (action.key === 'tell') {
+      const message = window.prompt('Message to send to the agent');
+      if (!message?.trim()) return;
+      setPendingKey(action.key);
+      postActionMutation.mutate({ action, body: { message: message.trim() } });
       return;
     }
 

@@ -67,6 +67,9 @@ function mockStore({ currentIssue = issue(), currentAgent, reviewStatus = {} as 
 function mockFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes('/api/dashboard/session')) {
+      return Response.json({ csrfToken: 'test-csrf-token' });
+    }
     if (url.includes('/planning-state')) {
       return Response.json({ hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false });
     }

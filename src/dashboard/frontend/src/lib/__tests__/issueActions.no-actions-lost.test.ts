@@ -1,7 +1,14 @@
+import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { DialogProvider } from '../../components/DialogProvider';
+import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
 import {
   ISSUE_ACTIONS,
+  PROJECT_TREE_CONTEXT_ACTIONS,
+  ZONE_B_SESSION_ACTIONS,
   type IssueActionKey,
 } from '../issueActions';
 
@@ -62,26 +69,32 @@ const statusFlowActions = [
   { surfaceText: 'Reopen', registryKey: 'reopen' },
 ] as const satisfies readonly { surfaceText: string; registryKey: IssueActionKey | null; note?: string }[];
 
-const projectTreeUtilityActions = [
-  { surfaceText: 'Copy project name', scope: 'project', ownerSurface: 'ProjectNode' },
-  { surfaceText: 'View Logs', scope: 'container', ownerSurface: 'ContainerNode' },
-  { surfaceText: 'Inspect', scope: 'container', ownerSurface: 'ContainerNode' },
-  { surfaceText: 'Restart', scope: 'container', ownerSurface: 'ContainerNode' },
-  { surfaceText: 'Stop', scope: 'container', ownerSurface: 'ContainerNode' },
-  { surfaceText: 'Start', scope: 'container', ownerSurface: 'ContainerNode' },
-  { surfaceText: 'Open State Dir', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
-  { surfaceText: 'View JSONL', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
-  { surfaceText: 'Deep Wipe', scope: 'agent-state', ownerSurface: 'FeatureItem' },
-] as const;
+const projectTreeUtilityActions = PROJECT_TREE_CONTEXT_ACTIONS;
+const zoneBSessionActions = ZONE_B_SESSION_ACTIONS;
 
-const zoneBSessionActions = [
-  { key: 'stopSession', surfaceText: 'Stop session' },
-  { key: 'viewTerminal', surfaceText: 'View terminal' },
-  { key: 'viewState', surfaceText: 'View State.md' },
-  { key: 'viewVbrief', surfaceText: 'View vBRIEF' },
-  { key: 'copySessionId', surfaceText: 'Copy Session ID' },
-  { key: 'copyTmuxCommand', surfaceText: 'Copy tmux command' },
-] as const;
+function renderZoneBActionStrip() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(
+      DialogProvider,
+      null,
+      createElement(ZoneBActionStrip, {
+        issueId: 'PAN-1331',
+        onViewTerminal: () => undefined,
+        session: {
+          sessionId: 'agent-pan-1331',
+          type: 'work',
+          presence: 'active',
+          tmuxSession: 'agent-pan-1331',
+          hasJsonl: true,
+          roundMetadata: { roundCount: 1 },
+        } as any,
+      }),
+    ),
+  ));
+}
 
 function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
   const menu = document.createElement('div');
@@ -131,16 +144,33 @@ describe('issueActions no-actions-lost audit', () => {
     }
   });
 
-  it('documents retained project-tree utility actions as non-issue-scoped surfaces', () => {
+  it('keeps retained project-tree context-menu actions in the non-issue registry', () => {
+    expect(projectTreeUtilityActions.map((action) => action.label)).toEqual(expect.arrayContaining([
+      'Copy project name',
+      'View Logs',
+      'Inspect',
+      'Restart',
+      'Stop',
+      'Start',
+      'Open State Dir',
+      'View JSONL',
+      'Deep Wipe',
+    ]));
     for (const action of projectTreeUtilityActions) {
-      expect(action.scope, action.surfaceText).not.toBe('issue');
-      expect(action.ownerSurface, action.surfaceText).toMatch(/ProjectNode|ContainerNode|FeatureItem/);
+      expect(action.scope, action.label).not.toBe('issue');
+      expect(action.ownerSurface, action.label).toMatch(/ProjectNode|ContainerNode|FeatureItem/);
     }
   });
 
-  it('documents Zone B session-scoped actions outside the issue action registry', () => {
-    for (const action of zoneBSessionActions) {
-      expect(registryKeys.has(action.key as IssueActionKey), action.surfaceText).toBe(false);
+  it('renders Zone B session-scoped actions from their real surface', () => {
+    renderZoneBActionStrip();
+
+    expect(screen.getByTitle('Stop session')).toBeInTheDocument();
+    expect(screen.getByTitle('View terminal')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('zone-b-overflow'));
+    for (const action of zoneBSessionActions.filter((entry) => !['stopSession', 'viewTerminal'].includes(entry.key))) {
+      expect(screen.getByText(action.label), action.key).toBeInTheDocument();
+      expect(registryKeys.has(action.key as IssueActionKey), action.label).toBe(false);
     }
   });
 

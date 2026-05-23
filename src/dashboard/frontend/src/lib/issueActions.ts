@@ -102,6 +102,36 @@ export interface IssueActionEntry {
   group: IssueActionGroup;
 }
 
+export type NonIssueActionScope = 'project' | 'container' | 'session-artifact' | 'agent-state' | 'session';
+
+export interface NonIssueActionEntry {
+  key: string;
+  label: string;
+  scope: NonIssueActionScope;
+  ownerSurface: 'ProjectNode' | 'ContainerNode' | 'FeatureItem' | 'ZoneBActionStrip';
+}
+
+export const PROJECT_TREE_CONTEXT_ACTIONS: NonIssueActionEntry[] = [
+  { key: 'copyProjectName', label: 'Copy project name', scope: 'project', ownerSurface: 'ProjectNode' },
+  { key: 'viewContainerLogs', label: 'View Logs', scope: 'container', ownerSurface: 'ContainerNode' },
+  { key: 'inspectContainer', label: 'Inspect', scope: 'container', ownerSurface: 'ContainerNode' },
+  { key: 'restartContainer', label: 'Restart', scope: 'container', ownerSurface: 'ContainerNode' },
+  { key: 'stopContainer', label: 'Stop', scope: 'container', ownerSurface: 'ContainerNode' },
+  { key: 'startContainer', label: 'Start', scope: 'container', ownerSurface: 'ContainerNode' },
+  { key: 'openStateDir', label: 'Open State Dir', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
+  { key: 'viewJsonl', label: 'View JSONL', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
+  { key: 'deepWipe', label: 'Deep Wipe', scope: 'agent-state', ownerSurface: 'FeatureItem' },
+];
+
+export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
+  { key: 'stopSession', label: 'Stop session', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  { key: 'viewTerminal', label: 'View terminal', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  { key: 'viewState', label: 'View State.md', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  { key: 'viewVbrief', label: 'View vBRIEF', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  { key: 'copySessionId', label: 'Copy Session ID', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  { key: 'copyTmuxCommand', label: 'Copy tmux command', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+];
+
 const always = () => true;
 const hasAgent = (state: IssueActionState) => !!state.agent;
 const hasWorkspace = (state: IssueActionState) => state.workspace?.exists === true;
@@ -179,10 +209,10 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
   { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/issues/:id/swarm', enabledWhen: hasParallelizablePlan, phasePrimary: [], kind: 'dialog', group: 'work' },
   { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
-  { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/issues/:id/done', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
+  { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
   { key: 'requestReview', label: 'Request review', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
   { key: 'restartReview', label: 'Restart review', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'review' },
-  { key: 'recoverReview', label: 'Recover review', panVerb: 'review reset', endpoint: '/api/review/:id/recover', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'recoverReview', label: 'Recover review', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
   { key: 'stopAgent', label: 'Stop agent', panVerb: 'kill', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'agent' },
   { key: 'pause', label: 'Pause agent', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'unpause', label: 'Unpause agent', panVerb: 'unpause', endpoint: '/api/agents/:agentId/unpause', enabledWhen: isPaused, phasePrimary: [], kind: 'safe', group: 'agent' },

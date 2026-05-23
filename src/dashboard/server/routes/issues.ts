@@ -2659,10 +2659,18 @@ const getIssueBeadsRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/beads/:beadId/inspect ───────────────────────
 
+function isValidBeadId(beadId: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(beadId);
+}
+
 const postIssueBeadInspectRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/beads/:beadId/inspect',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const id = (params['id'] ?? '').toUpperCase();
     const beadId = params['beadId'] ?? '';
@@ -2671,6 +2679,9 @@ const postIssueBeadInspectRoute = HttpRouter.add(
     }
     if (!beadId.trim()) {
       return jsonResponse({ error: 'Missing bead ID' }, { status: 400 });
+    }
+    if (!isValidBeadId(beadId)) {
+      return jsonResponse({ error: 'Invalid bead ID' }, { status: 400 });
     }
 
     const body = yield* readJsonBody;
