@@ -103,6 +103,7 @@ import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
 import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
+import { registerMergeCommands } from './commands/merge.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -525,6 +526,7 @@ registerInspectCommand(program);
 registerCavemanCommands(program);
 registerScopeCommands(program);
 registerFlywheelCommands(program);
+registerMergeCommands(program);
 
 // Shorthand: pan status = pan status
 program

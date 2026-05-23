@@ -5304,8 +5304,8 @@
     "hash": "18b92af7bb40ed0815d36fc0c805cf53"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/index.ts": {
-    "mtime": 1779535299.7843463,
-    "hash": "69e85e025c4302e3d6753e5b433b2745"
+    "mtime": 1779548910.6968238,
+    "hash": "455715c83d824b134a5dcabb463cdb55"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/fork.ts": {
     "mtime": 1779535299.7813463,
@@ -5514,6 +5514,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/scope.ts": {
     "mtime": 1779535299.7824,
     "hash": "bc0274a3f053c3ebbad070a105611ccf"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/merge.ts": {
+    "mtime": 1779549161.1604972,
+    "hash": "c1534f79e65a91cddbf961c5bd9642ff"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/request-review.ts": {
     "mtime": 1779535299.7824,
@@ -5762,6 +5766,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/__tests__/workspace-reap.test.ts": {
     "mtime": 1779535299.7795851,
     "hash": "4cf25036792fbf5fa13154822b31fe3e"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/__tests__/merge.test.ts": {
+    "mtime": 1779548932.375575,
+    "hash": "42fdec549511ce25dd802c4fa8ae06be"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/cli/commands/__tests__/flywheel.test.ts": {
     "mtime": 1779536079.155188,
