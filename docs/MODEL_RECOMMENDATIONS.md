@@ -30,6 +30,8 @@ Mark the following as wrong or outdated:
 - **Speed rankings** (Gemini 2.0 Flash, GLM-4 Flash) — outdated. Use Gemini 3 Flash Preview, GLM-4.7 Flash, or MiniMax M2.7 Highspeed as the new fast-tier references; no current published latency benchmark covers the 2026 fleet uniformly, so we don't rank them numerically here.
 - **Monthly cost estimates** — kept as a rough order-of-magnitude only. Actual cost moved with new tokenizers, prompt caching defaults, and the broader provider mix.
 - **Sources list** — the 2025-era articles linked at the bottom are largely superseded; updated source URLs are inline per row in the per-model tables below.
+- **OpenAI catalog (2026-05-23 addendum, PAN-1122):** trimmed to match the Codex CLI published list. Kept: `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark`, `gpt-5.2`. Dropped: `gpt-5.5-pro`, `gpt-5.4-pro`, `gpt-5.5-mini`, `gpt-5.5-nano`, `gpt-5.4-nano`, `o3`, `o4-mini`, `gpt-4o`, `gpt-4o-mini`. Saved configs referencing dropped IDs are migrated by `MODEL_DEPRECATIONS` in `src/lib/model-capabilities.ts` and warned at settings-load. `gpt-5.5-pro` is OUT of consideration for any role going forward.
+- **Sonnet 4.6 + Opus 4.7 capability notes already current.** No further Claude family changes in this revision.
 
 ## Performance benchmarks — what's verified
 
@@ -41,15 +43,18 @@ Confidence column: **H** = vendor page + ≥1 corroborating source. **M** = sing
 |---|---|---|---|
 | gpt-5.5 | 88.7% | H | openai.com/index/introducing-gpt-5-5, tokenmix |
 | claude-opus-4-7 | 87.6% | H | vellum.ai, anthropic news |
+| gpt-5.3-codex | 85.0% | M | marc0.dev/en/leaderboard (May 2026) |
 | gemini-3.1-pro-preview | 80.6% | H | smartchunks.com, vellum.ai |
 | kimi-k2.6 | 80.2% | H | benchlm.ai, automatio.ai |
+| gpt-5.2 | 80.0% (Thinking) | H | vellum.ai/blog/gpt-5-2-benchmarks, marc0.dev |
 | claude-sonnet-4-6 | 79.6% | H | digitalapplied.com, nxcode.io, rootly.com |
 | mimo-v2.5-pro | 78.9% | M | buildfastwithai |
 | gemini-3-flash-preview | 78% | H | blog.google flash announcement |
 | minimax-m2.7 | 78% | M | thomas-wiegold.com, wavespeed.ai |
 | claude-haiku-4-5 | 73.3% | H | llm-stats, medium leucopsis |
 | glm-4.7-flash | 59.2% | M | deepinfra |
-| gpt-5.5-pro | — | — | not separately published |
+| gpt-5.3-codex-spark | — | — | research preview; benchmark "coming soon" per benchlm.ai |
+| gpt-5.4 | — | — | not separately published |
 | gpt-5.4-mini | — | — | SWE-Bench Pro 54.4% reported, Verified not split out |
 | gemini-3.1-flash-lite-preview | — | — | not separately published |
 | glm-5.1 | — | — | SWE-Bench Pro 58.4% (SOTA), Verified not separately published |
@@ -59,9 +64,9 @@ Confidence column: **H** = vendor page + ≥1 corroborating source. **M** = sing
 
 | Model | Score | Confidence | Source |
 |---|---|---|---|
-| gpt-5.5-pro | 94.4% | M | almcorp.com (cited "5.4 Pro" / 5.5 Pro) |
 | gemini-3.1-pro-preview | 94.3% | H | DeepMind model card |
 | claude-opus-4-7 | 94.2% | H | vellum.ai, anthropic announcement |
+| gpt-5.2 | 92.4% (Thinking) | H | vellum.ai |
 | gemini-3-flash-preview | 90.4% | H | blog.google flash announcement |
 | kimi-k2.6 | 90.5% | H | benchlm.ai |
 | minimax-m2.7 | 87.4% | M | wavespeed.ai |
@@ -72,7 +77,10 @@ Confidence column: **H** = vendor page + ≥1 corroborating source. **M** = sing
 | mimo-v2.5-pro | 66.7% | M | buildfastwithai |
 | claude-haiku-4-5 | — | — | "middling" per vals.ai, no exact score |
 | gpt-5.5 | — | — | not separately published |
+| gpt-5.4 | — | — | not separately published |
 | gpt-5.4-mini | — | — | conflicting secondary numbers, none confirmed |
+| gpt-5.3-codex | — | — | pricepertoken lists "GPQA 91.5" but does not clarify Diamond subset |
+| gpt-5.3-codex-spark | — | — | no published score (research preview) |
 | minimax-m2.7-highspeed | — | — | no separate eval |
 
 ### MMLU-Pro
@@ -127,8 +135,11 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 | claude-sonnet-4-6 | $3.00 | $15.00 | 50% batch; 90% cache reads |
 | claude-haiku-4-5 | $1.00 | $5.00 | 50% batch; 90% cache reads |
 | gpt-5.5 | $5.00 | $30.00 | 50% batch/flex; cached input $0.50; Priority 2.5x; >272k input 2x in / 1.5x out |
-| gpt-5.5-pro | $30.00 | $180.00 | 50% batch/flex; Priority 2.5x; cached rate UNVERIFIED |
+| gpt-5.4 | UNVERIFIED | UNVERIFIED | Vendor pricing page didn't separate gpt-5.4 base from the family in retrievable excerpts |
 | gpt-5.4-mini | $0.75 | $4.50 | Cached input $0.075 (90% off); batch discount likely but not separately quoted |
+| gpt-5.3-codex | $1.75 | $14.00 | Cached input $0.175 (90% off); Priority 2.5x ($3.50/$28.00); batch UNVERIFIED |
+| gpt-5.3-codex-spark | n/a (API) | n/a (API) | ChatGPT-Pro-only research preview; routed via Codex CLI subscription auth through CLIProxy, not raw API. Headline rate card matches the family when reachable. |
+| gpt-5.2 | $1.75 | $14.00 | Cached input $0.175 (90% off); batch UNVERIFIED |
 | gemini-3.1-pro-preview | $2.00 (≤200k) / $4.00 (>200k) | $12.00 / $18.00 | 50% batch; context cache $0.20/1M ≤200k |
 | gemini-3-flash-preview | $0.50 | $3.00 | 50% batch; context caching available |
 | gemini-3.1-flash-lite-preview | $0.25 | $1.50 | 50% batch; context cache; flat across thinking levels |
@@ -147,8 +158,11 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 | claude-sonnet-4-6 | 1,000,000 (1M beta) | — |
 | claude-haiku-4-5 | 200,000 | — |
 | gpt-5.5 | 1,050,000 | 128,000 |
-| gpt-5.5-pro | 1,050,000 | 128,000 |
+| gpt-5.4 | 1,050,000 | 128,000 |
 | gpt-5.4-mini | 400,000 | 128,000 |
+| gpt-5.3-codex | 400,000 | UNVERIFIED |
+| gpt-5.3-codex-spark | 128,000 | UNVERIFIED |
+| gpt-5.2 | 400,000 | 128,000 |
 | gemini-3.1-pro-preview | 1,000,000 | — |
 | gemini-3-flash-preview | 1,000,000 | — |
 | gemini-3.1-flash-lite-preview | 1,048,576 | 64,000 |
@@ -172,8 +186,12 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 **claude-sonnet-4-6.** 79.6% SWE-Bench Verified single-run; near-Opus on practical enterprise tasks at 1/5 the cost. Default model for the implementation pipeline. The 1M ctx beta lets it carry the whole spec + relevant code without trimming.
 
 **Alternatives:**
+- `gpt-5.3-codex` ($1.75/$14.00, 400k ctx, 85.0% SWE-Bench Verified) — coding-optimized OpenAI flagship. Strong default when the operator wants ChatGPT subscription auth via Codex CLI / CLIProxy instead of an Anthropic key. Higher per-token output cost than Sonnet 4.6 but the cached-input rate ($0.175/1M, 90% off) makes long-running implementation loops competitive.
 - `minimax-m2.7` ($0.28/$1.20, 78% SWE-Bench Verified, 87.4% GPQA, auto-cache $0.06/1M) — cheapest verified high-quality coder. Best for high-volume work where cache reuse dominates cost. Tradeoff: smaller (205k) context; OpenAI-compatible JSON mode but no third-party reliability eval.
 - `kimi-k2.6` ($0.60/$2.50, 80.2% SWE-Bench Verified, 256k ctx) — strong middle ground. Open-weight with native INT4; agent-swarm primitive built in.
+
+#### `work.inspect` (high-volume code scanning, follow-up issue)
+**`gpt-5.3-codex-spark`** — ultra-fast (1000+ tok/sec) coding variant. ChatGPT-Pro-only research preview, no raw API; reachable through Codex CLI subscription auth via CLIProxy when a Pro account is configured. Right shape for short, code-touching scans that benefit from very low TTFT. The `work.inspect` sub-role itself is not yet implemented — see the follow-up issue for the work.* subtype taxonomy.
 
 ### `review.security`
 **claude-opus-4-7.** Don't compromise here. Mature tool-use schema, best published reliability profile, highest GPQA. Security bugs are 10-100x more expensive to fix later than the model spend on review.
@@ -194,15 +212,27 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 
 **Alternative:** `glm-4.7-flash` ($0.06/$0.40) — when you want to push the cost floor lower and the task is dominated by I/O (large `ls`/`grep`/`find` sweeps).
 
-### Orchestrator role (flywheel inventory, ranked suggestions)
+### Flywheel orchestrator (continuously inventory issues, diagnose pipeline state, emit ranked JSON suggestions)
 
-Top 3 ranked by `(quality × speed) / cost`, considering only models with verified pricing AND verified core benchmarks (SWE-Bench Verified, GPQA-Diamond):
+The Panopticon flywheel is high-frequency, stateless, schema-strict, and cost-sensitive. Per-poll work is: read N open issues, classify, rank, emit JSON. It is **not** a long-running agent workflow — each invocation is bounded.
 
-1. **gemini-3-flash-preview** — $0.50/$3.00, 1M ctx, SWE-Bench 78%, GPQA 90.4%. Best quality-per-dollar for a high-frequency loop. Native JSON schema mode. Lowest latency in the top tier.
+**Top 3** ranked by `(quality × speed) / cost`, restricted to models with verified pricing AND verified core benchmarks:
+
+1. **gemini-3-flash-preview** — $0.50/$3.00, 1M ctx, SWE-Bench 78%, GPQA 90.4%. Best quality-per-dollar for a high-frequency loop. Native JSON schema mode (`response_schema` with enums). Lowest latency in the top tier.
 2. **minimax-m2.7** — $0.28/$1.20, 205k ctx, SWE-Bench 78%, GPQA 87.4%. Cheapest verified high-quality option. Auto-cache at $0.06/1M makes the per-loop cost of re-feeding issue state nearly free. Tradeoff: non-US vendor with shallower docs; OpenAI-compatible JSON mode with UNVERIFIED strict-schema reliability.
-3. **claude-haiku-4-5** — $1.00/$5.00, 200k ctx, SWE-Bench 73.3%. More expensive than the other two, but with the most mature tool-use / structured-output stack and lowest tail-risk on schema adherence. Worth the premium when the orchestrator is the single point of decision for downstream agents.
+3. **claude-haiku-4-5** — $1.00/$5.00, 200k ctx, SWE-Bench 73.3%. More expensive than the other two, but with the most mature tool-use / structured-output stack and lowest tail-risk on schema adherence. Worth the premium when the flywheel is the single point of decision for downstream agents.
 
-**Excluded from the top 3:** `claude-opus-4-7` and `gpt-5.5-pro` are too expensive for continuous polling. `gemini-3.1-pro-preview` is strong but ~4x the cost of flash-preview with proportional quality gain only on hard tasks. `mimo-v2.5-pro` has the right price but GPQA 66.7% is well below the others. `kimi-k2.6` and `glm-5.1` are competitive but have UNVERIFIED structured-output reliability — risky for a role that emits JSON suggestions consumed by the dashboard.
+#### Why not `gpt-5.2` (the addendum specifically asked)
+
+**Verdict: overkill for the flywheel as currently scoped.** Reasoning:
+
+- **Cost:** $1.75 in / $14.00 out per 1M tokens — 5-50x the per-call cost of Flash/Haiku/MiniMax. Even with 90% cache-read discount on input, the output side dominates a polling workload that emits N ranked suggestions per call.
+- **Latency:** 0.70s median TTFT, 64 tok/sec — middling. Flash/Haiku-tier models routinely hit <300ms TTFT and 150+ tok/sec.
+- **Structured output:** standard OpenAI strict mode. No advantage over Anthropic / Google strict modes that Haiku and Flash already have.
+- **"Long-running agents" positioning:** real, but mis-targeted at this workload. OpenAI sells gpt-5.2 on multi-step tool-use chains and stateful "deep deliberation" — which a stateless polling loop emitting bounded JSON is not. The value prop doesn't apply.
+- **Where gpt-5.2 *would* be correct:** if the flywheel evolves into a stateful orchestrator that owns multi-step debugging sessions across many tool calls per invocation (e.g. autonomously triaging a failing PR end-to-end, calling git, ci, and test tools in sequence within a single agent loop), revisit gpt-5.2 then. Today it is the wrong instrument for the job.
+
+**Excluded from the top 3:** `claude-opus-4-7` is too expensive for continuous polling; `gpt-5.5-pro` is dropped from the catalog regardless; `gemini-3.1-pro-preview` is strong but ~4x the cost of flash-preview with proportional quality gain only on hard tasks; `mimo-v2.5-pro` has the right price but GPQA 66.7% is well below the others; `kimi-k2.6` and `glm-5.1` are competitive but have UNVERIFIED structured-output reliability — risky for a role that emits JSON consumed by the dashboard.
 
 ## Cost distribution (approximate)
 
