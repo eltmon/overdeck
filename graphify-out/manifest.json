@@ -5323,6 +5323,10 @@
     "mtime": 1779511306.0860825,
     "hash": "f3fc7dd5a6f73860a9a4be0670cc233e"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/__tests__/read-workspace-file-rpc.test.ts": {
+    "mtime": 1779546552.3817818,
+    "hash": "a7bee9bbf27a01eeb88915fb97ac5e30"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/server/services/__tests__/conversation-service.test.ts": {
     "mtime": 1779511306.0860825,
     "hash": "c3afc77514b18641bcb2dab3c560ee28"
