@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 interface FlywheelStatusDetailsProps {
   status: FlywheelStatus;
   onNavigateAgent?: (agentId: string) => void;
+  onNavigateIssue?: (issueId: string) => void;
 }
 
 type AgentStatus = Agent['status'];
@@ -118,10 +119,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatusDetailsProps) {
+export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue }: FlywheelStatusDetailsProps) {
   const ramAvailableMb = Math.max(status.system.ramTotalMb - status.system.ramUsedMb, 0);
   const swapAvailableMb = Math.max(status.system.swapTotalMb - status.system.swapUsedMb, 0);
   const navigateAgent = onNavigateAgent ?? (() => undefined);
+  const navigateIssue = onNavigateIssue ?? (() => undefined);
   const sortedSuggestions = sortSuggestions(status.suggestions);
 
   return (
@@ -139,7 +141,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatu
                       {suggestion.action}
                     </span>
                     {issueId && (
-                      <button type="button" className="font-mono text-xs font-medium text-primary hover:underline" onClick={() => navigateAgent(issueId)}>
+                      <button type="button" className="font-mono text-xs font-medium text-primary hover:underline" onClick={() => navigateIssue(issueId)}>
                         {issueId}
                       </button>
                     )}

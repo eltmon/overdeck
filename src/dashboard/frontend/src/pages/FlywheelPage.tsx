@@ -8,6 +8,7 @@ import { subscribeFlywheelStatus } from '../lib/wsTransport';
 interface FlywheelPageProps {
   onOpenSettings?: () => void;
   onNavigateAgent?: (agentId: string) => void;
+  onNavigateIssue?: (issueId: string) => void;
 }
 
 type FlywheelLeftTab = 'status' | 'state';
@@ -57,7 +58,7 @@ function getLastTickFreshness(lastTickAt: string, nowMs: number): { label: strin
   return { label: `stalled — last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-destructive/30 bg-destructive/15 text-destructive' };
 }
 
-export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPageProps) {
+export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
   const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
@@ -222,7 +223,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
         <div className="p-6" role="tabpanel" aria-label={activeTab === 'status' ? 'Flywheel status' : 'Flywheel state'}>
           {activeTab === 'status' ? (
             status ? (
-              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} />
+              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
             ) : (
               <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
                 <div>

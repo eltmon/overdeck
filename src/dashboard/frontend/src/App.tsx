@@ -950,6 +950,7 @@ export default function App() {
                 setSelectedAgent(agentId);
                 setActiveTab('agents');
               }}
+              onNavigateIssue={(issueId) => openIssue(issueId)}
             />
           </div>
         )}

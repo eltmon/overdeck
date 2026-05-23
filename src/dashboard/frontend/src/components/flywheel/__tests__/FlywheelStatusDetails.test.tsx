@@ -142,16 +142,18 @@ describe('FlywheelStatusDetails', () => {
 
   it('navigates issue suggestions but leaves system suggestions without click-through', () => {
     const onNavigateAgent = vi.fn();
+    const onNavigateIssue = vi.fn();
     render(<FlywheelStatusDetails status={{
       ...status,
       suggestions: [
         { priority: 'high', action: 'start', issueId: 'PAN-55', rationale: 'Start this eligible issue' },
         { priority: 'medium', action: 'investigate', rationale: 'Investigate host-level state' },
       ],
-    }} onNavigateAgent={onNavigateAgent} />);
+    }} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'PAN-55' }));
-    expect(onNavigateAgent).toHaveBeenCalledWith('PAN-55');
+    expect(onNavigateIssue).toHaveBeenCalledWith('PAN-55');
+    expect(onNavigateAgent).not.toHaveBeenCalled();
 
     const systemSuggestion = screen.getByText('Investigate host-level state').closest('[data-testid="flywheel-suggestion"]');
     expect(systemSuggestion).not.toBeNull();

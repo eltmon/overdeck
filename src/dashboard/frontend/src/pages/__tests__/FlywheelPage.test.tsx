@@ -17,7 +17,7 @@ vi.mock('../../lib/wsTransport', () => ({
 }));
 
 vi.mock('../../components/flywheel/FlywheelStatusDetails', () => ({
-  FlywheelStatusDetails: (props: { status: FlywheelStatus; onNavigateAgent?: (agentId: string) => void }) => {
+  FlywheelStatusDetails: (props: { status: FlywheelStatus; onNavigateAgent?: (agentId: string) => void; onNavigateIssue?: (issueId: string) => void }) => {
     mocks.statusDetails(props);
     return <div data-testid="status-details">{props.status.runId}</div>;
   },
@@ -115,15 +115,16 @@ describe('FlywheelPage', () => {
   it('renders a real FlywheelStatus payload from the subscription without console errors', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onNavigateAgent = vi.fn();
+    const onNavigateIssue = vi.fn();
 
-    render(<FlywheelPage onNavigateAgent={onNavigateAgent} />);
+    render(<FlywheelPage onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />);
 
     act(() => {
       mocks.listener?.(status);
     });
 
     expect(screen.getByTestId('status-details')).toHaveTextContent('RUN-7');
-    expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent }));
+    expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent, onNavigateIssue }));
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
