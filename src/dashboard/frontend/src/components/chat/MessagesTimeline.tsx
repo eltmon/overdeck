@@ -364,6 +364,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     row={row}
                     isStreaming={streaming}
                     conversationName={conversationName}
+                    cwd={cwd}
+                    issueId={issueId}
                     turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                     onOpenTurnDiff={onOpenTurnDiff}
                     resolvedTheme={resolvedTheme}

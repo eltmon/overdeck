@@ -68,7 +68,12 @@ function validateIntegerAtLeast(value: number | undefined, name: string, min: nu
 function selectRequestedLines(text: string, line: number | undefined, contextLines: number | undefined): { text: string; totalLines: number } {
   const lines = splitLines(text);
   const totalLines = lines.length;
-  if (!line) return { text, totalLines };
+  if (!line) {
+    return {
+      text: contextLines === undefined ? text : lines.slice(0, contextLines).join('\n'),
+      totalLines,
+    };
+  }
 
   const context = contextLines ?? DEFAULT_CONTEXT_LINES;
   const start = Math.max(1, line - context);

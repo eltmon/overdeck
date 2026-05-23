@@ -4,6 +4,20 @@ import { describe, expect, it } from 'vitest';
 import { ChatMarkdown } from '../ChatMarkdown';
 
 describe('ChatMarkdown file links', () => {
+  it('renders bare assistant file paths as MarkdownFileLink chips when cwd is provided', () => {
+    render(<ChatMarkdown text="Open package.json:1 or /home/eltmon/project/src/App.tsx:42:5." cwd="/home/eltmon/project" />);
+
+    expect(screen.getByRole('link', { name: /project\/package\.json · L1/ })).toHaveClass('chat-markdown-file-link');
+    expect(screen.getByRole('link', { name: /project\/src\/App\.tsx · L42:C5/ })).toHaveClass('chat-markdown-file-link');
+  });
+
+  it('keeps bare assistant file paths as text when cwd is unavailable', () => {
+    render(<ChatMarkdown text="Open /home/eltmon/project/src/App.tsx:42:5." cwd={undefined} />);
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('Open /home/eltmon/project/src/App.tsx:42:5.')).toBeInTheDocument();
+  });
+
   it('renders file hrefs as MarkdownFileLink chips when cwd is provided', () => {
     render(<ChatMarkdown text="Open [package.json:1](package.json:1)." cwd="/home/eltmon/project" />);
 

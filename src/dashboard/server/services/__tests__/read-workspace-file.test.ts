@@ -85,6 +85,24 @@ describe('readWorkspaceFile', () => {
     );
   });
 
+  it('returns a bounded top-of-file excerpt when contextLines is provided without a line', async () => {
+    const { readWorkspaceFile } = await import('../read-workspace-file.js');
+    await writeFile(join(workspacePath, 'src.ts'), ['one', 'two', 'three', 'four', 'five'].join('\n'));
+
+    const result = await readWorkspaceFile({
+      issueId: 'PAN-1370',
+      relativePath: 'src.ts',
+      contextLines: 2,
+    });
+
+    expect(result).toEqual({
+      text: ['one', 'two'].join('\n'),
+      lang: 'typescript',
+      truncated: false,
+      totalLines: 5,
+    });
+  });
+
   it('caps reads at 256 KiB and reports truncation', async () => {
     const { readWorkspaceFile } = await import('../read-workspace-file.js');
     const body = `${'a'.repeat(256 * 1024)}overflow`;

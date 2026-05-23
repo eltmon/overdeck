@@ -27,7 +27,7 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { DiffsThemeNames } from '@pierre/diffs';
-import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref } from '../../markdown-links';
+import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks } from '../../markdown-links';
 import { MarkdownFileLink } from './MarkdownFileLink';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -255,6 +255,48 @@ function transformMarkdownUrl(url: string): string {
   return shouldPreserveMarkdownFileLinkHref(url) ? url : defaultUrlTransform(url);
 }
 
+type ReactMarkdownRemarkPlugins = React.ComponentProps<typeof ReactMarkdown>['remarkPlugins'];
+
+interface MarkdownNode {
+  type: string;
+  value?: string;
+  url?: string;
+  title?: string | null;
+  children?: MarkdownNode[];
+}
+
+const TEXT_LINK_SKIP_NODE_TYPES = new Set(['code', 'inlineCode', 'link', 'linkReference', 'definition']);
+
+function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
+  return (tree: MarkdownNode) => {
+    const visit = (node: MarkdownNode) => {
+      if (!node.children || TEXT_LINK_SKIP_NODE_TYPES.has(node.type)) return;
+
+      const children: MarkdownNode[] = [];
+      for (const child of node.children) {
+        if (child.type === 'text' && child.value !== undefined) {
+          for (const segment of splitMarkdownTextFileLinks(child.value, options.cwd)) {
+            children.push(segment.href
+              ? {
+                type: 'link',
+                url: segment.href,
+                title: null,
+                children: [{ type: 'text', value: segment.text }],
+              }
+              : { type: 'text', value: segment.text });
+          }
+        } else {
+          visit(child);
+          children.push(child);
+        }
+      }
+      node.children = children;
+    };
+
+    visit(tree);
+  };
+}
+
 function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components {
   return {
     pre({ children }) {
@@ -326,11 +368,15 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   issueId,
 }: ChatMarkdownProps) {
   const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
+    [cwd],
+  );
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
       <div className={styles.chatMarkdown}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={transformMarkdownUrl}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
           {text}
         </ReactMarkdown>
       </div>

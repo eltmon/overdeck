@@ -20,6 +20,7 @@ const POSIX_FILE_ROOT_PREFIXES = [
   '/private/',
   '/root/',
 ] as const;
+const BARE_FILE_TEXT_LINK_PATTERN = /(^|[\s([{"'`])((?:\/(?:Users|home|tmp|var|etc|opt|mnt|Volumes|private|root)\/[A-Za-z0-9._~+@%/=-]+|(?:~\/|\.{1,2}\/)?[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+|[A-Za-z0-9._-]+\.[A-Za-z0-9_-]+)(?::\d+(?::\d+)?)?)/g;
 
 export interface MarkdownFileLinkMeta {
   filePath: string;
@@ -28,6 +29,11 @@ export interface MarkdownFileLinkMeta {
   basename: string;
   line?: number;
   column?: number;
+}
+
+export interface MarkdownTextFileLinkSegment {
+  text: string;
+  href?: string;
 }
 
 function safeDecode(value: string): string {
@@ -254,19 +260,48 @@ export function resolveMarkdownFileLinkTarget(
   cwd?: string,
 ): string | null {
   const pathWithPosition = parseMarkdownFileLinkHref(href);
-  if (!pathWithPosition) return null;
+  if (!pathWithPosition || !cwd) return null;
 
   if (!isRelativePath(pathWithPosition)) {
     return pathWithPosition;
   }
 
-  if (!cwd) return null;
   return resolvePathLinkTarget(pathWithPosition, cwd);
 }
 
 function basenameOfPath(path: string): string {
   const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
   return separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
+}
+
+export function splitMarkdownTextFileLinks(text: string, cwd?: string): MarkdownTextFileLinkSegment[] {
+  if (!cwd || text.length === 0) return [{ text }];
+
+  const segments: MarkdownTextFileLinkSegment[] = [];
+  let cursor = 0;
+  BARE_FILE_TEXT_LINK_PATTERN.lastIndex = 0;
+
+  for (const match of text.matchAll(BARE_FILE_TEXT_LINK_PATTERN)) {
+    const prefix = match[1] ?? '';
+    const href = match[2];
+    if (!href) continue;
+
+    const hrefStart = match.index + prefix.length;
+    const hrefEnd = hrefStart + href.length;
+    if (hrefStart < cursor || !resolveMarkdownFileLinkMeta(href, cwd)) continue;
+
+    if (hrefStart > cursor) {
+      segments.push({ text: text.slice(cursor, hrefStart) });
+    }
+    segments.push({ text: href, href });
+    cursor = hrefEnd;
+  }
+
+  if (cursor === 0) return [{ text }];
+  if (cursor < text.length) {
+    segments.push({ text: text.slice(cursor) });
+  }
+  return segments;
 }
 
 export function resolveMarkdownFileLinkMeta(

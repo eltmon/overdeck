@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMarkdownFileLinkMeta } from './markdown-links';
+import { resolveMarkdownFileLinkMeta, splitMarkdownTextFileLinks } from './markdown-links';
 
 const cwd = '/home/eltmon/project';
 
@@ -62,9 +62,11 @@ describe('resolveMarkdownFileLinkMeta', () => {
     },
   );
 
-  it('returns null when cwd is empty for relative paths', () => {
+  it('returns null when cwd is empty for file paths', () => {
     expect(resolveMarkdownFileLinkMeta('src/App.tsx', '')).toBeNull();
     expect(resolveMarkdownFileLinkMeta('src/App.tsx', undefined)).toBeNull();
+    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', '')).toBeNull();
+    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', undefined)).toBeNull();
   });
 
   it('resolves Windows absolute paths', () => {
@@ -81,5 +83,21 @@ describe('resolveMarkdownFileLinkMeta', () => {
       line: 8,
       column: 2,
     });
+  });
+
+  it('splits bare file paths in assistant text into link segments when cwd is available', () => {
+    expect(splitMarkdownTextFileLinks('Open package.json:1 and src/App.tsx:7:3.', cwd)).toEqual([
+      { text: 'Open ' },
+      { text: 'package.json:1', href: 'package.json:1' },
+      { text: ' and ' },
+      { text: 'src/App.tsx:7:3', href: 'src/App.tsx:7:3' },
+      { text: '.' },
+    ]);
+  });
+
+  it('leaves bare file paths as text when cwd is unavailable', () => {
+    expect(splitMarkdownTextFileLinks('Open /home/eltmon/project/src/App.tsx:12', undefined)).toEqual([
+      { text: 'Open /home/eltmon/project/src/App.tsx:12' },
+    ]);
   });
 });
