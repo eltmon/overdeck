@@ -355,23 +355,37 @@ describe('applyEventReducer — review/pipeline events', () => {
   })
 
   it('merge.auto.scheduled stores auto-merge schedule state', () => {
+    const state: DashboardState = { ...emptyState, issuesRaw: [{ identifier: 'PAN-1', title: 'Auto merge issue' }] }
     const event = makeEvent('merge.auto.scheduled', 9, {
       issueId: 'PAN-1',
       executeAt: '2026-05-23T12:05:00.000Z',
+      scheduledAt: '2026-05-23T12:00:00.000Z',
       cooldownSeconds: 300,
     })
-    const next = applyEventReducer(emptyState, event)
+    const next = applyEventReducer(state, event)
 
     expect(next.reviewStatusByIssueId['PAN-1']).toMatchObject({
       issueId: 'PAN-1',
-      autoMergeScheduled: { executeAt: '2026-05-23T12:05:00.000Z', cooldownSeconds: 300 },
+      autoMergeScheduled: {
+        executeAt: '2026-05-23T12:05:00.000Z',
+        scheduledAt: '2026-05-23T12:00:00.000Z',
+      },
+    })
+    expect(next.issuesRaw[0]).toMatchObject({
+      identifier: 'PAN-1',
+      autoMergeScheduled: {
+        executeAt: '2026-05-23T12:05:00.000Z',
+        scheduledAt: '2026-05-23T12:00:00.000Z',
+      },
     })
   })
 
   it('terminal merge.auto events clear auto-merge schedule state', () => {
-    const scheduled = applyEventReducer(emptyState, makeEvent('merge.auto.scheduled', 9, {
+    const state: DashboardState = { ...emptyState, issuesRaw: [{ identifier: 'PAN-1', title: 'Auto merge issue' }] }
+    const scheduled = applyEventReducer(state, makeEvent('merge.auto.scheduled', 9, {
       issueId: 'PAN-1',
       executeAt: '2026-05-23T12:05:00.000Z',
+      scheduledAt: '2026-05-23T12:00:00.000Z',
       cooldownSeconds: 300,
     }))
     const next = applyEventReducer(scheduled, makeEvent('merge.auto.aborted', 10, {
@@ -380,6 +394,7 @@ describe('applyEventReducer — review/pipeline events', () => {
     }))
 
     expect(next.reviewStatusByIssueId['PAN-1']?.autoMergeScheduled).toBeUndefined()
+    expect(next.issuesRaw[0]).toMatchObject({ identifier: 'PAN-1', autoMergeScheduled: null })
   })
 })
 

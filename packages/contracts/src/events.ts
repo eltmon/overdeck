@@ -418,7 +418,12 @@ export const MergeAutoScheduledEvent = Schema.Struct({
   type: Schema.Literal("merge.auto.scheduled"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, executeAt: Schema.String, cooldownSeconds: Schema.Number }),
+  payload: Schema.Struct({
+    issueId: IssueId,
+    executeAt: Schema.String,
+    scheduledAt: Schema.String,
+    cooldownSeconds: Schema.Number,
+  }),
 })
 export type MergeAutoScheduledEvent = typeof MergeAutoScheduledEvent.Type
 

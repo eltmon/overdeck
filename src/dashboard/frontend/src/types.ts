@@ -7,6 +7,11 @@ export interface LinearProject {
 
 export type IssueSource = 'linear' | 'github' | 'gitlab' | 'jira' | 'rally';
 
+export interface AutoMergeScheduled {
+  executeAt: string;
+  scheduledAt: string;
+}
+
 export interface Issue {
   id: string;
   identifier: string;
@@ -40,6 +45,7 @@ export interface Issue {
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
+  autoMergeScheduled?: AutoMergeScheduled | null;
   // Planning-state (embedded from /api/issues via filesystem checks)
   hasPlan?: boolean;
   hasBeads?: boolean;

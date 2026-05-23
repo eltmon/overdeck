@@ -240,6 +240,21 @@ function removeAgentFromSessionIndex(
   return next
 }
 
+function setIssueAutoMergeScheduled(
+  issues: unknown[],
+  issueId: string,
+  autoMergeScheduled: { executeAt: string; scheduledAt: string } | null,
+): unknown[] {
+  return issues.map(issue => {
+    if (!issue || typeof issue !== 'object') return issue
+    const record = issue as Record<string, unknown>
+    if (record['identifier'] === issueId || record['id'] === issueId) {
+      return { ...record, autoMergeScheduled }
+    }
+    return issue
+  })
+}
+
 // ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
 
 function defaultRuntimeSnapshot(agentId: string, timestamp: string, sequence: number): AgentRuntimeSnapshot {
@@ -572,16 +587,18 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'merge.auto.scheduled': {
-      const { issueId, executeAt, cooldownSeconds } = event.payload
+      const { issueId, executeAt, scheduledAt } = event.payload
+      const autoMergeScheduled = { executeAt, scheduledAt }
       const existing = state.reviewStatusByIssueId[issueId] ?? { issueId }
       const nextStatus: ReviewStatusSnapshot = {
         ...existing,
-        autoMergeScheduled: { executeAt, cooldownSeconds },
+        autoMergeScheduled,
       }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+        issuesRaw: setIssueAutoMergeScheduled(state.issuesRaw, issueId, autoMergeScheduled),
       }
     }
 
@@ -596,6 +613,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus as ReviewStatusSnapshot },
+        issuesRaw: setIssueAutoMergeScheduled(state.issuesRaw, issueId, null),
       }
     }
 

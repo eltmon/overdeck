@@ -24,6 +24,7 @@ import {
 } from '@panctl/contracts';
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
+import { getPendingAutoMerges } from '../../lib/database/auto-merge-db.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
@@ -77,6 +78,27 @@ function toJsonish(value: unknown, seen = new WeakSet<object>()): Jsonish | unde
 
 function cleanIssues(issues: unknown[]): unknown[] {
   return issues.map((issue) => toJsonish(issue) ?? null);
+}
+
+function withAutoMergeSchedules(issues: unknown[]): unknown[] {
+  const pendingByIssueId = new Map(
+    getPendingAutoMerges().map((row) => [
+      row.issueId,
+      { executeAt: row.executeAt, scheduledAt: row.scheduledAt },
+    ]),
+  );
+
+  return issues.map((issue) => {
+    if (!issue || typeof issue !== 'object') return issue;
+    const record = issue as Record<string, unknown>;
+    const issueId = typeof record['identifier'] === 'string'
+      ? record['identifier']
+      : typeof record['id'] === 'string'
+        ? record['id']
+        : null;
+    if (!issueId) return record;
+    return { ...record, autoMergeScheduled: pendingByIssueId.get(issueId.toUpperCase()) ?? null };
+  });
 }
 
 // ─── Value validators for strict literal types ──────────────────────────────
@@ -241,7 +263,7 @@ export const ReadModelServiceLive = Layer.effect(
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
-        issues: state.issuesRaw,
+        issues: withAutoMergeSchedules(state.issuesRaw),
         resources: state.resources ?? undefined,
         memory: {
           observationsByIssueId: state.observationsByIssueId,

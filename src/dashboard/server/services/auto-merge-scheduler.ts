@@ -20,7 +20,7 @@ import type { DomainEvent } from '@panctl/contracts';
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 type AutoMergeEventPayloads = {
-  'merge.auto.scheduled': { issueId: string; executeAt: string; cooldownSeconds: number };
+  'merge.auto.scheduled': { issueId: string; executeAt: string; scheduledAt: string; cooldownSeconds: number };
   'merge.auto.cancelled': { issueId: string; reason: string; cancelledBy: string };
   'merge.auto.executed': { issueId: string };
   'merge.auto.aborted': { issueId: string; gateFailureReason: string };
@@ -167,7 +167,9 @@ export class AutoMergeScheduler {
     if (!status?.readyForMerge) return false;
     if (status.mergeStatus && status.mergeStatus !== 'pending') return false;
 
-    const executeAt = new Date(this.deps.now().getTime() + config.cooldownMinutes * 60_000).toISOString();
+    const scheduledAtMs = this.deps.now().getTime();
+    const scheduledAt = new Date(scheduledAtMs).toISOString();
+    const executeAt = new Date(scheduledAtMs + config.cooldownMinutes * 60_000).toISOString();
     const scheduled = this.deps.schedulePending(normalizedIssueId, executeAt);
     if (!scheduled) return false;
 
@@ -176,6 +178,7 @@ export class AutoMergeScheduler {
     emitAutoMergeEvent('merge.auto.scheduled', {
       issueId: normalizedIssueId,
       executeAt,
+      scheduledAt,
       cooldownSeconds: config.cooldownMinutes * 60,
     });
     emitAutoMergeActivity(normalizedIssueId, 'info', `Auto-merge scheduled for ${normalizedIssueId}`);

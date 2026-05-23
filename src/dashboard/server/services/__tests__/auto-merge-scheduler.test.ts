@@ -142,7 +142,12 @@ describe('AutoMergeScheduler', () => {
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'pending', executeAt: '2026-05-23T12:05:00.000Z' });
     expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
       type: 'merge.auto.scheduled',
-      payload: { issueId: 'PAN-1', executeAt: '2026-05-23T12:05:00.000Z', cooldownSeconds: 300 },
+      payload: {
+        issueId: 'PAN-1',
+        executeAt: '2026-05-23T12:05:00.000Z',
+        scheduledAt: '2026-05-23T12:00:00.000Z',
+        cooldownSeconds: 300,
+      },
     }));
     expect(activityTtsMock).toHaveBeenCalledTimes(1);
     expectLastTts({

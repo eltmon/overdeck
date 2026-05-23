@@ -301,7 +301,7 @@ export type AgentSnapshot = typeof AgentSnapshot.Type
 
 export const AutoMergeScheduledSnapshot = Schema.Struct({
   executeAt: Schema.String,
-  cooldownSeconds: Schema.Number,
+  scheduledAt: Schema.String,
 })
 export type AutoMergeScheduledSnapshot = typeof AutoMergeScheduledSnapshot.Type
 
