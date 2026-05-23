@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1414: Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
-    "updated": "2026-05-23T11:24:51.471Z"
+    "updated": "2026-05-23T18:05:09.481Z"
   },
   "plan": {
     "id": "pan-1414",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-23T11:25:00.000Z",
-    "updated": "2026-05-23T11:24:51.471Z",
+    "updated": "2026-05-23T18:05:09.481Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
@@ -67,7 +67,7 @@
       {
         "id": "reduce-constants",
         "title": "Reduce SHIP_DISPATCH_STALENESS_MS to 30s and SHIP_DISPATCH_COOLDOWN_MS to 90s",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T11:25:00.000Z",
         "metadata": {
@@ -83,7 +83,7 @@
           {
             "id": "reduce-constants.ac1",
             "title": "SHIP_DISPATCH_STALENESS_MS equals 30 * 1000 (30 s) in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -91,7 +91,7 @@
           {
             "id": "reduce-constants.ac2",
             "title": "SHIP_DISPATCH_COOLDOWN_MS equals 90 * 1000 (90 s) in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "reduce-constants.ac3",
             "title": "JSDoc Guards bullets for checkUndispatchedShip reflect `30 s` staleness and `90 s` cooldown — no stale `2 min` / `5 min` references remain in the file's comments",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "reduce-constants.ac4",
             "title": "All existing tests in src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts still pass — STALE_TS of 10 min remains valid against the new 30 s threshold",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -115,7 +115,7 @@
           {
             "id": "reduce-constants.ac5",
             "title": "npm run typecheck and npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -125,7 +125,7 @@
       {
         "id": "per-issue-redispatch-counter",
         "title": "Add per-issue re-dispatch counter and log `[deacon] Ship re-dispatched (N total for issue X)`",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T11:25:00.000Z",
         "metadata": {
@@ -141,7 +141,7 @@
           {
             "id": "per-issue-redispatch-counter.ac1",
             "title": "Module-level `shipDispatchCounts: Map<string, number>` exists in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -149,7 +149,7 @@
           {
             "id": "per-issue-redispatch-counter.ac2",
             "title": "On each successful re-dispatch path, a log line of exact format `[deacon] Ship re-dispatched (N total for issue X)` is emitted, where N is the post-increment count and X is the issueId",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -157,7 +157,7 @@
           {
             "id": "per-issue-redispatch-counter.ac3",
             "title": "Counter increments on every re-dispatch attempt that actually fires onIssueStateChange (not on cooldown skips, staleness skips, or readyForMerge skips)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -165,7 +165,7 @@
           {
             "id": "per-issue-redispatch-counter.ac4",
             "title": "New unit test in deacon-undispatched-ship.test.ts asserts the log format and N value after a re-dispatch (using a console.log spy)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -173,7 +173,7 @@
           {
             "id": "per-issue-redispatch-counter.ac5",
             "title": "npm run typecheck, npm run lint, and the deacon-undispatched-ship test file all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -183,7 +183,7 @@
       {
         "id": "patrol-fires-within-60s-test",
         "title": "Add fake-timer test: patrol fires within 60s of a stale ship-eligible status",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T11:25:00.000Z",
         "metadata": {
@@ -199,7 +199,7 @@
           {
             "id": "patrol-fires-within-60s-test.ac1",
             "title": "Test uses vi.useFakeTimers() and vi.setSystemTime() — no real-clock setTimeout-based waiting",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -207,7 +207,7 @@
           {
             "id": "patrol-fires-within-60s-test.ac2",
             "title": "Test asserts NOT dispatched when status is freshly updated, then asserts dispatched after advancing system time by 60_000 ms",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -215,7 +215,7 @@
           {
             "id": "patrol-fires-within-60s-test.ac3",
             "title": "Test uses an issueId distinct from existing tests in the file so module-level cooldown / counter maps do not mask the assertion",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -223,7 +223,7 @@
           {
             "id": "patrol-fires-within-60s-test.ac4",
             "title": "Test would FAIL against the pre-change 2-min staleness constant (proves the new 30 s value is what the test is exercising)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -231,7 +231,7 @@
           {
             "id": "patrol-fires-within-60s-test.ac5",
             "title": "Full test file passes: npm test -- src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

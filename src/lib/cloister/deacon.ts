@@ -2581,12 +2581,13 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 // Wait this long after the review/test status last changed before the patrol
 // steps in — long enough that the reactive scheduler's primary
 // onIssueStateChange('shipping') trigger has had every chance to fire first.
-const SHIP_DISPATCH_STALENESS_MS = 2 * 60 * 1000; // 2 min
+const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
 // Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
 // is already idempotent (activeRoleRunExists skips a live, current ship run),
 // so this is purely to keep the patrol log quiet while a ship run is in flight.
-const SHIP_DISPATCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
+const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
 const shipDispatchCooldowns = new Map<string, number>();
+const shipDispatchCounts = new Map<string, number>();
 
 /**
  * Safety-net patrol: re-dispatch the ship role for issues where review and
@@ -2608,8 +2609,8 @@ const shipDispatchCooldowns = new Map<string, number>();
  * Guards:
  *   - review + test both 'passed', not yet readyForMerge
  *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
- *   - staleness: status at least 2 min old (don't race the primary trigger)
- *   - per-issue cooldown: 5 min between re-dispatch attempts
+ *   - staleness: status at least 30 s old (don't race the primary trigger)
+ *   - per-issue cooldown: 90 s between re-dispatch attempts
  */
 export async function checkUndispatchedShip(): Promise<string[]> {
   const actions: string[] = [];
@@ -2617,16 +2618,31 @@ export async function checkUndispatchedShip(): Promise<string[]> {
   try {
     const statuses = loadReviewStatuses();
     const now = Date.now();
+    const shipEligibleKeys = new Set<string>();
 
     for (const [key, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'passed') continue;
       if (status.readyForMerge) continue;
       if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
+      if (!status.updatedAt) continue;
+      shipEligibleKeys.add(key);
+    }
+
+    for (const key of new Set([...shipDispatchCooldowns.keys(), ...shipDispatchCounts.keys()])) {
+      if (!shipEligibleKeys.has(key)) {
+        shipDispatchCooldowns.delete(key);
+        shipDispatchCounts.delete(key);
+      }
+    }
+
+    for (const [key, status] of Object.entries(statuses)) {
+      if (!shipEligibleKeys.has(key)) continue;
 
       // Give the reactive scheduler's primary trigger time to land first.
-      if (!status.updatedAt) continue;
-      if (now - new Date(status.updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
+      const updatedAt = status.updatedAt;
+      if (!updatedAt) continue;
+      if (now - new Date(updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
 
       // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
       const lastAttempt = shipDispatchCooldowns.get(key);
@@ -2642,6 +2658,9 @@ export async function checkUndispatchedShip(): Promise<string[]> {
       try {
         const { onIssueStateChange } = await import('./service.js');
         await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
+        const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
+        shipDispatchCounts.set(key, dispatchCount);
+        console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
         actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
       } catch (err) {
         console.error(
