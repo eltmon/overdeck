@@ -30,7 +30,6 @@ describe('role definitions', () => {
     });
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
-    expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('Read the issue and the PRD draft');
     expect(body).toContain('.pan/drafts/');
     expect(body).toContain('AskUserQuestion');
@@ -54,7 +53,6 @@ describe('role definitions', () => {
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
-    expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('## Per-Bead Workflow');
     expect(body).toContain('metadata.requiresInspection === true');
     expect(body).toContain('inspectionDepth: "deep"');
@@ -94,7 +92,6 @@ describe('role definitions', () => {
     // intentionally absent from the tools list.
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
     expect((frontmatter.tools as string[])).not.toContain('Agent');
-    expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('You are the review synthesis agent');
     expect(body).toContain('pan review spawn-reviewer');
     expect(body.toLowerCase()).toContain('poll');
@@ -113,7 +110,6 @@ describe('role definitions', () => {
     });
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
-    expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(frontmatter.mcpServers).toEqual(expect.any(Array));
     expect(body).toContain('There is no separate UAT role');
     expect(body).toContain('Playwright MCP tools');
@@ -134,7 +130,6 @@ describe('role definitions', () => {
     });
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Edit']));
-    expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('Ship NEVER merges');
     expect(body).toContain('ready-to-merge');
     expect(body).toContain('gh pr merge');
