@@ -11,7 +11,7 @@ import {
   type AutoMergeRow,
 } from '../../../lib/database/auto-merge-db.js';
 import { getCombinedCommitStatus, getPrLabels } from '../../../lib/forge.js';
-import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { listProjects, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { getReviewStatus, type ReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { getEventStore } from '../event-store.js';
@@ -301,6 +301,20 @@ export const autoMergeScheduler = new AutoMergeScheduler();
 
 export function startAutoMergeScheduler(): Promise<void> {
   return autoMergeScheduler.start();
+}
+
+export async function logEnabledAutoMergeProjects(): Promise<void> {
+  const projects = await Effect.runPromise(listProjects());
+  const enabledProjects: string[] = [];
+
+  for (const project of projects) {
+    const config = await Effect.runPromise(getAutoMergeConfig(project.key));
+    if (config.enabled) enabledProjects.push(project.key);
+  }
+
+  if (enabledProjects.length > 0) {
+    console.log(`[merge-auto] AUTO-MERGE ENABLED for project(s): ${enabledProjects.join(', ')}`);
+  }
 }
 
 export function stopAutoMergeScheduler(): void {
