@@ -5,6 +5,9 @@ import { WS_METHODS } from '@panctl/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),
+  request: vi.fn(),
+  getAvailableEditors: vi.fn(),
+  shellOpenInEditor: vi.fn(),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -69,6 +72,16 @@ describe('IssueDrawer', () => {
     vi.restoreAllMocks();
     wsTransportMock.subscribe.mockReset();
     wsTransportMock.subscribe.mockReturnValue(vi.fn());
+    wsTransportMock.getAvailableEditors.mockReset();
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: [] });
+    wsTransportMock.shellOpenInEditor.mockReset();
+    wsTransportMock.shellOpenInEditor.mockResolvedValue({ success: true });
+    wsTransportMock.request.mockReset();
+    wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
+      [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
+      [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
+    }));
+    localStorage.clear();
     window.history.replaceState(null, '', '/');
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
@@ -134,6 +147,48 @@ describe('IssueDrawer', () => {
 
     expect(subscribeIssueEvents).toHaveBeenCalledWith({ issueId: 'PAN-1' });
     expect(useDashboardStore.getState().recentActivity).toEqual([{ id: 'activity-1', issueId: 'PAN-1', message: 'Scoped update' }]);
+  });
+
+  it('renders the open-in picker for an existing drawer workspace', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      exists: true,
+      issueId: 'PAN-1',
+      path: '/tmp/pan-workspace',
+    }), { status: 200 }));
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    const section = await screen.findByTestId('drawer-workspace-section');
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1');
+    expect(within(section).getByText('/tmp/pan-workspace')).toHaveAttribute('title', '/tmp/pan-workspace');
+    expect(await within(section).findByText('Cursor')).toBeInTheDocument();
+
+    fireEvent.click(within(section).getByLabelText('Choose editor'));
+    fireEvent.click(await screen.findByText('VS Code'));
+
+    await waitFor(() => {
+      expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+        cwd: '/tmp/pan-workspace',
+        editor: 'vscode',
+      });
+    });
+    expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+  });
+
+  it('hides the drawer open-in picker when no workspace exists', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      exists: false,
+      issueId: 'PAN-1',
+    }), { status: 200 }));
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1'));
+    expect(screen.queryByTestId('drawer-workspace-section')).toBeNull();
+    expect(wsTransportMock.getAvailableEditors).not.toHaveBeenCalled();
   });
 
   it('tears down the drawer issue subscription on close and reuses quick same-issue reopens', async () => {

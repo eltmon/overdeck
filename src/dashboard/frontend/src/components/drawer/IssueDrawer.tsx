@@ -16,6 +16,8 @@ import PhaseTimeline from './PhaseTimeline';
 import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
+import { PanOpenInPicker } from '../PanOpenInPicker';
+import type { WorkspaceInfo } from '../../lib/workspace-types';
 
 const ACTIVITY_PHASE_DOT_CLASSES = {
   work: 'bg-primary',
@@ -81,6 +83,34 @@ function DrawerPlanPanel({ issueId }: { issueId: string }) {
         <VBriefViewer doc={data ?? null} />
       )}
     </div>
+  );
+}
+
+function DrawerWorkspaceSection({ issueId }: { issueId: string }) {
+  const { data: workspace } = useQuery<WorkspaceInfo | null>({
+    queryKey: ['drawer-workspace', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}`);
+      if (!res.ok) return null;
+      return res.json() as Promise<WorkspaceInfo>;
+    },
+    retry: false,
+  });
+
+  if (!workspace?.exists || !workspace.path) return null;
+
+  return (
+    <section data-testid="drawer-workspace-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
+      <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Workspace</div>
+      <div className="flex items-center justify-between gap-[12px]">
+        <div className="min-w-0 truncate font-mono text-[11px] leading-[18px] text-muted-foreground" title={workspace.path}>
+          {workspace.path}
+        </div>
+        <div className="shrink-0">
+          <PanOpenInPicker cwd={workspace.path} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -219,6 +249,7 @@ export function IssueDrawer() {
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
+                <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
                 <DrawerVerificationGates />
                 <DrawerBeadsList />
