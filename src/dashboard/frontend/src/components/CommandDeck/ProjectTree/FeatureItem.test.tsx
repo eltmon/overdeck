@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import { DialogProvider } from '../../DialogProvider';
 import { FeatureItem, pickBestSession } from './FeatureItem';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 
@@ -146,6 +149,15 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   };
 }
 
+function renderFeature(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <DialogProvider>{ui}</DialogProvider>
+    </QueryClientProvider>,
+  );
+}
+
 // ─── pickBestSession ──────────────────────────────────────────────────────────
 
 describe('pickBestSession', () => {
@@ -212,7 +224,7 @@ describe('FeatureItem', () => {
   });
 
   it('renders feature info without caret when no sessions', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -225,7 +237,7 @@ describe('FeatureItem', () => {
   });
 
   it('renders a muted untitled placeholder when title is empty', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature()}
         title="   "
@@ -241,7 +253,7 @@ describe('FeatureItem', () => {
   });
 
   it('does not duplicate the issue id when title is missing', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature()}
         title=""
@@ -255,7 +267,7 @@ describe('FeatureItem', () => {
   });
 
   it('shows caret when sessions are present', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -266,7 +278,7 @@ describe('FeatureItem', () => {
   });
 
   it('shows an activity tooltip for aggregate session state', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [
@@ -283,7 +295,7 @@ describe('FeatureItem', () => {
   });
 
   it('shows work and review badges on the parent row', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [
@@ -301,7 +313,7 @@ describe('FeatureItem', () => {
   });
 
   it('shows a review error badge when a review session failed', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [makeSession({ sessionId: 'review-1', type: 'reviewer', role: 'security', status: 'error', presence: 'ended' })],
@@ -314,7 +326,7 @@ describe('FeatureItem', () => {
   });
 
   it('applies the colored kanban state pill class', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ stateLabel: 'Planning' })}
         isSelected={false}
@@ -325,7 +337,7 @@ describe('FeatureItem', () => {
   });
 
   it('adds contextual tooltip text to the feature state pill', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ stateLabel: 'In Review', readyForMerge: true })}
         isSelected={false}
@@ -336,7 +348,7 @@ describe('FeatureItem', () => {
   });
 
   it('adds richer progress tooltip text for rally progress pills', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           isRally: true,
@@ -352,7 +364,7 @@ describe('FeatureItem', () => {
   });
 
   it('toggles expansion when caret is clicked', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -366,7 +378,7 @@ describe('FeatureItem', () => {
   });
 
   it('collapses when caret is clicked again', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -380,7 +392,7 @@ describe('FeatureItem', () => {
 
   it('calls onSelect when row is clicked', () => {
     const onSelect = vi.fn();
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -398,7 +410,7 @@ describe('FeatureItem', () => {
       makeSession({ sessionId: 'idle-1', presence: 'idle' }),
       makeSession({ sessionId: 'active-1', presence: 'active' }),
     ];
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions })}
         isSelected={false}
@@ -414,7 +426,7 @@ describe('FeatureItem', () => {
   it('does not call onSelectSession when row is clicked and no sessions exist', () => {
     const onSelect = vi.fn();
     const onSelectSession = vi.fn();
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -433,7 +445,7 @@ describe('FeatureItem', () => {
       makeSession({ sessionId: 'sess-a' }),
       makeSession({ sessionId: 'sess-b' }),
     ];
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions, stateLabel: 'Done' })}
         isSelected={false}
@@ -447,7 +459,7 @@ describe('FeatureItem', () => {
   });
 
   it('persists expansion state to localStorage', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -462,7 +474,7 @@ describe('FeatureItem', () => {
 
   it('restores expansion state from localStorage on mount', () => {
     localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -474,7 +486,7 @@ describe('FeatureItem', () => {
   });
 
   it('does not auto-expand on mount when localStorage has no entry for terminal states', () => {
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
@@ -490,7 +502,7 @@ describe('FeatureItem', () => {
       makeSession({ sessionId: 'sess-a' }),
       makeSession({ sessionId: 'sess-b' }),
     ];
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions, stateLabel: 'Done' })}
         isSelected={false}
@@ -524,7 +536,7 @@ describe('FeatureItem', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
@@ -571,7 +583,7 @@ describe('FeatureItem', () => {
 
   it('shows cleanup affordances for orphaned resources', () => {
     const onCleanupOrphanedResources = vi.fn();
-    render(
+    renderFeature(
       <FeatureItem
         feature={makeFeature({
           issueId: 'PAN-777',

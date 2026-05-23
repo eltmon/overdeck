@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import DrawerActionBar from './DrawerActionBar';
@@ -83,8 +82,6 @@ function DrawerPlanPanel({ issueId }: { issueId: string }) {
     </div>
   );
 }
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());

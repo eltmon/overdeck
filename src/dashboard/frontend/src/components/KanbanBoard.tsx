@@ -36,16 +36,11 @@ import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
-
-// Parity registry anchor — keeps the card action surface tied to the
-// shared Command Deck parity inventory used by tests.
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {

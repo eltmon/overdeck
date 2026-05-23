@@ -1,15 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { getHarness } from '@panctl/contracts';
 
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAgentProblemStatus } from '../../lib/pipeline-state';
 import { useDashboardStore, selectAgentOutput } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 function isActiveAgent(agent: Agent) {
   return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';

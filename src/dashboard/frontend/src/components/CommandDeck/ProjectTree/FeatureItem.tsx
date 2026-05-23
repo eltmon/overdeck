@@ -1,19 +1,15 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
-  BookText, Bug, Container, Radio, Workflow, Play, RefreshCw, RotateCcw,
-  XCircle, ClipboardCheck, Zap,
+  BookText, Bug, Container, Radio, Workflow,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
-import { useAvailableModels } from '../../shared/ModelPicker/ModelPicker';
 import {
   ContextMenuRoot,
   ContextMenuTrigger,
@@ -22,11 +18,8 @@ import {
   ContextMenuDestructiveItem,
   ContextMenuSeparator,
   ContextMenuLabel,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
 } from '../../shared/ContextMenu';
-import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import styles from '../styles/command-deck.module.css';
 
@@ -665,35 +658,24 @@ interface FeatureContextMenuProps {
   onOpenPlanDialog?: (issueId: string) => void;
 }
 
-function StartModelSubmenu({
-  onStart,
-}: {
-  onStart: (model?: string) => void;
-}) {
-  const { groups } = useAvailableModels();
-
+function FeatureIssueActionItems({ views }: { views: IssueActionView[] }) {
   return (
-    <ContextMenuSub>
-      <ContextMenuSubTrigger>Start with Model…</ContextMenuSubTrigger>
-      <ContextMenuSubContent>
-        <ContextMenuItem onSelect={() => onStart()}>
-          <span className="flex-1">Default model</span>
-        </ContextMenuItem>
-        {groups.map((group) => (
-          <div key={group.provider}>
-            <ContextMenuLabel>{group.label}</ContextMenuLabel>
-            {group.models.map((m) => (
-              <ContextMenuItem key={m.id} onSelect={() => onStart(m.id)}>
-                <span className="flex-1">{m.label}</span>
-                {m.costDisplay && (
-                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
-                )}
-              </ContextMenuItem>
-            ))}
-          </div>
-        ))}
-      </ContextMenuSubContent>
-    </ContextMenuSub>
+    <>
+      {views.map((view) => {
+        const label = view.isPending ? `${view.action.label}…` : view.action.label;
+        const disabled = !view.enabled || view.isPending;
+        const props = {
+          key: view.action.key,
+          disabled,
+          onSelect: () => view.invoke(),
+        };
+
+        if (view.action.kind === 'destructive' || view.action.group === 'danger') {
+          return <ContextMenuDestructiveItem {...props}>{label}</ContextMenuDestructiveItem>;
+        }
+        return <ContextMenuItem {...props}>{label}</ContextMenuItem>;
+      })}
+    </>
   );
 }
 
@@ -704,118 +686,12 @@ function FeatureContextMenu({
   onOpenStateDir,
   onViewJsonl,
   onDeepWipe,
-  onStopSession,
-  onResumeSession,
-  onRestartSession,
-  onOpenPlanDialog,
 }: FeatureContextMenuProps) {
-  const queryClient = useQueryClient();
-  const { groups } = useAvailableModels();
-
-  const agentRunning = feature.agentStatus === 'running';
-  const agentStopped = feature.agentStatus === 'stopped';
-  const hasAgent = !!feature.agentStatus;
-
-  const startAgentMutation = useMutation({
-    mutationFn: async (model?: string) => {
-      const body: Record<string, unknown> = { issueId: feature.issueId };
-      if (model) body.model = model;
-      const res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to start agent');
-      return data;
-    },
-    onSuccess: () => {
-      void refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const reviewMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force: true }),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string; success?: boolean; message?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to start review');
-      if (data.success === false) throw new Error(data.message || 'Review was not started');
-      return data;
-    },
-    onSuccess: () => {
-      void refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const recoverMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rerun: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(err.error || 'Failed to recover pipeline');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      void refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const completePlanningMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/complete-planning`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to complete planning');
-      return data;
-    },
-    onSuccess: () => {
-      toast.success(`Planning complete for ${feature.issueId}`);
-      void refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const swarmMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/swarm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: feature.issueId }),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string; dispatched?: number; slots?: unknown[] };
-      if (!res.ok) throw new Error(data.error || 'Failed to dispatch swarm');
-      return data;
-    },
-    onSuccess: (data) => {
-      toast.success(`Swarm dispatched for ${feature.issueId}: ${(data as any).dispatched ?? 0} slot(s)`);
-      void refreshDashboardState(queryClient);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 8000 });
-    },
-  });
+  const issueActions = useIssueActions(feature.issueId);
+  const issueActionViews = useMemo(
+    () => [...issueActions.primary, ...issueActions.secondary, ...issueActions.overflow],
+    [issueActions.primary, issueActions.secondary, issueActions.overflow],
+  );
 
   const handleDeepWipe = useCallback(() => {
     if (!onDeepWipe) return;
@@ -827,142 +703,39 @@ function FeatureContextMenu({
     }
   }, [feature.issueId, onDeepWipe]);
 
-  const isRecoverable = feature.sessions?.some(
-    s => (s.type === 'review' || s.type === 'reviewer') && isErrorSession(s),
-  ) ?? false;
+  const hasUtilityActions = (workSessionId && (onOpenStateDir || (hasJsonl && onViewJsonl))) || onDeepWipe;
 
   return (
-    <ContextMenuContent>
-      {/* Lifecycle actions */}
-      {agentRunning && workSessionId && onStopSession && (
-        <ContextMenuItem onSelect={() => onStopSession(workSessionId)}>
-          <XCircle size={12} className="mr-2" />
-          Stop Agent
-        </ContextMenuItem>
-      )}
+    <>
+      <ContextMenuContent>
+        <ContextMenuLabel>Issue actions</ContextMenuLabel>
+        <FeatureIssueActionItems views={issueActionViews} />
 
-      {agentStopped && workSessionId && onResumeSession && (
-        <ContextMenuItem onSelect={() => onResumeSession(workSessionId)}>
-          <Play size={12} className="mr-2" />
-          Resume Session
-        </ContextMenuItem>
-      )}
+        {hasUtilityActions ? <ContextMenuSeparator /> : null}
 
-      {!hasAgent && (
-        <ContextMenuItem onSelect={() => startAgentMutation.mutate(undefined)} disabled={startAgentMutation.isPending}>
-          {startAgentMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Play size={12} className="mr-2" />}
-          Start Agent
-        </ContextMenuItem>
-      )}
-
-      {/* Start/Resume with Model submenu */}
-      {(!hasAgent || agentStopped) && (
-        <StartModelSubmenu onStart={(model) => startAgentMutation.mutate(model)} />
-      )}
-
-      {agentRunning && workSessionId && onRestartSession && (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Switch Model…</ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            {groups.map((group) => (
-              <div key={group.provider}>
-                <ContextMenuLabel>{group.label}</ContextMenuLabel>
-                {group.models.map((m) => (
-                  <ContextMenuItem key={m.id} onSelect={() => onRestartSession(workSessionId, feature.issueId, 'work', undefined, m.id)}>
-                    <span className="flex-1">{m.label}</span>
-                    {m.costDisplay && (
-                      <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
-                    )}
-                  </ContextMenuItem>
-                ))}
-              </div>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      )}
-
-      {/* Pipeline actions */}
-      {(agentRunning || agentStopped || !hasAgent) && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => reviewMutation.mutate()} disabled={reviewMutation.isPending}>
-            {reviewMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RefreshCw size={12} className="mr-2" />}
-            Review & Test
+        {workSessionId && onOpenStateDir && (
+          <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
+            <FolderOpen size={12} className="mr-2" />
+            Open State Dir
           </ContextMenuItem>
-        </>
-      )}
+        )}
 
-      {isRecoverable && (
-        <ContextMenuItem onSelect={() => recoverMutation.mutate()} disabled={recoverMutation.isPending}>
-          {recoverMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RotateCcw size={12} className="mr-2" />}
-          Recover
-        </ContextMenuItem>
-      )}
+        {hasJsonl && workSessionId && onViewJsonl && (
+          <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
+            <FileText size={12} className="mr-2" />
+            View JSONL
+          </ContextMenuItem>
+        )}
 
-      {/* Plan actions — always available so users can (re-)plan stuck/empty issues */}
-      {onOpenPlanDialog && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <BookText size={12} className="mr-2" />
-              Plan
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              <ContextMenuItem onSelect={() => onOpenPlanDialog(feature.issueId)}>
-                <BookText size={12} className="mr-2" />
-                {feature.hasPlanning || feature.resourceDetails?.hasVbrief ? 'Continue Planning…' : 'Start Planning…'}
-              </ContextMenuItem>
-              <ContextMenuItem
-                onSelect={() => completePlanningMutation.mutate()}
-                disabled={completePlanningMutation.isPending || !feature.resourceDetails?.hasVbrief || !feature.resourceDetails?.hasBeads}
-              >
-                {completePlanningMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <ClipboardCheck size={12} className="mr-2" />}
-                Done Planning
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        </>
-      )}
-
-      {/* Swarm action */}
-      {feature.resourceDetails?.hasVbrief && (
-        <ContextMenuItem
-          onSelect={() => swarmMutation.mutate()}
-          disabled={swarmMutation.isPending}
-        >
-          {swarmMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Zap size={12} className="mr-2" />}
-          Swarm
-        </ContextMenuItem>
-      )}
-
-      {/* Utility actions */}
-      <ContextMenuSeparator />
-
-      {workSessionId && onOpenStateDir && (
-        <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
-          <FolderOpen size={12} className="mr-2" />
-          Open State Dir
-        </ContextMenuItem>
-      )}
-
-      {hasJsonl && workSessionId && onViewJsonl && (
-        <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
-          <FileText size={12} className="mr-2" />
-          View JSONL
-        </ContextMenuItem>
-      )}
-
-      {onDeepWipe && (
-        <>
-          <ContextMenuSeparator />
+        {onDeepWipe && (
           <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
             <Trash2 size={12} className="mr-2" />
             Deep Wipe
           </ContextMenuDestructiveItem>
-        </>
-      )}
-    </ContextMenuContent>
+        )}
+      </ContextMenuContent>
+      <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
+    </>
   );
 }
 

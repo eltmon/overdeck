@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Container } from 'lucide-react';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../../lib/commandDeckSurfaceRegistry';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { InlineSparkline } from '../InlineSparkline';
 import {
@@ -10,8 +9,6 @@ import {
   ContextMenuItem,
 } from '../../shared/ContextMenu';
 import styles from '../styles/command-deck.module.css';
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 export interface ContainerNodeProps {
   name: string;

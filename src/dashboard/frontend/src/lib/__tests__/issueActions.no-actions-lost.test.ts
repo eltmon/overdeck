@@ -4,67 +4,11 @@ import {
   ISSUE_ACTIONS,
   type IssueActionKey,
 } from '../issueActions';
-import {
-  COMMAND_DECK_SURFACE_REGISTRY,
-} from '../commandDeckSurfaceRegistry';
-import {
-  flattenActions,
-  getZoneBActions,
-  type ActionKey,
-} from '../commandDeckActions';
 
 const registryKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
 const registryByKey = new Map(ISSUE_ACTIONS.map((action) => [action.key, action]));
 
-const legacyActionKeys = [
-  'merge',
-  'reviewTest',
-  'recover',
-  'stopAgent',
-  'startAgent',
-  'resumeSession',
-  'resetSession',
-  'createWorkspace',
-  'copySettings',
-  'closeOut',
-  'beads',
-  'inference',
-  'discussions',
-  'transcripts',
-  'upload',
-  'syncDiscussions',
-  'syncMain',
-  'statusReview',
-  'reopen',
-  'restartAgent',
-  'restartFromPlan',
-  'resetIssue',
-  'cancel',
-  'stopSession',
-  'viewTerminal',
-  'viewState',
-  'viewVbrief',
-  'copySessionId',
-  'copyTmuxCommand',
-] as const satisfies readonly ActionKey[];
-
-const sessionScopedActionKeys = [
-  'stopSession',
-  'viewTerminal',
-  'viewState',
-  'viewVbrief',
-  'copySessionId',
-  'copyTmuxCommand',
-] as const satisfies readonly ActionKey[];
-
-type IssueActionCoverage = {
-  legacyKey: ActionKey;
-  registryKey: IssueActionKey | null;
-  surfaceText: string;
-  note?: string;
-};
-
-const legacyIssueActionCoverage = [
+const legacyCommandDeckIssueActions = [
   { legacyKey: 'merge', registryKey: null, surfaceText: 'Merge', note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
   { legacyKey: 'reviewTest', registryKey: 'reviewTest', surfaceText: 'Review & Test' },
   { legacyKey: 'recover', registryKey: 'recoverReview', surfaceText: 'Recover' },
@@ -88,7 +32,13 @@ const legacyIssueActionCoverage = [
   { legacyKey: 'restartFromPlan', registryKey: 'restartFromPlan', surfaceText: 'Restart from plan' },
   { legacyKey: 'resetIssue', registryKey: 'resetIssue', surfaceText: 'Reset issue' },
   { legacyKey: 'cancel', registryKey: 'cancel', surfaceText: 'Cancel Issue' },
-] as const satisfies readonly IssueActionCoverage[];
+] as const satisfies readonly { legacyKey: string; registryKey: IssueActionKey | null; surfaceText: string; note?: string }[];
+
+const commandDeckGapActions = [
+  'untroubled',
+  'inspectBead',
+  'open',
+] as const satisfies readonly IssueActionKey[];
 
 const badgeBarActions = [
   { surfaceText: 'Tasks', registryKey: 'beads' },
@@ -112,13 +62,16 @@ const statusFlowActions = [
   { surfaceText: 'Reopen', registryKey: 'reopen' },
 ] as const satisfies readonly { surfaceText: string; registryKey: IssueActionKey | null; note?: string }[];
 
-const projectTreeContextMenuActions = [
+const projectTreeUtilityActions = [
   { surfaceText: 'Copy project name', scope: 'project', ownerSurface: 'ProjectNode' },
   { surfaceText: 'View Logs', scope: 'container', ownerSurface: 'ContainerNode' },
   { surfaceText: 'Inspect', scope: 'container', ownerSurface: 'ContainerNode' },
   { surfaceText: 'Restart', scope: 'container', ownerSurface: 'ContainerNode' },
   { surfaceText: 'Stop', scope: 'container', ownerSurface: 'ContainerNode' },
   { surfaceText: 'Start', scope: 'container', ownerSurface: 'ContainerNode' },
+  { surfaceText: 'Open State Dir', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
+  { surfaceText: 'View JSONL', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
+  { surfaceText: 'Deep Wipe', scope: 'agent-state', ownerSurface: 'FeatureItem' },
 ] as const;
 
 const zoneBSessionActions = [
@@ -128,9 +81,9 @@ const zoneBSessionActions = [
   { key: 'viewVbrief', surfaceText: 'View vBRIEF' },
   { key: 'copySessionId', surfaceText: 'Copy Session ID' },
   { key: 'copyTmuxCommand', surfaceText: 'Copy tmux command' },
-] as const satisfies readonly { key: typeof sessionScopedActionKeys[number]; surfaceText: string }[];
+] as const;
 
-function renderMenuLabels(entries: readonly IssueActionCoverage[]) {
+function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
   const menu = document.createElement('div');
   for (const entry of entries) {
     if (!entry.registryKey) continue;
@@ -146,13 +99,8 @@ function renderMenuLabels(entries: readonly IssueActionCoverage[]) {
 }
 
 describe('issueActions no-actions-lost audit', () => {
-  it('catalogues every ActionKey value from the existing Command Deck vocabulary', () => {
-    expect(new Set(legacyActionKeys).size).toBe(legacyActionKeys.length);
-    expect(new Set([...legacyIssueActionCoverage.map((entry) => entry.legacyKey), ...sessionScopedActionKeys])).toEqual(new Set(legacyActionKeys));
-  });
-
-  it('maps every existing issue-scoped Command Deck action to the new registry or a documented human-only exclusion', () => {
-    for (const entry of legacyIssueActionCoverage) {
+  it('maps every pre-reconciliation issue-scoped Command Deck action to the registry or a documented human-only exclusion', () => {
+    for (const entry of legacyCommandDeckIssueActions) {
       if (entry.registryKey === null) {
         expect(entry.note, entry.legacyKey).toContain('Human-only');
       } else {
@@ -161,13 +109,9 @@ describe('issueActions no-actions-lost audit', () => {
     }
   });
 
-  it('covers every currently registered dashboard surface action', () => {
-    const coverageByLegacyKey = new Map(legacyIssueActionCoverage.map((entry) => [entry.legacyKey, entry]));
-
-    for (const registration of COMMAND_DECK_SURFACE_REGISTRY) {
-      const coverage = coverageByLegacyKey.get(registration.actionKey);
-      expect(coverage, `${registration.surface}:${registration.source}`).toBeDefined();
-      if (coverage?.registryKey) expect(registryKeys.has(coverage.registryKey), registration.actionKey).toBe(true);
+  it('keeps the Command Deck gap actions in the registry', () => {
+    for (const key of commandDeckGapActions) {
+      expect(registryKeys.has(key), key).toBe(true);
     }
   });
 
@@ -187,26 +131,24 @@ describe('issueActions no-actions-lost audit', () => {
     }
   });
 
-  it('documents project-tree context menu actions as non-issue-scoped retained surfaces', () => {
-    for (const action of projectTreeContextMenuActions) {
+  it('documents retained project-tree utility actions as non-issue-scoped surfaces', () => {
+    for (const action of projectTreeUtilityActions) {
       expect(action.scope, action.surfaceText).not.toBe('issue');
-      expect(action.ownerSurface, action.surfaceText).toMatch(/ProjectNode|ContainerNode/);
+      expect(action.ownerSurface, action.surfaceText).toMatch(/ProjectNode|ContainerNode|FeatureItem/);
     }
   });
 
-  it('keeps Zone B session-scoped actions on the existing Command Deck session surface', () => {
-    const renderedZoneBKeys = new Set(flattenActions(getZoneBActions({ presence: 'active', type: 'work', hasTerminal: true })));
-
+  it('documents Zone B session-scoped actions outside the issue action registry', () => {
     for (const action of zoneBSessionActions) {
-      expect(renderedZoneBKeys.has(action.key), action.surfaceText).toBe(true);
+      expect(registryKeys.has(action.key as IssueActionKey), action.surfaceText).toBe(false);
     }
   });
 
   it('has menu-renderable labels for every registry-covered legacy issue action', () => {
-    const menu = renderMenuLabels(legacyIssueActionCoverage);
+    const menu = renderMenuLabels(legacyCommandDeckIssueActions);
 
     try {
-      for (const { registryKey } of legacyIssueActionCoverage) {
+      for (const { registryKey } of legacyCommandDeckIssueActions) {
         if (!registryKey) continue;
         const action = registryByKey.get(registryKey);
         expect(action?.label.trim(), registryKey).not.toBe('');

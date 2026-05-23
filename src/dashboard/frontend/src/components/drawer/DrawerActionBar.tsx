@@ -3,13 +3,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAlert, useConfirm } from '../DialogProvider';
 import { useResetIssue } from '../../hooks/useResetIssue';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { isAgentRunningStatus } from '../../lib/pipeline-state';
 import Button, { ButtonLink } from '../primitives/Button';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 function isActiveAgent(agent: Agent) {
   return isAgentRunningStatus(agent.status);

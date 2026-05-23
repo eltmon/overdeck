@@ -82,7 +82,7 @@ function OverflowButton({ views, triggerRef }: { views: IssueActionView[]; trigg
   );
 }
 
-function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
+export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
   const { activeDialog, agent, lifecycle, issue, workspace, closeDialog } = actions;
   const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
   const handleClose = () => {
