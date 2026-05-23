@@ -2289,8 +2289,9 @@ async function runForkPipeline(
       conv.issueId ?? undefined,
       true, // resume — load the copied JSONL history
       conv.harness ?? 'claude-code',
-      true, // plainFork — skip channels MCP wiring so it doesn't inflate the
-            // resumed context past Claude Code's auto-compact threshold
+      false, // plainFork=false — wire channels MCP so message delivery has a
+             // reliable transport. The MCP tool definitions are added to the
+             // resumed system prompt, not the JSONL — no context inflation.
     );
     await waitForTmuxSession(conv.tmuxSession);
 
