@@ -2579,7 +2579,7 @@
   border-radius: 4px;
   display: flex;
   align-items: center;
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity 0.15s, color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
