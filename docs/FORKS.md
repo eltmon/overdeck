@@ -107,6 +107,10 @@ Switching models when forking is common, but comes with caveats:
 - Zero LLM cost
 - Parses JSONL locally and extracts user messages, files modified, and tools used
 
+## Handoff Prompt Template
+
+Agent-authored handoff forks use the orchestrator-injected template in `roles/handoff.md`. The template defines the Markdown handoff contract, including the required `## Suggested skills` section, artifact-reference rules, redaction requirements, and the `{{outputPath}}` plus `.done` sentinel completion protocol.
+
 ## Developer Notes
 
 See `src/lib/conversations/summary-fork.ts` for the fork pipeline implementation.
