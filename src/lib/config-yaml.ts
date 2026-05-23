@@ -11,7 +11,7 @@
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { Effect } from 'effect';
-import { ConfigError, ConfigParseError } from './errors.js';
+import { ConfigError, ConfigParseError, FsError } from './errors.js';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -21,7 +21,7 @@ import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
-import { getProjectSync } from './projects.js';
+import { getProject } from './projects.js';
 import type { RuntimeName } from './runtimes/types.js';
 export type { SubscriptionPlan, AuthMode };
 
@@ -1098,36 +1098,44 @@ function mergeAutoMergeConfig(result: NormalizedConfig, config: YamlConfig | nul
   result.merge.autoMerge = normalizeAutoMergeConfig(config.merge.autoMerge);
 }
 
-function loadProjectConfigByKey(projectKey: string): YamlConfig | null {
-  const project = getProjectSync(projectKey);
-  if (!project) return null;
+function loadProjectConfigByKey(projectKey: string): Effect.Effect<YamlConfig | null, ConfigParseError | FsError> {
+  return Effect.gen(function* () {
+    const project = yield* getProject(projectKey);
+    if (!project) return null;
 
-  const newConfigPath = join(project.path, '.pan.yaml');
-  if (existsSync(newConfigPath)) {
-    return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
-  }
+    const newConfigPath = join(project.path, '.pan.yaml');
+    if (yield* Effect.promise(() => pathExistsFromDisk(newConfigPath))) {
+      return stripProjectTtsEndpoint(yield* Effect.promise(() => loadYamlFileFromDisk(newConfigPath)));
+    }
 
-  const legacyConfigPath = join(project.path, '.panopticon.yaml');
-  if (existsSync(legacyConfigPath)) {
-    process.stderr.write(
-      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
-    );
-    return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
-  }
+    const legacyConfigPath = join(project.path, '.panopticon.yaml');
+    if (yield* Effect.promise(() => pathExistsFromDisk(legacyConfigPath))) {
+      process.stderr.write(
+        `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+      );
+      return stripProjectTtsEndpoint(yield* Effect.promise(() => loadYamlFileFromDisk(legacyConfigPath)));
+    }
 
-  return null;
+    return null;
+  });
 }
 
-export function getAutoMergeConfig(projectKey?: string): NormalizedAutoMergeConfig {
-  if (!projectKey) {
-    return cloneAutoMergeConfig(loadConfigSync().config.merge.autoMerge);
-  }
+export const getAutoMergeConfig = (
+  projectKey?: string,
+): Effect.Effect<NormalizedAutoMergeConfig, ConfigError | ConfigParseError | FsError> =>
+  Effect.gen(function* () {
+    if (!projectKey) {
+      const { config } = yield* loadConfigNoMigration();
+      return cloneAutoMergeConfig(config.merge.autoMerge);
+    }
 
-  const globalConfig = loadGlobalConfig();
-  const projectConfig = loadProjectConfigByKey(projectKey);
-  const { config } = mergeConfigs(projectConfig, globalConfig);
-  return cloneAutoMergeConfig(config.merge.autoMerge);
-}
+    const [globalConfig, projectConfig] = yield* Effect.all([
+      Effect.promise(() => loadGlobalConfigFromDisk()),
+      loadProjectConfigByKey(projectKey),
+    ], { concurrency: 'unbounded' });
+    const { config } = mergeConfigs(projectConfig, globalConfig);
+    return cloneAutoMergeConfig(config.merge.autoMerge);
+  });
 
 function isWorkhorseRef(ref: ModelRef): boolean {
   return ref.startsWith('workhorse:');

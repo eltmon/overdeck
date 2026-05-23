@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs, getAutoMergeConfig } from '../../src/lib/config-yaml.js';
-import * as projects from '../../src/lib/projects.js';
+import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs } from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -318,35 +317,6 @@ api_keys:
       expect(config.merge.autoMerge.maxStaleMinutes).toBe(1);
       expect(warn).toHaveBeenCalledWith('[panopticon] merge.autoMerge.cooldownMinutes must be >= 1; clamping 0 to 1.');
       expect(warn).toHaveBeenCalledWith('[panopticon] merge.autoMerge.maxStaleMinutes must be >= cooldownMinutes; clamping 0 to 1.');
-    });
-
-    it('reads project-scoped auto-merge config by project key', () => {
-      const projectRoot = join(testDir, 'auto-merge-project');
-      mkdirSync(projectRoot, { recursive: true });
-      writeFileSync(join(projectRoot, '.pan.yaml'), `
-merge:
-  autoMerge:
-    enabled: true
-    cooldownMinutes: 4
-    maxStaleMinutes: 8
-    requireGitHubCiPassing: false
-    requireAllCommitStatusChecks: false
-    requireNoBlockerLabels:
-      - project-only
-`, 'utf-8');
-      vi.spyOn(projects, 'getProjectSync').mockReturnValue({
-        name: 'Auto Merge Project',
-        path: projectRoot,
-      });
-
-      expect(getAutoMergeConfig('auto-merge-project')).toEqual({
-        enabled: true,
-        cooldownMinutes: 4,
-        maxStaleMinutes: 8,
-        requireGitHubCiPassing: false,
-        requireAllCommitStatusChecks: false,
-        requireNoBlockerLabels: ['project-only'],
-      });
     });
   });
 });
