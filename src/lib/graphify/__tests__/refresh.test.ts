@@ -95,7 +95,24 @@ describe('refreshGraphify', () => {
       'which graphify',
       'graphify update .',
       'git add graphify-out/',
-      'git diff --cached --quiet',
+      'git diff --cached --quiet -- graphify-out/',
+    ]);
+  });
+
+  it('leaves pre-staged non-graphify files out of the refresh commit', async () => {
+    execResults.push(
+      { stdout: '/usr/local/bin/graphify\n' },
+      { stdout: 'updated\n' },
+      { stdout: '' },
+      { stdout: '' },
+    );
+
+    await expect(refreshGraphify(projectPath, 'PAN-1408')).resolves.toEqual({ skipped: 'no-changes' });
+    expect(execCommands()).toEqual([
+      'which graphify',
+      'graphify update .',
+      'git add graphify-out/',
+      'git diff --cached --quiet -- graphify-out/',
     ]);
   });
 
@@ -115,8 +132,8 @@ describe('refreshGraphify', () => {
       'which graphify',
       'graphify update .',
       'git add graphify-out/',
-      'git diff --cached --quiet',
-      "git commit -m 'chore(graphify): refresh after PAN-1408'",
+      'git diff --cached --quiet -- graphify-out/',
+      "git commit -m 'chore(graphify): refresh after PAN-1408' -- graphify-out/",
       'git push origin main',
       'git rev-parse HEAD',
     ]);
@@ -141,13 +158,43 @@ describe('refreshGraphify', () => {
       'which graphify',
       'graphify update .',
       'git add graphify-out/',
-      'git diff --cached --quiet',
-      "git commit -m 'chore(graphify): refresh after PAN-1408'",
+      'git diff --cached --quiet -- graphify-out/',
+      "git commit -m 'chore(graphify): refresh after PAN-1408' -- graphify-out/",
       'git push origin main',
       'git fetch origin main',
       'git pull --rebase origin main',
       'git push origin main',
       'git rev-parse HEAD',
+    ]);
+  });
+
+  it('aborts a failed non-fast-forward rebase retry', async () => {
+    execResults.push(
+      { stdout: '/usr/local/bin/graphify\n' },
+      { stdout: 'updated\n' },
+      { stdout: '' },
+      { error: execError('diff found changes', { code: 1 }) },
+      { stdout: '[main abc123] chore(graphify): refresh after PAN-1408\n' },
+      { error: execError('rejected non-fast-forward', { code: 1, stderr: '! [rejected] main -> main (non-fast-forward)' }) },
+      { stdout: '' },
+      { error: execError('conflict', { code: 1, stderr: 'CONFLICT (content): Merge conflict' }) },
+      { stdout: '' },
+    );
+
+    const result = await refreshGraphify(projectPath, 'PAN-1408');
+
+    expect(result).toMatchObject({ ok: false });
+    expect('ok' in result && result.ok === false ? result.error : '').toContain('push failed');
+    expect(execCommands()).toEqual([
+      'which graphify',
+      'graphify update .',
+      'git add graphify-out/',
+      'git diff --cached --quiet -- graphify-out/',
+      "git commit -m 'chore(graphify): refresh after PAN-1408' -- graphify-out/",
+      'git push origin main',
+      'git fetch origin main',
+      'git pull --rebase origin main',
+      'git rebase --abort',
     ]);
   });
 
@@ -172,8 +219,8 @@ describe('refreshGraphify', () => {
       'which graphify',
       'graphify update .',
       'git add graphify-out/',
-      'git diff --cached --quiet',
-      "git commit -m 'chore(graphify): refresh after PAN-1408'",
+      'git diff --cached --quiet -- graphify-out/',
+      "git commit -m 'chore(graphify): refresh after PAN-1408' -- graphify-out/",
       'git push origin main',
       'git fetch origin main',
       'git pull --rebase origin main',

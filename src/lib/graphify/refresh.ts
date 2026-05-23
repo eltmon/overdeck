@@ -41,22 +41,22 @@ export async function refreshGraphify(projectPath: string, issueId: string): Pro
     return { ok: false, error: `git add graphify-out/ failed: ${formatExecError(error)}` };
   }
 
-  const stagedChanges = await hasStagedChanges(projectPath);
-  if (stagedChanges.ok === false) {
-    return stagedChanges;
+  const stagedGraphifyChanges = await hasStagedGraphifyChanges(projectPath);
+  if (stagedGraphifyChanges.ok === false) {
+    return stagedGraphifyChanges;
   }
-  if (!stagedChanges.hasChanges) {
+  if (!stagedGraphifyChanges.hasChanges) {
     return { skipped: 'no-changes' };
   }
 
   try {
-    await execAsync(`git commit -m ${shellQuote(`chore(graphify): refresh after ${issueId}`)}`, {
+    await execAsync(`git commit -m ${shellQuote(`chore(graphify): refresh after ${issueId}`)} -- graphify-out/`, {
       cwd: projectPath,
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
   } catch (error) {
-    return { ok: false, error: `git commit failed: ${formatExecError(error)}` };
+    return { ok: false, error: `git commit graphify-out/ failed: ${formatExecError(error)}` };
   }
 
   const pushResult = await pushGraphifyCommit(projectPath);
@@ -72,15 +72,15 @@ export async function refreshGraphify(projectPath: string, issueId: string): Pro
   }
 }
 
-async function hasStagedChanges(projectPath: string): Promise<{ ok: true; hasChanges: boolean } | { ok: false; error: string }> {
+async function hasStagedGraphifyChanges(projectPath: string): Promise<{ ok: true; hasChanges: boolean } | { ok: false; error: string }> {
   try {
-    await execAsync('git diff --cached --quiet', { cwd: projectPath, encoding: 'utf-8' });
+    await execAsync('git diff --cached --quiet -- graphify-out/', { cwd: projectPath, encoding: 'utf-8' });
     return { ok: true, hasChanges: false };
   } catch (error) {
     if (getErrorCode(error) === 1) {
       return { ok: true, hasChanges: true };
     }
-    return { ok: false, error: `git diff --cached --quiet failed: ${formatExecError(error)}` };
+    return { ok: false, error: `git diff --cached --quiet -- graphify-out/ failed: ${formatExecError(error)}` };
   }
 }
 
@@ -104,11 +104,22 @@ async function pushGraphifyCommit(projectPath: string): Promise<{ ok: true } | {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
+  } catch (error) {
+    return { ok: false, error: `push failed: ${formatExecError(error)}` };
+  }
+
+  try {
     await execAsync('git pull --rebase origin main', {
       cwd: projectPath,
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
+  } catch (error) {
+    await abortRebase(projectPath);
+    return { ok: false, error: `push failed: ${formatExecError(error)}` };
+  }
+
+  try {
     await execAsync('git push origin main', {
       cwd: projectPath,
       encoding: 'utf-8',
@@ -117,6 +128,18 @@ async function pushGraphifyCommit(projectPath: string): Promise<{ ok: true } | {
     return { ok: true };
   } catch (error) {
     return { ok: false, error: `push failed: ${formatExecError(error)}` };
+  }
+}
+
+async function abortRebase(projectPath: string): Promise<void> {
+  try {
+    await execAsync('git rebase --abort', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch {
+    return;
   }
 }
 
