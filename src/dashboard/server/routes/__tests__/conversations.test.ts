@@ -82,6 +82,48 @@ function decodeTextResponse(response: { body: unknown }) {
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
 }
 
+describe('parseSummaryForkFocus', () => {
+  it('trims handoff focus text', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('  continue the API wiring  ')).toEqual({
+      ok: true,
+      focus: 'continue the API wiring',
+    });
+  });
+
+  it('normalizes blank and absent focus to undefined', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(undefined)).toEqual({ ok: true, focus: undefined });
+    expect(parseSummaryForkFocus('   ')).toEqual({ ok: true, focus: undefined });
+  });
+
+  it('rejects non-string focus values', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(42)).toEqual({ ok: false, error: 'focus must be a string' });
+  });
+
+  it('rejects focus values longer than 500 characters', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('a'.repeat(501))).toEqual({
+      ok: false,
+      error: 'focus must be 500 characters or fewer',
+    });
+  });
+
+  it('rejects control characters in focus', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('continue\nthen ship')).toEqual({
+      ok: false,
+      error: 'focus must not contain control characters',
+    });
+  });
+});
+
 beforeEach(async () => {
   // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
   await resetDb();

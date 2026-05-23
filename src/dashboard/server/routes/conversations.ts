@@ -543,6 +543,16 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
+  if (value === undefined || value === null) return { ok: true, focus: undefined };
+  if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
+  const focus = value.trim();
+  if (!focus) return { ok: true, focus: undefined };
+  if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
+  if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
+  return { ok: true, focus };
+}
+
 function safeUploadExtension(filename: string, mimeType: string): string {
   const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
   if (!mimeExtension) return '';
@@ -2674,6 +2684,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
           forkMode = 'plain';
         }
+        const focusResult = parseSummaryForkFocus(body['focus']);
+        if (!focusResult.ok) {
+          return jsonResponse({ error: focusResult.error }, { status: 400 });
+        }
+        const handoffFocus = focusResult.focus;
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
@@ -2741,7 +2756,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });
