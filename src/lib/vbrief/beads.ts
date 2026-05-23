@@ -41,6 +41,83 @@ export interface CreateBeadsResult {
   beadIds: Map<string, string>;
 }
 
+export interface ClearBeadsResult {
+  cleared: number;
+  errors: string[];
+}
+
+function firstLine(value: unknown): string {
+  const raw = typeof value === 'string'
+    ? value
+    : value instanceof Error
+      ? value.message
+      : String(value ?? '');
+  return raw.split('\n')[0] || 'unknown error';
+}
+
+function execFileErrorMessage(error: any): string {
+  return firstLine(error?.stderr?.toString() || error?.message || error);
+}
+
+function parseBdList(stdout: unknown): any[] {
+  const parsed = JSON.parse(String(stdout || '[]'));
+  if (!Array.isArray(parsed)) throw new Error('bd list returned non-array JSON');
+  return parsed;
+}
+
+function beadIdsFromList(beads: any[]): string[] {
+  return beads
+    .map(bead => bead?.id)
+    .filter(id => id !== undefined && id !== null && String(id).length > 0)
+    .map(id => String(id));
+}
+
+async function listBeadsForIssue(workspacePath: string, issueLabel: string): Promise<any[]> {
+  const { stdout } = await execFileAsync(
+    'bd',
+    ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+    { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
+  );
+  return parseBdList(stdout);
+}
+
+export async function clearBeadsForIssue(workspacePath: string, issueLabel: string): Promise<ClearBeadsResult> {
+  let existingBeads: any[];
+  try {
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel);
+  } catch (error: any) {
+    return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
+  }
+
+  const errors: string[] = [];
+  let cleared = 0;
+  for (const id of beadIdsFromList(existingBeads)) {
+    try {
+      await execFileAsync('bd', ['delete', id, '--force'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+      });
+      cleared++;
+    } catch (error: any) {
+      errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
+    }
+  }
+
+  let residualBeads: any[];
+  try {
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel);
+  } catch (error: any) {
+    errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
+    return { cleared, errors };
+  }
+
+  const residualIds = beadIdsFromList(residualBeads);
+  if (residualIds.length > 0) {
+    errors.push(`residual ${residualIds.length} beads after delete: ${residualIds.join(', ')}`);
+  }
+
+  return { cleared, errors };
+}
+
 function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefItem): { requiresInspection: boolean; inspectionDepth: 'fast' | 'deep' } {
   if (policy === 'never') return { requiresInspection: false, inspectionDepth: 'fast' };
   if (policy === 'fast') return { requiresInspection: true, inspectionDepth: 'fast' };
