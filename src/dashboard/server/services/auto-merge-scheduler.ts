@@ -93,6 +93,12 @@ function emitAutoMergeTts(issueId: string, utterance: string, eventType: AutoMer
   emitActivityTtsSync({ issueId, utterance, eventType, priority, source: 'dashboard' });
 }
 
+function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { _tag?: string; message?: string };
+  return candidate._tag === 'ForgeTimeoutError' || candidate.message?.toLowerCase().includes('timeout') === true;
+}
+
 export class AutoMergeScheduler {
   private readonly timers = new Map<string, TimerHandle>();
   private started = false;
@@ -247,29 +253,29 @@ export class AutoMergeScheduler {
 
   private async validateGates(issueId: string, config: NormalizedAutoMergeConfig): Promise<string | null> {
     const status = await this.deps.getStatus(issueId);
-    if (!status?.readyForMerge) return 'ready_for_merge_false';
-    if (status.mergeStatus && status.mergeStatus !== 'pending') return `merge_status_${status.mergeStatus}`;
+    if (!status?.readyForMerge) return 'no-longer-ready';
+    if (status.mergeStatus && status.mergeStatus !== 'pending') return `merge-status:${status.mergeStatus}`;
 
     const needsPrUrl = config.requireNoBlockerLabels.length > 0 || config.requireGitHubCiPassing || config.requireAllCommitStatusChecks;
-    if (needsPrUrl && !status.prUrl) return 'missing_pr_url';
+    if (needsPrUrl && !status.prUrl) return 'missing-pr-url';
 
     if (status.prUrl && config.requireNoBlockerLabels.length > 0) {
       try {
         const blockerLabels = new Set(config.requireNoBlockerLabels.map(label => label.toLowerCase()));
         const labels = await this.deps.getLabels(status.prUrl);
         const blocker = labels.find(label => blockerLabels.has(label.toLowerCase()));
-        if (blocker) return `blocker_label:${blocker}`;
+        if (blocker) return `blocker-label:${blocker}`;
       } catch (error) {
-        return `label_query_failed:${error instanceof Error ? error.message : String(error)}`;
+        return isTimeoutError(error) ? 'label-check-timeout' : `label-check-failed:${error instanceof Error ? error.message : String(error)}`;
       }
     }
 
     if (status.prUrl && (config.requireGitHubCiPassing || config.requireAllCommitStatusChecks)) {
       try {
         const combinedStatus = await this.deps.getCombinedStatus(status.prUrl);
-        if (!combinedStatus.passing) return 'ci_not_passing';
+        if (!combinedStatus.passing) return 'ci-failing';
       } catch (error) {
-        return `ci_query_failed:${error instanceof Error ? error.message : String(error)}`;
+        return isTimeoutError(error) ? 'ci-check-timeout' : `ci-check-failed:${error instanceof Error ? error.message : String(error)}`;
       }
     }
 

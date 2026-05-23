@@ -173,10 +173,10 @@ describe('AutoMergeScheduler', () => {
   });
 
   it.each([
-    ['ready gate', { getStatus: vi.fn().mockResolvedValueOnce(reviewStatus()).mockResolvedValue(reviewStatus({ readyForMerge: false })) }, 'ready_for_merge_false'],
-    ['label gate', { getLabels: vi.fn().mockResolvedValue(['do-not-merge']) }, 'blocker_label:do-not-merge'],
-    ['CI gate', { getCombinedStatus: vi.fn().mockResolvedValue({ passing: false }) }, 'ci_not_passing'],
-    ['timeout gate', { getCombinedStatus: vi.fn().mockRejectedValue(new Error('timeout')) }, 'ci_query_failed:timeout'],
+    ['ready gate', { getStatus: vi.fn().mockResolvedValueOnce(reviewStatus()).mockResolvedValue(reviewStatus({ readyForMerge: false })) }, 'no-longer-ready'],
+    ['label gate', { getLabels: vi.fn().mockResolvedValue(['do-not-merge']) }, 'blocker-label:do-not-merge'],
+    ['CI gate', { getCombinedStatus: vi.fn().mockResolvedValue({ passing: false }) }, 'ci-failing'],
+    ['timeout gate', { getCombinedStatus: vi.fn().mockRejectedValue(new Error('timeout')) }, 'ci-check-timeout'],
   ])('aborts after cooldown when the %s fails', async (_name, options, expectedReason) => {
     const harness = createHarness(options);
     await scheduleReadyIssue(harness);
