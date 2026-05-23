@@ -152,6 +152,7 @@ import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSes
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
+import { checkStuckAgentRemediation } from './stuck-remediation.js';
 
 // ============================================================================
 // Configuration
@@ -4657,6 +4658,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
+
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
     ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
