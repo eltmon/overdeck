@@ -170,13 +170,11 @@ interface HighlightedProps {
 }
 
 // Spans (not <mark>) avoid the browser's bright-yellow default style.
-// Theme-aware highlight:
-//   - light mode: soft amber-200 backdrop with dark amber-900 text
-//     (marker-pen feel on a white surface)
-//   - dark mode: translucent amber backdrop with light amber-200 text
-//     (subtle warm accent that doesn't shout against the dark surface)
-const HIGHLIGHT_CLASS =
-  'rounded-sm px-px bg-amber-200/70 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200';
+// Background-only highlight: the parent's text color carries through, and
+// only the backdrop signals "this matched". GitHub-search style — quieter
+// than swapping the text color, and the same single rule reads well in
+// both light and dark themes.
+const HIGHLIGHT_CLASS = 'rounded-sm px-px text-inherit bg-amber-300/40 dark:bg-amber-400/20';
 
 function Highlighted({ text, terms }: HighlightedProps) {
   if (!text) return null;
