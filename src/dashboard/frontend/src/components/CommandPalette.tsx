@@ -169,6 +169,12 @@ interface HighlightedProps {
   terms: string[];
 }
 
+// Spans (not <mark>) avoid the browser's bright-yellow default style. A
+// subtle translucent amber backdrop reads clearly in dark mode without
+// shouting; text color inherits from the parent so the underlying
+// foreground/muted-foreground hierarchy stays intact.
+const HIGHLIGHT_CLASS = 'rounded-sm bg-amber-300/15 text-amber-200 px-px';
+
 function Highlighted({ text, terms }: HighlightedProps) {
   if (!text) return null;
   if (terms.length === 0) return <>{text}</>;
@@ -178,7 +184,7 @@ function Highlighted({ text, terms }: HighlightedProps) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">{part}</mark>
+          <span key={i} className={HIGHLIGHT_CLASS}>{part}</span>
         ) : (
           <span key={i}>{part}</span>
         ),
@@ -576,7 +582,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                             <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
                               {action.excerptSegments.map((seg, i) =>
                                 seg.kind === 'match' ? (
-                                  <mark key={i} className="bg-primary/20 text-foreground rounded px-0.5">{seg.value}</mark>
+                                  <span key={i} className={HIGHLIGHT_CLASS}>{seg.value}</span>
                                 ) : (
                                   <span key={i}>{seg.value}</span>
                                 ),
