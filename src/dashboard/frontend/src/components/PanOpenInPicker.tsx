@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { EDITORS, type EditorId, WS_METHODS } from '@panctl/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport';
 import { getPreferredEditor, setPreferredEditor } from '../editorPreferences';
+import { EDITOR_OPEN_FAVORITE_KEY_LABEL, useEditorOpenFavoriteShortcut } from '../lib/keybindings';
 import { editorIconFor } from './EditorIcons';
 import { toast } from 'sonner';
 
@@ -19,6 +20,8 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
   const [preferred, setPreferred] = useState<EditorId | null>(getPreferredEditor);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEditorOpenFavoriteShortcut(cwd);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +85,7 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
       <button
         onClick={() => handleOpen(primaryEditor)}
         className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border"
-        title={`Open in ${EDITOR_LABELS[primaryEditor]}`}
+        title={`Open in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
       >
         <PrimaryIcon className="w-2.5 h-2.5" />
         {EDITOR_LABELS[primaryEditor]}
