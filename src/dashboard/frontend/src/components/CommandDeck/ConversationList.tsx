@@ -52,6 +52,12 @@ export interface Conversation {
   compacting?: boolean;
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
   deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;
+  /** Agent-authored handoff document path for handoff-fork targets. */
+  handoffDocPath?: string | null;
+  /** Target conversation id created from this source's handoff. */
+  handoffTargetConvId?: number | null;
+  /** Reason a requested handoff fork downgraded to summary mode. */
+  forkFallbackReason?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ import {
 } from '../../../lib/checkpoint/checkpoint-manager.js';
 
 import { Effect, Layer, Option } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
@@ -548,6 +548,35 @@ function safeUploadExtension(filename: string, mimeType: string): string {
   if (!mimeExtension) return '';
   const originalExtension = extname(filename).toLowerCase();
   return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+}
+
+export async function handleConversationHandoffDoc(
+  name: string,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+  if (!conv.handoffDocPath) {
+    return jsonResponse({ error: 'Handoff document not found' }, { status: 404 });
+  }
+
+  try {
+    const docText = await readFile(conv.handoffDocPath, 'utf-8');
+    return HttpServerResponse.text(docText, {
+      contentType: 'text/markdown',
+      headers: {
+        'Content-Disposition': `inline; filename="${conv.name}-handoff.md"`,
+      },
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ENOENT') {
+      return jsonResponse({ error: 'Handoff document is no longer available' }, { status: 410 });
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[conversations] failed to read handoff doc for "${name}":`, msg);
+    return jsonResponse({ error: 'Failed to read handoff document' }, { status: 500 });
+  }
 }
 
 export async function handleConversationImageUpload(
@@ -1374,6 +1403,23 @@ const getConversationRoute = HttpRouter.add(
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/handoff-doc ─────────────────────────
+
+const getConversationHandoffDocRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/handoff-doc',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(() => handleConversationHandoffDoc(name));
   }),
 );
 
@@ -3247,6 +3293,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
   getArchivedConversationsRoute,
   getConversationRoute,
+  getConversationHandoffDocRoute,
   postConversationRoute,
   patchConversationRoute,
   deleteConversationRoute,
