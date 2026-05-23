@@ -254,15 +254,23 @@ export class AutoMergeScheduler {
     if (needsPrUrl && !status.prUrl) return 'missing_pr_url';
 
     if (status.prUrl && config.requireNoBlockerLabels.length > 0) {
-      const blockerLabels = new Set(config.requireNoBlockerLabels.map(label => label.toLowerCase()));
-      const labels = await this.deps.getLabels(status.prUrl);
-      const blocker = labels.find(label => blockerLabels.has(label.toLowerCase()));
-      if (blocker) return `blocker_label:${blocker}`;
+      try {
+        const blockerLabels = new Set(config.requireNoBlockerLabels.map(label => label.toLowerCase()));
+        const labels = await this.deps.getLabels(status.prUrl);
+        const blocker = labels.find(label => blockerLabels.has(label.toLowerCase()));
+        if (blocker) return `blocker_label:${blocker}`;
+      } catch (error) {
+        return `label_query_failed:${error instanceof Error ? error.message : String(error)}`;
+      }
     }
 
     if (status.prUrl && (config.requireGitHubCiPassing || config.requireAllCommitStatusChecks)) {
-      const combinedStatus = await this.deps.getCombinedStatus(status.prUrl);
-      if (!combinedStatus.passing) return 'ci_not_passing';
+      try {
+        const combinedStatus = await this.deps.getCombinedStatus(status.prUrl);
+        if (!combinedStatus.passing) return 'ci_not_passing';
+      } catch (error) {
+        return `ci_query_failed:${error instanceof Error ? error.message : String(error)}`;
+      }
     }
 
     return null;
