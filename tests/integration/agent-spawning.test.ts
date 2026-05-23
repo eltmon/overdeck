@@ -140,13 +140,13 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
         titleModel: 'claude-haiku-4-5',
       },
       claude: { permissionMode: 'bypass' },
-      experimental: { claudeCodeChannels: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
       caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
     } as NormalizedConfig,
   };
   return {
     ...actual,
-    isClaudeCodeChannelsEnabled: vi.fn().mockReturnValue(false),
+    isClaudeCodeChannelsMcpEnabled: vi.fn().mockReturnValue(false),
     loadConfig: vi.fn().mockReturnValue(loadedConfig),
     loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
   };

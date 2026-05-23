@@ -15,7 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -1316,8 +1316,8 @@ function resolvePtySupervisorScriptPath(): string {
  * Decide whether to enable Claude Code Channels for a work-agent launch.
  *
  * Eligibility (all required):
- *   - experimental.claudeCodeChannels is true in the merged config
- *   - the agent is a work agent (specialists/conversations stay on tmux)
+ *   - experimental.claudeCodeChannelsMcp is true in the merged config
+ *   - the agent is a work agent (specialists/conversations stay off MCP)
  *   - the harness is Claude Code (not Pi or another runtime harness)
  *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
  *   - the workspace is not running inside a Docker container
@@ -1325,7 +1325,8 @@ function resolvePtySupervisorScriptPath(): string {
  * Logs the decision exactly once with a category prefix so users can see why
  * the bridge did or did not engage. The function is otherwise side-effect
  * free; the caller is responsible for writing the .mcp.json and mutating
- * state.channelsEnabled when eligible is true.
+ * state.channelsEnabled when eligible is true. This legacy MCP transport is now
+ * opt-in for new spawns; the PTY supervisor is the default delivery transport.
  */
 export function decideChannelsForWorkAgent(
   agentId: string,
@@ -1337,11 +1338,8 @@ export function decideChannelsForWorkAgent(
     console.log(`[${agentId}] ${tag}`);
   };
 
-  if (!isClaudeCodeChannelsEnabled()) {
-    // Flag-off path is the silent default: no log line, no work. The bead
-    // explicitly limits eligibility logs to launches where the flag is on so
-    // the signal is meaningful.
-    return { eligible: false, reason: 'flag-off' };
+  if (!isClaudeCodeChannelsMcpEnabled()) {
+    return { eligible: false, reason: 'mcp-default-off' };
   }
 
   if (state.role !== 'work') {
@@ -2765,13 +2763,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
-  // Channels gate: when the experimental flag is on AND this work agent is
-  // eligible, write a per-agent .mcp.json that wires the panopticon-bridge as
-  // a stdio MCP server, set channelsEnabled in the agent state record, and
-  // pass the bridge MCP path through to buildAgentLaunchConfig so claude is
-  // started with --mcp-config + --dangerously-load-development-channels. When
-  // the flag is off OR the agent is ineligible we touch nothing here — same
-  // code path, same files on disk, as before PAN-985.
+  // Channels MCP gate: only the explicit legacy override writes a per-agent
+  // .mcp.json, bridge token, and channelsEnabled state for new spawns. The PTY
+  // supervisor remains the default delivery transport.
   const channelsDecision = decideChannelsForWorkAgent(agentId, options, state);
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {

@@ -156,10 +156,34 @@ describe('AgentState role persistence', () => {
     expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
-  it('bases Channels eligibility on work role and claude-code harness', async () => {
+  it('defaults Channels MCP eligibility off for new work-agent spawns', async () => {
     vi.doMock('../config-yaml.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../config-yaml.js')),
-      isClaudeCodeChannelsEnabled: () => true,
+      isClaudeCodeChannelsMcpEnabled: () => false,
+    }));
+    const { decideChannelsForWorkAgent } = await import('../agents.js');
+
+    const state: AgentState = {
+      id: 'agent-pan-channels',
+      issueId: 'PAN-1048',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'starting',
+      startedAt: '2026-05-09T00:00:00.000Z',
+    };
+
+    expect(decideChannelsForWorkAgent('agent-pan-channels', {} as any, state)).toEqual({
+      eligible: false,
+      reason: 'mcp-default-off',
+    });
+  });
+
+  it('bases Channels MCP override eligibility on work role and claude-code harness', async () => {
+    vi.doMock('../config-yaml.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../config-yaml.js')),
+      isClaudeCodeChannelsMcpEnabled: () => true,
     }));
     const { decideChannelsForWorkAgent } = await import('../agents.js');
 
@@ -290,7 +314,7 @@ describe('AgentState role persistence', () => {
     const emitActivityEntry = vi.fn();
     vi.doMock('../config-yaml.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../config-yaml.js')),
-      isClaudeCodeChannelsEnabled: () => false,
+      isClaudeCodeChannelsMcpEnabled: () => false,
     }));
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({

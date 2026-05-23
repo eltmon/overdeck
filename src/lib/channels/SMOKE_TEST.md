@@ -1,10 +1,11 @@
 # Claude Code Channels — Manual Smoke Test (PAN-985)
 
-End-to-end verification of the experimental Channels prompt-delivery path.
-Run on a real workstation against a real `claude` binary with claude.ai or
-Console-API auth. CI cannot exercise this path because it requires an
-interactive Claude session; the in-process unit tests in
-`__tests__/panopticon-bridge.test.ts` and
+End-to-end verification of the legacy Channels MCP prompt-delivery fallback.
+New work agents use the PTY supervisor by default; this path is retained as an
+explicit YAML-only diagnostic override. Run on a real workstation against a
+real `claude` binary with claude.ai or Console-API auth. CI cannot exercise
+this path because it requires an interactive Claude session; the in-process
+unit tests in `__tests__/panopticon-bridge.test.ts` and
 `../__tests__/deliver-agent-message.test.ts` are the automated layer.
 
 ## Prerequisites
@@ -18,14 +19,14 @@ interactive Claude session; the in-process unit tests in
 
 ## Procedure
 
-1. **Toggle the experimental flag on.**
-   - Open the dashboard Settings page.
-   - Scroll to the bottom; the **Experimental** section is the last on the page.
-   - Flip **Use Claude Code Channels for prompt delivery (work agents only)** on.
-   - Confirm the toggle persists: refresh the page and verify it stays on.
-   - Behind the scenes this writes
-     `experimental: { claudeCodeChannels: true }` to
-     `~/.panopticon/config.yaml`.
+1. **Enable the legacy MCP override in YAML.**
+   - Edit `~/.panopticon/config.yaml` and set:
+     ```yaml
+     experimental:
+       claudeCodeChannelsMcp: true
+     ```
+   - The dashboard Settings toggle for `claudeCodeChannels` controls
+     conversation delivery only; it does not wire MCP for new work agents.
 
 2. **Start a work agent.**
    - From the dashboard or `pan start <ISSUE>`.
@@ -103,7 +104,8 @@ Fallback to tmux (transient bridge crash):
 
 ## Reverting
 
-1. Toggle the experimental flag **off** in dashboard Settings.
+1. Remove `experimental.claudeCodeChannelsMcp` or set it to `false` in
+   `~/.panopticon/config.yaml`.
 2. Stop and restart any running work agents (`pan kill <id>` then
    `pan start <id>`). Existing agent state files retain
    `channelsEnabled = true` from the previous launch; the next spawn

@@ -9,6 +9,7 @@ let tmpHome: string;
 let workspace: string;
 let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
+let channelsMcpEnabled: boolean;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
   return {
@@ -77,7 +78,7 @@ function mockSpawnDependencies(): void {
     const actual = await importOriginal<typeof import('../config-yaml.js')>();
     return {
       ...actual,
-      isClaudeCodeChannelsEnabled: () => false,
+      isClaudeCodeChannelsMcpEnabled: () => channelsMcpEnabled,
       loadConfigSync: () => ({
         config: {
           workhorses: actual.DEFAULT_WORKHORSES,
@@ -102,6 +103,7 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
   process.env.PANOPTICON_HOME = tmpHome;
+  channelsMcpEnabled = false;
   delete process.env.PAN_DOCKER;
   delete process.env.PANOPTICON_DOCKER_WORKSPACE;
   mockSpawnDependencies();
@@ -159,7 +161,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(getAgentStateSync('agent-pan-1405')?.supervisorEnabled).toBe(true);
   });
 
-  it('writes pty-token, persists supervisorEnabled, and wraps the launcher before tmux spawn', async () => {
+  it('writes pty-token, skips Channels MCP by default, persists supervisorEnabled, and wraps the launcher', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
     const { spawnAgent } = await import('../agents.js');
 
@@ -172,16 +174,46 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
     expect(existsSync(join(agentDir, 'pty-token'))).toBe(true);
+    expect(existsSync(join(workspace, '.pan', 'agent-mcp.json'))).toBe(false);
+    expect(existsSync(join(tmpHome, 'bridge-tokens', 'agent-pan-1405.token'))).toBe(false);
     expect(state.supervisorEnabled).toBe(true);
-    expect(JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')).supervisorEnabled).toBe(true);
+    expect(state.channelsEnabled).toBeUndefined();
+    expect(persisted.supervisorEnabled).toBe(true);
+    expect(persisted.channelsEnabled).toBeUndefined();
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
+    expect(launcher).not.toContain('--mcp-config');
+    expect(launcher).not.toContain('--dangerously-load-development-channels');
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
     );
+  });
+
+  it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {
+    channelsMcpEnabled = true;
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+    expect(existsSync(join(workspace, '.pan', 'agent-mcp.json'))).toBe(true);
+    expect(existsSync(join(tmpHome, 'bridge-tokens', 'agent-pan-1405.token'))).toBe(true);
+    expect(state.channelsEnabled).toBe(true);
+    expect(persisted.channelsEnabled).toBe(true);
+    expect(launcher).toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
+    expect(launcher).toContain('--dangerously-load-development-channels');
   });
 
   it('fails before launcher or tmux creation when the supervisor artifact is missing', async () => {

@@ -107,7 +107,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         rollupPendingThreshold: 4,
         sidebarRefreshIntervalMs: 10000,
       },
-      experimental: { claudeCodeChannels: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
       claude: { permissionMode: 'auto' },
       tts: {
         enabled: false,
@@ -608,6 +608,21 @@ describe('validateSettingsApi', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Unknown tts setting(s): daemonPort');
+  });
+
+  it('rejects invalid experimental flag types', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      experimental: {
+        claudeCodeChannels: 'yes',
+        claudeCodeChannelsMcp: 'yes',
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('experimental.claudeCodeChannels must be a boolean');
+    expect(result.errors).toContain('experimental.claudeCodeChannelsMcp must be a boolean');
   });
 
   it('rejects invalid tts field types', async () => {

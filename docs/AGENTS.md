@@ -28,12 +28,23 @@ The following files and directories are written by active code:
 | `mail/` | `messageAgent()` | Inbound message queue |
 | `initial-prompt.md` | `spawnAgent()` / `spawnRun()` | Prompt sent on startup |
 | `launcher.sh` | `spawnAgent()` / `spawnRun()` | Shell script that launches the run |
+| `pty-token` | `spawnAgent()` | Per-agent bearer token for PTY supervisor delivery |
 | `output.log` | `messageAgent()` / capture | Captured output |
 | `completed` | `recoverAgent()` | Completion marker |
 | `health.json` | `recoverAgent()` | Last-known health snapshot |
 | `current-task.json` | `writeTaskCache()` | Cached task state for resumption |
 | `handoffs/` | `handoff.ts` | Handoff prompt debug artifacts |
 | `context-pct` / `initial-context-pct` | `scripts/statusline.sh` | Context window usage metrics |
+
+## Delivery artifacts
+
+New Claude Code work agents launch through the PTY supervisor by default. The
+legacy Claude Code Channels MCP bridge is opt-in for new spawns through
+`experimental.claudeCodeChannelsMcp: true`; when enabled, `spawnAgent()` writes
+`<workspace>/.pan/agent-mcp.json`, a bridge token under
+`~/.panopticon/bridge-tokens/`, and `state.channelsEnabled = true`. Existing
+agents with `channelsEnabled = true` continue to use Channels as the delivery
+fallback even when the MCP override is later disabled.
 
 ## Legacy Directories
 

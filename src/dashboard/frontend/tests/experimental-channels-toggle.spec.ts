@@ -33,7 +33,7 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
       },
       api_keys: {},
       tracker_keys: {},
-      experimental: { claudeCodeChannels: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
     };
 
     await page.route('**/api/settings', async (route: Route) => {
@@ -76,7 +76,7 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
 
     await toggle.click();
     await expect.poll(() => lastWrittenBody, { timeout: 5_000 }).toMatchObject({
-      experimental: { claudeCodeChannels: true },
+      experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false },
     });
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
