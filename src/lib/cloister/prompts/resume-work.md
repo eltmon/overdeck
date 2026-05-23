@@ -12,6 +12,7 @@ optional:
   - CURRENT_PHASE
   - REMAINING_WORK_BLOCK
   - NO_STATE_BLOCK
+  - TLDR_AVAILABLE
 ---
 # Agent Resumed — {{ISSUE_ID}}
 
@@ -40,6 +41,19 @@ You have been **resumed** from a previous session. Your full conversation histor
 {{#NO_STATE_BLOCK}}
 {{NO_STATE_BLOCK}}
 {{/NO_STATE_BLOCK}}
+{{#TLDR_AVAILABLE}}
+## TLDR: Fast Re-Orientation
+
+You have access to TLDR MCP tools for catching up on partial work without re-reading whole files:
+- `tldr_context <file>` — summarize in-flight files before editing them again
+- `tldr_structure <directory>` — rebuild your mental model of the touched subsystem
+- `tldr_semantic <query>` — locate code related to the resume instructions or feedback
+- `tldr_calls <function> <file>` — find callers before changing a resumed implementation
+- `tldr_impact <function> <file>` — understand downstream effects before continuing
+
+Use TLDR first to regain context quickly, then use full Reads only for exact code you need to edit or verify.
+
+{{/TLDR_AVAILABLE}}
 ## What To Do Now
 
 {{INSTRUCTIONS_BLOCK}}
