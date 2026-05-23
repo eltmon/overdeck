@@ -224,6 +224,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
   if (config.enabledProviders.has('mimo')) return resolveModelId('mimo-v2.5-pro');
   if (config.enabledProviders.has('nous')) return resolveModelId('qwen/qwen3.6-plus');
+  if (config.enabledProviders.has('dashscope')) return resolveModelId('qwen3-coder-plus');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
     if (fav) return resolveModelId(fav);
@@ -658,6 +659,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
         nous: settings.models.providers.nous,
+        dashscope: settings.models.providers.dashscope,
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -672,6 +674,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
+      dashscope: settings.api_keys.dashscope,
     },
     tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
@@ -786,7 +789,7 @@ export async function setRoleConfig(role: Role, roleConfig: RoleConfig): Promise
 }
 
 export async function updateProviderApiKey(
-  provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous',
+  provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
   return updateSettingsApi({
@@ -909,6 +912,7 @@ export function getAvailableModelsApi(): {
   mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
     anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;

@@ -50,6 +50,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5': { provider: 'openai', displayName: 'GPT-5.5', costPer1MTokens: 1 },
     'gpt-5.5-mini': { provider: 'openai', displayName: 'GPT-5.5 Mini', costPer1MTokens: 1 },
     'minimax-m2.7-highspeed': { provider: 'minimax', displayName: 'MiniMax M2.7', costPer1MTokens: 1 },
+    'qwen3-coder-plus': { provider: 'dashscope', displayName: 'Qwen3 Coder Plus', costPer1MTokens: 1 },
   },
   MODEL_DEPRECATIONS: {
     'claude-opus-4-6': 'claude-opus-4-7',
@@ -62,6 +63,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5',
     'gpt-5.5-mini',
     'minimax-m2.7-highspeed',
+    'qwen3-coder-plus',
   ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
 }));
@@ -133,6 +135,15 @@ describe('getDefaultConversationModelApi', () => {
 
     expect(getDefaultConversationModelApi()).toBe('gpt-5.5');
     expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.5');
+  });
+
+  it('defaults to Qwen3 Coder Plus when only DashScope is enabled', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['dashscope']) }));
+
+    const { getDefaultConversationModelApi } = await import('../settings-api.js');
+
+    expect(getDefaultConversationModelApi()).toBe('qwen3-coder-plus');
+    expect(mockResolveModelId).toHaveBeenCalledWith('qwen3-coder-plus');
   });
 });
 
@@ -402,6 +413,30 @@ describe('saveSettingsApi', () => {
     expect(loadSettingsApi().roles?.review?.sub?.security?.model).toBe('parent');
   });
 
+  it('persists DashScope provider enablement and API key', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        providers: {
+          ...settings.models.providers,
+          dashscope: true,
+        },
+      },
+      api_keys: {
+        ...settings.api_keys,
+        dashscope: 'dashscope-test-key',
+      },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('dashscope: true');
+    expect(written).toContain('dashscope: dashscope-test-key');
+  });
+
   it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -475,6 +510,8 @@ describe('validateSettingsApi', () => {
         kimi: false,
         mimo: false,
         openrouter: false,
+        nous: false,
+        dashscope: false,
       },
       gemini_thinking_level: 3,
     },

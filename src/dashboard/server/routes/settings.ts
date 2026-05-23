@@ -52,7 +52,7 @@ const readJsonBody = Effect.gen(function* () {
 });
 
 /** Model ID to API model ID mapping */
-const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
+export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models — gpt-5.x are real OpenAI model IDs (identity map).
   // Codex sign-in routes through CLIProxy; API key routes direct.
   'gpt-5.5-pro': { apiModel: 'gpt-5.5-pro' },
@@ -91,6 +91,11 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'mimo-v2.5': { apiModel: 'mimo-v2.5' },
   // Nous Portal models
   'qwen/qwen3.6-plus': { apiModel: 'qwen/qwen3.6-plus' },
+  // Alibaba DashScope models
+  'qwen3-max': { apiModel: 'qwen3-max' },
+  'qwen3-coder-plus': { apiModel: 'qwen3-coder-plus' },
+  'qwen3-plus': { apiModel: 'qwen3-plus' },
+  'qwen3.7-max': { apiModel: 'qwen3.7-max' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfig, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath } from '../../src/lib/config-yaml.js';
+import { loadConfig, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs } from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -115,6 +115,31 @@ api_keys:
       expect(config.apiKeys.openai).toBe('sk-from-env');
 
       delete process.env.TEST_OPENAI_KEY;
+    });
+
+    it('normalizes DashScope provider and API key from models.providers', () => {
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            anthropic: false,
+            dashscope: { enabled: true, api_key: 'dashscope-test-key' },
+          },
+        },
+      });
+
+      expect(config.enabledProviders.has('anthropic')).toBe(false);
+      expect(config.enabledProviders.has('dashscope')).toBe(true);
+      expect(config.apiKeys.dashscope).toBe('dashscope-test-key');
+    });
+
+    it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {
+      const { config } = mergeConfigs({
+        models: { providers: { anthropic: false, dashscope: false } },
+        api_keys: { dashscope: 'dashscope-test-key' },
+      });
+
+      expect(config.apiKeys.dashscope).toBe('dashscope-test-key');
+      expect(config.enabledProviders.has('dashscope')).toBe(false);
     });
   });
 
