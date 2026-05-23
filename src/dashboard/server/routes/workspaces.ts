@@ -1080,6 +1080,10 @@ function getFlyAppName(vmName: string): string {
   return match ? match[1] : vmName;
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function flyExecCmd(vmName: string, command: string): string {
   const appName = getFlyAppName(vmName);
   return `fly ssh console -a ${appName} -C "${command.replace(/"/g, '\\"')}"`;
@@ -3638,12 +3642,23 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    const parsedIssueId = parseIssueIdSync(issueId);
+    if (!parsedIssueId) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+    const canonicalIssueId = issueId.toUpperCase();
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
     const eventStore = yield* EventStoreService;
+
+    const urlOpt = HttpServerRequest.toURL(request);
+    const forceReview =
+      (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
+      (body as any)?.force === true;
+    const nudgeReview =
+      (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('nudge') === 'true') ||
+      (body as any)?.nudge === true;
 
     const existingStatus = getReviewStatusSync(issueId);
 
@@ -3657,14 +3672,78 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     if (existingStatus?.reviewStatus === 'passed') {
+      if (forceReview) {
+        console.log(`[request-review] FORCE: full reset requested by operator for ${canonicalIssueId}`);
+      } else if (nudgeReview) {
+        if (existingStatus.testStatus !== 'passed') {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'Cannot nudge — tests have not passed',
+              hint: 'Use ?force=true for a full re-review or wait for tests to complete',
+            },
+            { status: 400 },
+          );
+        }
+
+        console.log(`[request-review] NUDGE: re-emitting test.passed for ${canonicalIssueId} without state reset`);
+        yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+          type: 'test.passed',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: canonicalIssueId },
+        } as any)));
+        return jsonResponse({
+          success: true,
+          nudged: true,
+          message: `Re-emitted test.passed for ${canonicalIssueId}`,
+        });
+      }
+
+      const issueLowerRerun = canonicalIssueId.toLowerCase();
+      const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+      const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+      const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
+      const workspacePathRerun = wsInfoRerun.isRemote
+        ? wsInfoRerun.remotePath!
+        : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+
+      if (existingStatus.reviewedAtCommit && !forceReview) {
+        let currentHeadSha: string | undefined;
+        const headResult = yield* Effect.promise(async () => {
+          try {
+            const result = wsInfoRerun.isRemote && wsInfoRerun.vmName
+              ? await execAsync(
+                  flyExecCmd(wsInfoRerun.vmName!, `cd ${shellQuote(workspacePathRerun)} && git rev-parse HEAD`),
+                  { encoding: 'utf-8', timeout: 30000 },
+                )
+              : await execAsync('git rev-parse HEAD', {
+                  cwd: workspacePathRerun,
+                  encoding: 'utf-8',
+                });
+            return { ok: true as const, stdout: result.stdout };
+          } catch (error) {
+            return { ok: false as const, error };
+          }
+        });
+        if (headResult.ok) {
+          currentHeadSha = headResult.stdout.trim();
+        } else {
+          const message = headResult.error instanceof Error ? headResult.error.message : String(headResult.error);
+          console.warn(`[request-review] ${issueId}: HEAD lookup failed, falling back to full rerun: ${message}`);
+        }
+
+        if (currentHeadSha && currentHeadSha === existingStatus.reviewedAtCommit) {
+          console.log(`[request-review] REFUSED: no code drift since review passed for ${issueId} at ${currentHeadSha.slice(0, 7)}`);
+          return jsonResponse({
+            success: false,
+            noCodeDrift: true,
+            error: 'No code drift since review passed',
+            hint: 'Use ?nudge=true to re-emit lifecycle events without resetting state, or ?force=true to force a full re-review',
+          });
+        }
+      }
+
       if (shouldTreatAsRerun(existingStatus)) {
-        const issueLowerRerun = issueId.toLowerCase();
-        const issuePrefixRerun = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-        const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
-        const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
-        const workspacePathRerun = wsInfoRerun.isRemote
-          ? wsInfoRerun.remotePath!
-          : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
         if (!wsInfoRerun.isRemote) {
           yield* restoreTrackedBeadsExport(workspacePathRerun);
         }
@@ -3705,7 +3784,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
                 await execAsync(
                   flyExecCmd(
                     wsInfoRerun.vmName,
-                    `cd ${workspacePathRerun} && git push origin ${branchNameRerun} 2>&1 || true`
+                    `cd ${shellQuote(workspacePathRerun)} && git push origin ${branchNameRerun} 2>&1 || true`
                   ),
                   { encoding: 'utf-8', timeout: 30000 }
                 );
