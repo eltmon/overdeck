@@ -3180,7 +3180,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         const localPath = workspaceInfo.localPath;
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(localPath));
+          const gitInfo = yield* getWorkspaceGitInfo(localPath);
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
           }
@@ -3901,7 +3901,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (!workspaceInfo.isRemote) {
       try {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
-        const commitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
+        const commitInfo = yield* getWorkspaceGitInfo(workspacePath);
         requestReviewCommits = { HEAD: commitInfo.HEAD, branch: commitInfo.branch };
       } catch {}
     }
