@@ -4,7 +4,7 @@
     "created": "2026-05-23T04:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1331: Restore the per-issue action surface — wire every `pan` verb into Board cards and the Issue Detail drawer (PAN-1148 §4.8)",
-    "updated": "2026-05-23T04:09:19.224Z"
+    "updated": "2026-05-23T04:20:29.929Z"
   },
   "plan": {
     "id": "pan-1331",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "86eabc36-2861-4d24-a017-68368d817147",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-23T04:30:00.000Z",
-    "updated": "2026-05-23T04:09:19.224Z",
+    "updated": "2026-05-23T04:20:29.929Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1331",
@@ -56,7 +56,7 @@
     ],
     "narratives": {
       "Problem": "The PAN-1148 redesign deleted InspectorPanel.tsx and the inspector/ folder, reducing the per-issue action surface to a 4-button drawer footer (Reset · Stop · View PR · Merge) plus a Tell input. Roughly 20 issue-scoped `pan` verbs (plan/swarm/tell/done/review/restart/reset/recover/pause/unpause/untroubled/resume/sync-main/inspect/reopen/close/wipe/destroy/open/start--auto) have no dashboard entry point anywhere except the Command Deck project tree. Three actions (untroubled, per-bead inspect, open in editor) have zero UI on any surface. The existing `commandDeckSurfaceRegistry.ts` is a stale parity table referenced as dead code (`void`) in multiple components. This is not a redesign conformance gap — the PRD never specified a full action surface until §4.8 was added as an amendment.",
-      "Proposal": "Implement PRD §4.8 in one initiative: (1) Replace `commandDeckActions.ts` with a single canonical `issueActions` registry matching §4.8.1's catalog. (2) Build `<IssueActionMenu>` as the shared rendering primitive (one component, three modes: inline / overflow-only / hybrid). (3) Add `POST /api/issues/:id/beads/:beadId/inspect` server route. (4) Wire the new primitive into the Issue Detail drawer footer (canonical full-coverage surface). (5) Wire into Board cards with hybrid mode + right-click. (6) Wire into Pipeline rows and Agent cards (fix dead `⋯` button). (7) Reconcile ZoneActionStrip onto the new registry; delete `commandDeckActions.ts` + `commandDeckSurfaceRegistry.ts` and sweep all `void` references. (8) Ship a CLI↔dashboard parity test that asserts every issue-scoped `pan` verb has a registry entry and renders on the drawer — closes the long-standing #243 audit and makes the 'CLI is the lower bound' contract enforceable in CI."
+      "Proposal": "Implement PRD §4.8 in one initiative with a STRICT 'no actions lost' invariant — every action that the dashboard exposes anywhere today must still be reachable after this work, in addition to the new PRD §4.8.1 additions. (1) Build a SUPERSET `issueActions` registry: PRD §4.8.1 catalog UNION every action currently in `commandDeckActions.ts` and on existing surfaces (Badge Bar, Status Flow Control, project-tree context menu, drawer footer). (2) Build `<IssueActionMenu>` as the shared rendering primitive (one component, three modes). (3) Add `POST /api/issues/:id/beads/:beadId/inspect`. (4) Wire the primitive into the Issue Detail drawer footer. (5) Wire into Board cards with hybrid mode + right-click. (6) Wire into Pipeline rows and fix the dead Agent `⋯` button. (7) Audit every existing surface for action coverage; ONLY THEN reconcile ZoneActionStrip onto the new registry and delete `commandDeckActions.ts` + `commandDeckSurfaceRegistry.ts`. (8) Ship a CLI↔dashboard parity test plus a hard 'no actions lost' assertion that enumerates pre-existing actions and verifies every one is in the new registry. Closes #243; gives the user a single mental model where every relevant action is discoverable on every surface without anything being lost."
     },
     "autoDecisions": [
       {
@@ -83,7 +83,7 @@
     "items": [
       {
         "id": "registry",
-        "title": "Create canonical `issueActions` registry module matching PRD §4.8.1 catalog",
+        "title": "Create canonical `issueActions` registry as a SUPERSET — PRD §4.8.1 catalog UNION every action exposed in the dashboard today",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-23T04:30:00.000Z",
@@ -104,8 +104,8 @@
           ]
         },
         "narrative": {
-          "Action": "Create `src/dashboard/frontend/src/lib/issueActions.ts` exporting (a) `IssueActionKey` union type with one key per PRD §4.8.1 row (plan, autoPlan, watchPlanning, donePlanning, startAgent, startSkipPlanning, swarm, tell, doneWork, requestReview, restartReview, recoverReview, stopAgent, pause, unpause, untroubled, recoverAgent, resumeSession, switchModel, syncMain, inspectBead, reopen, closeOut, wipe, destroyWorkspace, open, resetIssue, viewPr), (b) `IssueActionEntry` interface (`key`, `label`, `panVerb`, `endpoint`, `enabledWhen(state)`, `phasePrimary: PipelinePhase[]`, `kind: 'safe'|'dialog'|'destructive'`, `group`), (c) the full `ISSUE_ACTIONS: IssueActionEntry[]` table populated from §4.8.1, (d) `getEnabledActions(state)` and `getPhasePrimaryActions(state, phase)` pure selector functions. No React, no JSX, no handlers — pure declarative metadata + selector logic. Reuse the existing `derivePipelineState()` from `commandDeckActions.ts` (extract it into its own module if needed). Comprehensive unit tests for the selectors against fixture states covering each PRD §4.8.3 phase row.",
-          "WhyInspect": "This bead is the foundation every other bead encodes assumptions about. A wrong shape for `IssueActionEntry`, a missing action key, or a flawed `enabledWhen` predicate cascades into every surface — work agent could redo half the consumers if this is wrong. `inspectionDepth: deep` because the registry also encodes the §4.8.3 phase-primary mapping, which the inspector should verify against the PRD table line-by-line."
+          "Action": "Create `src/dashboard/frontend/src/lib/issueActions.ts` exporting (a) `IssueActionKey` union type containing TWO groups: (i) PRD §4.8.1 row keys — plan, autoPlan, watchPlanning, donePlanning, startAgent, startSkipPlanning, swarm, tell, doneWork, requestReview, restartReview, recoverReview, stopAgent, pause, unpause, untroubled, recoverAgent, resumeSession, switchModel, syncMain, inspectBead, reopen, closeOut, wipe, destroyWorkspace, open, resetIssue, viewPr; AND (ii) preserved-from-existing keys — beads, inference, discussions, transcripts, upload, syncDiscussions, statusReview, createWorkspace, copySettings, resetSession, restartFromPlan, restartAgent, reviewTest (the compound shortcut). (b) `IssueActionEntry` interface (`key`, `label`, `panVerb`, `endpoint`, `enabledWhen(state)`, `phasePrimary: PipelinePhase[]`, `kind: 'safe'|'dialog'|'destructive'`, `group`). (c) The full `ISSUE_ACTIONS: IssueActionEntry[]` table covering BOTH groups. (d) Pure selectors `getEnabledActions(state)` and `getPhasePrimaryActions(state, phase)`. The PRD §4.8.3 phase-primary table is encoded; the preserved-from-existing actions live in the registry but have empty `phasePrimary` (they're reachable via the `⋯` overflow but never promoted to inline). No React, no JSX, no handlers — pure declarative metadata + selector logic. Reuse the existing `derivePipelineState()` from `commandDeckActions.ts` (extract it into its own module so both the new registry AND the old one can consume it during the transition). Comprehensive unit tests for the selectors against fixture states covering each PRD §4.8.3 phase row.",
+          "WhyInspect": "This bead is the foundation every other bead encodes assumptions about. A wrong shape for `IssueActionEntry`, a missing action key, a flawed `enabledWhen` predicate, OR a missing preserved-from-existing entry cascades into every surface — work agent could redo half the consumers AND silently drop user-visible actions if this is wrong. `inspectionDepth: deep` because the registry encodes both the §4.8.3 phase-primary mapping AND the no-actions-lost invariant, which the inspector should verify against the PRD table AND against a list of existing surfaces."
         },
         "subItems": [
           {
@@ -118,7 +118,15 @@
           },
           {
             "id": "registry.ac2",
-            "title": "Every registry entry has a non-empty `label`, a `panVerb` that matches an actual CLI command (or null for client-only actions like View PR), an `endpoint` (or null), an `enabledWhen` predicate, a `phasePrimary` array (may be empty), a `kind`, and a `group`",
+            "title": "Registry contains the SUPERSET — every PRD §4.8.1 key PLUS preserved-from-existing keys: beads, inference, discussions, transcripts, upload, syncDiscussions, statusReview, createWorkspace, copySettings, resetSession, restartFromPlan, restartAgent, reviewTest. Zero existing actions dropped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry.ac2b",
+            "title": "Every registry entry has a non-empty `label`, a `panVerb` (or null for client-only / non-CLI actions), an `endpoint` (or null), an `enabledWhen` predicate, a `phasePrimary` array (may be empty for preserved-existing entries), a `kind`, and a `group`",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -566,8 +574,74 @@
         ]
       },
       {
+        "id": "no-loss-audit",
+        "title": "Static no-actions-lost audit: enumerate every action exposed in the dashboard today and verify each has a registry entry — HARD GATE before any deletion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Write `src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts`. It hardcodes a list of EVERY action currently surfaced anywhere in the dashboard (the full ActionKey set from the old `commandDeckActions.ts` plus any one-off buttons elsewhere — Reset/Stop/Merge in DrawerActionBar, the BadgeBar artifact actions, the kanban card's MergeButton/RecoverButton/ResetIssueButton/StopAgentButton/RestartFromPlanButton, the StatusFlowControl buttons in `WorkspaceStatusOverview.tsx`, the project-tree right-click items in `ProjectNode.tsx` + `ContainerNode.tsx`). For each, the test asserts (a) the new `issueActions` registry contains an entry whose semantic intent matches, AND (b) the action's rendered text appears in the DOM when the menu is rendered with that action enabled. The test fails the build if any pre-existing action lacks a registry counterpart. This is the gate that BLOCKS the `deck-zone-actions` deletion bead until coverage is provably complete."
+        },
+        "subItems": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "Test file enumerates every ActionKey value from the existing `commandDeckActions.ts` and asserts each has a corresponding entry in the new `issueActions` registry (either same key or an alias-mapping documented in the file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "Test enumerates the BadgeBar artifact actions (Tasks, Status, Inference, Discussions, Transcripts, Upload, Sync) and asserts each has a registry entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "Test enumerates the WorkspaceStatusOverview / StatusFlowControl buttons (compact MERGE, Review & Test, Recover, Stop, Start, Resume, Reset Session, Create Workspace, Reopen) and asserts each has a registry entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac4",
+            "title": "Test enumerates the project-tree right-click context-menu items (in `ProjectNode.tsx` + `ContainerNode.tsx`) and asserts each has a registry entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac5",
+            "title": "Test asserts that Zone B session-scoped actions (stopSession, viewTerminal, viewState, viewVbrief, copySessionId, copyTmuxCommand) STILL RENDER on their existing surface — they are session actions, not issue actions, and must not be lost in this refactor even though they're not in `issueActions`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac6",
+            "title": "Test runs in `npm test` and fails the suite if any catalogued action is missing from the registry — verified by intentionally removing a registry entry and seeing the test fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
         "id": "deck-zone-actions",
-        "title": "Reconcile `ZoneActionStrip` onto the new registry; delete `commandDeckActions.ts`",
+        "title": "Reconcile `ZoneActionStrip` onto the new registry; delete `commandDeckActions.ts` ONLY AFTER no-loss-audit passes",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-23T04:30:00.000Z",
@@ -578,7 +652,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Rewrite `src/dashboard/frontend/src/components/CommandDeck/ZoneActionStrip.tsx` (657 lines) to render `<IssueActionMenu issueId={id} mode='hybrid'>` instead of its current bespoke 25-action switch statement. Move any zone-specific labeling/density rules into the registry as needed (most should be expressible via existing `phasePrimary` + `enabledWhen`). Update `useZoneAActions.ts` to provide the data the registry handlers consume rather than the legacy ActionKey set. Delete `src/dashboard/frontend/src/lib/commandDeckActions.ts` and its associated tests. Sweep `void COMMAND_DECK_SURFACE_REGISTRY;` references in `KanbanBoard.tsx`, `ZoneActionStrip.tsx`, `ProjectTree/ContainerNode.tsx`, `FeatureMetadata/BadgeBar.tsx`, `ZoneCOverviewTabs/*.tsx`. Update `ZoneActionStrip.test.tsx`, `IssueWorkbench.test.tsx`, and `CommandDeck.test.tsx` to test against the new primitive's behavior."
+          "Action": "GATE: this bead may not start until `no-loss-audit` is green. Rewrite `src/dashboard/frontend/src/components/CommandDeck/ZoneActionStrip.tsx` (657 lines) to render `<IssueActionMenu issueId={id} mode='hybrid'>` instead of its current bespoke 25-action switch statement. Move any zone-specific labeling/density rules into the registry as needed (most should be expressible via existing `phasePrimary` + `enabledWhen`). Update `useZoneAActions.ts` to provide the data the registry handlers consume rather than the legacy ActionKey set. Delete `src/dashboard/frontend/src/lib/commandDeckActions.ts` and its associated tests. Sweep `void COMMAND_DECK_SURFACE_REGISTRY;` references in `KanbanBoard.tsx`, `ZoneActionStrip.tsx`, `ProjectTree/ContainerNode.tsx`, `FeatureMetadata/BadgeBar.tsx`, `ZoneCOverviewTabs/*.tsx`. Update `ZoneActionStrip.test.tsx`, `IssueWorkbench.test.tsx`, and `CommandDeck.test.tsx` to test against the new primitive's behavior. After deletion, rerun `no-loss-audit` and `parity-test` — both must still pass."
         },
         "subItems": [
           {
@@ -791,6 +865,16 @@
         "from": "deck-zone-actions",
         "to": "parity-test",
         "type": "informs"
+      },
+      {
+        "from": "registry",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit",
+        "to": "deck-zone-actions",
+        "type": "blocks"
       }
     ],
     "metadata": {
