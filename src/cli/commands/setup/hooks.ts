@@ -316,6 +316,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
+    'rtk-bash-filter',
     'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   ];
   for (const scriptName of hookScripts) {
@@ -493,6 +494,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     console.log(chalk.dim('  • TLDR MCP          - Token-efficient code analysis'));
   }
   console.log(chalk.dim('  • Caveman           - Compressed output hooks (activate with agents.caveman.enabled: true)'));
+  console.log(chalk.dim('  • RTK Bash filter   - Token-efficient Bash output hooks (activate with agents.rtk.enabled: true)'));
   console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
