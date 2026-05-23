@@ -4,7 +4,7 @@
     "created": "2026-05-23T04:48:22Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-748: Show context usage indicator at top of conversations",
-    "updated": "2026-05-23T06:46:48.962Z"
+    "updated": "2026-05-23T06:52:42.430Z"
   },
   "plan": {
     "id": "pan-748",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "97ffce1a-52a5-4886-8816-83c4923604a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 6,
+    "sequence": 8,
     "created": "2026-05-23T04:48:22Z",
-    "updated": "2026-05-23T06:46:48.962Z",
+    "updated": "2026-05-23T06:52:42.430Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/748",
@@ -566,60 +566,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-23-PAN-748-show-context-usage-indicator-at-top-of-conversations.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-748",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-23T06:46:48.955Z",
+        "updatedAt": "2026-05-23T06:52:42.429Z",
         "work": {
-          "updatedAt": "2026-05-23T06:46:48.955Z",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-23T06:46:48.955Z",
-          "notes": "Verification FAILED at test (30248ms):\n\n 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/issues-close-out.test.ts > POST /api/issues/:id/close-out > allows cookie-authenticated dashboard requests with exact trusted origin and CSRF token\nAssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/dashboard/server/routes/__tests__/issues-close-out.test.ts:237:27\n    235|     });\n    236|\n    237|     expect(result.status).toBe(200);\n       |                           ^\n    238|     expect(closeOutMock).toHaveBeenCalledOnce();\n    239|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/issues-close-out.test.ts > POST /api/issues/:id/close-out > rejects cookie-authenticated close-out requests without a CSRF token\nAssertionError: expected { error: 'Invalid origin' } to deeply equal { error: 'Invalid CSRF token' }\n\n- Expected\n+ Received\n\n  {\n-   \"error\": \"Invalid CSRF token\",\n+   \"error\": \"Invalid origin\",\n  }\n\n ❯ src/dashboard/server/routes/__tests__/issues-close-out.test.ts:262:25\n    260|\n    261|     expect(result.status).toBe(403);\n    262|     expect(result.body).toEqual({ error: 'Invalid CSRF token' });\n       |                         ^\n    263|     expect(closeOutMock).not.toHaveBeenCalled();\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
+          "status": "passed",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-23T06:46:48.955Z",
-              "notes": "Verification FAILED at test (30248ms):\n\n 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/issues-close-out.test.ts > POST /api/issues/:id/close-out > allows cookie-authenticated dashboard requests with exact trusted origin and CSRF token\nAssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/dashboard/server/routes/__tests__/issues-close-out.test.ts:237:27\n    235|     });\n    236|\n    237|     expect(result.status).toBe(200);\n       |                           ^\n    238|     expect(closeOutMock).toHaveBeenCalledOnce();\n    239|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/issues-close-out.test.ts > POST /api/issues/:id/close-out > rejects cookie-authenticated close-out requests without a CSRF token\nAssertionError: expected { error: 'Invalid origin' } to deeply equal { error: 'Invalid CSRF token' }\n\n- Expected\n+ Received\n\n  {\n-   \"error\": \"Invalid CSRF token\",\n+   \"error\": \"Invalid origin\",\n  }\n\n ❯ src/dashboard/server/routes/__tests__/issues-close-out.test.ts:262:25\n    260|\n    261|     expect(result.status).toBe(403);\n    262|     expect(result.body).toEqual({ error: 'Invalid CSRF token' });\n       |                         ^\n    263|     expect(closeOutMock).not.toHaveBeenCalled();\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n"
+              "status": "passed",
+              "at": "2026-05-23T06:52:42.429Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-23T06:46:48.955Z",
-          "notes": "Agent re-review request (1/25): Completed acceptance criteria",
+          "status": "reviewing",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
+          "notes": "Agent re-review request (2/25): Fixed test",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-23T06:46:48.955Z",
-              "notes": "Agent re-review request (1/25): Completed acceptance criteria"
+              "status": "reviewing",
+              "at": "2026-05-23T06:52:42.429Z",
+              "notes": "Agent re-review request (2/25): Fixed test"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-23T06:46:48.955Z",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T06:46:48.955Z"
+              "at": "2026-05-23T06:52:42.429Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-23T06:46:48.955Z",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-23T06:46:48.955Z",
+          "updatedAt": "2026-05-23T06:52:42.429Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T06:46:48.955Z"
+              "at": "2026-05-23T06:52:42.429Z"
             }
           ],
           "readyForMerge": false,
