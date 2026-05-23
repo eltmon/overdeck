@@ -9,9 +9,10 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, DSP_FLAG
  *   POST   /api/conversations                — spawn a new conversation
  *   POST   /api/conversations/:name/stop     — kill session, mark ended (preserves row)
  *   POST   /api/conversations/:name/archive  — kill session and hide from list
+ *   DELETE /api/conversations/:name          — cleanup alias: kill and archive, preserve transcript
  *   POST   /api/conversations/:name/resume   — reattach or respawn
  *
- * Conversations are NEVER deleted from the database. The only removal verb is `archive`.
+ * Conversations are NEVER deleted from the database, and JSONL transcript files are never removed.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -80,7 +81,6 @@ import {
   listSessionNames,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
-import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -90,6 +90,7 @@ import {
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
+import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
@@ -108,7 +109,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
@@ -134,6 +135,7 @@ const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
+const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -667,20 +669,12 @@ export async function handleConversationMessage(
     // Unmanaged @paths in prose are allowed to pass through
   }
 
-  // Deliver via deliverAgentMessage so channels eligibility and fallback
-  // policy are respected (PAN-1123). For Pi agents this resolves to tmux
-  // because channels eligibility requires harness === 'claude-code'.
-  let deliveryMethod = conv.deliveryMethod;
-  if (!deliveryMethod) {
-    const settings = loadSettingsApi();
-    deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
-  }
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
       message,
       'conversation-message',
-      deliveryMethod,
+      resolveConversationDeliveryMethod(conv),
     );
   } catch (deliveryErr: unknown) {
     const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
@@ -724,6 +718,39 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promi
     await new Promise(r => setTimeout(r, 250));
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
+}
+
+function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
+  return harness === 'claude-code'
+    && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
+    && process.env.PAN_DOCKER !== '1';
+}
+
+function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
+  return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+}
+
+function resolvePtySupervisorScriptPath(): string {
+  return join(packageRoot, 'dist', 'pty-supervisor.js');
+}
+
+function getPtySupervisorSocketPath(agentId: string): string {
+  return join(process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'), 'sockets', `pty-${agentId}.sock`);
+}
+
+async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
+  const socketPath = getPtySupervisorSocketPath(agentId);
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const info = await stat(socketPath);
+      if ((info.mode & 0o777) === 0o600) return;
+    } catch {
+      // not bound yet
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath}`);
 }
 
 /**
@@ -813,7 +840,7 @@ void backfillConversationModels().catch((err: unknown) => {
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
 
-async function spawnConversationSession(
+export async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
   claudeSessionId: string,
@@ -924,6 +951,16 @@ async function spawnConversationSession(
     throw new Error('Invalid effort level');
   }
 
+  const useSupervisor = shouldUseSupervisorForConversation(harness);
+  let supervisorScriptPath: string | undefined;
+  if (useSupervisor) {
+    supervisorScriptPath = resolvePtySupervisorScriptPath();
+    if (!existsSync(supervisorScriptPath)) {
+      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    }
+    await writePtyToken(tmuxSession);
+  }
+
   // Channels setup for Claude Code conversations when the experimental flag
   // is on. Writes a per-session bridge token and MCP config so Claude loads
   // the panopticon-bridge stdio server on startup.
@@ -970,7 +1007,7 @@ async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      panopticonEnv: { ...(issueId ? { issueId } : {}), ...(piFields ? { agentId: tmuxSession } : {}) },
+      panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
@@ -983,6 +1020,8 @@ async function spawnConversationSession(
       keepAlive: true,
       fileMode: 0o700,
       channelsBridgeMcpConfig,
+      useSupervisor,
+      supervisorScriptPath,
     }),
     { mode: 0o700 },
   );
@@ -1029,6 +1068,10 @@ async function spawnConversationSession(
       );
     }
     throw err;
+  }
+
+  if (useSupervisor) {
+    await waitForPtySupervisorSocket(tmuxSession);
   }
 
   // Channels: dismiss the dev-channels confirmation dialog so the bridge MCP
@@ -1444,9 +1487,7 @@ const postConversationRoute = HttpRouter.add(
 
             // If a message was provided, send it now that the runtime is ready.
             if (message) {
-              const settings = loadSettingsApi();
-              const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
-              await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
+              await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
             }
           } catch (spawnErr: unknown) {
             const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
@@ -2149,6 +2190,41 @@ const patchConversationRoute = HttpRouter.add(
   }),
 );
 
+const deleteConversationRoute = HttpRouter.add(
+  'DELETE',
+  '/api/conversations/:name',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        markConversationEnded(name);
+        archiveConversation(name);
+        removeFavorite('conversation', name);
+        invalidateFavoritesCache();
+        await cleanupConversationAttachments(name);
+
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] delete conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: POST /api/conversations/:name/archive ───────────────────────────
 
 const postConversationArchiveRoute = HttpRouter.add(
@@ -2368,9 +2444,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }
   }
-  const settings = loadSettingsApi();
-  const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
-  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', deliveryMethod);
+  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', resolveConversationDeliveryMethod(conv));
 }
 
 async function runForkPipeline(
@@ -2606,9 +2680,7 @@ const postConversationPlanActionRoute = HttpRouter.add(
           await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
           if (feedback) {
             await new Promise(r => setTimeout(r, 300));
-            const settings = loadSettingsApi();
-            const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
-            await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', deliveryMethod);
+            await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', resolveConversationDeliveryMethod(conv));
           }
           return jsonResponse({ ok: true });
         }
@@ -3110,6 +3182,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationRoute,
   postConversationRoute,
   patchConversationRoute,
+  deleteConversationRoute,
   postConversationStopRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,

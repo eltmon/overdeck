@@ -189,8 +189,10 @@ export interface ApiSettingsConfig {
     rally?: string;
   };
   experimental?: {
-    /** Use Claude Code Channels for prompt delivery to eligible work agents. */
+    /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
+    /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
+    claudeCodeChannelsMcp?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.
@@ -551,6 +553,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tracker_keys: config.trackerKeys,
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
+      claudeCodeChannelsMcp: config.experimental?.claudeCodeChannelsMcp ?? false,
     },
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
@@ -698,7 +701,10 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : undefined,
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
-      ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
+      ? {
+          claudeCodeChannels: settings.experimental.claudeCodeChannels,
+          claudeCodeChannelsMcp: settings.experimental.claudeCodeChannelsMcp,
+        }
       : undefined,
     claude: settings.claude?.permissionMode
       ? { permissionMode: settings.claude.permissionMode }
@@ -871,9 +877,12 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (typeof settings.experimental !== 'object' || settings.experimental === null) {
       errors.push('experimental must be an object');
     } else {
-      const ccc = (settings.experimental as { claudeCodeChannels?: unknown }).claudeCodeChannels;
-      if (ccc !== undefined && typeof ccc !== 'boolean') {
+      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown };
+      if (experimental.claudeCodeChannels !== undefined && typeof experimental.claudeCodeChannels !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
+      }
+      if (experimental.claudeCodeChannelsMcp !== undefined && typeof experimental.claudeCodeChannelsMcp !== 'boolean') {
+        errors.push('experimental.claudeCodeChannelsMcp must be a boolean');
       }
     }
   }
