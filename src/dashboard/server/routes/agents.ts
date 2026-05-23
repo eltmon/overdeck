@@ -2479,7 +2479,7 @@ const postAgentsRoute = HttpRouter.add(
     }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
+      const codexAuth = yield* checkCodexAuthStatus();
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,

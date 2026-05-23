@@ -22,14 +22,14 @@ vi.mock('util', async (importOriginal) => {
 
 import { Effect } from 'effect';
 import {
-  movePrd as movePrdEffect,
+  movePrd as movePrdProgram,
   findWorkspacePath,
-  archiveWorkspaceArtifacts as archiveWorkspaceArtifactsEffect,
+  archiveWorkspaceArtifacts as archiveWorkspaceArtifactsProgram,
 } from '../../../../src/lib/lifecycle/archive-planning.js';
 
-const movePrd = (...args: Parameters<typeof movePrdEffect>) => Effect.runPromise(movePrdEffect(...args));
-const archiveWorkspaceArtifacts = (...args: Parameters<typeof archiveWorkspaceArtifactsEffect>) =>
-  Effect.runPromise(archiveWorkspaceArtifactsEffect(...args));
+const movePrd = (...args: Parameters<typeof movePrdProgram>) => Effect.runPromise(movePrdProgram(...args));
+const archiveWorkspaceArtifacts = (...args: Parameters<typeof archiveWorkspaceArtifactsProgram>) =>
+  Effect.runPromise(archiveWorkspaceArtifactsProgram(...args));
 
 describe('archive-planning', () => {
   let testDir: string;

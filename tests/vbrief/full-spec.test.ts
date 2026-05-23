@@ -15,12 +15,12 @@ import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
-import { readWorkspaceContinue as readWorkspaceContinueEffect } from '../../src/lib/pan-dir/continue.js';
+import { readWorkspaceContinue as readWorkspaceContinueProgram } from '../../src/lib/pan-dir/continue.js';
 import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
 
 // readWorkspaceContinue is Effect-returning post-PAN-1249.
 const readWorkspaceContinue = (workspacePath: string) =>
-  Effect.runPromise(readWorkspaceContinueEffect(workspacePath));
+  Effect.runPromise(readWorkspaceContinueProgram(workspacePath));
 
 let PROJECT_ROOT: string;
 let TEST_DIR: string;

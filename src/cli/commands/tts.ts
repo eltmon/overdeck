@@ -24,9 +24,9 @@ export const DEFAULT_TTS_TEST_VOICE = 'Vivian';
 
 export type TtsTestVoiceKind = 'system' | 'status';
 
-type PromiseOrEffect<T> = Promise<T> | Effect.Effect<T, unknown, never>;
+type PromiseOrProgram<T> = Promise<T> | Effect.Effect<T, unknown, never>;
 
-async function runPromiseOrEffect<T>(value: PromiseOrEffect<T>): Promise<T> {
+async function runPromiseOrProgram<T>(value: PromiseOrProgram<T>): Promise<T> {
   return typeof (value as { pipe?: unknown }).pipe === 'function'
     ? Effect.runPromise(value as Effect.Effect<T, unknown, never>)
     : value as Promise<T>;
@@ -34,7 +34,7 @@ async function runPromiseOrEffect<T>(value: PromiseOrEffect<T>): Promise<T> {
 
 export interface RunTtsTestDeps {
   config?: NormalizedTtsDaemonConfig;
-  findVoiceById?: (id: string) => PromiseOrEffect<TtsVoice | undefined>;
+  findVoiceById?: (id: string) => PromiseOrProgram<TtsVoice | undefined>;
   fetch?: typeof fetch;
   stdout?: Pick<typeof console, 'log'>;
   stderr?: Pick<typeof console, 'error'>;
@@ -43,9 +43,9 @@ export interface RunTtsTestDeps {
 
 export interface TtsVoiceCommandDeps {
   config?: NormalizedTtsDaemonConfig;
-  loadVoices?: () => PromiseOrEffect<readonly TtsVoice[]>;
-  findVoiceByName?: (name: string) => PromiseOrEffect<TtsVoice | undefined>;
-  deleteVoice?: (id: string) => PromiseOrEffect<boolean>;
+  loadVoices?: () => PromiseOrProgram<readonly TtsVoice[]>;
+  findVoiceByName?: (name: string) => PromiseOrProgram<TtsVoice | undefined>;
+  deleteVoice?: (id: string) => PromiseOrProgram<boolean>;
   updateTtsConfig?: (updates: TtsConfigUpdate) => Promise<void>;
   fetch?: typeof fetch;
   stdout?: Pick<typeof console, 'log'>;
@@ -54,11 +54,11 @@ export interface TtsVoiceCommandDeps {
 
 export interface TtsDaemonCommandDeps {
   config?: NormalizedTtsDaemonConfig;
-  getStatus?: (config: NormalizedTtsDaemonConfig) => PromiseOrEffect<TtsDaemonStatus>;
-  startDaemon?: (options: { config: NormalizedTtsDaemonConfig; detach?: boolean; waitForHealth?: boolean; timeoutMs?: number }) => PromiseOrEffect<TtsDaemonStartResult>;
-  stopDaemon?: (timeoutMs?: number) => PromiseOrEffect<TtsDaemonStopResult>;
-  installSystemdUnit?: () => PromiseOrEffect<string>;
-  runForeground?: (config: NormalizedTtsDaemonConfig) => PromiseOrEffect<{ exitCode: number | null; signal: NodeJS.Signals | null }>;
+  getStatus?: (config: NormalizedTtsDaemonConfig) => PromiseOrProgram<TtsDaemonStatus>;
+  startDaemon?: (options: { config: NormalizedTtsDaemonConfig; detach?: boolean; waitForHealth?: boolean; timeoutMs?: number }) => PromiseOrProgram<TtsDaemonStartResult>;
+  stopDaemon?: (timeoutMs?: number) => PromiseOrProgram<TtsDaemonStopResult>;
+  installSystemdUnit?: () => PromiseOrProgram<string>;
+  runForeground?: (config: NormalizedTtsDaemonConfig) => PromiseOrProgram<{ exitCode: number | null; signal: NodeJS.Signals | null }>;
   stdout?: Pick<typeof console, 'log'>;
   stderr?: Pick<typeof console, 'error'>;
 }
@@ -111,7 +111,7 @@ export function formatVoiceDetails(voice: TtsVoice): string {
 }
 
 export async function listTtsVoices(deps: TtsVoiceCommandDeps = {}): Promise<TtsVoice[]> {
-  const voices = [...await runPromiseOrEffect((deps.loadVoices ?? loadVoices)())];
+  const voices = [...await runPromiseOrProgram((deps.loadVoices ?? loadVoices)())];
   const stdout = deps.stdout ?? console;
   if (voices.length === 0) {
     stdout.log('No voices saved yet');
@@ -122,7 +122,7 @@ export async function listTtsVoices(deps: TtsVoiceCommandDeps = {}): Promise<Tts
 }
 
 async function findVoiceByNameOrReport(name: string, deps: TtsVoiceCommandDeps): Promise<TtsVoice | undefined> {
-  const voice = await runPromiseOrEffect((deps.findVoiceByName ?? findVoiceByName)(name));
+  const voice = await runPromiseOrProgram((deps.findVoiceByName ?? findVoiceByName)(name));
   if (!voice) (deps.stderr ?? console).error(chalk.red(`Voice not found: ${name}`));
   return voice;
 }
@@ -221,7 +221,7 @@ export async function runTtsTest(text: string | undefined, deps: RunTtsTestDeps 
     return postTtsSpeakPayload(buildDefaultTtsTestVoice(), text, config, { fetch: deps.fetch, stdout, stderr });
   }
 
-  const voice = await runPromiseOrEffect((deps.findVoiceById ?? findVoiceById)(configuredVoiceId));
+  const voice = await runPromiseOrProgram((deps.findVoiceById ?? findVoiceById)(configuredVoiceId));
   if (!voice) {
     const label = voiceKind === 'status' ? 'status voice' : 'system voice';
     const message = `Configured ${label} not found: ${configuredVoiceId}`;
@@ -242,7 +242,7 @@ export async function playTtsVoice(name: string, text: string | undefined, deps:
 export async function deleteTtsVoiceByName(name: string, deps: TtsVoiceCommandDeps = {}): Promise<boolean> {
   const voice = await findVoiceByNameOrReport(name, deps);
   if (!voice) return false;
-  const deleted = await runPromiseOrEffect((deps.deleteVoice ?? deleteVoice)(voice.id));
+  const deleted = await runPromiseOrProgram((deps.deleteVoice ?? deleteVoice)(voice.id));
   if (deleted) (deps.stdout ?? console).log(`Deleted ${voice.name}`);
   return deleted;
 }
@@ -307,7 +307,7 @@ export function formatTtsDaemonStatus(status: TtsDaemonStatus): string {
 
 export async function runTtsDaemonStatus(deps: TtsDaemonCommandDeps = {}): Promise<TtsDaemonStatus> {
   const config = getTtsConfig(deps);
-  const status = await runPromiseOrEffect((deps.getStatus ?? getTtsDaemonStatus)(config));
+  const status = await runPromiseOrProgram((deps.getStatus ?? getTtsDaemonStatus)(config));
   (deps.stdout ?? console).log(formatTtsDaemonStatus(status));
   return status;
 }
@@ -317,7 +317,7 @@ export async function runTtsDaemonStart(
   deps: TtsDaemonCommandDeps = {},
 ): Promise<TtsDaemonStartResult> {
   const config = getTtsConfig(deps);
-  const result = await runPromiseOrEffect((deps.startDaemon ?? startTtsDaemon)({
+  const result = await runPromiseOrProgram((deps.startDaemon ?? startTtsDaemon)({
     config,
     detach: options.detach,
     waitForHealth: options.waitForHealth,
@@ -337,13 +337,13 @@ export async function runTtsDaemonStart(
 
 export async function runTtsDaemonForegroundCommand(deps: TtsDaemonCommandDeps = {}): Promise<number> {
   const config = getTtsConfig(deps);
-  const result = await runPromiseOrEffect((deps.runForeground ?? runTtsDaemonForeground)(config));
+  const result = await runPromiseOrProgram((deps.runForeground ?? runTtsDaemonForeground)(config));
   if (result.signal) (deps.stderr ?? console).error(chalk.yellow(`TTS daemon exited from ${result.signal}`));
   return result.exitCode ?? (result.signal ? 1 : 0);
 }
 
 export async function runTtsDaemonStop(deps: TtsDaemonCommandDeps = {}): Promise<TtsDaemonStopResult> {
-  const result = await runPromiseOrEffect((deps.stopDaemon ?? stopTtsDaemon)());
+  const result = await runPromiseOrProgram((deps.stopDaemon ?? stopTtsDaemon)());
   const stdout = deps.stdout ?? console;
   const stderr = deps.stderr ?? console;
   if (result.stopped) stdout.log(chalk.green(`✓ Stopped TTS daemon${result.pid ? ` (pid ${result.pid})` : ''}`));
@@ -360,7 +360,7 @@ export async function runTtsDaemonRestart(
 }
 
 export async function runTtsInstallSystemd(deps: TtsDaemonCommandDeps = {}): Promise<string> {
-  const unitPath = await runPromiseOrEffect((deps.installSystemdUnit ?? installTtsSystemdUnit)());
+  const unitPath = await runPromiseOrProgram((deps.installSystemdUnit ?? installTtsSystemdUnit)());
   (deps.stdout ?? console).log(chalk.green(`✓ Installed systemd user unit at ${unitPath}`));
   (deps.stdout ?? console).log('Enable it with: systemctl --user enable --now panopticon-qwen-tts.service');
   return unitPath;

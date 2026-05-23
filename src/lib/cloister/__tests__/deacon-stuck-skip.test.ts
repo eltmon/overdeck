@@ -65,7 +65,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
   sendKeys: effectMock(undefined),
-  sendKeysEffect: effectMock(undefined),
+  sendKeysProgram: effectMock(undefined),
   };
 });
 
@@ -240,7 +240,7 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
 
     await patrolWorkAgentResolutions();
 
-    // sendKeysEffect should have been called for the poke
+    // sendKeysProgram should have been called for the poke
     expect(mockSendKeysAsync).toHaveBeenCalledOnce();
   });
 

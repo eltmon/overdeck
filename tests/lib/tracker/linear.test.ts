@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { LinearTracker } from '../../../src/lib/tracker/linear.js';
 import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/interface.js';
 
-function isEffect(v: unknown): boolean {
+function isEffectValue(v: unknown): boolean {
   if (!v || typeof v !== 'object') return false;
   for (const key of Object.getOwnPropertyNames(v)) {
     if (key.startsWith('~effect/Effect/')) return true;
@@ -17,7 +17,7 @@ function wrap<T extends object>(t: T): any {
       if (typeof value !== 'function') return value;
       return (...args: any[]) => {
         const result = value.apply(target, args);
-        if (isEffect(result)) {
+        if (isEffectValue(result)) {
           return Effect.runPromise(result as any).catch((err) => {
             if (err && typeof err === 'object' && 'cause' in err && err.cause) {
               const cause = (err as any).cause;

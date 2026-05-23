@@ -43,7 +43,7 @@ vi.mock('../../tmux.js', async () => {
   return {
     capturePane: vi.fn(() => Effect.succeed('')),
     listSessionNames: () => Effect.promise(() => tmuxMocks.listSessionNames()),
-    sendKeysEffect: vi.fn(() => Effect.void),
+    sendKeysProgram: vi.fn(() => Effect.void),
     sessionExists: tmuxMocks.sessionExists,
     sessionExistsSync: tmuxMocks.sessionExists,
     sessionExists: (name: string) => Effect.sync(() => tmuxMocks.sessionExists(name)),
@@ -67,7 +67,7 @@ vi.mock('../../agents.js', async () => {
     getAgentState: vi.fn(() => Effect.succeed(null)),
     getAgentStateSync: vi.fn(() => Effect.succeed(null)),
     setAgentPaused: (...args: unknown[]) => Effect.sync(() => setAgentPausedMock(...args)),
-    setAgentPausedEffect: (...args: unknown[]) => Effect.sync(() => setAgentPausedMock(...args)),
+    setAgentPausedProgram: (...args: unknown[]) => Effect.sync(() => setAgentPausedMock(...args)),
   };
 });
 vi.mock('../validation.js', () => ({
@@ -129,14 +129,14 @@ import { postMergeLifecycle, resetPostMergeState, spawnMergeAgentForBranches } f
 import { dropStash, listStashes } from '../../stashes.js';
 import { spawnRun } from '../../agents.js';
 import { AGENTS_DIR } from '../../paths.js';
-import { findSpecByIssue as findSpecByIssueEffect, writeSpecForIssue as writeSpecForIssueEffect } from '../../pan-dir/specs.js';
+import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../pan-dir/specs.js';
 import { Effect } from 'effect';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to Promise for tests.
 const findSpecByIssue = (projectRoot: string, issueId: string) =>
-  Effect.runPromise(findSpecByIssueEffect(projectRoot, issueId) as Effect.Effect<any, any, never>);
+  Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
-  Effect.runPromise(writeSpecForIssueEffect(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
+  Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
 
 describe('merge-agent ship role and stash lifecycle', () => {
   let setTimeoutSpy: ReturnType<typeof vi.spyOn>;

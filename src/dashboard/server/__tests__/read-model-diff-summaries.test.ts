@@ -296,7 +296,7 @@ describe('ReadModel checkpoint reconciliation', () => {
                 role: 'work',
               },
             ])),
-            listRunningAgentsEffect: vi.fn(() => Effect.succeed([
+            listRunningAgentsProgram: vi.fn(() => Effect.succeed([
               {
                 id: 'agent-reconcile',
                 issueId: 'PAN-1024',

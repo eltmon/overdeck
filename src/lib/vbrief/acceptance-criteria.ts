@@ -136,7 +136,7 @@ export function checkAllCriteriaCompletedSync(workspacePath: string): ACCompleti
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// Compose with `readWorkspacePlanEffect` from io.ts so AC extraction and AC
+// Compose with `readWorkspacePlanProgram` from io.ts so AC extraction and AC
 // completion checks can participate in Effect-native pipelines without
 // blocking the event loop. extractACFromDocument and the AC-completion logic
 // itself are pure-sync — only the plan read is wrapped.

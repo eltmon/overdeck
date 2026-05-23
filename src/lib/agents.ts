@@ -750,7 +750,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     });
 
     if (oldStatus && oldStatus !== state.status) {
-      logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateEffect)`);
+      logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }
   });
 };
@@ -1535,7 +1535,7 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
 export function getAgentRuntimeStateSync(agentId: string): AgentRuntimeState | null {
   // Sync path: read from the in-process mirror (empty in fresh CLI processes,
   // populated inside the dashboard server). CLI commands should use
-  // getAgentRuntimeStateEffect so they fall through to HTTP.
+  // getAgentRuntimeStateProgram so they fall through to HTTP.
   return snapshotToRuntimeState(Effect.runSync(getRuntimeSnapshot(agentId)));
 }
 

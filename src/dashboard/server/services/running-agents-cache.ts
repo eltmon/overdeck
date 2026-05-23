@@ -3,7 +3,7 @@ import { listRunningAgents, type AgentState } from '../../../lib/agents.js';
 
 type RunningAgent = AgentState & { tmuxActive: boolean };
 type RunningAgents = RunningAgent[];
-type ListAgentsEffect = () => Effect.Effect<RunningAgents, unknown>;
+type ListAgentsProgram = () => Effect.Effect<RunningAgents, unknown>;
 
 const RUNNING_AGENTS_CACHE_TTL_MS = 3_000;
 const GLOBAL_RUNNING_AGENTS_CACHE_KEY = '__all_agents__';
@@ -24,7 +24,7 @@ function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, tt
 }
 
 export async function getCachedRunningAgents(
-  listAgents: ListAgentsEffect = listRunningAgents,
+  listAgents: ListAgentsProgram = listRunningAgents,
 ): Promise<RunningAgents> {
   sweepExpired(runningAgentsCache, RUNNING_AGENTS_CACHE_TTL_MS);
   const cached = runningAgentsCache.get(GLOBAL_RUNNING_AGENTS_CACHE_KEY);

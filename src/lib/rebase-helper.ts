@@ -206,7 +206,7 @@ async function tryResolvePlanningConflicts(
 //
 // Additive Effect-channel variant of the rebase helper. The Promise-returning
 // API is preserved for existing callers; new Effect-based callers can compose
-// `rebaseAndPushReposEffect` directly without round-tripping through
+// `rebaseAndPushReposProgram` directly without round-tripping through
 // `Effect.runPromise`.
 
 /** Tagged error for rebase-helper Effect variants. */

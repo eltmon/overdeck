@@ -36,9 +36,9 @@ export interface TtsSpeakPayload {
   embedding?: number[];
 }
 
-type PromiseOrEffect<T> = Promise<T> | Effect.Effect<T, unknown, never>;
+type PromiseOrProgram<T> = Promise<T> | Effect.Effect<T, unknown, never>;
 
-async function runPromiseOrEffect<T>(value: PromiseOrEffect<T>): Promise<T> {
+async function runPromiseOrProgram<T>(value: PromiseOrProgram<T>): Promise<T> {
   return typeof (value as { pipe?: unknown }).pipe === 'function'
     ? Effect.runPromise(value as Effect.Effect<T, unknown, never>)
     : value as Promise<T>;
@@ -46,7 +46,7 @@ async function runPromiseOrEffect<T>(value: PromiseOrEffect<T>): Promise<T> {
 
 export interface ResolveAndSpeakDeps {
   config: NormalizedTtsDaemonConfig;
-  findVoiceById?: (id: string) => PromiseOrEffect<TtsVoice | undefined>;
+  findVoiceById?: (id: string) => PromiseOrProgram<TtsVoice | undefined>;
   fetch?: FetchLike;
   timeoutMs?: number;
 }
@@ -176,7 +176,7 @@ async function postSpeakPayload(
   const voiceId = resolveVoiceId(options, config).trim();
   if (!voiceId) return 'no-voice';
 
-  const voice = await runPromiseOrEffect((deps.findVoiceById ?? findVoiceById)(voiceId));
+  const voice = await runPromiseOrProgram((deps.findVoiceById ?? findVoiceById)(voiceId));
   if (!voice) return 'no-voice';
 
   return postSpeakPayload(buildTtsSpeakPayloadSync(voice, text, config), config, deps);

@@ -64,7 +64,7 @@ import {
 } from '../services/tracker-config.js';
 import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
-import { checkAgentHealthEffect, determineHealthStatusEffect } from '../../lib/health-filtering.js';
+import { checkAgentHealth, determineHealthStatus } from '../../lib/health-filtering.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { findPlan, readPlan } from '../../../lib/vbrief/io.js';
@@ -210,7 +210,7 @@ const pendingConfirmations = new Map<string, ConfirmationRequest>();
 
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
 
-const checkPlanStatusEffect = (
+const checkPlanStatus = (
   workspacePath: string,
   matchStatus: (status: string) => boolean,
 ): Effect.Effect<boolean, unknown> => Effect.gen(function* () {
@@ -466,7 +466,7 @@ const getHealthAgentsRoute = HttpRouter.add(
           const stateFile = join(agentsDir, name, 'state.json');
           const healthFile = join(agentsDir, name, 'health.json');
 
-          const healthStatus = await Effect.runPromise(determineHealthStatusEffect(name, stateFile, liveSessions));
+          const healthStatus = await Effect.runPromise(determineHealthStatus(name, stateFile, liveSessions));
           if (!healthStatus) return null;
 
           // Only read health.json for agents that survive the status filter —
@@ -519,7 +519,7 @@ const postHealthAgentPingRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
     try {
-        const health = await Effect.runPromise(checkAgentHealthEffect(id));
+        const health = await Effect.runPromise(checkAgentHealth(id));
 
         if (!health.alive) {
           return jsonResponse({ success: false, status: 'dead' });
@@ -1014,10 +1014,10 @@ const getPlanningStatusRoute = HttpRouter.add(
         // planningCompleted means `plan.status` indicates planning has finished
         // (any of proposed/approved/pending/running/completed/blocked).
         const hasCompletionMarker = existsSync(panDir)
-          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => status === 'proposed'))
+          ? await Effect.runPromise(checkPlanStatus(workspacePath, status => status === 'proposed'))
           : false;
         const planningCompleted = existsSync(panDir)
-          ? await Effect.runPromise(checkPlanStatusEffect(workspacePath, status => PLANNING_FINISHED_STATUSES.has(status)))
+          ? await Effect.runPromise(checkPlanStatus(workspacePath, status => PLANNING_FINISHED_STATUSES.has(status)))
           : false;
 
         return jsonResponse({

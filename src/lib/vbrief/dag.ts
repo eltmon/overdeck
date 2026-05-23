@@ -864,7 +864,7 @@ export const writePlanFileAtomic = (planPath: string, doc: VBriefDocument): Effe
   });
 
 /** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
-const mirrorTaskOperationToContinueFileEffect = (
+const mirrorTaskOperationToContinueFile = (
   workspacePath: string,
   itemId: string,
   status: VBriefItemStatus,
@@ -921,16 +921,16 @@ export const applyTaskOperationToPlanFile = (
     }
 
     yield* assertSingleWriter(planPath, operation.writerId);
-    const operationEffect = Effect.gen(function* () {
+    const operationProgram = Effect.gen(function* () {
       const current = yield* readPlanFile(planPath);
       const result = applyTaskOperation(current, operation);
       yield* writePlanFileAtomic(planPath, result.doc);
       const wsPath = workspacePath ?? dirname(dirname(planPath));
-      yield* mirrorTaskOperationToContinueFileEffect(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
+      yield* mirrorTaskOperationToContinueFile(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
       return result;
     });
 
-    return yield* operationEffect.pipe(
+    return yield* operationProgram.pipe(
       Effect.ensuring(releasePlanWriter(planPath, operation.writerId).pipe(Effect.catch(() => Effect.void))),
     );
   });
@@ -1073,7 +1073,7 @@ export const writePipelineMirrorToPlanFile = (
     if (!existsSync(planPath)) return null;
 
     yield* assertSingleWriter(planPath, writerId);
-    const writeEffect = Effect.gen(function* () {
+    const writeProgram = Effect.gen(function* () {
       const doc = yield* readPlanFile(planPath);
       setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
       const now = new Date().toISOString();
@@ -1084,7 +1084,7 @@ export const writePipelineMirrorToPlanFile = (
       return doc;
     });
 
-    return yield* writeEffect.pipe(
+    return yield* writeProgram.pipe(
       Effect.ensuring(releasePlanWriter(planPath, writerId).pipe(Effect.catch(() => Effect.void))),
     );
   });

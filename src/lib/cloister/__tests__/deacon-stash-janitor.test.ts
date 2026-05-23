@@ -87,7 +87,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   sessionExists: vi.fn(() => false),
   sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
-  sendKeysEffect: effectMock(undefined),
+  sendKeysProgram: effectMock(undefined),
   isPaneDead: effectMock(false),
   };
 });

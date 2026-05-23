@@ -114,14 +114,14 @@ describe('EventStoreService.append via yield*', () => {
 
     const testLayer = Layer.succeed(EventStoreService, mockEventStore as any);
 
-    const routeEffect = Effect.gen(function* () {
+    const routeProgram = Effect.gen(function* () {
       const eventStore = yield* EventStoreService;
       yield* eventStore.append({ type: 'test.event', timestamp: new Date().toISOString(), payload: {} });
       return jsonResponse({ ok: true });
     });
 
     const response = await Effect.runPromise(
-      Effect.provide(httpHandler(routeEffect), testLayer)
+      Effect.provide(httpHandler(routeProgram), testLayer)
     );
     const body = response.body as { body: Uint8Array } | null;
     const text = body?.body ? new TextDecoder().decode(body.body) : '{}';

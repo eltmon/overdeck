@@ -32,7 +32,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
   })),
-  stopAgentEffect: vi.fn(),
+  stopAgentProgram: vi.fn(),
 }));
 
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
@@ -63,12 +63,12 @@ vi.mock('../../../lib/tmux.js', async () => {
 
 vi.mock('../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
-  flywheelLifecycleMocks.stopAgentEffect.mockImplementation((agentId: string) => Effect.sync(() => {
+  flywheelLifecycleMocks.stopAgentProgram.mockImplementation((agentId: string) => Effect.sync(() => {
     flywheelLifecycleMocks.stoppedAgents.push(agentId);
   }));
   return {
-    stopAgent: flywheelLifecycleMocks.stopAgentEffect,
-    stopAgentEffect: flywheelLifecycleMocks.stopAgentEffect,
+    stopAgent: flywheelLifecycleMocks.stopAgentProgram,
+    stopAgentProgram: flywheelLifecycleMocks.stopAgentProgram,
   };
 });
 
@@ -179,7 +179,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
-    flywheelLifecycleMocks.stopAgentEffect.mockClear();
+    flywheelLifecycleMocks.stopAgentProgram.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });

@@ -154,7 +154,7 @@ const getOpenAIAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/openai-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* Effect.promise(() => getOpenAIAuthStatus());
+    const status = yield* getOpenAIAuthStatus();
     return jsonResponse(status);
   })),
 );

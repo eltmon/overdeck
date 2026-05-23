@@ -61,7 +61,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   killSession: vi.fn(() => Effect.void),
   killSessionSync: vi.fn(() => Effect.void),
   sendKeys: vi.fn(() => Effect.void),
-  sendKeysEffect: vi.fn(() => Effect.void),
+  sendKeysProgram: vi.fn(() => Effect.void),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn().mockReturnValue(false),
   sessionExistsSync: vi.fn().mockReturnValue(false),
@@ -111,7 +111,7 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
     ...actual,
     isCliproxyRunning: vi.fn().mockReturnValue(Effect.succeed(true)),
     isCliproxyRunningSync: vi.fn().mockReturnValue(true),
-    isCliproxyRunningEffect: vi.fn(() => Effect.succeed(true)),
+    isCliproxyRunningProgram: vi.fn(() => Effect.succeed(true)),
   };
 });
 

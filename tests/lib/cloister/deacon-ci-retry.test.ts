@@ -41,7 +41,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     sessionExists: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSessionExists(...args))),
     sessionExistsSync: (...args: unknown[]) => mockSessionExists(...args),
     sendKeys: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
-    sendKeysEffect: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
+    sendKeysProgram: (...args: unknown[]) => Effect.promise(() => Promise.resolve(mockSendKeysAsync(...args))),
     buildTmuxCommandString: vi.fn(),
     capturePane: vi.fn(() => Effect.succeed('')),
     createSession: vi.fn(() => Effect.succeed(undefined)),

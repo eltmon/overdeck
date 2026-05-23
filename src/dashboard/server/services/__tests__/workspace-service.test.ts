@@ -32,13 +32,13 @@ vi.mock('node:fs', () => ({ existsSync: mockExistsSync }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -72,7 +72,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.resolve('PAN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const info = await runEffect(program);
+      const info = await runProgram(program);
       expect(info.issueId).toBe('PAN-1');
       expect(info.path).toContain('feature-pan-1');
       expect(info.exists).toBe(false);
@@ -88,7 +88,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.resolve('PAN-5');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const info = await runEffect(program);
+      const info = await runProgram(program);
       expect(info.exists).toBe(true);
     });
   });
@@ -111,7 +111,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.create('PAN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const path = await runEffect(program);
+      const path = await runProgram(program);
       expect(path).toContain('feature-pan-1');
       expect(mockCreateWorkspace).toHaveBeenCalledWith(
         expect.objectContaining({ featureName: 'pan-1' }),
@@ -129,7 +129,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.create('PAN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const path = await runEffect(program);
+      const path = await runProgram(program);
       expect(path).toContain('feature-pan-1');
       expect(mockCreateWorkspace).not.toHaveBeenCalled();
     });
@@ -150,7 +150,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.create('PAN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('WorkspaceCreateError');
       expect((err as any).message).toContain('git worktree failed');
     });
@@ -166,7 +166,7 @@ describe('WorkspaceService Effect service', () => {
         return yield* ws.create('UNKNOWN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('WorkspaceCreateError');
     });
   });
@@ -186,7 +186,7 @@ describe('WorkspaceService Effect service', () => {
         yield* ws.remove('PAN-1');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockRemoveWorkspace).toHaveBeenCalled();
     });
 
@@ -200,7 +200,7 @@ describe('WorkspaceService Effect service', () => {
         yield* ws.remove('PAN-99');
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('WorkspaceNotFound');
     });
   });
@@ -217,7 +217,7 @@ describe('WorkspaceService Effect service', () => {
       }).pipe(Effect.provide(WorkspaceServiceLive));
 
       // Should not throw
-      await runEffect(program);
+      await runProgram(program);
       expect(mockStopWorkspaceDocker).toHaveBeenCalled();
     });
   });

@@ -13,7 +13,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 // PAN-1249: readFile / writeFile / unlink are consumed by the additive Effect
-// helpers below (`readFileEffect`, `writeFileEffect`, `unlinkEffect`).
+// helpers below (`readFileOp`, `writeFileOp`, `unlinkPath`).
 import { readdir, readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
@@ -39,7 +39,7 @@ const execFileAsync = promisify(execFile);
  * internally so callers can keep their Promise-returning signatures while the
  * implementation drifts towards Effect.
  */
-const execEffect = (
+const execCommand = (
   command: string,
   options?: Parameters<typeof execAsync>[1],
 ): Effect.Effect<{ stdout: string; stderr: string }, ProcessSpawnError> =>
@@ -61,7 +61,7 @@ const execEffect = (
   });
 
 /** Wrap `execFileAsync` in Effect with a typed error. */
-const execFileEffect = (
+const execFileCommand = (
   command: string,
   args: readonly string[],
   options?: Parameters<typeof execFileAsync>[2],
@@ -84,7 +84,7 @@ const execFileEffect = (
   });
 
 /** Wrap a fs/promises read in Effect with a typed FsError. */
-const readFileEffect = (path: string): Effect.Effect<string, FsError> =>
+const readFileOp = (path: string): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: () => readFile(path, 'utf-8'),
     catch: (cause) =>
@@ -96,7 +96,7 @@ const readFileEffect = (path: string): Effect.Effect<string, FsError> =>
   });
 
 /** Wrap a fs/promises write in Effect with a typed FsError. */
-const writeFileEffect = (path: string, data: string): Effect.Effect<void, FsError> =>
+const writeFileOp = (path: string, data: string): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: () => writeFile(path, data, 'utf-8'),
     catch: (cause) =>
@@ -108,7 +108,7 @@ const writeFileEffect = (path: string, data: string): Effect.Effect<void, FsErro
   });
 
 /** Wrap a fs/promises unlink in Effect with a typed FsError. */
-const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
+const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: () => unlink(path),
     catch: (cause) =>
@@ -702,7 +702,7 @@ const ACTIVE_STATUS_PATTERNS = [
  * — capture errors collapse to `false`. The public Promise function is a
  * thin `Effect.runPromise` wrapper.
  */
-const isAgentActiveInTmuxEffect = (sessionName: string): Effect.Effect<boolean, never> =>
+const isAgentActiveInTmuxProgram = (sessionName: string): Effect.Effect<boolean, never> =>
   capturePane(sessionName, 5).pipe(
     Effect.map((stdout) => {
       if (!stdout.trim()) return false;
@@ -733,7 +733,7 @@ const isAgentActiveInTmuxEffect = (sessionName: string): Effect.Effect<boolean, 
   );
 
 export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(isAgentActiveInTmuxEffect(sessionName));
+  return Effect.runPromise(isAgentActiveInTmuxProgram(sessionName));
 }
 
 /**

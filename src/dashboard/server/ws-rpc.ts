@@ -871,7 +871,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
  */
 export const websocketRpcRouteLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(
+    const rpcWebSocketHttp = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(
       Effect.provide(
         Layer.mergeAll(
           PanRpcLayer,
@@ -890,7 +890,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       if (!originCheck.ok) {
         return jsonResponse({ error: originCheck.error }, { status: 403 });
       }
-      return yield* rpcWebSocketHttpEffect;
+      return yield* rpcWebSocketHttp;
     }));
   }),
 );

@@ -24,7 +24,7 @@ vi.mock('fs', () => ({
 
 // ── child_process mock ─────────────────────────────────────────────────────
 const mockExecAsync = vi.fn();
-const mockReadPlanEffect = vi.fn();
+const mockReadPlan = vi.fn();
 vi.mock('child_process', () => ({
   exec: vi.fn((cmd: string, opts: unknown, cb: unknown) => {
     // promisify calls exec(cmd, opts, callback)
@@ -41,7 +41,7 @@ vi.mock('child_process', () => ({
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),
-  readPlanEffect: (...args: unknown[]) => mockReadPlanEffect(...args),
+  readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),
@@ -70,7 +70,7 @@ describe('buildReviewContext', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadPlanEffect.mockReturnValue(Effect.fail(new Error('no plan')));
+    mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
   });
 
@@ -170,7 +170,7 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadPlanEffect.mockReturnValue(Effect.fail(new Error('no plan')));
+    mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
     mockExecAsync.mockRejectedValue(new Error('no git'));
   });

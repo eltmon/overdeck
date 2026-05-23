@@ -159,7 +159,7 @@ export const dispatchTestAgentAndNotify = (
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
 
-    const spawnEffect: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
+    const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
       try: () => spawnRun(issueId, 'test', { workspace, prompt }),
       catch: (cause) => {
         const msg = cause instanceof Error ? cause.message : String(cause);
@@ -210,7 +210,7 @@ export const dispatchTestAgentAndNotify = (
       }),
     );
 
-    const spawnResult: DispatchTestAgentResult = yield* spawnEffect;
+    const spawnResult: DispatchTestAgentResult = yield* spawnProgram;
 
     if (spawnResult.delivered && notifyAgent) {
       const notified = yield* Effect.tryPromise({

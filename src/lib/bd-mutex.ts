@@ -58,7 +58,7 @@ export const withBdMutex = <A, E>(
 
 /**
  * Effect-native variant of withWorkspaceBdMutex. Same context constraint as
- * withBdMutexEffect.
+ * withBdMutex.
  */
 export const withWorkspaceBdMutex = <A, E>(
   workspacePath: string,

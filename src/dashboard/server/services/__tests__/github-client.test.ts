@@ -24,13 +24,13 @@ function makeResponse(body: unknown, status = 200) {
   } as Response;
 }
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -57,7 +57,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.getIssue('owner', 'repo', 1);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
       expect((err as any).tracker).toBe('github');
     });
@@ -83,7 +83,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.getIssue('owner', 'repo', 42);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const issue = await runEffect(program);
+      const issue = await runProgram(program);
       expect(issue.number).toBe(42);
       expect(issue.title).toBe('Fix bug');
       expect(issue.state).toBe('open');
@@ -100,7 +100,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.getIssue('owner', 'repo', 999);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
     });
 
@@ -114,7 +114,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.getIssue('owner', 'repo', 1);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
     });
   });
@@ -130,7 +130,7 @@ describe('GitHubClient Effect service', () => {
         yield* client.addLabel('owner', 'repo', 42, 'in-progress');
       }).pipe(Effect.provide(GitHubClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues/42/labels',
         expect.objectContaining({
@@ -152,7 +152,7 @@ describe('GitHubClient Effect service', () => {
         yield* client.removeLabel('owner', 'repo', 42, 'in-progress');
       }).pipe(Effect.provide(GitHubClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues/42/labels/in-progress',
         expect.objectContaining({ method: 'DELETE' }),
@@ -170,7 +170,7 @@ describe('GitHubClient Effect service', () => {
       }).pipe(Effect.provide(GitHubClientLive));
 
       // Should NOT throw
-      await runEffect(program);
+      await runProgram(program);
     });
   });
 
@@ -187,7 +187,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.ensureLabel('owner', 'repo', 'merged', '00c000');
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const label = await runEffect(program);
+      const label = await runProgram(program);
       expect(label.name).toBe('merged');
     });
 
@@ -203,7 +203,7 @@ describe('GitHubClient Effect service', () => {
         return yield* client.ensureLabel('owner', 'repo', 'merged');
       }).pipe(Effect.provide(GitHubClientLive));
 
-      const label = await runEffect(program);
+      const label = await runProgram(program);
       expect(label.id).toBe(5);
       expect(label.name).toBe('merged');
     });
@@ -220,7 +220,7 @@ describe('GitHubClient Effect service', () => {
         yield* client.addComment('owner', 'repo', 42, 'hello');
       }).pipe(Effect.provide(GitHubClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues/42/comments',
         expect.objectContaining({
@@ -242,7 +242,7 @@ describe('GitHubClient Effect service', () => {
         yield* client.closeIssue('owner', 'repo', 42);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues/42',
         expect.objectContaining({
@@ -262,7 +262,7 @@ describe('GitHubClient Effect service', () => {
         yield* client.reopenIssue('owner', 'repo', 42);
       }).pipe(Effect.provide(GitHubClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues/42',
         expect.objectContaining({

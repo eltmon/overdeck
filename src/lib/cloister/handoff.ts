@@ -216,7 +216,7 @@ export function shouldHandoff(agentId: string): boolean {
 // of them surface here. The Effect variant collapses these into a single typed
 // error channel so callers can `Effect.catchTag` the relevant case.
 
-/** Tagged error for `performHandoffEffect` failures. */
+/** Tagged error for `performHandoffProgram` failures. */
 export class HandoffError extends Data.TaggedError('HandoffError')<{
   readonly agentId: string;
   readonly stage: string;

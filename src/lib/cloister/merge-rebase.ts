@@ -4,7 +4,7 @@
  * Replaces spawnRebaseAgentForBranch with direct git operations via execAsync.
  * No specialist, no polling, no tmux session — just git commands.
  *
- * PAN-1249: Additive Effect variant `rebaseFeatureBranchEffect` exposed for
+ * PAN-1249: Additive Effect variant `rebaseFeatureBranchProgram` exposed for
  * Effect-typed callers. The Promise-based `rebaseFeatureBranch` retains its
  * legacy "result-object on success-or-failure" contract used by existing
  * cloister merge plumbing.

@@ -84,11 +84,11 @@ vi.mock('node:child_process', async () => {
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
   findPlanSync: vi.fn(),
-  findPlanEffect: vi.fn(),
+  findPlanProgram: vi.fn(),
   readWorkspacePlan: vi.fn(),
   readWorkspacePlanSync: vi.fn(),
   readPlan: vi.fn(),
-  readPlanEffect: vi.fn(),
+  readPlanProgram: vi.fn(),
   applyStatusOverrides: vi.fn((doc: any) => doc),
   VBriefMergeConflictError: class VBriefMergeConflictError extends Error {},
 }));
@@ -254,7 +254,7 @@ describe('swarm route helpers', () => {
 
   // PAN-977 review-round-18 regression: `continueDirForWorkspace` must return
   // the workspace root, not `${workspacePath}/.pan`. Internally
-  // `writeContinueStateEffect` appends `.pan/continues/` via getContinuesDir, so
+  // `writeContinueStateProgram` appends `.pan/continues/` via getContinuesDir, so
   // a `.pan/`-suffixed argument produced `${workspace}/.pan/.pan/continues/`
   // that `work-agent-prompt.ts:99` (which reads from the correct path) could
   // never see — silently dropping synthesisOutputs delivery for every
@@ -1216,7 +1216,7 @@ describe('swarm route helpers', () => {
     await __testInternals.persistSwarmRuntime(featureWorkspace, initialState as any);
 
     // PAN-977 review-round-18: pass the workspace root, NOT `.pan/`.
-    // `writeContinueStateEffect` appends `.pan/continues/` internally via
+    // `writeContinueStateProgram` appends `.pan/continues/` internally via
     // `getContinuesDir(projectRoot)`.
     const continueDir = featureWorkspace;
     const cont = await import('../../../../lib/vbrief/continue-state.js');

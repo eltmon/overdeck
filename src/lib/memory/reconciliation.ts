@@ -67,8 +67,8 @@ export async function reconcileAgentMemory(
   agentId: string,
   options: ReconcileAgentMemoryOptions = {},
 ): Promise<MemoryReconciliationResult> {
-  const getAgentState = options.getAgentState ?? getAgentStateFromEffect;
-  const getAgentRuntimeState = options.getAgentRuntimeState ?? getAgentRuntimeStateFromEffect;
+  const getAgentState = options.getAgentState ?? getAgentStateFromStore;
+  const getAgentRuntimeState = options.getAgentRuntimeState ?? getAgentRuntimeStateFromStore;
   const state = await getAgentState(agentId);
   const sessionId = state?.sessionId ?? (await getAgentRuntimeState(agentId))?.claudeSessionId;
   const result = emptyResult();
@@ -126,11 +126,11 @@ async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs:
   return { size: fileStat.size, mtimeMs: fileStat.mtimeMs };
 }
 
-function getAgentStateFromEffect(agentId: string): Promise<AgentState | null> {
+function getAgentStateFromStore(agentId: string): Promise<AgentState | null> {
   return Effect.runPromise(getAgentState(agentId));
 }
 
-function getAgentRuntimeStateFromEffect(agentId: string): Promise<AgentRuntimeState | null> {
+function getAgentRuntimeStateFromStore(agentId: string): Promise<AgentRuntimeState | null> {
   return Effect.runPromise(getAgentRuntimeState(agentId));
 }
 

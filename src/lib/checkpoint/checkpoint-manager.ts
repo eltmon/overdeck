@@ -465,7 +465,7 @@ function parseNumstatWithStatus(numstat: string, nameStatus: string): TurnDiffFi
 // The existing Promise functions remain canonical; these are an additive
 // surface for the perf-driver migration (PAN-1249).
 
-function assertSafeAgentIdEffect(agentId: string): Effect.Effect<void, InvalidAgentIdError> {
+function assertSafeAgentIdProgram(agentId: string): Effect.Effect<void, InvalidAgentIdError> {
   return SAFE_AGENT_ID_RE.test(agentId)
     ? Effect.void
     : Effect.fail(new InvalidAgentIdError({ agentId }))
@@ -478,7 +478,7 @@ export function captureCheckpoint(
   turnId: string,
 ): Effect.Effect<void, CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     yield* Effect.tryPromise({
       try: () => captureCheckpointPromise(cwd, agentId, turnId),
       catch: (cause) =>
@@ -494,7 +494,7 @@ export function hasCheckpoint(
   turnId: string,
 ): Effect.Effect<boolean, InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.promise(() => hasCheckpointPromise(cwd, agentId, turnId))
   })
 }
@@ -506,7 +506,7 @@ export function deleteCheckpoint(
   turnId: string,
 ): Effect.Effect<void, InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     yield* Effect.promise(() => deleteCheckpointPromise(cwd, agentId, turnId))
   })
 }
@@ -520,7 +520,7 @@ export function diffCheckpoints(
   filePath?: string,
 ): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
       try: () => diffCheckpointsPromise(cwd, agentId, fromTurnId, toTurnId, filePath),
       catch: (cause) =>
@@ -536,7 +536,7 @@ export function diffCheckpointToHead(
   turnId: string,
 ): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
       try: () => diffCheckpointToHeadPromise(cwd, agentId, turnId),
       catch: (cause) =>
@@ -553,7 +553,7 @@ export function diffCheckpointFiles(
   toTurnId: string,
 ): Effect.Effect<TurnDiffFileChange[], CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
       try: () => diffCheckpointFilesPromise(cwd, agentId, fromTurnId, toTurnId),
       catch: (cause) =>
@@ -569,7 +569,7 @@ export function getCheckpointTimestamp(
   turnId: string,
 ): Effect.Effect<string, InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.promise(() => getCheckpointTimestampPromise(cwd, agentId, turnId))
   })
 }
@@ -580,7 +580,7 @@ export function listCheckpoints(
   agentId: string,
 ): Effect.Effect<string[], InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.promise(() => listCheckpointsPromise(cwd, agentId))
   })
 }
@@ -591,7 +591,7 @@ export function deleteAllCheckpoints(
   agentId: string,
 ): Effect.Effect<void, InvalidAgentIdError> {
   return Effect.gen(function* () {
-    yield* assertSafeAgentIdEffect(agentId)
+    yield* assertSafeAgentIdProgram(agentId)
     yield* Effect.promise(() => deleteAllCheckpointsPromise(cwd, agentId))
   })
 }

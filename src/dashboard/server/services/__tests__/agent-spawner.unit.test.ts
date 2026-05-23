@@ -21,17 +21,16 @@ vi.mock('node:fs', () => ({
 // ─── Mock lib/agents.ts ───────────────────────────────────────────────────────
 
 const mockGetAgentState = vi.fn();
-const mockGetAgentStateEffect = vi.fn();
 const mockSpawnAgent = vi.fn();
 const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
   getAgentStateSync: mockGetAgentState,
-  getAgentStateEffect: mockGetAgentStateEffect,
+  getAgentStateProgram: mockGetAgentState,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
-  stopAgentEffect: (agentId: string) => Effect.sync(() => mockStopAgent(agentId)),
+  stopAgentProgram: (agentId: string) => Effect.sync(() => mockStopAgent(agentId)),
   messageAgent: mockMessageAgent,
   normalizeAgentId: (id: string) => id.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
 }));
@@ -60,13 +59,13 @@ vi.mock('../../../../lib/projects.js', () => ({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -82,7 +81,6 @@ describe('AgentSpawner — integration', () => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockGetAgentState.mockReturnValue(Effect.succeed(null));
-    mockGetAgentStateEffect.mockReturnValue(Effect.succeed(null));
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);
@@ -100,7 +98,7 @@ describe('AgentSpawner — integration', () => {
         return yield* spawner.startWork('484', { workspacePath: WORKSPACE });
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('AgentStartError');
       expect((err as any).message).toContain('bare numeric');
       expect((err as any).message).toContain('PAN-484');
@@ -114,7 +112,7 @@ describe('AgentSpawner — integration', () => {
         return yield* spawner.startWork('PAN-1', { workspacePath: WORKSPACE });
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      const result = await runEffect(program);
+      const result = await runProgram(program);
       expect(result.issueId).toBe('PAN-1');
       expect(mockSpawnAgent).toHaveBeenCalledOnce();
     });
@@ -128,7 +126,7 @@ describe('AgentSpawner — integration', () => {
         return yield* spawner.startWork('PAN-1', { workspacePath: '/nonexistent' });
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('WorkspaceNotFound');
     });
 
@@ -141,7 +139,7 @@ describe('AgentSpawner — integration', () => {
         return yield* spawner.startWork('PAN-1', { workspacePath: WORKSPACE });
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('AgentAlreadyRunning');
     });
   });
@@ -157,7 +155,7 @@ describe('AgentSpawner — integration', () => {
       }).pipe(Effect.provide(AgentSpawnerLive));
 
       // Should not throw
-      await runEffect(program);
+      await runProgram(program);
     });
   });
 
@@ -170,7 +168,7 @@ describe('AgentSpawner — integration', () => {
         yield* spawner.message('pan-1', 'hello');
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockMessageAgent).toHaveBeenCalledWith('pan-1', 'hello');
     });
   });
@@ -184,7 +182,7 @@ describe('AgentSpawner — integration', () => {
         yield* spawner.deepWipe('PAN-1', { confirmed: true });
       }).pipe(Effect.provide(AgentSpawnerLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockDeepWipe).toHaveBeenCalledWith(
         expect.objectContaining({ issueId: 'PAN-1' }),
         expect.objectContaining({ deleteWorkspace: true, deleteBranches: true }),

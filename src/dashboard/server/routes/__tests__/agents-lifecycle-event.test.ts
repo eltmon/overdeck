@@ -26,9 +26,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
-  getAgentStateEffect: vi.fn(),
+  getAgentStateProgram: vi.fn(),
   stopAgent: vi.fn(),
-  stopAgentEffect: vi.fn(),
+  stopAgentProgram: vi.fn(),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
@@ -45,8 +45,8 @@ vi.mock('../origin-validation.js', () => ({
 import { createAgentStopHandler } from '../agents.js';
 import { getAgentState, stopAgent } from '../../../../lib/agents.js';
 
-const mockGetAgentStateEffect = vi.mocked(getAgentState);
-const mockStopAgentEffect = vi.mocked(stopAgent);
+const mockGetAgentState = vi.mocked(getAgentState);
+const mockStopAgent = vi.mocked(stopAgent);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -90,11 +90,11 @@ function getLastAppendedLogLine(): { event?: string } | null {
 describe('createAgentStopHandler lifecycle events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentStateEffect.mockReturnValue(Effect.succeed({
+    mockGetAgentState.mockReturnValue(Effect.succeed({
       issueId: 'PAN-TEST',
       role: 'work',
     } as any));
-    mockStopAgentEffect.mockReturnValue(Effect.void);
+    mockStopAgent.mockReturnValue(Effect.void);
     mockAppendFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);
   });
@@ -115,10 +115,10 @@ describe('createAgentStopHandler lifecycle events', () => {
     expect(log?.event).toBe('agent.stop_requested');
   });
 
-  it('calls stopAgentEffect and getAgentStateEffect', async () => {
+  it('calls stopAgentProgram and getAgentStateProgram', async () => {
     await runAgentStopHandler('agent.stop_requested', 'agent-pan-999');
 
-    expect(mockGetAgentStateEffect).toHaveBeenCalledWith('agent-pan-999');
-    expect(mockStopAgentEffect).toHaveBeenCalledWith('agent-pan-999');
+    expect(mockGetAgentState).toHaveBeenCalledWith('agent-pan-999');
+    expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-999');
   });
 });

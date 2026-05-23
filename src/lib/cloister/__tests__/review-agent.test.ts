@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
   spawnRun: vi.fn(),
-  saveAgentStateEffect: vi.fn(),
-  getAgentStateEffect: vi.fn(),
+  saveAgentStateProgram: vi.fn(),
+  getAgentStateProgram: vi.fn(),
   listSessionNames: vi.fn(),
   isPaneDead: vi.fn(),
   killSession: vi.fn(),
@@ -32,10 +32,10 @@ vi.mock('child_process', () => ({
 
 vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
-  saveAgentState: mocks.saveAgentStateEffect,
-  saveAgentStateEffect: mocks.saveAgentStateEffect,
-  getAgentState: mocks.getAgentStateEffect,
-  getAgentStateEffect: mocks.getAgentStateEffect,
+  saveAgentState: mocks.saveAgentStateProgram,
+  saveAgentStateProgram: mocks.saveAgentStateProgram,
+  getAgentState: mocks.getAgentStateProgram,
+  getAgentStateProgram: mocks.getAgentStateProgram,
   messageAgent: vi.fn(),
 }));
 
@@ -110,8 +110,8 @@ describe('spawnReviewRoleForIssue', () => {
       status: 'running',
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
-    mocks.saveAgentStateEffect.mockReturnValue(Effect.void);
-    mocks.getAgentStateEffect.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
+    mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.listStashes.mockReturnValue(Effect.succeed([]));
@@ -129,7 +129,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateEffect).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',

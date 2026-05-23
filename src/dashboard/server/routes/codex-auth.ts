@@ -101,7 +101,7 @@ const getCodexAuthRoute = HttpRouter.add(
   '/api/settings/codex-auth',
   httpHandler(
     Effect.gen(function* () {
-      const status = yield* Effect.promise(() => checkCodexAuthStatus());
+      const status = yield* checkCodexAuthStatus();
       return jsonResponse(status);
     }),
   ),
@@ -186,9 +186,9 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
         (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
       );
-      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus(
+      const authStatus = yield* checkCodexAuthStatus(
         refreshedCredential ? { ignoreBurnBefore: session.createdAt } : undefined,
-      ));
+      );
       if (!refreshedCredential || authStatus.status !== 'valid') {
         return jsonResponse({
           completed: true,

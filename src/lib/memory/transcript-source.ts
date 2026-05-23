@@ -52,8 +52,8 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   private readonly isSubagentSession: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
 
   constructor(options: ClaudeCodeTranscriptSourceOptions = {}) {
-    this.listAgents = options.listAgents ?? listRunningAgentsFromEffect;
-    this.getRuntimeState = options.getRuntimeState ?? getAgentRuntimeStateFromEffect;
+    this.listAgents = options.listAgents ?? listRunningAgentsFromStore;
+    this.getRuntimeState = options.getRuntimeState ?? getAgentRuntimeStateFromStore;
     this.resolveTranscriptPath = options.resolveTranscriptPath ?? sessionFilePath;
     this.statTranscript = options.statTranscript ?? stat;
     this.isSubagentSession = options.isSubagentSession ?? isClaudeCodeSubagentSession;
@@ -156,11 +156,11 @@ export async function getActiveTranscriptEntries(
   return registry.getActiveTranscripts();
 }
 
-function listRunningAgentsFromEffect(): Promise<RunningAgent[]> {
+function listRunningAgentsFromStore(): Promise<RunningAgent[]> {
   return Effect.runPromise(listRunningAgents());
 }
 
-function getAgentRuntimeStateFromEffect(agentId: string): Promise<{ claudeSessionId?: string } | null> {
+function getAgentRuntimeStateFromStore(agentId: string): Promise<{ claudeSessionId?: string } | null> {
   return Effect.runPromise(getAgentRuntimeState(agentId));
 }
 

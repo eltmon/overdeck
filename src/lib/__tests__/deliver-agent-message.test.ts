@@ -16,7 +16,7 @@ vi.mock('../tmux.js', () => ({
   killSessionSync: vi.fn(),
   killSession: vi.fn(() => Effect.void),
   sendKeys: vi.fn(() => Effect.void),
-  sendKeysEffect: vi.fn(() => Effect.void),
+  sendKeysProgram: vi.fn(() => Effect.void),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn(),
   sessionExistsSync: vi.fn(),
@@ -133,7 +133,7 @@ describe('channel bridge delivery', () => {
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
-  it('deliverAgentMessage flag-off: delegates to sendKeysEffect exactly once with no socket attempt', async () => {
+  it('deliverAgentMessage flag-off: delegates to sendKeysProgram exactly once with no socket attempt', async () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
     await deliverAgentMessage(agentId, 'hello', 'test');
@@ -141,12 +141,12 @@ describe('channel bridge delivery', () => {
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'hello');
   });
 
-  it('state-file missing: delegates to sendKeysEffect (treat as flag-off)', async () => {
+  it('state-file missing: delegates to sendKeysProgram (treat as flag-off)', async () => {
     await deliverAgentMessage('agent-no-state', 'hello', 'test');
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
   });
 
-  it('flag-on, socket-success: posts to bridge and does NOT call sendKeysEffect', async () => {
+  it('flag-on, socket-success: posts to bridge and does NOT call sendKeysProgram', async () => {
     const agentId = 'agent-channels';
     writeAgentState(agentId, { channelsEnabled: true });
     const token = writeBridgeTokenSync(agentId);
@@ -165,7 +165,7 @@ describe('channel bridge delivery', () => {
     }
   });
 
-  it('flag-on, socket-ENOENT: falls back to sendKeysEffect', async () => {
+  it('flag-on, socket-ENOENT: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-no-sock';
     writeAgentState(agentId, { channelsEnabled: true });
     // Do NOT start a bridge — socket file does not exist.
@@ -174,7 +174,7 @@ describe('channel bridge delivery', () => {
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback hi');
   });
 
-  it('flag-on, socket-timeout: falls back to sendKeysEffect', async () => {
+  it('flag-on, socket-timeout: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     writeBridgeTokenSync(agentId);
@@ -189,7 +189,7 @@ describe('channel bridge delivery', () => {
     }
   }, 10_000);
 
-  it('flag-on, missing bridge token: falls back to sendKeysEffect', async () => {
+  it('flag-on, missing bridge token: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-no-token';
     writeAgentState(agentId, { channelsEnabled: true });
     const socketPath = join(socketDir, `agent-${agentId}.sock`);

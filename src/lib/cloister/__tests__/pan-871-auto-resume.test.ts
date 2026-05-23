@@ -30,12 +30,12 @@ vi.mock('../../../lib/agents.js', async () => {
   getAgentDir: vi.fn((agentId: string) => `/tmp/test-agents/${agentId}`),
   getAgentState: effectMock(null),
   getAgentStateSync: vi.fn(),
-  getAgentStateEffect: effectMock(null),
+  getAgentStateProgram: effectMock(null),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
   recordAgentFailure: effectMock(null),
-  recordAgentFailureEffect: effectMock(null),
+  recordAgentFailureProgram: effectMock(null),
   };
 });
 
@@ -128,7 +128,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   sessionExists: vi.fn(() => false),
   sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
-  sendKeysEffect: effectMock(undefined),
+  sendKeysProgram: effectMock(undefined),
   };
 });
 

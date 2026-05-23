@@ -24,15 +24,15 @@ vi.mock('../../agents.js', async () => {
   return {
   listRunningAgentsSync: vi.fn(() => []),
   listRunningAgents: effectMock([]),
-  // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsEffect
+  // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsProgram
   // on the reactive scheduler hot path.
-  listRunningAgentsEffect: effectMock([]),
+  listRunningAgentsProgram: effectMock([]),
   getAgentState: effectMock(null),
   getAgentStateSync: effectMock(null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
   // dynamic call in the scheduler throws before reaching the wrapper spy.
-  getAgentStateEffect: effectMock(null),
+  getAgentStateProgram: effectMock(null),
   getAgentRuntimeState: vi.fn(() => null),
   getAgentRuntimeStateSync: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),

@@ -47,13 +47,13 @@ function makeRawIssue(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function runEffect<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
+async function runProgram<A, E>(effect: Effect.Effect<A, E, never>): Promise<A> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 }
 
-async function runEffectFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
+async function runProgramFail<A, E>(effect: Effect.Effect<A, E, never>): Promise<E> {
   const exit = await Effect.runPromise(Effect.exit(effect));
   if (Exit.isSuccess(exit))
     throw new Error('Expected effect to fail, got: ' + JSON.stringify(exit.value));
@@ -83,7 +83,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getIssue('US1234');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerNotConfigured');
       expect((err as any).tracker).toBe('rally');
     });
@@ -98,7 +98,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getIssue('US1234');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const issue = await runEffect(program);
+      const issue = await runProgram(program);
       expect(issue.ref).toBe('US1234');
       expect(issue.title).toBe('Test Story');
       expect(issue.state).toBe('in_progress');
@@ -115,7 +115,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getIssue('US9999');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('IssueNotFound');
     });
 
@@ -129,7 +129,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getIssue('US1234');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
       expect((err as any).tracker).toBe('rally');
     });
@@ -149,7 +149,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getChildIssues('F123');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const children = await runEffect(program);
+      const children = await runProgram(program);
       expect(children).toHaveLength(2);
       expect(children[0].ref).toBe('US100');
       expect(children[0].status).toBe('open');
@@ -167,7 +167,7 @@ describe('RallyClient Effect service', () => {
         return yield* client.getChildIssues('F123');
       }).pipe(Effect.provide(RallyClientLive));
 
-      const err = await runEffectFail(program);
+      const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('TrackerApiError');
     });
   });
@@ -181,7 +181,7 @@ describe('RallyClient Effect service', () => {
         yield* client.updateState('US1234', 'closed');
       }).pipe(Effect.provide(RallyClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockTransitionIssue).toHaveBeenCalledWith('US1234', 'closed');
     });
   });
@@ -195,7 +195,7 @@ describe('RallyClient Effect service', () => {
         yield* client.addComment('US1234', 'PR merged!');
       }).pipe(Effect.provide(RallyClientLive));
 
-      await runEffect(program);
+      await runProgram(program);
       expect(mockAddComment).toHaveBeenCalledWith('US1234', 'PR merged!');
     });
   });

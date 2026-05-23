@@ -12,7 +12,7 @@ import { capturePane, sessionExists } from '../../lib/tmux.js';
 /**
  * Check if agent tmux session is alive
  */
-export const checkAgentHealthEffect = (agentId: string) =>
+export const checkAgentHealth = (agentId: string) =>
   Effect.gen(function* () {
     const alive = yield* sessionExists(agentId);
     if (!alive) {
@@ -24,26 +24,17 @@ export const checkAgentHealthEffect = (agentId: string) =>
     return { alive: true, lastOutput: stdout.trim() };
   }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
 
-export async function checkAgentHealthAsync(agentId: string): Promise<{
-  alive: boolean;
-  lastOutput?: string;
-  outputAge?: number;
-}> {
-  return Effect.runPromise(checkAgentHealthEffect(agentId));
-}
-
 /**
  * Determine health status based on activity
  * Returns null if agent should be hidden (completed/stopped/no state.json)
  *
- * `liveSessions` is REQUIRED — pass the result of `getAgentSessionsAsync()`
- * fetched once per request. Iterating ~150 agent dirs and spawning a tmux
- * subprocess per agent (sessionExistsAsync + capturePaneAsync) was pinning
+ * `liveSessions` is REQUIRED — pass the session list fetched once per request.
+ * Iterating ~150 agent dirs and spawning a tmux subprocess per agent was pinning
  * the dashboard process at 100% CPU on every 5s `/api/health/agents` poll.
  * State is also read before the tmux check so stopped/completed/missing
  * agents short-circuit without any extra work.
  */
-export const determineHealthStatusEffect = (
+export const determineHealthStatus = (
   agentId: string,
   stateFile: string,
   liveSessions: Set<string>
@@ -110,11 +101,3 @@ export const determineHealthStatusEffect = (
 
     return { status: 'healthy' };
   });
-
-export async function determineHealthStatusAsync(
-  agentId: string,
-  stateFile: string,
-  liveSessions: Set<string>
-): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } | null> {
-  return Effect.runPromise(determineHealthStatusEffect(agentId, stateFile, liveSessions));
-}

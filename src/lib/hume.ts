@@ -237,7 +237,7 @@ export const createHumeConfig = (
   });
 
 /**
- * Effect-native deleteHumeConfig. Same shape as createHumeConfigEffect:
+ * Effect-native deleteHumeConfig. Same shape as createHumeConfig:
  * step-level failures stay in the returned payload, transport-level throws
  * become HumeApiError on the typed error channel.
  */

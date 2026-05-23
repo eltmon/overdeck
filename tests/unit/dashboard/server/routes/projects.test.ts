@@ -17,7 +17,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn(),
-  getAgentRuntimeStateEffect: vi.fn(),
+  getAgentRuntimeStateProgram: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({

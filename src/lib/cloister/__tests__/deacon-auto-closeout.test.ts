@@ -52,15 +52,15 @@ vi.mock('../../../lib/agents.js', async () => {
   getAgentRuntimeStateSync: vi.fn(),
   getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
-  getAgentStateEffect: effectMock(null),
+  getAgentStateProgram: effectMock(null),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
-  recordAgentFailureEffect: effectMock(null),
+  recordAgentFailureProgram: effectMock(null),
   resumeAgent: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
-  saveAgentStateEffect: effectMock(undefined),
+  saveAgentStateProgram: effectMock(undefined),
   saveSessionId: vi.fn(),
   };
 });
@@ -110,7 +110,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
   listSessionNames: effectMock([]),
-  sendKeysEffect: effectMock(undefined),
+  sendKeysProgram: effectMock(undefined),
   sessionExists: vi.fn(() => false),
   sessionExistsSync: vi.fn(() => false),
   sessionExists: effectMock(false),
@@ -169,7 +169,7 @@ vi.mock('../config.js', async () => {
   return {
   loadCloisterConfig: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
   loadCloisterConfigSync: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
-  loadCloisterConfigEffect: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
+  loadCloisterConfigProgram: effectMock({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} }),
   };
 });
 vi.mock('../specialists.js', () => ({
