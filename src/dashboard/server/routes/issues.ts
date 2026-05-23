@@ -129,7 +129,7 @@ export async function completePlanningArtifacts(options: {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(withBdMutex(() => mod.createBeadsFromVBrief(path))));
   });
-  const beadsResult = await Effect.runPromise(createBeads(workspacePath));
+  const beadsResult = await createBeads(workspacePath);
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0 || !beadsResult.success || beadsResult.created.length !== planItemCount) {
     const detail = beadsResult.errors.length > 0
