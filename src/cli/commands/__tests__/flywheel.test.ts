@@ -530,6 +530,48 @@ describe('flywheel CLI commands', () => {
     expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('Second observation.');
   });
 
+  // Guard: pan flywheel report finalizes the run (writes report.md, clears
+  // the active-run gate, flips deriveRunStatus to 'complete'). Running it
+  // mid-flight silently terminates a live run, which surprised an operator
+  // who invoked it expecting a read-only snapshot. The guard refuses when
+  // the orchestrator session is alive; the orchestrator's own end-of-run
+  // call passes --force.
+  it('refuses to write a report while the orchestrator session is alive', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = false;
+    flywheelLifecycleMocks.sessionExists = true;
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelReportCommand({ cwd: repoDir });
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Refusing to write report'));
+    // Gate must NOT have been cleared.
+    expect(flywheelLifecycleMocks.activeRunId).toBe('RUN-1');
+    // report.md must NOT have been written.
+    await expect(readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8'))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+
+    process.exitCode = undefined;
+  });
+
+  it('writes the report under --force even when the orchestrator session is alive', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = false;
+    flywheelLifecycleMocks.sessionExists = true;
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelReportCommand({ cwd: repoDir, force: true });
+
+    expect(process.exitCode).toBeUndefined();
+    const runReport = await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8');
+    expect(runReport).toContain('# Flywheel Run 1 Report');
+    // Gate cleared as before.
+    expect(flywheelLifecycleMocks.activeRunId).toBeNull();
+  });
+
   // PAN-1245: report must clear the gate even when the cwd is not a git
   // repo. Previously isFlywheelStateDirty threw on non-git cwd and the gate
   // stayed stuck, blocking the next pan flywheel start.

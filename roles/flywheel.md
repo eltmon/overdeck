@@ -67,7 +67,7 @@ Allowed:
 - `gh issue view` for inventory and author/label verification.
 - `gh issue create` for substrate bug records.
 - `pan flywheel emit-status` to publish every tick snapshot.
-- `pan flywheel report` to close out the run.
+- `pan flywheel report --force` to close out the run (the `--force` flag is required from inside the orchestrator session; without it the command refuses while the orchestrator is alive, to protect against external callers silently terminating a live run).
 
 Never:
 
@@ -90,8 +90,8 @@ These are two different artifacts. Do not conflate them.
 
 When the brief's scope is empty, paused indefinitely, or explicitly complete:
 
-1. Run `pan flywheel report` to write the per-run report and commit any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`.
+1. Run `pan flywheel report --force` to write the per-run report and commit any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The `--force` flag is required because the command refuses by default while the orchestrator session (you) is still alive — that guard exists so external callers can't silently terminate a live run.
 2. Surface merge-ready work for human UAT and approval.
 3. Leave the repository clean, pushed, and with no unreported substrate bugs.
 
-Do not declare the run complete until `pan flywheel report` succeeds.
+Do not declare the run complete until `pan flywheel report --force` succeeds.

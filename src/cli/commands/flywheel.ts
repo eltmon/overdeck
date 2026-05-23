@@ -39,6 +39,7 @@ interface StartFlywheelRunResult {
 
 interface ReportOptions {
   cwd?: string;
+  force?: boolean;
 }
 
 interface ReportOpenOptions {
@@ -555,6 +556,19 @@ function clearFlywheelRunGate(runId: string): void {
 export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
   try {
     const cwd = options.cwd ?? process.cwd();
+
+    // Writing report.md finalizes the run (clears the active-run gate and
+    // makes deriveRunStatus → 'complete'). Refuse if the orchestrator session
+    // is still alive, since that would silently terminate a live run. The
+    // orchestrator's own end-of-run call passes --force to bypass this guard.
+    if (!options.force && await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
+      console.error('Refusing to write report — flywheel orchestrator session is still alive.');
+      console.error('This command finalizes the run (writes report.md and clears the active-run gate).');
+      console.error('Run `pan flywheel pause` (or `pan flywheel abort`) first, or pass --force to override.');
+      process.exitCode = 1;
+      return;
+    }
+
     const status = await loadReportFlywheelStatus();
     if (!status) {
       console.error('no flywheel run to report');
@@ -689,7 +703,8 @@ export function registerFlywheelCommands(program: Command): void {
 
   flywheel
     .command('report')
-    .description('Write and commit the current Flywheel run report')
+    .description('Finalize the active Flywheel run: write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
+    .option('--force', 'Bypass the orchestrator-alive guard. Intended for the orchestrator role\'s own end-of-run call.')
     .action(flywheelReportCommand);
 
   flywheel
