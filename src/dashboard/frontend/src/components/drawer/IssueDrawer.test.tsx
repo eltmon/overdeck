@@ -523,6 +523,32 @@ describe('IssueDrawer', () => {
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
   });
 
+  it('hides the manual merge button while auto-merge cooldown is scheduled', () => {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          prUrl: 'https://example.com/pr/1',
+          updatedAt: '2026-05-18T00:00:00.000Z',
+          autoMergeScheduled: {
+            executeAt: '2026-05-23T12:05:00.000Z',
+            scheduledAt: '2026-05-23T12:00:00.000Z',
+          },
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.queryByTestId('merge-btn')).toBeNull();
+  });
+
   it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],

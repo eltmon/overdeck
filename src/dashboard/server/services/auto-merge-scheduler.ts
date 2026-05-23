@@ -11,7 +11,7 @@ import {
   type AutoMergeRow,
 } from '../../../lib/database/auto-merge-db.js';
 import { getCombinedCommitStatus, getPrLabels } from '../../../lib/forge.js';
-import { listProjects, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { listProjects, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { getReviewStatus, type ReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { getEventStore } from '../event-store.js';
@@ -33,6 +33,7 @@ export interface AutoMergeSchedulerDeps {
   setTimer: (fn: () => void, delayMs: number) => TimerHandle;
   clearTimer: (timer: TimerHandle) => void;
   getConfig: (projectKey?: string) => Promise<NormalizedAutoMergeConfig>;
+  resolveProjectKey: (issueId: string) => Promise<string | undefined>;
   getStatus: (issueId: string) => Promise<ReviewStatus | null>;
   getPendingRows: () => AutoMergeRow[];
   schedulePending: (issueId: string, executeAt: string) => boolean;
@@ -51,6 +52,7 @@ const DEFAULT_DEPS: AutoMergeSchedulerDeps = {
   setTimer: (fn, delayMs) => setTimeout(fn, delayMs),
   clearTimer: (timer) => clearTimeout(timer),
   getConfig: (projectKey) => Effect.runPromise(getAutoMergeConfig(projectKey)),
+  resolveProjectKey: async (issueId) => (await Effect.runPromise(resolveProjectFromIssue(issueId)))?.projectKey,
   getStatus: (issueId) => Effect.runPromise(getReviewStatus(issueId)),
   getPendingRows: getPendingAutoMerges,
   schedulePending: schedulePendingAutoMerge,
@@ -87,8 +89,8 @@ function formatMinutes(minutes: number): string {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
-function resolveProjectKey(issueId: string, explicitProjectKey?: string): string | undefined {
-  return explicitProjectKey ?? resolveProjectFromIssueSync(issueId)?.projectKey;
+async function resolveProjectKey(deps: AutoMergeSchedulerDeps, issueId: string, explicitProjectKey?: string): Promise<string | undefined> {
+  return explicitProjectKey ?? deps.resolveProjectKey(issueId);
 }
 
 function transitionLog(issueId: string, event: string, context?: Record<string, unknown>): void {
@@ -160,7 +162,8 @@ export class AutoMergeScheduler {
     const normalizedIssueId = normalizeIssueId(issueId);
     if (disabledByEnv()) return false;
 
-    const config = await this.deps.getConfig(resolveProjectKey(normalizedIssueId, projectKey));
+    const resolvedProjectKey = await resolveProjectKey(this.deps, normalizedIssueId, projectKey);
+    const config = await this.deps.getConfig(resolvedProjectKey);
     if (!config.enabled) return false;
 
     const status = await this.deps.getStatus(normalizedIssueId);
@@ -173,7 +176,7 @@ export class AutoMergeScheduler {
     const scheduled = this.deps.schedulePending(normalizedIssueId, executeAt);
     if (!scheduled) return false;
 
-    this.arm(normalizedIssueId, executeAt, resolveProjectKey(normalizedIssueId, projectKey), config.cooldownMinutes > 1);
+    this.arm(normalizedIssueId, executeAt, resolvedProjectKey, config.cooldownMinutes > 1);
     transitionLog(normalizedIssueId, 'scheduled', { executeAt });
     emitAutoMergeEvent('merge.auto.scheduled', {
       issueId: normalizedIssueId,
@@ -206,7 +209,7 @@ export class AutoMergeScheduler {
   }
 
   private async recoverPending(row: AutoMergeRow): Promise<void> {
-    const projectKey = resolveProjectKey(row.issueId);
+    const projectKey = await resolveProjectKey(this.deps, row.issueId);
     const config = await this.deps.getConfig(projectKey);
     if (!config.enabled) {
       this.abort(row.issueId, 'disabled');
@@ -276,7 +279,7 @@ export class AutoMergeScheduler {
     this.clearIssueTimers(normalizedIssueId);
 
     try {
-      const config = await this.deps.getConfig(resolveProjectKey(normalizedIssueId, projectKey));
+      const config = await this.deps.getConfig(await resolveProjectKey(this.deps, normalizedIssueId, projectKey));
       if (!config.enabled) {
         this.abort(normalizedIssueId, 'disabled');
         return;

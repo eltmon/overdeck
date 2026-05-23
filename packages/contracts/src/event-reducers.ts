@@ -506,15 +506,22 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'pipeline.status_changed':
-    case 'review.status_changed':
+    case 'review.status_changed': {
+      const { issueId, status } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId]
+      const nextStatus: ReviewStatusSnapshot =
+        status.autoMergeScheduled === undefined && status.mergeStatus !== 'merged' && existing?.autoMergeScheduled
+          ? { ...status, autoMergeScheduled: existing.autoMergeScheduled }
+          : status
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         reviewStatusByIssueId: {
           ...state.reviewStatusByIssueId,
-          [event.payload.issueId]: event.payload.status,
+          [issueId]: nextStatus,
         },
       }
+    }
 
     // PAN-915 — event-driven reviewer sub-status. Avoids tmux polling in
     // enrichReviewStatusFromSessions for the common case (reviewer dispatched).

@@ -60,6 +60,7 @@ function createHarness(options: {
   status?: ReviewStatus | null;
   pendingRows?: AutoMergeRow[];
   getConfig?: AutoMergeSchedulerDeps['getConfig'];
+  resolveProjectKey?: AutoMergeSchedulerDeps['resolveProjectKey'];
   getStatus?: AutoMergeSchedulerDeps['getStatus'];
   getLabels?: AutoMergeSchedulerDeps['getLabels'];
   getCombinedStatus?: AutoMergeSchedulerDeps['getCombinedStatus'];
@@ -73,6 +74,7 @@ function createHarness(options: {
     setTimer: (fn, delayMs) => setTimeout(fn, delayMs),
     clearTimer: (timer) => clearTimeout(timer),
     getConfig: options.getConfig ?? vi.fn().mockResolvedValue(options.config ?? config()),
+    resolveProjectKey: options.resolveProjectKey ?? vi.fn().mockResolvedValue('pan'),
     getStatus: options.getStatus ?? vi.fn().mockResolvedValue(options.status ?? reviewStatus()),
     getPendingRows: vi.fn(() => [...rows.values()]),
     schedulePending: vi.fn((issueId, executeAt) => {
@@ -269,12 +271,14 @@ describe('AutoMergeScheduler', () => {
 
   it('re-arms pending rows on boot', async () => {
     const executeAt = '2026-05-23T12:05:00.000Z';
-    const harness = createHarness({ pendingRows: [row('PAN-1', executeAt)] });
+    const resolveProjectKey = vi.fn().mockResolvedValue('pan');
+    const harness = createHarness({ pendingRows: [row('PAN-1', executeAt)], resolveProjectKey });
 
     await harness.scheduler.start();
     await vi.advanceTimersByTimeAsync(5 * 60_000);
 
     expect(harness.deps.getPendingRows).toHaveBeenCalledTimes(1);
+    expect(resolveProjectKey).toHaveBeenCalledWith('PAN-1');
     expect(harness.deps.triggerMerge).toHaveBeenCalledWith('PAN-1');
   });
 

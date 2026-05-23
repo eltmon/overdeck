@@ -6,7 +6,7 @@ import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface MergeButtonProps {
   issueId: string;
-  reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string };
+  reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string; autoMergeScheduled?: { executeAt: string; scheduledAt: string } };
   variant: 'card' | 'inspector';
   issueState?: string;
   onClick?: (e: React.MouseEvent) => void;
@@ -56,7 +56,7 @@ export function MergeButton({ issueId, reviewStatus, variant, issueState, onClic
     : 0;
   const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
 
-  if (issueState === 'verifying_on_main' || !reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged') {
+  if (issueState === 'verifying_on_main' || !reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged' || reviewStatus?.autoMergeScheduled) {
     return null;
   }
 

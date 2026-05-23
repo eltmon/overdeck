@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
-    "updated": "2026-05-23T16:23:42.583Z"
+    "updated": "2026-05-23T16:29:46.144Z"
   },
   "plan": {
     "id": "pan-1418",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 8,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-23T16:23:42.583Z",
+    "updated": "2026-05-23T16:29:46.144Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
@@ -1125,34 +1125,32 @@
     "metadata": {
       "canonicalFilename": "2026-05-23-PAN-1418-optional-opt-in-auto-merge-for-single-developer-workflow-configurable-per-project.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1418",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-23T16:23:41.540Z",
+        "updatedAt": "2026-05-23T16:29:43.664Z",
         "work": {
-          "updatedAt": "2026-05-23T16:23:41.540Z",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-23T16:23:41.540Z",
-          "notes": "Verification FAILED at test (31525ms):\n\no-merge-cancel.integration.test.ts:164:20\n    162|     const result = await postCancel('PAN-2001');\n    163|\n    164|     expect(result).toEqual({ status: 200, body: { cancelled: true } });\n       |                    ^\n    165|     expect(getAutoMergeStatus('PAN-2001')).toMatchObject({\n    166|       status: 'cancelled',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts > POST /api/issues/:issueId/merge/cancel > returns false for a second cancel when no pending row remains\nAssertionError: expected { status: 403, …(1) } to match object { status: 200, …(1) }\n(1 matching property omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"body\": {\n-     \"cancelled\": true,\n+     \"error\": \"Missing origin\",\n    },\n-   \"status\": 200,\n+   \"status\": 403,\n  }\n\n ❯ src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts:174:41\n    172|   it('returns false for a second cancel when no pending row remains', …\n    173|     await scheduleViaScheduler('PAN-2002');\n    174|     await expect(postCancel('PAN-2002')).resolves.toMatchObject({ stat…\n       |                                         ^\n    175|\n    176|     const result = await postCancel('PAN-2002');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts > POST /api/issues/:issueId/merge/cancel > returns 409 when the auto-merge row is already executing\nAssertionError: expected 403 to be 409 // Object.is equality\n\n- Expected\n+ Received\n\n- 409\n+ 403\n\n ❯ src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts:188:27\n    186|     const result = await postCancel('PAN-2003');\n    187|\n    188|     expect(result.status).toBe(409);\n       |                           ^\n    189|     expect(result.body).toMatchObject({ cancelled: false, error: 'Auto…\n    190|     expect(getAutoMergeStatus('PAN-2003')).toMatchObject({ status: 'ex…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n",
+          "status": "passed",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-23T16:23:41.540Z",
-              "notes": "Verification FAILED at test (31525ms):\n\no-merge-cancel.integration.test.ts:164:20\n    162|     const result = await postCancel('PAN-2001');\n    163|\n    164|     expect(result).toEqual({ status: 200, body: { cancelled: true } });\n       |                    ^\n    165|     expect(getAutoMergeStatus('PAN-2001')).toMatchObject({\n    166|       status: 'cancelled',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts > POST /api/issues/:issueId/merge/cancel > returns false for a second cancel when no pending row remains\nAssertionError: expected { status: 403, …(1) } to match object { status: 200, …(1) }\n(1 matching property omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"body\": {\n-     \"cancelled\": true,\n+     \"error\": \"Missing origin\",\n    },\n-   \"status\": 200,\n+   \"status\": 403,\n  }\n\n ❯ src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts:174:41\n    172|   it('returns false for a second cancel when no pending row remains', …\n    173|     await scheduleViaScheduler('PAN-2002');\n    174|     await expect(postCancel('PAN-2002')).resolves.toMatchObject({ stat…\n       |                                         ^\n    175|\n    176|     const result = await postCancel('PAN-2002');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts > POST /api/issues/:issueId/merge/cancel > returns 409 when the auto-merge row is already executing\nAssertionError: expected 403 to be 409 // Object.is equality\n\n- Expected\n+ Received\n\n- 409\n+ 403\n\n ❯ src/dashboard/server/routes/__tests__/auto-merge-cancel.integration.test.ts:188:27\n    186|     const result = await postCancel('PAN-2003');\n    187|\n    188|     expect(result.status).toBe(409);\n       |                           ^\n    189|     expect(result.body).toMatchObject({ cancelled: false, error: 'Auto…\n    190|     expect(getAutoMergeStatus('PAN-2003')).toMatchObject({ status: 'ex…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n"
+              "status": "passed",
+              "at": "2026-05-23T16:29:43.664Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-23T16:23:41.540Z",
+          "status": "reviewing",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "notes": "Stale review head plus CSRFable auto-merge cancel endpoint",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-23T16:23:41.540Z",
+              "status": "reviewing",
+              "at": "2026-05-23T16:29:43.664Z",
               "notes": "Stale review head plus CSRFable auto-merge cancel endpoint"
             }
           ],
@@ -1160,25 +1158,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-23T16:23:41.540Z",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T16:23:41.540Z"
+              "at": "2026-05-23T16:29:43.664Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-23T16:23:41.540Z",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-23T16:23:41.540Z",
+          "updatedAt": "2026-05-23T16:29:43.664Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-23T16:23:41.540Z"
+              "at": "2026-05-23T16:29:43.664Z"
             }
           ],
           "readyForMerge": false,

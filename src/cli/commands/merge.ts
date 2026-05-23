@@ -18,9 +18,10 @@ export async function cancelAutoMergeCommand(id: string): Promise<void> {
   let result: CancelAutoMergeResponse;
 
   try {
+    const dashboardOrigin = new URL(dashboardUrl).origin;
     response = await fetch(`${dashboardUrl}/api/issues/${encodeURIComponent(issueId)}/merge/cancel`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Origin: dashboardOrigin },
       body: JSON.stringify({ reason: 'cli' }),
     });
     result = await readCancelResponse(response);

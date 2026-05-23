@@ -38,7 +38,7 @@ describe('merge CLI commands', () => {
 
     expect(mocks.fetch).toHaveBeenCalledWith('http://dashboard.test/api/issues/PAN-1234/merge/cancel', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://dashboard.test' },
       body: JSON.stringify({ reason: 'cli' }),
     });
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Cancelled auto-merge for PAN-1234'));
