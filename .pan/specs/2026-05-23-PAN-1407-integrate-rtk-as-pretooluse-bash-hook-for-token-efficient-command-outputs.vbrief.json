@@ -1,0 +1,604 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T08:25:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1407: Integrate RTK as PreToolUse Bash hook for token-efficient command outputs",
+    "updated": "2026-05-23T08:16:01.975Z"
+  },
+  "plan": {
+    "id": "pan-1407",
+    "title": "Integrate RTK as PreToolUse Bash hook for token-efficient command outputs",
+    "status": "proposed",
+    "uid": "ec1c7e40-0e3a-4f71-8311-d26fe8d15c52",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T08:25:00.000Z",
+    "updated": "2026-05-23T08:16:01.975Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1407",
+        "label": "PAN-1407",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/rtk-ai/rtk",
+        "label": "rtk-ai/rtk",
+        "type": "external"
+      }
+    ],
+    "tags": [
+      "hooks",
+      "token-efficiency",
+      "agent-cost",
+      "pre-tool-use",
+      "bash"
+    ],
+    "narratives": {
+      "Problem": "Panopticon work agents burn a large fraction of their context window on raw Bash output (git status, npm output, typecheck/test cycles, find/grep). Bash output is unstructured and verbose, and TLDR (already integrated) only intercepts the Read tool. There is no analogous compression layer for the Bash tool, so a long task hits compaction earlier than it should, raises per-task cost, and limits how many turns the agent can sustain before context exhaustion.",
+      "Proposal": "Adopt RTK (Rust Token Killer, https://github.com/rtk-ai/rtk) — a Rust CLI that filters and compresses shell command outputs by 60-90%. Wire it as a PreToolUse hook on the Bash matcher inside each role's frontmatter, mirroring the existing tldr-read-enforcer pattern (which uses the same architectural slot for the Read tool). RTK is opt-in via agents.rtk.enabled (default false). Install path: download a prebuilt rtk binary from rtk-ai/rtk GitHub releases into ~/.panopticon/bin/rtk during pan admin hooks install. A wrapper script ~/.panopticon/bin/rtk-bash-filter reads the PreToolUse JSON, checks the config gate, invokes rtk, and emits compressed output. All six role frontmatters (work, plan, review, test, ship, flywheel) get the new PreToolUse Bash matcher. Settings UI exposes the toggle. CLAUDE.md gets a one-line note so agents do not get confused by compressed git/npm output."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Download rtk binary from rtk-ai/rtk GitHub releases at install time, not vendored.",
+        "rationale": "Caveman already follows the install-time pattern, so this matches existing conventions. Vendoring multiplies repo size by one binary per OS/arch combo and complicates updates. The download is one-shot at pan admin hooks install and cached at ~/.panopticon/bin/rtk; install-time network is acceptable since the whole setup command already touches GitHub for other binaries."
+      },
+      {
+        "summary": "Prefer prebuilt binaries from rtk-ai/rtk releases (linux-x64, darwin-arm64, darwin-x64). Skip compile-from-source.",
+        "rationale": "Avoids forcing cargo as an install dependency on every Panopticon user. If a prebuilt is not available for the host platform, the installer logs a warning and skips RTK install (graceful degradation, no error). The hook wrapper detects the missing binary and no-ops, so workflows continue to work without compression."
+      },
+      {
+        "summary": "Enable RTK in ALL six role frontmatters (work, plan, review, test, ship, flywheel), not only high-bash roles.",
+        "rationale": "The wrapper is a no-op when the config gate is off, so the cost of registering it everywhere is zero. Consistency makes drift between role files impossible. Plan/review/test still call typecheck/test in bursts, so they benefit. Keeping a single shape across roles also simplifies the per-agent inspection that operators do when debugging."
+      },
+      {
+        "summary": "RTK targets the Bash tool only; TLDR continues to target Read only. No double-compression risk.",
+        "rationale": "PreToolUse matchers are tool-scoped. Bash and Read are distinct tools, so the matchers do not overlap. Commands like cat that read files use the Bash tool, not the Read tool, so they will be subject only to RTK compression — which is the desired behavior (compressed cat output is still semantically meaningful)."
+      },
+      {
+        "summary": "Config knob is agents.rtk (mirroring agents.caveman, agents.tldr), default agents.rtk.enabled = false.",
+        "rationale": "Issue explicitly calls for opt-in. Default off matches the precedent set by caveman (also defaults off). Path agents.rtk.enabled is the natural namespace under the existing agents.* config tree."
+      },
+      {
+        "summary": "Acceptance for the ≥30% Bash-output token reduction is met by a reproducible manual benchmark recipe in docs/, not a CI test.",
+        "rationale": "Spawning a full work agent and measuring token deltas is non-deterministic across runs (model output varies) and requires real Bash workloads. A documented A/B recipe + one captured before/after measurement attached to the issue gives the user a path to verify and reproduce. CI cost of an automated end-to-end RTK benchmark is not justified for a feature that is opt-in and externally observable."
+      }
+    ],
+    "items": [
+      {
+        "id": "research-rtk-release",
+        "title": "Research and document the rtk-ai/rtk release artifact pattern and pin a version",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "install-rtk-binary",
+            "rtk-hook-wrapper-script"
+          ]
+        },
+        "narrative": {
+          "Action": "Verify the rtk-ai/rtk release tag, list of prebuilt asset names per platform (linux-x64, darwin-arm64, darwin-x64, linux-arm64 if present), and choose a pinned version. Produce docs/RTK-INTEGRATION.md describing: (1) the release URL pattern (e.g. https://github.com/rtk-ai/rtk/releases/download/<tag>/rtk-<platform>), (2) the platform→asset-name mapping, (3) the pinned version constant the installer will reference, (4) the rtk CLI invocation shape (stdin → stdout, exit codes, flags) the wrapper will use, (5) any hash/checksum to validate the download. If rtk does not currently publish prebuilt binaries for the platforms we care about, document that as a blocker hazard and update the plan."
+        },
+        "subItems": [
+          {
+            "id": "research-rtk-release.ac1",
+            "title": "docs/RTK-INTEGRATION.md exists and identifies a pinned rtk version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "research-rtk-release.ac2",
+            "title": "Doc lists each platform→release-asset-name mapping the installer will use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "research-rtk-release.ac3",
+            "title": "Doc describes rtk CLI invocation contract (stdin/stdout shape, flags, exit codes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "research-rtk-release.ac4",
+            "title": "If no prebuilt binary exists for any of the supported platforms, doc records that as a hazard and flags the next step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-knob-agents-rtk",
+        "title": "Add agents.rtk config knob (enabled default false) to config-yaml.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml.ts, add agents.rtk to DEFAULT_CONFIG with { enabled: false } and a NormalizedRtkConfig type. Add a mergeRtkConfig() function modeled on mergeCavemanConfig() and a getDefaultRtkConfig()/mergeRtkConfigs() pair so callers can read the resolved value. Export the resolver alongside the caveman/tts equivalents. Surface the value via the same shape Cloister already consumes (normalized config object) so the hook wrapper can be told whether to compress."
+        },
+        "subItems": [
+          {
+            "id": "config-knob-agents-rtk.ac1",
+            "title": "DEFAULT_CONFIG.agents.rtk = { enabled: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-knob-agents-rtk.ac2",
+            "title": "mergeRtkConfig() + mergeRtkConfigs() exist and follow the caveman pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-knob-agents-rtk.ac3",
+            "title": "Setting agents.rtk.enabled in projects.yaml is picked up by the resolver and round-trips through a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-rtk-binary",
+        "title": "Install rtk binary from rtk-ai/rtk releases during pan admin hooks install",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an installRtk() function (in a new src/lib/rtk/setup.ts or directly in src/cli/commands/setup/hooks.ts following the existing caveman pattern). On invocation: detect the host platform, resolve the release asset URL from the pinned version (from docs/RTK-INTEGRATION.md), download into ~/.panopticon/bin/rtk, chmod 0755, validate the binary runs (rtk --version exits 0). Idempotent — re-runs skip if the pinned version is already installed. On unsupported platform OR network failure: log a warning, skip, do NOT fail the overall pan admin hooks install run (graceful degradation). Wire the call into setupHooksCommand() in src/cli/commands/setup/hooks.ts, after the existing caveman block."
+        },
+        "subItems": [
+          {
+            "id": "install-rtk-binary.ac1",
+            "title": "pan admin hooks install downloads and installs rtk to ~/.panopticon/bin/rtk on supported platforms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-rtk-binary.ac2",
+            "title": "Re-running pan admin hooks install does not re-download if the pinned rtk version is already installed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-rtk-binary.ac3",
+            "title": "On unsupported platform or network failure, pan admin hooks install logs a warning and continues; exit code stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-rtk-binary.ac4",
+            "title": "Installed binary passes rtk --version smoke check before install function returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rtk-hook-wrapper-script",
+        "title": "Author the rtk-bash-filter PreToolUse wrapper script",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1407",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "register-rtk-hook-in-install",
+            "add-rtk-to-work-role",
+            "add-rtk-to-other-roles"
+          ]
+        },
+        "narrative": {
+          "Action": "Create sync-sources/hooks/rtk-bash-filter (bash) following the tldr-read-enforcer pattern. Reads the PreToolUse JSON envelope from stdin, checks tool_name == 'Bash' (bypass otherwise), reads agents.rtk.enabled from the resolved Panopticon config gate (or a simple environment variable PANOPTICON_RTK_ENABLED that the agent launcher sets — pick whichever matches how tldr-read-enforcer reads its gate today), bypasses when disabled, bypasses when ~/.panopticon/bin/rtk is missing, bypasses when the captured command output is short enough that compression is not worth it. When active: pipes the command output through rtk and emits the rewritten output via the documented PreToolUse JSON response shape. Never break Claude Code execution — wrap rtk invocation in defensive checks and degrade to passthrough on any failure. Include verbose comments at the top documenting the bypass conditions, mirroring tldr-read-enforcer's documentation header."
+        },
+        "subItems": [
+          {
+            "id": "rtk-hook-wrapper-script.ac1",
+            "title": "sync-sources/hooks/rtk-bash-filter exists, is executable bash, and is documented at the top with all bypass conditions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtk-hook-wrapper-script.ac2",
+            "title": "Wrapper exits 0 (passthrough) on non-Bash tool_name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtk-hook-wrapper-script.ac3",
+            "title": "Wrapper exits 0 (passthrough) when agents.rtk.enabled is false (default) or when rtk binary is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtk-hook-wrapper-script.ac4",
+            "title": "Wrapper invokes rtk and emits the compressed output via the PreToolUse JSON response shape when enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtk-hook-wrapper-script.ac5",
+            "title": "Any rtk failure falls back to passthrough — agent execution never breaks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-rtk-hook-in-install",
+        "title": "Add rtk-bash-filter to the hookScripts copy list in setupHooksCommand",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/setup/hooks.ts, add 'rtk-bash-filter' to the hookScripts array (the one that copies scripts from sync-sources/hooks/ into ~/.panopticon/bin/). Verify chmod 0755 propagates (the existing loop already calls chmodSync). Add a one-line printout to the success-message section noting RTK wrapper is installed."
+        },
+        "subItems": [
+          {
+            "id": "register-rtk-hook-in-install.ac1",
+            "title": "After pan admin hooks install, ~/.panopticon/bin/rtk-bash-filter exists with mode 0755",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-rtk-hook-in-install.ac2",
+            "title": "Success message in setupHooksCommand lists RTK alongside TLDR/caveman",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-rtk-to-work-role",
+        "title": "Add PreToolUse Bash matcher pointing at rtk-bash-filter to roles/work.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In roles/work.md frontmatter, add a new PreToolUse matcher block for 'Bash' calling $HOME/.panopticon/bin/rtk-bash-filter. Place it after the existing 'Read' matcher block so the PreToolUse list reads: '.*' (pre-tool-hook), 'Read' (tldr-read-enforcer), 'Bash' (rtk-bash-filter). Do not modify any other hook entry."
+        },
+        "subItems": [
+          {
+            "id": "add-rtk-to-work-role.ac1",
+            "title": "roles/work.md PreToolUse contains a Bash matcher invoking $HOME/.panopticon/bin/rtk-bash-filter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-rtk-to-work-role.ac2",
+            "title": "Existing pre-tool-hook and tldr-read-enforcer entries are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-rtk-to-other-roles",
+        "title": "Add the same PreToolUse Bash matcher to plan, review, test, ship, flywheel roles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replicate the work.md change in roles/plan.md, roles/review.md, roles/test.md, roles/ship.md, and roles/flywheel.md frontmatter. Review-* sub-role files (review-correctness.md, review-performance.md, review-requirements.md, review-security.md) do NOT carry their own hooks frontmatter today — confirm and leave them alone. Verify each role still parses and Cloister still spawns it (npm run lint passes; sanity-spawn one role locally to confirm)."
+        },
+        "subItems": [
+          {
+            "id": "add-rtk-to-other-roles.ac1",
+            "title": "roles/plan.md, roles/review.md, roles/test.md, roles/ship.md, roles/flywheel.md all contain the PreToolUse Bash matcher invoking rtk-bash-filter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-rtk-to-other-roles.ac2",
+            "title": "review-* sub-role files are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-rtk-to-other-roles.ac3",
+            "title": "npm run lint passes after the changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-md-note",
+        "title": "Add a one-line CLAUDE.md note explaining compressed Bash outputs when RTK is enabled",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a short paragraph to the project CLAUDE.md (under a 'Bash Output Compression (RTK)' heading) explaining that when agents.rtk.enabled is true, Bash command outputs (git status, npm output, etc.) the agent sees are compressed versions, and the raw output can be regenerated by re-running the command with RTK disabled (PANOPTICON_RTK_ENABLED=0). Keep it under five lines."
+        },
+        "subItems": [
+          {
+            "id": "claude-md-note.ac1",
+            "title": "Project CLAUDE.md has a short RTK section explaining compressed Bash outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui-toggle",
+        "title": "Add agents.rtk.enabled toggle to the Panopticon dashboard Settings UI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Surface the agents.rtk.enabled toggle in the Settings page where existing agent toggles live (caveman, tldr). Wire it through whichever API path Settings uses to persist projects.yaml-resolved values. Default position OFF. Label: 'RTK Bash compression (experimental)'. Help text: 'Filters Bash command outputs through rtk-ai/rtk to reduce token consumption. Opt-in.'"
+        },
+        "subItems": [
+          {
+            "id": "settings-ui-toggle.ac1",
+            "title": "Settings page exposes an agents.rtk.enabled toggle defaulting OFF",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-toggle.ac2",
+            "title": "Toggling persists the setting through whatever backend store Settings already uses for caveman/tldr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-benchmark-doc",
+        "title": "Document the manual cost-benchmark methodology and capture one A/B measurement",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend docs/RTK-INTEGRATION.md (created in bead 1) with a 'Cost benchmark' section describing the A/B methodology: pick a representative issue, spawn a work agent with agents.rtk.enabled=false (record total Bash output tokens from the cost event log), spawn the same agent again with agents.rtk.enabled=true (record again), compute % reduction. Capture one before/after measurement, paste it into the doc, and confirm it clears the ≥30% Bash output token reduction bar from the issue acceptance criteria. If it does NOT clear 30%, file a follow-up issue rather than silently passing."
+        },
+        "subItems": [
+          {
+            "id": "cost-benchmark-doc.ac1",
+            "title": "docs/RTK-INTEGRATION.md has a Cost benchmark section with reproducible A/B steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-benchmark-doc.ac2",
+            "title": "One captured A/B measurement is pasted into the doc with the % reduction figure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-benchmark-doc.ac3",
+            "title": "If measurement < 30%, a follow-up issue is filed referencing PAN-1407",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "end-to-end-smoke-test",
+        "title": "End-to-end smoke: spawn a work agent with RTK enabled and confirm no regression",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Pick a small PAN issue, spawn a work agent with agents.rtk.enabled=true, observe the conversation transcript for: (a) at least one Bash output that is visibly compressed (e.g. git status output is shorter than raw), (b) no agent errors in tmux capture, (c) the agent makes a commit successfully (compression did not corrupt the command output the agent reads). Record the issue number and observation summary in the issue thread / docs/RTK-INTEGRATION.md."
+        },
+        "subItems": [
+          {
+            "id": "end-to-end-smoke-test.ac1",
+            "title": "A work agent runs with agents.rtk.enabled=true and reaches a commit without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "end-to-end-smoke-test.ac2",
+            "title": "At least one Bash output in the transcript is visibly compressed vs the raw command output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "end-to-end-smoke-test.ac3",
+            "title": "Observation summary captured in docs/RTK-INTEGRATION.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "research-rtk-release",
+        "to": "install-rtk-binary",
+        "type": "blocks"
+      },
+      {
+        "from": "research-rtk-release",
+        "to": "rtk-hook-wrapper-script",
+        "type": "blocks"
+      },
+      {
+        "from": "config-knob-agents-rtk",
+        "to": "rtk-hook-wrapper-script",
+        "type": "blocks"
+      },
+      {
+        "from": "install-rtk-binary",
+        "to": "rtk-hook-wrapper-script",
+        "type": "informs"
+      },
+      {
+        "from": "rtk-hook-wrapper-script",
+        "to": "register-rtk-hook-in-install",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rtk-hook-in-install",
+        "to": "add-rtk-to-work-role",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rtk-hook-in-install",
+        "to": "add-rtk-to-other-roles",
+        "type": "blocks"
+      },
+      {
+        "from": "add-rtk-to-work-role",
+        "to": "add-rtk-to-other-roles",
+        "type": "informs"
+      },
+      {
+        "from": "config-knob-agents-rtk",
+        "to": "settings-ui-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "add-rtk-to-work-role",
+        "to": "end-to-end-smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "install-rtk-binary",
+        "to": "end-to-end-smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "end-to-end-smoke-test",
+        "to": "cost-benchmark-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-md-note",
+        "to": "end-to-end-smoke-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1407-integrate-rtk-as-pretooluse-bash-hook-for-token-efficient-command-outputs.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
