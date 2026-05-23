@@ -1,0 +1,926 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T06:55:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1405: Universal PTY supervisor for message delivery (replace tmux paste-buffer + obsolete channels MCP gate)",
+    "updated": "2026-05-23T06:49:10.591Z"
+  },
+  "plan": {
+    "id": "pan-1405",
+    "title": "Universal PTY supervisor for message delivery (replace tmux paste-buffer + obsolete channels MCP gate)",
+    "status": "proposed",
+    "uid": "c8f3e9b2-7a4d-4f1e-b8c5-9d2a3f6e1c4b",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T06:55:00.000Z",
+    "updated": "2026-05-23T06:49:10.591Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1405",
+        "label": "PAN-1405",
+        "type": "issue"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/channels",
+        "label": "Claude Code Channels (legacy)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "delivery",
+      "pty",
+      "supervisor",
+      "channels",
+      "tmux",
+      "claude-code"
+    ],
+    "narratives": {
+      "Problem": "Orchestrator→agent message delivery is currently a two-path fork (Anthropic-only channels MCP, or tmux paste-buffer). Both are unreliable: tmux drops messages when the user scrolls into copy-mode; channels MCP pays a context-window tax, fires a dev-channels dialog that races against auto-compact prompts, and only runs on Anthropic-routed agents (skipping every cliproxy / GPT / Kimi / MiniMax session). Plain forks intentionally skip channels MCP for this reason but then have no reliable delivery path at all.",
+      "Proposal": "Introduce a small PTY supervisor process that owns Claude's PTY master fd, proxies stdin/stdout/resize bidirectionally between tmux and Claude, and listens on a per-agent Unix socket for orchestrator-injected messages. Cloister's deliverAgentMessage tries this socket FIRST for all Claude Code agents (any provider), then channels (legacy fallback for already-running sessions), then tmux. Pi keeps its own rpc.in FIFO. Channels MCP becomes off-by-default for new spawns; the dev-channels dialog dismissal is skipped when not needed; plain forks get supervisor delivery without the MCP context tax."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use Node 22 for the supervisor (not Bun) because @homebridge/node-pty-prebuilt-multiarch is a native Node addon that exits code 0 immediately under Bun's compat layer.",
+        "rationale": "Confirmed in CLAUDE.md and the dashboard-node22-only rule. Same reason the dashboard server is Node-only."
+      },
+      {
+        "summary": "Socket layout mirrors the existing channels bridge: ${PANOPTICON_HOME}/sockets/pty-<agentId>.sock at mode 0600, HTTP-on-unix wire format, pty-token header auth via a new src/lib/pty-token.ts helper.",
+        "rationale": "Symmetry with panopticon-bridge keeps the postUnixSocketJson primitive, log paths, and operator mental model the same."
+      },
+      {
+        "summary": "Supervisor builds to dist/pty-supervisor.js via tsdown, with @homebridge/node-pty-prebuilt-multiarch added to the root package.json and marked `external` in the new tsdown entry.",
+        "rationale": "Node 22 can't run TS sources directly; bundling the supervisor as plain JS avoids tsx-runtime startup latency and keeps the launcher invocation a single `node <projectRoot>/dist/pty-supervisor.js` call."
+      },
+      {
+        "summary": "deliverAgentMessage becomes a three-tier router (supervisor → channels → tmux). Channels MCP wiring becomes off-by-default for NEW spawns but the code path stays for already-running agents.",
+        "rationale": "Zero forced respawn for existing channels-enabled agents. Plain forks and new spawns get supervisor delivery with no MCP context cost."
+      },
+      {
+        "summary": "Supervisor echoes socket-delivered messages to its stdout (visible in tmux) by default; per-message `{ echo: false }` field reserved for future silent-delivery callers.",
+        "rationale": "Operator transcript completeness wins over secrecy. Reserving the field keeps the wire format forward-compatible."
+      },
+      {
+        "summary": "Eligibility for the supervisor: harness === 'claude-code' (excludes Pi), provider-agnostic (no Anthropic gate), excludes Docker workspaces via the existing PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE env vars.",
+        "rationale": "Docker host/container shared-socket plumbing is unsolved and out of scope. All other Claude Code agents (Anthropic + every cliproxy-routed model) become eligible."
+      },
+      {
+        "summary": "Permission-decision relay (bidirectional tool-call mediation) stays on the existing channels MCP path for agents that wire it; the supervisor is one-way only.",
+        "rationale": "Issue body explicitly lists bidirectional tool-call mediation as out of scope. Keeps PAN-1405 surgical."
+      }
+    ],
+    "items": [
+      {
+        "id": "pty-token-helper",
+        "title": "Add src/lib/pty-token.ts mirroring bridge-token.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/pty-token.ts exposing readPtyTokenSync(agentId), writePtyTokenSync(agentId), and PTY_TOKEN_HEADER. Token file lives at ~/.panopticon/agents/<agentId>/pty-token at mode 0600. Mirror bridge-token.ts API and tests exactly so callers have a familiar shape."
+        },
+        "subItems": [
+          {
+            "id": "pty-token-helper.ac1",
+            "title": "writePtyTokenSync writes a 32-byte hex token to ~/.panopticon/agents/<id>/pty-token at mode 0600.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-token-helper.ac2",
+            "title": "readPtyTokenSync returns the token, or null when the file does not exist.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-token-helper.ac3",
+            "title": "Exported header constant PTY_TOKEN_HEADER is 'x-panopticon-pty-token' (distinct from BRIDGE_TOKEN_HEADER for diagnosability).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-token-helper.ac4",
+            "title": "Unit tests in src/lib/__tests__/pty-token.test.ts cover write→read round-trip, missing file returns null, and mode-0600 enforcement.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-script",
+        "title": "Create src/lib/channels/pty-supervisor.ts (PTY master + unix socket)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1405",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "supervisor-unit-tests",
+            "launcher-supervisor-field",
+            "deliver-three-tier",
+            "spawn-eligibility-and-state"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/channels/pty-supervisor.ts as a Node 22 script that spawns claude in a PTY (via @homebridge/node-pty-prebuilt-multiarch), proxies stdin↔PTY input and PTY output↔stdout, forwards SIGWINCH/resize events, and listens on ~/.panopticon/sockets/pty-<agentId>.sock for HTTP-on-unix POSTs that inject text into Claude's PTY input. Echo each socket-delivered message back to stdout (so the user sees it in the tmux pane). On EXIT/SIGTERM/SIGINT, unlink the socket and exit. Require PANOPTICON_AGENT_ID env var; reject requests without a matching pty-token header. Add a new tsdown entry to emit dist/pty-supervisor.js (node-pty marked external). Add @homebridge/node-pty-prebuilt-multiarch to root package.json. Header comment documents the architecture, the H1 PTY-owns-claude lifecycle, env-var requirements (TERM/COLORTERM/LANG passthrough), and the per-message echo behavior."
+        },
+        "subItems": [
+          {
+            "id": "supervisor-script.ac1",
+            "title": "Spawning the supervisor with PANOPTICON_AGENT_ID set and `claude --version` as the child completes, prints 'claude --version' output to stdout, and exits when the child exits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac2",
+            "title": "After spawn, ~/.panopticon/sockets/pty-<agentId>.sock exists at mode 0600 (verified via fs.stat).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac3",
+            "title": "POST { content: 'hello' } with a valid pty-token header writes 'hello\\n' (with a trailing newline) to Claude's PTY input AND echoes it to supervisor stdout. POST without a token returns 403.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac4",
+            "title": "Process.stdout 'resize' events call pty.resize(cols, rows) on the spawned PTY.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac5",
+            "title": "On SIGTERM and SIGINT the supervisor unlinks its socket file and exits 0; the spawned child receives SIGTERM and is reaped before exit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac6",
+            "title": "Per-agent log at ~/.panopticon/logs/pty-supervisor-<agentId>.log records each socket POST as one JSON line with { ts, agentId, kind: 'socket_write', contentLength, caller? }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac7",
+            "title": "@homebridge/node-pty-prebuilt-multiarch is added to the root package.json dependencies, and tsdown emits dist/pty-supervisor.js with node-pty marked external (verified by inspecting the bundle).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-script.ac8",
+            "title": "Header comment in pty-supervisor.ts documents: Node-only requirement (no Bun), H1 PTY-owns-claude crash semantics, env-var passthrough, socket-path convention, per-message echo behavior, and the out-of-scope nature of permission relay.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-unit-tests",
+        "title": "Unit tests for pty-supervisor.ts using a dummy child command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add src/lib/channels/__tests__/pty-supervisor.test.ts. Tests spawn the supervisor against `cat` (or `bash -c 'cat'`) as a stand-in for claude — `cat` echoes stdin, which lets us assert that socket POSTs reach the child's input. Cover lifecycle (socket cleanup on exit), token auth (403 on missing token), and echo-to-stdout behavior. Run under Node only (skip under Bun)."
+        },
+        "subItems": [
+          {
+            "id": "supervisor-unit-tests.ac1",
+            "title": "Test 'socket POST reaches child stdin': spawn supervisor with `cat`, POST {content:'ping'}, assert 'ping' appears on supervisor stdout via the cat echo.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-tests.ac2",
+            "title": "Test 'socket POST without token returns 403' using a wrong header value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-tests.ac3",
+            "title": "Test 'socket unlink on exit': after SIGTERM the socket file is removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-tests.ac4",
+            "title": "Test 'echo behavior': socket-delivered message appears in stdout exactly once (no duplication, no truncation).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-tests.ac5",
+            "title": "Tests skip under Bun (typeof Bun !== 'undefined') with a clear .skipIf — node-pty cannot run there.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-supervisor-field",
+        "title": "Add useSupervisor + supervisorScriptPath fields to LauncherConfig",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/lib/launcher-generator.ts so when useSupervisor is true, the final `exec claude <args>` becomes `exec node <supervisorScriptPath> claude <args>`. Behavior is identical for everything else. Cover both the conversation path (buildCommand for spawnMode === 'conversation') and the work-agent path (buildNonConversationCommand). Add unit tests to launcher-generator.test.ts that assert the exec line composition with and without useSupervisor. Do not touch Pi or review sub-role launchers."
+        },
+        "subItems": [
+          {
+            "id": "launcher-supervisor-field.ac1",
+            "title": "LauncherConfig.useSupervisor (boolean, default undefined→false) and LauncherConfig.supervisorScriptPath (string, required when useSupervisor=true) are added with JSDoc explaining the wrap-claude semantics.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-supervisor-field.ac2",
+            "title": "When useSupervisor=true on a work-agent launcher, the emitted script contains exactly one line matching `^exec node <supervisorScriptPath> claude(?: --[\\w-]+ .+)*$` — claude args are preserved verbatim from buildNonConversationCommand.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-supervisor-field.ac3",
+            "title": "When useSupervisor=true on a conversation launcher, the final command line wraps claude in `node <supervisorScriptPath>`; the keep-alive loop and conversation-ended echoes are unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-supervisor-field.ac4",
+            "title": "When useSupervisor=false / undefined the generated script is BYTE-FOR-BYTE identical to today — a regression snapshot test asserts this for one work-agent and one conversation fixture.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-supervisor-field.ac5",
+            "title": "Pi launchers and review sub-role launchers ignore useSupervisor (it is a Claude-Code-only field).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-supervisor-field.ac6",
+            "title": "supervisorScriptPath is shellQuote'd in the emitted exec line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deliver-three-tier",
+        "title": "deliverAgentMessage: try supervisor socket → channels → tmux",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update deliverAgentMessage in src/lib/agents.ts to a three-tier router: (1) if pty-supervisor socket exists AND pty-token can be read → POST via postUnixSocketJson with PTY_TOKEN_HEADER → on 2xx, log path='supervisor' and return. (2) else if channelsEnabled and channels socket exists → existing channels POST path → log path='channel'. (3) else → sendKeys(tmux) → log path='tmux'. The explicit deliveryMethod argument is honored: 'tmux' still forces tmux, 'channels' still forces channels (errors if unavailable). A new explicit deliveryMethod value 'supervisor' is added that errors if the socket is missing. Default 'auto' uses the tiered fallback. Per-tier failure reasons are appended to the existing channel-delivery log under the new key 'pty-supervisor' (and continue to fall through). Module-private helper resolves the supervisor socket path with the same panopticonHomeForChannels() function (rename it to panopticonHomeForSockets() inside this bead, with the old name kept as an alias if any external caller imports it)."
+        },
+        "subItems": [
+          {
+            "id": "deliver-three-tier.ac1",
+            "title": "When supervisor socket exists and POST returns 200, the function returns and writes a delivery-log line with path='supervisor'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-three-tier.ac2",
+            "title": "When supervisor socket is missing but channels socket exists and channelsEnabled=true, the function falls through to channels and writes path='channel'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-three-tier.ac3",
+            "title": "When neither socket exists (or both fail), the function falls through to tmux sendKeys and writes path='tmux' with the per-tier failure reasons.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-three-tier.ac4",
+            "title": "deliveryMethod='supervisor' throws MessageDeliveryFailed when the supervisor socket POST fails (no silent fallback). 'channels' keeps its existing strict behavior. 'tmux' bypasses both sockets.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-three-tier.ac5",
+            "title": "Bridge log and per-agent delivery log filename are unchanged so existing dashboards / log readers don't break — the new path='supervisor' line lands in the same file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-three-tier.ac6",
+            "title": "Existing call sites in agents.ts (resumeAgent, messageAgent, auto-continue) are NOT modified — they continue to call deliverAgentMessage; only its internals change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deliver-tests",
+        "title": "Extend deliver-agent-message.test.ts with supervisor routing cases",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update src/lib/__tests__/deliver-agent-message.test.ts to cover: supervisor-only success, supervisor missing → channels success, both sockets missing → tmux, supervisor POST 5xx → channels fallback, supervisor POST timeout → channels fallback, explicit deliveryMethod='supervisor' strict-error on missing socket. Reuse existing fake-socket fixtures."
+        },
+        "subItems": [
+          {
+            "id": "deliver-tests.ac1",
+            "title": "Test 'supervisor-only success': pty socket present, POST 200, channels socket absent → path='supervisor'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-tests.ac2",
+            "title": "Test 'supervisor missing, channels success': pty socket absent, channels socket present and channelsEnabled=true → path='channel'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-tests.ac3",
+            "title": "Test 'both missing → tmux': neither socket exists → sendKeys mock invoked, path='tmux'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-tests.ac4",
+            "title": "Test 'supervisor POST 500 → channels fallback': supervisor exists but returns 500; channels exists → path='channel' with reason='socket-post-failed: …' logged for the supervisor tier.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-tests.ac5",
+            "title": "Test 'deliveryMethod=\"supervisor\" strict': no socket → throws MessageDeliveryFailed; no fallback occurs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-tests.ac6",
+            "title": "Use vi.useFakeTimers / vi.advanceTimersByTimeAsync for any timeout-based test — no real setTimeout waits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-eligibility-and-state",
+        "title": "Wire supervisor into spawnAgent: decideSupervisorForWorkAgent + state.supervisorEnabled + useSupervisor passthrough",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-wiring",
+            "plain-fork-supervisor",
+            "channels-mcp-default-off"
+          ]
+        },
+        "narrative": {
+          "Action": "Add decideSupervisorForWorkAgent(agentId, options, state) → { eligible, reason } to src/lib/agents.ts. Eligibility: harness === 'claude-code' AND NOT inside Docker (PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE env). Provider-agnostic — no Anthropic gate. Add supervisorEnabled?: boolean to AgentState. In spawnAgent, when eligible: writePtyTokenSync(agentId), set state.supervisorEnabled=true, pass useSupervisor=true and supervisorScriptPath=resolved-dist-path to buildAgentLaunchConfig→generateLauncherScriptSync. If dist/pty-supervisor.js is missing, raise a clear error: 'pty-supervisor build artifact missing — run `npm run build`.' Channels eligibility is now independent (and defaults off — see channels-mcp-default-off bead)."
+        },
+        "subItems": [
+          {
+            "id": "spawn-eligibility-and-state.ac1",
+            "title": "decideSupervisorForWorkAgent returns { eligible: false, reason: 'docker-not-supported-yet' } when PAN_DOCKER=1 or PANOPTICON_DOCKER_WORKSPACE=1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac2",
+            "title": "decideSupervisorForWorkAgent returns { eligible: false, reason: 'harness-pi' } when state.harness !== 'claude-code'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac3",
+            "title": "decideSupervisorForWorkAgent returns { eligible: true } for a Claude Code work agent on any provider (Anthropic, cliproxy-routed GPT/Kimi/MiniMax, Bedrock, Vertex, Foundry).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac4",
+            "title": "AgentState gains optional supervisorEnabled?: boolean; saveAgentStateSync persists it; getAgentState reads it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac5",
+            "title": "When eligible, spawnAgent writes pty-token before tmux session creation and passes useSupervisor=true + supervisorScriptPath to the launcher generator.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac6",
+            "title": "When dist/pty-supervisor.js is absent, spawnAgent throws a clear actionable error BEFORE creating tmux/launcher artifacts (no half-spawn state).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-eligibility-and-state.ac7",
+            "title": "Unit tests in agents-spawn-supervisor.test.ts cover each eligibility branch (Docker excluded, Pi excluded, every provider accepted) and assert state.supervisorEnabled persists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-wiring",
+        "title": "Enable supervisor for Claude Code conversation sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update spawnConversationSession in src/dashboard/server/routes/conversations.ts to wire useSupervisor=true + supervisorScriptPath for Claude Code (non-Pi) conversations that aren't in Docker. Write pty-token before tmux create. Pi conversations stay on tmux paste-buffer. Keep channels-MCP code path untouched at this bead — channels-mcp-default-off handles its retirement."
+        },
+        "subItems": [
+          {
+            "id": "conversation-wiring.ac1",
+            "title": "For a Claude Code conversation (non-Pi, non-Docker), the generated launcher script contains 'exec node …/dist/pty-supervisor.js claude' and the pty-token file is written before tmux create.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-wiring.ac2",
+            "title": "Pi conversations have NO supervisor wrapping in the launcher (verified by snapshot or grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-wiring.ac3",
+            "title": "Docker conversations (PAN_DOCKER=1) have NO supervisor wrapping.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-wiring.ac4",
+            "title": "After spawnConversationSession returns, ~/.panopticon/sockets/pty-<tmuxSession>.sock exists at mode 0600 (asserted in an integration test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plain-fork-supervisor",
+        "title": "Re-apply the 'skip channels MCP on plain forks' policy and route them through the supervisor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Restore the plain-fork channels-MCP skip behavior (the policy reverted by 'Revert fix(conversations): wire channels MCP on plain forks too' / 8219536cc). Plain forks now MUST NOT wire panopticon-bridge MCP and MUST NOT call dismissDevChannelsDialog — they get supervisor delivery instead. The plainFork branch in spawnConversationSession explicitly sets useSupervisor=true and channelsBridgeMcpConfig=undefined. Add a regression test asserting the launcher for a plain fork contains 'exec node … pty-supervisor.js claude' and does NOT contain '--mcp-config' or '--dangerously-load-development-channels'."
+        },
+        "subItems": [
+          {
+            "id": "plain-fork-supervisor.ac1",
+            "title": "Plain-fork launcher script contains the supervisor wrap line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plain-fork-supervisor.ac2",
+            "title": "Plain-fork launcher script does NOT contain '--mcp-config' or '--dangerously-load-development-channels server:panopticon-bridge'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plain-fork-supervisor.ac3",
+            "title": "dismissDevChannelsDialog is NOT invoked on the plain-fork code path (asserted via spy/mock in the test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plain-fork-supervisor.ac4",
+            "title": "deliverAgentMessage to a plain-fork conversation routes to path='supervisor' (asserted in an integration test that sends a message and reads the delivery log).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channels-mcp-default-off",
+        "title": "Channels MCP wiring becomes off-by-default for new spawns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Gate channels MCP wiring behind an explicit experimental.claudeCodeChannelsMcp flag (default false) — separate from the existing experimental.claudeCodeChannels which historically toggled the whole feature. Update decideChannelsForWorkAgent so the flag-off path is the default. The supervisor is the new preferred transport; channels-MCP code stays only as the delivery fallback for agents whose state.json still has channelsEnabled=true. Document the deprecation in the function header and in docs/. Existing tests for decideChannelsForWorkAgent are updated to match the new default. NOTE: do NOT remove the experimental.claudeCodeChannels flag — preserve backwards compatibility so operators can re-enable channels MCP per-agent for diagnostic comparison."
+        },
+        "subItems": [
+          {
+            "id": "channels-mcp-default-off.ac1",
+            "title": "decideChannelsForWorkAgent returns { eligible: false, reason: 'mcp-default-off' } when experimental.claudeCodeChannelsMcp is unset/false, even when all other criteria pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channels-mcp-default-off.ac2",
+            "title": "spawnAgent on a fresh Claude Code work agent writes NO agent-mcp.json and NO bridge-token by default; verified via fs.exists assertions in the spawn-eligibility unit tests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channels-mcp-default-off.ac3",
+            "title": "Operator override: setting experimental.claudeCodeChannelsMcp=true restores the previous eligibility ladder (provider=anthropic, non-Docker, non-Pi) and writes the MCP config + bridge token as today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channels-mcp-default-off.ac4",
+            "title": "An already-running agent with state.channelsEnabled=true continues to receive messages via channels delivery (no resume required) — covered by an integration test that pre-seeds state.json with channelsEnabled=true and asserts deliverAgentMessage routes path='channel'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skip-dialog-when-no-channels",
+        "title": "Skip dismissDevChannelsDialog when channels MCP is not wired",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Gate every dismissDevChannelsDialog call site on the actual channels-MCP wiring state — when channelsBridgeMcpConfig is undefined (or state.channelsEnabled is false), do NOT invoke the dialog dismissal. This is correctness, not optimization: the dialog only renders when --dangerously-load-development-channels is passed; spamming Enter at a session that never showed the dialog can confirm unrelated prompts (auto-compact, file-trust). Touch call sites in src/lib/agents.ts:spawnAgent and src/dashboard/server/routes/conversations.ts:spawnConversationSession."
+        },
+        "subItems": [
+          {
+            "id": "skip-dialog-when-no-channels.ac1",
+            "title": "spawnAgent: when state.channelsEnabled is false, dismissDevChannelsDialog is not called (asserted via spy in agents-spawn-supervisor.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-dialog-when-no-channels.ac2",
+            "title": "spawnConversationSession: when channelsBridgeMcpConfig is undefined, dismissDevChannelsDialog is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-dialog-when-no-channels.ac3",
+            "title": "Existing channels-MCP-on path (operator opt-in) still calls the dismissal — no regression for that flow.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-supervisor",
+        "title": "Playwright UAT: scroll-mode message delivery + no-MCP plain fork",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Playwright UAT (isolated browser instance/profile — no shared session) under tests/playwright/ that: (1) creates a new Claude Code conversation via the dashboard, (2) opens the terminal panel and scrolls up to enter tmux copy-mode, (3) sends a message via the conversation input (which calls deliverAgentMessage), (4) asserts the agent transcript advances (assertion via /api/conversations history endpoint or a visible transcript element), (5) opens a plain fork of that conversation and asserts the launcher script under ~/.panopticon/agents/<id>/launcher.sh contains 'pty-supervisor.js' and does NOT contain '--mcp-config'. The UAT must seed any required login/setup inside the isolated session (no dependency on another agent's playwright state)."
+        },
+        "subItems": [
+          {
+            "id": "uat-supervisor.ac1",
+            "title": "Playwright spec uses a freshly-created browser context/profile (no shared cookies, no shared state). Login/setup is performed inside the spec.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-supervisor.ac2",
+            "title": "Step: terminal panel is scrolled up by N lines so tmux is in copy-mode. Sending a message still results in the agent's transcript advancing within the timeout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-supervisor.ac3",
+            "title": "Step: plain fork created; its launcher.sh contains the supervisor exec line AND does not contain '--mcp-config' or '--dangerously-load-development-channels'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-supervisor.ac4",
+            "title": "Step: send a message to the plain fork and assert delivery log line path='supervisor' is appended to ~/.panopticon/logs/<id>.delivery.log (or equivalent existing log path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-supervisor.ac5",
+            "title": "Spec cleans up: closes its browser context, kills the spawned conversation and plain fork via /api/conversations DELETE so the host does not accumulate orphans.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-supervisor",
+        "title": "Document the PTY supervisor in CLAUDE.md and docs/",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T06:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a 'PTY supervisor for orchestrator delivery' section to CLAUDE.md (next to the existing 'Claude Code Channels (experimental)' block, which is now downgraded to 'legacy fallback'). Update docs/ to describe the three-tier delivery, the Node-only requirement, the dist/pty-supervisor.js build artifact, the Docker exclusion, and the H1 'supervisor owns claude' lifecycle. Update the 'Claude Code Channels' subsection to point at the supervisor as the recommended transport. No code changes."
+        },
+        "subItems": [
+          {
+            "id": "docs-supervisor.ac1",
+            "title": "CLAUDE.md has a new section 'PTY supervisor for orchestrator delivery' that explains the three-tier router, the Node 22 requirement, and the H1 crash semantics.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supervisor.ac2",
+            "title": "The existing 'Claude Code Channels (experimental)' section is updated with a 'now legacy fallback — see PTY supervisor section' lead-in.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supervisor.ac3",
+            "title": "Where appropriate, docs/ pages that mention delivery (anything that grep'd for 'channels MCP' or 'tmux paste-buffer') are updated to reflect supervisor-first delivery.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pty-token-helper",
+        "to": "supervisor-script",
+        "type": "blocks"
+      },
+      {
+        "from": "pty-token-helper",
+        "to": "spawn-eligibility-and-state",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-script",
+        "to": "supervisor-unit-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-script",
+        "to": "launcher-supervisor-field",
+        "type": "informs"
+      },
+      {
+        "from": "supervisor-script",
+        "to": "deliver-three-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-script",
+        "to": "spawn-eligibility-and-state",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-supervisor-field",
+        "to": "spawn-eligibility-and-state",
+        "type": "blocks"
+      },
+      {
+        "from": "deliver-three-tier",
+        "to": "deliver-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-eligibility-and-state",
+        "to": "conversation-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-eligibility-and-state",
+        "to": "channels-mcp-default-off",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-wiring",
+        "to": "plain-fork-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "channels-mcp-default-off",
+        "to": "skip-dialog-when-no-channels",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-wiring",
+        "to": "uat-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "plain-fork-supervisor",
+        "to": "uat-supervisor",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-dialog-when-no-channels",
+        "to": "uat-supervisor",
+        "type": "informs"
+      },
+      {
+        "from": "uat-supervisor",
+        "to": "docs-supervisor",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1405-universal-pty-supervisor-for-message-delivery-replace-tmux-paste-buffer-obsolete-channels-mcp-gate.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
