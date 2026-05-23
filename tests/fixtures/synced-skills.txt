@@ -44,6 +44,7 @@ pan-issues
 pan-kill
 pan-logs
 pan-memory
+pan-merge
 pan-network
 pan-new-project
 pan-oversee

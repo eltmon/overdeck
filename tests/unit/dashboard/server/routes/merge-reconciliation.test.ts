@@ -97,7 +97,10 @@ vi.mock('../../../../../src/lib/cloister/task-readiness.js', () => ({ getUnblock
 vi.mock('../../../../../src/lib/cloister/verification-runner.js', () => ({ runVerificationForIssue: vi.fn() }));
 vi.mock('../../../../../src/lib/tldr-daemon.js', () => ({ getTldrDaemonService: vi.fn() }));
 vi.mock('../../../../../src/lib/remote/workspace-metadata.js', () => ({ loadWorkspaceMetadata: vi.fn() }));
-vi.mock('../../../../../src/dashboard/server/services/merge-queue-service.js', () => ({ setMergeQueueTriggerHandler: vi.fn() }));
+vi.mock('../../../../../src/dashboard/server/services/merge-queue-service.js', () => ({
+  setMergeQueueTriggerHandler: vi.fn(),
+  triggerRegisteredMerge: vi.fn(),
+}));
 vi.mock('../../../../../src/lib/work-agent-lifecycle.js', () => ({ getWorkAgentLifecycleState: vi.fn() }));
 vi.mock('../../../../../src/lib/review-status-enrichment.js', () => ({ enrichReviewStatusFromSessions: vi.fn((s) => s) }));
 vi.mock('../../../../../src/dashboard/server/services/domain-services.js', () => ({ EventStoreService: {} }));
