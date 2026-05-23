@@ -1620,7 +1620,7 @@ const getWorkspaceRoute = HttpRouter.add(
           yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
         }
 
-        const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+        const stashes = yield* listStashes(workspacePath);
         const salvageableStashes = stashes
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
@@ -1918,7 +1918,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stashes = yield* listStashes(workspacePath);
     const salvageableStashes = stashes
       .filter(isSalvageableStash)
       .filter((entry) => entry.issueId === issueId.toUpperCase())
@@ -1955,18 +1955,18 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stashes = yield* listStashes(workspacePath);
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    const branchName = yield* Effect.promise(() => createRecoveryBranchFromStash(
+    const branchName = yield* createRecoveryBranchFromStash(
       workspacePath,
       stash.ref,
       stash.issueId,
       stash.shortDescription,
-    ));
+    );
 
     return jsonResponse({ success: true, branchName });
   }))
@@ -1992,13 +1992,13 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stashes = yield* listStashes(workspacePath);
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    yield* Effect.promise(() => dropStash(workspacePath, stash.ref));
+    yield* dropStash(workspacePath, stash.ref);
     return jsonResponse({ success: true });
   }))
 );
@@ -4241,9 +4241,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       import('../../../lib/cloister/review-agent.js'),
     );
     const resolved = resolveProjectFromIssueSync(issueId);
-    const { killed, failed } = yield* Effect.promise(() =>
-      killAllReviewerSessions(resolved?.projectKey, issueId),
-    );
+    const { killed, failed } = yield* killAllReviewerSessions(resolved?.projectKey, issueId);
 
     // Reset only reviewStatus — leave test/merge/verification untouched
     setReviewStatus(issueId, {

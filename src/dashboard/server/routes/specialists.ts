@@ -1477,7 +1477,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
     );
-    const killResult = yield* Effect.promise(() => killAllReviewerSessions(project, issueId));
+    const killResult = yield* killAllReviewerSessions(project, issueId);
 
     // Resolve workspace info for re-dispatch
     const projectConfig = resolveProjectFromIssueSync(issueId);
