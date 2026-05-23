@@ -22,11 +22,13 @@ import React, {
   useMemo,
   type ReactNode,
 } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { DiffsThemeNames } from '@pierre/diffs';
+import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks } from '../../markdown-links';
+import { MarkdownFileLink } from './MarkdownFileLink';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
@@ -249,7 +251,53 @@ function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
 
 // ─── Custom markdown components ───────────────────────────────────────────────
 
-function makeComponents(isStreaming: boolean): Components {
+function transformMarkdownUrl(url: string): string {
+  return shouldPreserveMarkdownFileLinkHref(url) ? url : defaultUrlTransform(url);
+}
+
+type ReactMarkdownRemarkPlugins = React.ComponentProps<typeof ReactMarkdown>['remarkPlugins'];
+
+interface MarkdownNode {
+  type: string;
+  value?: string;
+  url?: string;
+  title?: string | null;
+  children?: MarkdownNode[];
+}
+
+const TEXT_LINK_SKIP_NODE_TYPES = new Set(['code', 'inlineCode', 'link', 'linkReference', 'definition']);
+
+function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
+  return (tree: MarkdownNode) => {
+    const visit = (node: MarkdownNode) => {
+      if (!node.children || TEXT_LINK_SKIP_NODE_TYPES.has(node.type)) return;
+
+      const children: MarkdownNode[] = [];
+      for (const child of node.children) {
+        if (child.type === 'text' && child.value !== undefined) {
+          for (const segment of splitMarkdownTextFileLinks(child.value, options.cwd)) {
+            children.push(segment.href
+              ? {
+                type: 'link',
+                url: segment.href,
+                title: null,
+                children: [{ type: 'text', value: segment.text }],
+              }
+              : { type: 'text', value: segment.text });
+          }
+        } else {
+          visit(child);
+          children.push(child);
+        }
+      }
+      node.children = children;
+    };
+
+    visit(tree);
+  };
+}
+
+function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components {
   return {
     pre({ children }) {
       // Extract code block contents
@@ -278,9 +326,15 @@ function makeComponents(isStreaming: boolean): Components {
       );
     },
     a({ href, children }) {
+      const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
+      if (fileLinkMeta) {
+        return <MarkdownFileLink {...fileLinkMeta} issueId={issueId} />;
+      }
+
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
       const safeHref =
         typeof href === 'string' &&
+        href.trim().length > 0 &&
         !/^(javascript|data|vbscript):/i.test(href.trim())
           ? href
           : undefined;
@@ -303,18 +357,26 @@ function makeComponents(isStreaming: boolean): Components {
 interface ChatMarkdownProps {
   text: string;
   isStreaming?: boolean;
+  cwd?: string;
+  issueId?: string | null;
 }
 
 export const ChatMarkdown = memo(function ChatMarkdown({
   text,
   isStreaming = false,
+  cwd,
+  issueId,
 }: ChatMarkdownProps) {
-  const components = useMemo(() => makeComponents(isStreaming), [isStreaming]);
+  const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
+    [cwd],
+  );
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
       <div className={styles.chatMarkdown}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
           {text}
         </ReactMarkdown>
       </div>
