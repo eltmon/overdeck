@@ -1200,7 +1200,7 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const questions = yield* Effect.promise(() => getAgentPendingQuestions(id));
+    const questions = yield* getAgentPendingQuestions(id);
     return jsonResponse({ pending: questions.length > 0, questions });
   })),
 );
@@ -1220,7 +1220,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
       return jsonResponse({ error: 'answers array required' }, { status: 400 });
     }
 
-    const pendingQuestions = yield* Effect.promise(() => getAgentPendingQuestions(id));
+    const pendingQuestions = yield* getAgentPendingQuestions(id);
     if (pendingQuestions.length === 0) {
       return jsonResponse({ error: 'No pending questions found' }, { status: 400 });
     }
@@ -2383,7 +2383,7 @@ const postAgentsRoute = HttpRouter.add(
     let hasBeads = false;
     let beadCount = 0;
     try {
-      const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execFileAsync(
+      const { stdout: bdOutput } = yield* withBdMutex(() => Effect.promise(() => execFileAsync(
         'bd',
         ['list', '--json', '-l', issueLower, '--status', 'all', '--limit', '0'],
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
@@ -2403,7 +2403,7 @@ const postAgentsRoute = HttpRouter.add(
       console.log(`[agents] No beads for ${issueId} — attempting auto-recovery via createBeadsFromVBrief`);
       try {
         const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-        const recovery = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
+        const recovery = yield* createBeadsFromVBrief(workspacePath);
         beadCount = recovery.created.length;
         hasBeads = recovery.created.length > 0 && (planItemCount === null || recovery.created.length === planItemCount);
         if (hasBeads) {

@@ -1,0 +1,141 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T05:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1394: Conversation title Sparkles 'regenerate title' button is invisible (opacity: 0 by default)",
+    "updated": "2026-05-23T04:47:27.068Z"
+  },
+  "plan": {
+    "id": "pan-1394",
+    "title": "Conversation title: Sparkles 'regenerate title' button is invisible (opacity: 0 by default)",
+    "status": "proposed",
+    "uid": "3b72ae7b-3018-4f54-8849-142c5c0123b9",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T05:00:00.000Z",
+    "updated": "2026-05-23T04:47:27.068Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1394",
+        "label": "PAN-1394",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "css",
+      "ux",
+      "discoverability",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The Sparkles 'regenerate title' button and the Pencil 'rename' button in the Conversation panel header share the .conversationTitleEditBtn class, which sets opacity: 0 by default and only promotes to opacity: 1 when the user hovers the title row. The Sparkles button is the primary AI-retitle affordance and is undiscoverable as a result — users have no way of knowing the feature exists until they happen to hover the title. The Pencil rename button has the same problem, though the bug report frames Pencil as a secondary action.",
+      "Proposal": "Change a single CSS declaration: in src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css, set .conversationTitleEditBtn { opacity: 0.4 } instead of opacity: 0. The existing :hover rule that promotes opacity to 1 stays in place, so both buttons remain visually understated at rest and brighten on hover. This is the 'both buttons opacity 0.4 default' option the bug report explicitly authorizes, and it is the smallest possible diff (a one-line CSS change) that fixes discoverability for both Pencil and Sparkles. No JSX changes, no new CSS class, and no behavioral changes to the retitleMutation spinner inline override."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose 'both buttons opacity 0.4' over 'split classes / Sparkles always at opacity 1, Pencil hover-only'.",
+        "rationale": "The bug report offers two acceptable fixes ('Sparkles always visible' vs 'both at opacity: 0.4 that brightens on hover'). The 0.4 option is the smaller, more surgical change — one-line CSS edit, no JSX refactor, no new class — and it also restores discoverability for the Pencil rename button, which suffers from the same invisibility today. Splitting the class would require new CSS, a className change in ConversationPanel.tsx, and a judgment call about Pencil's resting state; the 0.4 option avoids all of that."
+      },
+      {
+        "summary": "Resting opacity set to 0.4 (not 0.5, 0.6, or 1).",
+        "rationale": "0.4 is the exact value named in the bug report's worked example, providing a clearly visible-but-understated affordance that promotes to 1.0 on hover via the existing transition. Picking a different number would be a free invention; matching the report avoids relitigating a UX detail the reporter already specified."
+      },
+      {
+        "summary": "Browser UAT is required (Playwright in an isolated browser instance).",
+        "rationale": "This is a visual/UX bug. Typecheck and unit tests cannot prove the button is now discoverable. The test role must launch the dashboard, open a conversation, and confirm the Sparkles button is visible without hovering. Playwright isolation is mandated by the planning template to avoid stepping on parallel agents' sessions."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-opacity",
+        "title": "Set .conversationTitleEditBtn default opacity to 0.4 so Sparkles + Pencil are discoverable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T05:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1394",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css, change the .conversationTitleEditBtn base rule's `opacity: 0;` to `opacity: 0.4;`. Leave the .conversationTerminalTitle:hover .conversationTitleEditBtn rule (opacity: 1) and the .conversationTitleEditBtn:hover rule unchanged. Do not modify ConversationPanel.tsx or any other CSS class. Verify in the running dashboard that (a) the Sparkles button is visible without hovering the title, (b) the Pencil button is visible without hovering, (c) both buttons still brighten to full opacity on hover, and (d) the Sparkles spinner remains fully opaque while a retitle request is in flight. Run a Playwright check in an isolated browser instance as part of verification."
+        },
+        "subItems": [
+          {
+            "id": "fix-opacity.ac1",
+            "title": "The .conversationTitleEditBtn base rule in command-deck.module.css has `opacity: 0.4` (not 0). Only that single declaration changes in the file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac2",
+            "title": "When viewing a conversation in the CommandDeck without hovering anything, the Sparkles (✨) regenerate-title button is visible next to the conversation title at ~40% opacity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac3",
+            "title": "The Pencil (rename) button is also visible at ~40% opacity in the same resting state — no separate class change required, both buttons share the rule.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac4",
+            "title": "Hovering the conversation title row promotes both buttons to full opacity (opacity: 1) via the existing .conversationTerminalTitle:hover .conversationTitleEditBtn rule.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac5",
+            "title": "While the Sparkles regenerate-title mutation is in flight, the button's spinner (Loader2 icon) remains fully opaque — the inline style={{ opacity: 1 }} override on ConversationPanel.tsx:499 still wins over the new 0.4 base.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac6",
+            "title": "No other CSS rule, no other file, and no JSX className changes are included in the diff. The change is exactly one line in command-deck.module.css.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac7",
+            "title": "Browser UAT (Playwright in an isolated browser instance/profile, no shared session with other agents) confirms the Sparkles button is visible at rest, brightens on hover, and triggers the retitle mutation when clicked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-opacity.ac8",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1394-conversation-title-sparkles-regenerate-title-button-is-invisible-opacity-0-by-default.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

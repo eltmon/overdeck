@@ -1,0 +1,875 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:51:24.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1389: Activity feed sidebar — time-bucketed session/observation history panel",
+    "updated": "2026-05-23T04:54:52.346Z"
+  },
+  "plan": {
+    "id": "pan-1389",
+    "title": "Activity feed sidebar: time-bucketed session/observation history panel",
+    "status": "proposed",
+    "uid": "e2b4173a-5273-454c-aa06-4c0152757c75",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:51:24.000Z",
+    "updated": "2026-05-23T04:54:52.346Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1389",
+        "label": "PAN-1389",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
+        "label": "PAN-1052 (observation feed)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "sidebar",
+      "observations",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "When working across multiple sessions, the dashboard offers no persistent, cross-session way to see what was recently worked on or to jump back into a prior session's context. The per-issue CommandDeck ActivityFeedSidebar shows one issue's observation feed, and the Activity Log panel shows raw events from three streams. Neither gives the at-a-glance, multi-source, time-bucketed history a user needs to orient themselves across all in-flight work.",
+      "Proposal": "Add a new global right-hand sidebar (SessionFeedSidebar) that merges four item types — conversations, observations (activity), git activity, and placeholder slots for files/comments — into a single feed grouped by contiguous time labels per the reference UI audit. Default collapsed, toggleable from the app shell, persisted to localStorage. Reuse existing data sources (store.conversationsByName, store.observationsByIssueId, /api/git-activity, /api/conversations enrichment) so no new server endpoints are required for the four in-scope tabs. Files and Comments tabs ship as empty-state stubs with follow-up issues filed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Choose 5-minute 'Just Now' threshold (≤300s), overriding the 1-hour value in the issue body.",
+        "rationale": "Latest comment from the same author (eltmon, 2026-05-23) explicitly corrects this from a reference UI code audit: 'now - timestamp < 300s (5 minutes, not 1 hour as previously noted)'. Honoring the later, more specific source. Threshold exposed as a single named constant so a reviewer can flip back to 1 hour with one edit."
+      },
+      {
+        "summary": "Use M5t-style contiguous-label time grouping rather than the fixed bucket set in the issue body.",
+        "rationale": "Reference comment states groups are 'contiguous runs of items with the same formatted label — no fixed bucket set, just label breaks'. This reads better across a multi-day feed (collapses long quiet periods, expands busy moments). The existing fixed-bucket lib/timeBuckets.ts is unchanged and continues to power the per-issue ActivityFeedSidebar."
+      },
+      {
+        "summary": "Ship Files and Comments tabs as permanent empty-state stubs, not full implementations.",
+        "rationale": "Reference design includes them but neither has a backing data source today (no aggregate file_change feed; no issue-comments cache in the dashboard). Implementing them requires new server endpoints outside this issue's scope. Stubs keep the tab strip faithful to the reference and mark the absence visibly; follow-up issues filed and noted in hazards."
+      },
+      {
+        "summary": "Mount as a right-hand sidebar with default-CLOSED toggle persisted to localStorage.",
+        "rationale": "Default-closed avoids surprising existing users with a wider chrome on first load. Persistence matches the existing left Sidebar collapse pattern (SIDEBAR_STORAGE_KEY in components/Sidebar.tsx). Once a user opens it, it stays open across reloads."
+      },
+      {
+        "summary": "Click navigation: conversation → /conv/<name>; observation → /command-deck for that issueId; git → no-op (no global git history view exists today).",
+        "rationale": "Reuses existing app routes; no new pages required. Git no-op is honest about the gap rather than fabricating a destination."
+      },
+      {
+        "summary": "Place new component under src/dashboard/frontend/src/components/sessionFeed/ with the name SessionFeedSidebar — distinct from the existing ActivityPanel and CommandDeck/ActivityFeedSidebar.",
+        "rationale": "Three 'activity-named' components would invite confusion. A new namespace and a name that emphasizes the cross-session scope keeps each component's purpose unambiguous."
+      },
+      {
+        "summary": "Cap the global activity selector at the most recent 500 observations across all issues.",
+        "rationale": "Bounded memory and render cost regardless of agent fleet size. 500 is generous for a sidebar that displays maybe a few dozen rows above the fold and lazily lets the user scroll older entries."
+      }
+    ],
+    "items": [
+      {
+        "id": "session-feed-types",
+        "title": "Add SessionFeedEntry discriminated union and shared types",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-feed-selector",
+            "observation-feed-selector",
+            "git-feed-source",
+            "merged-feed-selector",
+            "conversation-card",
+            "activity-card",
+            "git-card",
+            "session-feed-sidebar"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/types.ts exporting a SessionFeedEntry discriminated union (kind: 'conversation' | 'activity' | 'git' | 'file_change' | 'comment'), a shared SessionFeedTab type ('all' | 'chats' | 'files' | 'git' | 'comments' | 'activity'), and per-kind payload shapes that match the reference contract (ConversationEntry fields for conversation, MemoryObservation summary fields for activity, ActivityEntry shape for git). Every variant carries id, timestamp (ISO string), workspaceId (or null), and issueId (or null) so downstream code can sort, group, and filter uniformly."
+        },
+        "subItems": [
+          {
+            "id": "session-feed-types.ac1",
+            "title": "types.ts compiles under tsc --strict and exports SessionFeedEntry as a discriminated union with all six kinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-types.ac2",
+            "title": "Every variant carries id (string), timestamp (ISO string), workspaceId (string|null), issueId (IssueId|null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-types.ac3",
+            "title": "Conversation variant matches the ConversationEntry contract in the issue comment (agent, lastMessageDate, lastMessageSnippet, messageCount, threadLabel, threadIsPrimary — with optionality where the source row may not have the field)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-types.ac4",
+            "title": "SessionFeedTab union has exactly six members and matches the reference tab strip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "label-formatter",
+        "title": "Add M5t-style time-label formatter and contiguous-grouping helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "bucket-section",
+            "session-feed-sidebar"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/sessionFeedLabels.ts exporting (1) JUST_NOW_THRESHOLD_MS = 5 * 60 * 1000, (2) formatBucketLabel(timestamp: string|Date, now: Date): string returning 'Just Now' when (now - timestamp) ≤ JUST_NOW_THRESHOLD_MS, an hour-of-day string like '9 PM' for earlier today, 'Yesterday <Mon DD> · <H AM/PM>' for yesterday, '<Weekday> <Mon DD>' for this week, and a locale date for older, (3) groupByContiguousLabel<T>(items: T[], getLabel: (item: T) => string): Array<{ label: string; items: T[] }> that groups contiguous items sharing the same label. Add unit tests covering each label branch and a grouping test where two adjacent items have the same label and a third differs."
+        },
+        "subItems": [
+          {
+            "id": "label-formatter.ac1",
+            "title": "formatBucketLabel returns 'Just Now' when the input is within 5 minutes of now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "label-formatter.ac2",
+            "title": "formatBucketLabel returns an hour-of-day string (e.g. '9 PM') for earlier-today inputs older than 5 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "label-formatter.ac3",
+            "title": "formatBucketLabel returns 'Yesterday <Mon DD> · <H AM/PM>' for inputs from the previous local day",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "label-formatter.ac4",
+            "title": "formatBucketLabel returns '<Weekday> <Mon DD>' for inputs older than yesterday but within the past 7 days",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "label-formatter.ac5",
+            "title": "groupByContiguousLabel collapses adjacent items with the same label and starts a new group when the label changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "label-formatter.ac6",
+            "title": "JUST_NOW_THRESHOLD_MS is exported as a single named constant so the value can be changed in one place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-feed-selector",
+        "title": "Selector: derive conversation SessionFeedEntry[] from store + REST",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/useConversationFeed.ts. It reads the existing useQuery({ queryKey: ['conversations'] }) shape returned by GET /api/conversations and maps each Conversation row to a SessionFeedEntry of kind 'conversation', deriving lastMessageDate from lastAttachedAt || createdAt, lastMessageSnippet from title (or 'No messages yet' when null), agent from harness ('claude-code' → 'claude_code', 'pi' → 'pi', null → 'unknown'), messageCount from the enrichment field if present and undefined otherwise. Filters out conversations where archivedAt is non-null. Adds tests using a stubbed react-query result."
+        },
+        "subItems": [
+          {
+            "id": "conversation-feed-selector.ac1",
+            "title": "Returns one SessionFeedEntry per non-archived Conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-feed-selector.ac2",
+            "title": "lastMessageDate prefers lastAttachedAt, falls back to createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-feed-selector.ac3",
+            "title": "Snippet falls back to 'No messages yet' when title is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-feed-selector.ac4",
+            "title": "agent mapping: 'claude-code' → 'claude_code', 'pi' → 'pi', null → 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observation-feed-selector",
+        "title": "Selector: flatten observationsByIssueId into activity SessionFeedEntry[]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/useObservationFeed.ts. It exports a closure-keyed selector (createObservationFeedSelector) following the pattern in CommandDeck/ActivityFeedSidebar.tsx createActionStatusObservationSelector — closure variables hold lastSource and lastResult so React subscribers do not re-render when the underlying slice identity is unchanged. It flattens state.observationsByIssueId across every issue, keeps only entries with actionStatus !== null, sorts newest-first by timestamp, caps the result at the most recent 500 entries, and maps each one to a SessionFeedEntry of kind 'activity' with id=observation.id, timestamp=observation.timestamp, issueId, workspaceId, headline=observation.actionStatus, summary=observation.summary."
+        },
+        "subItems": [
+          {
+            "id": "observation-feed-selector.ac1",
+            "title": "Flattens observations from every issueId key into a single sorted list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observation-feed-selector.ac2",
+            "title": "Filters out observations where actionStatus is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observation-feed-selector.ac3",
+            "title": "Sorted newest-first by timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observation-feed-selector.ac4",
+            "title": "Caps output at 500 entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observation-feed-selector.ac5",
+            "title": "Returns referentially identical result when the source slice identity is unchanged (memoization test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-feed-source",
+        "title": "Hook: useGitFeed wraps /api/git-activity into SessionFeedEntry[]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/useGitFeed.ts using react-query (queryKey ['session-feed-git'], refetchInterval 15_000, staleTime 5_000) to fetch GET /api/git-activity. Maps each returned ActivityEntry to a SessionFeedEntry of kind 'git' with id=entry.id, timestamp=entry.timestamp, issueId=entry.issueId ?? null, workspaceId=null, message=entry.message, level=entry.level, source=entry.source. Surfaces loading and error states the caller can render."
+        },
+        "subItems": [
+          {
+            "id": "git-feed-source.ac1",
+            "title": "Hook returns SessionFeedEntry[] of kind 'git', loading boolean, and error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-feed-source.ac2",
+            "title": "refetchInterval matches the 15s cadence used by ActivityPanel for git-activity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-feed-source.ac3",
+            "title": "When the endpoint returns non-OK, the hook returns an empty array and surfaces error rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-feed-selector",
+        "title": "Merge conversation/observation/git feeds into a single deduplicated stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/useMergedFeed.ts. Consumes the three single-source hooks and returns a memoized SessionFeedEntry[] deduplicated by id and sorted newest-first by timestamp. Provides a tab-aware filter: for tab='all' the merged list; for tab='chats'|'activity'|'git' the single-source list; for 'files'|'comments' an empty array (stub tab support handled at the rendering layer)."
+        },
+        "subItems": [
+          {
+            "id": "merged-feed-selector.ac1",
+            "title": "Merges entries from all three sources, deduplicating by id (first occurrence wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-feed-selector.ac2",
+            "title": "Output is sorted strictly newest-first by timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-feed-selector.ac3",
+            "title": "Tab filter returns only entries whose kind matches the requested tab (or all for 'all'; empty for 'files'|'comments')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-card",
+        "title": "Render conversation entry card with reference fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx rendering, in this order: (1) agent icon — reuse ProviderIcons from components/CommandDeck/ProviderIcons.tsx mapped from entry.agent; (2) status dot — small colored circle, color from a local STATUS_DOT_COLORS map keyed on agent state (active/waiting/idle), defaulting to 'idle' when not known; (3) agent display name truncated to ~120px; (4) relative timestamp using formatRelativeTime; (5) snippet rendered as plain text (no markdown in v1 — the reference comment notes markdown but this is acceptable per the v1 scope) truncated to two lines; (6) message count + bubble icon when messageCount is defined; (7) thread label badge when threadIsPrimary is false. Card receives onSelect callback. Tests cover field rendering and onSelect call."
+        },
+        "subItems": [
+          {
+            "id": "conversation-card.ac1",
+            "title": "Renders agent icon resolved through ProviderIcons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-card.ac2",
+            "title": "Shows relative timestamp via formatRelativeTime in a <time> element with dateTime set to the ISO timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-card.ac3",
+            "title": "Hides messageCount when undefined; hides thread label when threadIsPrimary is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-card.ac4",
+            "title": "Calls onSelect with the entry id when the card is clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-card",
+        "title": "Render observation entry card (compact)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/ActivityFeedCard.tsx rendering, in this order: a primary-colored dot, the headline (actionStatus), 'workspaceId · issueId' subtext, and a relative timestamp. Same compact rhythm as CommandDeck/ActivityFeedSidebar.tsx but with the workspaceId surfaced explicitly since this is the cross-issue view. Receives onSelect callback. Tests cover field rendering and onSelect call."
+        },
+        "subItems": [
+          {
+            "id": "activity-card.ac1",
+            "title": "Renders headline (entry.headline) and subtext 'workspaceId · issueId'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-card.ac2",
+            "title": "Shows relative timestamp in a <time> element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-card.ac3",
+            "title": "Calls onSelect with the entry id when the card is clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-card",
+        "title": "Render git entry card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/GitFeedCard.tsx rendering, in this order: a git icon (lucide GitCommit or GitBranch chosen from entry.source heuristics), the message text truncated to one line, an issueId badge when present, and a relative timestamp. Tests cover field rendering."
+        },
+        "subItems": [
+          {
+            "id": "git-card.ac1",
+            "title": "Renders git icon, message, optional issueId badge, and relative timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-card.ac2",
+            "title": "Hides issueId badge when entry.issueId is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bucket-section",
+        "title": "Render a labeled group of feed entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/BucketSection.tsx that takes { label: string; items: SessionFeedEntry[]; onSelect: (entry) => void } and renders a small uppercase label header followed by the items in order, dispatching to the correct card by entry.kind. Used by SessionFeedSidebar after running groupByContiguousLabel over the tab-filtered feed. Tests cover label rendering and card-kind dispatch."
+        },
+        "subItems": [
+          {
+            "id": "bucket-section.ac1",
+            "title": "Renders the label exactly once at the top of the section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bucket-section.ac2",
+            "title": "Dispatches each item to ConversationFeedCard / ActivityFeedCard / GitFeedCard based on entry.kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bucket-section.ac3",
+            "title": "Items are rendered in the order provided (caller controls sort)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-feed-sidebar",
+        "title": "SessionFeedSidebar: tab bar, tab content, empty states, live updates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx as the parent component. Renders a 6-tab strip (All | Chats | Files | Git | Comments | Activity) wired to SessionFeedTab state stored in component-local useState (and synced to localStorage key 'panopticon.ui.sessionFeedSidebarTab'). For each tab: pulls the relevant feed via useMergedFeed, runs groupByContiguousLabel using formatBucketLabel, renders one BucketSection per group. Live reactivity is automatic — Zustand observation slices and react-query intervals already push updates. Header includes a Terminal/History icon and an X close button that calls onClose. Files and Comments tabs render their stub empty state (see stub-tabs bead). The 'All' tab renders the global empty state only when every wired source is empty. Each wired tab (Chats, Git, Activity) renders its own per-tab empty state when its source is empty. Tests cover tab switching, empty states per tab, group label rendering, and a 'live update' test that mutates store.observationsByIssueId and asserts the Activity tab updates without re-mount."
+        },
+        "subItems": [
+          {
+            "id": "session-feed-sidebar.ac1",
+            "title": "Tab bar contains exactly six tabs in order: All, Chats, Files, Git, Comments, Activity (covers AC1 of the issue body — sidebar panel renders time-bucketed session entries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-sidebar.ac2",
+            "title": "Entries within each label group are ordered newest-first (covers AC3 of the issue body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-sidebar.ac3",
+            "title": "When a new MemoryObservation is dispatched into the store, the Activity tab and All tab update without a remount (covers AC4 of the issue body — panel updates as new observations are written)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-sidebar.ac4",
+            "title": "Each wired tab (All, Chats, Git, Activity) renders its own empty state when its source is empty; the All tab's empty state appears only when every source is empty (covers AC5 of the issue body — empty state handled gracefully)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-sidebar.ac5",
+            "title": "Active tab persists across reloads via localStorage key 'panopticon.ui.sessionFeedSidebarTab'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-feed-sidebar.ac6",
+            "title": "Component header comment explicitly enumerates the other two 'activity-named' components and explains the scope distinction (mitigates H3 namespace hazard)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stub-tabs",
+        "title": "Files and Comments tabs render permanent 'coming soon' empty states",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add two small empty-state components inside SessionFeedSidebar (or as siblings under components/sessionFeed/) that explain the data source for Files (aggregate file_change feed) and Comments (issue comments) is not yet wired. Each empty state includes one short sentence and, when the relevant follow-up issue is filed, references it by ID. The tabs remain clickable so the strip matches the reference design. Tests assert the empty state is rendered when the tab is Files or Comments."
+        },
+        "subItems": [
+          {
+            "id": "stub-tabs.ac1",
+            "title": "Selecting the Files tab renders a 'Files feed coming soon' empty state with a one-line explanation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-tabs.ac2",
+            "title": "Selecting the Comments tab renders a 'Comments feed coming soon' empty state with a one-line explanation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-tabs.ac3",
+            "title": "Neither stub tab attempts a fetch or store read (no spinner, no network)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-mount",
+        "title": "Mount SessionFeedSidebar in App shell with a persisted toggle (default closed)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/App.tsx to add a right-hand SessionFeedSidebar slot rendered to the right of the existing main view, with width ~320px when open and zero when closed. Open/closed state lives in App component state, hydrated from localStorage key 'panopticon.ui.sessionFeedSidebarOpen' (default false). Add a toggle button (lucide History icon) in the App shell — either inline at the top-right of the main pane header or as a tiny edge-tab — that flips the state and persists. Tests cover toggle, persistence, and that the default state is closed."
+        },
+        "subItems": [
+          {
+            "id": "app-mount.ac1",
+            "title": "Sidebar is closed by default on first load (no localStorage entry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-mount.ac2",
+            "title": "Clicking the toggle opens the sidebar and writes 'true' to localStorage 'panopticon.ui.sessionFeedSidebarOpen'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-mount.ac3",
+            "title": "On reload with localStorage 'true', the sidebar is open without flicker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-mount.ac4",
+            "title": "Clicking the in-sidebar X close button restores the closed state and persists it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "click-navigate",
+        "title": "Click on a feed entry navigates to its primary destination",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:51:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the onSelect callback in SessionFeedSidebar: for kind='conversation' push '/conv/<name>' via window.history (matching existing /conv/:id routing in App.tsx); for kind='activity' push '/command-deck?issueId=<issueId>' (or whatever the existing command-deck entry URL is — check App.tsx tab routing) to surface the issue's command deck where the per-issue ActivityFeedSidebar lives; for kind='git' no-op with a one-time console.debug. Tests stub window.location and assert the correct URL is pushed for each kind."
+        },
+        "subItems": [
+          {
+            "id": "click-navigate.ac1",
+            "title": "Conversation entry click pushes /conv/<name> and dispatches popstate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "click-navigate.ac2",
+            "title": "Activity entry click pushes the existing command-deck route for the entry's issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "click-navigate.ac3",
+            "title": "Git entry click is a no-op (does not throw, does not navigate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "session-feed-types",
+        "to": "conversation-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "observation-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "git-feed-source",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "merged-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "conversation-card",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "activity-card",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "git-card",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-types",
+        "to": "session-feed-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "label-formatter",
+        "to": "bucket-section",
+        "type": "blocks"
+      },
+      {
+        "from": "label-formatter",
+        "to": "session-feed-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-feed-selector",
+        "to": "merged-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "observation-feed-selector",
+        "to": "merged-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "git-feed-source",
+        "to": "merged-feed-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-feed-selector",
+        "to": "session-feed-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-card",
+        "to": "bucket-section",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-card",
+        "to": "bucket-section",
+        "type": "blocks"
+      },
+      {
+        "from": "git-card",
+        "to": "bucket-section",
+        "type": "blocks"
+      },
+      {
+        "from": "bucket-section",
+        "to": "session-feed-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-sidebar",
+        "to": "stub-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-sidebar",
+        "to": "app-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "session-feed-sidebar",
+        "to": "click-navigate",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1389-activity-feed-sidebar-time-bucketed-session-observation-history-panel.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -54,6 +54,15 @@ function selectPaletteResult(result: HTMLElement) {
   });
 }
 
+// Cmdk renders each row with `data-value` = the item's stable id. Using it
+// avoids the accessible-name flakiness introduced by the <Highlighted>
+// component, which splits text across multiple spans.
+function getOptionByValue(value: string): HTMLElement {
+  const el = document.querySelector(`[role="option"][data-value="${value}"]`);
+  if (!el) throw new Error(`No palette option with data-value="${value}"`);
+  return el as HTMLElement;
+}
+
 describe('CommandPalette issue results', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -78,7 +87,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from an issue ID search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'PAN-42' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'PAN-42' } });
     selectPaletteResult(screen.getAllByText('PAN-42')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -88,8 +97,8 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a branch search result for the owning issue', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'feature/pan-42-command' } });
-    selectPaletteResult(screen.getByText('Alpha command issue · feature/pan-42-command'));
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'feature/pan-42-command' } });
+    selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
@@ -98,8 +107,8 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a title fragment search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'Alpha command' } });
-    selectPaletteResult(screen.getByText('Alpha command issue · feature/pan-42-command'));
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'Alpha command' } });
+    selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
@@ -115,13 +124,13 @@ describe('CommandPalette flywheel action', () => {
     const user = userEvent.setup();
     const { onNavigate } = renderPalette();
 
-    await user.type(screen.getByPlaceholderText('Search actions, workspaces, agents…'), 'flywheel');
+    await user.type(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), 'flywheel');
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
-    expect(screen.getByText('Run flywheel')).toBeInTheDocument();
-    expect(screen.getByText('Start the autonomous pipeline run on all In Progress / In Review issues')).toBeInTheDocument();
+    const flywheelOption = getOptionByValue('pan-flywheel');
+    expect(flywheelOption).toBeInTheDocument();
 
-    await user.click(screen.getByText('Run flywheel'));
+    await user.click(flywheelOption);
 
     await waitFor(() => {
       expect(onNavigate).toHaveBeenCalledWith('flywheel');
