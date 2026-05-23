@@ -33,6 +33,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
+import { PTY_TOKEN_HEADER, readPtyTokenSync } from './pty-token.js';
 import { canUseHarnessSync } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
@@ -588,11 +589,11 @@ export interface AgentState {
    */
   channelsEnabled?: boolean;
   /**
-   * Delivery method for agent messages. 'auto' tries channels then falls back
-   * to tmux; 'channels' is strict (throws on failure); 'tmux' bypasses
-   * channels entirely. When absent, resolved from global settings.
+   * Delivery method for agent messages. 'auto' tries supervisor, then channels,
+   * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
+   * bypasses socket transports entirely.
    */
-  deliveryMethod?: 'auto' | 'channels' | 'tmux';
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
 
   /**
    * Short HEAD sha (8 chars) of the workspace at the moment this role run was
@@ -968,7 +969,7 @@ export function isAgentTroubled(agentId: string): boolean {
 /** Update just the delivery method on an agent's state file. */
 export async function setAgentDeliveryMethod(
   agentId: string,
-  deliveryMethod: 'auto' | 'channels' | 'tmux',
+  deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
   const state = await Effect.runPromise(getAgentState(agentId));
   if (!state) return;
@@ -979,8 +980,12 @@ export async function setAgentDeliveryMethod(
 /**
  * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
  */
-function panopticonHomeForChannels(): string {
+function panopticonHomeForSockets(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+function panopticonHomeForChannels(): string {
+  return panopticonHomeForSockets();
 }
 
 /**
@@ -988,10 +993,16 @@ function panopticonHomeForChannels(): string {
  */
 async function appendChannelDeliveryLog(
   agentId: string,
-  entry: { path: 'channel' | 'tmux'; reason?: string; caller?: string },
+  entry: {
+    path: 'supervisor' | 'channel' | 'tmux';
+    reason?: string;
+    caller?: string;
+    'pty-supervisor'?: string;
+    channels?: string;
+  },
 ): Promise<void> {
   try {
-    const home = panopticonHomeForChannels();
+    const home = panopticonHomeForSockets();
     const dir = join(home, 'logs');
     await (await import('fs/promises')).mkdir(dir, { recursive: true });
     const line = JSON.stringify({
@@ -1021,7 +1032,8 @@ async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
   timeoutMs: number,
-  bridgeToken: string,
+  token: string,
+  tokenHeader: string = BRIDGE_TOKEN_HEADER,
 ): Promise<{ status: number; body: string }> {
   const payload = JSON.stringify(body);
 
@@ -1054,7 +1066,7 @@ async function postUnixSocketJson(
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
-          [BRIDGE_TOKEN_HEADER]: bridgeToken,
+          [tokenHeader]: token,
         },
       },
       (res) => {
@@ -1086,34 +1098,34 @@ async function postUnixSocketJson(
 }
 
 /**
- * Single delivery primitive for orchestrator-to-work-agent messages. When the
- * target agent has channelsEnabled set in its state.json AND the per-agent
- * bridge socket exists AND the POST returns 200, the message goes through the
- * bridge and tmux is not involved. In every other case (flag off, state file
- * missing, socket missing, socket POST failure for any reason) the call falls
- * back to sendKeysAsync — the user-visible behaviour is identical to today's
- * tmux-only delivery. Internal callers that today reach for sendKeysAsync to
- * talk to a work agent should call this primitive instead so the eligibility
- * and fallback policy live in one place.
+ * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
+ * tries the PTY supervisor socket, then legacy Channels MCP, then tmux. Explicit
+ * socket methods are strict and throw instead of falling back.
  */
 export async function deliverAgentMessage(
   agentId: string,
   message: string,
   caller: string = 'unknown',
-  deliveryMethod?: 'auto' | 'channels' | 'tmux',
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
 
-  // Resolve delivery method.
+  let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
   if (!resolvedMethod) {
-    let channelsEnabled = false;
     try {
       const state = await Effect.runPromise(getAgentState(normalizedId));
       channelsEnabled = Boolean(state?.channelsEnabled);
-      resolvedMethod = state?.deliveryMethod ?? (channelsEnabled ? 'auto' : 'tmux');
+      resolvedMethod = state?.deliveryMethod ?? 'auto';
     } catch {
-      resolvedMethod = 'tmux';
+      resolvedMethod = 'auto';
+    }
+  } else if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
+    try {
+      const state = await Effect.runPromise(getAgentState(normalizedId));
+      channelsEnabled = Boolean(state?.channelsEnabled);
+    } catch {
+      channelsEnabled = false;
     }
   }
 
@@ -1122,64 +1134,84 @@ export async function deliverAgentMessage(
     return;
   }
 
-  // resolvedMethod is 'auto' or 'channels' — attempt channels delivery.
-  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
-  if (!existsSync(socketPath)) {
-    const errMsg = `Channels socket missing for ${normalizedId} (${caller})`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+  let supervisorFailure: string | undefined;
+  if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
+    const supervisorSocketPath = join(panopticonHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
+    const ptyToken = readPtyTokenSync(normalizedId);
+    if (!existsSync(supervisorSocketPath)) {
+      supervisorFailure = 'socket-missing';
+    } else if (!ptyToken) {
+      supervisorFailure = 'pty-token-missing';
+    } else {
+      try {
+        await postUnixSocketJson(
+          supervisorSocketPath,
+          { content: message, meta: { caller } },
+          2000,
+          ptyToken,
+          PTY_TOKEN_HEADER,
+        );
+        await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
+        return;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        supervisorFailure = `socket-post-failed: ${reason}`;
+      }
     }
-    // auto mode: log visibly and fallback
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
+
+    if (resolvedMethod === 'supervisor') {
+      throw new Error(`MessageDeliveryFailed: PTY supervisor delivery failed for ${normalizedId} (${caller}): ${supervisorFailure}`);
+    }
+  }
+
+  if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
+    let channelFailure: string | undefined;
+    const socketPath = join(panopticonHomeForSockets(), 'sockets', `agent-${normalizedId}.sock`);
+    if (!channelsEnabled) {
+      channelFailure = 'channels-disabled';
+    } else if (!existsSync(socketPath)) {
+      channelFailure = 'socket-missing';
+    } else {
+      const bridgeToken = readBridgeTokenSync(normalizedId);
+      if (!bridgeToken) {
+        channelFailure = 'bridge-token-missing';
+      } else {
+        try {
+          await postUnixSocketJson(
+            socketPath,
+            { content: message, meta: { caller } },
+            2000,
+            bridgeToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, {
+            path: 'channel',
+            caller,
+            ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
+          });
+          return;
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          channelFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+    }
+
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: Channels delivery failed for ${normalizedId} (${caller}): ${channelFailure}`);
+    }
+
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
-      reason: 'socket-missing',
+      reason: channelFailure,
       caller,
+      ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
+      ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await Effect.runPromise(sendKeys(normalizedId, message));
     return;
   }
 
-  const bridgeToken = readBridgeTokenSync(normalizedId);
-  if (!bridgeToken) {
-    const errMsg = `Channels bridge token missing for ${normalizedId} (${caller})`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
-    }
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
-    await appendChannelDeliveryLog(normalizedId, {
-      path: 'tmux',
-      reason: 'bridge-token-missing',
-      caller,
-    });
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
-  }
-
-  try {
-    await postUnixSocketJson(
-      socketPath,
-      { content: message, meta: { caller } },
-      2000,
-      bridgeToken,
-    );
-    await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
-    return;
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    const errMsg = `Channels socket post failed for ${normalizedId} (${caller}): ${reason}`;
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
-    }
-    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
-    await appendChannelDeliveryLog(normalizedId, {
-      path: 'tmux',
-      reason: `socket-post-failed: ${reason}`,
-      caller,
-    });
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
-  }
+  await Effect.runPromise(sendKeys(normalizedId, message));
 }
 
 export async function deliverAgentPermissionDecision(
