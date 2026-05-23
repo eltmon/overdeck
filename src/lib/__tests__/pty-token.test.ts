@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getPtyTokenPath, PTY_TOKEN_HEADER, readPtyTokenSync, writePtyTokenSync } from '../pty-token.js';
+import { getPtyTokenPath, PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from '../pty-token.js';
 
 let tmpHome: string;
 let previousPanopticonHome: string | undefined;
@@ -23,23 +23,23 @@ afterEach(() => {
 });
 
 describe('pty-token', () => {
-  it('writes and reads back a 32-byte hex token', () => {
-    const token = writePtyTokenSync('agent-test');
+  it('writes and reads back a 32-byte hex token', async () => {
+    const token = await writePtyToken('agent-test');
 
     expect(token).toMatch(/^[a-f0-9]{64}$/);
-    expect(readPtyTokenSync('agent-test')).toBe(token);
+    await expect(readPtyToken('agent-test')).resolves.toBe(token);
   });
 
-  it('returns null when the token file does not exist', () => {
-    expect(readPtyTokenSync('missing-agent')).toBeNull();
+  it('returns null when the token file does not exist', async () => {
+    await expect(readPtyToken('missing-agent')).resolves.toBeNull();
   });
 
-  it('writes the token under the agent directory with mode 0600', () => {
-    const token = writePtyTokenSync('agent-mode');
+  it('writes the token under the agent directory with mode 0600', async () => {
+    const token = await writePtyToken('agent-mode');
     const path = getPtyTokenPath('agent-mode');
 
     expect(path).toBe(join(tmpHome, 'agents', 'agent-mode', 'pty-token'));
-    expect(readPtyTokenSync('agent-mode')).toBe(token);
+    await expect(readPtyToken('agent-mode')).resolves.toBe(token);
     expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 

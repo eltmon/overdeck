@@ -33,7 +33,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
-import { PTY_TOKEN_HEADER, readPtyTokenSync, writePtyTokenSync } from './pty-token.js';
+import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
 import { canUseHarnessSync } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
@@ -1140,7 +1140,7 @@ export async function deliverAgentMessage(
   let supervisorFailure: string | undefined;
   if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
     const supervisorSocketPath = join(panopticonHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
-    const ptyToken = readPtyTokenSync(normalizedId);
+    const ptyToken = await readPtyToken(normalizedId);
     if (!existsSync(supervisorSocketPath)) {
       supervisorFailure = 'socket-missing';
     } else if (!ptyToken) {
@@ -2650,7 +2650,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (!existsSync(supervisorScriptPath)) {
       throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
     }
-    writePtyTokenSync(agentId);
+    await writePtyToken(agentId);
     state.supervisorEnabled = true;
   }
 

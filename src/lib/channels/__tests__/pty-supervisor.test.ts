@@ -4,7 +4,7 @@ import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { PTY_TOKEN_HEADER, writePtyTokenSync } from '../../pty-token.js';
+import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
 
 const REPO_ROOT = process.cwd();
 const SUPERVISOR_ENTRY = join(REPO_ROOT, 'dist/pty-supervisor.js');
@@ -85,7 +85,7 @@ async function postToUnixSocket(
 }
 
 async function readySupervisor(agentId: string, command = 'cat', args: string[] = []): Promise<{ token: string; socketPath: string }> {
-  const token = writePtyTokenSync(agentId);
+  const token = await writePtyToken(agentId);
   startSupervisor(agentId, command, args);
   const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
   await waitFor(() => existsSync(socketPath), 'supervisor socket was not created');

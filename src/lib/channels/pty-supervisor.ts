@@ -26,7 +26,7 @@ import { appendFile, chmod, mkdir, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../paths.js';
-import { PTY_TOKEN_HEADER, readPtyTokenSync } from '../pty-token.js';
+import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
@@ -77,8 +77,8 @@ function constantTimeHeaderMatch(provided: string | string[] | undefined, expect
   return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
-function validatePtyToken(req: IncomingMessage, agentId: string): boolean {
-  const expected = readPtyTokenSync(agentId);
+async function validatePtyToken(req: IncomingMessage, agentId: string): Promise<boolean> {
+  const expected = await readPtyToken(agentId);
   if (!expected) return false;
   return constantTimeHeaderMatch(req.headers[PTY_TOKEN_HEADER], expected);
 }
@@ -166,7 +166,7 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
       writeJson(res, 405, { error: 'method not allowed' });
       return;
     }
-    if (!validatePtyToken(req, agentId)) {
+    if (!(await validatePtyToken(req, agentId))) {
       writeJson(res, 403, { error: 'forbidden' });
       return;
     }

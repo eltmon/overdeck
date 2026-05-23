@@ -44,7 +44,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 });
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
-import { PTY_TOKEN_HEADER, writePtyTokenSync } from '../pty-token.js';
+import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
@@ -146,7 +146,7 @@ describe('channel bridge delivery', () => {
   it('supervisor-only success: posts to PTY socket and does not call sendKeysProgram', async () => {
     const agentId = 'agent-supervisor';
     writeAgentState(agentId, { channelsEnabled: false });
-    const token = writePtyTokenSync(agentId);
+    const token = await writePtyToken(agentId);
     const socketPath = join(socketDir, `pty-${agentId}.sock`);
     const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
@@ -201,7 +201,7 @@ describe('channel bridge delivery', () => {
   it('supervisor POST 500: falls through to channels and logs supervisor failure', async () => {
     const agentId = 'agent-supervisor-500';
     writeAgentState(agentId, { channelsEnabled: true });
-    writePtyTokenSync(agentId);
+    await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 500,
@@ -228,7 +228,7 @@ describe('channel bridge delivery', () => {
     vi.useFakeTimers();
     const agentId = 'agent-supervisor-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
-    writePtyTokenSync(agentId);
+    await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
