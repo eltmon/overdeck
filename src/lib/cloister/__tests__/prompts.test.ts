@@ -451,6 +451,42 @@ optional:
       })
     );
 
+    it.effect('renders test TLDR guidance only when TLDR_AVAILABLE is true', () =>
+      Effect.gen(function* () {
+        const baseVars = {
+          ISSUE_ID: 'PAN-611',
+          BRANCH: 'feature/pan-611',
+          WORKSPACE: '/workspace',
+          IS_POLYREPO: false,
+          TEST_COMMANDS: 'npm test',
+          BASELINE_COMMANDS: 'git checkout main && npm test',
+          TEST_CONFIG_SUMMARY: 'default test suite',
+          TIMEOUT_MS: 600000,
+          API_URL: 'http://localhost:3011',
+          FEATURE_NAME: 'pan-611',
+          DOCKER_PS_FORMAT: '{{.Names}}',
+        };
+        const enabled = yield* renderPrompt({
+          name: 'test',
+          vars: { ...baseVars, TLDR_AVAILABLE: true },
+        });
+        const disabled = yield* renderPrompt({
+          name: 'test',
+          vars: { ...baseVars, TLDR_AVAILABLE: false },
+        });
+        const absent = yield* renderPrompt({ name: 'test', vars: baseVars });
+
+        expect(enabled).toContain('## TLDR: Efficient Failure Diagnosis');
+        expect(enabled).toContain('tldr_context');
+        expect(enabled).toContain('tldr_structure');
+        expect(enabled).toContain('tldr_semantic');
+        expect(enabled).toContain('tldr_calls');
+        expect(enabled).toContain('tldr_impact');
+        expect(disabled).not.toContain('## TLDR: Efficient Failure Diagnosis');
+        expect(absent).not.toContain('## TLDR: Efficient Failure Diagnosis');
+      })
+    );
+
     it.effect('renders Playwright isolation guidance in the work prompt', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
