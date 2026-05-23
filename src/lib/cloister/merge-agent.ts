@@ -459,6 +459,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       throw err;
     }
 
+    try {
+      const { refreshGraphify } = await import('../graphify/refresh.js');
+      const graphifyResult = await refreshGraphify(projectPath, issueId);
+      if ('ok' in graphifyResult) {
+        if (graphifyResult.ok) {
+          console.log(`[merge-agent] ✓ Updated graphify-out and pushed commit ${graphifyResult.commit}`);
+          logActivity('graphify_refresh', `Updated graphify-out and pushed commit ${graphifyResult.commit}`);
+        } else {
+          console.warn(`[merge-agent] Graphify refresh failed: ${graphifyResult.error}`);
+          logActivity('graphify_refresh_failed', graphifyResult.error);
+        }
+      } else {
+        console.log(`[merge-agent] Graphify refresh skipped: ${graphifyResult.skipped}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Graphify refresh failed: ${message}`);
+      logActivity('graphify_refresh_failed', message);
+    }
+
     // 2. Compact old beads (via lifecycle module)
     try {
       const { compactBeads } = await import('../lifecycle/compact-beads.js');
