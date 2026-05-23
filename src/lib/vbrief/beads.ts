@@ -242,27 +242,17 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  // Re-planning means "the old plan was invalid" — start fresh.
-  try {
-    const { stdout: existingJson } = await execFileAsync(
-      'bd',
-      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
-    );
-    const existingBeads = JSON.parse(existingJson || '[]');
-    if (Array.isArray(existingBeads) && existingBeads.length > 0) {
-      const ids = existingBeads.map((b: any) => b.id).filter(Boolean);
-      for (const id of ids) {
-        try {
-          await execFileAsync('bd', ['delete', id, '--force'], { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
-        } catch {
-          // Individual delete failure is non-fatal
-        }
-      }
-      console.log(`[beads] Cleared ${ids.length} existing beads for ${issueLabel} before re-creating`);
-    }
-  } catch {
-    // If listing fails (no beads exist, bd not initialized), proceed with creation
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel);
+  if (clearResult.errors.length > 0) {
+    return {
+      success: false,
+      created: [],
+      errors: clearResult.errors.map(error => `dedup failed: ${error}`),
+      beadIds: new Map(),
+    };
+  }
+  if (clearResult.cleared > 0) {
+    console.log(`[beads] Cleared ${clearResult.cleared} existing beads for ${issueLabel} (verified)`);
   }
 
   // Build blocking-edge map: item.id → set of item IDs that block it
