@@ -16,7 +16,17 @@
     },
     {
       "id": "D2",
-      "summary": "REPLACE the existing `src/dashboard/frontend/src/lib/commandDeckActions.ts` (25 ActionKey vocabulary) with a new canonical `issueActions` registry that matches PRD §4.8.1's catalog (~28 actions including plan/tell/pause/unpause/untroubled/sync-main/inspect/wipe/destroy/open). Delete `commandDeckActions.ts`, delete `commandDeckSurfaceRegistry.ts`, and rewrite ZoneActionStrip's phase-primary partitioning on top of the new registry. This is the 'single source of truth' the PRD asks for; coexistence would leave two parallel vocabularies. Confirmed by user.",
+      "summary": "Build the new canonical `issueActions` registry as a SUPERSET — every action from PRD §4.8.1 (~28) PLUS every action currently exposed anywhere in the dashboard today (Command Deck ZoneActionStrip, Badge Bar artifact actions, Status Flow Control, project-tree context menu, drawer footer). Old files are only deleted after the parity test verifies every previously-exposed action has a registry entry. ZERO ACTIONS MAY BE LOST. Revised per user direction 2026-05-23: 'I just want to be able to do all relevant actions across all boards and projects issue trees and stuff.'",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D2a",
+      "summary": "Concrete superset additions on top of PRD §4.8.1: `beads` (open BeadsDialog), `inference`, `discussions`, `transcripts`, `upload`, `syncDiscussions`, `statusReview` (Command Deck Badge Bar viewers/openers); `createWorkspace`, `copySettings`, `resetSession`, `restartFromPlan`, `restartAgent` (workspace and agent utilities); `reviewTest` (the compound Review/Test trigger — kept as a shortcut alongside the PRD's split `requestReview`/`restartReview`/`recoverReview` so the existing single-button affordance is preserved). The full union is the registry's source of truth.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D2b",
+      "summary": "Session-scoped Zone B actions (`stopSession`, `viewTerminal`, `viewState`, `viewVbrief`, `copySessionId`, `copyTmuxCommand`) are SESSION actions, not issue actions, and stay on their existing surface (Zone B / session cards). They are NOT pulled into the IssueActionMenu, but their renderer is NOT touched by this work — Zone B keeps its existing action surface intact. The parity audit also confirms these still render after the refactor.",
       "recordedAt": "2026-05-23T04:30:00.000Z"
     },
     {
@@ -61,6 +71,11 @@
     {
       "id": "D11",
       "summary": "The IssueDrawer footer (`DrawerActionBar.tsx`) is the canonical full-coverage surface. Its inline phase-primary set adapts per phase (per PRD §4.8.3 phase-primary table). View PR and Merge are pinned right via the new `pinRight` prop. Reset/Stop are reachable via the menu like every other action — no special hardcoded Reset/Stop buttons.",
+      "recordedAt": "2026-05-23T04:30:00.000Z"
+    },
+    {
+      "id": "D12",
+      "summary": "Add a 'no actions lost' audit as a hard gate: before the `deck-zone-actions` bead is allowed to delete `commandDeckActions.ts` or `commandDeckSurfaceRegistry.ts`, the parity test must enumerate every action currently exposed in the dashboard (via static analysis of the existing surfaces) and assert each has a corresponding registry entry. If parity fails, deletion is blocked and the missing action(s) must be added to the registry first.",
       "recordedAt": "2026-05-23T04:30:00.000Z"
     }
   ],
