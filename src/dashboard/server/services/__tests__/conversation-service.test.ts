@@ -129,11 +129,11 @@ describe('computeContextUsage', () => {
   });
 
   it('clamps percentUsed at 100', async () => {
-    const buffer = Buffer.alloc(600000, 'x');
+    const buffer = Buffer.alloc(1_000_000, 'x');
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
-    const result = await computeContextUsage('/fake/context-overflow.jsonl', 'gpt-4o');
+    const result = await computeContextUsage('/fake/context-overflow.jsonl', 'claude-opus-4-7');
 
     expect(result?.percentUsed).toBe(100);
   });

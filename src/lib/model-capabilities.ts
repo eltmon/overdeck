@@ -34,14 +34,20 @@ import type { SubscriptionPlan } from './subscription-types.js';
 export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'claude-opus-4-5': 'claude-opus-4-7',
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
-  // OpenAI retired/superseded models
-  'gpt-5.2-codex': 'gpt-5.3-codex', // superseded by gpt-5.3-codex (April 2026)
-  'gpt-5.5-mini': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  'gpt-5.5-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  'gpt-5.4-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
-  'o3-deep-research': 'o3',
-  // NOTE: gpt-5.4 family is Panopticon's abstraction over real OpenAI models.
-  // Do NOT treat gpt-4o/gpt-4o-mini as deprecated — they are the actual API names.
+  // OpenAI retired/superseded models — addendum 2026-05-23 trim to the
+  // Codex CLI catalog (gpt-5.5, 5.4, 5.4-mini, 5.3-codex, 5.3-codex-spark,
+  // 5.2). Pro tiers and the o-series reasoning models are out.
+  'gpt-5.2-codex': 'gpt-5.3-codex',     // superseded by gpt-5.3-codex (April 2026)
+  'gpt-5.5-mini': 'gpt-5.4-mini',       // hallucinated tier — never shipped
+  'gpt-5.5-nano': 'gpt-5.4-mini',       // hallucinated tier — never shipped
+  'gpt-5.4-nano': 'gpt-5.4-mini',       // hallucinated tier — never shipped
+  'gpt-5.5-pro': 'gpt-5.5',             // dropped 2026-05-23 — flagship absorbs Pro role
+  'gpt-5.4-pro': 'gpt-5.4',             // dropped 2026-05-23 — drop the -pro tier
+  'o3': 'gpt-5.4',                      // dropped 2026-05-23 — reasoning -> balanced flagship
+  'o3-deep-research': 'gpt-5.4',        // dropped 2026-05-23 — was already aliased to o3
+  'o4-mini': 'gpt-5.4-mini',            // dropped 2026-05-23 — compact reasoning -> mini
+  'gpt-4o': 'gpt-5.4',                  // dropped 2026-05-23 — legacy flagship -> current balanced
+  'gpt-4o-mini': 'gpt-5.4-mini',        // dropped 2026-05-23 — legacy economy -> mini
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
   'gemini-3-flash': 'gemini-3-flash-preview',
@@ -438,7 +444,34 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 85,
     },
-    notes: 'Previous-generation general-purpose model (Oct 2025). Superseded by GPT-5.4.',
+    notes: 'Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles.',
+  },
+
+  'gpt-5.3-codex-spark': {
+    model: 'gpt-5.3-codex-spark',
+    provider: 'openai',
+    displayName: 'GPT-5.3 Codex Spark',
+    // Headline rate card matches the Codex family ($1.75 in / $14 out) when
+    // the model is reachable, but Spark is a ChatGPT-Pro-only research
+    // preview as of 2026-05-23 — no raw API access. Panopticon routes via
+    // Codex CLI subscription auth through CLIProxy, so it is reachable
+    // when the operator has a Pro account.
+    costPer1MTokens: 7.875,
+    contextWindow: 128000, // 128K per OpenAI excerpt + multiple secondary sources
+    skills: {
+      'code-generation': 92,
+      'code-review': 86,
+      debugging: 84,
+      planning: 78,
+      documentation: 82,
+      testing: 88,
+      security: 76,
+      performance: 82,
+      synthesis: 84,
+      speed: 98, // "1000+ tok/sec" per OpenAI launch material
+      'context-length': 72, // 128K — smaller than the Codex base 400K
+    },
+    notes: 'Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available.',
   },
 
   // Retired OpenAI model IDs — kept for backward compat

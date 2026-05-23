@@ -112,6 +112,13 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('Rollup threshold');
     expect(SETTINGS_PAGE_SOURCE).toContain('Sidebar refresh interval');
   });
+
+  it('surfaces the RTK Bash compression toggle in experimental settings', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('RTK Bash compression');
+    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {
@@ -195,6 +202,15 @@ describe('buildMiniMaxFormData', () => {
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.tts).toEqual(existing.tts);
+  });
+
+  it('preserves existing agent settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      agents: { rtk: { enabled: true } },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.agents?.rtk?.enabled).toBe(true);
   });
 
   it('preserves gemini_thinking_level from formData, not from defaults', () => {

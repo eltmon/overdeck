@@ -130,6 +130,7 @@ services:
       # Single-deacon invariant: see .claude/rules/single-deacon-invariant.md.
       # The host's `pan up` owns agent lifecycle; container dashboard runs as a read/UI peer only.
       - PANOPTICON_DISABLE_DEACON=1
+      - PANOPTICON_TRUSTED_ORIGINS=https://{{FEATURE_FOLDER}}.pan.localhost
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:

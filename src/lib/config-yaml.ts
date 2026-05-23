@@ -354,6 +354,8 @@ export interface YamlConfig {
   agents?: {
     /** Caveman compressed output mode configuration */
     caveman?: CavemanConfig;
+    /** RTK Bash output compression configuration */
+    rtk?: RtkConfig;
   };
 
   /** TTS configuration */
@@ -445,6 +447,10 @@ export interface CavemanConfig {
   test?: CavemanMode;
   /** Intensity for merge agents (default: 'full') */
   merge?: CavemanMode;
+}
+
+export interface RtkConfig {
+  enabled?: boolean;
 }
 
 /**
@@ -562,6 +568,9 @@ export interface NormalizedConfig {
   /** Caveman compressed output configuration (normalised, never undefined) */
   caveman: NormalizedCavemanConfig;
 
+  /** RTK Bash output compression configuration (normalised, never undefined) */
+  rtk: NormalizedRtkConfig;
+
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
 
@@ -619,6 +628,10 @@ export interface NormalizedCavemanConfig {
     test: CavemanMode;
     merge: CavemanMode;
   };
+}
+
+export interface NormalizedRtkConfig {
+  enabled: boolean;
 }
 
 /**
@@ -739,6 +752,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       test: 'full',
       merge: 'full',
     },
+  },
+  rtk: {
+    enabled: false,
   },
   tts: {
     enabled: false,
@@ -1019,6 +1035,29 @@ function mergeCavemanConfig(
   if (caveman.merge !== undefined) {
     result.modes.merge = caveman.merge;
   }
+}
+
+function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig | null): void {
+  const rtk = config?.agents?.rtk;
+  if (!rtk) return;
+
+  if (rtk.enabled !== undefined) {
+    result.enabled = rtk.enabled;
+  }
+}
+
+export function getDefaultRtkConfig(): NormalizedRtkConfig {
+  return {
+    enabled: DEFAULT_CONFIG.rtk.enabled,
+  };
+}
+
+export function mergeRtkConfigs(...configs: (YamlConfig | null)[]): NormalizedRtkConfig {
+  const result = getDefaultRtkConfig();
+  for (const config of configs) {
+    mergeRtkConfig(result, config);
+  }
+  return result;
 }
 
 function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {
@@ -1302,6 +1341,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.caveman.enabled,
       abTest: DEFAULT_CONFIG.caveman.abTest,
       modes: { ...DEFAULT_CONFIG.caveman.modes },
+    },
+    rtk: {
+      enabled: DEFAULT_CONFIG.rtk.enabled,
     },
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
@@ -1656,6 +1698,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge caveman configuration
     mergeCavemanConfig(result.caveman, config);
+
+    // Merge RTK configuration
+    mergeRtkConfig(result.rtk, config);
 
     // Merge TTS daemon configuration
     mergeTtsConfig(result.tts, config);

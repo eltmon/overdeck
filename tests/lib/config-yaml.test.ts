@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs } from '../../src/lib/config-yaml.js';
+import {
+  loadConfigSync,
+  hasProjectConfig,
+  hasGlobalConfig,
+  getGlobalConfigPath,
+  getProjectConfigPath,
+  mergeConfigs,
+  mergeRtkConfigs,
+} from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -141,6 +149,27 @@ api_keys:
 
       expect(config.apiKeys.dashscope).toBe('dashscope-test-key');
       expect(config.enabledProviders.has('dashscope')).toBe(false);
+    });
+
+    it('normalizes RTK agent config with default-off precedence', () => {
+      expect(mergeRtkConfigs().enabled).toBe(false);
+
+      const { config } = mergeConfigs({
+        agents: {
+          rtk: { enabled: true },
+        },
+      });
+
+      expect(config.rtk.enabled).toBe(true);
+      expect(
+        mergeRtkConfigs({ agents: { rtk: { enabled: true } } }).enabled,
+      ).toBe(true);
+      expect(
+        mergeRtkConfigs(
+          { agents: { rtk: { enabled: true } } },
+          { agents: { rtk: { enabled: false } } },
+        ).enabled,
+      ).toBe(false);
     });
   });
 
