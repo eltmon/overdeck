@@ -78,7 +78,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from an issue ID search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'PAN-42' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'PAN-42' } });
     selectPaletteResult(screen.getAllByText('PAN-42')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -88,7 +88,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a branch search result for the owning issue', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'feature/pan-42-command' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'feature/pan-42-command' } });
     selectPaletteResult(screen.getByText('Alpha command issue · feature/pan-42-command'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -98,7 +98,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a title fragment search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search actions, workspaces, agents…'), { target: { value: 'Alpha command' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'Alpha command' } });
     selectPaletteResult(screen.getByText('Alpha command issue · feature/pan-42-command'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -115,7 +115,7 @@ describe('CommandPalette flywheel action', () => {
     const user = userEvent.setup();
     const { onNavigate } = renderPalette();
 
-    await user.type(screen.getByPlaceholderText('Search actions, workspaces, agents…'), 'flywheel');
+    await user.type(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), 'flywheel');
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(screen.getByText('Run flywheel')).toBeInTheDocument();

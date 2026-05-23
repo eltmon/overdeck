@@ -46,6 +46,7 @@ import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
 import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
+import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
@@ -304,6 +305,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   autopresoRouteLayer,
   metricsRouteLayer,
   miscRouteLayer,
+  paletteRouteLayer,
   conversationsRouteLayer,
   eventsRouteLayer,
   showRouteLayer,
