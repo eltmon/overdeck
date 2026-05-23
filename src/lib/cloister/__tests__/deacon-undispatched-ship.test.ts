@@ -8,7 +8,7 @@ import { Effect } from 'effect';
  * forever — review/test green, readyForMerge false, Merge button never lights.
  * checkUndispatchedShip() is the backstop.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
@@ -124,7 +124,12 @@ const STALE_TS = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
 describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('re-dispatches ship when review+test passed but readyForMerge is false', async () => {
@@ -221,6 +226,29 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     // Immediate second patrol tick — cooldown must suppress the re-dispatch.
     await checkUndispatchedShip();
     expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches stale ship-eligible statuses within the next 60s patrol window', async () => {
+    const now = new Date('2026-05-23T13:00:00.000Z');
+    vi.setSystemTime(now);
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-1414-PATROL': {
+        issueId: 'PAN-1414-PATROL',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+        mergeStatus: 'pending',
+        updatedAt: now.toISOString(),
+      },
+    } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+    await checkUndispatchedShip();
+    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
+
+    vi.setSystemTime(new Date(now.getTime() + 60_000));
+    await checkUndispatchedShip();
+
+    expect(mockOnIssueStateChange).toHaveBeenCalledWith('PAN-1414-PATROL', 'shipping');
   });
 
   it('logs the per-issue re-dispatch count after each fired shipping trigger', async () => {
