@@ -230,7 +230,6 @@ export function getPhasePrimaryActions(_state: IssueActionState, phase: Pipeline
 export function deriveIssueActionPhase(state: IssueActionState): PipelinePhase {
   if (state.hasPendingInput) return 'INPUT';
   if (state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'error') return 'STUCK';
-  if (hasReviewFailure(state)) return 'STUCK';
 
   switch (derivePipelineState(state)) {
     case 'planning_active':
@@ -246,6 +245,9 @@ export function deriveIssueActionPhase(state: IssueActionState): PipelinePhase {
       return 'REVIEW_RUNNING';
     case 'in_review_changes_requested':
       return 'CHANGES_REQUESTED';
+    case 'testing_failures':
+    case 'verification_failing':
+      return 'STUCK';
     case 'ready_to_merge':
       return 'READY_TO_MERGE';
     case 'merging':
@@ -255,6 +257,7 @@ export function deriveIssueActionPhase(state: IssueActionState): PipelinePhase {
     case 'done':
       return 'MERGED';
     default:
+      if (hasReviewFailure(state)) return 'STUCK';
       return state.hasPlan ? 'PLANNED_IDLE' : 'QUEUED_FOR_PLAN';
   }
 }

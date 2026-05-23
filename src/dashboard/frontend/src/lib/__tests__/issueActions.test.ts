@@ -221,6 +221,8 @@ describe('getPhasePrimaryActions', () => {
     expect(deriveIssueActionPhase({ ...baseState, hasPlan: false, issueCanonicalState: 'todo' })).toBe('QUEUED_FOR_PLAN');
     expect(deriveIssueActionPhase({ ...baseState, agent: { status: 'running', role: 'plan' }, issueCanonicalState: 'in_progress' })).toBe('PLANNING');
     expect(deriveIssueActionPhase({ ...baseState, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' })).toBe('WORK_RUNNING');
+    expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) })).toBe('CHANGES_REQUESTED');
+    expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ testStatus: 'failed' }) })).toBe('STUCK');
     expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ readyForMerge: true }) })).toBe('READY_TO_MERGE');
     expect(deriveIssueActionPhase({ ...baseState, isMerged: true })).toBe('MERGED');
   });

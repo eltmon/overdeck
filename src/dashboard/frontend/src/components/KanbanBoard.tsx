@@ -29,6 +29,7 @@ import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { deriveIssueActionPhase, type PipelinePhase } from '../lib/issueActions';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { cn } from '../lib/utils';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
@@ -37,6 +38,7 @@ import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { IssueActionMenu, useIssueActions } from './IssueActionMenu';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
@@ -2736,9 +2738,12 @@ const CARD_VERB_BY_PHASE: Partial<Record<PipelinePhase, 'WORK RUNNING' | 'REVIEW
 
 export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
+  const [actionOpenSignal, setActionOpenSignal] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
+  const issueActions = useIssueActions(issue.identifier);
+  const hasEnabledIssueAction = issueActions.all.some((view) => view.enabled);
 
   useEffect(() => {
     if (isSelected && cardRef.current) {
@@ -2764,6 +2769,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     isMerged,
   });
   const isPipelineStuck = issueActionPhase === 'STUCK';
+  const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
   const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
   const cardVerbBadge =
     canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
@@ -2804,6 +2810,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       unhealthyCard={isStackUnhealthy}
       sessionLostCard={false}
       onClick={onSelect}
+      onContextMenu={(event) => {
+        if (!hasEnabledIssueAction) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setActionOpenSignal((value) => value + 1);
+      }}
     >
       <div className="relative" style={{ padding: '12px 12px 10px' }}>
         {/* Hover overlays */}
@@ -2933,6 +2945,18 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           >
             {cardAvatarInitials(activeAgent?.id ?? issue.identifier)}
           </span>
+        </div>
+
+        <div
+          data-component="board-card-action-row"
+          data-visible-mode={pinActionRow ? 'pinned' : 'hover'}
+          className={cn(
+            'mt-2 flex items-center gap-1 border-t border-border pt-2 transition-opacity',
+            !pinActionRow && '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100',
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <IssueActionMenu issueId={issue.identifier} mode="hybrid" className="flex w-full items-center gap-1" openSignal={actionOpenSignal} />
         </div>
 
         <CostBreakdownModal
