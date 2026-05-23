@@ -1,0 +1,571 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:48:22Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-748: Show context usage indicator at top of conversations",
+    "updated": "2026-05-23T04:50:59.040Z"
+  },
+  "plan": {
+    "id": "pan-748",
+    "title": "Show context usage indicator at top of conversations",
+    "status": "proposed",
+    "uid": "97ffce1a-52a5-4886-8816-83c4923604a6",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:48:22Z",
+    "updated": "2026-05-23T04:50:59.040Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/748",
+        "label": "PAN-748",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "ux",
+      "conversations",
+      "context"
+    ],
+    "narratives": {
+      "Problem": "Users have no visibility into how much of a model's context window a conversation is consuming. Conversations that approach context exhaustion silently degrade — responses get more confused, or the harness compacts mid-conversation without warning. Today the only feedback is the eventual compaction event or visible degradation. The dashboard already tracks per-conversation cost in USD; it should also show a context-pressure gauge so users can decide when to start a new conversation, summarize, or accept a compaction.",
+      "Proposal": "Add a small context-usage indicator to both conversation header bars (ConversationTerminal.tsx and ConversationPanel.tsx). Server computes 'active context' as bytes from the last compaction boundary to EOF of the JSONL session file, divides by 4 for a token estimate, looks up the model's context window in MODEL_CAPABILITIES, and includes a contextUsage field on the Conversation contract returned by REST endpoints and emitted on the subscribeConversationMessages RPC stream. A single <ContextUsageIndicator> component renders the size in compact 'k'/'M' format alongside a color-coded percentage bar (green <50%, yellow 50-80%, red >80%), with CSS container-query variants so it abbreviates on medium headers and hides on small ones. Unknown models cause contextUsage to be null and the indicator to hide gracefully — no fake defaults."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Estimate tokens as ceil(activeBytes / 4) rather than parsing per-message Claude API usage blocks.",
+        "rationale": "The issue explicitly offers byte/4 as Option B. Per-message usage parsing is harness-specific (Claude vs Pi vs OpenAI emit different shapes) and adds significant code surface for marginal accuracy gain. The indicator is a pressure gauge, not an accounting tool — ~20% drift on the displayed token count does not change whether the bar is green, yellow, or red in the regions users care about. Hazard H1 captures the limitation and points at a future enhancement path."
+      },
+      {
+        "summary": "Display estimated tokens in the 'k'/'M' format, not raw bytes.",
+        "rationale": "The percentage bar's denominator is contextWindow (in tokens). If the displayed number is in a different unit (bytes), users see '33.04k' next to '22% of 200K context' and have to reconcile two scales. Tokens-everywhere keeps it readable."
+      },
+      {
+        "summary": "Return contextUsage: null when the model is unknown; hide the indicator entirely rather than picking a 200K default.",
+        "rationale": "A fake default produces a wrong percentage for whatever the real model is. The issue's AC explicitly requires 'graceful fallback when model is unknown', which the dashboard already does for other model-dependent UI. Hiding is better than misleading."
+      },
+      {
+        "summary": "Use CSS container queries on the header container for responsive variants, not viewport @media queries.",
+        "rationale": "The conversation header's width varies with sidebar state, split panels, and embedded vs full views. Viewport queries don't reflect the header's actual width. Container queries are well-supported in modern Chromium/Firefox/Safari (the dashboard's target). Hazard H6 covers the fallback for older browsers (degrade to wide variant, which is still functional)."
+      },
+      {
+        "summary": "Compute context usage server-side in conversation-service.ts (not in agent-enrichment-service.ts).",
+        "rationale": "Agent enrichment is per-running-agent. Context usage is per-conversation — applies to active and ended conversations, with or without an attached agent. The conversation service already owns findLastCompactBoundary, the compactOffsetCache, and the watch/parse infrastructure. Adding the helper here keeps cohesion."
+      },
+      {
+        "summary": "Live updates piggyback on the existing subscribeConversationMessages RPC stream rather than introducing a new watcher.",
+        "rationale": "The RPC stream already fires on every JSONL change with debouncing. Adding contextUsage to the emitted event payload reuses the watcher, debounce, and reconnection semantics. A separate watcher would duplicate inotify subscriptions and complicate cleanup."
+      },
+      {
+        "summary": "Single shared <ContextUsageIndicator> component imported by both header views, not two parallel implementations.",
+        "rationale": "Both headers render the same data with the same color rules and responsive variants. A shared component is the obvious DRY choice and prevents drift. Issue AC also requires 'Works for both ConversationTerminal and ConversationPanel views' — a single component is the cheapest way to satisfy that."
+      }
+    ],
+    "items": [
+      {
+        "id": "compute-helper",
+        "title": "Add computeContextUsage() helper in conversation-service.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-748",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "rest-enrich",
+            "rpc-emit"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/conversation-service.ts, add an exported async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null>. It calls findLastCompactBoundary(sessionFile) to get the byte offset, fs.stat()s the file to get total size, computes activeBytes = max(0, size - boundaryOffset), estimates tokens = Math.ceil(activeBytes / 4), resolves the model via resolveModelIdSync() and looks up contextWindow in MODEL_CAPABILITIES. Returns { activeBytes, estimatedTokens, contextWindow, percentUsed } when the model is known; returns null when model is null/empty or not in MODEL_CAPABILITIES after resolution. Clamps percentUsed to [0, 100]. Add a short code comment near the function noting the bytes/4 heuristic and the limitation. The ContextUsage type itself is defined in the contracts bead — for this bead, define a local interface and align it once contracts land (or coordinate ordering)."
+        },
+        "subItems": [
+          {
+            "id": "compute-helper.ac1",
+            "title": "Helper returns null when model is null, empty string, or not in MODEL_CAPABILITIES after resolveModelIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compute-helper.ac2",
+            "title": "Helper returns { activeBytes, estimatedTokens, contextWindow, percentUsed } when given a valid sessionFile and a known model.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compute-helper.ac3",
+            "title": "activeBytes equals fileSize - findLastCompactBoundary(sessionFile) when a compact boundary exists; equals fileSize when no boundary exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compute-helper.ac4",
+            "title": "estimatedTokens equals Math.ceil(activeBytes / 4); percentUsed = (estimatedTokens / contextWindow) * 100, clamped to [0, 100].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compute-helper.ac5",
+            "title": "Vitest unit tests cover: known Claude model, known GPT model, deprecated model that resolves to current, unknown model returns null, null model returns null, file with no compact boundary, file with multiple compact boundaries (uses last), empty file (activeBytes = 0, percentUsed = 0).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compute-helper.ac6",
+            "title": "Reuses existing compactOffsetCache via findLastCompactBoundary — does not re-scan the entire JSONL on each call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-type",
+        "title": "Add ContextUsage type to contracts; extend Conversation and ConversationEvent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-748",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "rest-enrich",
+            "rpc-emit",
+            "indicator-component",
+            "wire-terminal-header",
+            "wire-panel-header"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/ (or wherever the Conversation shape and ConversationEvent union are defined per the survey: packages/contracts/src/rpc.ts and the conversation type module), add a new ContextUsage interface: { activeBytes: number; estimatedTokens: number; contextWindow: number; percentUsed: number }. Add optional contextUsage: ContextUsage | null to the Conversation shape returned by REST endpoints, and to the ConversationEvent payload emitted by subscribeConversationMessages. Use Effect Schema (or whatever schema layer the contracts package uses) so it serializes correctly across the RPC boundary. Run packages/contracts build (cd packages/contracts && npm run build) so consumers pick up the new types."
+        },
+        "subItems": [
+          {
+            "id": "contracts-type.ac1",
+            "title": "ContextUsage type exported from packages/contracts with fields: activeBytes (number), estimatedTokens (number), contextWindow (number), percentUsed (number).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-type.ac2",
+            "title": "Conversation contract (REST response shape) gains optional contextUsage: ContextUsage | null field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-type.ac3",
+            "title": "ConversationEvent / subscribeConversationMessages payload gains optional contextUsage: ContextUsage | null field. Schema validates correctly.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-type.ac4",
+            "title": "Contracts package builds cleanly: cd packages/contracts && npm run build exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-type.ac5",
+            "title": "Typecheck passes for the whole repo after the contract change: npm run typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rest-enrich",
+        "title": "Enrich REST /api/conversations and /api/conversations/:id with contextUsage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts, update the response serialization for GET /api/conversations (list, around line 1105) and GET /api/conversations/:id (single, around line 1163) to call computeContextUsage(conversation.sessionFile, conversation.model) and include the result as the contextUsage field on each Conversation object. Skip the call entirely when sessionFile is null/empty. Compute in parallel for the list endpoint (Promise.all) to avoid serializing fs.stat calls. Returns null contextUsage when the helper returns null."
+        },
+        "subItems": [
+          {
+            "id": "rest-enrich.ac1",
+            "title": "GET /api/conversations returns each Conversation object with a contextUsage field (object or null).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-enrich.ac2",
+            "title": "GET /api/conversations/:id returns the Conversation with the contextUsage field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-enrich.ac3",
+            "title": "List endpoint computes contextUsage in parallel (Promise.all), not sequentially.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-enrich.ac4",
+            "title": "Conversations with null/empty sessionFile produce contextUsage: null without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-enrich.ac5",
+            "title": "Manual curl against the running dashboard (or vitest route test) confirms the field is present with expected shape for an existing conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-emit",
+        "title": "Emit contextUsage on the subscribeConversationMessages RPC stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/ws-rpc.ts (subscribeConversationMessages handler, around line 545-639), after each watch callback fires with new ParseResult, call computeContextUsage(sessionFile, model) and include the result in the emitted ConversationEvent. Pull conversation.model from the DB (or pass it through from the subscription open) — model is set on conversation creation and rarely changes mid-stream, so it can be fetched once at subscribe time and cached for the lifetime of the subscription. Cleanup unchanged."
+        },
+        "subItems": [
+          {
+            "id": "rpc-emit.ac1",
+            "title": "subscribeConversationMessages emits contextUsage on every ConversationEvent (or as an additional event type alongside messages — pick the simpler shape).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-emit.ac2",
+            "title": "Subscription resolves conversation.model once at open; does not re-query DB on every JSONL change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-emit.ac3",
+            "title": "When computeContextUsage returns null (unknown model), the event payload carries contextUsage: null — does not omit the field, does not throw.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-emit.ac4",
+            "title": "Watcher cleanup on unsubscribe still works correctly — no leaked fs.watch handles after subscribe/unsubscribe cycles.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "indicator-component",
+        "title": "Build <ContextUsageIndicator> React component with responsive variants",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/chat/ContextUsageIndicator.tsx (or a shared location both ConversationTerminal and ConversationPanel can import from — verify import paths first). Props: { contextUsage: ContextUsage | null }. Renders nothing when contextUsage is null. Otherwise renders a flex row: (1) compact size text in 'k'/'M' format from estimatedTokens (e.g., 33.04k, 1.53M, raw number for < 1024), (2) percentage text (e.g., '22%'), (3) a thin horizontal bar with width = percentUsed% and color from a threshold function (green <50%, yellow 50-80%, red >80%). Title attribute on the wrapper shows full numbers and the model's context window for tooltip context. Use a CSS module sibling file (ContextUsageIndicator.module.css) with @container queries on the indicator's container: wide variant shows all three elements, medium variant shows size+bar (no percentage text), small variant shows only a colored dot whose color matches the threshold and whose title carries the full text. The header container in both consumer headers must be marked with container-type: inline-size for the queries to fire. Format helper formatCompactCount(n) is a small pure function alongside the component."
+        },
+        "subItems": [
+          {
+            "id": "indicator-component.ac1",
+            "title": "Component renders nothing (returns null) when contextUsage prop is null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac2",
+            "title": "formatCompactCount produces: '512' for 512, '33.04k' for 33041, '1.53M' for 1_530_000. Implemented as a pure helper next to the component.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac3",
+            "title": "Bar color is green for percentUsed < 50, yellow for 50-80, red for > 80. Driven by CSS classes (not inline color) so themes can override.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac4",
+            "title": "Wide variant (container > 900px) shows size text + percentage text + bar.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac5",
+            "title": "Medium variant (container 600-900px) shows size text + bar (no separate percentage text).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac6",
+            "title": "Small variant (container < 600px) shows only a colored dot. Title attribute exposes full size + percentage so hover/focus surfaces it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac7",
+            "title": "Vitest/RTL tests cover: null prop, three variants render at three container widths, threshold colors at 0%, 49%, 50%, 79%, 80%, 99%, format helper edge cases.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "indicator-component.ac8",
+            "title": "Accessibility: bar has role='progressbar' with aria-valuenow/min/max set; the entire indicator has a title attribute summarizing the values for screen readers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-terminal-header",
+        "title": "Wire <ContextUsageIndicator> into ConversationTerminal.tsx header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/ConversationTerminal.tsx, import <ContextUsageIndicator>, add container-type: inline-size to the header container's CSS (in command-deck.module.css under .conversationTerminalHeader), and place the indicator inside the header between featureCost and conversationTerminalStatus. Pull conversation.contextUsage from the conversation object (already populated by REST and RPC). When the RPC stream emits a fresh contextUsage, the component subscribed to that conversation should re-render via the existing message stream subscription path."
+        },
+        "subItems": [
+          {
+            "id": "wire-terminal-header.ac1",
+            "title": "ConversationTerminal header renders <ContextUsageIndicator contextUsage={conversation.contextUsage ?? null} /> in the correct position.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-header.ac2",
+            "title": "Header container CSS has container-type: inline-size so the indicator's @container queries fire.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-header.ac3",
+            "title": "Indicator updates live as the conversation grows — visually verified by running the dashboard and watching an active conversation accumulate messages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-header.ac4",
+            "title": "When conversation.model is null or unknown, no indicator (or only the dot in small variant) is rendered — header layout unaffected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-panel-header",
+        "title": "Wire <ContextUsageIndicator> into ConversationPanel.tsx header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/ConversationPanel.tsx, import <ContextUsageIndicator>, ensure the header container (.conversationTerminalHeader in the shared CSS module, or the local panel header class) has container-type: inline-size, and place the indicator between featureCost and conversationTerminalStatus. Wire conversation.contextUsage through. Verify the embedded variant (when !embedded check) also receives the indicator if appropriate — or document that embedded mode intentionally omits it (likely the better choice since embedded panels have minimal headers)."
+        },
+        "subItems": [
+          {
+            "id": "wire-panel-header.ac1",
+            "title": "ConversationPanel header (the !embedded path) renders <ContextUsageIndicator contextUsage={conversation.contextUsage ?? null} /> in the correct position.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-panel-header.ac2",
+            "title": "Header container has container-type: inline-size — verified by inspecting the rendered DOM or CSS module.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-panel-header.ac3",
+            "title": "Embedded variant (when embedded prop is truthy) intentionally omits the indicator OR includes it consistently — decision documented in a code comment in the same commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-panel-header.ac4",
+            "title": "Indicator updates live as the conversation grows — visually verified by running the dashboard and watching an active conversation accumulate messages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-panel-header.ac5",
+            "title": "When conversation.model is null or unknown, indicator hides (or only the dot in small variant is shown) — header layout unaffected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-panel-header.ac6",
+            "title": "End-to-end smoke: open a conversation in the dashboard, observe indicator present with non-zero values for a known model; check at wide, medium, and small header widths (resize the panel) and confirm responsive variants apply.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "compute-helper",
+        "to": "rest-enrich",
+        "type": "blocks"
+      },
+      {
+        "from": "compute-helper",
+        "to": "rpc-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-type",
+        "to": "rest-enrich",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-type",
+        "to": "rpc-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-type",
+        "to": "indicator-component",
+        "type": "blocks"
+      },
+      {
+        "from": "rest-enrich",
+        "to": "wire-terminal-header",
+        "type": "informs"
+      },
+      {
+        "from": "rest-enrich",
+        "to": "wire-panel-header",
+        "type": "informs"
+      },
+      {
+        "from": "rpc-emit",
+        "to": "wire-terminal-header",
+        "type": "informs"
+      },
+      {
+        "from": "rpc-emit",
+        "to": "wire-panel-header",
+        "type": "informs"
+      },
+      {
+        "from": "indicator-component",
+        "to": "wire-terminal-header",
+        "type": "blocks"
+      },
+      {
+        "from": "indicator-component",
+        "to": "wire-panel-header",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-748-show-context-usage-indicator-at-top-of-conversations.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
