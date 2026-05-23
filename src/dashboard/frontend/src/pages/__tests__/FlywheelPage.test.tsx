@@ -89,6 +89,7 @@ describe('FlywheelPage', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -125,6 +126,29 @@ describe('FlywheelPage', () => {
     expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent }));
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it('updates the last tick freshness chip across live, aging, and stalled states', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:03:20.000Z'));
+    vi.mocked(fetch).mockImplementation(async () => Response.json(status));
+
+    render(<FlywheelPage />);
+
+    act(() => {
+      mocks.listener?.(status);
+    });
+    expect(screen.getByText('live')).toHaveClass('text-success');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(screen.getByText('last tick 35s ago')).toHaveClass('text-warning');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByText('stalled — last tick 1m ago')).toHaveClass('text-destructive');
   });
 
   it('clears stale live status when the subscription emits null', () => {
