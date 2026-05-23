@@ -40,6 +40,7 @@ import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
 import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../lib/memory/reconciliation.js';
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
+import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 
 declare const Bun: unknown;
 
@@ -77,6 +78,19 @@ void startSharedIssueService().then(() => {
   // already calls clearReviewStatus on its own path.
   void pruneClosedIssueReviewStatuses().catch((err) => {
     console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+  });
+  void Effect.runPromise(cleanupClosedIssueAgentDirectories({
+    issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
+    force: true,
+  })).then((result) => {
+    if (result.removed.length > 0) {
+      console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+    }
+    if (result.protected.length > 0) {
+      console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
+    }
+  }).catch((err) => {
+    console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
   });
 });
 console.log('[panopticon] IssueDataService started (non-blocking)');
@@ -250,8 +264,12 @@ function toAgentStatusPayload(status: AgentState['status'] | undefined) {
     : 'unknown';
 }
 
-function buildAgentStatusChangedPayload(state: AgentState, previousStatus?: AgentState['status']) {
-  return {
+function buildAgentStatusChangedPayload(
+  state: AgentState,
+  previousStatus?: AgentState['status'],
+  hasLiveTmuxSession?: boolean,
+) {
+  const payload = {
     agentId: state.id,
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
@@ -267,6 +285,7 @@ function buildAgentStatusChangedPayload(state: AgentState, previousStatus?: Agen
     lastFailureReason: state.lastFailureReason ?? null,
     lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
   };
+  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLiveTmuxSession };
 }
 
 // Wire up deacon → domain events for orphaned agent recovery.
@@ -299,13 +318,13 @@ setAgentStoppedNotifier((agentId) => {
     }
   })();
 });
-setAgentStatusChangedNotifier((state, previousStatus) => {
+setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   try {
     const es = getEventStore();
     es.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: buildAgentStatusChangedPayload(state, previousStatus),
+      payload: buildAgentStatusChangedPayload(state, previousStatus, hasLiveTmuxSession),
     } as any);
   } catch (err) {
     console.error('[pipeline] Failed to append agent.status_changed event:', err);

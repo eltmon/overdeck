@@ -1,7 +1,9 @@
+import type { AgentStatus } from '@panctl/contracts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgents } from '../lib/store';
+import { classifyDashboardAgent } from '../lib/agent-classifier';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 
@@ -30,24 +32,22 @@ export function StoppedAgentsBanner() {
     prevApiErrorAgentsRef.current = currentApiErrorAgents;
   }, [agents]);
 
-  /** PAN-1048: roles that indicate active pipeline work. A stopped agent in
-   *  one of these roles + not completed = likely crashed/orphaned. Standby
-   *  (work agent with a live tmux session post-pan-done) is filtered separately
-   *  by the lifecycle.hasLiveTmuxSession check below — those are intentional
-   *  pauses, not crashes. */
   const PIPELINE_ROLES = new Set(['plan', 'work', 'review', 'test', 'ship']);
 
   const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   const recentStoppedAgents = agents.filter((a) => {
-    if (a.status !== 'stopped') return false;
-    // Exclude agents that finished their work normally
+    if (!a.issueId) return false;
+    if (classifyDashboardAgent({
+      issueId: a.issueId,
+      status: a.status as AgentStatus,
+      hasLiveTmuxSession: a.hasLiveTmuxSession ?? a.lifecycle?.hasLiveTmuxSession,
+      lastActivity: a.lastActivity,
+      startedAt: a.startedAt,
+    }) !== 'stopped') return false;
     if (a.runtimeState === 'completed') return false;
     if (a.resolution === 'completed' || a.resolution === 'done') return false;
     if (a.lifecycle?.isCompleted) return false;
-    // Exclude work agents in standby (live tmux session after pan done)
-    if (a.role === 'work' && a.lifecycle?.hasLiveTmuxSession) return false;
-    // Only care about agents that have a known pipeline role
     if (!a.role) return false;
     if (!PIPELINE_ROLES.has(a.role)) return false;
     // Only show recently-active agents — old state files are historical debris

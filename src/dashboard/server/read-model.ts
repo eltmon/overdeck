@@ -43,6 +43,80 @@ export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 's
   return !agent.workspace || isTerminalTurnDiffSummaryStatus(agent.status)
 }
 
+type IssueReadSourceState = {
+  identifier?: unknown;
+  id?: unknown;
+  status?: unknown;
+  state?: unknown;
+  canonicalStatus?: unknown;
+  rawTrackerState?: unknown;
+  completedAt?: unknown;
+}
+
+function normalizeIssueId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+export function getClosedIssueIdsForReadSource(issues: unknown[]): Set<string> {
+  const closed = new Set<string>();
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object') continue;
+    const item = issue as IssueReadSourceState;
+    const issueId = normalizeIssueId(item.identifier) ?? normalizeIssueId(item.id);
+    if (!issueId) continue;
+    const state = String(item.state ?? '').toLowerCase();
+    const status = String(item.status ?? '').toLowerCase();
+    const canonicalStatus = String(item.canonicalStatus ?? '').toLowerCase();
+    const rawTrackerState = String(item.rawTrackerState ?? '').toLowerCase();
+    if (
+      item.completedAt ||
+      state === 'closed' ||
+      status === 'done' ||
+      status === 'closed' ||
+      status === 'cancelled' ||
+      status === 'canceled' ||
+      status === 'completed' ||
+      canonicalStatus === 'done' ||
+      canonicalStatus === 'closed' ||
+      canonicalStatus === 'cancelled' ||
+      canonicalStatus === 'canceled' ||
+      canonicalStatus === 'completed' ||
+      rawTrackerState === 'closed' ||
+      rawTrackerState === 'done' ||
+      rawTrackerState === 'completed'
+    ) {
+      closed.add(issueId);
+    }
+  }
+  return closed;
+}
+
+export function pruneAgentsForReadSource(
+  agentsById: Record<string, AgentSnapshot>,
+  issues: unknown[],
+  agentsDir = AGENTS_DIR,
+): { agentsById: Record<string, AgentSnapshot>; prunedCount: number } {
+  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
+  const nextAgentsById: Record<string, AgentSnapshot> = {};
+  let prunedCount = 0;
+
+  for (const agent of Object.values(agentsById)) {
+    if (closedIssueIds.has(agent.issueId.toUpperCase())) {
+      prunedCount++;
+      continue;
+    }
+    if (!existsSync(join(agentsDir, agent.id, 'state.json'))) {
+      prunedCount++;
+      continue;
+    }
+    nextAgentsById[agent.id] = agent;
+  }
+
+  return { agentsById: nextAgentsById, prunedCount };
+}
+
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
@@ -281,6 +355,13 @@ export const ReadModelServiceLive = Layer.effect(
         console.error('[ReadModel] Failed to refresh issues for snapshot:', err);
       }
 
+      const pruned = pruneAgentsForReadSource(state.agentsById, state.issuesRaw);
+      if (pruned.prunedCount > 0) {
+        state = { ...state, agentsById: pruned.agentsById };
+        projectionCache?.save(buildSnapshot());
+        console.log(`[ReadModel] Pruned ${pruned.prunedCount} stale agent${pruned.prunedCount === 1 ? '' : 's'} from read source`);
+      }
+
       return buildSnapshot();
     });
 
@@ -401,6 +482,7 @@ export const ReadModelServiceLive = Layer.effect(
               costSoFar: a.costSoFar,
               sessionId: a.sessionId || undefined,
               role: toRole((a as { role?: unknown }).role),
+              hasLiveTmuxSession: a.tmuxActive,
               stoppedByUser: a.stoppedByUser,
               paused: a.paused,
               pausedReason: a.pausedReason,
@@ -528,6 +610,7 @@ export const ReadModelServiceLive = Layer.effect(
             costSoFar: a.costSoFar,
             sessionId: a.sessionId || undefined,
             role: toRole((a as { role?: unknown }).role),
+            hasLiveTmuxSession: a.tmuxActive,
             paused: a.paused,
             pausedReason: a.pausedReason,
             pausedAt: a.pausedAt,

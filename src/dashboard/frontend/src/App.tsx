@@ -37,6 +37,7 @@ import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
+import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
@@ -767,6 +768,7 @@ export default function App() {
 
         {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
         <StoppedAgentsBanner />
+        <OrphanTestAgentsSurface />
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
         <CodexAuthBanner />

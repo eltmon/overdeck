@@ -95,6 +95,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
                 role: toRole(agent.role) ?? 'work',
+                hasLiveTmuxSession: agent.tmuxActive,
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
                 pendingQuestionPrompt: undefined,
@@ -122,6 +123,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               agentId,
               status: 'running',
               previousStatus: 'stopped',
+              hasLiveTmuxSession: true,
             },
           }
           await eventStore.appendAsync(statusEvent as never)

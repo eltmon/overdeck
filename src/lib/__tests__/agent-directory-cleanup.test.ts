@@ -4,18 +4,26 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   isValidAgentDirectoryName,
   isLegacyConversationDirectory,
   getPlanningIssueId,
+  getAgentDirectoryIssueId,
   findOrphanedAgentDirs,
   cleanupAgentDirectories,
+  findClosedIssueAgentDirs,
+  cleanupClosedIssueAgentDirectories,
+  CLOSED_ISSUE_AGENT_DIR_GRACE_MS,
 } from '../agent-directory-cleanup.js';
 
 let TEST_DIR: string;
+
+const NOW_MS = Date.parse('2026-05-23T12:00:00.000Z');
+const OLD_CLOSED_AT = new Date(NOW_MS - CLOSED_ISSUE_AGENT_DIR_GRACE_MS - 1).toISOString();
+const RECENT_CLOSED_AT = new Date(NOW_MS - CLOSED_ISSUE_AGENT_DIR_GRACE_MS + 1).toISOString();
 
 // Mock tmux module
 vi.mock('../tmux.js', () => ({
@@ -141,6 +149,19 @@ describe('getPlanningIssueId', () => {
   it('returns null for non-planning directories', () => {
     expect(getPlanningIssueId('agent-pan-801')).toBeNull();
     expect(getPlanningIssueId('conv-20260411-1125')).toBeNull();
+  });
+});
+
+describe('getAgentDirectoryIssueId', () => {
+  it('extracts canonical issue IDs from role and slot agent directories', () => {
+    expect(getAgentDirectoryIssueId('agent-pan-1052-ship')).toBe('PAN-1052');
+    expect(getAgentDirectoryIssueId('agent-pan-1122-5')).toBe('PAN-1122');
+    expect(getAgentDirectoryIssueId('agent-min-215-review-security')).toBe('MIN-215');
+  });
+
+  it('rejects unrelated and uppercase directory names', () => {
+    expect(getAgentDirectoryIssueId('conv-20260411-1125')).toBeNull();
+    expect(getAgentDirectoryIssueId('agent-PAN-1052-ship')).toBeNull();
   });
 });
 
@@ -334,5 +355,73 @@ describe('cleanupAgentDirectories', () => {
     expect(result.removed).toEqual([]);
     expect(result.protected).toEqual([]);
     expect(result.wouldRemove).toEqual([]);
+  });
+});
+
+describe('closed issue agent directory cleanup', () => {
+  it('finds old closed-issue agent directories by directory name', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
+    mkdirSync(join(TEST_DIR, 'agent-pan-1052-ship'), { recursive: true });
+
+    const result = await Effect.runPromise(findClosedIssueAgentDirs({
+      agentsDir: TEST_DIR,
+      nowMs: NOW_MS,
+      issues: [{ identifier: 'PAN-1052', status: 'done', completedAt: OLD_CLOSED_AT }],
+    }));
+
+    expect(result.map((dir) => dir.name)).toEqual(['agent-pan-1052-ship']);
+    expect(result[0].issueId).toBe('PAN-1052');
+    expect(result[0].hasRunningSession).toBe(false);
+  });
+
+  it('does not report recent closed issues or active issues', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
+    mkdirSync(join(TEST_DIR, 'agent-pan-1331-ship'), { recursive: true });
+    mkdirSync(join(TEST_DIR, 'agent-pan-1419-work-1'), { recursive: true });
+
+    const result = await Effect.runPromise(findClosedIssueAgentDirs({
+      agentsDir: TEST_DIR,
+      nowMs: NOW_MS,
+      issues: [
+        { identifier: 'PAN-1331', status: 'done', completedAt: RECENT_CLOSED_AT },
+        { identifier: 'PAN-1419', status: 'in_progress' },
+      ],
+    }));
+
+    expect(result).toEqual([]);
+  });
+
+  it('removes old closed-issue agent directories during cleanup', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
+    mkdirSync(join(TEST_DIR, 'agent-pan-1190-review'), { recursive: true });
+
+    const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+      agentsDir: TEST_DIR,
+      nowMs: NOW_MS,
+      force: true,
+      issues: [{ identifier: 'PAN-1190', status: 'closed', completedAt: OLD_CLOSED_AT }],
+    }));
+
+    expect(result.removed).toEqual(['agent-pan-1190-review']);
+    expect(existsSync(join(TEST_DIR, 'agent-pan-1190-review'))).toBe(false);
+  });
+
+  it('protects directories that contain JSONL session files', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
+    const agentDir = join(TEST_DIR, 'agent-pan-1148-test');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'session.jsonl'), '{}\n', 'utf8');
+
+    const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+      agentsDir: TEST_DIR,
+      nowMs: NOW_MS,
+      force: true,
+      issues: [{ identifier: 'PAN-1148', canonicalStatus: 'done', completedAt: OLD_CLOSED_AT }],
+    }));
+
+    expect(result.removed).toEqual([]);
+    expect(result.protected).toEqual(['agent-pan-1148-test']);
+    expect(existsSync(agentDir)).toBe(true);
+    expect(existsSync(join(agentDir, 'session.jsonl'))).toBe(true);
   });
 });

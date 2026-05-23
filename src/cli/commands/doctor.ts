@@ -1,8 +1,10 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
+import type { AgentStatus } from '@panctl/contracts';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
-import { listSessionNamesSync } from '../../lib/tmux.js';
+import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -14,6 +16,10 @@ import {
   CLAUDE_DIR,
   packageRoot,
 } from '../../lib/paths.js';
+import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { CacheService } from '../../dashboard/server/services/cache-service.js';
+import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
 // Bump in lockstep with packages/pi-extension API surface compatibility.
@@ -209,6 +215,194 @@ function countItems(path: string): number {
   }
 }
 
+function getCachedIssueRowsForDoctor(): unknown[] {
+  try {
+    const cache = new CacheService();
+    return ['github', 'linear', 'rally'].flatMap((tracker) => {
+      const entry = cache.getStale(tracker, 'issues');
+      return Array.isArray(entry?.data) ? entry.data : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function checkClosedIssueOrphanAgentDirs(
+  issues: unknown[],
+  agentsDir: string = AGENTS_DIR,
+): Promise<CheckResult> {
+  const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+    issues,
+    agentsDir,
+    dryRun: true,
+  }));
+
+  if (result.totalCandidates === 0) {
+    return {
+      name: 'Closed-Issue Agent Dirs',
+      status: 'ok',
+      message: 'No old closed-issue agent dirs detected',
+    };
+  }
+
+  const removable = result.wouldRemove.slice(0, 8).join(', ');
+  const protectedDirs = result.protected.slice(0, 8).join(', ');
+  const details = [
+    result.wouldRemove.length > 0 ? `removable: ${removable}` : null,
+    result.protected.length > 0 ? `protected: ${protectedDirs}` : null,
+  ].filter(Boolean).join('; ');
+
+  return {
+    name: 'Closed-Issue Agent Dirs',
+    status: 'warn',
+    message: `${result.totalCandidates} old closed-issue agent dir${result.totalCandidates === 1 ? '' : 's'} detected`,
+    fix: details
+      ? `Restart pan up to run the startup sweep. ${details}`
+      : 'Restart pan up to run the startup sweep.',
+  };
+}
+
+type DoctorAgentState = {
+  id?: unknown;
+  issueId?: unknown;
+  status?: unknown;
+  startedAt?: unknown;
+  lastActivity?: unknown;
+};
+
+type DoctorDashboardAgent = {
+  id?: unknown;
+  issueId?: unknown;
+  status?: unknown;
+  startedAt?: unknown;
+  lastActivity?: unknown;
+  hasLiveTmuxSession?: unknown;
+};
+
+function normalizeDoctorAgentId(agentId: string): string {
+  return /^(agent|planning|conv)-/.test(agentId) ? agentId : `agent-${agentId.toLowerCase()}`;
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
+  if (!existsSync(agentsDir)) return [];
+
+  const states: DoctorAgentState[] = [];
+  for (const dir of readdirSync(agentsDir, { withFileTypes: true })) {
+    if (!dir.isDirectory()) continue;
+    const statePath = join(agentsDir, dir.name, 'state.json');
+    if (!existsSync(statePath)) continue;
+    try {
+      const state = JSON.parse(readFileSync(statePath, 'utf8')) as DoctorAgentState;
+      states.push({ ...state, id: stringField(state.id) ?? dir.name });
+    } catch {
+      // Ignore unreadable agent state; other doctor checks surface broader FS health.
+    }
+  }
+  return states;
+}
+
+async function getDashboardAgentRowsForDoctor(): Promise<DoctorDashboardAgent[] | null> {
+  try {
+    const response = await fetch(`${getDashboardApiUrlSync().replace(/\/$/, '')}/api/agents`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data) ? data as DoctorDashboardAgent[] : null;
+  } catch {
+    return null;
+  }
+}
+
+export function checkStoppedListClassification(options: {
+  agentsDir?: string;
+  dashboardAgents: DoctorDashboardAgent[] | null;
+  tmuxSessionNames?: string[];
+  nowMs?: number;
+}): CheckResult {
+  const agentsDir = options.agentsDir ?? AGENTS_DIR;
+  const tmuxSessionNames = options.tmuxSessionNames
+    ?? getAgentSessionsSync().map((session) => session.name);
+  const tmuxSessions = new Set(tmuxSessionNames);
+  const liveRunningAgents = readDoctorAgentStates(agentsDir).filter((state) => {
+    const id = stringField(state.id);
+    return state.status === 'running' && id && tmuxSessions.has(normalizeDoctorAgentId(id));
+  });
+
+  if (liveRunningAgents.length === 0) {
+    return {
+      name: 'Stopped-List Classification',
+      status: 'ok',
+      message: 'No running agent state disagrees with tmux liveness',
+    };
+  }
+
+  if (options.dashboardAgents === null) {
+    return {
+      name: 'Stopped-List Classification',
+      status: 'warn',
+      message: 'Dashboard /api/agents unavailable; could not verify stopped-list classification',
+      fix: 'Start pan up and rerun pan doctor. PAN-1419 guards running+tmux agents from stopped lists.',
+    };
+  }
+
+  const dashboardById = new Map(
+    options.dashboardAgents
+      .map((agent) => [stringField(agent.id), agent] as const)
+      .filter((entry): entry is readonly [string, DoctorDashboardAgent] => entry[0] !== undefined),
+  );
+  const misclassified: string[] = [];
+
+  for (const state of liveRunningAgents) {
+    const id = normalizeDoctorAgentId(stringField(state.id)!);
+    const dashboardAgent = dashboardById.get(id);
+    if (!dashboardAgent) {
+      misclassified.push(id);
+      continue;
+    }
+
+    const issueId = stringField(dashboardAgent.issueId) ?? stringField(state.issueId);
+    const status = stringField(dashboardAgent.status);
+    if (!issueId || !status) {
+      misclassified.push(id);
+      continue;
+    }
+
+    const classification = classifyDashboardAgent({
+      issueId,
+      status: status as AgentStatus,
+      hasLiveTmuxSession: typeof dashboardAgent.hasLiveTmuxSession === 'boolean'
+        ? dashboardAgent.hasLiveTmuxSession
+        : undefined,
+      lastActivity: stringField(dashboardAgent.lastActivity),
+      startedAt: stringField(dashboardAgent.startedAt) ?? stringField(state.startedAt),
+    }, options.nowMs);
+
+    if (classification !== 'active') {
+      misclassified.push(id);
+    }
+  }
+
+  if (misclassified.length === 0) {
+    return {
+      name: 'Stopped-List Classification',
+      status: 'ok',
+      message: 'Running agents with live tmux classify as active',
+    };
+  }
+
+  return {
+    name: 'Stopped-List Classification',
+    status: 'warn',
+    message: `${misclassified.length} running agent${misclassified.length === 1 ? '' : 's'} with live tmux would not classify as active: ${misclassified.join(', ')}`,
+    fix: 'PAN-1419: ensure /api/agents and read-model snapshots preserve hasLiveTmuxSession for live tmux agents.',
+  };
+}
+
 export interface DoctorOptions {
   strict?: boolean;
 }
@@ -349,6 +543,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       message: '0 agent sessions',
     });
   }
+
+  checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
+  checks.push(checkStoppedListClassification({
+    dashboardAgents: await getDashboardAgentRowsForDoctor(),
+  }));
 
   // Check smee-client webhook relay
   try {
