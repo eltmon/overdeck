@@ -75,7 +75,7 @@ const CONFIG_EXTENSIONS = new Set(['env', 'toml', 'yaml', 'yml']);
 let sharedQuickviewHighlighterPromise: Promise<unknown> | null = null;
 
 function extensionOfPath(path: string): string {
-  const basename = path.replaceAll('\\', '/').split('/').at(-1) ?? '';
+  const basename = path.replace(/\\/g, '/').split('/').at(-1) ?? '';
   const dotIndex = basename.lastIndexOf('.');
   return dotIndex > 0 ? basename.slice(dotIndex + 1).toLowerCase() : '';
 }
@@ -113,9 +113,9 @@ async function resolvePreferredEditor(): Promise<EditorId> {
 
 function escapeHtml(value: string): string {
   return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 async function highlightQuickviewCode(code: string, lang: string): Promise<string> {
@@ -136,13 +136,13 @@ async function highlightQuickviewCode(code: string, lang: string): Promise<strin
 
 function relativePathForPreview(displayPath: string): string {
   const pathWithoutPosition = displayPath.replace(/:\d+(?::\d+)?$/, '');
-  const normalized = pathWithoutPosition.replaceAll('\\', '/');
+  const normalized = pathWithoutPosition.replace(/\\/g, '/');
   const parts = normalized.split('/').filter(Boolean);
   return parts.length > 1 ? parts.slice(1).join('/') : normalized;
 }
 
 function issueIdFromPath(targetPath: string): string | undefined {
-  const normalized = targetPath.replaceAll('\\', '/');
+  const normalized = targetPath.replace(/\\/g, '/');
   const match = normalized.match(/\/workspaces\/feature-([a-z]+-\d+)(?:\/|:|$)/i);
   return match?.[1]?.toUpperCase();
 }

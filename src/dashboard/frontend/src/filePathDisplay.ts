@@ -28,7 +28,7 @@ function splitPathAndPosition(value: string): {
 }
 
 function normalizePathSeparators(path: string): string {
-  return path.replaceAll('\\', '/');
+  return path.replace(/\\/g, '/');
 }
 
 function canonicalizeWindowsDrivePath(path: string): string {
