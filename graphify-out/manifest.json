@@ -3648,8 +3648,8 @@
     "hash": "652152c60a3fd515d0e9a5f78b37fd64"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx": {
-    "mtime": 1779511306.060271,
-    "hash": "72476d7419aadacb405d32e7bd4117c8"
+    "mtime": 1779527103.5234165,
+    "hash": "dfdcc4c2f8359cbebc4cb64e3895dee3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/CostsTab.tsx": {
     "mtime": 1779511306.060271,
@@ -3700,8 +3700,8 @@
     "hash": "8e8cb27d1aeffb3510e315dd13abbb02"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/CommandDeck/__tests__/ZoneCOverview.test.tsx": {
-    "mtime": 1779511306.0608,
-    "hash": "78b45c6af8df89e2b658c9325b259085"
+    "mtime": 1779527139.478553,
+    "hash": "aa707d6f71fec5e815ea1ef4334cc2ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/CommandDeck/__tests__/LiveCounter.test.tsx": {
     "mtime": 1779511306.0608,

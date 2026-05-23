@@ -45,6 +45,7 @@ import { SwitchModelModal } from '../../SwitchModelModal';
 import { useSwitchModel } from '../../../hooks/useSwitchModel';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
+import { PanOpenInPicker } from '../../PanOpenInPicker';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 
 interface OverviewTabProps {
@@ -936,26 +937,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   <Pause size={12} /> Stop
                 </button>
               )}
-              {workspace.data?.path && (
-                <a
-                  href={`vscode://file/${workspace.data.path}`}
-                  style={{
-                    padding: '5px 10px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    background: 'transparent',
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    color: 'inherit',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <ExternalLink size={12} /> Open VS Code
-                </a>
-              )}
+              {workspace.data?.path && <PanOpenInPicker cwd={workspace.data.path} />}
               {workspace.data?.canContainerize && !workspace.data?.hasAgent && (
                 <button
                   type="button"
