@@ -4,17 +4,6 @@ description: Per-bead spec verifier — reads a single bead's diff and decides I
 model: sonnet
 permissionMode: plan
 tools: Read, Grep, Glob, Bash
-hooks:
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
 ---
 
 # Panopticon Inspect Agent

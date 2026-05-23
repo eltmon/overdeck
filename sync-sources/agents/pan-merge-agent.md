@@ -3,21 +3,6 @@ name: pan-merge-agent
 description: Merge specialist — rebases an approved PR onto main, resolves conflicts, runs verification, and squash-merges via gh CLI.
 model: sonnet
 permissionMode: bypassPermissions
-hooks:
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Merge Agent

@@ -4,21 +4,6 @@ description: Code review specialist — analyzes a feature branch's diff for cor
 model: opus
 permissionMode: default
 tools: Read, Grep, Glob, Bash, Write
-hooks:
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Review Agent

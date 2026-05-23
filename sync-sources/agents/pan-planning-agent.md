@@ -4,26 +4,6 @@ description: Panopticon planning agent — researches the issue, writes the vBRI
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
-hooks:
-  PreToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Planning Agent

@@ -10,19 +10,6 @@ mcpServers:
       args:
         - "-y"
         - "@playwright/mcp@latest"
-hooks:
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
 ---
 
 # Panopticon UAT Agent
