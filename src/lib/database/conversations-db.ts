@@ -11,6 +11,7 @@
  */
 
 import { getDatabase, DatabaseError } from './index.js';
+import type { ConversationFilter } from './discovered-sessions-db.js';
 export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -54,6 +55,36 @@ export interface Conversation {
   /** Error message when background spawn failed (e.g. quota exhausted, auth error). Null = spawned OK or not yet known. */
   spawnError: string | null;
 }
+
+export interface ArchivedConversationWithEnrichment {
+  id: number;
+  name: string;
+  cwd: string;
+  issueId: string | null;
+  createdAt: string;
+  claudeSessionId: string | null;
+  title: string | null;
+  totalCost: number;
+  archivedAt: string;
+  model: string | null;
+  discoveredJsonlPath: string | null;
+  discoveredWorkspacePath: string | null;
+  messageCount: number | null;
+  firstTs: string | null;
+  lastTs: string | null;
+  primaryModel: string | null;
+  tokenInput: number | null;
+  tokenOutput: number | null;
+  estimatedCost: number | null;
+  toolsUsed: string | null;
+  filesTouched: string | null;
+  tags: string | null;
+  summary: string | null;
+  enrichmentLevel: number | null;
+  enrichmentFailed: number | null;
+}
+
+export type ArchivedConversationListOptions = ConversationFilter;
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
 
@@ -196,6 +227,150 @@ export function listArchivedConversations(): Conversation[] {
     )
     .all() as Record<string, unknown>[];
   return rows.map(rowToConversation);
+}
+
+function archivedArrayIndexCondition(
+  target: { table: 'discovered_session_tags'; column: 'tag' } | { table: 'discovered_session_tools'; column: 'tool' } | { table: 'discovered_session_files'; column: 'file_path' },
+  values: string[],
+): { sql: string; params: string[] } | null {
+  const filtered = [...new Set(values.filter((value) => value.length > 0))];
+  if (filtered.length === 0) return null;
+  return {
+    sql: `EXISTS (SELECT 1 FROM ${target.table} idx WHERE idx.session_id = ds.id AND idx.${target.column} IN (${filtered.map(() => '?').join(',')}))`,
+    params: filtered,
+  };
+}
+
+function buildArchivedConversationFilterSql(options: ArchivedConversationListOptions): { where: string; params: unknown[] } {
+  const conditions = ['c.archived_at IS NOT NULL'];
+  const params: unknown[] = [];
+  const lastTs = 'COALESCE(ds.last_ts, c.archived_at)';
+  const firstTs = 'COALESCE(ds.first_ts, c.created_at)';
+  const primaryModel = 'COALESCE(ds.primary_model, c.model)';
+  const estimatedCost = 'COALESCE(ds.estimated_cost, c.total_cost)';
+  const messageCount = 'COALESCE(ds.message_count, 0)';
+  const enrichmentLevel = 'COALESCE(ds.enrichment_level, 0)';
+
+  if (options.workspacePath !== undefined) {
+    conditions.push('c.cwd = ?');
+    params.push(options.workspacePath);
+  }
+  if (options.primaryModel !== undefined) {
+    conditions.push(`${primaryModel} = ?`);
+    params.push(options.primaryModel);
+  }
+  if (options.unmanaged === true) {
+    conditions.push('0 = 1');
+  }
+  if (options.since !== undefined) {
+    conditions.push(`${lastTs} >= ?`);
+    params.push(options.since);
+  }
+  if (options.before !== undefined) {
+    conditions.push(`${lastTs} < ?`);
+    params.push(options.before);
+  }
+  if (options.after !== undefined) {
+    conditions.push(`${firstTs} >= ?`);
+    params.push(options.after);
+  }
+  if (options.minCost !== undefined) {
+    conditions.push(`${estimatedCost} >= ?`);
+    params.push(options.minCost);
+  }
+  if (options.maxCost !== undefined) {
+    conditions.push(`${estimatedCost} <= ?`);
+    params.push(options.maxCost);
+  }
+  if (options.minMessages !== undefined) {
+    conditions.push(`${messageCount} >= ?`);
+    params.push(options.minMessages);
+  }
+  if (options.issueId !== undefined) {
+    conditions.push('c.issue_id = ?');
+    params.push(options.issueId);
+  }
+  if (options.enriched === true) {
+    conditions.push(`${enrichmentLevel} > 0`);
+  }
+  if (options.notEnriched === true) {
+    conditions.push(`${enrichmentLevel} = 0`);
+  }
+  if (options.enrichmentLevel !== undefined) {
+    conditions.push(`${enrichmentLevel} = ?`);
+    params.push(options.enrichmentLevel);
+  }
+  if (options.enrichmentLevelLessThan !== undefined) {
+    conditions.push(`${enrichmentLevel} < ?`);
+    params.push(options.enrichmentLevelLessThan);
+  }
+
+  const tagCondition = options.tags ? archivedArrayIndexCondition({ table: 'discovered_session_tags', column: 'tag' }, options.tags) : null;
+  if (tagCondition) {
+    conditions.push(tagCondition.sql);
+    params.push(...tagCondition.params);
+  }
+  const toolCondition = options.tools ? archivedArrayIndexCondition({ table: 'discovered_session_tools', column: 'tool' }, options.tools) : null;
+  if (toolCondition) {
+    conditions.push(toolCondition.sql);
+    params.push(...toolCondition.params);
+  }
+  const fileCondition = options.files ? archivedArrayIndexCondition({ table: 'discovered_session_files', column: 'file_path' }, options.files) : null;
+  if (fileCondition) {
+    conditions.push(fileCondition.sql);
+    params.push(...fileCondition.params);
+  }
+
+  return { where: `WHERE ${conditions.join(' AND ')}`, params };
+}
+
+export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
+  const db = getDatabase();
+  const { where, params } = buildArchivedConversationFilterSql(options);
+  const safeLimit = Number.isFinite(options.limit) && options.limit! >= 0 ? options.limit! : undefined;
+  const safeOffset = Number.isFinite(options.offset) && options.offset! >= 0 ? options.offset! : undefined;
+  const limit = safeLimit !== undefined ? 'LIMIT ?' : safeOffset !== undefined ? 'LIMIT -1' : '';
+  const offset = safeOffset !== undefined ? 'OFFSET ?' : '';
+  const paginationParams = [
+    ...(safeLimit !== undefined ? [safeLimit] : []),
+    ...(safeOffset !== undefined ? [safeOffset] : []),
+  ];
+
+  return db
+    .prepare(
+      `SELECT
+         c.id AS id,
+         c.name AS name,
+         c.cwd AS cwd,
+         c.issue_id AS issueId,
+         c.created_at AS createdAt,
+         c.claude_session_id AS claudeSessionId,
+         c.title AS title,
+         c.total_cost AS totalCost,
+         c.archived_at AS archivedAt,
+         c.model AS model,
+         ds.jsonl_path AS discoveredJsonlPath,
+         ds.workspace_path AS discoveredWorkspacePath,
+         ds.message_count AS messageCount,
+         ds.first_ts AS firstTs,
+         ds.last_ts AS lastTs,
+         ds.primary_model AS primaryModel,
+         ds.token_input AS tokenInput,
+         ds.token_output AS tokenOutput,
+         ds.estimated_cost AS estimatedCost,
+         ds.tools_used AS toolsUsed,
+         ds.files_touched AS filesTouched,
+         ds.tags AS tags,
+         ds.summary AS summary,
+         ds.enrichment_level AS enrichmentLevel,
+         ds.enrichment_failed AS enrichmentFailed
+       FROM conversations c
+       LEFT JOIN discovered_sessions ds ON ds.session_id = c.claude_session_id
+       ${where}
+       ORDER BY c.archived_at DESC, c.created_at DESC
+       ${limit} ${offset}`,
+    )
+    .all(...params, ...paginationParams) as ArchivedConversationWithEnrichment[];
 }
 
 export function listArchivedConversationNames(): string[] {

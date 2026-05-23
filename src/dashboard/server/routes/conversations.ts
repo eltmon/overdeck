@@ -25,6 +25,7 @@ import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
+import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import {
   findCommitAtTime,
@@ -41,6 +42,7 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
+  listArchivedConversationsWithEnrichment,
   getConversationByName,
   getConversationById,
   createConversation,
@@ -62,6 +64,8 @@ import {
   removeFavorite,
   updateForkStatus,
   updateSpawnError,
+  type ArchivedConversationListOptions,
+  type ArchivedConversationWithEnrichment,
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
@@ -1100,6 +1104,114 @@ interface ConversationAboutSummary {
 const aboutSummaryCache = new Map<string, { transcriptSize: number; data: ConversationAboutSummary }>();
 const ABOUT_SUMMARY_CACHE_MAX = 100;
 
+type ArchivedConversationResponse = {
+  id: number;
+  source: 'managed-archived';
+  conversationName: string;
+  jsonlPath: string | null;
+  workspacePath: string;
+  primaryModel: string | null;
+  messageCount: number;
+  firstTs: string;
+  lastTs: string;
+  estimatedCost: number;
+  tokenInput: number;
+  tokenOutput: number;
+  toolsUsed: string[];
+  filesTouched: string[];
+  tags: string[];
+  summary: string | null;
+  enrichmentLevel: 0 | 1 | 2 | 3;
+  enrichmentFailed: boolean;
+  panopticonManaged: true;
+  panIssueId: string | null;
+  archivedAt: string;
+};
+
+function parseStringArrayColumn(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
+  return {
+    id: row.id,
+    source: 'managed-archived',
+    conversationName: row.name,
+    jsonlPath: row.discoveredJsonlPath ?? (row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
+    workspacePath: row.cwd,
+    primaryModel: row.primaryModel ?? row.model,
+    messageCount: row.messageCount ?? 0,
+    firstTs: row.firstTs ?? row.createdAt,
+    lastTs: row.lastTs ?? row.archivedAt,
+    estimatedCost: row.estimatedCost ?? row.totalCost,
+    tokenInput: row.tokenInput ?? 0,
+    tokenOutput: row.tokenOutput ?? 0,
+    toolsUsed: parseStringArrayColumn(row.toolsUsed),
+    filesTouched: parseStringArrayColumn(row.filesTouched),
+    tags: parseStringArrayColumn(row.tags),
+    summary: row.summary ?? row.title,
+    enrichmentLevel: ((row.enrichmentLevel ?? 0) as 0 | 1 | 2 | 3),
+    enrichmentFailed: Boolean(row.enrichmentFailed),
+    panopticonManaged: true,
+    panIssueId: row.issueId,
+    archivedAt: row.archivedAt,
+  };
+}
+
+function parseOptionalNumberParam(params: URLSearchParams, name: string): number | undefined {
+  const value = params.get(name);
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
+  const options: ArchivedConversationListOptions = {};
+  const workspacePath = params.get('workspacePath');
+  const primaryModel = params.get('primaryModel');
+  const since = params.get('since');
+  const tag = params.get('tag');
+  const tool = params.get('tool');
+  const file = params.get('file');
+  const minCost = parseOptionalNumberParam(params, 'minCost');
+  const maxCost = parseOptionalNumberParam(params, 'maxCost');
+  const enrichmentLevel = parseOptionalNumberParam(params, 'enrichmentLevel');
+  const rawLimit = parseOptionalNumberParam(params, 'limit');
+  const rawOffset = parseOptionalNumberParam(params, 'offset');
+
+  if (workspacePath) options.workspacePath = workspacePath;
+  if (primaryModel) options.primaryModel = primaryModel;
+  if (since) options.since = parseRelativeTime(since);
+  if (params.get('managed') === 'true') options.managed = true;
+  if (params.get('enriched') === 'true') options.enriched = true;
+  if (tag) options.tags = [tag];
+  if (tool) options.tools = [tool];
+  if (file) options.files = [file];
+  if (minCost !== undefined) options.minCost = minCost;
+  if (maxCost !== undefined) options.maxCost = maxCost;
+  if (enrichmentLevel !== undefined) options.enrichmentLevel = enrichmentLevel;
+  options.limit = rawLimit === undefined ? 50 : Math.min(Math.max(rawLimit, 0), 100);
+  if (rawOffset !== undefined) options.offset = Math.max(rawOffset, 0);
+  return options;
+}
+
+export async function handleArchivedConversationsList(options: ArchivedConversationListOptions = {}): Promise<ReturnType<typeof jsonResponse>> {
+  try {
+    const rows = listArchivedConversationsWithEnrichment(options).map(mapArchivedConversation);
+    return jsonResponse(rows);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] list archived conversations failed:', msg);
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
 const getConversationsRoute = HttpRouter.add(
@@ -1155,6 +1267,20 @@ const getConversationsRoute = HttpRouter.add(
         console.error('[conversations] list conversations failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
+  }),
+);
+
+const getArchivedConversationsRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/archived',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const url = new URL(request.url, 'http://localhost');
+    return yield* Effect.promise(() => handleArchivedConversationsList(parseArchivedConversationListOptions(url.searchParams)));
   }),
 );
 
@@ -2980,6 +3106,7 @@ const getConversationAboutRoute = HttpRouter.add(
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
+  getArchivedConversationsRoute,
   getConversationRoute,
   postConversationRoute,
   patchConversationRoute,

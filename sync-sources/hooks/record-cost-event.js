@@ -3784,6 +3784,7 @@ function initDiscoveredSessionsSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
     CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS discovered_session_tags (
       session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
@@ -4222,6 +4223,9 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_discovered_model
       ON discovered_sessions(primary_model);
 
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+      ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
       summary,
       summary_detailed,
@@ -4249,7 +4253,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 40`);
+	db.pragma(`user_version = 41`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4257,7 +4261,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 40) return;
+	if (currentVersion === 41) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4489,6 +4493,7 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
       CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
         summary, summary_detailed, tags, files_touched,
         content='discovered_sessions', content_rowid='id'
@@ -4666,6 +4671,7 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
       CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
         summary, summary_detailed, tags, files_touched,
         content='discovered_sessions', content_rowid='id'
@@ -4720,7 +4726,11 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 40`);
+	if (currentVersion < 41) db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+    `);
+	db.pragma(`user_version = 41`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

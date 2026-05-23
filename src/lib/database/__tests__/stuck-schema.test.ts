@@ -62,6 +62,8 @@ describe('stuck state schema (PAN-653)', () => {
       expect(names).toContain('discovered_sessions');
       expect(names).toContain('sessions_fts');
       expect(names).toContain('session_embeddings');
+      const indexes = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index'`).all() as Array<{ name: string }>;
+      expect(indexes.map((index) => index.name)).toContain('idx_discovered_session_id');
     } finally {
       db.close();
     }
