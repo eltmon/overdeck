@@ -29,6 +29,7 @@ const mockResolveProjectFromIssue = vi.fn();
 const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 
 vi.mock('../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),

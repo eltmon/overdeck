@@ -128,6 +128,7 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
 }));
