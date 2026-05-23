@@ -112,7 +112,13 @@ import {
 import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
-import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
+import {
+  generateSummaryForFork,
+  generateFallbackSummary,
+  reserveSummaryForkSession,
+  copySessionFromCompactBoundary,
+  type SummaryForkMode,
+} from '../../../lib/conversations/summary-fork.js';
 import {
   CONVERSATION_TITLE_MODEL,
   serializeConversationTranscript,
@@ -2452,7 +2458,7 @@ async function runForkPipeline(
   parentConv: Conversation,
   sessionId: string,
   summaryModel?: string,
-  plain = false,
+  forkMode: SummaryForkMode = 'summary',
   localSummaryOnly = false,
   includeThinkingInSummary?: boolean,
   summaryHarness?: RuntimeName,
@@ -2463,7 +2469,7 @@ async function runForkPipeline(
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
-  if (plain) {
+  if (forkMode === 'plain') {
     if (conv.harness === 'pi') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
       // Pi cannot consume Claude JSONL, so a Pi plain fork would silently start
@@ -2564,7 +2570,17 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
-        const plain = body['plain'] === true;
+        const requestedForkMode = body['forkMode'];
+        let forkMode: SummaryForkMode = 'summary';
+        if (requestedForkMode !== undefined) {
+          if (requestedForkMode !== 'summary' && requestedForkMode !== 'plain' && requestedForkMode !== 'handoff') {
+            return jsonResponse({ error: 'Invalid forkMode' }, { status: 400 });
+          }
+          forkMode = requestedForkMode;
+        } else if (body['plain'] === true) {
+          console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
+          forkMode = 'plain';
+        }
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
@@ -2597,7 +2613,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
-        if (plain && launchHarness === 'pi') {
+        if (forkMode === 'plain' && launchHarness === 'pi') {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
           // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
           // start an empty session. Summary forks are fine because they inject the
@@ -2606,7 +2622,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
             error: 'Plain forks cannot launch under Pi — Pi cannot consume Claude session history. Use a summary fork to launch under Pi.',
           }, { status: 400 });
         }
-        const defaultTitle = plain
+        const defaultTitle = forkMode === 'plain'
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;
 
@@ -2617,18 +2633,18 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           issueId: conv.issueId ?? undefined,
           title: customTitle || defaultTitle,
           titleSource: 'manual',
-          titleSeed: plain
+          titleSeed: forkMode === 'plain'
             ? `Fork of ${conv.name}`
             : `Summary Fork of ${conv.name}`,
           claudeSessionId: sessionId,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
           harness: launchHarness,
-          forkStatus: plain ? 'spawning' : 'summarizing',
+          forkStatus: forkMode === 'plain' ? 'spawning' : 'summarizing',
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain, localSummaryOnly, includeThinkingInSummary, summaryHarness).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });

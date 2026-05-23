@@ -34,13 +34,13 @@ import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
 
+export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
+
 export interface SummaryForkOptions {
   model?: string;
   cwd?: string;
   localSummaryOnly?: boolean;
-  /** When true, skip summary generation and copy the raw JSONL history
-   *  (from the last compact_boundary, if any) into the new session file. */
-  plain?: boolean;
+  forkMode?: SummaryForkMode;
   /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
   includeThinkingInSummary?: boolean;
 }
@@ -255,14 +255,15 @@ function sanitizeEntryForPlainFork(entry: any): any {
   const cwd = options.cwd || conv.cwd || process.cwd();
   const launchModel = options.model || conv.model;
   const summaryModel = options.model || conv.model;
-  console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false} plain=${options.plain || false}`);
+  const forkMode = options.forkMode ?? 'summary';
+  console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false} forkMode=${forkMode}`);
 
   const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(cwd));
 
   let summary: string;
   let usedSummaryModel: string | null;
 
-  if (options.plain) {
+  if (forkMode === 'plain') {
     // Plain fork: copy raw JSONL from last compact boundary (or full history)
     // into the new session file so Claude Code can --resume it directly.
     await Effect.runPromise(copySessionFromCompactBoundary(sourceSessionFile, sessionFile));
@@ -287,11 +288,11 @@ function sanitizeEntryForPlainFork(entry: any): any {
     tmuxSession: newTmux,
     cwd,
     issueId: conv.issueId ?? undefined,
-    title: options.plain
+    title: forkMode === 'plain'
       ? `Fork: ${conv.title || conv.name}`
       : `Summary Fork: ${conv.title || conv.name}`,
     titleSource: 'manual',
-    titleSeed: options.plain
+    titleSeed: forkMode === 'plain'
       ? `Fork of ${conv.name}`
       : `Summary Fork of ${conv.name}`,
     claudeSessionId: sessionId,

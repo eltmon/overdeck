@@ -579,6 +579,50 @@ describe('conversations route — DB integration', () => {
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');
   });
+
+  it('creates a plain fork conversation from the forkMode discriminator', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+
+    const cwd = '/home/test/plain-project';
+    const sessionId = 'plain-session-123';
+    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+    mkdirSync(claudeProjectDir, { recursive: true });
+    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: 'Before compaction' },
+      }),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'private chain' }],
+        },
+      }),
+    ].join('\n') + '\n');
+
+    const conv = createConversation({
+      name: 'plain-source-conv',
+      tmuxSession: 'conv-plain-source-conv',
+      cwd,
+      claudeSessionId: sessionId,
+      title: 'Plain source',
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
+
+    expect(result.conversation.title).toBe('Fork: Plain source');
+    expect(result.summary).toBe('');
+    expect(result.summaryModel).toBeNull();
+    const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
+    expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
+    expect(forkedJsonl).not.toContain('"type":"thinking"');
+    expect(forkedJsonl).not.toContain('Before compaction');
+  });
 });
 
 // ─── validateOrigin unit tests ────────────────────────────────────────────────
