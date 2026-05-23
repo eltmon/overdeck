@@ -3,13 +3,14 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
 import { PanRpcError } from '@panctl/contracts';
 
 const projectPath = vi.hoisted(() => ({ value: '' }));
 
 vi.mock('../../../../lib/projects.js', () => ({
-  resolveProjectFromIssueSync: () => ({ projectPath: projectPath.value, projectKey: 'panopticon-cli' }),
+  resolveProjectFromIssue: () => Effect.succeed({ projectPath: projectPath.value, projectKey: 'panopticon-cli' }),
 }));
 
 async function expectPanRpcError(promise: Promise<unknown>, code: string) {
@@ -57,6 +58,17 @@ describe('readWorkspaceFile', () => {
 
     await expectPanRpcError(
       readWorkspaceFile({ issueId: 'PAN-1370', relativePath: '../outside.txt' }),
+      'PATH_OUTSIDE_WORKSPACE',
+    );
+  });
+
+  it('rejects absolute paths outside the workspace', async () => {
+    const { readWorkspaceFile } = await import('../read-workspace-file.js');
+    const outside = resolve(tempRoot, 'outside.txt');
+    await writeFile(outside, 'outside');
+
+    await expectPanRpcError(
+      readWorkspaceFile({ issueId: 'PAN-1370', relativePath: outside }),
       'PATH_OUTSIDE_WORKSPACE',
     );
   });

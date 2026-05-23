@@ -4,7 +4,7 @@ import { extname, resolve, sep } from 'node:path';
 import { Effect } from 'effect';
 import { PanRpcError, type ReadWorkspaceFileInput, type ReadWorkspaceFileResult } from '@panctl/contracts';
 
-import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { getWorkspacePathForIssue } from '../workspace-paths.js';
 
 const MAX_WORKSPACE_FILE_BYTES = 256 * 1024;
@@ -106,7 +106,7 @@ export function languageForPath(path: string): string {
 export async function readWorkspaceFile(input: ReadWorkspaceFileInput): Promise<ReadWorkspaceFileResult> {
   const line = validateIntegerAtLeast(input.line, 'line', 1);
   const contextLines = validateIntegerAtLeast(input.contextLines, 'contextLines', 0);
-  const project = resolveProjectFromIssueSync(input.issueId);
+  const project = await Effect.runPromise(resolveProjectFromIssue(input.issueId));
   if (!project) {
     throw new PanRpcError({ message: `No project found for ${input.issueId}`, code: 'WORKSPACE_NOT_FOUND' });
   }
