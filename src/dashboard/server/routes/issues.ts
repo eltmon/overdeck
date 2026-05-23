@@ -129,7 +129,7 @@ export async function completePlanningArtifacts(options: {
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
-    return (await Effect.runPromise(withBdMutex(() => mod.createBeadsFromVBrief(path))));
+    return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
   });
   const rawBeadsResult = createBeads(workspacePath);
   const beadsResult = Effect.isEffect(rawBeadsResult)
@@ -1579,7 +1579,7 @@ const postIssueReopenRoute = HttpRouter.add(
               )));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
-                const result = await Effect.runPromise(withBdMutex(() => createBeadsFromVBrief(workspacePath)));
+                const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
                 if (result.created.length > 0) {
                   console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
                   return true;
@@ -2809,7 +2809,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* withBdMutex(() => createBeadsFromVBrief(workspacePath));
+    const result = yield* createBeadsFromVBrief(workspacePath);
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
