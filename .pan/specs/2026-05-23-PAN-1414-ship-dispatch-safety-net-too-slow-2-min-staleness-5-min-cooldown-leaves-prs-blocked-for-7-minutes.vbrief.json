@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1414: Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
-    "updated": "2026-05-23T11:24:51.471Z"
+    "updated": "2026-05-23T17:56:25.234Z"
   },
   "plan": {
     "id": "pan-1414",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-23T11:25:00.000Z",
-    "updated": "2026-05-23T11:24:51.471Z",
+    "updated": "2026-05-23T17:56:25.234Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
@@ -67,7 +67,7 @@
       {
         "id": "reduce-constants",
         "title": "Reduce SHIP_DISPATCH_STALENESS_MS to 30s and SHIP_DISPATCH_COOLDOWN_MS to 90s",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T11:25:00.000Z",
         "metadata": {
@@ -83,7 +83,7 @@
           {
             "id": "reduce-constants.ac1",
             "title": "SHIP_DISPATCH_STALENESS_MS equals 30 * 1000 (30 s) in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -91,7 +91,7 @@
           {
             "id": "reduce-constants.ac2",
             "title": "SHIP_DISPATCH_COOLDOWN_MS equals 90 * 1000 (90 s) in src/lib/cloister/deacon.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "reduce-constants.ac3",
             "title": "JSDoc Guards bullets for checkUndispatchedShip reflect `30 s` staleness and `90 s` cooldown — no stale `2 min` / `5 min` references remain in the file's comments",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "reduce-constants.ac4",
             "title": "All existing tests in src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts still pass — STALE_TS of 10 min remains valid against the new 30 s threshold",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -115,7 +115,7 @@
           {
             "id": "reduce-constants.ac5",
             "title": "npm run typecheck and npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

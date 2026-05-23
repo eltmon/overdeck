@@ -119,7 +119,7 @@ import { onIssueStateChange } from '../service.js';
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
 const mockOnIssueStateChange = vi.mocked(onIssueStateChange);
 
-// A status updated long enough ago to clear the 2-min staleness guard.
+// A status updated long enough ago to clear the 30 s staleness guard.
 const STALE_TS = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
 describe('checkUndispatchedShip — undispatched-ship safety-net', () => {

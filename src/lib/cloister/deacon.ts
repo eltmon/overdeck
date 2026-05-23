@@ -2612,11 +2612,11 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 // Wait this long after the review/test status last changed before the patrol
 // steps in — long enough that the reactive scheduler's primary
 // onIssueStateChange('shipping') trigger has had every chance to fire first.
-const SHIP_DISPATCH_STALENESS_MS = 2 * 60 * 1000; // 2 min
+const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
 // Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
 // is already idempotent (activeRoleRunExists skips a live, current ship run),
 // so this is purely to keep the patrol log quiet while a ship run is in flight.
-const SHIP_DISPATCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
+const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
 const shipDispatchCooldowns = new Map<string, number>();
 
 /**
@@ -2639,8 +2639,8 @@ const shipDispatchCooldowns = new Map<string, number>();
  * Guards:
  *   - review + test both 'passed', not yet readyForMerge
  *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
- *   - staleness: status at least 2 min old (don't race the primary trigger)
- *   - per-issue cooldown: 5 min between re-dispatch attempts
+ *   - staleness: status at least 30 s old (don't race the primary trigger)
+ *   - per-issue cooldown: 90 s between re-dispatch attempts
  */
 export async function checkUndispatchedShip(): Promise<string[]> {
   const actions: string[] = [];
