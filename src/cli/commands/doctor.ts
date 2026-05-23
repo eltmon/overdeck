@@ -1,7 +1,9 @@
 import chalk from 'chalk';
-import { existsSync, readdirSync, readFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { exec, execSync } from 'child_process';
+import { promisify } from 'util';
 import { listSessionNamesSync } from '../../lib/tmux.js';
+import { listProjectsSync } from '../../lib/projects.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
@@ -16,6 +18,8 @@ import {
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
 // Bump in lockstep with packages/pi-extension API surface compatibility.
 export const SUPPORTED_PI_VERSION_MIN = '0.73.0';
+
+const execAsync = promisify(exec);
 
 function compareSemver(a: string, b: string): number {
   const pa = a.split('.').map((n) => parseInt(n, 10));
@@ -110,6 +114,54 @@ function checkCommand(cmd: string): boolean {
 
 function checkDirectory(path: string): boolean {
   return existsSync(path);
+}
+
+export async function checkGraphifyFreshness(projectPath: string): Promise<CheckResult | null> {
+  const summaryPath = join(projectPath, 'graphify-out', 'GRAPH_SUMMARY.md');
+  if (!existsSync(summaryPath)) {
+    return null;
+  }
+
+  let headTimeMs: number;
+  try {
+    const { stdout } = await execAsync('git log -1 --format=%ct', { cwd: projectPath, encoding: 'utf-8' });
+    headTimeMs = Number(stdout.trim()) * 1000;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      name: 'Graphify graph freshness',
+      status: 'warn',
+      message: `Could not read HEAD timestamp: ${message}`,
+      fix: `Run: git status from ${projectPath}`,
+    };
+  }
+
+  if (!Number.isFinite(headTimeMs)) {
+    return {
+      name: 'Graphify graph freshness',
+      status: 'warn',
+      message: 'Could not parse HEAD timestamp',
+      fix: `Run: git log -1 --format=%ct from ${projectPath}`,
+    };
+  }
+
+  const summaryMtimeMs = statSync(summaryPath).mtimeMs;
+  if (summaryMtimeMs >= headTimeMs) {
+    return {
+      name: 'Graphify graph freshness',
+      status: 'ok',
+      message: 'Fresh — updated since HEAD',
+    };
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days = Math.max(1, Math.ceil((headTimeMs - summaryMtimeMs) / dayMs));
+  return {
+    name: 'Graphify graph freshness',
+    status: 'warn',
+    message: `Stale — ${days} day${days === 1 ? '' : 's'} older than HEAD`,
+    fix: `Run: graphify update . from ${projectPath}; or wait for the next merge to refresh automatically`,
+  };
 }
 
 interface ComposeDriftEntry {
@@ -329,6 +381,13 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       status: 'warn',
       message: 'Status check failed',
     });
+  }
+
+  for (const { config } of listProjectsSync()) {
+    const graphifyCheck = await checkGraphifyFreshness(config.path);
+    if (graphifyCheck) {
+      checks.push(graphifyCheck);
+    }
   }
 
   // Check Docker compose label drift (PAN-956)
