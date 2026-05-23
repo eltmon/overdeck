@@ -1,0 +1,87 @@
+{
+  "version": "1",
+  "issueId": "PAN-1410",
+  "created": "2026-05-23T08:34:24.436Z",
+  "updated": "2026-05-23T08:40:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1410",
+    "sha": "ad70c6de2",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Move dedup ownership entirely into createBeadsFromVBrief with strict, observable failure semantics — bd list errors, individual bd delete errors, and any residual beads after the delete pass all cause the function to return success:false and skip creation, instead of being silently swallowed by the current outer-and-inner try/catch (beads.ts lines 167-189).",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Extract clearBeadsForIssue(workspacePath, issueLabel) as a separate exported helper so the dedup pass is independently testable and so callers can dedup without re-creating if a future use case needs that. The helper does list → delete-loop → verify-empty and collects errors as structured strings.",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Acquire withBdMutexPromise inside createBeadsFromVBriefPromise rather than at every caller. This serializes the four currently-unmutexed callers (CLI pan plan finalize, CLI pan start auto-recovery x2, dashboard start-agent auto-recovery) automatically. Outer withBdMutex wrappers at issues.ts:130/1567/2740 must be removed in the same bead because the existing Promise-queue mutex is non-reentrant and would deadlock.",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Do not change call-site error UX. The existing surfaces (plan-finalize.ts:64-72 prints to stderr; issues.ts:134-139 throws; agents.ts:2411-2422 returns 422 with recoveryError; start.ts handles result.errors) already propagate result.errors verbatim. New 'dedup failed: ...' error messages flow through without modification.",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Out of scope: cross-process serialization (CLI process and dashboard process racing on the bd Dolt database). The four observed pile-on incidents (PAN-748, PAN-1132, PAN-1370, PAN-1408) were all repeated in-process invocations, which the internal mutex solves. Cross-process locking would require file-based mutual exclusion on .beads/ and is a much bigger change.",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Out of scope: refactoring start.ts:954-960's execSync bd create fallback. That branch handles the 'no planning state at all' case for trivial issues and does NOT call createBeadsFromVBrief, so it cannot pile on duplicates. CLI execSync is permitted by project rules.",
+      "recordedAt": "2026-05-23T08:40:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "withBdMutexPromise (src/lib/bd-mutex.ts) is non-reentrant — it chains Promises through a shared `pending` variable. If the outer withBdMutex wrappers at issues.ts:130/1567/2740 remain in place after the inner mutex is added, the inner await will never resolve because the outer is still holding the queue position.",
+      "mitigation": "Bead internal-mutex-and-audit-callsites explicitly enumerates the three outer-wrapper removals as acceptance criteria. typecheck + the new unit tests (which exercise both code paths) will catch a deadlock in CI."
+    },
+    {
+      "id": "H2",
+      "summary": "Existing tests in src/lib/vbrief/__tests__/create-beads.test.ts mock `child_process` and `util.promisify` to return a single shared mockExecAsync. Any change to argv shape (e.g. switching `bd list` flags) must be reflected in the mock's matching logic. New tests reuse the same mock and must script its responses based on argv inspection.",
+      "mitigation": "The new clearBeadsForIssue helper uses the same `bd list --json -l <label> --status all --limit 0` and `bd delete <id> --force` argvs as the existing dedup block, so the mock's matching pattern is unchanged. The post-delete verification re-uses the bd list argv too."
+    },
+    {
+      "id": "H3",
+      "summary": "The dedup helper now runs an extra `bd list` after the delete loop to verify emptiness. On a workspace with hundreds of beads (rare but possible in long-lived plans), this is a small extra latency cost. The existing code already iterated over each delete serially, so the cost is dominated by deletes, not by the extra list.",
+      "mitigation": "Documented in the function header. If this ever becomes a hot path, the verification can be replaced with a count-based check (bd list --limit 1) instead of a full list."
+    },
+    {
+      "id": "H4",
+      "summary": "After the change, callers that previously succeeded on a transient `bd list` failure (because dedup was silently skipped) will now fail. This is the intended behavior — better to surface the bd problem than to accumulate duplicates — but it could cause one-shot failures in environments where bd was previously flaky and the duplicate accumulation was masking the underlying instability.",
+      "mitigation": "Acceptable: PAN-1396 already exists for tracking bd reliability. Surfacing bd failures loudly accelerates fixing the underlying issue rather than burying it. Error messages include the bd stderr first line so operators can triage."
+    },
+    {
+      "id": "H5",
+      "summary": "There are five direct call sites of createBeadsFromVBrief plus one indirect via mod.createBeadsFromVBrief. Missing any when removing outer wrappers leaves a deadlock landmine.",
+      "mitigation": "Bead internal-mutex-and-audit-callsites enumerates each call site by file:line (issues.ts:130, issues.ts:1567, issues.ts:2740 for removal; agents.ts:2406, plan-finalize.ts:62, start.ts:932, start.ts:976 already without wrappers). typecheck + build + unit tests catch any miss."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1410: Beads duplicate-pile-on-finalize: pan plan finalize, complete-planning, and pan start auto-recovery each create beads without deduping",
+      "timestamp": "2026-05-23T08:34:24.436Z"
+    },
+    {
+      "reason": "planning",
+      "note": "Investigated src/lib/vbrief/beads.ts (createBeadsFromVBriefPromise lines 167-189 has silent dedup), enumerated all six call sites (CLI plan-finalize.ts:62 + start.ts:932/976 without mutex; dashboard issues.ts:130/1567/2740 with withBdMutex; dashboard agents.ts:2406 without mutex), and reviewed src/lib/bd-mutex.ts (Promise-queue mutex, non-reentrant). Wrote vBRIEF with four beads: clear-beads-helper (foundation, requiresInspection:true), dedup-strict-semantics, internal-mutex-and-audit-callsites, unit-tests-idempotency. Auto mode — no user questions asked; defensible defaults recorded in plan.autoDecisions[].",
+      "timestamp": "2026-05-23T08:40:00.000Z",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
