@@ -140,6 +140,10 @@ async function closeBridge(server: NetServer): Promise<void> {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 }
 
+function removeTempDir(path: string): void {
+  rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+}
+
 async function runTmux(args: string[]): Promise<string> {
   if (!actualTmux) throw new Error('tmux module not initialized');
   const command = actualTmux.getTmuxCommand(args);
@@ -387,9 +391,9 @@ afterEach(async () => {
   if (originalTrustedOrigins === undefined) delete process.env.PANOPTICON_TRUSTED_ORIGINS;
   else process.env.PANOPTICON_TRUSTED_ORIGINS = originalTrustedOrigins;
   delete process.env.PANOPTICON_FRONTEND_DIR;
-  rmSync(tmpHome, { recursive: true, force: true });
-  rmSync(fakeHome, { recursive: true, force: true });
-  rmSync(workspace, { recursive: true, force: true });
+  removeTempDir(tmpHome);
+  removeTempDir(fakeHome);
+  removeTempDir(workspace);
   vi.doUnmock('../../src/dashboard/server/event-store.js');
   vi.doUnmock('../../src/lib/tmux.js');
 });

@@ -471,6 +471,10 @@ When TLDR is available, you'll have these MCP tools:
 
 **Use TLDR liberally to maximize your session effectiveness.**
 
+## Bash Output Compression (RTK)
+
+When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm output, etc.) may be compressed by RTK. Re-run with `PANOPTICON_RTK_ENABLED=0` to regenerate raw command output.
+
 ## vBRIEF Plans & Lifecycle
 
 Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:

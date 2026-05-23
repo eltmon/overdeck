@@ -10,6 +10,10 @@ hooks:
       hooks:
         - type: command
           command: "$HOME/.panopticon/bin/pre-tool-hook"
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "$HOME/.panopticon/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
       hooks:

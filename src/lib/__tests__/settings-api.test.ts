@@ -108,6 +108,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         sidebarRefreshIntervalMs: 10000,
       },
       experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
+      rtk: { enabled: false },
       claude: { permissionMode: 'auto' },
       tts: {
         enabled: false,
@@ -448,6 +449,25 @@ describe('saveSettingsApi', () => {
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('dashscope: true');
     expect(written).toContain('dashscope: dashscope-test-key');
+  });
+
+  it('persists RTK agent settings without removing existing agent settings', async () => {
+    mockReadFile.mockResolvedValue('agents:\n  caveman:\n    enabled: true\n');
+    mockLoadConfig.mockReturnValue(baseConfig({ rtk: { enabled: true } }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.agents?.rtk?.enabled).toBe(true);
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      agents: { rtk: { enabled: false } },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('caveman:');
+    expect(written).toContain('rtk:');
+    expect(written).toContain('enabled: false');
   });
 
   it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
