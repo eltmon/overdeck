@@ -763,6 +763,29 @@ describe('IssueCard', () => {
     expect(onPlan).not.toHaveBeenCalled();
   });
 
+  it('renders auto-merge countdown when autoMergeScheduled is set', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
+      useDashboardStore.setState({ rpcConnected: true });
+
+      renderIssueCard({
+        issue: createMockIssue({
+          status: 'In Review',
+          autoMergeScheduled: {
+            executeAt: '2026-05-23T12:02:05.000Z',
+            scheduledAt: '2026-05-23T12:00:00.000Z',
+          },
+        }),
+      });
+
+      expect(screen.getByText('Auto-merging in')).toBeInTheDocument();
+      expect(screen.getByText('2:05')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('renders Beads N/M progress row when beadCounts is present', () => {
     renderIssueCard({
       issue: createMockIssue({ beadCounts: { completed: 7, total: 12 } }),

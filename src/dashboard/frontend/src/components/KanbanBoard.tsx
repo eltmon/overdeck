@@ -41,6 +41,7 @@ import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
+import { MergeAutoMergeCountdown } from './MergeAutoMergeCountdown';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -2742,6 +2743,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
   const isClosedNotMerged = reviewStatus?.mergeStatus === 'failed' || issue.mergeStatus === 'failed';
   const isReadyToMerge = !isMerged && !isClosedNotMerged && reviewStatus?.readyForMerge === true;
+  const autoMergeScheduled = !isMerged ? issue.autoMergeScheduled : null;
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
@@ -2869,6 +2871,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 {label}
               </span>
             ))}
+          </div>
+        )}
+
+        {autoMergeScheduled && (
+          <div className="mb-2" onClick={(event) => event.stopPropagation()}>
+            <MergeAutoMergeCountdown issueId={issue.identifier} executeAt={autoMergeScheduled.executeAt} />
           </div>
         )}
 

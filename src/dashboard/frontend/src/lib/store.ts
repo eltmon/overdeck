@@ -72,6 +72,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
     ...syncSnapshotShared(state, snapshot),
     drawer: state.drawer,
     bootstrapComplete: true,
+    rpcConnected: state.rpcConnected,
     snapshotTimestamp: snapshot.timestamp,
   }
 }
@@ -81,6 +82,7 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
     ...applyEventShared(state, event),
     drawer: state.drawer,
     bootstrapComplete: state.bootstrapComplete,
+    rpcConnected: state.rpcConnected,
     snapshotTimestamp: state.snapshotTimestamp,
   }
 }
@@ -90,6 +92,7 @@ function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardSta
     ...applyEventsShared(state, events),
     drawer: state.drawer,
     bootstrapComplete: state.bootstrapComplete,
+    rpcConnected: state.rpcConnected,
     snapshotTimestamp: state.snapshotTimestamp,
   }
 }

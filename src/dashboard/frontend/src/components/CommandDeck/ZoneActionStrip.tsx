@@ -21,6 +21,7 @@ import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useZoneAActions } from './useZoneAActions';
 import { MergeButton } from '../MergeButton';
+import { MergeAutoMergeCountdown } from '../MergeAutoMergeCountdown';
 import { StopAgentButton } from '../StopAgentButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
@@ -124,6 +125,7 @@ export function ZoneActionStrip({
     || reviewStatus?.testStatus === 'failed'
     || reviewStatus?.testStatus === 'dispatch_failed'
     || reviewStatus?.mergeStatus === 'failed';
+  const autoMergeScheduled = reviewStatus?.mergeStatus === 'merged' ? null : issue?.autoMergeScheduled;
 
   if (reviewStatusLoading) {
     return (
@@ -137,6 +139,7 @@ export function ZoneActionStrip({
   const renderAction = (key: ActionKey) => {
     switch (key) {
       case 'merge':
+        if (autoMergeScheduled) return null;
         return (
           <MergeButton
             key={key}
@@ -543,6 +546,11 @@ export function ZoneActionStrip({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {autoMergeScheduled && (
+        <div style={{ padding: '6px 12px 0' }}>
+          <MergeAutoMergeCountdown issueId={issueId} executeAt={autoMergeScheduled.executeAt} />
+        </div>
+      )}
       {/* Primary + Secondary inline strip */}
       <div
         data-testid="zone-a-action-strip"
