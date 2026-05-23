@@ -1,0 +1,83 @@
+{
+  "version": "1",
+  "issueId": "PAN-1414",
+  "created": "2026-05-23T11:20:15.008Z",
+  "updated": "2026-05-23T11:25:00.000Z",
+  "gitState": { "branch": "feature/pan-1414", "sha": "5f67b8be3", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "SHIP_DISPATCH_STALENESS_MS reduced from 2 min to 30 s; SHIP_DISPATCH_COOLDOWN_MS reduced from 5 min to 90 s. Values match issue body verbatim.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Per-issue re-dispatch counter implemented as a module-level Map<string, number> with process-lifetime persistence (mirrors existing shipDispatchCooldowns lifecycle). NOT cleared on issue completion — cross-cycle signal is the whole point of the metric.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Log format is exact: `[deacon] Ship re-dispatched (N total for issue X)` — matches the issue body so existing operator grep/dashboard queries built against this string continue to work.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "New 60s-staleness assertion uses vi.useFakeTimers()/vi.setSystemTime() with a fresh issueId, per the project's fake-timers-for-retry-tests rule. Existing tests in the file (STALE_TS = now - 10 min) are left unchanged — they still exercise the same behavior under the new 30 s threshold.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "JSDoc comment block above checkUndispatchedShip is updated in the same bead as the constants — leaving doc-comment values stale after the constants change would be a small but real bandaid.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Patrol cadence is NOT touched. The deacon already runs frequently enough; with staleness=30s an eligible issue gets dispatched on the next tick, well inside the 60s target. Tuning patrol interval would be over-scoped.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Bead 1 (constants) blocks Bead 3 (60s test) — the test would fail against the old 2-min staleness. Bead 2 (counter+log) is independent of the other two.",
+      "recordedAt": "2026-05-23T11:25:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Module-level shipDispatchCooldowns and the new shipDispatchCounts maps persist across tests in the same file. Existing tests already hit this (PAN-977 vs PAN-888 trick); the new fake-timer test must use yet another fresh issueId.",
+      "mitigation": "Use a distinct issueId (e.g. PAN-991 or PAN-1414-T1) in the new test. Do NOT attempt to reset the maps via importing internals — the existing tests document this constraint as the intended pattern."
+    },
+    {
+      "id": "H2",
+      "summary": "Lower cooldown (90 s) means more frequent re-dispatch attempts if the reactive chain is genuinely broken on an issue. activeRoleRunExists is the actual idempotency guard, so this is safe, but log volume on a misbehaving issue will increase.",
+      "mitigation": "Acceptable by design — the per-issue counter is precisely the signal we want to surface; chattier logs on a broken issue are the bug we're trying to detect, not noise."
+    },
+    {
+      "id": "H3",
+      "summary": "Tightened staleness (30 s) could theoretically race the reactive scheduler if onIssueStateChange('shipping') takes >30 s to dispatch. The reactive path is described as firing within ~1 s.",
+      "mitigation": "activeRoleRunExists protects against double-dispatch when a run is already in flight, and onIssueStateChange's own zombie-detection handles stale sessions. Even if the patrol fires a duplicate, it's a no-op."
+    },
+    {
+      "id": "H4",
+      "summary": "Cloister patrol cadence may not align perfectly with the 60s test target — if the patrol runs every N seconds and N > 30, an issue could become eligible at t=30 but not get patrolled until t=30+N.",
+      "mitigation": "Out of scope per D6. The acceptance criterion is `patrol fires within 60 s of stale ship-eligible status`; the test exercises checkUndispatchedShip directly (skipping the patrol scheduler), which validates the function-level guarantee. If end-to-end cadence becomes a concern later, that is a separate follow-up issue."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-23T11:20:15.008Z",
+      "reason": "planning",
+      "note": "Initial planning session started for PAN-1414",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-23T11:25:00.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete: 3 beads decomposed (constants, counter+log, fake-timer test). All inferred choices recorded in autoDecisions. No contradictions surfaced.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ]
+}
