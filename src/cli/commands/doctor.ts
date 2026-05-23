@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Effect } from 'effect';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -14,6 +15,8 @@ import {
   CLAUDE_DIR,
   packageRoot,
 } from '../../lib/paths.js';
+import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { CacheService } from '../../dashboard/server/services/cache-service.js';
 
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
 // Bump in lockstep with packages/pi-extension API surface compatibility.
@@ -209,6 +212,53 @@ function countItems(path: string): number {
   }
 }
 
+function getCachedIssueRowsForDoctor(): unknown[] {
+  try {
+    const cache = new CacheService();
+    return ['github', 'linear', 'rally'].flatMap((tracker) => {
+      const entry = cache.getStale(tracker, 'issues');
+      return Array.isArray(entry?.data) ? entry.data : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function checkClosedIssueOrphanAgentDirs(
+  issues: unknown[],
+  agentsDir: string = AGENTS_DIR,
+): Promise<CheckResult> {
+  const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+    issues,
+    agentsDir,
+    dryRun: true,
+  }));
+
+  if (result.totalCandidates === 0) {
+    return {
+      name: 'Closed-Issue Agent Dirs',
+      status: 'ok',
+      message: 'No old closed-issue agent dirs detected',
+    };
+  }
+
+  const removable = result.wouldRemove.slice(0, 8).join(', ');
+  const protectedDirs = result.protected.slice(0, 8).join(', ');
+  const details = [
+    result.wouldRemove.length > 0 ? `removable: ${removable}` : null,
+    result.protected.length > 0 ? `protected: ${protectedDirs}` : null,
+  ].filter(Boolean).join('; ');
+
+  return {
+    name: 'Closed-Issue Agent Dirs',
+    status: 'warn',
+    message: `${result.totalCandidates} old closed-issue agent dir${result.totalCandidates === 1 ? '' : 's'} detected`,
+    fix: details
+      ? `Restart pan up to run the startup sweep. ${details}`
+      : 'Restart pan up to run the startup sweep.',
+  };
+}
+
 export interface DoctorOptions {
   strict?: boolean;
 }
@@ -349,6 +399,8 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       message: '0 agent sessions',
     });
   }
+
+  checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
 
   // Check smee-client webhook relay
   try {

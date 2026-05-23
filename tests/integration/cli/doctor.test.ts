@@ -1,9 +1,18 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { existsSync } from 'fs';
+
+const mocks = vi.hoisted(() => ({
+  cleanupClosedIssueAgentDirectories: vi.fn(),
+}));
 
 // Mock dependencies
 vi.mock('execa', () => ({
   execa: vi.fn().mockResolvedValue({ stdout: '', exitCode: 0 }),
+}));
+
+vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
+  cleanupClosedIssueAgentDirectories: mocks.cleanupClosedIssueAgentDirectories,
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
@@ -32,6 +41,12 @@ vi.mock('fs', async (importOriginal) => {
 describe('doctor command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.cleanupClosedIssueAgentDirectories.mockReturnValue(Effect.succeed({
+      removed: [],
+      protected: [],
+      wouldRemove: [],
+      totalCandidates: 0,
+    }));
   });
 
   describe('configuration checks', () => {
@@ -122,6 +137,38 @@ describe('doctor command', () => {
       mockExistsSync.mockReturnValue(true);
 
       expect(existsSync('/home/test/.panopticon/commands')).toBe(true);
+    });
+  });
+
+  describe('closed issue agent directory checks', () => {
+    it('reports stale closed-issue agent directories', async () => {
+      mocks.cleanupClosedIssueAgentDirectories.mockReturnValueOnce(Effect.succeed({
+        removed: [],
+        protected: [],
+        wouldRemove: ['agent-pan-1052-ship'],
+        totalCandidates: 1,
+      }));
+
+      const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
+      const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');
+
+      expect(result).toMatchObject({
+        name: 'Closed-Issue Agent Dirs',
+        status: 'warn',
+      });
+      expect(result.message).toContain('1 old closed-issue agent dir');
+      expect(result.fix).toContain('agent-pan-1052-ship');
+    });
+
+    it('passes when no stale closed-issue agent directories exist', async () => {
+      const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
+      const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');
+
+      expect(result).toMatchObject({
+        name: 'Closed-Issue Agent Dirs',
+        status: 'ok',
+        message: 'No old closed-issue agent dirs detected',
+      });
     });
   });
 });
