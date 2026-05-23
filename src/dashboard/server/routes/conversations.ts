@@ -86,6 +86,7 @@ import {
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
+import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
@@ -104,7 +105,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
@@ -130,6 +131,7 @@ const execAsync = promisify(exec);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
+const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -722,6 +724,35 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promi
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
 }
 
+function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
+  return harness === 'claude-code'
+    && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
+    && process.env.PAN_DOCKER !== '1';
+}
+
+function resolvePtySupervisorScriptPath(): string {
+  return join(packageRoot, 'dist', 'pty-supervisor.js');
+}
+
+function getPtySupervisorSocketPath(agentId: string): string {
+  return join(process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'), 'sockets', `pty-${agentId}.sock`);
+}
+
+async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
+  const socketPath = getPtySupervisorSocketPath(agentId);
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const info = await stat(socketPath);
+      if ((info.mode & 0o777) === 0o600) return;
+    } catch {
+      // not bound yet
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath}`);
+}
+
 /**
  * Extract the model from a Claude Code JSONL session file by reading
  * until the first assistant message with a model field.
@@ -809,7 +840,7 @@ void backfillConversationModels().catch((err: unknown) => {
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
 
-async function spawnConversationSession(
+export async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
   claudeSessionId: string,
@@ -920,6 +951,16 @@ async function spawnConversationSession(
     throw new Error('Invalid effort level');
   }
 
+  const useSupervisor = shouldUseSupervisorForConversation(harness);
+  let supervisorScriptPath: string | undefined;
+  if (useSupervisor) {
+    supervisorScriptPath = resolvePtySupervisorScriptPath();
+    if (!existsSync(supervisorScriptPath)) {
+      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    }
+    await writePtyToken(tmuxSession);
+  }
+
   // Channels setup for Claude Code conversations when the experimental flag
   // is on. Writes a per-session bridge token and MCP config so Claude loads
   // the panopticon-bridge stdio server on startup.
@@ -966,7 +1007,7 @@ async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      panopticonEnv: { ...(issueId ? { issueId } : {}), ...(piFields ? { agentId: tmuxSession } : {}) },
+      panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
@@ -979,6 +1020,8 @@ async function spawnConversationSession(
       keepAlive: true,
       fileMode: 0o700,
       channelsBridgeMcpConfig,
+      useSupervisor,
+      supervisorScriptPath,
     }),
     { mode: 0o700 },
   );
@@ -1025,6 +1068,10 @@ async function spawnConversationSession(
       );
     }
     throw err;
+  }
+
+  if (useSupervisor) {
+    await waitForPtySupervisorSocket(tmuxSession);
   }
 
   // Channels: dismiss the dev-channels confirmation dialog so the bridge MCP
