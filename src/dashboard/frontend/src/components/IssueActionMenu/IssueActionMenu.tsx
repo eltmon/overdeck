@@ -173,7 +173,7 @@ export function IssueActionMenu({ issueId, mode, pinRight = [], className, agent
   const scopedSecondary = actions.secondary.filter(inScope);
   const scopedOverflow = actions.overflow.filter(inScope);
   const pinned = pinRight
-    .map((key) => scopedAll.find((view) => view.action.key === key))
+    .map((key) => scopedAll.find((view) => view.action.key === key && view.enabled))
     .filter((view): view is IssueActionView => !!view);
   const primary = scopedPrimary.filter((view) => !pinSet.has(view.action.key));
   const hybridOverflow = [...scopedSecondary, ...scopedOverflow].filter((view) => !pinSet.has(view.action.key));
