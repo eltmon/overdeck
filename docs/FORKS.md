@@ -50,6 +50,38 @@ A **plain fork** copies the raw JSONL history (from the last compact boundary) i
 - Cross-model forks may still fail if the history contains provider-specific tool schemas or other non-portable blocks
 - Less practical for very long conversations
 
+### Handoff (agent-authored)
+
+A **handoff fork** asks the live source agent to write the seed text itself, then starts the new conversation from that authored handoff document.
+
+**What happens:**
+1. Panopticon creates a handoff document path under `${PANOPTICON_HOME}/handoffs/` using the source conversation id and timestamp, for example `${PANOPTICON_HOME}/handoffs/<source-conv-id>-<iso-ts>.md`.
+2. Panopticon renders the inlined prompt template from `roles/handoff.md`, substituting the optional `--focus` text and the exact output path.
+3. The prompt is delivered to the source conversation through `deliverAgentMessage()` so Channels and tmux fallback use the same message-delivery primitive as normal agent communication.
+4. The source agent writes the Markdown handoff document and then creates the sibling sentinel file `<source-conv-id>-<iso-ts>.md.done` only after the document is complete.
+5. Panopticon polls asynchronously for both the document and sentinel, validates the document, and injects the document text into the target conversation as the first message.
+
+**Document contract:**
+- The document must be at least 200 characters after trimming.
+- It must include an H2 `## Suggested skills` section.
+- It should reference artifacts by stable path, issue, commit, log, screenshot, or URL rather than copying large source material into the handoff.
+- It must redact secrets and sensitive data such as API keys, passwords, tokens, cookies, private keys, and PII.
+
+**Focus:**
+- `pan handoff <conversation> --focus "..."` and the dashboard Focus field tell the source agent what the successor most needs to know.
+- If no focus is provided, the prompt tells the agent to write a general continuation handoff.
+
+**Timeout and fallback:**
+- The default handshake timeout is 5 minutes (`300_000ms`).
+- Timeout, validation failure, source-ended state, or source-in-workspace-devcontainer detection automatically falls back to a summary fork.
+- Fallback keeps the command useful: the target conversation still starts, but its title is `Summary Fork: ...` instead of `Handoff: ...`.
+
+**Caveats:**
+- Workspace devcontainer sources cannot write to the host `${PANOPTICON_HOME}/handoffs/` in v1, so Panopticon falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
+- Handoff seed text is portable Markdown, so Pi targets consume it the same way they consume summary forks. Plain forks remain Claude-Code-only because Pi cannot resume Claude JSONL history.
+
+Implementation lives in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.
+
 ## Fork Options
 
 When forking from the dashboard, you can configure:
@@ -57,6 +89,8 @@ When forking from the dashboard, you can configure:
 | Option | Default | Description |
 |--------|---------|-------------|
 | **Plain fork** | Off | Copy raw history instead of generating a summary |
+| **Handoff fork** | Off | Ask the live source agent to author the seed document |
+| **Focus** | Empty | Optional guidance for what the source agent should emphasize in a handoff |
 | **Fast summary (no LLM)** | Off | Use a heuristic fallback instead of calling an LLM to summarize. Faster and free, but less nuanced |
 | **Include thinking in summary** | Off | When generating a summary, include thinking block content as labeled text. Increases summary size but preserves reasoning details |
 | **Summary model** | Configured compaction model | Which model generates the summary. Only applies when Fast summary is off |
@@ -116,7 +150,9 @@ Agent-authored handoff forks use the orchestrator-injected template in `roles/ha
 See `src/lib/conversations/summary-fork.ts` for the fork pipeline implementation.
 
 Key functions:
-- `createSummaryFork()` — entry point, orchestrates session reservation and summary generation
+- `createSummaryFork()` — entry point, orchestrates session reservation and seed generation
+- `requestHandoffFromAgent()` — live-agent handoff prompt delivery, doc/sentinel polling, and validation
+- `validateHandoffDoc()` — handoff document contract check
 - `generateSummaryForFork()` — calls the LLM summarizer with fork-specific settings
 - `generateFallbackSummary()` — heuristic summary when LLM is unavailable
 - `copySessionFromCompactBoundary()` — raw JSONL copy with thinking sanitization for plain fork
