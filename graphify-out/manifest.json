@@ -4088,12 +4088,12 @@
     "hash": "c9fb77c63be5f2b7f21121329f46fa0d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx": {
-    "mtime": 1779546219.0034618,
-    "hash": "5f4f20cf4aec0b6a27d855a206d810fc"
+    "mtime": 1779546784.0186646,
+    "hash": "5b20b4ebf3e3cabbe850f06c21601c36"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx": {
-    "mtime": 1779545779.7396364,
-    "hash": "07fb04f7db3b1889b3d642bd4adf82d5"
+    "mtime": 1779546908.718912,
+    "hash": "408cbd571bc3301d6e737ce671fa7222"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/ModelPicker.tsx": {
     "mtime": 1779511306.0667882,
@@ -4128,8 +4128,8 @@
     "hash": "326b8f560bb06fcf3918a6324db5da0b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/usePickerPosition.ts": {
-    "mtime": 1779511306.0675108,
-    "hash": "cd09eaae183c78b0a09ea1a9d5cdbb8d"
+    "mtime": 1779546699.0097704,
+    "hash": "3f1ab937df1edb5c3f4961d8f3492c05"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/defaultConversationModel.ts": {
     "mtime": 1779511306.0675108,
@@ -4144,20 +4144,20 @@
     "hash": "ca0f4c94cc246e3f1e244db019982268"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx": {
-    "mtime": 1779545422.360732,
-    "hash": "b6518c453e81a245af21cbb596ba2f29"
+    "mtime": 1779546767.6501071,
+    "hash": "7496efbece4843c1f29c6adea064dc21"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/PlanCard.tsx": {
     "mtime": 1779545831.3993716,
     "hash": "161f329ac678e71617f3869fe979162b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx": {
-    "mtime": 1779545787.3688924,
-    "hash": "3c92d2485f94fd5089b024dde1df4809"
+    "mtime": 1779546925.5064838,
+    "hash": "63af0e449d84831b7e721d29ddd00fc2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx": {
-    "mtime": 1779545466.1392295,
-    "hash": "7c5d83abbae6a5ff83fc756abbc620cb"
+    "mtime": 1779546972.1840744,
+    "hash": "50b952fa0da19d46c742d8e29f607504"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx": {
     "mtime": 1779511306.0675108,

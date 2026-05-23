@@ -1039,6 +1039,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           compacting={isCompacting}
           conversationName={conversation.name}
           cwd={conversation.cwd}
+          issueId={conversation.issueId}
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
           onOpenTurnDiff={onOpenTurnDiff}
           resolvedTheme={resolvedTheme}

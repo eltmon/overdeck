@@ -255,7 +255,7 @@ function transformMarkdownUrl(url: string): string {
   return shouldPreserveMarkdownFileLinkHref(url) ? url : defaultUrlTransform(url);
 }
 
-function makeComponents(isStreaming: boolean, cwd: string | undefined): Components {
+function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components {
   return {
     pre({ children }) {
       // Extract code block contents
@@ -286,7 +286,7 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined): Componen
     a({ href, children }) {
       const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
       if (fileLinkMeta) {
-        return <MarkdownFileLink {...fileLinkMeta} />;
+        return <MarkdownFileLink {...fileLinkMeta} issueId={issueId} />;
       }
 
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
@@ -316,14 +316,16 @@ interface ChatMarkdownProps {
   text: string;
   isStreaming?: boolean;
   cwd?: string;
+  issueId?: string | null;
 }
 
 export const ChatMarkdown = memo(function ChatMarkdown({
   text,
   isStreaming = false,
   cwd,
+  issueId,
 }: ChatMarkdownProps) {
-  const components = useMemo(() => makeComponents(isStreaming, cwd), [isStreaming, cwd]);
+  const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>

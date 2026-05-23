@@ -21,7 +21,7 @@ const MIN_DOWN_HEIGHT = 240;
 // on whether the dropdown is positioned above or below, and that state persists.
 export function usePickerPosition(
   open: boolean,
-  containerRef: RefObject<HTMLDivElement | null>,
+  containerRef: RefObject<HTMLElement | null>,
   { estimatedWidth = 280, preferredHeight = 400 }: Options = {},
 ): PickerPosition {
   const [position, setPosition] = useState<PickerPosition>({

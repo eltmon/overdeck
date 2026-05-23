@@ -6,6 +6,7 @@ const wsTransportMock = vi.hoisted(() => ({
   request: vi.fn(),
   getAvailableEditors: vi.fn(),
   shellOpenInEditor: vi.fn(),
+  readWorkspaceFile: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => ({
@@ -19,6 +20,12 @@ vi.mock('../../../lib/wsTransport', () => ({
 
 vi.mock('sonner', () => ({
   toast: toastMock,
+}));
+
+vi.mock('@pierre/diffs', () => ({
+  getSharedHighlighter: vi.fn().mockResolvedValue({
+    codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
+  }),
 }));
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
@@ -45,10 +52,18 @@ describe('MarkdownFileLink', () => {
     wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
     wsTransportMock.shellOpenInEditor.mockReset();
     wsTransportMock.shellOpenInEditor.mockResolvedValue({ success: true });
+    wsTransportMock.readWorkspaceFile.mockReset();
+    wsTransportMock.readWorkspaceFile.mockResolvedValue({
+      text: 'export const value = 1;\n',
+      lang: 'typescript',
+      truncated: false,
+      totalLines: 80,
+    });
     wsTransportMock.request.mockReset();
     wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
       [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
       [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
+      [WS_METHODS.readWorkspaceFile]: wsTransportMock.readWorkspaceFile,
     }));
   });
 
@@ -161,6 +176,86 @@ describe('MarkdownFileLink', () => {
       });
       expect(toastMock.success).toHaveBeenCalledWith('Opened in editor');
     });
+  });
+
+  it('shows a Quickview popover on Shift+hover and requests a workspace-relative file preview', async () => {
+    render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
+
+    fireEvent.mouseEnter(screen.getByTestId('markdown-file-link-container'), { shiftKey: true });
+
+    expect(await screen.findByTestId('markdown-file-quickview-content')).toHaveTextContent('export const value = 1;');
+    expect(wsTransportMock.readWorkspaceFile).toHaveBeenCalledWith({
+      issueId: 'PAN-1370',
+      relativePath: 'src/App.tsx',
+      line: 12,
+      contextLines: 12,
+    });
+    expect(screen.getByText(/line 12 · 80 lines/)).toBeInTheDocument();
+  });
+
+  it('dismisses Quickview on mouse leave and Shift release', async () => {
+    render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
+    const container = screen.getByTestId('markdown-file-link-container');
+
+    fireEvent.mouseEnter(container, { shiftKey: true });
+    expect(await screen.findByTestId('markdown-file-quickview')).toBeInTheDocument();
+
+    fireEvent.mouseLeave(container);
+    expect(screen.queryByTestId('markdown-file-quickview')).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(container, { shiftKey: true });
+    expect(await screen.findByTestId('markdown-file-quickview')).toBeInTheDocument();
+    fireEvent.keyUp(window, { key: 'Shift' });
+    expect(screen.queryByTestId('markdown-file-quickview')).not.toBeInTheDocument();
+  });
+
+  it('positions Quickview inside the viewport near the right edge', async () => {
+    render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
+    const container = screen.getByTestId('markdown-file-link-container');
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+      x: 760,
+      y: 100,
+      width: 32,
+      height: 20,
+      top: 100,
+      right: 792,
+      bottom: 120,
+      left: 760,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.mouseEnter(container, { shiftKey: true });
+
+    expect(await screen.findByTestId('markdown-file-quickview')).toHaveStyle({ right: '0px' });
+  });
+
+  it('shows a truncated indicator in the Quickview footer', async () => {
+    wsTransportMock.readWorkspaceFile.mockResolvedValue({
+      text: 'a'.repeat(10),
+      lang: 'plaintext',
+      truncated: true,
+      totalLines: 1,
+    });
+    render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
+
+    fireEvent.mouseEnter(screen.getByTestId('markdown-file-link-container'), { shiftKey: true });
+
+    expect(await screen.findByTestId('markdown-file-quickview-truncated')).toHaveTextContent('truncated — first 256 KiB');
+  });
+
+  it('keeps plain left-click opening the file in the editor when Quickview is available', async () => {
+    localStorage.setItem('panopticon:last-editor', 'vscode');
+    render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
+
+    fireEvent.click(screen.getByRole('link'));
+
+    await waitFor(() => {
+      expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+        cwd: meta.targetPath,
+        editor: 'vscode',
+      });
+    });
+    expect(wsTransportMock.readWorkspaceFile).not.toHaveBeenCalled();
   });
 
   it('maps common file extensions to specialized icons and unknown files to a fallback', () => {
