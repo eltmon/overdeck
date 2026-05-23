@@ -1612,8 +1612,8 @@
     "hash": "68a5576da6dabbd457b6cc062f8b4a8a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/lib/review-status.ts": {
-    "mtime": 1779535299.8613489,
-    "hash": "c851fa48a4b37ee42fd196ca91c16627"
+    "mtime": 1779549506.7914512,
+    "hash": "91e5c6af94dd44d1eddde1bad4afab21"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/lib/project-repos.ts": {
     "mtime": 1779535299.8603487,
@@ -2522,6 +2522,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/lib/__tests__/tts-daemon.test.ts": {
     "mtime": 1779535299.8434215,
     "hash": "9951ceb0d8d183446a4ae8c721aef8de"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/lib/__tests__/review-status-auto-merge.test.ts": {
+    "mtime": 1779549569.7295852,
+    "hash": "fc702293ff3ca58fe1c72138c60201df"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/lib/__tests__/restart-status.test.ts": {
     "mtime": 1779535299.8434215,
@@ -4740,8 +4744,8 @@
     "hash": "ac3c5ed9431fd3bf005d28e94145fc39"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/server/main.ts": {
-    "mtime": 1779544456.7035887,
-    "hash": "81c551234f25f02c4a0b69b6280c1eea"
+    "mtime": 1779549524.9010663,
+    "hash": "ad66cf8b8e25f7f42ce258cf77df307a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1418/src/dashboard/server/ws-rpc.ts": {
     "mtime": 1779535299.8253477,

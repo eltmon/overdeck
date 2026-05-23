@@ -28,6 +28,35 @@ function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', iss
   }
 }
 
+type AutoMergeOnReadyHandler = (issueId: string, projectKey?: string) => Promise<unknown> | unknown;
+
+let autoMergeOnReadyHandler: AutoMergeOnReadyHandler | null = null;
+
+export function setAutoMergeOnReadyHandler(handler: AutoMergeOnReadyHandler | null): void {
+  autoMergeOnReadyHandler = handler;
+}
+
+function maybeScheduleAutoMergeOnReady(issueId: string): void {
+  const handler = autoMergeOnReadyHandler;
+  if (!handler) return;
+
+  Promise.resolve()
+    .then(async () => {
+      let projectKey: string | undefined;
+      try {
+        const { resolveProjectFromIssue } = await import('./projects.js');
+        const resolved = await Effect.runPromise(resolveProjectFromIssue(issueId));
+        projectKey = resolved?.projectKey;
+      } catch {
+        projectKey = undefined;
+      }
+      await handler(issueId, projectKey);
+    })
+    .catch((error) => {
+      console.warn(`[review-status] Failed to schedule auto-merge for ${issueId}:`, error instanceof Error ? error.message : error);
+    });
+}
+
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
   status: string;
@@ -379,6 +408,7 @@ export function setReviewStatusSync(
       source: 'cloister',
       eventType: 'readyForMerge',
     });
+    maybeScheduleAutoMergeOnReady(issueId);
   }
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus

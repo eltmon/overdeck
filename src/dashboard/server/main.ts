@@ -20,7 +20,7 @@ import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus, setAutoMergeOnReadyHandler } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore, initEventStore } from './event-store.js';
@@ -30,7 +30,7 @@ import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
-import { logEnabledAutoMergeProjects, startAutoMergeScheduler, stopAutoMergeScheduler } from './services/auto-merge-scheduler.js';
+import { logEnabledAutoMergeProjects, maybeScheduleAutoMerge, startAutoMergeScheduler, stopAutoMergeScheduler } from './services/auto-merge-scheduler.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
@@ -443,7 +443,9 @@ try {
   console.warn(`[panopticon] Failed to reset merge queue: ${err.message}`);
 }
 
-await startAutoMergeScheduler().catch((err: any) => {
+await startAutoMergeScheduler().then(() => {
+  setAutoMergeOnReadyHandler(maybeScheduleAutoMerge);
+}).catch((err: any) => {
   console.warn(`[panopticon] Failed to start auto-merge scheduler: ${err.message}`);
 });
 await logEnabledAutoMergeProjects().catch((err: any) => {
