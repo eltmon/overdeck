@@ -20,6 +20,21 @@ export class ForgeError extends Data.TaggedError('ForgeError')<{
   readonly cause?: unknown;
 }> {}
 
+export class ForgeTimeoutError extends Data.TaggedError('ForgeTimeoutError')<{
+  readonly forge: 'github' | 'gitlab';
+  readonly operation: string;
+  readonly timeoutMs: number;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class ForgeCommandError extends Data.TaggedError('ForgeCommandError')<{
+  readonly forge: 'github' | 'gitlab';
+  readonly operation: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 const execAsync = promisify(exec);
 const GITHUB_MERGE_POLL_INTERVAL_MS = 5000;
 export const GITHUB_MERGE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -77,6 +92,20 @@ export interface ForgeAdapter {
   discoverArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>;
 }
 
+export interface CombinedCommitStatusCheck {
+  name: string;
+  conclusion: string;
+}
+
+export interface CombinedCommitStatus {
+  passing: boolean;
+  checks: CombinedCommitStatusCheck[];
+  queriedAt: string;
+}
+
+const PR_GATE_TIMEOUT_MS = 5000;
+const PASSING_CHECK_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
+
 async function withBodyFile<T>(body: string | undefined, prefix: string, fn: (bodyFile?: string) => Promise<T>): Promise<T> {
   if (!body) return fn(undefined);
 
@@ -99,6 +128,60 @@ function buildGitHubReviewTarget(input: Pick<MergeReviewArtifactInput | CommentO
 
 function buildGitLabReviewTarget(input: Pick<MergeReviewArtifactInput | CommentOnArtifactInput, 'url' | 'id'>): string {
   return input.id || input.url || '';
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function detectForgeFromPrUrl(prUrl: string): ForgeType {
+  const lower = prUrl.toLowerCase();
+  return lower.includes('gitlab') || lower.includes('/merge_requests/') ? 'gitlab' : 'github';
+}
+
+function isExecTimeoutError(cause: unknown): boolean {
+  if (!cause || typeof cause !== 'object') return false;
+  const error = cause as { killed?: boolean; signal?: string; code?: string };
+  return error.killed === true || error.signal === 'SIGTERM' || error.code === 'ETIMEDOUT';
+}
+
+async function runForgeJsonCommand(
+  forge: ForgeType,
+  operation: string,
+  command: string,
+): Promise<string> {
+  try {
+    const { stdout } = await execAsync(command, { encoding: 'utf-8', timeout: PR_GATE_TIMEOUT_MS });
+    return stdout;
+  } catch (cause) {
+    if (isExecTimeoutError(cause)) {
+      throw new ForgeTimeoutError({
+        forge,
+        operation,
+        timeoutMs: PR_GATE_TIMEOUT_MS,
+        message: `${operation} timed out after ${PR_GATE_TIMEOUT_MS}ms`,
+        cause,
+      });
+    }
+    throw new ForgeCommandError({
+      forge,
+      operation,
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    });
+  }
+}
+
+function requirePrUrl(prUrl: string, operation: string): string {
+  const trimmed = prUrl.trim();
+  if (!trimmed) {
+    throw new ForgeCommandError({
+      forge: 'github',
+      operation,
+      message: 'Pull request URL is required',
+    });
+  }
+  return trimmed;
 }
 
 async function getExistingGitHubArtifact(
@@ -280,6 +363,76 @@ const githubForgeAdapter: ForgeAdapter = {
     return getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
   },
 };
+
+export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCommitStatus> {
+  const target = requirePrUrl(prUrl, 'getCombinedCommitStatus');
+  const forge = detectForgeFromPrUrl(target);
+
+  if (forge === 'gitlab') {
+    // GitLab status-gate parity is intentionally deferred to the v2 GitLab auto-merge follow-up.
+    return { passing: true, checks: [], queriedAt: new Date().toISOString() };
+  }
+
+  const stdout = await runForgeJsonCommand(
+    forge,
+    'getCombinedCommitStatus',
+    `gh pr checks ${shellQuote(target)} --json name,conclusion`,
+  );
+
+  try {
+    const parsed = JSON.parse(stdout) as Array<{ name?: unknown; conclusion?: unknown; state?: unknown; bucket?: unknown }>;
+    const checks = parsed.map((check) => {
+      const conclusion = String(check.conclusion ?? check.state ?? check.bucket ?? '').toLowerCase();
+      return {
+        name: typeof check.name === 'string' ? check.name : 'unknown',
+        conclusion,
+      };
+    });
+
+    return {
+      passing: checks.every((check) => PASSING_CHECK_CONCLUSIONS.has(check.conclusion)),
+      checks,
+      queriedAt: new Date().toISOString(),
+    };
+  } catch (cause) {
+    throw new ForgeCommandError({
+      forge,
+      operation: 'getCombinedCommitStatus',
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    });
+  }
+}
+
+export async function getPrLabels(prUrl: string): Promise<string[]> {
+  const target = requirePrUrl(prUrl, 'getPrLabels');
+  const forge = detectForgeFromPrUrl(target);
+
+  if (forge === 'gitlab') {
+    // GitLab label-gate parity is intentionally deferred to the v2 GitLab auto-merge follow-up.
+    return [];
+  }
+
+  const stdout = await runForgeJsonCommand(
+    forge,
+    'getPrLabels',
+    `gh pr view ${shellQuote(target)} --json labels`,
+  );
+
+  try {
+    const parsed = JSON.parse(stdout) as { labels?: Array<{ name?: unknown } | string> };
+    return (parsed.labels ?? [])
+      .map((label) => typeof label === 'string' ? label : label.name)
+      .filter((label): label is string => typeof label === 'string' && label.length > 0);
+  } catch (cause) {
+    throw new ForgeCommandError({
+      forge,
+      operation: 'getPrLabels',
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    });
+  }
+}
 
 const gitlabForgeAdapter: ForgeAdapter = {
   forge: 'gitlab',
