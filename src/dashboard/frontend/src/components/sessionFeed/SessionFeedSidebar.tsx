@@ -36,18 +36,11 @@ let loggedGitNavigationNoop = false;
 
 export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date() }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
-  const feed = useMergedFeed(activeTab);
-  const groups = useMemo(
-    () => groupByContiguousLabel(feed.entries, (entry) => formatBucketLabel(entry.timestamp, now)),
-    [feed.entries, now],
-  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
-
-  const isEmpty = activeTab === 'all' ? feed.allEntries.length === 0 : feed.entries.length === 0;
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-l border-border bg-background" aria-label="Session activity feed">
@@ -84,23 +77,62 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {feed.error && <p className="text-xs text-destructive">{feed.error.message}</p>}
-        {!feed.error && feed.isLoading && <p className="text-xs text-muted-foreground">Loading activity…</p>}
-        {!feed.error && !feed.isLoading && isEmpty && (
-          <div data-testid={`session-feed-empty-${activeTab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-            {EMPTY_STATES[activeTab]}
-          </div>
-        )}
-        {!feed.error && !feed.isLoading && !isEmpty && (
-          <div className="space-y-4">
-            {groups.map((group) => (
-              <BucketSection key={`${group.label}-${group.items[0]?.id ?? 'empty'}`} label={group.label} items={group.items} onSelect={onSelect} now={now} />
-            ))}
-          </div>
+        {isStubTab(activeTab) ? (
+          <StubTabEmptyState tab={activeTab} />
+        ) : (
+          <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} />
         )}
       </div>
     </aside>
   );
+}
+
+type WiredSessionFeedTab = Exclude<SessionFeedTab, 'files' | 'comments'>;
+
+type StubSessionFeedTab = Extract<SessionFeedTab, 'files' | 'comments'>;
+
+function FeedTabContent({ tab, onSelect, now }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date }) {
+  const feed = useMergedFeed(tab);
+  const groups = useMemo(
+    () => groupByContiguousLabel(feed.entries, (entry) => formatBucketLabel(entry.timestamp, now)),
+    [feed.entries, now],
+  );
+  const isEmpty = tab === 'all' ? feed.allEntries.length === 0 : feed.entries.length === 0;
+
+  if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
+  if (feed.isLoading) return <p className="text-xs text-muted-foreground">Loading activity…</p>;
+  if (isEmpty) {
+    return (
+      <div data-testid={`session-feed-empty-${tab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+        {EMPTY_STATES[tab]}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => (
+        <BucketSection key={`${group.label}-${group.items[0]?.id ?? 'empty'}`} label={group.label} items={group.items} onSelect={onSelect} now={now} />
+      ))}
+    </div>
+  );
+}
+
+function StubTabEmptyState({ tab }: { tab: StubSessionFeedTab }) {
+  const description = tab === 'files'
+    ? 'Aggregate file changes are not wired into the session feed yet.'
+    : 'Issue comments are not cached for the session feed yet.';
+
+  return (
+    <div data-testid={`session-feed-empty-${tab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+      <p className="font-medium text-foreground">{EMPTY_STATES[tab]}</p>
+      <p className="mt-1">{description}</p>
+    </div>
+  );
+}
+
+function isStubTab(tab: SessionFeedTab): tab is StubSessionFeedTab {
+  return tab === 'files' || tab === 'comments';
 }
 
 function readStoredTab(): SessionFeedTab {

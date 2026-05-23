@@ -8,14 +8,16 @@ import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types
 const hookSources = vi.hoisted(() => ({
   conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
   git: { entries: [] as GitSessionFeedEntry[], isLoading: false, error: null as Error | null },
+  useConversationFeed: vi.fn(),
+  useGitFeed: vi.fn(),
 }));
 
 vi.mock('../useConversationFeed', () => ({
-  useConversationFeed: () => hookSources.conversations,
+  useConversationFeed: hookSources.useConversationFeed,
 }));
 
 vi.mock('../useGitFeed', () => ({
-  useGitFeed: () => hookSources.git,
+  useGitFeed: hookSources.useGitFeed,
 }));
 
 const now = new Date('2026-05-23T01:05:00.000Z');
@@ -78,6 +80,10 @@ describe('SessionFeedSidebar', () => {
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
     hookSources.git = { entries: [], isLoading: false, error: null };
+    hookSources.useConversationFeed.mockImplementation(() => hookSources.conversations);
+    hookSources.useGitFeed.mockImplementation(() => hookSources.git);
+    hookSources.useConversationFeed.mockClear();
+    hookSources.useGitFeed.mockClear();
     useDashboardStore.setState({ observationsByIssueId: {} });
   });
 
@@ -118,6 +124,23 @@ describe('SessionFeedSidebar', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
     expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
+  });
+
+  it('renders stub tabs without invoking wired feed hooks', () => {
+    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'files');
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    expect(screen.getByTestId('session-feed-empty-files')).toHaveTextContent('Files feed coming soon.');
+    expect(screen.getByText('Aggregate file changes are not wired into the session feed yet.')).toBeTruthy();
+    expect(screen.queryByText('Loading activity…')).toBeNull();
+    expect(hookSources.useConversationFeed).not.toHaveBeenCalled();
+    expect(hookSources.useGitFeed).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+
+    expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
+    expect(screen.getByText('Issue comments are not cached for the session feed yet.')).toBeTruthy();
   });
 
   it('does not render the all-tab empty state when another wired source has entries', () => {
