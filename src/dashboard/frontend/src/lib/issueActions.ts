@@ -45,7 +45,6 @@ export type IssueActionKey =
   | 'open'
   | 'resetIssue'
   | 'viewPr'
-  | 'merge'
   | 'beads'
   | 'inference'
   | 'discussions'
@@ -137,7 +136,7 @@ const PHASE_PRIMARY_KEYS: Record<PipelinePhase, IssueActionKey[]> = {
   SHIP_RUNNING: ['tell', 'recoverAgent'],
   CHANGES_REQUESTED: ['open', 'requestReview'],
   STUCK: ['recoverAgent', 'tell'],
-  READY_TO_MERGE: ['viewPr', 'merge'],
+  READY_TO_MERGE: ['viewPr'],
   MERGED: ['closeOut'],
 };
 
@@ -181,7 +180,6 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'dialog', group: 'navigation' },
   { key: 'resetIssue', label: 'Reset issue', panVerb: 'reset', endpoint: '/api/issues/:id/reset', enabledWhen: (state) => !isMerged(state) && !isDoneOrCanceled(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
-  { key: 'merge', label: 'Merge to main', panVerb: null, endpoint: '/api/issues/:id/merge', enabledWhen: (state) => state.reviewStatus?.readyForMerge === true && !isMerged(state), phasePrimary: phasePrimary('merge'), kind: 'dialog', group: 'preserved' },
   { key: 'beads', label: 'Beads', panVerb: null, endpoint: '/api/issues/:id/beads', enabledWhen: (state) => state.hasBeads || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'inference', label: 'Inference', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'discussions', label: 'Discussions', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasDiscussions === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },

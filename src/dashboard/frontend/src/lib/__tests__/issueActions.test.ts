@@ -55,7 +55,6 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'restartFromPlan',
   'restartAgent',
   'reviewTest',
-  'merge',
 ];
 
 const baseState: IssueActionState = {
@@ -139,7 +138,7 @@ describe('getPhasePrimaryActions', () => {
     ['SHIP_RUNNING', { ...baseState, agent: { status: 'running', role: 'ship' }, reviewStatus: reviewStatus({ mergeStatus: 'merging' }) }, ['tell', 'recoverAgent']],
     ['CHANGES_REQUESTED', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) }, ['open', 'requestReview']],
     ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, reviewStatus: reviewStatus({ testStatus: 'failed' }) }, ['recoverAgent', 'tell']],
-    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['viewPr', 'merge']],
+    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['viewPr']],
     ['MERGED', { ...baseState, isMerged: true, reviewStatus: reviewStatus({ mergeStatus: 'merged' }) }, ['closeOut']],
   ];
 
