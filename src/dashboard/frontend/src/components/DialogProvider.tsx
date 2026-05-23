@@ -9,6 +9,7 @@ interface ConfirmOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'default' | 'destructive';
+  requiredText?: string;
 }
 
 interface AlertOptions {
@@ -118,7 +119,10 @@ function ConfirmDialogContent({
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [confirmationText, setConfirmationText] = useState('');
   const isDestructive = options.variant === 'destructive';
+  const requiresText = !!options.requiredText;
+  const confirmationMatches = !requiresText || confirmationText === options.requiredText;
 
   useEffect(() => {
     if (isDestructive) {
@@ -141,8 +145,20 @@ function ConfirmDialogContent({
       </div>
 
       {/* Body */}
-      <div className="px-6 py-5">
+      <div className="px-6 py-5 space-y-3">
         <p id="dialog-message" className="text-sm text-foreground whitespace-pre-line">{options.message}</p>
+        {requiresText ? (
+          <label className="block text-xs text-muted-foreground">
+            Type <span className="font-mono text-foreground">{options.requiredText}</span> to confirm
+            <input
+              className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              value={confirmationText}
+              onChange={(event) => setConfirmationText(event.target.value)}
+              aria-label="Confirmation text"
+              autoFocus
+            />
+          </label>
+        ) : null}
       </div>
 
       {/* Footer */}
@@ -157,7 +173,8 @@ function ConfirmDialogContent({
         <button
           ref={confirmRef}
           onClick={onConfirm}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          disabled={!confirmationMatches}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isDestructive
               ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
               : 'bg-primary text-primary-foreground hover:bg-primary/90'

@@ -18,6 +18,7 @@ optional:
   - AUTO_SECTION
   - PRD_REFERENCES
   - MEMORY_CONTEXT
+  - TLDR_AVAILABLE
 ---
 <!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
@@ -128,6 +129,19 @@ If the issue will require browser-based verification, encode that expectation cl
 - Agents must not depend on another agent's Playwright session or shared browser state.
 - Any required login/setup should be reproducible inside the isolated session.
 
+{{#TLDR_AVAILABLE}}
+### TLDR: Token-Efficient Code Discovery
+
+You have access to TLDR MCP tools for broad codebase discovery without reading full files first. Prefer these summaries during exploration, then use full Reads only when you need exact implementation details for the vBRIEF:
+- `tldr_context <file>` — summarize a candidate file's structure, imports, exports, and key functions
+- `tldr_structure <directory>` — understand a subsystem layout before choosing files to inspect
+- `tldr_semantic <query>` — find code by behavior or concept when the affected files are unknown
+- `tldr_calls <function> <file>` — identify callers that may constrain the plan
+- `tldr_impact <function> <file>` — see what a function touches before defining bead boundaries or hazards
+
+Use TLDR first for discovery breadth, and reserve full Reads for authoritative details you will encode into decisions, hazards, acceptance criteria, or bead descriptions.
+
+{{/TLDR_AVAILABLE}}
 ### Task Granularity — Decompose Aggressively
 
 **Default to the smallest bead you can defend.** Your job is to produce a *lot* of small, independently reviewable beads — not a handful of large ones.

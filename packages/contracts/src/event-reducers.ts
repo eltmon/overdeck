@@ -230,11 +230,11 @@ export function omitTurnDiffSummariesForAgent(
 
 /** Remove all entries in agentIdBySessionId that point to the given agentId. */
 function removeAgentFromSessionIndex(
-  agentIdBySessionId: ReadModelState['agentIdBySessionId'],
+  agentIdBySessionId: ReadModelState['agentIdBySessionId'] | undefined,
   agentId: string,
 ): ReadModelState['agentIdBySessionId'] {
   const next: Record<string, string> = {}
-  for (const [sessionId, id] of Object.entries(agentIdBySessionId)) {
+  for (const [sessionId, id] of Object.entries(agentIdBySessionId ?? {})) {
     if (id !== agentId) next[sessionId] = id
   }
   return next

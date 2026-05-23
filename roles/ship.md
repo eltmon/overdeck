@@ -12,26 +12,6 @@ tools:
   - Glob
   - Bash
   - Edit
-hooks:
-  PreToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Ship Role

@@ -61,6 +61,14 @@ const validPayload = {
       parkedAt: "2026-05-18T14:00:00.000Z",
     },
   ],
+  suggestions: [
+    {
+      action: "start",
+      issueId: "PAN-1201",
+      rationale: "Start the filed substrate bug because it blocks the current run.",
+      priority: "urgent",
+    },
+  ],
   system: {
     mainHead: "54631d0",
     ramUsedMb: 32768,
@@ -81,6 +89,19 @@ describe("FlywheelStatus", () => {
     const reparsed = decodeFlywheelStatus(JSON.parse(JSON.stringify(parsed)))
 
     expect(reparsed).toEqual(parsed)
+  })
+
+  it("decodes an empty suggestions array", () => {
+    const parsed = decodeFlywheelStatus({ ...validPayload, suggestions: [] })
+
+    expect(parsed.suggestions).toEqual([])
+  })
+
+  it("defaults missing suggestions to an empty array", () => {
+    const { suggestions: _suggestions, ...historicalPayload } = validPayload
+    const parsed = decodeFlywheelStatus(historicalPayload)
+
+    expect(parsed.suggestions).toEqual([])
   })
 
   it("rejects payloads missing runId", () => {
@@ -111,6 +132,20 @@ describe("FlywheelStatus", () => {
     const { mainHead: _mainHead, ...system } = validPayload.system
 
     expect(() => decodeFlywheelStatus({ ...validPayload, system })).toThrow()
+  })
+
+  it("rejects suggestions with unknown actions", () => {
+    expect(() => decodeFlywheelStatus({
+      ...validPayload,
+      suggestions: [{ ...validPayload.suggestions[0], action: "drive" }],
+    })).toThrow()
+  })
+
+  it("rejects suggestions with unknown priorities", () => {
+    expect(() => decodeFlywheelStatus({
+      ...validPayload,
+      suggestions: [{ ...validPayload.suggestions[0], priority: "critical" }],
+    })).toThrow()
   })
 
   it("rejects wrong enum values", () => {

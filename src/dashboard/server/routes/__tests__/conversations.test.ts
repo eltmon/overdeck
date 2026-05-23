@@ -77,6 +77,53 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+function decodeTextResponse(response: { body: unknown }) {
+  const payload = response.body as { body: Uint8Array } | null;
+  return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+describe('parseSummaryForkFocus', () => {
+  it('trims handoff focus text', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('  continue the API wiring  ')).toEqual({
+      ok: true,
+      focus: 'continue the API wiring',
+    });
+  });
+
+  it('normalizes blank and absent focus to undefined', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(undefined)).toEqual({ ok: true, focus: undefined });
+    expect(parseSummaryForkFocus('   ')).toEqual({ ok: true, focus: undefined });
+  });
+
+  it('rejects non-string focus values', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(42)).toEqual({ ok: false, error: 'focus must be a string' });
+  });
+
+  it('rejects focus values longer than 500 characters', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('a'.repeat(501))).toEqual({
+      ok: false,
+      error: 'focus must be 500 characters or fewer',
+    });
+  });
+
+  it('rejects control characters in focus', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('continue\nthen ship')).toEqual({
+      ok: false,
+      error: 'focus must not contain control characters',
+    });
+  });
+});
+
 beforeEach(async () => {
   // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
   await resetDb();
@@ -92,6 +139,51 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  it('returns a persisted handoff document as markdown', async () => {
+    const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    const docPath = join(TEST_HOME, 'handoffs', 'source-2026-05-23T04-35-00.000Z.md');
+    mkdirSync(join(TEST_HOME, 'handoffs'), { recursive: true });
+    writeFileSync(docPath, '## Current objective\n\nContinue the work.\n\n## Suggested skills\n\n- /pan-workflow\n');
+    createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });
+    const target = createConversation({ name: 'target-conv', tmuxSession: 'conv-target', cwd: '/cwd' });
+    recordConversationHandoff('source-conv', 'target-conv', docPath);
+
+    const response = await handleConversationHandoffDoc('target-conv');
+
+    expect(response.status).toBe(200);
+    expect(decodeTextResponse(response)).toContain('## Suggested skills');
+    expect(getConversationByName('source-conv')?.handoffTargetConvId).toBe(target.id);
+  });
+
+  it('returns 404 when a conversation has no handoff document path', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    createConversation({ name: 'plain-conv', tmuxSession: 'conv-plain', cwd: '/cwd' });
+
+    const response = await handleConversationHandoffDoc('plain-conv');
+
+    expect(response.status).toBe(404);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Handoff document not found' });
+  });
+
+  it('returns 410 when the recorded handoff document is missing on disk', async () => {
+    const { createConversation, recordConversationHandoff } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    const docPath = join(TEST_HOME, 'handoffs', 'missing.md');
+    createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });
+    createConversation({ name: 'target-conv', tmuxSession: 'conv-target', cwd: '/cwd' });
+    recordConversationHandoff('source-conv', 'target-conv', docPath);
+
+    const response = await handleConversationHandoffDoc('target-conv');
+
+    expect(response.status).toBe(410);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Handoff document is no longer available' });
+  });
+
   it('stores uploaded images under the owning conversation attachment directory', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
@@ -287,6 +379,222 @@ describe('conversations route — DB integration', () => {
     expect(list[0].status).toBe('active');
   });
 
+  it('returns archived conversations ordered by archivedAt descending', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
+    createConversation({ name: 'active-conv', tmuxSession: 'conv-active', cwd: '/cwd/active', title: 'Active' });
+    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived' });
+    archiveConversation('older-archived');
+    archiveConversation('newer-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-22T00:00:00.000Z', 'older-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T00:00:00.000Z', 'newer-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['newer-archived', 'older-archived']);
+    expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
+    expect(rows[0]).toMatchObject({
+      source: 'managed-archived',
+      panopticonManaged: true,
+      archivedAt: '2026-05-23T00:00:00.000Z',
+    });
+
+    const limitedResponse = await handleArchivedConversationsList({ limit: 1 });
+    const limitedRows = decodeJsonResponse(limitedResponse) as unknown as Array<Record<string, unknown>>;
+    expect(limitedRows.map((row) => row.conversationName)).toEqual(['newer-archived']);
+  });
+
+  it('filters archived conversations with active facets before mapping rows', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'matching-archived',
+      tmuxSession: 'conv-matching',
+      cwd: '/cwd/matching',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'matching-session',
+      model: 'fallback-model',
+    });
+    createConversation({
+      name: 'other-archived',
+      tmuxSession: 'conv-other',
+      cwd: '/cwd/other',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'other-session',
+      model: 'indexed-model',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/jsonl/matching-session.jsonl',
+      sessionId: 'matching-session',
+      workspacePath: '/indexed/matching',
+      messageCount: 8,
+      lastTs: '2026-05-21T00:00:00.000Z',
+      primaryModel: 'indexed-model',
+      estimatedCost: 4.56,
+      toolsUsed: ['Read'],
+      filesTouched: ['src/matching.ts'],
+      tags: ['dashboard'],
+    });
+    db.prepare(`UPDATE discovered_sessions SET enrichment_level = ? WHERE session_id = ?`).run(2, 'matching-session');
+    archiveConversation('matching-archived');
+    archiveConversation('other-archived');
+
+    const response = await handleArchivedConversationsList({
+      workspacePath: '/cwd/matching',
+      primaryModel: 'indexed-model',
+      tags: ['dashboard'],
+      tools: ['Read'],
+      files: ['src/matching.ts'],
+      minCost: 4,
+      enrichmentLevel: 2,
+      limit: 50,
+    });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
+  });
+
+  it('normalizes relative since values when parsing archived conversation filters', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
+
+    try {
+      const { parseArchivedConversationListOptions } = await import('../conversations.js');
+
+      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50'));
+
+      expect(options.since).toBe('2026-05-16T12:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns archived conversations without discovered_sessions enrichment', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'sparse-archived',
+      tmuxSession: 'conv-sparse',
+      cwd: '/cwd/sparse',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'sparse-session',
+      title: 'Sparse title',
+      model: 'claude-opus-4-7',
+    });
+    archiveConversation('sparse-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ?, total_cost = ? WHERE name = ?`).run('2026-05-23T01:00:00.000Z', 1.23, 'sparse-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'sparse-archived',
+      workspacePath: '/cwd/sparse',
+      primaryModel: 'claude-opus-4-7',
+      messageCount: 0,
+      estimatedCost: 1.23,
+      toolsUsed: [],
+      filesTouched: [],
+      tags: [],
+      summary: 'Sparse title',
+      enrichmentLevel: 0,
+      enrichmentFailed: false,
+      panIssueId: 'PAN-1391',
+      lastTs: '2026-05-23T01:00:00.000Z',
+    });
+    expect(rows[0].jsonlPath).toEqual(expect.stringContaining('sparse-session.jsonl'));
+  });
+
+  it('merges discovered_sessions enrichment for archived conversations', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'enriched-archived',
+      tmuxSession: 'conv-enriched',
+      cwd: '/cwd/enriched',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'enriched-session',
+      title: 'Conversation title',
+      model: 'fallback-model',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/jsonl/enriched-session.jsonl',
+      sessionId: 'enriched-session',
+      workspacePath: '/indexed/workspace',
+      messageCount: 8,
+      firstTs: '2026-05-20T00:00:00.000Z',
+      lastTs: '2026-05-21T00:00:00.000Z',
+      primaryModel: 'indexed-model',
+      tokenInput: 111,
+      tokenOutput: 222,
+      estimatedCost: 4.56,
+      toolsUsed: ['Read', 'Edit'],
+      filesTouched: ['src/file.ts'],
+      tags: ['dashboard'],
+    });
+    db.prepare(`UPDATE discovered_sessions SET summary = ?, enrichment_level = ?, enrichment_failed = ? WHERE session_id = ?`)
+      .run('Indexed summary', 2, 1, 'enriched-session');
+    archiveConversation('enriched-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T02:00:00.000Z', 'enriched-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'enriched-archived',
+      jsonlPath: '/jsonl/enriched-session.jsonl',
+      workspacePath: '/cwd/enriched',
+      primaryModel: 'indexed-model',
+      messageCount: 8,
+      firstTs: '2026-05-20T00:00:00.000Z',
+      lastTs: '2026-05-21T00:00:00.000Z',
+      estimatedCost: 4.56,
+      tokenInput: 111,
+      tokenOutput: 222,
+      toolsUsed: ['Read', 'Edit'],
+      filesTouched: ['src/file.ts'],
+      tags: ['dashboard'],
+      summary: 'Indexed summary',
+      enrichmentLevel: 2,
+      enrichmentFailed: true,
+    });
+  });
+
+  it('excludes non-archived conversations from the archived list', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({ name: 'not-archived', tmuxSession: 'conv-not-archived', cwd: '/cwd' });
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toEqual([]);
+  });
+
   it('deleting (marking ended) a conversation persists correctly', async () => {
     const { createConversation, markConversationEnded, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
     createConversation({ name: 'to-delete', tmuxSession: 'conv-to-delete', cwd: '/cwd' });
@@ -362,6 +670,50 @@ describe('conversations route — DB integration', () => {
 
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');
+  });
+
+  it('creates a plain fork conversation from the forkMode discriminator', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+
+    const cwd = '/home/test/plain-project';
+    const sessionId = 'plain-session-123';
+    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+    mkdirSync(claudeProjectDir, { recursive: true });
+    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: 'Before compaction' },
+      }),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'private chain' }],
+        },
+      }),
+    ].join('\n') + '\n');
+
+    const conv = createConversation({
+      name: 'plain-source-conv',
+      tmuxSession: 'conv-plain-source-conv',
+      cwd,
+      claudeSessionId: sessionId,
+      title: 'Plain source',
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
+
+    expect(result.conversation.title).toBe('Fork: Plain source');
+    expect(result.summary).toBe('');
+    expect(result.summaryModel).toBeNull();
+    const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
+    expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
+    expect(forkedJsonl).not.toContain('"type":"thinking"');
+    expect(forkedJsonl).not.toContain('Before compaction');
   });
 });
 

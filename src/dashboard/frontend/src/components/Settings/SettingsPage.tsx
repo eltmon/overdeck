@@ -2933,7 +2933,7 @@ export function SettingsPage() {
             <div className="min-w-0">
               <span className="text-sm font-medium text-foreground">Claude Code Channels</span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Route prompts via stdio MCP bridge instead of tmux send-keys (work agents only)
+                Use Channels transport for conversation delivery; work-agent MCP wiring is YAML-only
               </p>
             </div>
             <button

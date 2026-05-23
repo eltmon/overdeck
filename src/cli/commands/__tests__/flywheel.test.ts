@@ -99,6 +99,7 @@ import {
   flywheelPauseCommand,
   flywheelReportCommand,
   flywheelResumeCommand,
+  formatFlywheelStateReport,
   flywheelStartCommand,
   flywheelStatusCommand,
   parseFlywheelStatusJson,
@@ -129,6 +130,7 @@ const validStatus: FlywheelStatus = {
   substrateBugs: [],
   agents: [],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'abc1234',
     ramUsedMb: 1024,
@@ -157,6 +159,32 @@ async function createReportRepo(root: string): Promise<string> {
   await git(repoDir, ['-c', 'user.name=Panopticon Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed repo']);
   return repoDir;
 }
+
+describe('formatFlywheelStateReport', () => {
+  it('renders populated suggestions before the active pipeline and escapes table cells', () => {
+    const report = formatFlywheelStateReport({
+      ...validStatus,
+      suggestions: [
+        {
+          priority: 'urgent',
+          action: 'investigate',
+          issueId: 'PAN-9',
+          rationale: 'Route | gate\nneeds root-cause fix',
+        },
+      ],
+    });
+
+    expect(report.indexOf('## Suggestions')).toBeLessThan(report.indexOf('## Active Pipeline'));
+    expect(report).toContain('| Priority | Action | Issue | Rationale |');
+    expect(report).toContain('| urgent | investigate | PAN-9 | Route \\| gate needs root-cause fix |');
+  });
+
+  it('renders an empty suggestions message', () => {
+    const report = formatFlywheelStateReport({ ...validStatus, suggestions: [] });
+
+    expect(report).toContain('## Suggestions\n\nNo suggestions emitted this run.');
+  });
+});
 
 describe('flywheel CLI commands', () => {
   let tempDir: string;

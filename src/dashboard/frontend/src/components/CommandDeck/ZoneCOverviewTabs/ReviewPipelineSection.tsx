@@ -5,7 +5,6 @@ import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from '../../../lib/workspace-types';
 import { formatRelativeTime, isStale } from '../../../lib/dashboard-utils';
 import { StatusHistory } from './StatusHistory';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../../lib/commandDeckSurfaceRegistry';
 import { usePrQuery } from './queries';
 import { statusColor } from './PrDiffTab';
 
@@ -18,8 +17,6 @@ interface ReviewPipelineSectionProps {
   issueId?: string;
   onViewLog?: () => void;
 }
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 interface PipelineStep {
   key: string;

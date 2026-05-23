@@ -3162,7 +3162,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         const localPath = workspaceInfo.localPath;
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(localPath));
+          const gitInfo = yield* getWorkspaceGitInfo(localPath);
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
           }
@@ -3206,7 +3206,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           const { cleanupReviewTempStash } = yield* Effect.promise(() =>
             import('../../../lib/cloister/review-agent.js')
           );
-          yield* Effect.promise(() => cleanupReviewTempStash(issueId, wsInfo.localPath!));
+          yield* cleanupReviewTempStash(issueId, wsInfo.localPath!);
         }
       } catch (err) {
         console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);
@@ -3883,7 +3883,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (!workspaceInfo.isRemote) {
       try {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
-        const commitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspacePath));
+        const commitInfo = yield* getWorkspaceGitInfo(workspacePath);
         requestReviewCommits = { HEAD: commitInfo.HEAD, branch: commitInfo.branch };
       } catch {}
     }

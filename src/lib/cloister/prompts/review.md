@@ -15,6 +15,7 @@ optional:
   - POLYREPO_DIRS
   - ACCEPTANCE_CRITERIA
   - MEMORY_CONTEXT
+  - TLDR_AVAILABLE
 ---
 # Code Review — {{ISSUE_ID}}
 
@@ -42,6 +43,19 @@ You are a demanding code review specialist. Your job is to ensure code is produc
 {{MEMORY_CONTEXT}}
 {{/MEMORY_CONTEXT}}
 
+{{#TLDR_AVAILABLE}}
+## TLDR: Efficient Review Context
+
+You have access to TLDR MCP tools for understanding changed files and their surrounding context before reading full implementations:
+- `tldr_context <file>` — summarize a changed file before selecting exact sections to inspect
+- `tldr_structure <directory>` — understand neighboring modules that shape the diff's intent
+- `tldr_semantic <query>` — find related behavior, contracts, or tests not obvious from the file list
+- `tldr_calls <function> <file>` — verify caller expectations around changed functions
+- `tldr_impact <function> <file>` — trace downstream effects before deciding whether a change is safe
+
+Use TLDR to navigate quickly, then use full Reads for the actual files and exact code evidence required in review findings.
+
+{{/TLDR_AVAILABLE}}
 **IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the test-agent runs tests in the next step.
 
 {{#ACCEPTANCE_CRITERIA}}

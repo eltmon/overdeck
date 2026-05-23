@@ -86,7 +86,7 @@
     "prelint:skills": "npm run build:contracts && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
     "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:cli",
-    "test": "vitest run",
+    "test": "vitest run && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",

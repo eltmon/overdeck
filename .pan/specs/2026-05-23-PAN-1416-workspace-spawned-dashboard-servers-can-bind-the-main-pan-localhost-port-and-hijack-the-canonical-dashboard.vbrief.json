@@ -1,0 +1,487 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:27:23.625Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1416: Workspace-spawned dashboard servers can bind the main pan.localhost port and hijack the canonical dashboard",
+    "updated": "2026-05-23T11:30:18.763Z"
+  },
+  "plan": {
+    "id": "pan-1416",
+    "title": "Workspace-spawned dashboard servers can bind the main pan.localhost port and hijack the canonical dashboard",
+    "status": "proposed",
+    "uid": "c35e5e4d-f732-4ebd-86df-bc541d16e51e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:27:23.625Z",
+    "updated": "2026-05-23T11:30:18.763Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1416",
+        "label": "PAN-1416",
+        "type": "issue"
+      },
+      {
+        "uri": ".claude/rules/single-deacon-invariant.md",
+        "label": "Adjacent invariant: single-Deacon",
+        "type": "doc"
+      },
+      {
+        "uri": ".claude/rules/dashboard-node22-only.md",
+        "label": "Dashboard Node 22 rule",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/WORKSPACE-CONTAINERS.md",
+        "label": "Workspace container contract",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "safety-guard",
+      "workspace-isolation",
+      "operational-safety"
+    ],
+    "narratives": {
+      "Problem": "When a work agent runs `node dist/dashboard/server.js` from inside its workspace without setting API_PORT, the process happily binds the configured primary dashboard port (default 3011). Traefik routes pan.localhost → host.docker.internal:3011 unconditionally, so whoever owns that port becomes the de-facto canonical dashboard. Observed in production 2026-05-23: a workspace dashboard from workspaces/feature-pan-1391 was serving pan.localhost, meaning cross-workspace operations (clicking MERGE for PAN-1393) ran on stale workspace code, and workspace teardown could yank pan.localhost without warning. This is the dashboard-side analogue of the single-Deacon invariant — only one dashboard should be allowed to claim the canonical port.",
+      "Proposal": "Defense in depth with two server-side guards plus a doctor check. (1) Canonical-path guard: at startup, if process.cwd() matches /workspaces/feature-*/ AND API_PORT is unset AND PANOPTICON_DISABLE_DEACON is unset, refuse the primary-port bind — fall back to a kernel-assigned ephemeral port and log loudly. (2) Port-lock guard: the canonical dashboard writes ~/.panopticon/dashboard.lock with pid/port/cwd/heartbeat; a new instance reads it and, if a live canonical owns the intended port, refuses to bind that port. Non-workspace cwds exit with EX_TEMPFAIL; workspace cwds fall back to an ephemeral port. (3) pan doctor reports multiple dashboard instances and flags any non-canonical instance bound to the primary port. (4) Roles/skills/docs that prescribe workspace dashboard spawns are updated to mandate explicit API_PORT."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement both guards (port-lock + canonical-path) rather than picking one, because the observed failure mode (workspace dashboard binding 3011 after canonical was killed) is only caught by the canonical-path guard, while simultaneous-start collisions are only caught by the port-lock guard.",
+        "rationale": "The issue explicitly proposes both as 'defense in depth' and the failure modes they cover are disjoint. Skipping either leaves a real-world race uncovered."
+      },
+      {
+        "summary": "Lockfile location ~/.panopticon/dashboard.lock with schema { pid, port, cwd, startedAt, heartbeatAt, isCanonical }. Heartbeat interval 30s; stale threshold 90s.",
+        "rationale": "Mirrors the existing src/lib/restart-lock.ts and src/lib/smee.ts conventions (PANOPTICON_HOME-rooted, JSON, pid/ts liveness check). 30s heartbeat is tight enough that pan up restarts are not blocked while still surviving brief event-loop pauses; 90s stale threshold gives the new instance fast detection of a dead old one without thrashing."
+      },
+      {
+        "summary": "When a guard fires, the dashboard falls back to port 0 (kernel-assigned ephemeral) rather than refusing to start outright in the workspace case, and exits with EX_TEMPFAIL (75) in the non-workspace case.",
+        "rationale": "The issue body asks for 'refuse to bind the primary port and fall back to a workspace-local port + log clearly' in the workspace case. For the rarer non-workspace double-start, exiting loudly is more honest than silently moving to a random port — the operator made a mistake worth surfacing."
+      },
+      {
+        "summary": "Guards check only the API port (configured dashboard.api_port, default 3011). The frontend port (3010), supervisor port (api_port + 1), and other ports are left alone.",
+        "rationale": "Traefik routes pan.localhost to the API port; that is the single point of hijack. Expanding the guard surface to other ports increases the risk of breaking pan dev mode and the Vite frontend without buying any additional safety."
+      },
+      {
+        "summary": "Workspace cwd detection uses the regex /\\/workspaces\\/feature-[^/]+(\\/|$)/ applied to process.cwd().",
+        "rationale": "This is the canonical workspace layout documented in src/lib/cloister/service.ts (`${projectPath}/workspaces/feature-${issueLower}`) and used by the entire pipeline. The regex matches both subdir entries and exact workspace roots."
+      },
+      {
+        "summary": "Containers that legitimately serve as workspace UI peers are exempted via PANOPTICON_DISABLE_DEACON=1, which is already mandated by .claude/rules/single-deacon-invariant.md.",
+        "rationale": "Reusing an existing escape hatch avoids introducing a new env var and aligns the dashboard-guard policy with the deacon-guard policy. Anything that opts out of the single-Deacon invariant should also opt out of the canonical-port invariant."
+      },
+      {
+        "summary": "pan doctor process detection uses /proc/*/cmdline + /proc/<pid>/cwd on Linux (the production deployment target). darwin/win32 fall back to `ps -e -o pid,command` with no cwd resolution and a softer 'informational' warning.",
+        "rationale": "Linux gives us authoritative cwd via /proc. macOS and Windows installs of Panopticon are dev-only and the soft signal is sufficient there. Not worth pulling in a process-tree library for a doctor check."
+      },
+      {
+        "summary": "'Workspace test-spawn scripts' in the acceptance criteria is interpreted as the documented spawn patterns across CLAUDE.md, CONTRIBUTING.md, roles/, sync-sources/skills/, and the existing scripts/restart-dashboard.sh, not a single non-existent centralized script.",
+        "rationale": "Code search confirmed no canonical 'test-spawn' script — agents spawn dashboards ad-hoc per role prompt instructions. The fix is to encode API_PORT discipline in those prompts. The server-side guards remain the primary defense."
+      }
+    ],
+    "items": [
+      {
+        "id": "lockfile-writer",
+        "title": "Add dashboard heartbeat lockfile writer (~/.panopticon/dashboard.lock)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1416",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "port-lock-guard",
+            "pan-doctor-multi-dashboard"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/dashboard-lock.ts exporting writeDashboardLock(), refreshHeartbeat(), unlinkDashboardLock(), and readDashboardLock(). The writer writes ~/.panopticon/dashboard.lock atomically (tmp+rename) with schema { pid, port, cwd, startedAt, heartbeatAt, isCanonical }. isCanonical = !cwdMatchesWorkspacePattern(). Heartbeat interval 30s via setInterval; cleared on shutdown. Wire startup into src/dashboard/server/main.ts after PANOPTICON_HOME is ensured (around L47). Wire teardown into the existing handleShutdownSignal SIGTERM/SIGINT/SIGHUP handler at L400-L415 so graceful exits unlink the file before process.exit(0). Use fs/promises (async only — this is dashboard server code, blocking FS is banned per .claude/rules/no-execsync-server.md). Match conventions from src/lib/restart-lock.ts and src/lib/smee.ts."
+        },
+        "subItems": [
+          {
+            "id": "lockfile-writer.ac1",
+            "title": "~/.panopticon/dashboard.lock exists after dashboard startup with valid JSON containing pid, port, cwd, startedAt, heartbeatAt, isCanonical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile-writer.ac2",
+            "title": "heartbeatAt updates every 30s while the dashboard runs (verified by checking two snapshots > 30s apart)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile-writer.ac3",
+            "title": "Graceful SIGTERM/SIGINT/SIGHUP unlinks the lockfile before process exit (verified by tailing the file across a kill cycle)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile-writer.ac4",
+            "title": "isCanonical reflects whether process.cwd() matches the workspace pattern at startup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile-writer.ac5",
+            "title": "All file I/O uses fs/promises async APIs; no execSync, readFileSync, or writeFileSync introduced in dashboard server code paths (passes the existing dashboard-server lint rules)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-lock-guard",
+        "title": "Add startup port-lock guard that refuses to bind the primary port when a live canonical dashboard holds the lock",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1416",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before binding the HTTP server in src/dashboard/server/server.ts (the HttpServerLive layer around L71-L92, or in main.ts before runServer is awaited), read the lockfile via readDashboardLock(). If the lock exists, lock.pid is alive (process.kill(pid, 0) succeeds), lock.heartbeatAt is within the last 90s, lock.port === intendedBindPort, AND lock.pid !== process.pid, fire the guard. When firing: log a loud multi-line warning identifying the conflicting pid/cwd, then either (a) if process.cwd() matches the workspace pattern, override config.port to 0 (kernel-assigned ephemeral) and continue, then log the actual chosen port after listening, or (b) if not in a workspace cwd, process.exit(75) (EX_TEMPFAIL) so pan up surfaces the collision. Skip the guard entirely when PANOPTICON_DISABLE_DEACON=1 is set."
+        },
+        "subItems": [
+          {
+            "id": "port-lock-guard.ac1",
+            "title": "Starting a second dashboard against an alive lockfile, from a non-workspace cwd, exits with code 75 and prints a loud warning naming the conflicting pid and cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-lock-guard.ac2",
+            "title": "Starting a second dashboard against an alive lockfile, from a workspace cwd (e.g. workspaces/feature-pan-1416), falls back to an ephemeral port, logs the chosen port, and continues to serve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-lock-guard.ac3",
+            "title": "Starting a dashboard with a stale lockfile (heartbeatAt > 90s old OR lock.pid not alive) proceeds normally and overwrites the stale lock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-lock-guard.ac4",
+            "title": "Starting a dashboard with PANOPTICON_DISABLE_DEACON=1 bypasses the guard entirely (used by workspace devcontainer peers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-lock-guard.ac5",
+            "title": "Canonical pan up restart cycle works without delay: pan down → pan up completes within the normal time budget (graceful shutdown unlinks lockfile in time for the new bind)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "canonical-path-guard",
+        "title": "Add startup canonical-path guard that refuses primary-port bind when cwd is a workspace path and API_PORT is unset",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1416",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before binding the HTTP server (alongside the port-lock guard), test process.cwd() against /\\/workspaces\\/feature-[^/]+(\\/|$)/. If it matches AND process.env.API_PORT is undefined AND process.env.PANOPTICON_DISABLE_DEACON is unset, fire the guard. When firing: log a loud multi-line warning explaining the policy and the cwd, then override the bind port to 0 (ephemeral). After listening, log the actual chosen port so the operator (or agent) can connect to it. The canonical dashboard (cwd = project root) and devcontainer peers (PANOPTICON_DISABLE_DEACON=1) are unaffected."
+        },
+        "subItems": [
+          {
+            "id": "canonical-path-guard.ac1",
+            "title": "Starting node dist/dashboard/server.js from workspaces/feature-pan-* without API_PORT does NOT bind 3011; it binds an ephemeral port and logs the chosen port loudly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canonical-path-guard.ac2",
+            "title": "Starting node dist/dashboard/server.js from workspaces/feature-pan-* WITH explicit API_PORT=4511 binds 4511 as requested (guard does not fire)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canonical-path-guard.ac3",
+            "title": "Starting node dist/dashboard/server.js from the project root (no /workspaces/feature-* segment) binds 3011 as normal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canonical-path-guard.ac4",
+            "title": "Starting with PANOPTICON_DISABLE_DEACON=1 from a workspace cwd bypasses the guard (devcontainer peer scenario)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canonical-path-guard.ac5",
+            "title": "pan dev (npm run dev) launched from project root is unaffected — Vite (3010) and dashboard (3011) come up normally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-doctor-multi-dashboard",
+        "title": "pan doctor reports multiple dashboard instances and flags non-canonical primary-port owners",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1416",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/cli/commands/doctor.ts with a checkDashboardInstances() function (added to the existing checks pipeline). On Linux: read /proc/*/cmdline, filter for entries containing 'dist/dashboard/server.js', resolve each pid's cwd via /proc/<pid>/cwd. On darwin/win32: parse `ps -e -o pid,command` and skip cwd resolution. Cross-reference with ~/.panopticon/dashboard.lock if present to confirm canonical identity. Return: ok if exactly one canonical instance; warn if >1 instance running; error if a non-canonical (cwd matches workspace pattern) instance is bound to the configured primary port. Include the conflicting pid + cwd in the message and recommend `pan down && pan up` to recover."
+        },
+        "subItems": [
+          {
+            "id": "pan-doctor-multi-dashboard.ac1",
+            "title": "pan doctor with one canonical dashboard running reports OK ('Dashboard Instances: 1 canonical instance on port 3011')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-multi-dashboard.ac2",
+            "title": "pan doctor with two dashboards (one canonical, one workspace, different ports) reports WARN listing both with their pids/cwds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-multi-dashboard.ac3",
+            "title": "pan doctor with a non-canonical dashboard (cwd under workspaces/feature-*) bound to the configured primary port reports ERROR identifying the impostor and suggesting `pan down && pan up`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-doctor-multi-dashboard.ac4",
+            "title": "Check runs successfully on Linux with /proc-based detection; falls back to ps-based detection without crashing on darwin/win32",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-prompts-update",
+        "title": "Update docs/rules/role prompts to document the new guards and mandate explicit API_PORT for workspace dashboard spawns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1416",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the following surfaces to document the guards and prescribe API_PORT discipline: (1) .claude/rules/dashboard-node22-only.md — add a 'Canonical Port Invariant' section. (2) docs/WORKSPACE-CONTAINERS.md — add a paragraph about the dashboard.lock and the PANOPTICON_DISABLE_DEACON=1 exemption. (3) docs/PANOPTICON_DEV_SOP.md — note the multi-instance pan doctor check. (4) sync-sources/rules/dashboard-node22-only.md — mirror the rule update. (5) sync-sources/skills/pan-doctor/SKILL.md — document the new dashboard-instances check. (6) CONTRIBUTING.md — call out the API_PORT requirement when spawning a dashboard from a workspace for testing. Pure doc work — do not modify source code in this bead."
+        },
+        "subItems": [
+          {
+            "id": "docs-and-prompts-update.ac1",
+            "title": ".claude/rules/dashboard-node22-only.md and sync-sources/rules/dashboard-node22-only.md both include a Canonical Port Invariant section describing the cwd guard, the lockfile guard, and the PANOPTICON_DISABLE_DEACON=1 exemption",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts-update.ac2",
+            "title": "docs/WORKSPACE-CONTAINERS.md documents the dashboard.lock file (path, schema, heartbeat) and the devcontainer exemption",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts-update.ac3",
+            "title": "sync-sources/skills/pan-doctor/SKILL.md documents the new 'Dashboard Instances' check and what its WARN/ERROR statuses mean",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts-update.ac4",
+            "title": "CONTRIBUTING.md (or equivalent) tells contributors and agents that spawning a dashboard from a workspace requires setting API_PORT explicitly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts-update.ac5",
+            "title": "No source code under src/ is modified in this bead — diff is documentation-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "integration-tests",
+        "title": "Integration tests for lockfile lifecycle, port-lock guard, canonical-path guard, and pan doctor multi-dashboard detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:27:23.625Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1416",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add Vitest integration tests covering: (1) lockfile writer atomically creates/updates ~/.panopticon/dashboard.lock with the documented schema; heartbeats refresh; SIGTERM unlinks. (2) port-lock guard exits with 75 when a live lock conflicts and cwd is non-workspace; falls back to ephemeral port when cwd is workspace. (3) canonical-path guard fires on workspace cwd without API_PORT; does not fire when API_PORT is set; does not fire on project root cwd; does not fire when PANOPTICON_DISABLE_DEACON=1. (4) pan doctor reports OK/WARN/ERROR appropriately based on simulated process+lockfile state. Use PANOPTICON_HOME=tmpdir to isolate state per test (matches the pattern in src/lib/__tests__/restart-lock.test.ts). For port-binding tests, spawn the real dashboard binary in a child process with fake ports (use port 0 and read the assigned port from health output) — do NOT mock process.cwd() at the unit level; use cwd: ... in spawn options."
+        },
+        "subItems": [
+          {
+            "id": "integration-tests.ac1",
+            "title": "tests/unit/lib/dashboard-lock.test.ts covers writer, refresh, reader, unlink, stale detection (>90s), and dead-pid detection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-tests.ac2",
+            "title": "tests/integration/dashboard-port-lock.test.ts spawns two dashboards, asserts the second exits 75 from a non-workspace cwd and falls back to an ephemeral port from a workspace cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-tests.ac3",
+            "title": "tests/integration/dashboard-canonical-path.test.ts spawns the dashboard with cwd=workspaces/feature-pan-* and no API_PORT, asserts it does not bind 3011 and instead listens on an ephemeral port (visible in stdout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-tests.ac4",
+            "title": "tests/unit/cli/doctor-dashboard-instances.test.ts asserts OK / WARN / ERROR transitions of the pan doctor check given mocked process lists and lockfile states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-tests.ac5",
+            "title": "All new tests use isolated PANOPTICON_HOME via tmpdir and clean up after themselves; tests pass under the project's standard `npm test` invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lockfile-writer",
+        "to": "port-lock-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "lockfile-writer",
+        "to": "pan-doctor-multi-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "lockfile-writer",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "port-lock-guard",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "canonical-path-guard",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-doctor-multi-dashboard",
+        "to": "integration-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "lockfile-writer",
+        "to": "docs-and-prompts-update",
+        "type": "informs"
+      },
+      {
+        "from": "port-lock-guard",
+        "to": "docs-and-prompts-update",
+        "type": "informs"
+      },
+      {
+        "from": "canonical-path-guard",
+        "to": "docs-and-prompts-update",
+        "type": "informs"
+      },
+      {
+        "from": "pan-doctor-multi-dashboard",
+        "to": "docs-and-prompts-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1416-workspace-spawned-dashboard-servers-can-bind-the-main-pan-localhost-port-and-hijack-the-canonical-dashboard.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

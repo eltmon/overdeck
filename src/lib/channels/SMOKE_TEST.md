@@ -1,10 +1,11 @@
 # Claude Code Channels — Manual Smoke Test (PAN-985)
 
-End-to-end verification of the experimental Channels prompt-delivery path.
-Run on a real workstation against a real `claude` binary with claude.ai or
-Console-API auth. CI cannot exercise this path because it requires an
-interactive Claude session; the in-process unit tests in
-`__tests__/panopticon-bridge.test.ts` and
+End-to-end verification of the legacy Channels MCP prompt-delivery fallback.
+New work agents use the PTY supervisor by default; this path is retained as an
+explicit YAML-only diagnostic override. Run on a real workstation against a
+real `claude` binary with claude.ai or Console-API auth. CI cannot exercise
+this path because it requires an interactive Claude session; the in-process
+unit tests in `__tests__/panopticon-bridge.test.ts` and
 `../__tests__/deliver-agent-message.test.ts` are the automated layer.
 
 ## Prerequisites
@@ -18,14 +19,14 @@ interactive Claude session; the in-process unit tests in
 
 ## Procedure
 
-1. **Toggle the experimental flag on.**
-   - Open the dashboard Settings page.
-   - Scroll to the bottom; the **Experimental** section is the last on the page.
-   - Flip **Use Claude Code Channels for prompt delivery (work agents only)** on.
-   - Confirm the toggle persists: refresh the page and verify it stays on.
-   - Behind the scenes this writes
-     `experimental: { claudeCodeChannels: true }` to
-     `~/.panopticon/config.yaml`.
+1. **Enable the legacy MCP override in YAML.**
+   - Edit `~/.panopticon/config.yaml` and set:
+     ```yaml
+     experimental:
+       claudeCodeChannelsMcp: true
+     ```
+   - The dashboard Settings toggle for `claudeCodeChannels` controls
+     conversation delivery only; it does not wire MCP for new work agents.
 
 2. **Start a work agent.**
    - From the dashboard or `pan start <ISSUE>`.
@@ -53,34 +54,38 @@ interactive Claude session; the in-process unit tests in
 
 4. **Tail the bridge log.**
    - `tail -f ${PANOPTICON_HOME:-~/.panopticon}/logs/bridge-agent-pan-XXX.log`.
-   - For each delivered prompt you should see one JSON line per delivery,
-     e.g.:
+   - `deliverAgentMessage` writes the routing decision to this file. On a
+     healthy new agent the default decision is now `path: 'supervisor'`, because
+     the PTY supervisor is tried before Channels.
+   - A `path: 'channel'` line verifies the legacy MCP fallback only when the
+     supervisor tier is unavailable or when a caller explicitly forces Channels.
+     The bridge then writes a companion JSON line such as:
      ```
      {"ts":"2026-05-07T...","agentId":"agent-pan-XXX","contentLength":1234,"metaKeys":[]}
      ```
-     This is written by the bridge itself when it forwards a push as a
-     channel notification.
-   - The companion line written by `deliverAgentMessage` records the
-     decision (`path: 'channel'` for the success case,
-     `path: 'tmux', reason: 'socket-...'` for fallback). Both go to the
-     same `bridge-<id>.log` file.
 
 5. **Force a second delivery via `pan tell`.**
    - Run `pan tell PAN-XXX "echo smoke-test"`.
-   - The bridge log gains another entry, this time with
-     `caller: 'messageAgent:pan-tell'`. The agent's tmux pane should
-     show no typed text (the message went through the channel, not via
-     paste-buffer).
+   - With the supervisor healthy, the decision line should be
+     `path: 'supervisor'`. To test the Channels fallback itself, stop or remove
+     the PTY supervisor socket for this disposable smoke-test agent, then send a
+     second `pan tell` and expect `path: 'channel'` plus the bridge companion
+     line.
 
 ## Expected log signatures
 
-Successful channel push:
+Default supervisor push:
+```
+{"ts":"2026-...","agentId":"agent-pan-XXX","path":"supervisor","caller":"messageAgent:pan-tell"}
+```
+
+Legacy channel fallback push:
 ```
 {"ts":"2026-...","agentId":"agent-pan-XXX","path":"channel","caller":"messageAgent:pan-tell"}
 {"ts":"2026-...","agentId":"agent-pan-XXX","contentLength":17,"metaKeys":["caller"]}
 ```
 
-Fallback to tmux (transient bridge crash):
+Fallback to tmux (both sockets unavailable):
 ```
 {"ts":"2026-...","agentId":"agent-pan-XXX","path":"tmux","reason":"socket-post-failed: ...","caller":"messageAgent:pan-tell"}
 ```
@@ -103,7 +108,8 @@ Fallback to tmux (transient bridge crash):
 
 ## Reverting
 
-1. Toggle the experimental flag **off** in dashboard Settings.
+1. Remove `experimental.claudeCodeChannelsMcp` or set it to `false` in
+   `~/.panopticon/config.yaml`.
 2. Stop and restart any running work agents (`pan kill <id>` then
    `pan start <id>`). Existing agent state files retain
    `channelsEnabled = true` from the previous launch; the next spawn

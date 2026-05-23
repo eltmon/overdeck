@@ -14,16 +14,18 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 
 const EFFORT_LEVELS = [
   { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium (default)' },
+  { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
-  { id: 'xhigh', label: 'Extra High' },
+  { id: 'xhigh', label: 'Extra High (default)' },
   { id: 'max', label: 'Max' },
 ] as const;
 
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]['id'];
 
 const EFFORT_STORAGE_KEY = 'conv-composer-effort';
-const DEFAULT_EFFORT: EffortLevel = 'medium';
+// Matches Claude Code's own /model default. Models that don't list 'xhigh' in
+// MODEL_EFFORT_SUPPORT fall back to 'medium' in the selected= lookup below.
+const DEFAULT_EFFORT: EffortLevel = 'xhigh';
 
 export function loadStoredEffort(): EffortLevel {
   try {
@@ -58,7 +60,11 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
     ? EFFORT_LEVELS.filter((e) => availableLevels.includes(e.id))
     : EFFORT_LEVELS;
 
-  const selected = filteredLevels.find((e) => e.id === value) ?? filteredLevels[0] ?? EFFORT_LEVELS[1]!;
+  const selected =
+    filteredLevels.find((e) => e.id === value)
+    ?? filteredLevels.find((e) => e.id === 'medium')
+    ?? filteredLevels[0]
+    ?? EFFORT_LEVELS[1]!;
 
   useEffect(() => {
     if (!open) return;

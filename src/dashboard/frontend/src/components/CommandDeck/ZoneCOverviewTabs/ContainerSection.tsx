@@ -1,9 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Box, Database, Loader2, RefreshCw, Square, Play, Check, X, Activity } from 'lucide-react';
 import type { ContainerStatus, ContainerMenuState } from '../../../lib/workspace-types';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../../lib/commandDeckSurfaceRegistry';
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 interface ContainerSectionProps {
   containers: Record<string, ContainerStatus>;
