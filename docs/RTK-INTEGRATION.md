@@ -63,3 +63,9 @@ For non-Bash tools or unsupported Bash commands, `rtk hook claude` exits `0` and
 The rewritten command then executes normally through Bash. RTK subcommands proxy the underlying command and print compact stdout/stderr for supported command families (`git`, `gh`, `find`, `grep`, `npm`, `vitest`, `tsc`, and others). `rtk --version` exits `0` and prints `rtk 0.41.0` for the pinned binary.
 
 `rtk pipe --filter <name>` exists and reads raw stdin to stdout, but it is not the primary Panopticon PreToolUse integration because PreToolUse runs before Bash execution and cannot observe post-command output. The Panopticon wrapper should therefore gate config/binary availability itself, then delegate the JSON rewrite to `rtk hook claude`.
+
+## Smoke observation: PAN-1410
+
+On 2026-05-23, `agent-pan-1410` was spawned with `PANOPTICON_RTK_ENABLED=true` and the work role's `Bash` PreToolUse matcher installed. The agent completed PAN-1410, produced commits through the normal bead workflow, passed `npm run typecheck`, `npm run lint`, and `npm test`, pushed `origin/feature/pan-1410`, and `pan done PAN-1410` moved the issue to In Review.
+
+Representative Bash transcript entries showed large command outputs reduced to model-visible persisted previews: `npm run build` reported a 153.9KB persisted output with a 2KB preview, `npm run lint` reported a 41KB persisted output with a 2KB preview, and the final `npm test` completed successfully with `npm test exit 0`. No RTK hook errors or Bash execution corruption appeared in the tmux capture.
