@@ -114,7 +114,7 @@
       "version": "0.1.0",
     },
     "src/dashboard/frontend": {
-      "name": "panopticon-dashboard",
+      "name": "@panctl/frontend",
       "version": "0.1.0",
       "dependencies": {
         "@dagrejs/dagre": "^3.0.0",
@@ -598,6 +598,8 @@
     "@panctl/contracts": ["@panctl/contracts@workspace:packages/contracts"],
 
     "@panctl/desktop": ["@panctl/desktop@workspace:apps/desktop"],
+
+    "@panctl/frontend": ["@panctl/frontend@workspace:src/dashboard/frontend"],
 
     "@panopticon/pi-extension": ["@panopticon/pi-extension@workspace:packages/pi-extension"],
 
@@ -2214,8 +2216,6 @@
     "package-manager-detector": ["package-manager-detector@1.6.0", "", {}, "sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA=="],
 
     "pako": ["pako@2.0.3", "", {}, "sha512-WjR1hOeg+kki3ZIOjaf4b5WVcay1jaliKSYiEaB1XzwhMQZJxRdQRv0V31EKBYlxb4T7SK3hjfc/jxyU64BoSw=="],
-
-    "panopticon-dashboard": ["panopticon-dashboard@workspace:src/dashboard/frontend"],
 
     "panopticon-server": ["panopticon-server@workspace:src/dashboard/server"],
 
