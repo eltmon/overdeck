@@ -55,6 +55,34 @@ export interface Conversation {
   spawnError: string | null;
 }
 
+export interface ArchivedConversationWithEnrichment {
+  id: number;
+  name: string;
+  cwd: string;
+  issueId: string | null;
+  createdAt: string;
+  claudeSessionId: string | null;
+  title: string | null;
+  totalCost: number;
+  archivedAt: string;
+  model: string | null;
+  discoveredJsonlPath: string | null;
+  discoveredWorkspacePath: string | null;
+  messageCount: number | null;
+  firstTs: string | null;
+  lastTs: string | null;
+  primaryModel: string | null;
+  tokenInput: number | null;
+  tokenOutput: number | null;
+  estimatedCost: number | null;
+  toolsUsed: string | null;
+  filesTouched: string | null;
+  tags: string | null;
+  summary: string | null;
+  enrichmentLevel: number | null;
+  enrichmentFailed: number | null;
+}
+
 // ─── Row mapper ───────────────────────────────────────────────────────────────
 
 function rowToConversation(row: Record<string, unknown>): Conversation {
@@ -196,6 +224,44 @@ export function listArchivedConversations(): Conversation[] {
     )
     .all() as Record<string, unknown>[];
   return rows.map(rowToConversation);
+}
+
+export function listArchivedConversationsWithEnrichment(): ArchivedConversationWithEnrichment[] {
+  const db = getDatabase();
+  return db
+    .prepare(
+      `SELECT
+         c.id AS id,
+         c.name AS name,
+         c.cwd AS cwd,
+         c.issue_id AS issueId,
+         c.created_at AS createdAt,
+         c.claude_session_id AS claudeSessionId,
+         c.title AS title,
+         c.total_cost AS totalCost,
+         c.archived_at AS archivedAt,
+         c.model AS model,
+         ds.jsonl_path AS discoveredJsonlPath,
+         ds.workspace_path AS discoveredWorkspacePath,
+         ds.message_count AS messageCount,
+         ds.first_ts AS firstTs,
+         ds.last_ts AS lastTs,
+         ds.primary_model AS primaryModel,
+         ds.token_input AS tokenInput,
+         ds.token_output AS tokenOutput,
+         ds.estimated_cost AS estimatedCost,
+         ds.tools_used AS toolsUsed,
+         ds.files_touched AS filesTouched,
+         ds.tags AS tags,
+         ds.summary AS summary,
+         ds.enrichment_level AS enrichmentLevel,
+         ds.enrichment_failed AS enrichmentFailed
+       FROM conversations c
+       LEFT JOIN discovered_sessions ds ON ds.session_id = c.claude_session_id
+       WHERE c.archived_at IS NOT NULL
+       ORDER BY c.archived_at DESC, c.created_at DESC`,
+    )
+    .all() as ArchivedConversationWithEnrichment[];
 }
 
 export function listArchivedConversationNames(): string[] {

@@ -41,6 +41,7 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
+  listArchivedConversationsWithEnrichment,
   getConversationByName,
   getConversationById,
   createConversation,
@@ -62,6 +63,7 @@ import {
   removeFavorite,
   updateForkStatus,
   updateSpawnError,
+  type ArchivedConversationWithEnrichment,
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
@@ -1100,6 +1102,77 @@ interface ConversationAboutSummary {
 const aboutSummaryCache = new Map<string, { transcriptSize: number; data: ConversationAboutSummary }>();
 const ABOUT_SUMMARY_CACHE_MAX = 100;
 
+type ArchivedConversationResponse = {
+  id: number;
+  source: 'managed-archived';
+  conversationName: string;
+  jsonlPath: string | null;
+  workspacePath: string;
+  primaryModel: string | null;
+  messageCount: number;
+  firstTs: string;
+  lastTs: string;
+  estimatedCost: number;
+  tokenInput: number;
+  tokenOutput: number;
+  toolsUsed: string[];
+  filesTouched: string[];
+  tags: string[];
+  summary: string | null;
+  enrichmentLevel: 0 | 1 | 2 | 3;
+  enrichmentFailed: boolean;
+  panopticonManaged: true;
+  panIssueId: string | null;
+  archivedAt: string;
+};
+
+function parseStringArrayColumn(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
+  return {
+    id: row.id,
+    source: 'managed-archived',
+    conversationName: row.name,
+    jsonlPath: row.discoveredJsonlPath ?? (row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
+    workspacePath: row.cwd,
+    primaryModel: row.primaryModel ?? row.model,
+    messageCount: row.messageCount ?? 0,
+    firstTs: row.firstTs ?? row.createdAt,
+    lastTs: row.lastTs ?? row.archivedAt,
+    estimatedCost: row.estimatedCost ?? row.totalCost,
+    tokenInput: row.tokenInput ?? 0,
+    tokenOutput: row.tokenOutput ?? 0,
+    toolsUsed: parseStringArrayColumn(row.toolsUsed),
+    filesTouched: parseStringArrayColumn(row.filesTouched),
+    tags: parseStringArrayColumn(row.tags),
+    summary: row.summary ?? row.title,
+    enrichmentLevel: ((row.enrichmentLevel ?? 0) as 0 | 1 | 2 | 3),
+    enrichmentFailed: Boolean(row.enrichmentFailed),
+    panopticonManaged: true,
+    panIssueId: row.issueId,
+    archivedAt: row.archivedAt,
+  };
+}
+
+export async function handleArchivedConversationsList(): Promise<ReturnType<typeof jsonResponse>> {
+  try {
+    const rows = listArchivedConversationsWithEnrichment().map(mapArchivedConversation);
+    return jsonResponse(rows);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] list archived conversations failed:', msg);
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
 const getConversationsRoute = HttpRouter.add(
@@ -1155,6 +1228,19 @@ const getConversationsRoute = HttpRouter.add(
         console.error('[conversations] list conversations failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         }})
+  }),
+);
+
+const getArchivedConversationsRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/archived',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return yield* Effect.promise(() => handleArchivedConversationsList());
   }),
 );
 
@@ -2980,6 +3066,7 @@ const getConversationAboutRoute = HttpRouter.add(
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
+  getArchivedConversationsRoute,
   getConversationRoute,
   postConversationRoute,
   patchConversationRoute,

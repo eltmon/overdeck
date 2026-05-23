@@ -287,6 +287,148 @@ describe('conversations route — DB integration', () => {
     expect(list[0].status).toBe('active');
   });
 
+  it('returns archived conversations ordered by archivedAt descending', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
+    createConversation({ name: 'active-conv', tmuxSession: 'conv-active', cwd: '/cwd/active', title: 'Active' });
+    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived' });
+    archiveConversation('older-archived');
+    archiveConversation('newer-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-22T00:00:00.000Z', 'older-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T00:00:00.000Z', 'newer-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['newer-archived', 'older-archived']);
+    expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
+    expect(rows[0]).toMatchObject({
+      source: 'managed-archived',
+      panopticonManaged: true,
+      archivedAt: '2026-05-23T00:00:00.000Z',
+    });
+  });
+
+  it('returns archived conversations without discovered_sessions enrichment', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'sparse-archived',
+      tmuxSession: 'conv-sparse',
+      cwd: '/cwd/sparse',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'sparse-session',
+      title: 'Sparse title',
+      model: 'claude-opus-4-7',
+    });
+    archiveConversation('sparse-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ?, total_cost = ? WHERE name = ?`).run('2026-05-23T01:00:00.000Z', 1.23, 'sparse-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'sparse-archived',
+      workspacePath: '/cwd/sparse',
+      primaryModel: 'claude-opus-4-7',
+      messageCount: 0,
+      estimatedCost: 1.23,
+      toolsUsed: [],
+      filesTouched: [],
+      tags: [],
+      summary: 'Sparse title',
+      enrichmentLevel: 0,
+      enrichmentFailed: false,
+      panIssueId: 'PAN-1391',
+      lastTs: '2026-05-23T01:00:00.000Z',
+    });
+    expect(rows[0].jsonlPath).toEqual(expect.stringContaining('sparse-session.jsonl'));
+  });
+
+  it('merges discovered_sessions enrichment for archived conversations', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'enriched-archived',
+      tmuxSession: 'conv-enriched',
+      cwd: '/cwd/enriched',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'enriched-session',
+      title: 'Conversation title',
+      model: 'fallback-model',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/jsonl/enriched-session.jsonl',
+      sessionId: 'enriched-session',
+      workspacePath: '/indexed/workspace',
+      messageCount: 8,
+      firstTs: '2026-05-20T00:00:00.000Z',
+      lastTs: '2026-05-21T00:00:00.000Z',
+      primaryModel: 'indexed-model',
+      tokenInput: 111,
+      tokenOutput: 222,
+      estimatedCost: 4.56,
+      toolsUsed: ['Read', 'Edit'],
+      filesTouched: ['src/file.ts'],
+      tags: ['dashboard'],
+    });
+    db.prepare(`UPDATE discovered_sessions SET summary = ?, enrichment_level = ?, enrichment_failed = ? WHERE session_id = ?`)
+      .run('Indexed summary', 2, 1, 'enriched-session');
+    archiveConversation('enriched-archived');
+    db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T02:00:00.000Z', 'enriched-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'enriched-archived',
+      jsonlPath: '/jsonl/enriched-session.jsonl',
+      workspacePath: '/cwd/enriched',
+      primaryModel: 'indexed-model',
+      messageCount: 8,
+      firstTs: '2026-05-20T00:00:00.000Z',
+      lastTs: '2026-05-21T00:00:00.000Z',
+      estimatedCost: 4.56,
+      tokenInput: 111,
+      tokenOutput: 222,
+      toolsUsed: ['Read', 'Edit'],
+      filesTouched: ['src/file.ts'],
+      tags: ['dashboard'],
+      summary: 'Indexed summary',
+      enrichmentLevel: 2,
+      enrichmentFailed: true,
+    });
+  });
+
+  it('excludes non-archived conversations from the archived list', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({ name: 'not-archived', tmuxSession: 'conv-not-archived', cwd: '/cwd' });
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toEqual([]);
+  });
+
   it('deleting (marking ended) a conversation persists correctly', async () => {
     const { createConversation, markConversationEnded, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
     createConversation({ name: 'to-delete', tmuxSession: 'conv-to-delete', cwd: '/cwd' });
