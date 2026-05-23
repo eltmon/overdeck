@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 41;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -434,6 +434,19 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_merge_queue_project
       ON merge_queue(project_key, status, position);
+
+    -- ===== Auto Merge (PAN-1418: pending cooldown persistence) =====
+    CREATE TABLE IF NOT EXISTS auto_merge (
+      issue_id      TEXT PRIMARY KEY,
+      scheduled_at  TEXT NOT NULL,
+      execute_at    TEXT NOT NULL,
+      status        TEXT NOT NULL CHECK(status IN ('pending','executing','cancelled','executed','aborted','failed')),
+      cancel_reason TEXT,
+      abort_reason  TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_auto_merge_pending_execute
+      ON auto_merge(status, execute_at);
 
     -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
     CREATE TABLE IF NOT EXISTS merge_sets (
@@ -1178,6 +1191,23 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`); } catch { /* already exists */ }
+  }
+
+  // v40 → v41: add auto_merge table for pending cooldown persistence
+  if (currentVersion < 41) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS auto_merge (
+        issue_id      TEXT PRIMARY KEY,
+        scheduled_at  TEXT NOT NULL,
+        execute_at    TEXT NOT NULL,
+        status        TEXT NOT NULL CHECK(status IN ('pending','executing','cancelled','executed','aborted','failed')),
+        cancel_reason TEXT,
+        abort_reason  TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_auto_merge_pending_execute
+        ON auto_merge(status, execute_at);
+    `);
   }
 
   // After all migrations, set the version
