@@ -97,6 +97,7 @@ import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import {
+  computeContextUsage,
   parseConversationMessages,
   parseFromLastCompactBoundary,
   summarizeConversationActivity,
@@ -1285,23 +1286,28 @@ const getConversationsRoute = HttpRouter.add(
           const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
           let isWorking = false;
           let currentTool: string | null = null;
+          let contextUsage = null;
+          const convSf = await resolveSessionFile(conv);
 
-          if (sessionAlive) {
-            const sf = await resolveSessionFile(conv);
-            if (sf && existsSync(sf)) {
+          if (convSf && existsSync(convSf)) {
+            if (sessionAlive) {
               try {
-                const summary = await summarizeConversationActivity(sf);
+                const summary = await summarizeConversationActivity(convSf);
                 isWorking = summary.isWorking;
                 currentTool = summary.currentTool;
               } catch {
                 // JSONL parse failure — fall back to defaults
               }
             }
+            try {
+              contextUsage = await computeContextUsage(convSf, conv.model);
+            } catch {
+              contextUsage = null;
+            }
           }
 
-          const convSf = await resolveSessionFile(conv);
           const compacting = convSf ? isCompacting(convSf) : false;
-          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting };
+          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage };
         }));
 
         return jsonResponse(enriched);
@@ -1355,7 +1361,16 @@ const getConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
         const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
-        return jsonResponse({ ...conv, sessionAlive });
+        const convSf = await resolveSessionFile(conv);
+        let contextUsage = null;
+        if (convSf && existsSync(convSf)) {
+          try {
+            contextUsage = await computeContextUsage(convSf, conv.model);
+          } catch {
+            contextUsage = null;
+          }
+        }
+        return jsonResponse({ ...conv, sessionAlive, contextUsage });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] get conversation failed:', msg);
