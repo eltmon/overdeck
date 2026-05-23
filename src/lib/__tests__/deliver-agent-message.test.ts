@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, Server as NetServer } from 'node:net';
@@ -44,6 +44,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 });
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
+import { PTY_TOKEN_HEADER, writePtyTokenSync } from '../pty-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
@@ -69,6 +70,14 @@ interface FakeBridgeOptions {
   body: string;
   delayMs?: number;
   capture?: { lastBody?: string; lastHeaders?: Record<string, string> };
+}
+
+function readDeliveryLog(agentId: string): Array<Record<string, unknown>> {
+  return readFileSync(join(tmpHome, 'logs', `bridge-${agentId}.log`), 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<NetServer> {
@@ -129,8 +138,131 @@ describe('channel bridge delivery', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     delete process.env.PANOPTICON_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('supervisor-only success: posts to PTY socket and does not call sendKeysProgram', async () => {
+    const agentId = 'agent-supervisor';
+    writeAgentState(agentId, { channelsEnabled: false });
+    const token = writePtyTokenSync(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
+    try {
+      await deliverAgentMessage(agentId, 'supervisor hi', 'caller-supervisor');
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(capture.lastBody).toBeDefined();
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'supervisor hi',
+        meta: { caller: 'caller-supervisor' },
+      });
+      expect(capture.lastHeaders?.[PTY_TOKEN_HEADER]).toBe(token);
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('supervisor missing: falls through to channels when channels are enabled', async () => {
+    const agentId = 'agent-supervisor-missing';
+    writeAgentState(agentId, { channelsEnabled: true });
+    writeBridgeTokenSync(agentId);
+    const socketPath = join(socketDir, `agent-${agentId}.sock`);
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
+    try {
+      await deliverAgentMessage(agentId, 'channel hi', 'caller-channel');
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
+        path: 'channel',
+        'pty-supervisor': 'socket-missing',
+      });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('both sockets missing: falls through to tmux and logs tier failures', async () => {
+    const agentId = 'agent-no-sockets';
+    writeAgentState(agentId, { channelsEnabled: true });
+
+    await deliverAgentMessage(agentId, 'tmux hi', 'caller-tmux');
+
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'tmux hi');
+    expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
+      path: 'tmux',
+      channels: 'socket-missing',
+      'pty-supervisor': 'socket-missing',
+    });
+  });
+
+  it('supervisor POST 500: falls through to channels and logs supervisor failure', async () => {
+    const agentId = 'agent-supervisor-500';
+    writeAgentState(agentId, { channelsEnabled: true });
+    writePtyTokenSync(agentId);
+    writeBridgeTokenSync(agentId);
+    const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 500,
+      body: 'broken',
+    });
+    const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+    });
+    try {
+      await deliverAgentMessage(agentId, 'fallback channel', 'caller-500');
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
+      expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
+    } finally {
+      await Promise.all([
+        new Promise<void>((r) => supervisor.close(() => r())),
+        new Promise<void>((r) => channel.close(() => r())),
+      ]);
+    }
+  });
+
+  it('supervisor POST timeout: falls through to channels using fake timers', async () => {
+    vi.useFakeTimers();
+    const agentId = 'agent-supervisor-timeout';
+    writeAgentState(agentId, { channelsEnabled: true });
+    writePtyTokenSync(agentId);
+    writeBridgeTokenSync(agentId);
+    const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'late',
+      delayMs: 3_500,
+    });
+    const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+    });
+    try {
+      const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
+      await vi.advanceTimersByTimeAsync(2_500);
+      await delivered;
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
+      expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
+    } finally {
+      vi.useRealTimers();
+      await Promise.all([
+        new Promise<void>((r) => supervisor.close(() => r())),
+        new Promise<void>((r) => channel.close(() => r())),
+      ]);
+    }
+  });
+
+  it('deliveryMethod supervisor is strict when the PTY socket is missing', async () => {
+    const agentId = 'agent-supervisor-strict';
+    writeAgentState(agentId, { channelsEnabled: true });
+
+    await expect(deliverAgentMessage(agentId, 'strict hi', 'caller-strict', 'supervisor')).rejects.toThrow(
+      /MessageDeliveryFailed: PTY supervisor delivery failed/,
+    );
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
   });
 
   it('deliverAgentMessage flag-off: delegates to sendKeysProgram exactly once with no socket attempt', async () => {
