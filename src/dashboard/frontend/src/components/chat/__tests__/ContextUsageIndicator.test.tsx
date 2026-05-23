@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContextUsageIndicator, formatCompactCount } from '../ContextUsageIndicator';
@@ -19,6 +21,11 @@ function renderInContainer(width: number, contextUsage: ContextUsage | null = us
     </div>,
   );
 }
+
+const indicatorCss = readFileSync(
+  resolve(process.cwd(), 'src/components/chat/ContextUsageIndicator.module.css'),
+  'utf8',
+);
 
 describe('ContextUsageIndicator', () => {
   it('renders nothing when contextUsage is null', () => {
@@ -54,21 +61,29 @@ describe('ContextUsageIndicator', () => {
     expect(screen.getByTestId('context-usage-bar')).toBeInTheDocument();
   });
 
-  it('renders the medium variant slots for 600-900px containers', () => {
+  it('defines the medium variant as size plus bar without percent or window text', () => {
     renderInContainer(720, usage(22));
 
     expect(screen.getByTestId('context-usage-size')).toHaveTextContent('33.04k');
     expect(screen.getByTestId('context-usage-bar')).toBeInTheDocument();
-    expect(screen.getByTestId('context-usage-dot')).toBeInTheDocument();
+    expect(indicatorCss).toMatch(
+      /@container \(max-width: 900px\)[\s\S]*\.percentText,\s*\.windowText\s*\{[\s\S]*display: none;/,
+    );
   });
 
-  it('renders the small variant dot for containers below 600px', () => {
+  it('defines the small variant as the dot only with the full value in the title', () => {
     renderInContainer(420, usage(22));
 
     expect(screen.getByTestId('context-usage-dot')).toBeInTheDocument();
     expect(screen.getByTestId('context-usage-indicator')).toHaveAttribute(
       'title',
       '33,041 active tokens (22%) of 200,000 context window',
+    );
+    expect(indicatorCss).toMatch(
+      /@container \(max-width: 599px\)[\s\S]*\.sizeText,[\s\S]*\.barTrack\s*\{[\s\S]*display: none;/,
+    );
+    expect(indicatorCss).toMatch(
+      /@container \(max-width: 599px\)[\s\S]*\.dot\s*\{[\s\S]*display: inline-block;/,
     );
   });
 

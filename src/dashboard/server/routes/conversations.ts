@@ -93,6 +93,7 @@ import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -137,6 +138,7 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
+const CONVERSATION_LIST_ENRICHMENT_CONCURRENCY = 8;
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -1282,33 +1284,36 @@ const getConversationsRoute = HttpRouter.add(
         // Claude to be ready before returning 201, so newly-created conversations
         // are always live by the time they appear in the list.
         const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
-        const enriched = await Promise.all(conversations.map(async (conv) => {
-          const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
-          let isWorking = false;
-          let currentTool: string | null = null;
-          let contextUsage = null;
-          const convSf = await resolveSessionFile(conv);
+        const enriched = await Effect.runPromise(withConcurrencyLimit(
+          conversations.map((conv) => Effect.promise(async () => {
+            const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
+            let isWorking = false;
+            let currentTool: string | null = null;
+            let contextUsage = null;
+            const convSf = await resolveSessionFile(conv);
 
-          if (convSf && existsSync(convSf)) {
-            if (sessionAlive) {
+            if (convSf && existsSync(convSf)) {
+              if (sessionAlive) {
+                try {
+                  const summary = await summarizeConversationActivity(convSf);
+                  isWorking = summary.isWorking;
+                  currentTool = summary.currentTool;
+                } catch {
+                  // JSONL parse failure — fall back to defaults
+                }
+              }
               try {
-                const summary = await summarizeConversationActivity(convSf);
-                isWorking = summary.isWorking;
-                currentTool = summary.currentTool;
+                contextUsage = await computeContextUsage(convSf, conv.model);
               } catch {
-                // JSONL parse failure — fall back to defaults
+                contextUsage = null;
               }
             }
-            try {
-              contextUsage = await computeContextUsage(convSf, conv.model);
-            } catch {
-              contextUsage = null;
-            }
-          }
 
-          const compacting = convSf ? isCompacting(convSf) : false;
-          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage };
-        }));
+            const compacting = convSf ? isCompacting(convSf) : false;
+            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage };
+          })),
+          CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
+        ));
 
         return jsonResponse(enriched);
       }    catch (error: unknown) {
