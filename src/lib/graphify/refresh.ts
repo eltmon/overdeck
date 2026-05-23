@@ -59,20 +59,17 @@ export async function refreshGraphify(projectPath: string, issueId: string): Pro
     return { ok: false, error: `git commit failed: ${formatExecError(error)}` };
   }
 
-  let commit: string;
-  try {
-    const result = await execAsync('git rev-parse HEAD', { cwd: projectPath, encoding: 'utf-8' });
-    commit = result.stdout.trim();
-  } catch (error) {
-    return { ok: false, error: `git rev-parse HEAD failed: ${formatExecError(error)}` };
-  }
-
   const pushResult = await pushGraphifyCommit(projectPath);
   if (!pushResult.ok) {
     return pushResult;
   }
 
-  return { ok: true, commit, pushed: true };
+  try {
+    const result = await execAsync('git rev-parse HEAD', { cwd: projectPath, encoding: 'utf-8' });
+    return { ok: true, commit: result.stdout.trim(), pushed: true };
+  } catch (error) {
+    return { ok: false, error: `git rev-parse HEAD failed: ${formatExecError(error)}` };
+  }
 }
 
 async function hasStagedChanges(projectPath: string): Promise<{ ok: true; hasChanges: boolean } | { ok: false; error: string }> {
