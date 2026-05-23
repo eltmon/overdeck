@@ -86,7 +86,7 @@ async function evaluateAgent(
   const issueId = issueIdForAgent(agent);
   const reviewStatus = getReviewStatusSync(issueId);
   if (shouldSkipReviewStatus(reviewStatus)) return;
-  if (!isAgentIdleForNudge(agentId)) return;
+  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
   if (await hasReadyBeads(agent, issueId.toLowerCase())) return;
 
   const runtime = getAgentRuntimeStateSync(agentId);
