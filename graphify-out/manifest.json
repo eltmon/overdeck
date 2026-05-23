@@ -3200,8 +3200,8 @@
     "hash": "b427ad0456d504cdc1c49d17e19508b7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/PanOpenInPicker.tsx": {
-    "mtime": 1779511306.062787,
-    "hash": "a8ab2157225f976d090bf6088110e9eb"
+    "mtime": 1779525768.6771383,
+    "hash": "fd831c4f32b691c842ec6178dff5681d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/VerifyingOnMainBadge.tsx": {
     "mtime": 1779511306.0656354,
@@ -3334,6 +3334,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/HealthHistoryTimeline.tsx": {
     "mtime": 1779511306.0622554,
     "hash": "f74be14115e37711537c9536c1334bde"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/EditorIcons.tsx": {
+    "mtime": 1779525734.618968,
+    "hash": "e7951191f9a650be05f4e4a46e5f0866"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/ResourceBar.test.tsx": {
     "mtime": 1779511306.0638888,
