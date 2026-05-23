@@ -38,7 +38,7 @@ import {
 } from '../../../lib/checkpoint/checkpoint-manager.js';
 
 import { Effect, Layer, Option } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
@@ -56,6 +56,8 @@ import {
   setConversationHarness,
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
+  updateConversationForkFallbackReason,
+  recordConversationHandoff,
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
@@ -114,7 +116,17 @@ import {
 import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
-import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
+import {
+  generateSummaryForFork,
+  generateFallbackSummary,
+  reserveSummaryForkSession,
+  copySessionFromCompactBoundary,
+  requestHandoffFromAgent,
+  handoffPreconditionFallbackReason,
+  handoffFailureReason,
+  logHandoffFallback,
+  type SummaryForkMode,
+} from '../../../lib/conversations/summary-fork.js';
 import {
   CONVERSATION_TITLE_MODEL,
   serializeConversationTranscript,
@@ -534,11 +546,50 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
+  if (value === undefined || value === null) return { ok: true, focus: undefined };
+  if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
+  const focus = value.trim();
+  if (!focus) return { ok: true, focus: undefined };
+  if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
+  if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
+  return { ok: true, focus };
+}
+
 function safeUploadExtension(filename: string, mimeType: string): string {
   const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
   if (!mimeExtension) return '';
   const originalExtension = extname(filename).toLowerCase();
   return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+}
+
+export async function handleConversationHandoffDoc(
+  name: string,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+  if (!conv.handoffDocPath) {
+    return jsonResponse({ error: 'Handoff document not found' }, { status: 404 });
+  }
+
+  try {
+    const docText = await readFile(conv.handoffDocPath, 'utf-8');
+    return HttpServerResponse.text(docText, {
+      contentType: 'text/markdown',
+      headers: {
+        'Content-Disposition': `inline; filename="${conv.name}-handoff.md"`,
+      },
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ENOENT') {
+      return jsonResponse({ error: 'Handoff document is no longer available' }, { status: 410 });
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[conversations] failed to read handoff doc for "${name}":`, msg);
+    return jsonResponse({ error: 'Failed to read handoff document' }, { status: 500 });
+  }
 }
 
 export async function handleConversationImageUpload(
@@ -1382,6 +1433,23 @@ const getConversationRoute = HttpRouter.add(
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/handoff-doc ─────────────────────────
+
+const getConversationHandoffDocRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/handoff-doc',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(() => handleConversationHandoffDoc(name));
   }),
 );
 
@@ -2482,10 +2550,11 @@ async function runForkPipeline(
   parentConv: Conversation,
   sessionId: string,
   summaryModel?: string,
-  plain = false,
+  forkMode: SummaryForkMode = 'summary',
   localSummaryOnly = false,
   includeThinkingInSummary?: boolean,
   summaryHarness?: RuntimeName,
+  handoffFocus?: string,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -2493,7 +2562,7 @@ async function runForkPipeline(
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
-  if (plain) {
+  if (forkMode === 'plain') {
     if (conv.harness === 'pi') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
       // Pi cannot consume Claude JSONL, so a Pi plain fork would silently start
@@ -2531,11 +2600,51 @@ async function runForkPipeline(
   }
 
   let summary: string;
-  if (localSummaryOnly) {
-    summary = await Effect.runPromise(generateFallbackSummary(parentSessionFile));
-  } else {
+  let effectiveForkMode = forkMode;
+  let handoffDocPath: string | null = null;
+  let forkFallbackReason: string | null = null;
+
+  const buildSummary = async (): Promise<string> => {
+    if (localSummaryOnly) {
+      return Effect.runPromise(generateFallbackSummary(parentSessionFile));
+    }
     const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
-    summary = result.summary;
+    return result.summary;
+  };
+
+  if (forkMode === 'handoff') {
+    const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
+    if (preconditionFallback) {
+      forkFallbackReason = preconditionFallback;
+      effectiveForkMode = 'summary';
+      logHandoffFallback(parentConv, preconditionFallback);
+      summary = await buildSummary();
+    } else {
+      try {
+        const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+        summary = handoff.docText;
+        handoffDocPath = handoff.docPath;
+      } catch (error) {
+        forkFallbackReason = handoffFailureReason(error);
+        effectiveForkMode = 'summary';
+        logHandoffFallback(parentConv, forkFallbackReason);
+        summary = await buildSummary();
+      }
+    }
+  } else {
+    summary = await buildSummary();
+  }
+
+  updateConversationForkFallbackReason(convName, forkFallbackReason);
+  updateConversationTitle(
+    convName,
+    effectiveForkMode === 'handoff'
+      ? `Handoff: ${parentConv.title || parentConv.name}`
+      : `Summary Fork: ${parentConv.title || parentConv.name}`,
+    'manual',
+  );
+  if (handoffDocPath) {
+    recordConversationHandoff(parentConv.name, convName, handoffDocPath);
   }
 
   updateForkStatus(convName, 'spawning');
@@ -2594,7 +2703,22 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
           ? body['cwd'].trim()
           : undefined;
-        const plain = body['plain'] === true;
+        const requestedForkMode = body['forkMode'];
+        let forkMode: SummaryForkMode = 'summary';
+        if (requestedForkMode !== undefined) {
+          if (requestedForkMode !== 'summary' && requestedForkMode !== 'plain' && requestedForkMode !== 'handoff') {
+            return jsonResponse({ error: 'Invalid forkMode' }, { status: 400 });
+          }
+          forkMode = requestedForkMode;
+        } else if (body['plain'] === true) {
+          console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
+          forkMode = 'plain';
+        }
+        const focusResult = parseSummaryForkFocus(body['focus']);
+        if (!focusResult.ok) {
+          return jsonResponse({ error: focusResult.error }, { status: 400 });
+        }
+        const handoffFocus = focusResult.focus;
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
@@ -2627,7 +2751,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
-        if (plain && launchHarness === 'pi') {
+        if (forkMode === 'plain' && launchHarness === 'pi') {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
           // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
           // start an empty session. Summary forks are fine because they inject the
@@ -2636,9 +2760,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
             error: 'Plain forks cannot launch under Pi — Pi cannot consume Claude session history. Use a summary fork to launch under Pi.',
           }, { status: 400 });
         }
-        const defaultTitle = plain
+        const defaultTitle = forkMode === 'plain'
           ? `Fork: ${conv.title || conv.name}`
-          : `Summary Fork: ${conv.title || conv.name}`;
+          : forkMode === 'handoff'
+            ? `Handoff: ${conv.title || conv.name}`
+            : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({
           name: newName,
@@ -2647,18 +2773,20 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           issueId: conv.issueId ?? undefined,
           title: customTitle || defaultTitle,
           titleSource: 'manual',
-          titleSeed: plain
+          titleSeed: forkMode === 'plain'
             ? `Fork of ${conv.name}`
-            : `Summary Fork of ${conv.name}`,
+            : forkMode === 'handoff'
+              ? `Handoff of ${conv.name}`
+              : `Summary Fork of ${conv.name}`,
           claudeSessionId: sessionId,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
           harness: launchHarness,
-          forkStatus: plain ? 'spawning' : 'summarizing',
+          forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain, localSummaryOnly, includeThinkingInSummary, summaryHarness).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });
@@ -3210,6 +3338,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
   getArchivedConversationsRoute,
   getConversationRoute,
+  getConversationHandoffDocRoute,
   postConversationRoute,
   patchConversationRoute,
   deleteConversationRoute,

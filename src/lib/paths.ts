@@ -21,6 +21,11 @@ export const COSTS_DIR = join(PANOPTICON_HOME, 'costs');
 export const HEARTBEATS_DIR = join(PANOPTICON_HOME, 'heartbeats');
 export const ARCHIVES_DIR = join(PANOPTICON_HOME, 'archives');
 export const LOGS_DIR = join(PANOPTICON_HOME, 'logs');
+export const HANDOFFS_DIR = join(PANOPTICON_HOME, 'handoffs');
+
+export function getHandoffsDir(): string {
+  return join(getPanopticonHome(), 'handoffs');
+}
 
 // Traefik directories
 export const TRAEFIK_DIR = join(PANOPTICON_HOME, 'traefik');

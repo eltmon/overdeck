@@ -3381,6 +3381,7 @@ const COSTS_DIR = join(PANOPTICON_HOME, "costs");
 join(PANOPTICON_HOME, "heartbeats");
 join(PANOPTICON_HOME, "archives");
 join(PANOPTICON_HOME, "logs");
+join(PANOPTICON_HOME, "handoffs");
 const TRAEFIK_DIR = join(PANOPTICON_HOME, "traefik");
 join(TRAEFIK_DIR, "dynamic");
 join(TRAEFIK_DIR, "certs");
@@ -4076,7 +4077,10 @@ function initSchema(db) {
       fork_error       TEXT,                               -- error message when fork_status='failed'
       harness          TEXT,                                -- coding harness used for conversation runtime
       delivery_method  TEXT,                               -- 'auto', 'channels', or 'tmux'
-      spawn_error      TEXT                                -- error message when background spawn failed (quota, auth, etc.)
+      spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
+      handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
+      handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
+      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -4253,7 +4257,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 41`);
+	db.pragma(`user_version = 42`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4261,7 +4265,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 41) return;
+	if (currentVersion === 42) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4730,7 +4734,18 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id
         ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
     `);
-	db.pragma(`user_version = 41`);
+	if (currentVersion < 42) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 42`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

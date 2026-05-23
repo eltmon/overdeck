@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 41;
+export const SCHEMA_VERSION = 42;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -396,7 +396,10 @@ export function initSchema(db: Database.Database): void {
       fork_error       TEXT,                               -- error message when fork_status='failed'
       harness          TEXT,                                -- coding harness used for conversation runtime
       delivery_method  TEXT,                               -- 'auto', 'channels', or 'tmux'
-      spawn_error      TEXT                                -- error message when background spawn failed (quota, auth, etc.)
+      spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
+      handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
+      handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
+      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -1192,6 +1195,13 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id
         ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
     `);
+  }
+
+  // v41 → v42: add handoff fork artifact and fallback metadata to conversations
+  if (currentVersion < 42) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

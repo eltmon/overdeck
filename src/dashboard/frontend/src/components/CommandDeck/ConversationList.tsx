@@ -54,6 +54,12 @@ export interface Conversation {
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
   deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;
   contextUsage?: ContextUsage | null;
+  /** Agent-authored handoff document path for handoff-fork targets. */
+  handoffDocPath?: string | null;
+  /** Target conversation id created from this source's handoff. */
+  handoffTargetConvId?: number | null;
+  /** Reason a requested handoff fork downgraded to summary mode. */
+  forkFallbackReason?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
@@ -292,8 +298,8 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
           conversation={mutations.forkTarget}
           isPending={mutations.isForkPending}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness) => {
-            mutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness);
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
+            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
           }}
         />
       )}

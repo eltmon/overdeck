@@ -77,6 +77,53 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+function decodeTextResponse(response: { body: unknown }) {
+  const payload = response.body as { body: Uint8Array } | null;
+  return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+describe('parseSummaryForkFocus', () => {
+  it('trims handoff focus text', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('  continue the API wiring  ')).toEqual({
+      ok: true,
+      focus: 'continue the API wiring',
+    });
+  });
+
+  it('normalizes blank and absent focus to undefined', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(undefined)).toEqual({ ok: true, focus: undefined });
+    expect(parseSummaryForkFocus('   ')).toEqual({ ok: true, focus: undefined });
+  });
+
+  it('rejects non-string focus values', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus(42)).toEqual({ ok: false, error: 'focus must be a string' });
+  });
+
+  it('rejects focus values longer than 500 characters', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('a'.repeat(501))).toEqual({
+      ok: false,
+      error: 'focus must be 500 characters or fewer',
+    });
+  });
+
+  it('rejects control characters in focus', async () => {
+    const { parseSummaryForkFocus } = await import('../conversations.js');
+
+    expect(parseSummaryForkFocus('continue\nthen ship')).toEqual({
+      ok: false,
+      error: 'focus must not contain control characters',
+    });
+  });
+});
+
 beforeEach(async () => {
   // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
   await resetDb();
@@ -92,6 +139,51 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  it('returns a persisted handoff document as markdown', async () => {
+    const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    const docPath = join(TEST_HOME, 'handoffs', 'source-2026-05-23T04-35-00.000Z.md');
+    mkdirSync(join(TEST_HOME, 'handoffs'), { recursive: true });
+    writeFileSync(docPath, '## Current objective\n\nContinue the work.\n\n## Suggested skills\n\n- /pan-workflow\n');
+    createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });
+    const target = createConversation({ name: 'target-conv', tmuxSession: 'conv-target', cwd: '/cwd' });
+    recordConversationHandoff('source-conv', 'target-conv', docPath);
+
+    const response = await handleConversationHandoffDoc('target-conv');
+
+    expect(response.status).toBe(200);
+    expect(decodeTextResponse(response)).toContain('## Suggested skills');
+    expect(getConversationByName('source-conv')?.handoffTargetConvId).toBe(target.id);
+  });
+
+  it('returns 404 when a conversation has no handoff document path', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    createConversation({ name: 'plain-conv', tmuxSession: 'conv-plain', cwd: '/cwd' });
+
+    const response = await handleConversationHandoffDoc('plain-conv');
+
+    expect(response.status).toBe(404);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Handoff document not found' });
+  });
+
+  it('returns 410 when the recorded handoff document is missing on disk', async () => {
+    const { createConversation, recordConversationHandoff } = await import('../../../../lib/database/conversations-db.js');
+    const { handleConversationHandoffDoc } = await import('../conversations.js');
+
+    const docPath = join(TEST_HOME, 'handoffs', 'missing.md');
+    createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });
+    createConversation({ name: 'target-conv', tmuxSession: 'conv-target', cwd: '/cwd' });
+    recordConversationHandoff('source-conv', 'target-conv', docPath);
+
+    const response = await handleConversationHandoffDoc('target-conv');
+
+    expect(response.status).toBe(410);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Handoff document is no longer available' });
+  });
+
   it('stores uploaded images under the owning conversation attachment directory', async () => {
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload } = await import('../conversations.js');
@@ -578,6 +670,50 @@ describe('conversations route — DB integration', () => {
 
     const sourceConv = getConversationByName('source-conv');
     expect(sourceConv?.status).toBe('active');
+  });
+
+  it('creates a plain fork conversation from the forkMode discriminator', async () => {
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+
+    const cwd = '/home/test/plain-project';
+    const sessionId = 'plain-session-123';
+    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+    mkdirSync(claudeProjectDir, { recursive: true });
+    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: 'Before compaction' },
+      }),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'private chain' }],
+        },
+      }),
+    ].join('\n') + '\n');
+
+    const conv = createConversation({
+      name: 'plain-source-conv',
+      tmuxSession: 'conv-plain-source-conv',
+      cwd,
+      claudeSessionId: sessionId,
+      title: 'Plain source',
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
+
+    expect(result.conversation.title).toBe('Fork: Plain source');
+    expect(result.summary).toBe('');
+    expect(result.summaryModel).toBeNull();
+    const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
+    expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
+    expect(forkedJsonl).not.toContain('"type":"thinking"');
+    expect(forkedJsonl).not.toContain('Before compaction');
   });
 });
 
