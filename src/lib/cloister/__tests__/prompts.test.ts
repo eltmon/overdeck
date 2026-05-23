@@ -391,6 +391,33 @@ optional:
       })
     );
 
+    it.effect('renders resume-work TLDR guidance only when TLDR_AVAILABLE is true', () =>
+      Effect.gen(function* () {
+        const baseVars = {
+          ISSUE_ID: 'PAN-611',
+          INSTRUCTIONS_BLOCK: 'Continue the bead.',
+        };
+        const enabled = yield* renderPrompt({
+          name: 'resume-work',
+          vars: { ...baseVars, TLDR_AVAILABLE: true },
+        });
+        const disabled = yield* renderPrompt({
+          name: 'resume-work',
+          vars: { ...baseVars, TLDR_AVAILABLE: false },
+        });
+        const absent = yield* renderPrompt({ name: 'resume-work', vars: baseVars });
+
+        expect(enabled).toContain('## TLDR: Fast Re-Orientation');
+        expect(enabled).toContain('tldr_context');
+        expect(enabled).toContain('tldr_structure');
+        expect(enabled).toContain('tldr_semantic');
+        expect(enabled).toContain('tldr_calls');
+        expect(enabled).toContain('tldr_impact');
+        expect(disabled).not.toContain('## TLDR: Fast Re-Orientation');
+        expect(absent).not.toContain('## TLDR: Fast Re-Orientation');
+      })
+    );
+
     it.effect('renders Playwright isolation guidance in the work prompt', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
