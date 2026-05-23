@@ -14,7 +14,7 @@ import type { Conversation } from './ConversationList';
 
 const FORK_HELP_CONTENT = `## Fork Modes
 
-There are three ways to fork a conversation, from lightest to richest:
+There are four ways to fork a conversation, from lightest to richest:
 
 ### Plain Fork
 Copies the raw conversation history into a new session. No summary is generated — the new agent picks up exactly where the previous one left off.
@@ -23,7 +23,7 @@ If the conversation was previously compacted, only the history from the last com
 
 **Best for:** Continuing a conversation that hit a context limit, especially when staying on the same model.
 
-**Cross-model warning:** Raw history may contain model-specific data (like signed thinking blocks) that won't validate on a different provider. Use a summary fork when switching models.
+**Cross-model warning:** Raw history may contain model-specific data (like signed thinking blocks) that won't validate on a different provider. Use a summary or handoff fork when switching models.
 
 ### Fast Summary
 Generates a quick summary **without calling an LLM**. Extracts a bullet list of user messages, files modified, and tools used from the conversation history.
@@ -37,9 +37,19 @@ The summary is injected as the first message in the new session, and the agent i
 
 **Best for:** Most forks — gives the new agent a clear understanding of what was accomplished and decided.
 
+### Handoff (agent-authored)
+Asks the live source agent to write a Markdown handoff document, optionally focused on a specific next task or question. The document becomes the seed message for the new conversation.
+
+The source agent writes the handoff to Panopticon's handoffs directory and marks it complete with a .done sentinel. If the source conversation is ended, stalls, or produces an invalid document, Panopticon falls back to a summary fork.
+
+**Best for:** Deliberate context handoffs where the current agent knows the dead ends, important files, and suggested skills a successor should pick up.
+
 ---
 
 ## Options
+
+### Focus
+Only used by Handoff mode. Give the source agent a short prompt about what the successor should focus on.
 
 ### Summary Model
 The model used to **generate the summary**. This is independent of the model the new conversation runs on. Cheaper models like Haiku work well for straightforward summarization; use a larger model for complex or nuanced conversations.
@@ -50,6 +60,15 @@ When enabled, the model's internal reasoning (thinking blocks) is included in th
 ### Launch Model
 The model the **new forked conversation** will run on. Completely independent of the summary model — you can summarize with Haiku and launch on Opus, or vice versa. Defaults to the parent conversation's model.
 `;
+
+type ApiForkMode = 'summary' | 'plain' | 'handoff';
+type ForkModeOption = ApiForkMode | 'fast-summary';
+
+function forkTitlePrefix(mode: ForkModeOption): string {
+  if (mode === 'plain') return 'Plain Fork';
+  if (mode === 'handoff') return 'Handoff';
+  return 'Summary Fork';
+}
 
 function ForkHelpModal({ onClose }: { onClose: () => void }) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -102,12 +121,13 @@ interface ForkModalProps {
     conv: Conversation,
     launchModel: string,
     summaryModel: string,
-    plainFork: boolean,
+    forkMode: ApiForkMode,
     localSummaryOnly: boolean,
     includeThinkingInSummary: boolean,
     title?: string,
     launchHarness?: Harness,
     summaryHarness?: Harness,
+    focus?: string,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -118,20 +138,20 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   // Plain forks copy Claude JSONL and resume — Pi cannot consume that history,
-  // so plainFork forces launchHarness back to claude-code. Summary forks inject
-  // a generated summary through the Pi FIFO after spawn, so Pi launch is fine
-  // there subject to the canonical harness policy (ToS gate).
+  // so plain forks force launchHarness back to claude-code. Summary and handoff
+  // forks inject portable text after spawn, so Pi launch is fine there subject
+  // to the canonical harness policy (ToS gate).
   const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
-  const [plainFork, setPlainFork] = useState(false);
+  const [forkMode, setForkMode] = useState<ForkModeOption>('summary');
   useEffect(() => {
-    if (plainFork && launchHarness !== 'claude-code') {
+    if (forkMode === 'plain' && launchHarness !== 'claude-code') {
       setLaunchHarness('claude-code');
     }
-  }, [plainFork, launchHarness]);
-  const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
+  }, [forkMode, launchHarness]);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
+  const [handoffFocus, setHandoffFocus] = useState('');
   const [showHelp, setShowHelp] = useState(false);
 
   const convTitle = conversation.title ?? conversation.name;
@@ -141,11 +161,25 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
     setSummaryModel(compactionModel);
   }, [compactionModel]);
 
+  useEffect(() => {
+    setForkTitle(`${forkTitlePrefix(forkMode)}: ${convTitle}`);
+  }, [forkMode, convTitle]);
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  const apiForkMode: ApiForkMode = forkMode === 'plain'
+    ? 'plain'
+    : forkMode === 'handoff'
+      ? 'handoff'
+      : 'summary';
+  const localSummaryOnly = forkMode === 'fast-summary';
+  const isPlainFork = forkMode === 'plain';
+  const isHandoffFork = forkMode === 'handoff';
   const modelChanged = launchModel !== (conversation.model || defaultModel);
-  const showModelSwitchWarning = plainFork && modelChanged;
+  const showModelSwitchWarning = isPlainFork && modelChanged;
+  const handoffUnavailable = isHandoffFork && !conversation.sessionAlive;
+  const confirmDisabled = isPending || handoffUnavailable;
+  const handoffFocusValue = handoffFocus.trim() || undefined;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -185,12 +219,18 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
 
         <div className={styles.forkBody}>
           <p className={styles.forkDesc}>
-            {plainFork ? (
+            {isPlainFork ? (
               <>
                 Create a plain fork of{' '}
                 <strong title={title}>{truncatedTitle}</strong>.
                 The new conversation will carry over the raw history
                 (from the last compaction point, if any) without generating a summary.
+              </>
+            ) : isHandoffFork ? (
+              <>
+                Ask the live agent in{' '}
+                <strong title={title}>{truncatedTitle}</strong>{' '}
+                to write a handoff document for the next conversation.
               </>
             ) : (
               <>
@@ -216,15 +256,49 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               />
             </div>
 
-            <div className={styles.forkCheckboxRow}>
-              <input
-                type="checkbox"
-                id="plain-fork"
-                checked={plainFork}
-                onChange={(e) => setPlainFork(e.target.checked)}
-              />
-              <label htmlFor="plain-fork">Plain fork (skip summary, copy raw history)</label>
-            </div>
+            <fieldset className={styles.forkModeGroup}>
+              <legend>Mode</legend>
+              <label className={styles.forkCheckboxRow}>
+                <input
+                  type="radio"
+                  name="fork-mode"
+                  value="summary"
+                  checked={forkMode === 'summary'}
+                  onChange={() => setForkMode('summary')}
+                />
+                <span>Full summary</span>
+              </label>
+              <label className={styles.forkCheckboxRow}>
+                <input
+                  type="radio"
+                  name="fork-mode"
+                  value="fast-summary"
+                  checked={forkMode === 'fast-summary'}
+                  onChange={() => setForkMode('fast-summary')}
+                />
+                <span>Fast summary (no LLM, heuristic only)</span>
+              </label>
+              <label className={styles.forkCheckboxRow}>
+                <input
+                  type="radio"
+                  name="fork-mode"
+                  value="plain"
+                  checked={forkMode === 'plain'}
+                  onChange={() => setForkMode('plain')}
+                />
+                <span>Plain fork (skip summary, copy raw history)</span>
+              </label>
+              <label className={styles.forkCheckboxRow}>
+                <input
+                  type="radio"
+                  name="fork-mode"
+                  value="handoff"
+                  checked={forkMode === 'handoff'}
+                  onChange={() => setForkMode('handoff')}
+                />
+                <span>Handoff (agent-authored)</span>
+              </label>
+            </fieldset>
 
             {showModelSwitchWarning && (
               <div className={styles.forkWarning}>
@@ -234,34 +308,46 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               </div>
             )}
 
-            {!plainFork && (
-              <>
-                <div className={styles.forkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    id="local-summary"
-                    checked={localSummaryOnly}
-                    onChange={(e) => setLocalSummaryOnly(e.target.checked)}
-                  />
-                  <label htmlFor="local-summary">Fast summary (no LLM, heuristic only)</label>
-                </div>
+            {handoffUnavailable && (
+              <div className={styles.forkWarning}>
+                Handoff mode requires a running source conversation. Ended conversations
+                can still use Full summary, Fast summary, or Plain fork.
+              </div>
+            )}
 
-                {!localSummaryOnly && (
-                  <>
-                    <ModelHarnessPicker
-                      model={summaryModel}
-                      harness={summaryHarness}
-                      onModelChange={setSummaryModel}
-                      onHarnessChange={setSummaryHarness}
-                      groups={groups}
-                      harnessPolicy={harnessPolicy}
-                      modelLabel="Summary model"
-                    />
-                    <span className={pickerStyles.fieldHint}>
-                      Generates a concise summary of the conversation history.
-                    </span>
-                  </>
-                )}
+            {isHandoffFork && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                <label htmlFor="handoff-focus-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                  Focus (optional)
+                </label>
+                <textarea
+                  id="handoff-focus-input"
+                  value={handoffFocus}
+                  onChange={(e) => setHandoffFocus(e.target.value)}
+                  className={styles.forkTitleInput}
+                  rows={3}
+                  placeholder="What should the next conversation focus on?"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  Sent to the source agent as guidance for the handoff document.
+                </span>
+              </div>
+            )}
+
+            {forkMode === 'summary' && (
+              <>
+                <ModelHarnessPicker
+                  model={summaryModel}
+                  harness={summaryHarness}
+                  onModelChange={setSummaryModel}
+                  onHarnessChange={setSummaryHarness}
+                  groups={groups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Summary model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  Generates a concise summary of the conversation history.
+                </span>
 
                 <div className={styles.forkCheckboxRow}>
                   <input
@@ -273,12 +359,24 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
                   <label htmlFor="include-thinking">Include thinking in summary</label>
                 </div>
                 <span className={pickerStyles.fieldHint}>
-                  When enabled, thinking content is included as labeled text in the summary
+                  When enabled, thinking content is included as labeled text in the summary.
                 </span>
               </>
             )}
 
-            {plainFork ? (
+            {forkMode === 'fast-summary' && (
+              <span className={pickerStyles.fieldHint}>
+                Fast summary skips the summary model and uses local transcript metadata only.
+              </span>
+            )}
+
+            {isHandoffFork && (
+              <span className={pickerStyles.fieldHint}>
+                Handoff mode asks the source agent to write the seed document; no summary model is used.
+              </span>
+            )}
+
+            {isPlainFork ? (
               <>
                 <ModelSelect
                   value={launchModel}
@@ -316,8 +414,20 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           </button>
           <button
             className={styles.forkConfirmBtn}
-            disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined, launchHarness, summaryHarness)}
+            disabled={confirmDisabled}
+            title={handoffUnavailable ? 'Handoff mode requires a running source conversation' : undefined}
+            onClick={() => onConfirm(
+              conversation,
+              launchModel,
+              summaryModel,
+              apiForkMode,
+              localSummaryOnly,
+              forkMode === 'summary' && includeThinkingInSummary,
+              forkTitle.trim() || undefined,
+              launchHarness,
+              summaryHarness,
+              handoffFocusValue,
+            )}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}
