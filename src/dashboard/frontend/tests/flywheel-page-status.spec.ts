@@ -101,16 +101,33 @@ test.describe('Flywheel page', () => {
       window.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     });
 
+    let postedStatus: typeof status | null = null;
+
+    await page.route('**/__flywheel-seed', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><title>flywheel seed</title>',
+    }));
     await page.route('**/api/dashboard/session', (route) => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/flywheel/status', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().headers()['x-panopticon-internal-token']).toBe('test-token');
+      postedStatus = route.request().postDataJSON() as typeof status;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, runId: postedStatus.runId }),
+      });
+    });
     await page.route('**/api/flywheel/current', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(status),
+      body: JSON.stringify(postedStatus),
     }));
     await page.route('**/api/flywheel/runs?limit=10', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 'RUN-7', startedAt: status.startedAt, status: 'running' }]),
+      body: JSON.stringify(postedStatus ? [{ id: postedStatus.runId, startedAt: postedStatus.startedAt, status: 'running' }] : []),
     }));
     await page.route('**/api/flywheel/runs/RUN-7', (route) => route.fulfill({
       status: 200,
@@ -133,6 +150,20 @@ test.describe('Flywheel page', () => {
       contentType: 'application/json',
       body: JSON.stringify({ roles: { flywheel: { model: 'claude-opus-4-7', effort: 'high' } } }),
     }));
+
+    await page.goto(`${DASHBOARD_URL}/__flywheel-seed`);
+    await page.evaluate(async ({ url, payload }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-panopticon-internal-token': 'test-token',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`status seed failed: ${response.status}`);
+    }, { url: `${DASHBOARD_URL}/api/flywheel/status`, payload: status });
+    expect(postedStatus).toEqual(status);
 
     await page.goto(`${DASHBOARD_URL}/flywheel`);
 
