@@ -15,17 +15,6 @@
 # Don't use set -e — hooks must never break Claude Code execution.
 set +e
 
-INPUT=$(cat 2>/dev/null || echo '{}')
-
-if ! command -v jq >/dev/null 2>&1; then
-  exit 0
-fi
-
-TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
-if [ "$TOOL_NAME" != "Bash" ]; then
-  exit 0
-fi
-
 rtk_truthy() {
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     1|true|yes|on|enabled) return 0 ;;
@@ -119,24 +108,30 @@ rtk_config_enabled_value() {
   printf '%s\n' "$result"
 }
 
-RTK_ENABLED=false
+RTK_BIN="$HOME/.panopticon/bin/rtk"
+
 if [ -n "${PANOPTICON_RTK_ENABLED+x}" ]; then
-  if rtk_truthy "$PANOPTICON_RTK_ENABLED"; then
-    RTK_ENABLED=true
+  if ! rtk_truthy "$PANOPTICON_RTK_ENABLED"; then
+    exit 0
   fi
 else
   CONFIG_VALUE=$(rtk_config_enabled_value)
-  if rtk_truthy "$CONFIG_VALUE"; then
-    RTK_ENABLED=true
+  if ! rtk_truthy "$CONFIG_VALUE"; then
+    exit 0
   fi
 fi
 
-if [ "$RTK_ENABLED" != "true" ]; then
+if [ ! -x "$RTK_BIN" ]; then
   exit 0
 fi
 
-RTK_BIN="$HOME/.panopticon/bin/rtk"
-if [ ! -x "$RTK_BIN" ]; then
+if ! command -v jq >/dev/null 2>&1; then
+  exit 0
+fi
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "Bash" ]; then
   exit 0
 fi
 
