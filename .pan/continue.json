@@ -1,0 +1,114 @@
+{
+  "version": "1",
+  "issueId": "PAN-748",
+  "created": "2026-05-23T04:45:19.961Z",
+  "updated": "2026-05-23T04:48:22Z",
+  "gitState": { "branch": "feature/pan-748", "sha": "9f786bc34", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Estimate tokens via ceil(activeBytes / 4) rather than parsing per-message Claude API usage blocks from the JSONL.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Define 'activeBytes' as bytes from findLastCompactBoundary() offset to fs.stat().size of the JSONL. Reuses the existing compactOffsetCache.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Display estimated tokens (not raw bytes) in compact 'k'/'M' format so the displayed number and percentage denominator share the same unit (tokens).",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D4",
+      "summary": "When conversation.model is null or unresolved (not in MODEL_CAPABILITIES after resolveModelIdSync()), return contextUsage: null and have the indicator hide entirely. No 200K default.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Compute context usage server-side in conversation-service.ts (new computeContextUsage helper). Invoked from REST conversation routes and from the subscribeConversationMessages RPC stream.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Use CSS container queries (@container) on the header container for responsive variants, not viewport @media. Header width varies with sidebar/panel layouts.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Build a single <ContextUsageIndicator> component reused by both ConversationTerminal.tsx and ConversationPanel.tsx headers. Component owns format helper, color thresholds, and responsive CSS.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Color thresholds per the issue: green <50%, yellow 50-80%, red >80%. Use existing semantic CSS variables (--primary, --warning, --danger or equivalents).",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Live updates piggyback on the existing subscribeConversationMessages RPC stream. ContextUsage is included in each ConversationEvent payload. No new file watcher, no new polling loop.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Extend Conversation contract (packages/contracts) with optional contextUsage field. REST GET /api/conversations and GET /api/conversations/:id enrich responses with it.",
+      "recordedAt": "2026-05-23T04:48:22Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "bytes/4 is only a rough heuristic. Long-token languages and code-heavy content drift; the indicator could under-report or over-report by ~20%.",
+      "mitigation": "Document the heuristic in a code comment near computeContextUsage. Acceptable for v1 — the indicator is a pressure gauge, not an accounting tool. Future enhancement: parse Claude usage blocks when available."
+    },
+    {
+      "id": "H2",
+      "summary": "Non-Claude harnesses (Pi/OpenAI/Gemini) may set conversation.model to provider-specific IDs that aren't keys in MODEL_CAPABILITIES.",
+      "mitigation": "resolveModelIdSync() maps deprecated IDs; for genuinely unknown IDs, fall through to contextUsage: null. Indicator hides gracefully. Test with both 'claude-opus-4-7' and a fabricated unknown model ID."
+    },
+    {
+      "id": "H3",
+      "summary": "Compaction boundary is byte-offset-based. If the JSONL is truncated or rewritten, the cached offset may point past the new EOF.",
+      "mitigation": "findLastCompactBoundary already handles cache invalidation when the file shrinks (cache check on scannedUpTo > currentSize). Verify in the helper: clamp activeBytes to max(0, fileSize - boundaryOffset)."
+    },
+    {
+      "id": "H4",
+      "summary": "Recomputing context usage on every REST list call could repeatedly fs.stat() many JSONL files for users with hundreds of conversations.",
+      "mitigation": "fs.stat is cheap; findLastCompactBoundary is already cached. Acceptable for v1. If profiling shows it's slow, add a 1-second TTL cache on (fileSize, model) → ContextUsage."
+    },
+    {
+      "id": "H5",
+      "summary": "Two header components (ConversationTerminal and ConversationPanel) live in different module trees (CommandDeck vs chat). Sharing a component across them needs a location that both can import from.",
+      "mitigation": "Place <ContextUsageIndicator> under src/dashboard/frontend/src/components/chat/ (existing shared chat primitives) or a new src/dashboard/frontend/src/components/shared/ directory. Decide during component bead based on existing import patterns."
+    },
+    {
+      "id": "H6",
+      "summary": "Existing dashboard CSS uses viewport @media queries, not container queries. Introducing @container may surprise reviewers.",
+      "mitigation": "Component bead's acceptance criteria explicitly call out container query usage. Provide a fallback for browsers without @container support (degrade to wide-display variant, which is acceptable since the indicator remains functional)."
+    },
+    {
+      "id": "H7",
+      "summary": "The indicator must update live without breaking the existing message stream payload shape.",
+      "mitigation": "Extend ConversationEvent union additively (new optional field) rather than mutating existing event shapes. Frontend treats contextUsage as 'latest known value' — no state machine needed."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session started for PAN-748",
+      "note": "Initial planning session",
+      "timestamp": "2026-05-23T04:45:19.961Z"
+    },
+    {
+      "timestamp": "2026-05-23T04:48:22Z",
+      "reason": "planning",
+      "note": "Auto-plan: surveyed conversation-service, MODEL_CAPABILITIES, Conversation type, RPC stream, and both header components. Decided on bytes/4 token estimation, server-side compute in conversation-service.ts, single reusable indicator component, container queries for responsive, RPC-stream-based live updates. Authored vBRIEF with 7 beads (2 foundation, 5 mechanical).",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
