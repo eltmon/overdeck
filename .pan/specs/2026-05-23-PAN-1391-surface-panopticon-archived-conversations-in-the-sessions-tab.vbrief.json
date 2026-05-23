@@ -1,0 +1,519 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1391: Surface Panopticon-archived conversations in the Sessions tab",
+    "updated": "2026-05-23T04:29:45.589Z"
+  },
+  "plan": {
+    "id": "pan-1391",
+    "title": "Surface Panopticon-archived conversations in the Sessions tab",
+    "status": "proposed",
+    "uid": "7f8a5d3e-1b9c-4f2e-8a6d-9b3c5e7f1a2d",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:35:00.000Z",
+    "updated": "2026-05-23T04:29:45.589Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1391",
+        "label": "PAN-1391",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/457",
+        "label": "PAN-457 (parent)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/717",
+        "label": "PR #717 (Sessions tab)",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "ui",
+      "backend-route"
+    ],
+    "narratives": {
+      "Problem": "Panopticon-spawned conversations that get archived (conversations.archived_at NOT NULL) are filtered out of the active conversations list and the Sessions tab, leaving direct API calls or the unarchive-conversation Claude Code skill as the only paths to find or restore them. The Sessions tab shipped in PAN-457 / PR #717 already unifies discovered JSONL sessions with search and enrichment, so the cheap, coherent fix is to surface archived rows in that same tab behind a source filter — not a new sidebar entry or top-level Tab.",
+      "Proposal": "Add a GET /api/conversations/archived endpoint that returns archived Conversation rows LEFT-JOINed with discovered_sessions enrichment metadata, shaped to match the existing DiscoveredSession contract plus a `source: 'managed-archived'` discriminator. In ConversationsPage, add a 3-chip source filter to FacetPanel ([All] [Discovered] [Managed-archived]); selecting Managed-archived swaps the list fetcher to the new endpoint and renders rows in the same SessionTable with an Anchor badge distinguishing them. SessionDetail shows the archived timestamp and an Unarchive button that calls the existing POST /api/conversations/:name/unarchive route, then invalidates the relevant queries so the row reappears in Command Deck on its next read. No new Tab, no new sidebar entry, no schema migration."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a dedicated subpath GET /api/conversations/archived instead of a query parameter on the existing /api/conversations route.",
+        "rationale": "Avoids overloading an existing route whose semantics (list active, non-agent conversations) are well-defined. A subpath keeps the active-vs-archived split obvious at the URL and matches existing /api/conversations/:name/{stop,archive,unarchive,resume,...} naming conventions."
+      },
+      {
+        "summary": "Backend response shape is a unified DiscoveredSession-like row with a `source: 'managed-archived'` discriminator and extra fields archivedAt + conversationName.",
+        "rationale": "The existing SessionTable/SessionDetail components already render a rich DiscoveredSession shape; reusing it means archived rows feel native and we avoid duplicate table components. The discriminator plus two extra fields are the minimum delta needed for the Unarchive action and the badge."
+      },
+      {
+        "summary": "DB join lives in conversations-db.ts via a new listArchivedConversationsWithEnrichment() LEFT JOIN function.",
+        "rationale": "Single SQL round trip beats N+1 lookups. Putting the join in the DB module keeps SQL out of the HTTP layer and matches the existing helper-per-query convention in conversations-db.ts."
+      },
+      {
+        "summary": "'All' source chip means union of discovered + managed-archived rows; 'Discovered' is the current-only behavior; 'Managed-archived' is archived-only.",
+        "rationale": "Most intuitive reading of the chip set. 'All' otherwise would be a synonym for 'Discovered' and the chip would be redundant. Union mode requires merging two query results client-side."
+      },
+      {
+        "summary": "Hide the search bar when source === 'managed-archived'.",
+        "rationale": "Existing search (FTS + semantic) only indexes discovered_sessions; archived conversations are not in FTS/embeddings. Hiding avoids the misleading state where a user types a query and gets zero results because the archived store is invisible to the search backend. Cross-source search is a future enhancement."
+      },
+      {
+        "summary": "React row keys use composite `${source}-${id}` to avoid collisions when both row types share the table.",
+        "rationale": "DiscoveredSession.id and Conversation.id are independent integer sequences; without a composite key React would warn or worse, reuse DOM nodes across rows of different sources."
+      },
+      {
+        "summary": "Unarchive button reuses POST /api/conversations/:name/unarchive — no new endpoint.",
+        "rationale": "Endpoint already exists and is invoked by the unarchive-conversation skill. Adding a second path would create drift."
+      },
+      {
+        "summary": "Pi-harness archived conversations (JSONL in ~/.panopticon/agents/, never indexed by the discovered scanner) return with no enrichment metadata; the frontend renders the title as the summary.",
+        "rationale": "LEFT JOIN already returns nulls; no special handling needed beyond null-safe rendering, which SessionTable/SessionDetail already do for sparse fields."
+      }
+    ],
+    "items": [
+      {
+        "id": "backend-endpoint",
+        "title": "Add GET /api/conversations/archived endpoint with discovered_sessions enrichment join",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1391",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "frontend-source-filter",
+            "session-table-badge",
+            "session-detail-unarchive"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `listArchivedConversationsWithEnrichment()` to src/lib/database/conversations-db.ts (LEFT JOIN conversations c on discovered_sessions ds where ds.session_id = c.claude_session_id, filter c.archived_at IS NOT NULL, order by c.archived_at DESC). Add `getArchivedConversationsRoute` to src/dashboard/server/routes/conversations.ts using the same async Effect/HttpRouter pattern as `getConversationsRoute` — origin validation via validateOrigin, no sync FS, jsonResponse for output. Map each joined row to the unified shape: { id, source: 'managed-archived', conversationName, jsonlPath (derived via sessionFilePath when claude_session_id+cwd available, else null), workspacePath: cwd, primaryModel: model, messageCount (joined or 0), firstTs (joined or createdAt), lastTs (joined or archivedAt), estimatedCost (joined or totalCost), tokenInput (joined or 0), tokenOutput (joined or 0), toolsUsed (joined parsed JSON or []), filesTouched (joined parsed or []), tags (joined parsed or []), summary (joined or title), enrichmentLevel (joined or 0), enrichmentFailed (joined or false), panopticonManaged: true, panIssueId: issueId, archivedAt }. Register the route in `conversationsRouteLayer`. Add a Vitest test in src/dashboard/server/routes/__tests__/conversations.test.ts covering: (a) returns archived conversations sorted by archivedAt DESC, (b) excludes non-archived conversations, (c) returns rows even when no discovered_sessions row exists (LEFT JOIN null-safe), (d) merges enrichment fields when a matching discovered_sessions row is present."
+        },
+        "subItems": [
+          {
+            "id": "backend-endpoint.ac1",
+            "title": "GET /api/conversations/archived returns 200 with an array of archived conversation rows ordered by archivedAt DESC.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac2",
+            "title": "Each row contains the unified shape: id, source='managed-archived', conversationName, workspacePath, primaryModel, messageCount, lastTs, estimatedCost, summary, enrichmentLevel, panopticonManaged=true, panIssueId, archivedAt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac3",
+            "title": "Conversations with no matching discovered_sessions row are still returned, with null-safe defaults (messageCount=0, toolsUsed=[], summary falls back to conversation title).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac4",
+            "title": "Conversations with a matching discovered_sessions row include the joined enrichment fields (messageCount, summary, toolsUsed, filesTouched, tags, estimatedCost, tokenInput/Output, enrichmentLevel).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac5",
+            "title": "Non-archived conversations (archived_at IS NULL) are never returned by this endpoint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac6",
+            "title": "Endpoint is async-only — no execSync, readFileSync, writeFileSync, readdirSync, or statSync. Uses validateOrigin() like sibling routes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-endpoint.ac7",
+            "title": "Vitest covers all four behaviors (a)-(d) above and passes under `npm test`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-source-filter",
+        "title": "Add source filter chips to FacetPanel and wire the archived fetcher in ConversationsPage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1391",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "session-table-badge",
+            "session-detail-unarchive",
+            "test-source-filter",
+            "test-unarchive-button"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/conversations/FacetPanel.tsx, add a Source chip group at the top of the panel (above Time range) with three chips: All, Discovered, Managed-archived. Extend the Filters interface with `source?: 'all' | 'discovered' | 'managed-archived'`. In src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx: (1) thread `source` through the filters state (default 'all'); (2) add a `fetchArchivedConversations()` helper that calls fetch('/api/conversations/archived') and parses the unified rows; (3) add a useQuery keyed on ['archived-conversations'] that runs when source === 'managed-archived' OR 'all'; (4) when source === 'all', merge the discovered list with archived results (concat, sorted by lastTs DESC); when 'discovered', behave as today; when 'managed-archived', use only archived results and hide the search bar + search-related controls; (5) tag each row with its `source` field so SessionTable/SessionDetail can render correctly; (6) selectedId becomes a composite { source, id } (or stringified key) to disambiguate across sources."
+        },
+        "subItems": [
+          {
+            "id": "frontend-source-filter.ac1",
+            "title": "FacetPanel renders three chips labelled All / Discovered / Managed-archived; active chip is visually highlighted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac2",
+            "title": "Default source is 'all'. The chip group is the topmost facet block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac3",
+            "title": "Selecting 'Managed-archived' loads the archived list from GET /api/conversations/archived and shows ONLY archived rows in SessionTable.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac4",
+            "title": "Selecting 'Discovered' shows only discovered_sessions rows (current default behavior, no archived rows).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac5",
+            "title": "Selecting 'All' shows discovered + archived rows merged, sorted by lastTs DESC. React keys use composite source-id to avoid collisions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac6",
+            "title": "When source === 'managed-archived' the keyword/semantic search bar is hidden (FTS does not index archived conversations).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-source-filter.ac7",
+            "title": "Each row passed to SessionTable carries its `source` field; selection state survives switching chips without crashing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-table-badge",
+        "title": "Render anchor badge in SessionTable for managed-archived rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend the Session interface in src/dashboard/frontend/src/components/conversations/SessionTable.tsx to include `source: 'discovered' | 'managed-archived'` and optional `archivedAt: string | null`. Import `Anchor` from lucide-react. In the indicator column (currently rendering Star/CheckCircle/Circle), branch on `source === 'managed-archived'` to render an Anchor icon (cyan-to-amber color to distinguish from the existing Star for managed-active). Update the workspace cell to show a 'Archived' pill (or replace the existing Managed pill) when source === 'managed-archived'."
+        },
+        "subItems": [
+          {
+            "id": "session-table-badge.ac1",
+            "title": "Managed-archived rows render an Anchor icon in the indicator column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-table-badge.ac2",
+            "title": "Discovered rows continue to render Star / CheckCircle / Circle exactly as today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-table-badge.ac3",
+            "title": "Managed-archived rows show an 'Archived' (or 'Archived · <issueId>') badge in the workspace cell.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-table-badge.ac4",
+            "title": "Existing Star+'Managed' rendering for managed-active discovered rows is untouched.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-detail-unarchive",
+        "title": "Show archived timestamp and Unarchive button in SessionDetail for managed-archived rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend the Session interface in src/dashboard/frontend/src/components/conversations/SessionDetail.tsx to include `source: 'discovered' | 'managed-archived'`, `archivedAt: string | null`, and `conversationName: string | null`. When `source === 'managed-archived'`: (1) add an 'Archived at' metadata field showing the formatted archivedAt; (2) below the existing enrichment controls (or replacing them for archived rows since enrichment/embed make less sense), render an Unarchive button. The Unarchive button calls fetch(`/api/conversations/${conversationName}/unarchive`, { method: 'POST' }), shows a loading spinner during the call, on success invalidates ['archived-conversations'] and the active conversations query (if visible elsewhere via React Query keys), and either closes the drawer or marks the row as restored. Render a small toast/inline confirmation on success. Hide enrichment controls for managed-archived rows (they reference discovered_sessions IDs that may not exist)."
+        },
+        "subItems": [
+          {
+            "id": "session-detail-unarchive.ac1",
+            "title": "For source='managed-archived' rows, SessionDetail displays the Archived at timestamp in the Metadata section.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-detail-unarchive.ac2",
+            "title": "An Unarchive button is visible at the bottom of the drawer when source='managed-archived'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-detail-unarchive.ac3",
+            "title": "Clicking Unarchive calls POST /api/conversations/:name/unarchive and on success removes the row from the Managed-archived list (query invalidated).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-detail-unarchive.ac4",
+            "title": "Enrichment / Embed buttons are hidden for managed-archived rows (they would target potentially-missing discovered_sessions ids).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-detail-unarchive.ac5",
+            "title": "Failure paths (network error, 4xx, 5xx) surface an inline error message; the button re-enables.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-detail-unarchive.ac6",
+            "title": "Discovered (source='discovered') rows render exactly as today — no changes to existing enrichment/embed UX.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-source-filter",
+        "title": "RTL test for ConversationsPage source filter chip behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add tests to src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx covering: (a) default source is 'all' and merges discovered + archived rows; (b) clicking the 'Managed-archived' chip swaps to archived-only and hides the search bar; (c) clicking 'Discovered' shows only discovered rows; (d) row keys are composite (no React key warning when both sources are present). Mock the new /api/conversations/archived endpoint via vi.spyOn(globalThis, 'fetch') (the FacetPanel mock pattern + RPC mocks already in place stay as-is for discovered)."
+        },
+        "subItems": [
+          {
+            "id": "test-source-filter.ac1",
+            "title": "Test confirms default source='all' merges archived + discovered rows in the table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-source-filter.ac2",
+            "title": "Test confirms 'Managed-archived' chip selection fetches /api/conversations/archived and shows only archived rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-source-filter.ac3",
+            "title": "Test confirms search bar is not in the DOM when source='managed-archived'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-source-filter.ac4",
+            "title": "Test confirms 'Discovered' chip filters out archived rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-source-filter.ac5",
+            "title": "No React key warnings in the test console output when both row sources are rendered together.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-unarchive-button",
+        "title": "RTL test for SessionDetail unarchive button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add tests to src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx covering: (a) Unarchive button is visible only when source='managed-archived'; (b) clicking it calls POST /api/conversations/:name/unarchive with the correct conversationName; (c) on success the archived-conversations query is invalidated (verified via QueryClient spy); (d) network failure surfaces an inline error and the button re-enables. Use vi.spyOn(globalThis, 'fetch') to stub the endpoint."
+        },
+        "subItems": [
+          {
+            "id": "test-unarchive-button.ac1",
+            "title": "Test confirms the Unarchive button is absent for source='discovered' rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-unarchive-button.ac2",
+            "title": "Test confirms the Unarchive button is present and enabled for source='managed-archived' rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-unarchive-button.ac3",
+            "title": "Test confirms clicking Unarchive POSTs to /api/conversations/<name>/unarchive.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-unarchive-button.ac4",
+            "title": "Test confirms the archived-conversations query is invalidated on a 2xx response.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-unarchive-button.ac5",
+            "title": "Test confirms an inline error is shown when the unarchive POST returns non-2xx; the button re-enables.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "backend-endpoint",
+        "to": "frontend-source-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "backend-endpoint",
+        "to": "session-table-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "backend-endpoint",
+        "to": "session-detail-unarchive",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-source-filter",
+        "to": "session-table-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-source-filter",
+        "to": "session-detail-unarchive",
+        "type": "blocks"
+      },
+      {
+        "from": "session-table-badge",
+        "to": "test-source-filter",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-source-filter",
+        "to": "test-source-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "session-detail-unarchive",
+        "to": "test-unarchive-button",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1391-surface-panopticon-archived-conversations-in-the-sessions-tab.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
