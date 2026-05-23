@@ -12,6 +12,7 @@ import MetricStrip from '../primitives/MetricStrip';
 import TopBar from '../primitives/TopBar';
 import Button from '../primitives/Button';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
+import { IssueActionMenu } from '../IssueActionMenu';
 
 const ROLE_ORDER = {
   plan: 0,
@@ -472,6 +473,9 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                     stuck={stuck}
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
                     onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
+                    actionMenu={agent.issueId ? (
+                      <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
+                    ) : undefined}
                   />
                 );
               })}

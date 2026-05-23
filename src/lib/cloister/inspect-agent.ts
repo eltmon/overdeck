@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
@@ -40,6 +40,7 @@ import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState } from '../agents.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -71,7 +72,7 @@ export interface InspectResult {
  */
 async function getBeadDescription(beadId: string, workspacePath: string): Promise<string> {
   try {
-    const { stdout } = await execAsync(`bd show ${beadId} --json`, {
+    const { stdout } = await execFileAsync('bd', ['show', beadId, '--json'], {
       cwd: workspacePath,
       encoding: 'utf-8',
     });
@@ -84,9 +85,8 @@ async function getBeadDescription(beadId: string, workspacePath: string): Promis
     if (bead.labels?.length) parts.push(`**Labels:** ${bead.labels.join(', ')}`);
     return parts.join('\n\n') || `Bead ${beadId} (no description available)`;
   } catch {
-    // Fallback: try without --json
     try {
-      const { stdout } = await execAsync(`bd show ${beadId}`, {
+      const { stdout } = await execFileAsync('bd', ['show', beadId], {
         cwd: workspacePath,
         encoding: 'utf-8',
       });
@@ -95,7 +95,9 @@ async function getBeadDescription(beadId: string, workspacePath: string): Promis
       return `Bead ${beadId} (unable to read bead description)`;
     }
   }
-}async function buildInspectPromptPromise(context: InspectContext): Promise<string> {
+}
+
+async function buildInspectPromptPromise(context: InspectContext): Promise<string> {
   const templatePath = join(__dirname, 'prompts', 'inspect-agent.md');
 
   if (!existsSync(templatePath)) {

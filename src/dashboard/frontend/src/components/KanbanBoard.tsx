@@ -27,8 +27,9 @@ import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
-import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { deriveIssueActionPhase, type PipelinePhase } from '../lib/issueActions';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { cn } from '../lib/utils';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
@@ -36,16 +37,12 @@ import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { IssueActionMenu, useIssueActions } from './IssueActionMenu';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
-
-// Parity registry anchor — keeps the card action surface tied to the
-// shared Command Deck parity inventory used by tests.
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
@@ -2726,11 +2723,27 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, workspace: workspaceProp }: IssueCardProps) {
+const CARD_VERB_BY_PHASE: Partial<Record<PipelinePhase, 'WORK RUNNING' | 'REVIEW RUNNING' | 'SHIP RUNNING' | 'PLANNING' | 'INPUT' | 'READY TO MERGE' | 'MERGED' | 'CHANGES REQUESTED' | 'QUEUED FOR PLAN'>> = {
+  QUEUED_FOR_PLAN: 'QUEUED FOR PLAN',
+  PLANNING: 'PLANNING',
+  WORK_RUNNING: 'WORK RUNNING',
+  INPUT: 'INPUT',
+  REVIEW_RUNNING: 'REVIEW RUNNING',
+  SHIP_RUNNING: 'SHIP RUNNING',
+  CHANGES_REQUESTED: 'CHANGES REQUESTED',
+  STUCK: 'CHANGES REQUESTED',
+  READY_TO_MERGE: 'READY TO MERGE',
+  MERGED: 'MERGED',
+};
+
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
+  const [actionOpenSignal, setActionOpenSignal] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
+  const issueActions = useIssueActions(issue.identifier);
+  const hasEnabledIssueAction = issueActions.all.some((view) => view.enabled);
 
   useEffect(() => {
     if (isSelected && cardRef.current) {
@@ -2745,17 +2758,22 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
-  const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
-  const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
+  const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
+  const issueActionPhase = deriveIssueActionPhase({
+    reviewStatus,
+    agent: activeAgent,
+    workspace: { exists: !!(workspaceProp?.path || issue.workspacePath) },
+    hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
+    hasBeads: planningState?.hasBeads ?? issue.hasBeads ?? false,
+    issueCanonicalState: canonical,
+    isMerged,
+  });
+  const isPipelineStuck = issueActionPhase === 'STUCK';
+  const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
+  const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
   const cardVerbBadge =
     canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
-    isTerminal ? <VerbBadge variant="MERGED" /> :
-    isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
-    isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :
-    canonical === 'in_review' ? <VerbBadge variant="REVIEW RUNNING" /> :
-    canonical === 'in_progress' && isRunning ? <VerbBadge variant="WORK RUNNING" /> :
-    canonical === 'todo' || canonical === 'backlog' ? <VerbBadge variant="QUEUED FOR PLAN" /> :
+    cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
   const beadProgressColor =
     isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :
@@ -2792,6 +2810,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       unhealthyCard={isStackUnhealthy}
       sessionLostCard={false}
       onClick={onSelect}
+      onContextMenu={(event) => {
+        if (!hasEnabledIssueAction) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setActionOpenSignal((value) => value + 1);
+      }}
     >
       <div className="relative" style={{ padding: '12px 12px 10px' }}>
         {/* Hover overlays */}
@@ -2921,6 +2945,18 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           >
             {cardAvatarInitials(activeAgent?.id ?? issue.identifier)}
           </span>
+        </div>
+
+        <div
+          data-component="board-card-action-row"
+          data-visible-mode={pinActionRow ? 'pinned' : 'hover'}
+          className={cn(
+            'mt-2 flex items-center gap-1 border-t border-border pt-2 transition-opacity',
+            !pinActionRow && '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100',
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <IssueActionMenu issueId={issue.identifier} mode="hybrid" className="flex w-full items-center gap-1" openSignal={actionOpenSignal} />
         </div>
 
         <CostBreakdownModal

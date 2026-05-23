@@ -30,6 +30,8 @@ export type AgentCardProps = {
   stuckMessage?: ReactNode;
   onOpenIssue?: () => void;
   onStop?: () => void;
+  actionMenu?: ReactNode;
+  actionMenuDisabledTitle?: string;
   className?: string;
 };
 
@@ -54,6 +56,8 @@ function AgentCard({
   stuckMessage,
   onOpenIssue,
   onStop,
+  actionMenu,
+  actionMenuDisabledTitle = 'No issue ID available for this agent',
   className,
 }: AgentCardProps) {
   const style = {
@@ -81,14 +85,20 @@ function AgentCard({
           </div>
           <p className="mt-[6px] truncate font-mono text-[10px] leading-none text-muted-foreground">{id}</p>
         </div>
-        <button
-          type="button"
-          aria-label={`Open ${id} menu`}
-          className="rounded-[var(--radius-sm)] border border-border bg-muted p-[5px] text-muted-foreground transition-colors hover:text-foreground"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <MoreHorizontal className="h-[14px] w-[14px]" />
-        </button>
+        <div onClick={(event) => event.stopPropagation()}>
+          {actionMenu ?? (
+            <button
+              type="button"
+              aria-label={`Open ${id} menu`}
+              data-testid="agent-card-menu-button"
+              className="rounded-[var(--radius-sm)] border border-border bg-muted p-[5px] text-muted-foreground opacity-50"
+              title={actionMenuDisabledTitle}
+              disabled
+            >
+              <MoreHorizontal className="h-[14px] w-[14px]" />
+            </button>
+          )}
+        </div>
       </div>
 
       {issue && (

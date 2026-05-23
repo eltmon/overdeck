@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
@@ -649,6 +649,11 @@ describe('IssueCard', () => {
   });
 
   beforeEach(() => {
+    useDashboardStore.setState({
+      issuesRaw: [],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
       if (url === '/api/settings' && init?.method === 'PUT') {
@@ -680,8 +685,20 @@ describe('IssueCard', () => {
       workspace: { exists: false, issueId: 'TEST-123' },
       ...props,
     };
+    const cardAgents = [
+      defaultProps.workAgent,
+      ...(defaultProps.workAgents ?? []),
+      defaultProps.planningAgent,
+      ...(defaultProps.specialists ?? []),
+    ].filter((agent): agent is Agent => !!agent);
+    const currentReviewStatusByIssueId = useDashboardStore.getState().reviewStatusByIssueId;
+    useDashboardStore.setState({
+      issuesRaw: [defaultProps.issue],
+      agentsById: Object.fromEntries(cardAgents.map((agent) => [agent.id, agent])),
+      reviewStatusByIssueId: currentReviewStatusByIssueId,
+    } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    render(
+    const result = render(
       <QueryClientProvider client={queryClient}>
         <DialogProvider>
           <IssueCard {...defaultProps} />
@@ -689,7 +706,19 @@ describe('IssueCard', () => {
       </QueryClientProvider>,
     );
 
-    return defaultProps;
+    return { ...defaultProps, ...result };
+  }
+
+  function boardActionRow() {
+    const row = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="board-card-action-row"]');
+    expect(row).toBeInTheDocument();
+    return row as HTMLElement;
+  }
+
+  function inlineBoardActionIds() {
+    return Array.from(boardActionRow().querySelectorAll('button[data-testid^="issue-action-"]'))
+      .map((button) => button.getAttribute('data-testid'))
+      .filter((testId) => testId !== 'issue-action-overflow-button');
   }
 
   it('renders queued board cards without legacy launch controls', () => {
@@ -700,6 +729,107 @@ describe('IssueCard', () => {
     expect(screen.getByText('QUEUED FOR PLAN')).toBeInTheDocument();
     expect(screen.queryByTestId('action-auto-plan-TEST-123')).not.toBeInTheDocument();
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
+  });
+
+  it('renders a hover-revealed hybrid action row on ordinary Board cards', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo' }),
+    });
+
+    const row = boardActionRow();
+    expect(row).toHaveAttribute('data-visible-mode', 'hover');
+    expect(row).toHaveClass('border-t', 'border-border');
+    expect(row.className).toContain('group-hover:opacity-100');
+    expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
+  });
+
+  it('pins the Board action row when the issue has a running agent or pending action state', () => {
+    const { unmount } = renderIssueCard({
+      workAgent: createMockAgent({ id: 'agent-test-123', role: 'work', status: 'running' }),
+    });
+    expect(boardActionRow()).toHaveAttribute('data-visible-mode', 'pinned');
+
+    unmount();
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'TEST-123': { issueId: 'TEST-123', readyForMerge: true, mergeStatus: 'pending', prUrl: 'https://example.com/pr/1' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Review', state: 'in_review' }),
+    });
+    expect(boardActionRow()).toHaveAttribute('data-visible-mode', 'pinned');
+  });
+
+  it('opens the hybrid Board action overflow menu on right-click', async () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo' }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    const allowedDefault = card.dispatchEvent(event);
+
+    expect(allowedDefault).toBe(false);
+    await waitFor(() => expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument());
+    expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
+  });
+
+  it('snapshots inline Board action sets for representative phases', () => {
+    const actionSets: Record<string, (string | null)[]> = {};
+
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo' }),
+    });
+    actionSets.QUEUED_FOR_PLAN = inlineBoardActionIds();
+    cleanup();
+
+    renderIssueCard({
+      workAgent: createMockAgent({ id: 'agent-test-123', role: 'work', status: 'running' }),
+    });
+    actionSets.WORK_RUNNING = inlineBoardActionIds();
+    cleanup();
+
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'TEST-123': { issueId: 'TEST-123', reviewStatus: 'blocked', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Review', state: 'in_review', workspacePath: '/tmp/test-123' }),
+    });
+    actionSets.CHANGES_REQUESTED = inlineBoardActionIds();
+    cleanup();
+
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'TEST-123': { issueId: 'TEST-123', readyForMerge: true, mergeStatus: 'pending', prUrl: 'https://example.com/pr/1' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Review', state: 'in_review' }),
+    });
+    actionSets.READY_TO_MERGE = inlineBoardActionIds();
+
+    expect(actionSets).toMatchInlineSnapshot(`
+      {
+        "CHANGES_REQUESTED": [
+          "issue-action-open",
+          "issue-action-requestReview",
+        ],
+        "QUEUED_FOR_PLAN": [
+          "issue-action-plan",
+          "issue-action-startAgent",
+        ],
+        "READY_TO_MERGE": [
+          "issue-action-viewPr",
+        ],
+        "WORK_RUNNING": [
+          "issue-action-tell",
+          "issue-action-doneWork",
+        ],
+      }
+    `);
   });
 
   it('does not render Board card launch controls after planning completes', () => {
