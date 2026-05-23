@@ -552,6 +552,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
     }
 
+    await notifyTldrDaemon(projectPath, sourceBranch ?? '');
+
     try {
       const { refreshGraphify } = await import('../graphify/refresh.js');
       const graphifyResult = await refreshGraphify(projectPath, issueId);
@@ -571,8 +573,6 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       console.warn(`[merge-agent] Graphify refresh failed: ${message}`);
       logActivity('graphify_refresh_failed', message);
     }
-
-    await notifyTldrDaemon(projectPath, sourceBranch ?? '');
 
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
     _completedPostMerge.add(issueId);
