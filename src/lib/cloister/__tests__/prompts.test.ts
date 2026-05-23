@@ -418,6 +418,39 @@ optional:
       })
     );
 
+    it.effect('renders review TLDR guidance only when TLDR_AVAILABLE is true', () =>
+      Effect.gen(function* () {
+        const baseVars = {
+          ISSUE_ID: 'PAN-611',
+          BRANCH: 'feature/pan-611',
+          WORKSPACE: '/workspace',
+          DIFF_BASE: 'main',
+          IS_POLYREPO: false,
+          GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
+          GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
+          API_URL: 'http://localhost:3011',
+        };
+        const enabled = yield* renderPrompt({
+          name: 'review',
+          vars: { ...baseVars, TLDR_AVAILABLE: true },
+        });
+        const disabled = yield* renderPrompt({
+          name: 'review',
+          vars: { ...baseVars, TLDR_AVAILABLE: false },
+        });
+        const absent = yield* renderPrompt({ name: 'review', vars: baseVars });
+
+        expect(enabled).toContain('## TLDR: Efficient Review Context');
+        expect(enabled).toContain('tldr_context');
+        expect(enabled).toContain('tldr_structure');
+        expect(enabled).toContain('tldr_semantic');
+        expect(enabled).toContain('tldr_calls');
+        expect(enabled).toContain('tldr_impact');
+        expect(disabled).not.toContain('## TLDR: Efficient Review Context');
+        expect(absent).not.toContain('## TLDR: Efficient Review Context');
+      })
+    );
+
     it.effect('renders Playwright isolation guidance in the work prompt', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
