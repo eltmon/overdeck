@@ -3,7 +3,8 @@
  * preservation during search (PAN-457).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationsPage } from '../ConversationsPage';
 
@@ -36,15 +37,27 @@ let capturedOnChange: FilterOnChange | null = null;
 vi.mock('../FacetPanel', () => ({
   FacetPanel: ({ onChange }: { onChange: FilterOnChange }) => {
     capturedOnChange = onChange;
-    return null;
+    return (
+      <div data-testid="facet-panel">
+        <button onClick={() => onChange('source', undefined)}>All</button>
+        <button onClick={() => onChange('source', 'discovered')}>Discovered</button>
+        <button onClick={() => onChange('source', 'managed-archived')}>Managed-archived</button>
+      </div>
+    );
   },
 }));
 
-vi.mock('../SessionTable', () => ({
-  SessionTable: ({ sessions }: { sessions: unknown[] }) => (
-    <div data-testid="session-table">sessions:{sessions.length}</div>
-  ),
-}));
+vi.mock('../SessionTable', async () => {
+  const actual = await vi.importActual<typeof import('../SessionTable')>('../SessionTable');
+  const SessionTable = actual.SessionTable;
+  return {
+    SessionTable: (props: ComponentProps<typeof SessionTable>) => (
+      <div data-testid="session-table">
+        <SessionTable {...props} />
+      </div>
+    ),
+  };
+});
 vi.mock('../SessionDetail', () => ({ SessionDetail: () => null }));
 vi.mock('../ScanButton', () => ({
   ScanButton: ({ onScan }: { onScan: () => void }) => (
@@ -77,6 +90,18 @@ const SESSION_STUB = {
 
 const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1, total: 1 };
 const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts', durationMs: 2 };
+const ARCHIVED_RESPONSE = [{
+  ...SESSION_STUB,
+  id: 1,
+  source: 'managed-archived',
+  conversationName: 'Archived conversation',
+  workspacePath: '/home/user/Projects/archived',
+  summary: 'Archived summary',
+  lastTs: '2025-01-02T01:00:00Z',
+  archivedAt: '2025-01-02T00:00:00Z',
+  panopticonManaged: true,
+  panIssueId: 'PAN-1391',
+}];
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };
 const COST_RESPONSE = { sessionCount: 10, totalCost: 0.25, totalTokensIn: 1000, totalTokensOut: 2000 };
 const WORKSPACE_COST_RESPONSE = {
@@ -102,6 +127,10 @@ function renderPage(client: QueryClient) {
   );
 }
 
+function sessionRows() {
+  return within(screen.getByTestId('session-table')).getAllByRole('row').slice(1);
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ConversationsPage endpoint selection', () => {
@@ -113,9 +142,14 @@ describe('ConversationsPage endpoint selection', () => {
     rpcMocks.cost.mockResolvedValue(COST_RESPONSE);
     rpcMocks.costByWorkspace.mockResolvedValue(WORKSPACE_COST_RESPONSE);
     rpcMocks.scan.mockResolvedValue({ inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(ARCHIVED_RESPONSE),
+    }));
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
@@ -194,6 +228,39 @@ describe('ConversationsPage endpoint selection', () => {
     });
   });
 
+  it('archived fetch includes active facet filters and a bounded limit', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByText('Filters'));
+
+    await waitFor(() => expect(capturedOnChange).not.toBeNull());
+    act(() => {
+      capturedOnChange!('workspace', '/home/user/Projects/archived');
+      capturedOnChange!('model', 'claude-sonnet-4-6');
+      capturedOnChange!('tag', 'feat');
+      capturedOnChange!('tool', 'Read');
+      capturedOnChange!('file', '/home/user/Projects/archived/src/auth.ts');
+      capturedOnChange!('minCost', '0.01');
+      capturedOnChange!('enrichmentLevel', '1');
+    });
+
+    await waitFor(() => {
+      const calls = vi.mocked(globalThis.fetch).mock.calls.map(([url]) => String(url));
+      expect(calls.some((url) => {
+        const parsed = new URL(url, 'http://localhost');
+        return parsed.pathname === '/api/conversations/archived'
+          && parsed.searchParams.get('limit') === '50'
+          && parsed.searchParams.get('workspacePath') === '/home/user/Projects/archived'
+          && parsed.searchParams.get('primaryModel') === 'claude-sonnet-4-6'
+          && parsed.searchParams.get('tag') === 'feat'
+          && parsed.searchParams.get('tool') === 'Read'
+          && parsed.searchParams.get('file') === '/home/user/Projects/archived/src/auth.ts'
+          && parsed.searchParams.get('minCost') === '0.01'
+          && parsed.searchParams.get('enrichmentLevel') === '1';
+      })).toBe(true);
+    });
+  });
+
   it('wires tag, tool, and file filters into search RPC payloads', async () => {
     renderPage(makeClient());
 
@@ -220,5 +287,54 @@ describe('ConversationsPage endpoint selection', () => {
       limit: 50,
       offset: 0,
     });
+  });
+
+  it('defaults to all sources and merges archived rows before older discovered rows', async () => {
+    renderPage(makeClient());
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(2));
+
+    expect(sessionRows()[0]).toHaveTextContent('Projects/archived');
+    expect(sessionRows()[0]).toHaveTextContent('Archived summary');
+    expect(sessionRows()[1]).toHaveTextContent('Projects/alpha');
+    expect(sessionRows()[1]).toHaveTextContent('Fixed the auth bug');
+  });
+
+  it('shows only managed-archived rows and hides search controls when that source is selected', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByText('Filters'));
+    fireEvent.click(await screen.findByText('Managed-archived'));
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(1));
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/archived?limit=50');
+    expect(sessionRows()[0]).toHaveTextContent('Projects/archived');
+    expect(sessionRows()[0]).not.toHaveTextContent('Projects/alpha');
+    expect(screen.queryByPlaceholderText('Search sessions…')).not.toBeInTheDocument();
+  });
+
+  it('shows only discovered rows when the discovered source is selected', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByText('Filters'));
+    fireEvent.click(await screen.findByText('Discovered'));
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(1));
+
+    expect(sessionRows()[0]).toHaveTextContent('Projects/alpha');
+    expect(sessionRows()[0]).not.toHaveTextContent('Projects/archived');
+    expect(screen.getByPlaceholderText('Search sessions…')).toBeInTheDocument();
+  });
+
+  it('does not emit duplicate React key warnings when source ids collide', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    renderPage(makeClient());
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(2));
+
+    expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('Encountered two children with the same key'))).toBe(false);
+    errorSpy.mockRestore();
   });
 });

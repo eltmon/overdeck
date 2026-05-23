@@ -20,32 +20,21 @@ Claude Code exposes nine lifecycle hook events. Panopticon registers shell scrip
 | `UserPromptSubmit` | When the user submits a prompt | `user-prompt-submit-hook` | `agent.message_received`, `agent.waiting_cleared` |
 | `PermissionRequest` | When Claude requests tool permission | `permission-event-hook` | `conversation.permission_changed` |
 
-## The Split-Registry Rule (PAN-982)
+## Hook Registration
 
-Hooks are registered in **two places**, not one. This is intentional and prevents double-firing.
+All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install` and `pan admin hooks install` install the hook scripts into `~/.panopticon/bin/` and idempotently add any missing registrations to settings.json.
 
-### Global `~/.claude/settings.json`
+The global registry is the single source of truth for `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`, `Notification`, `PreCompact`, `PostCompact`, `UserPromptSubmit`, and `PermissionRequest`. Role files under `roles/` and synced agent definitions under `sync-sources/agents/` do not declare `hooks:` frontmatter.
 
-Six hooks live in global settings because Claude Code's per-agent frontmatter cannot reliably host them:
+Users upgrading across PAN-1402 should re-run `pan install` (or `pan admin hooks install`) after pulling the fixed version. Any work agent that was already running before the reinstall must be stopped and restarted before it can pick up the restored hook registration.
 
-- **Bootstrap-path hooks** (`SessionStart`, `UserPromptSubmit`) fire before `--agent` is fully bound, so frontmatter hooks would be missed.
-- **Session-wide signals** (`PreCompact`, `PostCompact`, `Notification`, `PermissionRequest`) need uniform routing across both pipeline-agent and ad-hoc Claude sessions.
+### History
 
-### Per-Agent Frontmatter (`agents/pan-*.md`)
-
-Three hooks live in each of the seven agent definition YAML frontmatters:
-
-- `PreToolUse`
-- `PostToolUse`
-- `Stop`
-
-The pipeline agents are: `pan-work-agent`, `pan-planning-agent`, `pan-review-agent`, `pan-test-agent`, `pan-merge-agent`, `pan-uat-agent`, and `pan-inspect-agent`.
-
-These were migrated out of global settings in PAN-982 because registering them globally **and** in frontmatter causes every event to fire twice (once from each source). The per-agent approach also means ad-hoc Claude sessions (launched without `--agent`) do not trigger Panopticon-specific hooks like heartbeat tracking or cost recording, which is correct — those hooks have no meaning outside a pipeline agent.
+PAN-982 attempted to move `PreToolUse`, `PostToolUse`, and `Stop` into per-agent frontmatter to avoid double-firing. PAN-1402 reverted that migration because Claude Code did not honor those frontmatter hooks when Panopticon launched agents with path-form `--agent roles/<role>.md`; the observable result was missing heartbeats, missing `sessions.json`, and `claudeSessionId: null`.
 
 ### Migration Pruning
 
-`pan install` (via `setupHooksCommand`) automatically strips legacy global registrations of `PreToolUse`, `PostToolUse`, and `Stop` from `~/.claude/settings.json` so upgrades across PAN-982 do not double-fire.
+No PAN-1402 pruning is needed. The old PAN-982 `removeIfPresent(...)` block was removed, so setup now only adds missing Panopticon hook registrations and leaves existing matching entries intact.
 
 ## Hook Execution Flow
 

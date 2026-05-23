@@ -3,21 +3,6 @@ name: pan-test-agent
 description: Panopticon test specialist — runs the project test suite against an agent's PR, reports failures, never edits code.
 model: sonnet
 permissionMode: bypassPermissions
-hooks:
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Test Agent

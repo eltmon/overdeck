@@ -23,7 +23,6 @@ import type { ReviewStatus, WorkspaceInfo } from '../lib/workspace-types';
 import { ReviewPipelineSection } from './CommandDeck/ZoneCOverviewTabs/ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
 export interface WorkspaceStatusOverviewProps {
@@ -64,8 +63,6 @@ export interface WorkspaceStatusOverviewProps {
   onResumeMessageChange?: (msg: string) => void;
   isSelected?: boolean;
 }
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 const STUCK_MERGE_MS = 2 * 60 * 1000;
 

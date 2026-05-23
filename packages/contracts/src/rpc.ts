@@ -46,6 +46,7 @@ export const WS_METHODS = {
 
   // Workspace detail (batched)
   getWorkspaceDetail: "pan.getWorkspaceDetail",
+  readWorkspaceFile: "pan.readWorkspaceFile",
 
   // Terminal control
   terminalOpen: "pan.terminalOpen",
@@ -109,6 +110,14 @@ export const CompactBoundary = Schema.Struct({
 })
 export type CompactBoundary = typeof CompactBoundary.Type
 
+export const ContextUsage = Schema.Struct({
+  activeBytes: Schema.Number,
+  estimatedTokens: Schema.Number,
+  contextWindow: Schema.Number,
+  percentUsed: Schema.Number,
+})
+export type ContextUsage = typeof ContextUsage.Type
+
 // ─── Chat / conversation message types (PAN-451) ──────────────────────────────
 
 export const ChatMessage = Schema.Struct({
@@ -150,6 +159,7 @@ export interface ConversationResponse {
   byteOffset: number;
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
+  contextUsage?: ContextUsage | null;
 }
 
 export const ConversationEvent = Schema.Union([
@@ -160,6 +170,7 @@ export const ConversationEvent = Schema.Union([
     streaming: Schema.Boolean,
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
+    contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),
@@ -254,6 +265,29 @@ export const TerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
 export const GetWorkspaceDetailRpc = Rpc.make(WS_METHODS.getWorkspaceDetail, {
   payload: Schema.Struct({ issueId: IssueId }),
   success: WorkspaceDetail,
+  error: PanRpcError,
+})
+
+export const ReadWorkspaceFileInput = Schema.Struct({
+  issueId: IssueId,
+  relativePath: Schema.String,
+  line: Schema.optional(Schema.Number),
+  contextLines: Schema.optional(Schema.Number),
+})
+export type ReadWorkspaceFileInput = typeof ReadWorkspaceFileInput.Type
+
+export const ReadWorkspaceFileResult = Schema.Struct({
+  text: Schema.String,
+  lang: Schema.String,
+  truncated: Schema.Boolean,
+  totalLines: Schema.Number,
+})
+export type ReadWorkspaceFileResult = typeof ReadWorkspaceFileResult.Type
+
+/** 10b. Read a workspace file for inline previews (unary) */
+export const ReadWorkspaceFileRpc = Rpc.make(WS_METHODS.readWorkspaceFile, {
+  payload: ReadWorkspaceFileInput,
+  success: ReadWorkspaceFileResult,
   error: PanRpcError,
 })
 
@@ -460,6 +494,7 @@ export const PanRpcGroup = RpcGroup.make(
   GetSnapshotRpc,
   ReplayEventsRpc,
   GetWorkspaceDetailRpc,
+  ReadWorkspaceFileRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,

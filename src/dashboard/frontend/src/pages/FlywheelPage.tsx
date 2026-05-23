@@ -8,6 +8,7 @@ import { subscribeFlywheelStatus } from '../lib/wsTransport';
 interface FlywheelPageProps {
   onOpenSettings?: () => void;
   onNavigateAgent?: (agentId: string) => void;
+  onNavigateIssue?: (issueId: string) => void;
 }
 
 type FlywheelLeftTab = 'status' | 'state';
@@ -39,10 +40,29 @@ function formatElapsed(ms: number): string {
   return `${minutes}m`;
 }
 
-export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPageProps) {
+function formatFreshnessAge(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  if (totalSeconds <= 90) return `${totalSeconds}s`;
+  return `${Math.max(1, Math.floor(totalSeconds / 60))}m`;
+}
+
+function getLastTickFreshness(lastTickAt: string, nowMs: number): { label: string; className: string } {
+  const lastTickMs = new Date(lastTickAt).getTime();
+  const ageMs = Number.isFinite(lastTickMs) ? Math.max(0, nowMs - lastTickMs) : Number.POSITIVE_INFINITY;
+  if (ageMs <= 30_000) {
+    return { label: 'live', className: 'border-success/30 bg-success/15 text-success' };
+  }
+  if (ageMs <= 90_000) {
+    return { label: `last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-warning/30 bg-warning/15 text-warning' };
+  }
+  return { label: `stalled — last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-destructive/30 bg-destructive/15 text-destructive' };
+}
+
+export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
   const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const leftWidthRef = useRef(leftWidth);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -85,6 +105,11 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
   }, [setLeftWidthClamped]);
 
   useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const refreshCurrentStatus = async () => {
       try {
@@ -107,6 +132,8 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
       unsubscribe();
     };
   }, []);
+
+  const freshness = status ? getLastTickFreshness(status.lastTickAt, nowMs) : null;
 
   return (
     <div
@@ -153,7 +180,11 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
               </div>
               <div className="rounded-md border border-border bg-background p-3">
                 <dt className="uppercase tracking-wide text-muted-foreground">Last tick</dt>
-                <dd className="mt-1 font-mono text-foreground">{new Date(status.lastTickAt).toLocaleTimeString()}</dd>
+                <dd className="mt-1">
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${freshness?.className ?? ''}`}>
+                    {freshness?.label ?? '—'}
+                  </span>
+                </dd>
               </div>
             </dl>
           )}
@@ -192,7 +223,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPagePr
         <div className="p-6" role="tabpanel" aria-label={activeTab === 'status' ? 'Flywheel status' : 'Flywheel state'}>
           {activeTab === 'status' ? (
             status ? (
-              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} />
+              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
             ) : (
               <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
                 <div>

@@ -4,7 +4,7 @@
     "created": "2026-05-23T06:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1402: Work agent state.json.claudeSessionId stays null — heartbeat hook never records the Claude session",
-    "updated": "2026-05-23T06:15:37.990Z"
+    "updated": "2026-05-23T06:45:37.649Z"
   },
   "plan": {
     "id": "pan-1402",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-23T06:30:00.000Z",
-    "updated": "2026-05-23T06:15:37.990Z",
+    "updated": "2026-05-23T06:45:37.649Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1402",
@@ -69,7 +69,7 @@
       {
         "id": "restore-tool-event-hooks-in-settings",
         "title": "Re-register PreToolUse/PostToolUse/Stop hooks in setupHooksCommand and remove the PAN-982 prune block",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T06:30:00.000Z",
         "metadata": {
@@ -91,7 +91,7 @@
           {
             "id": "restore-tool-event-hooks-in-settings.ac1",
             "title": "After running setupHooksCommand on an empty settings.json, the result contains PreToolUse with pre-tool-hook, PostToolUse with heartbeat-hook + permission-event-hook, and Stop with stop-hook + permission-event-hook.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "restore-tool-event-hooks-in-settings.ac2",
             "title": "When python3 is detected, the post-setup settings.json also contains PreToolUse with tldr-read-enforcer (matcher 'Read') and PostToolUse with tldr-post-edit (matcher 'Edit|Write').",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "restore-tool-event-hooks-in-settings.ac3",
             "title": "The `removeIfPresent(...)` PAN-982 migration block (and its console.log of removed entries) is fully deleted; setupHooksCommand never strips PreToolUse/PostToolUse/Stop entries that point at Panopticon's bin dir.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -115,7 +115,7 @@
           {
             "id": "restore-tool-event-hooks-in-settings.ac4",
             "title": "Running setupHooksCommand twice in a row leaves settings.json byte-identical the second time (idempotency preserved by addHookIfMissing).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -123,7 +123,7 @@
           {
             "id": "restore-tool-event-hooks-in-settings.ac5",
             "title": "`npm run lint`, `npm run typecheck`, and `npm test -- src/cli/commands/__tests__/setup-hooks.test.ts` all pass with no new failures after the change.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -133,7 +133,7 @@
       {
         "id": "strip-role-frontmatter-hooks",
         "title": "Remove `hooks:` blocks from roles/*.md and drop the matching assertions in role-definitions.test.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T06:30:00.000Z",
         "metadata": {
@@ -149,7 +149,7 @@
           {
             "id": "strip-role-frontmatter-hooks.ac1",
             "title": "roles/work.md, roles/plan.md, roles/review.md, roles/test.md, and roles/ship.md no longer contain a `hooks:` key in their YAML frontmatter.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -157,7 +157,7 @@
           {
             "id": "strip-role-frontmatter-hooks.ac2",
             "title": "All other frontmatter fields (name, description, permissionMode, effort, tools, mcpServers) on the five role files are preserved exactly as before.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -165,7 +165,7 @@
           {
             "id": "strip-role-frontmatter-hooks.ac3",
             "title": "src/lib/__tests__/role-definitions.test.ts contains no `frontmatter.hooks` assertions; `npm test -- src/lib/__tests__/role-definitions.test.ts` passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
       {
         "id": "strip-sync-sources-agents-hooks",
         "title": "Remove `hooks:` blocks from sync-sources/agents/pan-*-agent.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-23T06:30:00.000Z",
         "metadata": {
@@ -191,7 +191,7 @@
           {
             "id": "strip-sync-sources-agents-hooks.ac1",
             "title": "sync-sources/agents/pan-work-agent.md, pan-planning-agent.md, pan-review-agent.md, pan-inspect-agent.md, pan-test-agent.md, pan-uat-agent.md, and pan-merge-agent.md no longer contain a `hooks:` key in their YAML frontmatter.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -199,7 +199,7 @@
           {
             "id": "strip-sync-sources-agents-hooks.ac2",
             "title": "All other frontmatter fields (name, description, model, permissionMode, effort, tools, mcpServers) on the seven agent files are preserved exactly as before.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -207,7 +207,7 @@
           {
             "id": "strip-sync-sources-agents-hooks.ac3",
             "title": "Any existing test that asserts `frontmatter.hooks` exists for these agent files is updated or removed; `npm test` passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -217,7 +217,7 @@
       {
         "id": "add-setup-hooks-regression-test",
         "title": "Add regression tests in setup-hooks.test.ts that assert tool-event hooks register globally",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-23T06:30:00.000Z",
         "metadata": {
@@ -233,7 +233,7 @@
           {
             "id": "add-setup-hooks-regression-test.ac1",
             "title": "setup-hooks.test.ts contains a regression test for each tool-event hook restored in restore-tool-event-hooks-in-settings, asserting addPanopticonHookIfMissing writes the entry and is idempotent on the second call.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -241,7 +241,7 @@
           {
             "id": "add-setup-hooks-regression-test.ac2",
             "title": "A higher-level test exercises setupHooksCommand against an isolated temp HOME and asserts the resulting settings.json contains PreToolUse:pre-tool-hook, PostToolUse:heartbeat-hook, PostToolUse:permission-event-hook, Stop:stop-hook, and Stop:permission-event-hook (TLDR entries conditional on python3 detection).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -249,7 +249,7 @@
           {
             "id": "add-setup-hooks-regression-test.ac3",
             "title": "`npm test -- src/cli/commands/__tests__/setup-hooks.test.ts` passes with the new assertions.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
       {
         "id": "update-hooks-docs",
         "title": "Update docs/HOOKS.md to describe the PAN-1402 revert and remove the split-registry section",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-23T06:30:00.000Z",
         "metadata": {
@@ -275,7 +275,7 @@
           {
             "id": "update-hooks-docs.ac1",
             "title": "docs/HOOKS.md no longer contains the 'Split-Registry Rule (PAN-982)' section claiming PreToolUse/PostToolUse/Stop live in per-agent frontmatter.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -283,7 +283,7 @@
           {
             "id": "update-hooks-docs.ac2",
             "title": "A new 'Hook Registration' section describes all nine hooks living in global settings.json, with a 'History' paragraph summarizing the PAN-982 attempt and PAN-1402 revert.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -291,7 +291,7 @@
           {
             "id": "update-hooks-docs.ac3",
             "title": "Users upgrading across PAN-1402 are explicitly told to re-run `pan install` and restart any in-flight work agents to pick up the restored hook registration.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

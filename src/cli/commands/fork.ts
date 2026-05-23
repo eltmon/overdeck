@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
-import { createSummaryFork } from '../../lib/conversations/summary-fork.js';
+import { createSummaryFork, type SummaryForkMode } from '../../lib/conversations/summary-fork.js';
 import { sessionFilePath } from '../../lib/paths.js';
 
 interface ForkOptions {
@@ -34,10 +34,15 @@ export async function forkCommand(
     process.exit(1);
   }
 
-  const modeLabel = options.plain ? 'plain fork' : 'summary fork';
+  const forkMode: SummaryForkMode = options.plain ? 'plain' : 'summary';
+  const modeLabel = forkMode === 'plain' ? 'plain fork' : 'summary fork';
   console.log(chalk.gray(`Creating ${modeLabel} from conversation: ${conv.name} (${conv.title || 'untitled'})`));
 
-  const newConv = (await Effect.runPromise(createSummaryFork(conv, options))).conversation;
+  const newConv = (await Effect.runPromise(createSummaryFork(conv, {
+    model: options.model,
+    cwd: options.cwd,
+    forkMode,
+  }))).conversation;
 
   console.log(chalk.green(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)}ed conversation ${conv.name} → ${newConv.name}`));
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));

@@ -169,11 +169,12 @@ interface HighlightedProps {
   terms: string[];
 }
 
-// Spans (not <mark>) avoid the browser's bright-yellow default style. A
-// subtle translucent amber backdrop reads clearly in dark mode without
-// shouting; text color inherits from the parent so the underlying
-// foreground/muted-foreground hierarchy stays intact.
-const HIGHLIGHT_CLASS = 'rounded-sm bg-amber-300/15 text-amber-200 px-px';
+// Spans (not <mark>) avoid the browser's bright-yellow default style.
+// Background-only highlight: the parent's text color carries through, and
+// only the backdrop signals "this matched". GitHub-search style — quieter
+// than swapping the text color, and the same single rule reads well in
+// both light and dark themes.
+const HIGHLIGHT_CLASS = 'rounded-sm px-px text-inherit bg-amber-300/40 dark:bg-amber-400/20';
 
 function Highlighted({ text, terms }: HighlightedProps) {
   if (!text) return null;

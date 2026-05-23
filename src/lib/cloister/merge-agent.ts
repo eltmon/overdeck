@@ -554,6 +554,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
 
+    try {
+      const { refreshGraphify } = await import('../graphify/refresh.js');
+      const graphifyResult = await refreshGraphify(projectPath, issueId);
+      if ('ok' in graphifyResult) {
+        if (graphifyResult.ok) {
+          console.log(`[merge-agent] ✓ Updated graphify-out and pushed commit ${graphifyResult.commit}`);
+          logActivity('graphify_refresh', `Updated graphify-out and pushed commit ${graphifyResult.commit}`);
+        } else {
+          console.warn(`[merge-agent] Graphify refresh failed: ${graphifyResult.error}`);
+          logActivity('graphify_refresh_failed', graphifyResult.error);
+        }
+      } else {
+        console.log(`[merge-agent] Graphify refresh skipped: ${graphifyResult.skipped}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Graphify refresh failed: ${message}`);
+      logActivity('graphify_refresh_failed', message);
+    }
+
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
     _completedPostMerge.add(issueId);
 

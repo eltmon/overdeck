@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { FlywheelAgent, FlywheelStatus, FlywheelSubstrateBug } from '@panctl/contracts';
+import type { FlywheelAgent, FlywheelStatus, FlywheelSubstrateBug, FlywheelSuggestion } from '@panctl/contracts';
 import { AgentCard as ResourceAgentCard } from '../ResourceCard';
 import { IssueRow, MetricStrip, MetricTile } from '../shared/statusPrimitives';
 import type { Agent } from '../../types';
@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 interface FlywheelStatusDetailsProps {
   status: FlywheelStatus;
   onNavigateAgent?: (agentId: string) => void;
+  onNavigateIssue?: (issueId: string) => void;
 }
 
 type AgentStatus = Agent['status'];
@@ -17,6 +18,20 @@ const BUG_STATUS_CLASS: Record<FlywheelSubstrateBug['status'], string> = {
   fixed: 'bg-success/15 text-success border-success/30',
   filed: 'bg-primary/15 text-primary border-primary/30',
   workaround: 'bg-warning/15 text-warning border-warning/30',
+};
+
+const SUGGESTION_PRIORITY_CLASS: Record<FlywheelSuggestion['priority'], string> = {
+  urgent: 'bg-destructive/15 text-destructive border-destructive/30',
+  high: 'bg-warning/15 text-warning border-warning/30',
+  medium: 'bg-primary/15 text-primary border-primary/30',
+  low: 'bg-muted text-muted-foreground border-border',
+};
+
+const SUGGESTION_PRIORITY_ORDER: Record<FlywheelSuggestion['priority'], number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
 };
 
 const AGENT_STATUS_MAP: Record<FlywheelAgent['status'], AgentStatus> = {
@@ -77,6 +92,24 @@ function StatusBadge({ status }: { status: FlywheelSubstrateBug['status'] }) {
   );
 }
 
+function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['priority'] }) {
+  return (
+    <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide', SUGGESTION_PRIORITY_CLASS[priority])}>
+      {priority}
+    </span>
+  );
+}
+
+function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): FlywheelSuggestion[] {
+  return suggestions
+    .map((suggestion, index) => ({ suggestion, index }))
+    .sort((left, right) => {
+      const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
+      return priorityDiff === 0 ? left.index - right.index : priorityDiff;
+    })
+    .map(({ suggestion }) => suggestion);
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-lg border border-border bg-card/60 p-4">
@@ -86,13 +119,43 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatusDetailsProps) {
+export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue }: FlywheelStatusDetailsProps) {
   const ramAvailableMb = Math.max(status.system.ramTotalMb - status.system.ramUsedMb, 0);
   const swapAvailableMb = Math.max(status.system.swapTotalMb - status.system.swapUsedMb, 0);
   const navigateAgent = onNavigateAgent ?? (() => undefined);
+  const navigateIssue = onNavigateIssue ?? (() => undefined);
+  const sortedSuggestions = sortSuggestions(status.suggestions);
 
   return (
     <div className="space-y-4" aria-label="Flywheel status details">
+      <Section title="Suggestions">
+        {sortedSuggestions.length > 0 ? (
+          <div className="space-y-3">
+            {sortedSuggestions.map((suggestion, index) => {
+              const issueId = suggestion.issueId;
+              return (
+                <div key={`${suggestion.priority}-${suggestion.action}-${issueId ?? 'system'}-${index}`} data-testid="flywheel-suggestion" className="rounded-md border border-border bg-background p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SuggestionPriorityBadge priority={suggestion.priority} />
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {suggestion.action}
+                    </span>
+                    {issueId && (
+                      <button type="button" className="font-mono text-xs font-medium text-primary hover:underline" onClick={() => navigateIssue(issueId)}>
+                        {issueId}
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No suggestions yet — orchestrator will emit on next tick.</p>
+        )}
+      </Section>
+
       <MetricStrip>
         <MetricTile label="Bugs Fixed" value={status.headline.bugsFixed} tone="success" />
         <MetricTile

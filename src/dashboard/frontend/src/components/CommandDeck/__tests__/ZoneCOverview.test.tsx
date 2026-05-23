@@ -67,6 +67,11 @@ const reviewStatusResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const workspaceResult = vi.hoisted(() => ({
+  data: undefined as undefined | Record<string, unknown>,
+  isLoading: false,
+  isError: false,
+}));
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
@@ -77,11 +82,17 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePrDiffQuery: () => prResult,
   useDiscussionsQuery: () => discussionsResult,
   useReviewStatusQuery: () => reviewStatusResult,
-  useWorkspaceQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useWorkspaceQuery: () => workspaceResult,
 }));
 
 vi.mock('../../../hooks/useCostStream', () => ({
   useIssueCostStream: () => costStreamResult,
+}));
+
+vi.mock('../../PanOpenInPicker', () => ({
+  PanOpenInPicker: ({ cwd }: { cwd: string }) => (
+    <button type="button" data-testid="pan-open-in-picker" data-cwd={cwd}>Open Picker</button>
+  ),
 }));
 
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
@@ -127,6 +138,9 @@ describe('ZoneCOverview', () => {
     reviewStatusResult.data = undefined;
     reviewStatusResult.isLoading = false;
     reviewStatusResult.isError = false;
+    workspaceResult.data = undefined;
+    workspaceResult.isLoading = false;
+    workspaceResult.isError = false;
     costStreamResult.issueCost = 0;
     costStreamResult.issueEvents = [];
     costStreamResult.isLoading = false;
@@ -221,6 +235,20 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-link-beads')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-costs')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();
+  });
+
+  it('renders the editor picker next to the workspace path', () => {
+    workspaceResult.data = {
+      exists: true,
+      issueId: ISSUE,
+      path: '/tmp/workspace-pan-830',
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+
+    expect(screen.getByText('/tmp/workspace-pan-830')).toBeInTheDocument();
+    expect(screen.getByTestId('pan-open-in-picker')).toHaveAttribute('data-cwd', '/tmp/workspace-pan-830');
+    expect(screen.queryByRole('link', { name: /Open VS Code/i })).toBeNull();
   });
 
   it('keeps aggregate costs visible when the live stream reports a transient error', () => {

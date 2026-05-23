@@ -13,7 +13,7 @@ import {
   getTodaySpecialistHandoffs,
   updateSpecialistHandoffStatus,
 } from '../../../src/lib/cloister/specialist-handoff-logger.js';
-import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
+import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getPanopticonHome } from '../../../src/lib/paths.js';
@@ -28,9 +28,15 @@ function getTestLogDir(): string {
 
 // Isolated temp directory for hook files — prevents tests from reading real AGENTS_DIR
 let TEST_AGENTS_DIR: string;
+let TEST_PANOPTICON_HOME: string;
+let ORIGINAL_PANOPTICON_HOME: string | undefined;
 
 describe('specialist-handoff-logger', () => {
   beforeEach(() => {
+    ORIGINAL_PANOPTICON_HOME = process.env.PANOPTICON_HOME;
+    TEST_PANOPTICON_HOME = mkdtempSync(join(tmpdir(), 'pan-test-home-'));
+    process.env.PANOPTICON_HOME = TEST_PANOPTICON_HOME;
+
     // Clean up test log file
     if (existsSync(getTestLogFile())) {
       unlinkSync(getTestLogFile());
@@ -45,8 +51,11 @@ describe('specialist-handoff-logger', () => {
     if (existsSync(getTestLogFile())) {
       unlinkSync(getTestLogFile());
     }
-    // Remove temp agents dir
+    // Remove temp dirs
     rmSync(TEST_AGENTS_DIR, { recursive: true, force: true });
+    rmSync(TEST_PANOPTICON_HOME, { recursive: true, force: true });
+    if (ORIGINAL_PANOPTICON_HOME === undefined) delete process.env.PANOPTICON_HOME;
+    else process.env.PANOPTICON_HOME = ORIGINAL_PANOPTICON_HOME;
   });
 
   describe('createSpecialistHandoff', () => {

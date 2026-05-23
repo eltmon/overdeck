@@ -23,10 +23,11 @@ import {
   useDashboardStore,
   type DashboardState,
 } from '../lib/store'
-import type {
-  AgentSnapshot,
-  DashboardSnapshot,
-  DomainEvent,
+import {
+  INITIAL_READ_MODEL_STATE,
+  type AgentSnapshot,
+  type DashboardSnapshot,
+  type DomainEvent,
 } from '@panctl/contracts'
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -54,39 +55,10 @@ const reviewAgent: AgentSnapshot = {
 }
 
 const emptyState: DashboardState = {
+  ...INITIAL_READ_MODEL_STATE,
   drawer: { issueId: null, tab: 'overview' },
   bootstrapComplete: false,
   snapshotTimestamp: null,
-  sequence: 0,
-  agentsById: {},
-  agentRuntimeById: {},
-  reviewStatusByIssueId: {},
-  resources: null,
-  agentOutputById: {},
-  issuesRaw: [],
-  recentActivity: [],
-  detailedActivity: [],
-  ttsActivity: [],
-  shadowInferenceByIssueId: {},
-  turnDiffSummariesByAgentId: {},
-  channelPermissionRequestsById: {},
-  observationsByIssueId: {},
-  statusByIssueId: {},
-  rollupsByIssueId: {},
-  resetMarkersByScopeId: {},
-  healthByIssueId: {},
-  dashboardLifecycle: {
-    active: false,
-    reason: null,
-    issueId: null,
-    trigger: null,
-    startedAt: null,
-    completedAt: null,
-    failedAt: null,
-    error: null,
-  },
-  conversationsCompactingByName: {},
-  conversationsAwaitingPermissionByName: {},
 }
 
 function makeSnapshot(seq = 5): DashboardSnapshot {

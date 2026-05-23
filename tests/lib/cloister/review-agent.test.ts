@@ -622,6 +622,28 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(verifyIdx).toBeGreaterThanOrEqual(0);
     expect(dirtyIdx).toBeLessThan(verifyIdx);
     expect(requestReviewBlock).toContain('dirtyWorkspaceError');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
+  });
+
+  it('workspaces.ts request-review route yields the verification Effect directly', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    expect(requestReviewBlock).toContain('yield* runVerificationForIssue(');
+    expect(requestReviewBlock).toContain('yield* getWorkspaceGitInfo(workspacePath)');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
+    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {

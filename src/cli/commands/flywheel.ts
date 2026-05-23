@@ -184,6 +184,7 @@ async function createInitialFlywheelStatus(
       model: agentModel,
     }],
     parked: [],
+    suggestions: [],
     system: {
       mainHead: await gitOutput('git rev-parse --short HEAD', cwd).catch(() => 'unknown'),
       ramUsedMb: Math.max(0, ramTotalMb - mb(freemem())),
@@ -343,6 +344,9 @@ function tableCell(value: string | number | undefined): string {
 
 export function formatFlywheelStateReport(status: FlywheelStatus, mergeQueue: MergeQueueItem[] = []): string {
   const runNumber = runNumberFromRunId(status.runId);
+  const suggestionRows = status.suggestions.length > 0
+    ? status.suggestions.map((suggestion) => `| ${tableCell(suggestion.priority)} | ${tableCell(suggestion.action)} | ${tableCell(suggestion.issueId)} | ${tableCell(suggestion.rationale)} |`).join('\n')
+    : 'No suggestions emitted this run.';
   const activePipelineRows = status.activePipeline.length > 0
     ? status.activePipeline.map((item) => `| ${tableCell(item.issueId)} | ${tableCell(item.verb)} | ${tableCell(item.status)} | ${tableCell(item.title)} | ${tableCell(item.progressPercent)} | ${tableCell(item.pr)} |`).join('\n')
     : '| _None_ |  |  |  |  |  |';
@@ -385,7 +389,15 @@ Per-run report derived from the last \`FlywheelStatus\` snapshot. Durable cumula
 
 ---
 
-${mergeQueueSection}## Active Pipeline
+${mergeQueueSection}## Suggestions
+
+${status.suggestions.length > 0 ? `| Priority | Action | Issue | Rationale |
+|---|---|---|---|
+${suggestionRows}` : suggestionRows}
+
+---
+
+## Active Pipeline
 
 | Issue | Verb | Status | Title | Progress | PR |
 |---|---|---|---|---:|---:|

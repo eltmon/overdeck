@@ -55,7 +55,9 @@ function renderFleetView(props: { onNavigateToIssues?: () => void } = {}) {
 
   return render(
     <QueryClientProvider client={client}>
-      <FleetAgentsView {...props} />
+      <DialogProvider>
+        <FleetAgentsView {...props} />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
@@ -163,6 +165,48 @@ describe('FleetAgentsView', () => {
     expect(screen.queryByText('REVIEW RUNNING')).not.toBeInTheDocument();
     expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
+  });
+
+  it('opens an agent-scoped action menu from the fleet card overflow trigger', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getAllByTestId('issue-action-overflow-button')[0]);
+
+    const menu = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(menu).getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
+    expect(within(menu).getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
+    expect(within(menu).getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
+    expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');
+    expect(within(menu).getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
+    expect(within(menu).getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
+    expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
+    expect(within(menu).getByTestId('issue-action-switchModel')).toHaveTextContent('Switch model');
+    expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-swarm')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-inspectBead')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
+  });
+
+  it('disables the fleet card overflow trigger for orphan agents without an issue id', () => {
+    useDashboardStore.setState({
+      issuesRaw: [],
+      agentsById: {
+        'agent-orphan': agent({ id: 'agent-orphan', issueId: null, status: 'running', role: 'work' }),
+      },
+      agentOutputById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    const trigger = screen.getByRole('button', { name: 'Open agent-orphan menu' });
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute('title', 'No issue ID available for this agent');
   });
 
   it('opens the drawer from a fleet card and scrolls to the active-agent element', () => {
