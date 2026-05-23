@@ -114,6 +114,30 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
+  it('keeps plain forks off Channels MCP while routing them through the supervisor', async () => {
+    channelsEnabled = true;
+    createSupervisorSocket = true;
+    const { spawnConversationSession } = await import('../conversations.js');
+
+    await spawnConversationSession(
+      'conv-plain-fork-test',
+      tmpdir(),
+      'session-plain-fork-test',
+      'claude-sonnet-4-6',
+      undefined,
+      'PAN-1405',
+      true,
+      'claude-code',
+      true,
+    );
+
+    const launcher = launcherFor('conv-plain-fork-test');
+    expect(launcher).toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('--mcp-config');
+    expect(launcher).not.toContain('--dangerously-load-development-channels');
+    expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
+  });
+
   it('dismisses the dev-channels dialog only when Channels MCP is wired', async () => {
     channelsEnabled = true;
     createSupervisorSocket = true;

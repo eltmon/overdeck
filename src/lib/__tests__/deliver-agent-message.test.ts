@@ -165,6 +165,26 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('plain fork conversation delivery routes to supervisor without Channels state', async () => {
+    const agentId = 'conv-plain-fork';
+    const token = await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
+    try {
+      await deliverAgentMessage(agentId, 'plain fork hi', 'plain-fork-test');
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'plain fork hi',
+        meta: { caller: 'plain-fork-test' },
+      });
+      expect(capture.lastHeaders?.[PTY_TOKEN_HEADER]).toBe(token);
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it('supervisor missing: falls through to channels when channels are enabled', async () => {
     const agentId = 'agent-supervisor-missing';
     writeAgentState(agentId, { channelsEnabled: true });
