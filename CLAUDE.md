@@ -558,7 +558,8 @@ Rules:
 - At task start, read graphify-out/GRAPH_SUMMARY.md (~700 tokens) for orientation — do NOT read the full GRAPH_REPORT.md (35K tokens) unless you need the complete community listing.
 - For cross-module questions, use the CLI instead of reading files: `graphify query "<question>"`, `graphify path "<A>" "<B>"`, `graphify explain "<concept>"` — these traverse EXTRACTED + INFERRED edges and return only relevant nodes.
 - Only read source files once you know exactly which ones to read (from graphify output or the summary).
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+The graph is refreshed automatically by the merge agent after every merge to main; agents do not need to run `graphify update` manually.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
