@@ -21,6 +21,7 @@ import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
+import { getProjectSync } from './projects.js';
 import type { RuntimeName } from './runtimes/types.js';
 export type { SubscriptionPlan, AuthMode };
 
@@ -247,6 +248,28 @@ export interface ResourcesConfig {
   agent_block_count?: number;
 }
 
+export interface AutoMergeConfig {
+  enabled?: boolean;
+  cooldownMinutes?: number;
+  maxStaleMinutes?: number;
+  requireGitHubCiPassing?: boolean;
+  requireAllCommitStatusChecks?: boolean;
+  requireNoBlockerLabels?: string[];
+}
+
+export interface MergeConfig {
+  autoMerge?: AutoMergeConfig;
+}
+
+export interface NormalizedAutoMergeConfig {
+  enabled: boolean;
+  cooldownMinutes: number;
+  maxStaleMinutes: number;
+  requireGitHubCiPassing: boolean;
+  requireAllCommitStatusChecks: boolean;
+  requireNoBlockerLabels: string[];
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -343,6 +366,9 @@ export interface YamlConfig {
 
   /** Role-specific model and harness configuration. */
   roles?: RolesConfig;
+
+  /** Merge workflow configuration */
+  merge?: MergeConfig;
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
@@ -545,6 +571,11 @@ export interface NormalizedConfig {
     batchWindowSeconds: number;
   };
 
+  /** Merge workflow configuration (normalised, never undefined) */
+  merge: {
+    autoMerge: NormalizedAutoMergeConfig;
+  };
+
   /** Resource thresholds (normalised, never undefined) */
   resources: {
     memoryWarnGb: number;
@@ -731,6 +762,16 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     memoryBlockGb: 2,
     agentWarnCount: 8,
     agentBlockCount: 10,
+  },
+  merge: {
+    autoMerge: {
+      enabled: false,
+      cooldownMinutes: 5,
+      maxStaleMinutes: 60,
+      requireGitHubCiPassing: true,
+      requireAllCommitStatusChecks: true,
+      requireNoBlockerLabels: ['needs-design', 'needs-discussion', 'do-not-merge', 'wip'],
+    },
   },
   experimental: {
     claudeCodeChannels: false,
@@ -1023,6 +1064,71 @@ export function mergeTtsDaemonConfigs(...configs: (YamlConfig | null)[]): Normal
   return result;
 }
 
+function cloneAutoMergeConfig(config: NormalizedAutoMergeConfig): NormalizedAutoMergeConfig {
+  return {
+    ...config,
+    requireNoBlockerLabels: [...config.requireNoBlockerLabels],
+  };
+}
+
+function normalizeAutoMergeConfig(config: AutoMergeConfig): NormalizedAutoMergeConfig {
+  const normalized: NormalizedAutoMergeConfig = {
+    ...DEFAULT_CONFIG.merge.autoMerge,
+    ...config,
+    requireNoBlockerLabels: config.requireNoBlockerLabels !== undefined
+      ? [...config.requireNoBlockerLabels]
+      : [...DEFAULT_CONFIG.merge.autoMerge.requireNoBlockerLabels],
+  };
+
+  if (normalized.cooldownMinutes < 1) {
+    console.warn(`[panopticon] merge.autoMerge.cooldownMinutes must be >= 1; clamping ${normalized.cooldownMinutes} to 1.`);
+    normalized.cooldownMinutes = 1;
+  }
+
+  if (normalized.maxStaleMinutes < normalized.cooldownMinutes) {
+    console.warn(`[panopticon] merge.autoMerge.maxStaleMinutes must be >= cooldownMinutes; clamping ${normalized.maxStaleMinutes} to ${normalized.cooldownMinutes}.`);
+    normalized.maxStaleMinutes = normalized.cooldownMinutes;
+  }
+
+  return normalized;
+}
+
+function mergeAutoMergeConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  if (!config?.merge?.autoMerge) return;
+  result.merge.autoMerge = normalizeAutoMergeConfig(config.merge.autoMerge);
+}
+
+function loadProjectConfigByKey(projectKey: string): YamlConfig | null {
+  const project = getProjectSync(projectKey);
+  if (!project) return null;
+
+  const newConfigPath = join(project.path, '.pan.yaml');
+  if (existsSync(newConfigPath)) {
+    return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
+  }
+
+  const legacyConfigPath = join(project.path, '.panopticon.yaml');
+  if (existsSync(legacyConfigPath)) {
+    process.stderr.write(
+      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+    );
+    return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
+  }
+
+  return null;
+}
+
+export function getAutoMergeConfig(projectKey?: string): NormalizedAutoMergeConfig {
+  if (!projectKey) {
+    return cloneAutoMergeConfig(loadConfigSync().config.merge.autoMerge);
+  }
+
+  const globalConfig = loadGlobalConfig();
+  const projectConfig = loadProjectConfigByKey(projectKey);
+  const { config } = mergeConfigs(projectConfig, globalConfig);
+  return cloneAutoMergeConfig(config.merge.autoMerge);
+}
+
 function isWorkhorseRef(ref: ModelRef): boolean {
   return ref.startsWith('workhorse:');
 }
@@ -1210,6 +1316,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
+    },
+    merge: {
+      autoMerge: cloneAutoMergeConfig(DEFAULT_CONFIG.merge.autoMerge),
     },
     experimental: {
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
@@ -1537,6 +1646,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge TTS daemon configuration
     mergeTtsConfig(result.tts, config);
+
+    // Merge auto-merge configuration
+    mergeAutoMergeConfig(result, config);
 
     // Merge TTS summarizer configuration
     if (config.tts?.summarizer) {

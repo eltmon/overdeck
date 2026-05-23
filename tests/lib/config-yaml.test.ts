@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs } from '../../src/lib/config-yaml.js';
+import { loadConfigSync, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, getProjectConfigPath, mergeConfigs, getAutoMergeConfig } from '../../src/lib/config-yaml.js';
+import * as projects from '../../src/lib/projects.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -15,6 +16,7 @@ describe('config-yaml', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     // Clean up test files
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
@@ -204,6 +206,147 @@ api_keys:
 
       expect(path).toBeDefined();
       expect(path).toContain('.pan.yaml');
+    });
+  });
+
+  describe('merge.autoMerge', () => {
+    it('uses disabled auto-merge defaults when config omits merge settings', () => {
+      const { config } = mergeConfigs({});
+
+      expect(config.merge.autoMerge).toEqual({
+        enabled: false,
+        cooldownMinutes: 5,
+        maxStaleMinutes: 60,
+        requireGitHubCiPassing: true,
+        requireAllCommitStatusChecks: true,
+        requireNoBlockerLabels: ['needs-design', 'needs-discussion', 'do-not-merge', 'wip'],
+      });
+    });
+
+    it('normalizes global-only auto-merge config', () => {
+      const { config } = mergeConfigs({
+        merge: {
+          autoMerge: {
+            enabled: true,
+            cooldownMinutes: 7,
+            maxStaleMinutes: 90,
+            requireGitHubCiPassing: false,
+            requireAllCommitStatusChecks: false,
+            requireNoBlockerLabels: ['blocked'],
+          },
+        },
+      });
+
+      expect(config.merge.autoMerge).toEqual({
+        enabled: true,
+        cooldownMinutes: 7,
+        maxStaleMinutes: 90,
+        requireGitHubCiPassing: false,
+        requireAllCommitStatusChecks: false,
+        requireNoBlockerLabels: ['blocked'],
+      });
+    });
+
+    it('normalizes project-only auto-merge config over defaults', () => {
+      const { config } = mergeConfigs({
+        merge: {
+          autoMerge: {
+            enabled: true,
+            requireNoBlockerLabels: ['project-blocked'],
+          },
+        },
+      });
+
+      expect(config.merge.autoMerge).toEqual({
+        enabled: true,
+        cooldownMinutes: 5,
+        maxStaleMinutes: 60,
+        requireGitHubCiPassing: true,
+        requireAllCommitStatusChecks: true,
+        requireNoBlockerLabels: ['project-blocked'],
+      });
+    });
+
+    it('replaces global auto-merge config with project auto-merge config instead of deep-merging', () => {
+      const { config } = mergeConfigs(
+        {
+          merge: {
+            autoMerge: {
+              enabled: true,
+              cooldownMinutes: 2,
+              requireNoBlockerLabels: ['project-blocked'],
+            },
+          },
+        },
+        {
+          merge: {
+            autoMerge: {
+              enabled: true,
+              cooldownMinutes: 20,
+              maxStaleMinutes: 120,
+              requireGitHubCiPassing: false,
+              requireAllCommitStatusChecks: false,
+              requireNoBlockerLabels: ['global-blocked'],
+            },
+          },
+        },
+      );
+
+      expect(config.merge.autoMerge).toEqual({
+        enabled: true,
+        cooldownMinutes: 2,
+        maxStaleMinutes: 60,
+        requireGitHubCiPassing: true,
+        requireAllCommitStatusChecks: true,
+        requireNoBlockerLabels: ['project-blocked'],
+      });
+    });
+
+    it('clamps cooldown and max stale minutes with warnings', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { config } = mergeConfigs({
+        merge: {
+          autoMerge: {
+            cooldownMinutes: 0,
+            maxStaleMinutes: 0,
+          },
+        },
+      });
+
+      expect(config.merge.autoMerge.cooldownMinutes).toBe(1);
+      expect(config.merge.autoMerge.maxStaleMinutes).toBe(1);
+      expect(warn).toHaveBeenCalledWith('[panopticon] merge.autoMerge.cooldownMinutes must be >= 1; clamping 0 to 1.');
+      expect(warn).toHaveBeenCalledWith('[panopticon] merge.autoMerge.maxStaleMinutes must be >= cooldownMinutes; clamping 0 to 1.');
+    });
+
+    it('reads project-scoped auto-merge config by project key', () => {
+      const projectRoot = join(testDir, 'auto-merge-project');
+      mkdirSync(projectRoot, { recursive: true });
+      writeFileSync(join(projectRoot, '.pan.yaml'), `
+merge:
+  autoMerge:
+    enabled: true
+    cooldownMinutes: 4
+    maxStaleMinutes: 8
+    requireGitHubCiPassing: false
+    requireAllCommitStatusChecks: false
+    requireNoBlockerLabels:
+      - project-only
+`, 'utf-8');
+      vi.spyOn(projects, 'getProjectSync').mockReturnValue({
+        name: 'Auto Merge Project',
+        path: projectRoot,
+      });
+
+      expect(getAutoMergeConfig('auto-merge-project')).toEqual({
+        enabled: true,
+        cooldownMinutes: 4,
+        maxStaleMinutes: 8,
+        requireGitHubCiPassing: false,
+        requireAllCommitStatusChecks: false,
+        requireNoBlockerLabels: ['project-only'],
+      });
     });
   });
 });
