@@ -228,6 +228,39 @@ describe('ConversationsPage endpoint selection', () => {
     });
   });
 
+  it('archived fetch includes active facet filters and a bounded limit', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByText('Filters'));
+
+    await waitFor(() => expect(capturedOnChange).not.toBeNull());
+    act(() => {
+      capturedOnChange!('workspace', '/home/user/Projects/archived');
+      capturedOnChange!('model', 'claude-sonnet-4-6');
+      capturedOnChange!('tag', 'feat');
+      capturedOnChange!('tool', 'Read');
+      capturedOnChange!('file', '/home/user/Projects/archived/src/auth.ts');
+      capturedOnChange!('minCost', '0.01');
+      capturedOnChange!('enrichmentLevel', '1');
+    });
+
+    await waitFor(() => {
+      const calls = vi.mocked(globalThis.fetch).mock.calls.map(([url]) => String(url));
+      expect(calls.some((url) => {
+        const parsed = new URL(url, 'http://localhost');
+        return parsed.pathname === '/api/conversations/archived'
+          && parsed.searchParams.get('limit') === '50'
+          && parsed.searchParams.get('workspacePath') === '/home/user/Projects/archived'
+          && parsed.searchParams.get('primaryModel') === 'claude-sonnet-4-6'
+          && parsed.searchParams.get('tag') === 'feat'
+          && parsed.searchParams.get('tool') === 'Read'
+          && parsed.searchParams.get('file') === '/home/user/Projects/archived/src/auth.ts'
+          && parsed.searchParams.get('minCost') === '0.01'
+          && parsed.searchParams.get('enrichmentLevel') === '1';
+      })).toBe(true);
+    });
+  });
+
   it('wires tag, tool, and file filters into search RPC payloads', async () => {
     renderPage(makeClient());
 
@@ -275,7 +308,7 @@ describe('ConversationsPage endpoint selection', () => {
 
     await waitFor(() => expect(sessionRows()).toHaveLength(1));
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/archived');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/archived?limit=50');
     expect(sessionRows()[0]).toHaveTextContent('Projects/archived');
     expect(sessionRows()[0]).not.toHaveTextContent('Projects/alpha');
     expect(screen.queryByPlaceholderText('Search sessions…')).not.toBeInTheDocument();

@@ -312,6 +312,65 @@ describe('conversations route — DB integration', () => {
       panopticonManaged: true,
       archivedAt: '2026-05-23T00:00:00.000Z',
     });
+
+    const limitedResponse = await handleArchivedConversationsList({ limit: 1 });
+    const limitedRows = decodeJsonResponse(limitedResponse) as unknown as Array<Record<string, unknown>>;
+    expect(limitedRows.map((row) => row.conversationName)).toEqual(['newer-archived']);
+  });
+
+  it('filters archived conversations with active facets before mapping rows', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getDatabase();
+
+    createConversation({
+      name: 'matching-archived',
+      tmuxSession: 'conv-matching',
+      cwd: '/cwd/matching',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'matching-session',
+      model: 'fallback-model',
+    });
+    createConversation({
+      name: 'other-archived',
+      tmuxSession: 'conv-other',
+      cwd: '/cwd/other',
+      issueId: 'PAN-1391',
+      claudeSessionId: 'other-session',
+      model: 'indexed-model',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/jsonl/matching-session.jsonl',
+      sessionId: 'matching-session',
+      workspacePath: '/indexed/matching',
+      messageCount: 8,
+      lastTs: '2026-05-21T00:00:00.000Z',
+      primaryModel: 'indexed-model',
+      estimatedCost: 4.56,
+      toolsUsed: ['Read'],
+      filesTouched: ['src/matching.ts'],
+      tags: ['dashboard'],
+    });
+    db.prepare(`UPDATE discovered_sessions SET enrichment_level = ? WHERE session_id = ?`).run(2, 'matching-session');
+    archiveConversation('matching-archived');
+    archiveConversation('other-archived');
+
+    const response = await handleArchivedConversationsList({
+      workspacePath: '/cwd/matching',
+      primaryModel: 'indexed-model',
+      tags: ['dashboard'],
+      tools: ['Read'],
+      files: ['src/matching.ts'],
+      minCost: 4,
+      enrichmentLevel: 2,
+      limit: 50,
+    });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
   });
 
   it('returns archived conversations without discovered_sessions enrichment', async () => {

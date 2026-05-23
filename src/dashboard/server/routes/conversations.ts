@@ -63,6 +63,7 @@ import {
   removeFavorite,
   updateForkStatus,
   updateSpawnError,
+  type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
@@ -1162,9 +1163,46 @@ function mapArchivedConversation(row: ArchivedConversationWithEnrichment): Archi
   };
 }
 
-export async function handleArchivedConversationsList(): Promise<ReturnType<typeof jsonResponse>> {
+function parseOptionalNumberParam(params: URLSearchParams, name: string): number | undefined {
+  const value = params.get(name);
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
+  const options: ArchivedConversationListOptions = {};
+  const workspacePath = params.get('workspacePath');
+  const primaryModel = params.get('primaryModel');
+  const since = params.get('since');
+  const tag = params.get('tag');
+  const tool = params.get('tool');
+  const file = params.get('file');
+  const minCost = parseOptionalNumberParam(params, 'minCost');
+  const maxCost = parseOptionalNumberParam(params, 'maxCost');
+  const enrichmentLevel = parseOptionalNumberParam(params, 'enrichmentLevel');
+  const rawLimit = parseOptionalNumberParam(params, 'limit');
+  const rawOffset = parseOptionalNumberParam(params, 'offset');
+
+  if (workspacePath) options.workspacePath = workspacePath;
+  if (primaryModel) options.primaryModel = primaryModel;
+  if (since) options.since = since;
+  if (params.get('managed') === 'true') options.managed = true;
+  if (params.get('enriched') === 'true') options.enriched = true;
+  if (tag) options.tags = [tag];
+  if (tool) options.tools = [tool];
+  if (file) options.files = [file];
+  if (minCost !== undefined) options.minCost = minCost;
+  if (maxCost !== undefined) options.maxCost = maxCost;
+  if (enrichmentLevel !== undefined) options.enrichmentLevel = enrichmentLevel;
+  options.limit = rawLimit === undefined ? 50 : Math.min(Math.max(rawLimit, 0), 100);
+  if (rawOffset !== undefined) options.offset = Math.max(rawOffset, 0);
+  return options;
+}
+
+export async function handleArchivedConversationsList(options: ArchivedConversationListOptions = {}): Promise<ReturnType<typeof jsonResponse>> {
   try {
-    const rows = listArchivedConversationsWithEnrichment().map(mapArchivedConversation);
+    const rows = listArchivedConversationsWithEnrichment(options).map(mapArchivedConversation);
     return jsonResponse(rows);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -1240,7 +1278,8 @@ const getArchivedConversationsRoute = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
-    return yield* Effect.promise(() => handleArchivedConversationsList());
+    const url = new URL(request.url, 'http://localhost');
+    return yield* Effect.promise(() => handleArchivedConversationsList(parseArchivedConversationListOptions(url.searchParams)));
   }),
 );
 

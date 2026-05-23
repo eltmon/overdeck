@@ -283,8 +283,9 @@ async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
   return { ...result, sessions: result.sessions.map(fromRpcSession) };
 }
 
-async function fetchArchivedConversations(): Promise<DiscoveredSession[]> {
-  const response = await fetch('/api/conversations/archived');
+async function fetchArchivedConversations(params: URLSearchParams): Promise<DiscoveredSession[]> {
+  const query = params.toString();
+  const response = await fetch(`/api/conversations/archived${query ? `?${query}` : ''}`);
   if (!response.ok) throw new Error(`Failed to load archived conversations: ${response.status}`);
   return (await response.json()) as ArchivedConversationResponse[];
 }
@@ -378,8 +379,10 @@ export function ConversationsPage() {
   }, [semanticSearch, trimmedQuery]);
 
   const listParams = new URLSearchParams({ limit: '50' });
+  const archivedParams = new URLSearchParams({ limit: '50' });
   for (const [key, value] of filterParams) {
     listParams.set(key, value);
+    archivedParams.set(key, value);
   }
 
   const { data: listData, isLoading: isListLoading } = useQuery({
@@ -389,8 +392,8 @@ export function ConversationsPage() {
   });
 
   const { data: archivedSessions = [], isLoading: isArchivedLoading } = useQuery({
-    queryKey: ['archived-conversations'],
-    queryFn: fetchArchivedConversations,
+    queryKey: ['archived-conversations', archivedParams.toString()],
+    queryFn: () => fetchArchivedConversations(archivedParams),
     enabled: !effectiveQuery && sourceFilter !== 'discovered',
   });
 
