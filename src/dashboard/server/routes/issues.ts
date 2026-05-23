@@ -131,17 +131,21 @@ export async function completePlanningArtifacts(options: {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(withBdMutex(() => mod.createBeadsFromVBrief(path))));
   });
-  const beadsResultLike = createBeads(workspacePath);
-  const beadsResult = Effect.isEffect(beadsResultLike) ? await Effect.runPromise(beadsResultLike) : await beadsResultLike;
+  const rawBeadsResult = createBeads(workspacePath);
+  const beadsResult = Effect.isEffect(rawBeadsResult)
+    ? await Effect.runPromise(rawBeadsResult)
+    : await rawBeadsResult;
+  const created = beadsResult.created ?? [];
+  const errors = beadsResult.errors ?? [];
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
-  if (planItemCount === 0 || !beadsResult.success || beadsResult.created.length !== planItemCount) {
-    const detail = beadsResult.errors.length > 0
-      ? beadsResult.errors.join('; ')
-      : `created ${beadsResult.created.length} beads for ${planItemCount} plan items`;
+  if (planItemCount === 0 || !beadsResult.success || created.length !== planItemCount) {
+    const detail = errors.length > 0
+      ? errors.join('; ')
+      : `created ${created.length} beads for ${planItemCount} plan items`;
     throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
   }
 
-  return { proposed, beadCount: beadsResult.created.length, beadsWarning: null };
+  return { proposed, beadCount: created.length, beadsWarning: null };
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
