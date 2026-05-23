@@ -1,15 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { getHarness } from '@panctl/contracts';
 
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAgentProblemStatus } from '../../lib/pipeline-state';
 import { useDashboardStore, selectAgentOutput } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
+import { AgentTellForm } from '../AgentTellForm';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
-
-void COMMAND_DECK_SURFACE_REGISTRY;
 
 function isActiveAgent(agent: Agent) {
   return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';
@@ -71,7 +69,6 @@ export default function DrawerActiveAgent() {
   const agentOutput = useDashboardStore(
     activeAgent ? selectAgentOutput(activeAgent.id) : () => [],
   );
-  const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
   if (!activeAgent) {
@@ -88,10 +85,8 @@ export default function DrawerActiveAgent() {
   const streamLines = agentOutput.slice(-8);
   const meta = `${getFriendlyModelName(activeAgent.model)} · ${getHarness(activeAgent)} · spend ${formatSpend(activeAgent.costSoFar)}`;
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const text = message.trim();
-    if (!text || sending) return;
+  const sendTell = async (text: string) => {
+    if (sending) return false;
 
     setSending(true);
     try {
@@ -100,14 +95,14 @@ export default function DrawerActiveAgent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       });
-      if (response.ok) {
-        setMessage('');
-      } else {
+      if (!response.ok) {
         const body = await response.text();
         console.error('Tell failed:', body);
       }
+      return response.ok;
     } catch (error) {
       console.error('Tell failed:', error);
+      return false;
     } finally {
       setSending(false);
     }
@@ -132,23 +127,7 @@ export default function DrawerActiveAgent() {
         )) : <div className="italic text-muted-foreground">No recent stream output</div>}
       </div>
 
-      <form className="mt-[12px] flex gap-[8px]" onSubmit={onSubmit}>
-        <input
-          type="text"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder="Tell this agent..."
-          aria-label="Tell active agent"
-          className="h-[32px] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border bg-background px-[10px] text-[12px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
-        />
-        <button
-          type="submit"
-          disabled={!message.trim() || sending}
-          className="h-[32px] rounded-[var(--radius-sm)] bg-primary px-[12px] text-[12px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Send
-        </button>
-      </form>
+      <AgentTellForm className="mt-[12px] flex gap-[8px]" sending={sending} onSend={sendTell} />
     </section>
   );
 }

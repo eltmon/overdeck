@@ -10,8 +10,9 @@
 import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
+import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
 /** Detect AI provider from model name */
@@ -1026,6 +1027,31 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
  * the most recent compaction. For sessions that have never been compacted,
  * returns all messages.
  */
+export async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null> {
+  const normalizedModel = model?.trim();
+  if (!normalizedModel) return null;
+
+  const resolvedModel = resolveModelIdSync(normalizedModel);
+  const capability = Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
+    : undefined;
+  if (!capability) return null;
+
+  const boundaryOffset = await findLastCompactBoundary(sessionFile);
+  const fileStats = await stat(sessionFile);
+  const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
+  // Pressure gauge only: bytes/4 is a rough provider-agnostic token heuristic.
+  const estimatedTokens = Math.ceil(activeBytes / 4);
+  const percentUsed = Math.min(100, Math.max(0, (estimatedTokens / capability.contextWindow) * 100));
+
+  return {
+    activeBytes,
+    estimatedTokens,
+    contextWindow: capability.contextWindow,
+    percentUsed,
+  };
+}
+
 export async function parseFromLastCompactBoundary(
   sessionFile: string,
   priorState?: ParseState,

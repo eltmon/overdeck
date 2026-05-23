@@ -24,7 +24,9 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; plain?: boolean; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
+type ApiForkMode = 'summary' | 'plain' | 'handoff';
+
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -33,7 +35,9 @@ async function summaryForkConversation(opts: { conv: Conversation; model: string
       summaryModel: opts.summaryModel,
       harness: opts.harness,
       summaryHarness: opts.summaryHarness,
-      plain: opts.plain,
+      forkMode: opts.forkMode,
+      plain: opts.forkMode === 'plain',
+      focus: opts.focus,
       localSummaryOnly: opts.localSummaryOnly,
       includeThinkingInSummary: opts.includeThinkingInSummary,
       title: opts.title,
@@ -51,7 +55,7 @@ export interface ConversationMutations {
   rename: (opts: { name: string; title: string }) => void;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   openForkModal: (conv: Conversation) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi') => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => void;
   forkTarget: Conversation | null;
   closeForkModal: () => void;
   isForkPending: boolean;
@@ -120,9 +124,11 @@ export function useConversationMutations(
     mutationFn: summaryForkConversation,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      const msg = variables.plain
+      const msg = variables.forkMode === 'plain'
         ? 'Plain fork started — copying conversation history...'
-        : 'Fork started — summarizing conversation...';
+        : variables.forkMode === 'handoff'
+          ? 'Handoff fork started — requesting agent-authored context...'
+          : 'Fork started — summarizing conversation...';
       toast.success(msg, { duration: 4000 });
     },
     onError: (err: Error) => {
@@ -137,14 +143,15 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi') => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
       summaryModel,
       harness: launchHarness,
       summaryHarness,
-      plain: plainFork,
+      forkMode,
+      focus,
       localSummaryOnly,
       includeThinkingInSummary,
       title,

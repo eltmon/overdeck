@@ -1,0 +1,76 @@
+import { Effect } from 'effect';
+import chalk from 'chalk';
+import { existsSync } from 'fs';
+import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
+import { createSummaryFork } from '../../lib/conversations/summary-fork.js';
+import { sessionFilePath } from '../../lib/paths.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
+
+interface HandoffOptions {
+  focus?: string;
+  model?: string;
+  harness?: string;
+  cwd?: string;
+}
+
+function resolveConversation(convRef: string) {
+  if (/^\d+$/.test(convRef)) {
+    return getConversationById(parseInt(convRef, 10));
+  }
+  return getConversationByName(convRef);
+}
+
+function validateHarness(harness: string | undefined): RuntimeName | undefined {
+  if (harness === undefined || harness === 'claude-code' || harness === 'pi') {
+    return harness;
+  }
+  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code or pi.`));
+  process.exit(1);
+}
+
+export async function handoffCommand(
+  convRef: string,
+  options: HandoffOptions,
+): Promise<void> {
+  const conv = resolveConversation(convRef);
+  if (!conv) {
+    console.log(chalk.yellow(`Conversation not found: ${convRef}`));
+    process.exit(1);
+  }
+
+  const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
+  if (!sessionFile || !existsSync(sessionFile)) {
+    console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
+    process.exit(1);
+  }
+
+  const harness = validateHarness(options.harness);
+  console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
+  if (options.focus?.trim()) {
+    console.log(chalk.gray(`  Focus: ${options.focus.trim()}`));
+  }
+
+  const result = await Effect.runPromise(createSummaryFork(conv, {
+    model: options.model,
+    cwd: options.cwd,
+    harness,
+    forkMode: 'handoff',
+    focus: options.focus,
+  }));
+  const newConv = result.conversation;
+
+  if (result.forkFallbackReason) {
+    console.log(chalk.yellow(`Handoff fell back to summary fork: ${result.forkFallbackReason}`));
+  }
+
+  const label = result.forkMode === 'handoff' ? 'Handoff forked' : 'Summary forked';
+  console.log(chalk.green(`${label} conversation ${conv.name} → ${newConv.name}`));
+  console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
+  console.log(chalk.gray(`  Session: ${newConv.tmuxSession}`));
+  console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
+  console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
+  if (newConv.handoffDocPath) {
+    console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
+  }
+  console.log(chalk.gray(`  Dashboard: https://pan.localhost/conv/${newConv.id}`));
+}

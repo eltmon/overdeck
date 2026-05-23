@@ -490,6 +490,125 @@ describe('generateLauncherScript', () => {
     expect(script).toContain('--agent pan-work-agent');
     expect(script).toContain('--name agent-pan-982');
   });
+
+  it('wraps work agent claude command in the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      baseCommand: 'claude --agent pan-work-agent',
+      sessionId: 'sess-supervisor',
+      model: 'gpt-5.5',
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pan dist/pty-supervisor.js',
+    });
+    const execLines = script.split('\n').filter((line) => line.startsWith('exec '));
+    expect(execLines).toEqual([
+      "exec node '/opt/pan dist/pty-supervisor.js' claude --agent pan-work-agent --session-id 'sess-supervisor' --model 'gpt-5.5'",
+    ]);
+  });
+
+  it('wraps conversation claude command while preserving post-exit behavior', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      spawnMode: 'conversation',
+      workingDir: '/workspace/project',
+      setTerminalEnv: true,
+      trapHup: true,
+      baseCommand: 'claude',
+      sessionId: 'sess-conv',
+      extraArgs: '--effort "high"',
+      keepAlive: true,
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pty-supervisor.js',
+    });
+    expect(script).toContain("node '/opt/pty-supervisor.js' claude --session-id 'sess-conv' --effort \"high\"");
+    expect(script).toContain('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
+    expect(script).toContain('while true; do sleep 60; done');
+    expect(script).not.toContain('exec node');
+  });
+
+  it('leaves work and conversation launchers byte-identical when supervisor is disabled', () => {
+    const workConfig: LauncherConfig = {
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      baseCommand: 'claude --agent pan-work-agent',
+      sessionId: 'sess-work',
+    };
+    expect(generateLauncherScriptSync({ ...workConfig, useSupervisor: false })).toBe(
+      generateLauncherScriptSync(workConfig),
+    );
+
+    const conversationConfig: LauncherConfig = {
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      spawnMode: 'conversation',
+      baseCommand: 'claude',
+      resumeSessionId: 'sess-conv',
+      keepAlive: true,
+    };
+    expect(generateLauncherScriptSync({ ...conversationConfig, useSupervisor: false })).toBe(
+      generateLauncherScriptSync(conversationConfig),
+    );
+  });
+
+  it('requires supervisorScriptPath when supervisor wrapping is enabled', () => {
+    expect(() =>
+      generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        baseCommand: 'claude',
+        useSupervisor: true,
+      }),
+    ).toThrow(/supervisorScriptPath/);
+  });
+
+  it('quotes supervisorScriptPath in the emitted exec line', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      baseCommand: 'claude',
+      useSupervisor: true,
+      supervisorScriptPath: "/tmp/pan's supervisor.js",
+    });
+    expect(script).toContain("exec node '/tmp/pan'\\''s supervisor.js' claude");
+  });
+
+  it('ignores supervisor wrapping for Pi launchers and review sub-role launchers', () => {
+    const piScript = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'pi',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pty-supervisor.js',
+    });
+    expect(piScript).toContain('exec pi --mode rpc');
+    expect(piScript).not.toContain('pty-supervisor.js');
+
+    const reviewScript = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      promptFile: '/tmp/prompt.md',
+      promptFileMode: 'stdin',
+      baseCommand: 'claude --print',
+      sessionId: 'sess-review',
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pty-supervisor.js',
+      reviewSignal: {
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: '/tmp/review.md',
+        signalMarkerPath: '/tmp/reviewer-signaled',
+        launcherPidPath: '/tmp/reviewer-launcher.pid',
+        timeoutSeconds: 1800,
+      },
+    });
+    expect(reviewScript).toContain('timeout 1800 claude --print');
+    expect(reviewScript).not.toContain('pty-supervisor.js');
+  });
 });
 
 describe('generateLauncherWrapper', () => {

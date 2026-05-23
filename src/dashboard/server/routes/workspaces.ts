@@ -3226,7 +3226,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           const { cleanupReviewTempStash } = yield* Effect.promise(() =>
             import('../../../lib/cloister/review-agent.js')
           );
-          yield* Effect.promise(() => cleanupReviewTempStash(issueId, wsInfo.localPath!));
+          yield* cleanupReviewTempStash(issueId, wsInfo.localPath!);
         }
       } catch (err) {
         console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);

@@ -6,34 +6,6 @@ description: Panopticon work role — claims beads, writes code, commits per bea
 # single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: bypassPermissions
 effort: high
-hooks:
-  PreToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
-    - matcher: "Read"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/tldr-read-enforcer"
-  PostToolUse:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
-    - matcher: "Edit|Write"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/tldr-post-edit"
-  Stop:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
-        - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
 # Panopticon Work Role

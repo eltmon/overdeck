@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 41;
+export const SCHEMA_VERSION = 43;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -99,6 +99,7 @@ export function initDiscoveredSessionsSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
     CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS discovered_session_tags (
       session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
@@ -395,7 +396,10 @@ export function initSchema(db: Database.Database): void {
       fork_error       TEXT,                               -- error message when fork_status='failed'
       harness          TEXT,                                -- coding harness used for conversation runtime
       delivery_method  TEXT,                               -- 'auto', 'channels', or 'tmux'
-      spawn_error      TEXT                                -- error message when background spawn failed (quota, auth, etc.)
+      spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
+      handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
+      handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
+      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -554,6 +558,9 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_discovered_model
       ON discovered_sessions(primary_model);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+      ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
 
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
       summary,
@@ -926,6 +933,7 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
       CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
         summary, summary_detailed, tags, files_touched,
         content='discovered_sessions', content_rowid='id'
@@ -1133,6 +1141,7 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
       CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
         summary, summary_detailed, tags, files_touched,
         content='discovered_sessions', content_rowid='id'
@@ -1193,9 +1202,27 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`); } catch { /* already exists */ }
   }
 
-  // v40 → v41: add auto_merge table for pending cooldown persistence
+  // v40 → v41: index discovered session UUIDs for archived-conversation enrichment joins
   if (currentVersion < 41) {
     db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+    `);
+  }
+
+  // v41 → v42: add handoff fork artifact and fallback metadata to conversations
+  if (currentVersion < 42) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`); } catch { /* already exists */ }
+  }
+
+  // v42 → v43: add auto_merge table for pending cooldown persistence
+  if (currentVersion < 43) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
+        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+
       CREATE TABLE IF NOT EXISTS auto_merge (
         issue_id      TEXT PRIMARY KEY,
         scheduled_at  TEXT NOT NULL,
@@ -1209,6 +1236,7 @@ export function runMigrations(db: Database.Database): void {
         ON auto_merge(status, execute_at);
     `);
   }
+
 
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);

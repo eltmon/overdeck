@@ -18,6 +18,7 @@ optional:
   - MULTI_SUITE
   - DNS_DOMAIN
   - MEMORY_CONTEXT
+  - TLDR_AVAILABLE
 ---
 # Test Execution — {{ISSUE_ID}}
 
@@ -35,6 +36,19 @@ optional:
 {{MEMORY_CONTEXT}}
 {{/MEMORY_CONTEXT}}
 
+{{#TLDR_AVAILABLE}}
+## TLDR: Efficient Failure Diagnosis
+
+You have access to TLDR MCP tools for diagnosing failures without reading every related file in full:
+- `tldr_context <file>` — summarize failing tests, fixtures, helpers, or implementation files
+- `tldr_structure <directory>` — understand test and source layout around a failing suite
+- `tldr_semantic <query>` — find where an acceptance criterion or failing behavior is implemented
+- `tldr_calls <function> <file>` — trace callers around a function named in a failure
+- `tldr_impact <function> <file>` — understand downstream effects before attributing a regression
+
+Use TLDR to narrow the investigation, then use full Reads for exact failure evidence and the code paths you cite in test notes.
+
+{{/TLDR_AVAILABLE}}
 ## Test Suites
 
 {{TEST_CONFIG_SUMMARY}}

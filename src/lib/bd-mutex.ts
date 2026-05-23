@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 
 let pending: Promise<void> = Promise.resolve();
 
-async function withBdMutexPromise<T>(fn: () => Promise<T>): Promise<T> {
+export async function withBdMutexPromise<T>(fn: () => Promise<T>): Promise<T> {
   // Chain onto the previous promise — this serializes all callers
   const result = pending.then(fn, fn);
   // Update pending to track this operation's completion (success or failure)

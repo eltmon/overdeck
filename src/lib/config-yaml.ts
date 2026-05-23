@@ -404,6 +404,7 @@ export interface ExperimentalConfig {
    * delivery sites continue to use tmux send-keys. Default: false.
    */
   claudeCodeChannels?: boolean;
+  claudeCodeChannelsMcp?: boolean;
 }
 
 /**
@@ -599,6 +600,8 @@ export interface NormalizedConfig {
 export interface NormalizedExperimentalConfig {
   /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
   claudeCodeChannels: boolean;
+  /** Whether legacy Claude Code Channels MCP wiring is enabled for new spawns. */
+  claudeCodeChannelsMcp: boolean;
 }
 
 /**
@@ -775,6 +778,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   experimental: {
     claudeCodeChannels: false,
+    claudeCodeChannelsMcp: false,
   },
   claude: {
     permissionMode: 'auto',
@@ -1330,6 +1334,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     experimental: {
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+      claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
     },
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
@@ -1691,6 +1696,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.experimental.claudeCodeChannels === 'boolean') {
         result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
       }
+      if (typeof config.experimental.claudeCodeChannelsMcp === 'boolean') {
+        result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
+      }
     }
 
     if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
@@ -2036,6 +2044,10 @@ export function getProjectConfigPath(): string | null {
  */
 export function isClaudeCodeChannelsEnabled(): boolean {
   return loadConfigSync().config.experimental.claudeCodeChannels;
+}
+
+export function isClaudeCodeChannelsMcpEnabled(): boolean {
+  return loadConfigSync().config.experimental.claudeCodeChannelsMcp;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

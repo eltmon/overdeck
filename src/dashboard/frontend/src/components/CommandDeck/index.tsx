@@ -815,7 +815,7 @@ export function CommandDeck({
   useEffect(() => {
     if (!convId || conversations.length === 0) return;
     if (convId === appliedConvId.current) return;
-    const conv = conversations.find((c) => String(c.id) === convId);
+    const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
     if (conv) {
       setSelectedConversation(conv.name);
       // A conversation selection owns the right pane — clear any feature so a
@@ -848,9 +848,8 @@ export function CommandDeck({
     }
     const conv = conversations.find((c) => c.name === selectedConversation);
     if (conv) {
-      const nextId = String(conv.id);
-      if (nextId === convId) return;
-      onConvIdChange(nextId);
+      if (convId === String(conv.id) || convId === conv.name) return;
+      onConvIdChange(String(conv.id));
     }
   }, [selectedConversation, conversations, onConvIdChange, convId]);
 
@@ -1482,8 +1481,8 @@ export function CommandDeck({
               conversation={projectConvMutations.forkTarget}
               isPending={projectConvMutations.isForkPending}
               onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness);
+              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
               }}
             />
           )}

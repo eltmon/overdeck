@@ -144,6 +144,11 @@ export interface LauncherConfig {
    * not also provided.
    */
   channelsBridgeServerName?: string;
+
+  /** Wrap Claude Code in the PTY supervisor: `node <supervisorScriptPath> claude ...`. Defaults to false. */
+  useSupervisor?: boolean;
+  /** Absolute path to dist/pty-supervisor.js. Required when useSupervisor=true. */
+  supervisorScriptPath?: string;
 }
 
 /**
@@ -151,7 +156,7 @@ export interface LauncherConfig {
  * e.g. shellQuote("foo'bar") → "'foo'\\''bar'"
  */
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\''`)}'`;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 /**
@@ -166,6 +171,15 @@ function buildChannelsArgs(config: LauncherConfig): string {
   if (!config.channelsBridgeMcpConfig) return '';
   const serverName = config.channelsBridgeServerName ?? 'panopticon-bridge';
   return ` --mcp-config ${shellQuote(config.channelsBridgeMcpConfig)} --dangerously-load-development-channels server:${serverName}`;
+}
+
+function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
+  if (!config.useSupervisor) return cmd;
+  if (config.harness === 'pi' || config.reviewSignal) return cmd;
+  if (!config.supervisorScriptPath) {
+    throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
+  }
+  return `node ${shellQuote(config.supervisorScriptPath)} ${cmd}`;
 }
 
 /**
@@ -373,7 +387,7 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(`${cmd} ${args.join(' ')}`.trim());
+      parts.push(wrapWithSupervisor(config, `${cmd} ${args.join(' ')}`.trim()));
     }
     return parts;
   }
@@ -494,7 +508,8 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` ${shellQuote(config.promptInline)}`;
   }
 
-  parts.push(useExec ? `exec ${cmd.trim()}` : cmd.trim());
+  const wrapped = wrapWithSupervisor(config, cmd.trim());
+  parts.push(useExec ? `exec ${wrapped}` : wrapped);
   return parts;
 }
 

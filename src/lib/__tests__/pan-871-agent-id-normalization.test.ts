@@ -59,7 +59,7 @@ vi.mock('../cv.js', () => ({
 
 vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})), loadCloisterConfigSync: vi.fn(() => ({})) }));
 vi.mock('../providers.js', () => ({ getProviderForModel: vi.fn(() => ({ name: 'anthropic', compatibility: 'direct' })), getProviderEnv: vi.fn(() => ({})), setupCredentialFileAuth: vi.fn(), clearCredentialFileAuth: vi.fn() }));
-vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
+vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsMcpEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
 vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));

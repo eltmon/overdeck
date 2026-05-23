@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
+import { ContextUsageIndicator } from '../chat/ContextUsageIndicator';
 import type { Conversation } from './ConversationList';
 import styles from './styles/command-deck.module.css';
 
@@ -54,7 +55,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
   return (
     <div className={styles.conversationTerminal}>
       {/* Header bar */}
-      <div className={styles.conversationTerminalHeader}>
+      <div className={`${styles.conversationTerminalHeader} ${styles.conversationHeaderContainer}`}>
         <span className={styles.conversationTerminalTitle}>
           {conversation.name}
         </span>
@@ -63,6 +64,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
             {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
           </span>
         )}
+        <ContextUsageIndicator contextUsage={conversation.contextUsage ?? null} />
         <span className={styles.conversationTerminalStatus}>
           <Circle
             size={7}

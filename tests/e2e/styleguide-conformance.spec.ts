@@ -288,12 +288,13 @@ describe('styleguide rendered surface conformance', () => {
 
     const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
     await expect.poll(() => drawer.page.locator('[data-component="drawer-action-bar"]').count()).toBe(1);
-    await expect.poll(() => drawer.page.locator('[data-component="shared-button"][data-variant="ghost"]').count()).toBeGreaterThan(0);
-    await expect.poll(() => drawer.page.locator('[data-component="shared-button"][data-variant="primary"]').count()).toBeGreaterThan(0);
-    const ghostBorder = await drawer.page.locator('[data-testid="drawer-action-reset"]').evaluate((node) => getComputedStyle(node).borderColor);
-    const primaryShadow = await drawer.page.locator('[data-testid="drawer-action-merge"]').evaluate((node) => getComputedStyle(node).boxShadow);
-    expect(ghostBorder).not.toBe('rgba(0, 0, 0, 0)');
-    expect(primaryShadow).toContain('rgba(255, 255, 255, 0.06)');
+    const drawerActionBar = drawer.page.locator('[data-component="drawer-action-bar"]');
+    await expect.poll(() => drawerActionBar.locator('[data-testid="issue-action-menu"]').count()).toBe(1);
+    await expect.poll(() => drawerActionBar.locator('[data-testid="issue-action-tell"]').count()).toBe(1);
+    await expect.poll(() => drawerActionBar.locator('[data-testid="issue-action-doneWork"]').count()).toBe(1);
+    await expect.poll(() => drawerActionBar.locator('[data-testid="issue-action-overflow-button"]').count()).toBe(1);
+    await expect.poll(() => drawerActionBar.locator('[data-testid="drawer-action-reset"]').count()).toBe(0);
+    await expect.poll(() => drawerActionBar.locator('[data-testid="drawer-action-stop"]').count()).toBe(0);
     await drawer.context.close();
   }, 45_000);
 

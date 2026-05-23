@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode } from 'react';
+import { forwardRef, type MouseEvent, type ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -15,6 +15,7 @@ export type IssueCardProps = {
   unhealthyCard?: boolean;
   sessionLostCard?: boolean;
   onClick?: () => void;
+  onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
   children: ReactNode;
   className?: string;
   testId?: string;
@@ -39,6 +40,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
   unhealthyCard = false,
   sessionLostCard = false,
   onClick,
+  onContextMenu,
   children,
   className,
   testId,
@@ -61,6 +63,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
       data-merge-ready-card={mergeReadyCard ? 'true' : 'false'}
       data-testid={testId}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={cn(
         'group relative overflow-hidden rounded-2xl border cursor-pointer issue-card-surface shadow-sm transition-all',
         sessionLostCard && 'border-warning/50',

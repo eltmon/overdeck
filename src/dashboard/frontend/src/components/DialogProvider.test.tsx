@@ -116,6 +116,27 @@ describe('DialogProvider', () => {
       expect(screen.getByText('Keep')).toBeInTheDocument();
     });
 
+    it('requires confirmation text when provided', async () => {
+      const onResult = vi.fn();
+      render(
+        <DialogProvider>
+          <TestConfirmComponent
+            options={{ title: 'Reset', message: 'Reset?', confirmLabel: 'Reset issue', requiredText: 'Reset issue' }}
+            onResult={onResult}
+          />
+        </DialogProvider>
+      );
+
+      fireEvent.click(screen.getByText('Open Confirm'));
+      const confirmButton = screen.getByRole('button', { name: 'Reset issue' });
+
+      expect(confirmButton).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
+      fireEvent.click(confirmButton);
+
+      await waitFor(() => expect(onResult).toHaveBeenCalledWith(true));
+    });
+
     it('focuses Cancel button for destructive variant', async () => {
       const onResult = vi.fn();
       render(

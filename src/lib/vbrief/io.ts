@@ -142,8 +142,11 @@ export function issueIdFromWorkspacePath(workspacePath: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-/** Derive the project root from a workspace path (two levels up). */
+/** Derive the project root from a workspace path. */
 function projectRootFromWorkspace(workspacePath: string): string {
+  if (existsSync(join(workspacePath, '.git')) && existsSync(join(workspacePath, PAN_DIRNAME, 'specs'))) {
+    return workspacePath;
+  }
   return resolve(workspacePath, '..', '..');
 }
 

@@ -20,17 +20,19 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/deep-wipe
  *   POST /api/issues/:id/close-out
  *   GET  /api/issues/:id/beads
+ *   POST /api/issues/:id/beads/:beadId/inspect
  *   GET  /api/issues/:id/costs
  */
 
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
+import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -127,19 +129,23 @@ export async function completePlanningArtifacts(options: {
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
-    return (await Effect.runPromise(withBdMutex(() => mod.createBeadsFromVBrief(path))));
+    return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
   });
-  const beadsResultLike = createBeads(workspacePath);
-  const beadsResult = Effect.isEffect(beadsResultLike) ? await Effect.runPromise(beadsResultLike) : await beadsResultLike;
+  const rawBeadsResult = createBeads(workspacePath);
+  const beadsResult = Effect.isEffect(rawBeadsResult)
+    ? await Effect.runPromise(rawBeadsResult)
+    : await rawBeadsResult;
+  const created = beadsResult.created ?? [];
+  const errors = beadsResult.errors ?? [];
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
-  if (planItemCount === 0 || !beadsResult.success || beadsResult.created.length !== planItemCount) {
-    const detail = beadsResult.errors.length > 0
-      ? beadsResult.errors.join('; ')
-      : `created ${beadsResult.created.length} beads for ${planItemCount} plan items`;
+  if (planItemCount === 0 || !beadsResult.success || created.length !== planItemCount) {
+    const detail = errors.length > 0
+      ? errors.join('; ')
+      : `created ${created.length} beads for ${planItemCount} plan items`;
     throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
   }
 
-  return { proposed, beadCount: beadsResult.created.length, beadsWarning: null };
+  return { proposed, beadCount: created.length, beadsWarning: null };
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -414,6 +420,14 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+async function pathIsDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 // ─── Route: GET /api/issues ───────────────────────────────────────────────────
 
@@ -1565,7 +1579,7 @@ const postIssueReopenRoute = HttpRouter.add(
               )));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
-                const result = await Effect.runPromise(withBdMutex(() => createBeadsFromVBrief(workspacePath)));
+                const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
                 if (result.created.length > 0) {
                   console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
                   return true;
@@ -2643,6 +2657,63 @@ const getIssueBeadsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/issues/:id/beads/:beadId/inspect ───────────────────────
+
+function isValidBeadId(beadId: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(beadId);
+}
+
+const postIssueBeadInspectRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/beads/:beadId/inspect',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
+    const params = yield* HttpRouter.params;
+    const id = (params['id'] ?? '').toUpperCase();
+    const beadId = params['beadId'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    if (!beadId.trim()) {
+      return jsonResponse({ error: 'Missing bead ID' }, { status: 400 });
+    }
+    if (!isValidBeadId(beadId)) {
+      return jsonResponse({ error: 'Invalid bead ID' }, { status: 400 });
+    }
+
+    const body = yield* readJsonBody;
+    const project = resolveProjectFromIssueSync(id);
+    if (!project) {
+      return jsonResponse({ error: `Could not resolve project for ${id}` }, { status: 404 });
+    }
+
+    const issueLower = id.toLowerCase();
+    const workspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
+    const workspaceExists = yield* Effect.promise(() => pathIsDirectory(workspace));
+    if (!workspaceExists) {
+      return jsonResponse({ error: `No workspace found for ${id}` }, { status: 404 });
+    }
+
+    const result = yield* spawnInspectAgent({
+      projectKey: project.projectKey,
+      projectPath: project.projectPath,
+      issueId: id,
+      beadId,
+      workspace,
+      branch: `feature/${issueLower}`,
+    }, { deep: (body as { deep?: unknown }).deep === true });
+
+    if (!result.success) {
+      return jsonResponse({ success: false, error: result.error ?? result.message }, { status: 500 });
+    }
+
+    return jsonResponse({ success: true, runId: result.runId, tmuxSession: result.tmuxSession });
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/planning-state ───────────────────────────────
 //
 // Lightweight summary of an issue's planning artifacts:
@@ -2738,7 +2809,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* withBdMutex(() => createBeadsFromVBrief(workspacePath));
+    const result = yield* createBeadsFromVBrief(workspacePath);
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
@@ -3479,6 +3550,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCloseOutRoute,
   postIssuesBulkCloseOutRoute,
   getIssueBeadsRoute,
+  postIssueBeadInspectRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,

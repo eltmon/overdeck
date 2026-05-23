@@ -2,18 +2,20 @@
  * Session list table (PAN-457)
  */
 
-import { CheckCircle, Circle, Star } from 'lucide-react';
+import { Anchor, CheckCircle, Circle, Star } from 'lucide-react';
 
 interface Session {
   id: number;
+  source: 'discovered' | 'managed-archived';
   workspacePath: string | null;
-  jsonlPath: string;
+  jsonlPath: string | null;
   primaryModel: string | null;
   messageCount: number;
   lastTs: string | null;
   estimatedCost: number;
   tags: string[];
   summary: string | null;
+  archivedAt?: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
   panopticonManaged: boolean;
@@ -22,8 +24,8 @@ interface Session {
 
 interface Props {
   sessions: Session[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }
 
 export function SessionTable({ sessions, selectedId, onSelect }: Props) {
@@ -42,14 +44,15 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
         </thead>
         <tbody>
           {sessions.map((session) => {
-            const isSelected = session.id === selectedId;
-            const workspace = session.workspacePath ?? session.jsonlPath;
+            const key = `${session.source}-${session.id}`;
+            const isSelected = key === selectedId;
+            const workspace = session.workspacePath ?? session.jsonlPath ?? 'Unknown session path';
             const shortWorkspace = workspace.split('/').slice(-2).join('/');
 
             return (
               <tr
-                key={session.id}
-                onClick={() => onSelect(isSelected ? null : session.id)}
+                key={key}
+                onClick={() => onSelect(isSelected ? null : key)}
                 className={`border-b border-gray-900 cursor-pointer transition-colors ${
                   isSelected
                     ? 'bg-blue-950 border-blue-900'
@@ -58,7 +61,9 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
               >
                 {/* Enrichment/managed indicator */}
                 <td className="px-3 py-1.5 text-center">
-                  {session.panopticonManaged ? (
+                  {session.source === 'managed-archived' ? (
+                    <Anchor className="h-3 w-3 text-amber-400 inline" />
+                  ) : session.panopticonManaged ? (
                     <Star className="h-3 w-3 text-cyan-400 inline" />
                   ) : session.enrichmentLevel > 0 ? (
                     <CheckCircle className="h-3 w-3 text-green-500 inline" />
@@ -73,7 +78,11 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                     <div className="font-mono text-gray-200 truncate" title={workspace}>
                       {shortWorkspace}
                     </div>
-                    {session.panopticonManaged && (
+                    {session.source === 'managed-archived' ? (
+                      <span className="shrink-0 rounded-full border border-amber-700 bg-amber-950 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+                        Archived{session.panIssueId ? ` · ${session.panIssueId}` : ''}
+                      </span>
+                    ) : session.panopticonManaged && (
                       <span className="shrink-0 rounded-full border border-cyan-700 bg-cyan-950 px-1.5 py-0.5 text-[10px] font-medium text-cyan-200">
                         Managed{session.panIssueId ? ` · ${session.panIssueId}` : ''}
                       </span>

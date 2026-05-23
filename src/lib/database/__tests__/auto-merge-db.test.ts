@@ -28,13 +28,14 @@ afterEach(async () => {
 describe('auto-merge-db', () => {
   it('creates the auto_merge table through schema migration', async () => {
     const { getDatabase } = await import('../index.js');
+    const { SCHEMA_VERSION } = await import('../schema.js');
     const db = getDatabase();
 
     const table = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'auto_merge'`).get() as { name: string } | undefined;
     const userVersion = db.pragma('user_version', { simple: true });
 
     expect(table?.name).toBe('auto_merge');
-    expect(userVersion).toBe(41);
+    expect(userVersion).toBe(SCHEMA_VERSION);
   });
 
   it('schedules a pending auto merge and returns normalized status', async () => {

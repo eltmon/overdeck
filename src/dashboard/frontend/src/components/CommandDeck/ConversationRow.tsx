@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -119,6 +119,18 @@ export function ConversationRow({
       setTimeout(() => setCopiedId(false), 2000);
     });
   }, [conv.id]);
+
+  const openHandoffDoc = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    window.open(`/api/conversations/${encodeURIComponent(conv.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');
+  }, [conv.name]);
+
+  const openHandoffTarget = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (conv.handoffTargetConvId) {
+      window.location.href = `/conv/${conv.handoffTargetConvId}`;
+    }
+  }, [conv.handoffTargetConvId]);
 
   const handleArchiveClick = useCallback(async (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
@@ -277,6 +289,32 @@ export function ConversationRow({
         >
           <Pencil size={iconSize} />
         </span>
+        {conv.handoffDocPath && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationSummaryForkBtn}
+            onClick={openHandoffDoc}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openHandoffDoc(e); }}
+            title="Handoff doc"
+            aria-label={`Open handoff doc for ${conv.title ?? conv.name}`}
+          >
+            <FileText size={iconSize} />
+          </span>
+        )}
+        {conv.handoffTargetConvId && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationSummaryForkBtn}
+            onClick={openHandoffTarget}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openHandoffTarget(e); }}
+            title="Open handoff target"
+            aria-label={`Open handoff target for ${conv.title ?? conv.name}`}
+          >
+            <ExternalLink size={iconSize} />
+          </span>
+        )}
         {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && (
           <span
             role="button"
