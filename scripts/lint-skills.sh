@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 node scripts/fs-helper.mjs rmrf packages/contracts/dist
 npm --prefix ./packages/contracts run build >/dev/null
+npm run build:cli >/dev/null
 
 python3 - <<'PY'
 from __future__ import annotations
