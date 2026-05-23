@@ -10,6 +10,7 @@ const wsTransportMock = vi.hoisted(() => ({
 
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
+  success: vi.fn(),
 }));
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -35,6 +36,11 @@ describe('MarkdownFileLink', () => {
   beforeEach(() => {
     localStorage.clear();
     toastMock.error.mockReset();
+    toastMock.success.mockReset();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
     wsTransportMock.getAvailableEditors.mockReset();
     wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
     wsTransportMock.shellOpenInEditor.mockReset();
@@ -85,6 +91,76 @@ describe('MarkdownFileLink', () => {
       });
     });
     expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+  });
+
+  it('shows context menu actions in the expected order and prevents the native menu', () => {
+    render(<MarkdownFileLink {...meta} />);
+    const link = screen.getByRole('link');
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 12, clientY: 24 });
+
+    fireEvent(link, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Open in editor',
+      'Copy relative path',
+      'Copy full path',
+    ]);
+  });
+
+  it('copies the relative display path from the context menu', async () => {
+    render(<MarkdownFileLink {...meta} />);
+
+    fireEvent.contextMenu(screen.getByRole('link'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy relative path' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(meta.displayPath);
+      expect(toastMock.success).toHaveBeenCalledWith('Copied relative path');
+    });
+  });
+
+  it('copies the full target path from the context menu', async () => {
+    render(<MarkdownFileLink {...meta} />);
+
+    fireEvent.contextMenu(screen.getByRole('link'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy full path' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(meta.targetPath);
+      expect(toastMock.success).toHaveBeenCalledWith('Copied full path');
+    });
+  });
+
+  it('emits an error toast when clipboard writes fail', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    });
+    render(<MarkdownFileLink {...meta} />);
+
+    fireEvent.contextMenu(screen.getByRole('link'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy full path' }));
+
+    await waitFor(() => {
+      expect(toastMock.error).toHaveBeenCalledWith('Failed to copy full path: denied');
+    });
+  });
+
+  it('opens the target path from the context menu and emits a success toast', async () => {
+    localStorage.setItem('panopticon:last-editor', 'vscode');
+    render(<MarkdownFileLink {...meta} />);
+
+    fireEvent.contextMenu(screen.getByRole('link'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in editor' }));
+
+    await waitFor(() => {
+      expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+        cwd: meta.targetPath,
+        editor: 'vscode',
+      });
+      expect(toastMock.success).toHaveBeenCalledWith('Opened in editor');
+    });
   });
 
   it('maps common file extensions to specialized icons and unknown files to a fallback', () => {

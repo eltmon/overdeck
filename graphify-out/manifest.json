@@ -3096,8 +3096,8 @@
     "hash": "ccc384b799d17e70dd9e237860d9c940"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/contextMenuFallback.test.ts": {
-    "mtime": 1779545271.067555,
-    "hash": "6f0359d1a3e4df86efb8a6464f5028d3"
+    "mtime": 1779545319.7722256,
+    "hash": "a1598ad9e09efa272e0eee5d8800d2d5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/filePathDisplay.test.ts": {
     "mtime": 1779526198.1879041,
@@ -4144,8 +4144,8 @@
     "hash": "ca0f4c94cc246e3f1e244db019982268"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx": {
-    "mtime": 1779526952.8186328,
-    "hash": "b28dc50a5d103f695d9da1d383b92706"
+    "mtime": 1779545422.360732,
+    "hash": "b6518c453e81a245af21cbb596ba2f29"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/PlanCard.tsx": {
     "mtime": 1779511306.0667882,
@@ -4156,8 +4156,8 @@
     "hash": "aebb6b837a76963156d2b92e72a6ab9f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx": {
-    "mtime": 1779526978.8885221,
-    "hash": "f54a47bb9185782aff62f8701b880071"
+    "mtime": 1779545466.1392295,
+    "hash": "7c5d83abbae6a5ff83fc756abbc620cb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx": {
     "mtime": 1779511306.0675108,

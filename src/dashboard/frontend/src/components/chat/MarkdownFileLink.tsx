@@ -11,6 +11,7 @@ import {
 import { EDITORS, type EditorId, WS_METHODS } from '@panctl/contracts';
 import { toast } from 'sonner';
 
+import { showContextMenu } from '../../contextMenuFallback';
 import { getPreferredEditor, setPreferredEditor } from '../../editorPreferences';
 import { cn } from '../../lib/utils';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
@@ -111,10 +112,23 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
           editor,
         }),
       ))
+      .then(() => {
+        toast.success('Opened in editor');
+      })
       .catch((error) => {
         toast.error(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
       });
   }, [targetPath]);
+
+  const copyPath = useCallback((value: string, label: string) => {
+    void navigator.clipboard.writeText(value)
+      .then(() => {
+        toast.success(`Copied ${label}`);
+      })
+      .catch((error) => {
+        toast.error(`Failed to copy ${label}: ${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, []);
 
   return (
     <a
@@ -128,6 +142,19 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         event.preventDefault();
         event.stopPropagation();
         handleOpen();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          items: [
+            { label: 'Open in editor', onClick: handleOpen },
+            { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
+            { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
+          ],
+        });
       }}
     >
       <Icon className={FILE_ICON_CLASS_NAME} aria-hidden="true" data-testid="markdown-file-link-icon" />
