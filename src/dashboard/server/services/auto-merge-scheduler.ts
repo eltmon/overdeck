@@ -60,8 +60,23 @@ function disabledByEnv(): boolean {
   return process.env.PANOPTICON_DISABLE_AUTO_MERGE === '1';
 }
 
+const MAX_TTS_LENGTH = 139;
+
 function normalizeIssueId(issueId: string): string {
   return issueId.trim().toUpperCase();
+}
+
+function spokenIssueId(issueId: string): string {
+  return normalizeIssueId(issueId).replace(/-/g, ' ').toLowerCase();
+}
+
+function truncateTtsUtterance(utterance: string): string {
+  if (utterance.length <= MAX_TTS_LENGTH) return utterance;
+  return `${utterance.slice(0, MAX_TTS_LENGTH - 3)}...`;
+}
+
+function formatMinutes(minutes: number): string {
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
 function resolveProjectKey(issueId: string, explicitProjectKey?: string): string | undefined {
@@ -90,7 +105,7 @@ function emitAutoMergeActivity(issueId: string, level: 'info' | 'warn' | 'error'
 }
 
 function emitAutoMergeTts(issueId: string, utterance: string, eventType: AutoMergeEventType, priority = 2): void {
-  emitActivityTtsSync({ issueId, utterance, eventType, priority, source: 'dashboard' });
+  emitActivityTtsSync({ issueId, utterance: truncateTtsUtterance(utterance), eventType, priority, source: 'dashboard' });
 }
 
 function isTimeoutError(error: unknown): boolean {
@@ -101,6 +116,7 @@ function isTimeoutError(error: unknown): boolean {
 
 export class AutoMergeScheduler {
   private readonly timers = new Map<string, TimerHandle>();
+  private readonly reminderTimers = new Map<string, TimerHandle>();
   private started = false;
 
   constructor(private readonly deps: AutoMergeSchedulerDeps = DEFAULT_DEPS) {}
@@ -124,7 +140,11 @@ export class AutoMergeScheduler {
     for (const timer of this.timers.values()) {
       this.deps.clearTimer(timer);
     }
+    for (const timer of this.reminderTimers.values()) {
+      this.deps.clearTimer(timer);
+    }
     this.timers.clear();
+    this.reminderTimers.clear();
     this.started = false;
   }
 
@@ -143,21 +163,22 @@ export class AutoMergeScheduler {
     const scheduled = this.deps.schedulePending(normalizedIssueId, executeAt);
     if (!scheduled) return false;
 
-    this.arm(normalizedIssueId, executeAt, resolveProjectKey(normalizedIssueId, projectKey));
+    this.arm(normalizedIssueId, executeAt, resolveProjectKey(normalizedIssueId, projectKey), config.cooldownMinutes > 1);
     transitionLog(normalizedIssueId, 'scheduled', { executeAt });
     emitAutoMergeEvent('merge.auto.scheduled', { issueId: normalizedIssueId, executeAt });
     emitAutoMergeActivity(normalizedIssueId, 'info', `Auto-merge scheduled for ${normalizedIssueId}`);
-    emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge scheduled`, 'merge.auto.scheduled');
+    emitAutoMergeTts(
+      normalizedIssueId,
+      `Auto merging ${spokenIssueId(normalizedIssueId)} in ${formatMinutes(config.cooldownMinutes)} — say pan merge cancel ${spokenIssueId(normalizedIssueId)} to abort`,
+      'merge.auto.scheduled',
+      1,
+    );
     return true;
   }
 
   async cancel(issueId: string, reason: string, cancelledBy: string): Promise<boolean> {
     const normalizedIssueId = normalizeIssueId(issueId);
-    const timer = this.timers.get(normalizedIssueId);
-    if (timer) {
-      this.deps.clearTimer(timer);
-      this.timers.delete(normalizedIssueId);
-    }
+    this.clearIssueTimers(normalizedIssueId);
 
     const cancelled = this.deps.cancelPending(normalizedIssueId, reason);
     if (!cancelled) return false;
@@ -165,7 +186,7 @@ export class AutoMergeScheduler {
     transitionLog(normalizedIssueId, 'cancelled', { reason, cancelledBy });
     emitAutoMergeEvent('merge.auto.cancelled', { issueId: normalizedIssueId, reason, cancelledBy });
     emitAutoMergeActivity(normalizedIssueId, 'warn', `Auto-merge cancelled for ${normalizedIssueId}: ${reason}`);
-    emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge cancelled`, 'merge.auto.cancelled', 1);
+    emitAutoMergeTts(normalizedIssueId, `Auto merge of ${spokenIssueId(normalizedIssueId)} cancelled`, 'merge.auto.cancelled', 1);
     return true;
   }
 
@@ -189,29 +210,59 @@ export class AutoMergeScheduler {
       return;
     }
 
-    this.arm(row.issueId, row.executeAt, projectKey);
+    this.arm(row.issueId, row.executeAt, projectKey, config.cooldownMinutes > 1);
   }
 
-  private arm(issueId: string, executeAt: string, projectKey?: string): void {
+  private arm(issueId: string, executeAt: string, projectKey?: string, emitReminder = false): void {
     const normalizedIssueId = normalizeIssueId(issueId);
-    const existing = this.timers.get(normalizedIssueId);
-    if (existing) this.deps.clearTimer(existing);
+    this.clearIssueTimers(normalizedIssueId);
 
-    const delayMs = Math.max(0, Date.parse(executeAt) - this.deps.now().getTime());
+    const executeAtMs = Date.parse(executeAt);
+    const delayMs = Math.max(0, executeAtMs - this.deps.now().getTime());
     const timer = this.deps.setTimer(() => {
       this.timers.delete(normalizedIssueId);
       void this.fire(normalizedIssueId, projectKey);
     }, delayMs);
     this.timers.set(normalizedIssueId, timer);
+
+    const reminderDelayMs = executeAtMs - this.deps.now().getTime() - 30_000;
+    if (emitReminder && reminderDelayMs > 0) {
+      const reminderTimer = this.deps.setTimer(() => {
+        this.reminderTimers.delete(normalizedIssueId);
+        emitAutoMergeTts(
+          normalizedIssueId,
+          `Auto merge of ${spokenIssueId(normalizedIssueId)} in 30 seconds`,
+          'merge.auto.scheduled',
+          2,
+        );
+      }, reminderDelayMs);
+      this.reminderTimers.set(normalizedIssueId, reminderTimer);
+    }
+  }
+
+  private clearIssueTimers(issueId: string): void {
+    const normalizedIssueId = normalizeIssueId(issueId);
+    const timer = this.timers.get(normalizedIssueId);
+    if (timer) {
+      this.deps.clearTimer(timer);
+      this.timers.delete(normalizedIssueId);
+    }
+
+    const reminderTimer = this.reminderTimers.get(normalizedIssueId);
+    if (reminderTimer) {
+      this.deps.clearTimer(reminderTimer);
+      this.reminderTimers.delete(normalizedIssueId);
+    }
   }
 
   private async fire(issueId: string, projectKey?: string): Promise<void> {
     const normalizedIssueId = normalizeIssueId(issueId);
     if (!this.deps.markExecuting(normalizedIssueId)) return;
+    this.clearIssueTimers(normalizedIssueId);
 
     transitionLog(normalizedIssueId, 'executing');
     emitAutoMergeEvent('merge.auto.executing', { issueId: normalizedIssueId });
-    emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge cooldown complete`, 'merge.auto.executing');
+    emitAutoMergeTts(normalizedIssueId, `Auto merging ${spokenIssueId(normalizedIssueId)} now`, 'merge.auto.executing', 1);
 
     try {
       const config = await this.deps.getConfig(resolveProjectKey(normalizedIssueId, projectKey));
@@ -232,7 +283,6 @@ export class AutoMergeScheduler {
         transitionLog(normalizedIssueId, 'executed');
         emitAutoMergeEvent('merge.auto.executed', { issueId: normalizedIssueId });
         emitAutoMergeActivity(normalizedIssueId, 'success', `Auto-merge executed for ${normalizedIssueId}`);
-        emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge started`, 'merge.auto.executed', 1);
       } else {
         const reason = this.mergeResultMessage(result) ?? 'merge_trigger_failed';
         this.deps.markFailed(normalizedIssueId, reason);
@@ -284,16 +334,17 @@ export class AutoMergeScheduler {
 
   private abort(issueId: string, reason: string): void {
     const normalizedIssueId = normalizeIssueId(issueId);
-    const timer = this.timers.get(normalizedIssueId);
-    if (timer) {
-      this.deps.clearTimer(timer);
-      this.timers.delete(normalizedIssueId);
-    }
+    this.clearIssueTimers(normalizedIssueId);
     this.deps.markAborted(normalizedIssueId, reason);
     transitionLog(normalizedIssueId, 'aborted', { reason });
     emitAutoMergeEvent('merge.auto.aborted', { issueId: normalizedIssueId, reason });
     emitAutoMergeActivity(normalizedIssueId, 'warn', `Auto-merge aborted for ${normalizedIssueId}: ${reason}`);
-    emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge aborted`, 'merge.auto.aborted', 1);
+    emitAutoMergeTts(
+      normalizedIssueId,
+      `Auto merge of ${spokenIssueId(normalizedIssueId)} aborted — ${reason}`,
+      'merge.auto.aborted',
+      1,
+    );
   }
 
   private mergeResultSucceeded(result: unknown): boolean {

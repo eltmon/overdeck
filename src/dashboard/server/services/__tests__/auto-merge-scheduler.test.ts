@@ -116,6 +116,10 @@ async function scheduleReadyIssue(harness: ReturnType<typeof createHarness>): Pr
   await expect(harness.scheduler.maybeSchedule('pan-1', 'pan')).resolves.toBe(true);
 }
 
+function expectLastTts(payload: Record<string, unknown>): void {
+  expect(activityTtsMock).toHaveBeenLastCalledWith(expect.objectContaining(payload));
+}
+
 describe('AutoMergeScheduler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -137,6 +141,14 @@ describe('AutoMergeScheduler', () => {
     expect(harness.deps.schedulePending).toHaveBeenCalledWith('PAN-1', '2026-05-23T12:05:00.000Z');
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'pending', executeAt: '2026-05-23T12:05:00.000Z' });
     expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'merge.auto.scheduled' }));
+    expect(activityTtsMock).toHaveBeenCalledTimes(1);
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: 'Auto merging pan 1 in 5 minutes — say pan merge cancel pan 1 to abort',
+      priority: 1,
+      source: 'dashboard',
+      eventType: 'merge.auto.scheduled',
+    });
   });
 
   it('does not double-schedule an existing pending issue', async () => {
@@ -146,7 +158,34 @@ describe('AutoMergeScheduler', () => {
     await expect(harness.scheduler.maybeSchedule('PAN-1', 'pan')).resolves.toBe(false);
 
     expect(harness.deps.schedulePending).toHaveBeenCalledTimes(2);
-    expect(vi.getTimerCount()).toBe(1);
+    expect(vi.getTimerCount()).toBe(2);
+  });
+
+  it('emits a single T-30s reminder when cooldown is greater than one minute', async () => {
+    const harness = createHarness();
+    await scheduleReadyIssue(harness);
+    activityTtsMock.mockClear();
+
+    await vi.advanceTimersByTimeAsync(4 * 60_000 + 30_000);
+
+    expect(activityTtsMock).toHaveBeenCalledTimes(1);
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: 'Auto merge of pan 1 in 30 seconds',
+      priority: 2,
+      source: 'dashboard',
+      eventType: 'merge.auto.scheduled',
+    });
+  });
+
+  it('does not emit a T-30s reminder when cooldown is one minute', async () => {
+    const harness = createHarness({ config: config({ cooldownMinutes: 1 }) });
+    await scheduleReadyIssue(harness);
+    activityTtsMock.mockClear();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(activityTtsMock).not.toHaveBeenCalled();
   });
 
   it('cancels during cooldown by clearing the timer and updating the row', async () => {
@@ -159,6 +198,13 @@ describe('AutoMergeScheduler', () => {
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'cancelled', cancelReason: 'operator_cancelled' });
     expect(harness.deps.triggerMerge).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: 'Auto merge of pan 1 cancelled',
+      priority: 1,
+      source: 'dashboard',
+      eventType: 'merge.auto.cancelled',
+    });
   });
 
   it('fires after cooldown and triggers merge when gates pass', async () => {
@@ -170,6 +216,13 @@ describe('AutoMergeScheduler', () => {
     expect(harness.deps.markExecuting).toHaveBeenCalledWith('PAN-1');
     expect(harness.deps.triggerMerge).toHaveBeenCalledWith('PAN-1');
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'executed' });
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: 'Auto merging pan 1 now',
+      priority: 1,
+      source: 'dashboard',
+      eventType: 'merge.auto.executing',
+    });
   });
 
   it.each([
@@ -186,6 +239,13 @@ describe('AutoMergeScheduler', () => {
     expect(harness.deps.triggerMerge).not.toHaveBeenCalled();
     expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'aborted', abortReason: expectedReason });
     expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'merge.auto.aborted' }));
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: `Auto merge of pan 1 aborted — ${expectedReason}`,
+      priority: 1,
+      source: 'dashboard',
+      eventType: 'merge.auto.aborted',
+    });
   });
 
   it('re-arms pending rows on boot', async () => {
