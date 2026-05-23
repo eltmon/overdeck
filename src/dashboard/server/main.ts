@@ -30,6 +30,7 @@ import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
+import { startAutoMergeScheduler, stopAutoMergeScheduler } from './services/auto-merge-scheduler.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
@@ -406,6 +407,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
+  stopAutoMergeScheduler();
   stopTranscriptPoller();
   closeMemoryFtsDatabases();
   process.exit(0);
@@ -440,6 +442,10 @@ try {
 } catch (err: any) {
   console.warn(`[panopticon] Failed to reset merge queue: ${err.message}`);
 }
+
+await startAutoMergeScheduler().catch((err: any) => {
+  console.warn(`[panopticon] Failed to start auto-merge scheduler: ${err.message}`);
+});
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();

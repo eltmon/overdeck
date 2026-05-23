@@ -8,6 +8,13 @@ export function setMergeQueueTriggerHandler(handler: MergeTriggerHandler): void 
   mergeTriggerHandler = handler;
 }
 
+export async function triggerRegisteredMerge(issueId: string): Promise<unknown> {
+  if (!mergeTriggerHandler) {
+    throw new Error('Merge trigger handler not registered');
+  }
+  return mergeTriggerHandler(issueId);
+}
+
 export async function resumeQueuedMerges(): Promise<void> {
   if (!mergeTriggerHandler) {
     console.warn('[panopticon] Merge queue resume skipped: trigger handler not registered');
