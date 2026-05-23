@@ -373,6 +373,21 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
   });
 
+  it('normalizes relative since values when parsing archived conversation filters', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
+
+    try {
+      const { parseArchivedConversationListOptions } = await import('../conversations.js');
+
+      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50'));
+
+      expect(options.since).toBe('2026-05-16T12:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns archived conversations without discovered_sessions enrichment', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/database/conversations-db.js');
     const { getDatabase } = await import('../../../../lib/database/index.js');

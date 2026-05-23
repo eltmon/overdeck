@@ -25,6 +25,7 @@ import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
+import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import {
   findCommitAtTime,
@@ -1170,7 +1171,7 @@ function parseOptionalNumberParam(params: URLSearchParams, name: string): number
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
+export function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
   const options: ArchivedConversationListOptions = {};
   const workspacePath = params.get('workspacePath');
   const primaryModel = params.get('primaryModel');
@@ -1186,7 +1187,7 @@ function parseArchivedConversationListOptions(params: URLSearchParams): Archived
 
   if (workspacePath) options.workspacePath = workspacePath;
   if (primaryModel) options.primaryModel = primaryModel;
-  if (since) options.since = since;
+  if (since) options.since = parseRelativeTime(since);
   if (params.get('managed') === 'true') options.managed = true;
   if (params.get('enriched') === 'true') options.enriched = true;
   if (tag) options.tags = [tag];
