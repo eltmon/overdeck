@@ -38,6 +38,9 @@ export async function refreshGraphify(projectPath: string, issueId: string): Pro
   try {
     await execAsync('git add graphify-out/', { cwd: projectPath, encoding: 'utf-8' });
   } catch (error) {
+    if (isIgnoredPathError(error)) {
+      return { skipped: 'gitignored' };
+    }
     return { ok: false, error: `git add graphify-out/ failed: ${formatExecError(error)}` };
   }
 
@@ -156,6 +159,11 @@ function isTimeoutError(error: unknown): boolean {
   const maybeError = error as { killed?: boolean; signal?: string; code?: string | number; message?: string };
   const message = maybeError.message?.toLowerCase() ?? '';
   return maybeError.killed === true || maybeError.signal === 'SIGTERM' || maybeError.code === 'ETIMEDOUT' || message.includes('timed out') || message.includes('timeout');
+}
+
+function isIgnoredPathError(error: unknown): boolean {
+  const text = formatExecError(error).toLowerCase();
+  return text.includes('the following paths are ignored') || text.includes('use -f if you really want to add them');
 }
 
 function getErrorCode(error: unknown): string | number | undefined {

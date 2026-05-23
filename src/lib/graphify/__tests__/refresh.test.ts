@@ -116,6 +116,21 @@ describe('refreshGraphify', () => {
     ]);
   });
 
+  it('returns gitignored when graphify-out is ignored by git', async () => {
+    execResults.push(
+      { stdout: '/usr/local/bin/graphify\n' },
+      { stdout: 'updated\n' },
+      { error: execError('ignored', { code: 1, stderr: 'The following paths are ignored by one of your .gitignore files:\ngraphify-out\nhint: Use -f if you really want to add them.' }) },
+    );
+
+    await expect(refreshGraphify(projectPath, 'PAN-1408')).resolves.toEqual({ skipped: 'gitignored' });
+    expect(execCommands()).toEqual([
+      'which graphify',
+      'graphify update .',
+      'git add graphify-out/',
+    ]);
+  });
+
   it('commits, pushes, and returns the pushed SHA when graphify-out changes', async () => {
     execResults.push(
       { stdout: '/usr/local/bin/graphify\n' },
