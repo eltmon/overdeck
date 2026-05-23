@@ -1,17 +1,23 @@
-import { Effect } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { execFile } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { createServer as createHttpServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
-import { homedir, tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
+import { Effect } from 'effect';
+import { HttpRouter } from 'effect/unstable/http';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as TmuxModule from '../../src/lib/tmux.js';
+
+const execFileAsync = promisify(execFile);
 
 interface SupervisorSession {
-  transcript: string[];
   bridge: NetServer;
+  fifoPath: string;
 }
 
 let browser: Browser;
@@ -23,28 +29,34 @@ let tmpHome: string;
 let fakeHome: string;
 let workspace: string;
 let sessions: Map<string, SupervisorSession>;
+let tmuxSessions: Set<string>;
 let routeDispose: (() => Promise<void>) | undefined;
 let originalPanopticonHome: string | undefined;
 let originalHome: string | undefined;
 let originalTrustedOrigins: string | undefined;
+let actualTmux: typeof TmuxModule | undefined;
 
 function pageHtml(): string {
   return `<!doctype html>
 <html>
   <body>
     <button id="create">New conversation</button>
+    <button id="openTerminal">Open terminal</button>
     <button id="send">Send message</button>
     <button id="fork">Plain fork</button>
     <button id="sendFork">Send fork message</button>
     <textarea id="message">scroll-mode delivery ping</textarea>
     <textarea id="forkMessage">plain fork delivery ping</textarea>
-    <pre id="terminal" style="height: 80px; overflow: auto; white-space: pre-wrap;">${Array.from({ length: 120 }, (_, i) => `line ${i}`).join('\n')}</pre>
+    <div id="terminalPanel" data-ready="false" style="height: 80px; overflow: auto; white-space: pre-wrap;"></div>
     <pre id="transcript"></pre>
     <pre id="launcher"></pre>
     <script>
       window.current = null;
       window.fork = null;
       window.lastError = null;
+      window.terminalReady = false;
+      window.terminalSocket = null;
+      window.terminalText = '';
       async function api(path, options) {
         try {
           const res = await fetch(path, options);
@@ -55,8 +67,36 @@ function pageHtml(): string {
           throw error;
         }
       }
+      function appendTerminal(data) {
+        window.terminalText += data;
+        const panel = document.getElementById('terminalPanel');
+        panel.textContent = window.terminalText;
+        panel.scrollTop = panel.scrollHeight;
+      }
       document.getElementById('create').onclick = async () => {
         window.current = await api('/api/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      };
+      document.getElementById('openTerminal').onclick = async () => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(protocol + '//' + window.location.host + '/ws/terminal?session=' + encodeURIComponent(window.current.tmuxSession));
+        window.terminalSocket = socket;
+        socket.onopen = () => {
+          socket.send(JSON.stringify({ type: 'attach', cols: 80, rows: 24 }));
+        };
+        socket.onmessage = (event) => {
+          const data = typeof event.data === 'string' ? event.data : '';
+          if (data.charCodeAt(0) === 0) {
+            const control = JSON.parse(data.slice(1));
+            if (control.type === 'snapshot') {
+              appendTerminal(control.data || '');
+              window.terminalReady = true;
+              document.getElementById('terminalPanel').dataset.ready = 'true';
+              socket.send(JSON.stringify({ type: 'ready' }));
+            }
+            return;
+          }
+          appendTerminal(data);
+        };
       };
       document.getElementById('send').onclick = async () => {
         const body = JSON.stringify({ message: document.getElementById('message').value });
@@ -70,9 +110,16 @@ function pageHtml(): string {
         const body = JSON.stringify({ message: document.getElementById('forkMessage').value });
         await api('/api/conversations/' + window.fork.name + '/message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       };
+      window.cleanupConversation = async (conversation) => {
+        return await api('/api/conversations/' + conversation.name, { method: 'DELETE' });
+      };
     </script>
   </body>
 </html>`;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 async function requestBody(req: IncomingMessage): Promise<Buffer> {
@@ -93,8 +140,59 @@ async function closeBridge(server: NetServer): Promise<void> {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 }
 
-async function startFakeSupervisor(agentId: string): Promise<void> {
-  const transcript: string[] = [];
+async function runTmux(args: string[]): Promise<string> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const command = actualTmux.getTmuxCommand(args);
+  const { stdout } = await execFileAsync(command.command, command.args, { encoding: 'utf8' });
+  return String(stdout);
+}
+
+async function tmuxSessionExists(session: string): Promise<boolean> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  return Effect.runPromise(actualTmux.sessionExists(session));
+}
+
+async function captureTmuxTranscript(session: string): Promise<string> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  return Effect.runPromise(actualTmux.capturePane(session, 200));
+}
+
+async function enterTmuxCopyMode(session: string): Promise<void> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const target = actualTmux.exactPaneTarget(session);
+  await runTmux(['copy-mode', '-t', target]);
+  await runTmux(['send-keys', '-t', target, '-X', 'page-up']);
+}
+
+async function paneInCopyMode(session: string): Promise<boolean> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const target = actualTmux.exactPaneTarget(session);
+  const output = await runTmux(['display-message', '-p', '-t', target, '#{pane_in_mode}']);
+  return output.trim() === '1';
+}
+
+async function createSupervisorBackedTmuxSession(agentId: string): Promise<void> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const fifoDir = join(tmpHome, 'fifos');
+  mkdirSync(fifoDir, { recursive: true, mode: 0o700 });
+  const fifoPath = join(fifoDir, `${agentId}.fifo`);
+  rmSync(fifoPath, { force: true });
+  await execFileAsync('mkfifo', [fifoPath]);
+  const script = [
+    `for i in $(seq 1 160); do printf 'scrollback-line-%03d\\n' "$i"; done`,
+    `printf 'Claude ready\\n'`,
+    `while IFS= read -r line < ${shellQuote(fifoPath)}; do printf '%s\\n' "$line"; done`,
+  ].join('; ');
+  await Effect.runPromise(actualTmux.createSession(agentId, workspace, `bash -lc ${shellQuote(script)}`, {
+    env: { TERM: 'xterm-256color' },
+    width: 80,
+    height: 24,
+  }));
+  tmuxSessions.add(agentId);
+  await startFakeSupervisor(agentId, fifoPath);
+}
+
+async function startFakeSupervisor(agentId: string, fifoPath: string): Promise<void> {
   const tokenPath = join(tmpHome, 'agents', agentId, 'pty-token');
   const expectedToken = readFileSync(tokenPath, 'utf8').trim();
   const socketDir = join(tmpHome, 'sockets');
@@ -104,7 +202,7 @@ async function startFakeSupervisor(agentId: string): Promise<void> {
 
   const bridge = createNetServer((sock) => {
     let buf = Buffer.alloc(0);
-    sock.on('data', (chunk) => {
+    sock.on('data', async (chunk) => {
       buf = Buffer.concat([buf, chunk]);
       const text = buf.toString('utf8');
       const headerEnd = text.indexOf('\r\n\r\n');
@@ -120,7 +218,9 @@ async function startFakeSupervisor(agentId: string): Promise<void> {
       }));
       const parsed = JSON.parse(body) as { content?: string };
       const ok = headers['x-panopticon-pty-token'] === expectedToken;
-      if (ok && parsed.content) transcript.push(parsed.content);
+      if (ok && parsed.content) {
+        await writeFileAsync(fifoPath, `${parsed.content}\n`, 'utf8');
+      }
       const responseBody = ok ? 'ok' : 'forbidden';
       sock.end(
         `HTTP/1.1 ${ok ? 200 : 403} ${ok ? 'OK' : 'ERR'}\r\n` +
@@ -136,7 +236,7 @@ async function startFakeSupervisor(agentId: string): Promise<void> {
     chmodSync(socketPath, 0o600);
     resolve();
   }));
-  sessions.set(agentId, { transcript, bridge });
+  sessions.set(agentId, { bridge, fifoPath });
 }
 
 function readDeliveryLog(agentId: string): Array<Record<string, unknown>> {
@@ -162,8 +262,15 @@ async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId
   writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'parent context' } })}\n`);
 }
 
+async function cleanupConversationThroughApi(conversation: { name: string }): Promise<void> {
+  await page.evaluate(async (conv) => {
+    await (window as any).cleanupConversation(conv);
+  }, conversation);
+}
+
 async function startRealConversationRoutes(): Promise<void> {
   const { conversationsRouteLayer } = await import('../../src/dashboard/server/routes/conversations.js');
+  const { setupTerminalWebSocket } = await import('../../src/dashboard/server/ws-terminal.js');
   const routed = HttpRouter.toWebHandler(conversationsRouteLayer, { disableLogger: true });
   routeDispose = routed.dispose;
   httpServer = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -196,6 +303,7 @@ async function startRealConversationRoutes(): Promise<void> {
       res.end(JSON.stringify({ error: message }));
     }
   });
+  setupTerminalWebSocket(httpServer);
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', () => resolve()));
   const address = httpServer.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
@@ -210,6 +318,8 @@ beforeEach(async () => {
   fakeHome = mkdtempSync(join(tmpdir(), 'pan-playwright-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-playwright-workspace-'));
   sessions = new Map();
+  tmuxSessions = new Set();
+  actualTmux = undefined;
   originalPanopticonHome = process.env.PANOPTICON_HOME;
   originalHome = process.env.HOME;
   originalTrustedOrigins = process.env.PANOPTICON_TRUSTED_ORIGINS;
@@ -221,32 +331,30 @@ beforeEach(async () => {
     getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
   }));
 
-  vi.doMock('../../src/lib/tmux.js', () => ({
-    createSessionSync: vi.fn(),
-    createSession: vi.fn((session: string) => Effect.promise(async () => {
-      await startFakeSupervisor(session);
-    })),
-    killSessionSync: vi.fn(),
-    killSession: vi.fn((session: string) => Effect.promise(async () => {
-      const existing = sessions.get(session);
-      if (existing) await closeBridge(existing.bridge);
-      sessions.delete(session);
-    })),
-    sendKeys: vi.fn(() => Effect.succeed(undefined)),
-    sendRawKeystroke: vi.fn(() => Effect.succeed(undefined)),
-    MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
-    sessionExistsSync: vi.fn((session: string) => sessions.has(session)),
-    sessionExists: vi.fn((session: string) => Effect.succeed(sessions.has(session))),
-    getAgentSessionsSync: vi.fn(() => []),
-    getAgentSessions: vi.fn(() => Effect.succeed([])),
-    capturePaneSync: vi.fn(() => 'Claude ready'),
-    capturePane: vi.fn(() => Effect.succeed('Claude ready')),
-    listPaneValuesSync: vi.fn(() => []),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
-    setOption: vi.fn(() => Effect.succeed(undefined)),
-    waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
-    listSessionNames: vi.fn(() => Effect.succeed(Array.from(sessions.keys()))),
-  }));
+  vi.doMock('../../src/lib/tmux.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof TmuxModule>();
+    actualTmux = actual;
+    return {
+      ...actual,
+      createSessionSync: vi.fn(),
+      createSession: vi.fn((session: string) => Effect.promise(async () => {
+        await createSupervisorBackedTmuxSession(session);
+      })),
+      killSessionSync: vi.fn(),
+      killSession: vi.fn((session: string) => Effect.promise(async () => {
+        try {
+          await Effect.runPromise(actual.killSession(session));
+        } catch {
+          // cleanup is idempotent when the session is already gone
+        }
+        const existing = sessions.get(session);
+        if (existing) await closeBridge(existing.bridge);
+        sessions.delete(session);
+        tmuxSessions.delete(session);
+      })),
+      waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
+    };
+  });
 
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
@@ -264,6 +372,12 @@ afterEach(async () => {
   await routeDispose?.().catch(() => undefined);
   await Promise.all(Array.from(sessions.values()).map((session) => closeBridge(session.bridge).catch(() => undefined)));
   sessions.clear();
+  if (actualTmux) {
+    await Promise.all(Array.from(tmuxSessions).map((session) => Effect.runPromise(
+      actualTmux!.killSession(session).pipe(Effect.catch(() => Effect.succeed(undefined))),
+    )));
+  }
+  tmuxSessions.clear();
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
   if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
@@ -291,12 +405,17 @@ describe('conversation supervisor Playwright UAT', () => {
     }).not.toBeNull();
     const parent = await page.evaluate(() => (window as any).current as { name: string; tmuxSession: string; cwd: string; claudeSessionId: string });
     await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toBe(true);
 
-    await page.locator('#terminal').evaluate((node) => { node.scrollTop = 24; });
-    await expect.poll(() => page.locator('#terminal').evaluate((node) => node.scrollTop)).toBe(24);
+    await page.locator('#openTerminal').click();
+    await expect.poll(() => page.evaluate(() => (window as any).terminalReady)).toBe(true);
+    await expect.poll(() => page.locator('#terminalPanel').textContent()).toContain('scrollback-line-160');
+
+    await enterTmuxCopyMode(parent.tmuxSession);
+    await expect.poll(() => paneInCopyMode(parent.tmuxSession)).toBe(true);
 
     await page.locator('#send').click();
-    await expect.poll(() => sessions.get(parent.tmuxSession)?.transcript.at(-1)).toBe('scroll-mode delivery ping');
+    await expect.poll(() => captureTmuxTranscript(parent.tmuxSession)).toContain('scroll-mode delivery ping');
     await expect.poll(() => readDeliveryLog(parent.tmuxSession).at(-1)?.path).toBe('supervisor');
 
     await writeConversationSessionFile(parent);
@@ -304,6 +423,7 @@ describe('conversation supervisor Playwright UAT', () => {
     await expect.poll(() => page.evaluate(() => (window as any).fork)).not.toBeNull();
     const forkConversation = await page.evaluate(() => (window as any).fork as { name: string; tmuxSession: string });
     await expect.poll(() => sessions.has(forkConversation.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(forkConversation.tmuxSession)).toBe(true);
 
     const launcher = launcherFor(forkConversation.tmuxSession);
     expect(launcher).toContain('pty-supervisor.js');
@@ -311,14 +431,14 @@ describe('conversation supervisor Playwright UAT', () => {
     expect(launcher).not.toContain('--dangerously-load-development-channels');
 
     await page.locator('#sendFork').click();
-    await expect.poll(() => sessions.get(forkConversation.tmuxSession)?.transcript.at(-1)).toBe('plain fork delivery ping');
+    await expect.poll(() => captureTmuxTranscript(forkConversation.tmuxSession)).toContain('plain fork delivery ping');
     await expect.poll(() => readDeliveryLog(forkConversation.tmuxSession).at(-1)?.path).toBe('supervisor');
 
-    await closeBridge(sessions.get(parent.tmuxSession)!.bridge);
-    sessions.delete(parent.tmuxSession);
-    await closeBridge(sessions.get(forkConversation.tmuxSession)!.bridge);
-    sessions.delete(forkConversation.tmuxSession);
+    await cleanupConversationThroughApi(forkConversation);
+    await cleanupConversationThroughApi(parent);
 
-    expect(sessions.size).toBe(0);
+    await expect.poll(() => sessions.size).toBe(0);
+    await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toBe(false);
+    await expect.poll(() => tmuxSessionExists(forkConversation.tmuxSession)).toBe(false);
   }, 45_000);
 });

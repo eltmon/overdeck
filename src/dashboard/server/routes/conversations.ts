@@ -9,9 +9,10 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, DSP_FLAG
  *   POST   /api/conversations                — spawn a new conversation
  *   POST   /api/conversations/:name/stop     — kill session, mark ended (preserves row)
  *   POST   /api/conversations/:name/archive  — kill session and hide from list
+ *   DELETE /api/conversations/:name          — cleanup alias: kill and archive, preserve transcript
  *   POST   /api/conversations/:name/resume   — reattach or respawn
  *
- * Conversations are NEVER deleted from the database. The only removal verb is `archive`.
+ * Conversations are NEVER deleted from the database, and JSONL transcript files are never removed.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -2063,6 +2064,41 @@ const patchConversationRoute = HttpRouter.add(
   }),
 );
 
+const deleteConversationRoute = HttpRouter.add(
+  'DELETE',
+  '/api/conversations/:name',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        markConversationEnded(name);
+        archiveConversation(name);
+        removeFavorite('conversation', name);
+        invalidateFavoritesCache();
+        await cleanupConversationAttachments(name);
+
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] delete conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: POST /api/conversations/:name/archive ───────────────────────────
 
 const postConversationArchiveRoute = HttpRouter.add(
@@ -3019,6 +3055,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationRoute,
   postConversationRoute,
   patchConversationRoute,
+  deleteConversationRoute,
   postConversationStopRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,
