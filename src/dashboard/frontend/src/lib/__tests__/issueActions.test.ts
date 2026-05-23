@@ -133,6 +133,17 @@ describe('ISSUE_ACTIONS', () => {
     expect(enabled).toContain('resetSession');
   });
 
+  it('declares real CLI verbs only for issue-scoped pan commands', () => {
+    expect(action('requestReview').panVerb).toBe('review request');
+    expect(action('restartReview').panVerb).toBe('review restart');
+    expect(action('recoverReview').panVerb).toBe('review reset');
+    expect(action('stopAgent').panVerb).toBe('kill');
+    expect(action('resetIssue').panVerb).toBeNull();
+    expect(action('restartFromPlan').panVerb).toBeNull();
+    expect(action('restartAgent').panVerb).toBeNull();
+    expect(action('reviewTest').panVerb).toBe('review request');
+  });
+
   it('aligns PRD action kinds for lifecycle and navigation actions', () => {
     expect(action('watchPlanning').kind).toBe('dialog');
     expect(action('donePlanning').kind).toBe('safe');
