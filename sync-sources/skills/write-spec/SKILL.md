@@ -46,8 +46,8 @@ The planning agent reads the spec as its primary input, explores the codebase, a
 ### 1. Identify the Issue
 
 Parse the issue ID from the command argument. Determine the project:
-- `MIN-XXX` → MYN project, docs at `/home/eltmon/Projects/myn/docs/`
-- `PAN-XXX` → Panopticon project, docs at `/home/eltmon/Projects/panopticon-cli/docs/`
+- `MIN-XXX` → MYN project, docs at `~/Projects/myn/docs/`
+- `PAN-XXX` → Panopticon project, docs at `~/Projects/panopticon-cli/docs/`
 
 ### 2. Gather Context
 

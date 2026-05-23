@@ -61,13 +61,13 @@ was provided, ask the user:
 ### Step 2: Read the template
 
 ```bash
-cat /home/eltmon/Projects/panopticon-cli/benchmarks/templates/quantumllama.md
+cat ~/Projects/panopticon-cli/benchmarks/templates/quantumllama.md
 ```
 
 ### Step 3: Ensure the `benchmark` label exists
 
 ```bash
-cd /home/eltmon/Projects/panopticon-cli && gh label create benchmark --description "Synthetic benchmark issue" --color "7B61FF" --force
+cd ~/Projects/panopticon-cli && gh label create benchmark --description "Synthetic benchmark issue" --color "7B61FF" --force
 ```
 
 ### Step 4: Create the issue
@@ -78,7 +78,7 @@ Create a GitHub issue on `eltmon/panopticon-cli` with:
 - **Body**: The content from the template file
 
 ```bash
-cd /home/eltmon/Projects/panopticon-cli && gh issue create \
+cd ~/Projects/panopticon-cli && gh issue create \
   --title "Benchmark: QuantumLlama — <SCENARIO>" \
   --label "benchmark" \
   --body "$(cat benchmarks/templates/quantumllama.md)"

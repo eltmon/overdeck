@@ -70,7 +70,7 @@ echo "Created issue: PAN-$ISSUE_NUM"
 pan workspace create "PAN-$ISSUE_NUM"
 
 # Navigate to workspace
-WORKSPACE="/home/eltmon/projects/panopticon/workspaces/feature-pan-$ISSUE_NUM"
+WORKSPACE="~/Projects/panopticon-cli/workspaces/feature-pan-$ISSUE_NUM"
 cd "$WORKSPACE"
 ```
 
@@ -127,7 +127,7 @@ tmux capture-pane -t specialist-merge-agent -p | tail -20
 
 ```bash
 # Check if branch was merged to main
-cd /home/eltmon/projects/panopticon
+cd ~/Projects/panopticon-cli
 git fetch origin
 git log --oneline main -5 | grep -i "pan-$ISSUE_NUM" && echo "SUCCESS: Merge found!" || echo "PENDING: Merge not yet on main"
 
@@ -174,7 +174,7 @@ If test-agent doesn't receive task from review-agent:
 pan specialists wake test-agent --task "TEST TASK for PAN-$ISSUE_NUM:
 WORKSPACE: $WORKSPACE
 BRANCH: feature/pan-$ISSUE_NUM
-PROJECT: /home/eltmon/projects/panopticon
+PROJECT: ~/Projects/panopticon-cli
 
 1. cd $WORKSPACE
 2. Run tests: npm test
@@ -188,7 +188,7 @@ If merge-agent can't complete:
 
 ```bash
 # Check for uncommitted changes
-cd /home/eltmon/projects/panopticon
+cd ~/Projects/panopticon-cli
 git status
 
 # If .beads/ files are modified, that's OK (should be ignored)
