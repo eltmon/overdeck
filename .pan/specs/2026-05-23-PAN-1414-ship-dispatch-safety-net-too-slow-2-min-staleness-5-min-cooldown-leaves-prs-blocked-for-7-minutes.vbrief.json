@@ -1,0 +1,254 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T11:25:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1414: Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
+    "updated": "2026-05-23T11:24:51.471Z"
+  },
+  "plan": {
+    "id": "pan-1414",
+    "title": "Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
+    "status": "proposed",
+    "uid": "7c2f1a3d-9b8e-4f6a-b1c5-2d3e4f5a6b7c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T11:25:00.000Z",
+    "updated": "2026-05-23T11:24:51.471Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
+        "label": "PAN-1414",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "cloister",
+      "ship",
+      "reactive-scheduler",
+      "safety-net"
+    ],
+    "narratives": {
+      "Problem": "checkUndispatchedShip is the safety net when the reactive scheduler's onIssueStateChange('shipping') trigger fails to dispatch ship. Current SHIP_DISPATCH_STALENESS_MS=2min and SHIP_DISPATCH_COOLDOWN_MS=5min leave a fully-reviewed-and-tested PR stuck for at least 2 minutes (often up to 7) even when nothing is racing. Observed live on PAN-1393 and PAN-1408 during the 2026-05-23 session.",
+      "Proposal": "Tighten the patrol: drop staleness to 30s (the reactive trigger fires within ~1s if it's going to) and cooldown to 90s (activeRoleRunExists prevents double-dispatch once a run is in flight; cooldown only debounces log spam). Add a per-issue re-dispatch counter logged as `[deacon] Ship re-dispatched (N total for issue X)` so we can spot reactive-trigger unreliability — if the counter is non-zero across >2% of issues, the reactive event chain itself needs investigation. Validate with a fake-timer unit test asserting the patrol fires within 60s of a stale ship-eligible status."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decomposed into 3 small beads (constants, counter+log, fake-timer test) rather than one.",
+        "rationale": "CLAUDE.md decomposition guidance: each change is independently reviewable and verifiable. Constants change is mechanical; counter is a discrete new behavior; the test exercises the new behavior and uses fake timers per project rule."
+      },
+      {
+        "summary": "Re-dispatch counter is a module-level Map<string, number> with process-lifetime persistence (not cleared on issue completion).",
+        "rationale": "Consistent with the existing shipDispatchCooldowns map in the same file. The counter is purely diagnostic; resetting on completion would lose the cross-cycle signal the issue explicitly wants (`if counter > 0 on >2% of issues, reactive chain has a bug`). Process restart resets it, which is fine — operators read the log live."
+      },
+      {
+        "summary": "Log message format matches the issue body verbatim: `[deacon] Ship re-dispatched (N total for issue X)`.",
+        "rationale": "Issue specifies the exact format; any deviation would force the operator to update grep queries / dashboards built against this string."
+      },
+      {
+        "summary": "New unit test uses vi.useFakeTimers()/vi.setSystemTime() per the project's fake-timers-for-retry-tests rule.",
+        "rationale": "Project rule forbids real-time setTimeout in delay-based tests (OOM risk under parallelization). Existing tests in this file use a 10-min real-clock STALE_TS that bypasses the rule by being far past the threshold, but a new test asserting tight timing must use fake timers."
+      },
+      {
+        "summary": "Existing tests in deacon-undispatched-ship.test.ts are left unchanged.",
+        "rationale": "Their STALE_TS = now - 10min remains well past both old (2min) and new (30s) staleness thresholds, so they continue to assert the same behavior. Rewriting them to fake timers is out of scope for this issue and would inflate the diff without adding signal."
+      },
+      {
+        "summary": "JSDoc comment block above checkUndispatchedShip updated to reflect new timings.",
+        "rationale": "The Guards section explicitly says `staleness: status at least 2 min old` and `per-issue cooldown: 5 min`. Leaving stale docs after a constant change is one of the bandaid patterns CLAUDE.md prohibits — fix the doc with the constant in the same bead."
+      },
+      {
+        "summary": "No deacon patrol interval change required.",
+        "rationale": "The patrol already runs on the normal cycle. With staleness=30s and the patrol cadence, an issue becomes eligible within ~30s and gets dispatched on the next tick, well within the 60s acceptance target. Touching patrol cadence would be over-scoped."
+      }
+    ],
+    "items": [
+      {
+        "id": "reduce-constants",
+        "title": "Reduce SHIP_DISPATCH_STALENESS_MS to 30s and SHIP_DISPATCH_COOLDOWN_MS to 90s",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1414",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts, change SHIP_DISPATCH_STALENESS_MS from `2 * 60 * 1000` to `30 * 1000` (30 s) and SHIP_DISPATCH_COOLDOWN_MS from `5 * 60 * 1000` to `90 * 1000` (90 s). Update the JSDoc comment block above checkUndispatchedShip — the `Guards` bullets currently say `status at least 2 min old` and `per-issue cooldown: 5 min`, both must be updated to the new values. The inline `// 2 min` / `// 5 min` trailing comments must also change."
+        },
+        "subItems": [
+          {
+            "id": "reduce-constants.ac1",
+            "title": "SHIP_DISPATCH_STALENESS_MS equals 30 * 1000 (30 s) in src/lib/cloister/deacon.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-constants.ac2",
+            "title": "SHIP_DISPATCH_COOLDOWN_MS equals 90 * 1000 (90 s) in src/lib/cloister/deacon.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-constants.ac3",
+            "title": "JSDoc Guards bullets for checkUndispatchedShip reflect `30 s` staleness and `90 s` cooldown — no stale `2 min` / `5 min` references remain in the file's comments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-constants.ac4",
+            "title": "All existing tests in src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts still pass — STALE_TS of 10 min remains valid against the new 30 s threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-constants.ac5",
+            "title": "npm run typecheck and npm run lint pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "per-issue-redispatch-counter",
+        "title": "Add per-issue re-dispatch counter and log `[deacon] Ship re-dispatched (N total for issue X)`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1414",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts, add a module-level `const shipDispatchCounts = new Map<string, number>();` next to the existing shipDispatchCooldowns map. Inside checkUndispatchedShip, just before (or replacing) the existing `[deacon] Ship never dispatched for ${issueId} ...` console.log, increment the counter for the key and emit an additional log line in the exact format `[deacon] Ship re-dispatched (N total for issue X)`. The counter persists for the lifetime of the dashboard process (matching shipDispatchCooldowns). Add a unit test in deacon-undispatched-ship.test.ts capturing console.log output and asserting the count text appears with the correct N for successive re-dispatches of the same issue."
+        },
+        "subItems": [
+          {
+            "id": "per-issue-redispatch-counter.ac1",
+            "title": "Module-level `shipDispatchCounts: Map<string, number>` exists in src/lib/cloister/deacon.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-redispatch-counter.ac2",
+            "title": "On each successful re-dispatch path, a log line of exact format `[deacon] Ship re-dispatched (N total for issue X)` is emitted, where N is the post-increment count and X is the issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-redispatch-counter.ac3",
+            "title": "Counter increments on every re-dispatch attempt that actually fires onIssueStateChange (not on cooldown skips, staleness skips, or readyForMerge skips)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-redispatch-counter.ac4",
+            "title": "New unit test in deacon-undispatched-ship.test.ts asserts the log format and N value after a re-dispatch (using a console.log spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-redispatch-counter.ac5",
+            "title": "npm run typecheck, npm run lint, and the deacon-undispatched-ship test file all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-fires-within-60s-test",
+        "title": "Add fake-timer test: patrol fires within 60s of a stale ship-eligible status",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T11:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1414",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a test to src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts (or a sibling file if module-level map state would interfere) using vi.useFakeTimers() + vi.setSystemTime(): (a) seed a review status with updatedAt = now, run patrol, assert NOT dispatched; (b) advance system time by 60_000 ms, run patrol again, assert onIssueStateChange was called with ('<issueId>', 'shipping'). Use a fresh issueId distinct from PAN-977 / PAN-888 to avoid the module-level shipDispatchCooldowns / shipDispatchCounts maps masking the dispatch. Wrap with beforeEach(() => vi.useFakeTimers()) / afterEach(() => vi.useRealTimers()) per the project's fake-timers-for-retry-tests rule."
+        },
+        "subItems": [
+          {
+            "id": "patrol-fires-within-60s-test.ac1",
+            "title": "Test uses vi.useFakeTimers() and vi.setSystemTime() — no real-clock setTimeout-based waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-fires-within-60s-test.ac2",
+            "title": "Test asserts NOT dispatched when status is freshly updated, then asserts dispatched after advancing system time by 60_000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-fires-within-60s-test.ac3",
+            "title": "Test uses an issueId distinct from existing tests in the file so module-level cooldown / counter maps do not mask the assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-fires-within-60s-test.ac4",
+            "title": "Test would FAIL against the pre-change 2-min staleness constant (proves the new 30 s value is what the test is exercising)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-fires-within-60s-test.ac5",
+            "title": "Full test file passes: npm test -- src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reduce-constants",
+        "to": "patrol-fires-within-60s-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1414-ship-dispatch-safety-net-too-slow-2-min-staleness-5-min-cooldown-leaves-prs-blocked-for-7-minutes.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
