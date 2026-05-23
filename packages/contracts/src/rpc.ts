@@ -46,6 +46,7 @@ export const WS_METHODS = {
 
   // Workspace detail (batched)
   getWorkspaceDetail: "pan.getWorkspaceDetail",
+  readWorkspaceFile: "pan.readWorkspaceFile",
 
   // Terminal control
   terminalOpen: "pan.terminalOpen",
@@ -257,6 +258,29 @@ export const GetWorkspaceDetailRpc = Rpc.make(WS_METHODS.getWorkspaceDetail, {
   error: PanRpcError,
 })
 
+export const ReadWorkspaceFileInput = Schema.Struct({
+  issueId: IssueId,
+  relativePath: Schema.String,
+  line: Schema.optional(Schema.Number),
+  contextLines: Schema.optional(Schema.Number),
+})
+export type ReadWorkspaceFileInput = typeof ReadWorkspaceFileInput.Type
+
+export const ReadWorkspaceFileResult = Schema.Struct({
+  text: Schema.String,
+  lang: Schema.String,
+  truncated: Schema.Boolean,
+  totalLines: Schema.Number,
+})
+export type ReadWorkspaceFileResult = typeof ReadWorkspaceFileResult.Type
+
+/** 10b. Read a workspace file for inline previews (unary) */
+export const ReadWorkspaceFileRpc = Rpc.make(WS_METHODS.readWorkspaceFile, {
+  payload: ReadWorkspaceFileInput,
+  success: ReadWorkspaceFileResult,
+  error: PanRpcError,
+})
+
 /** 11. Start planning for an issue (command) */
 export const StartPlanningRpc = Rpc.make(WS_METHODS.startPlanning, {
   payload: Schema.Struct({ issueId: IssueId, options: Schema.optional(Schema.Unknown) }),
@@ -460,6 +484,7 @@ export const PanRpcGroup = RpcGroup.make(
   GetSnapshotRpc,
   ReplayEventsRpc,
   GetWorkspaceDetailRpc,
+  ReadWorkspaceFileRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,

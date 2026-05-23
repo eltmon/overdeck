@@ -31,6 +31,7 @@ import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
+import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -659,6 +660,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── shellOpenInEditor — open workspace in editor (PAN-966) ──────────────
       [WS_METHODS.shellOpenInEditor]: (input) =>
         panOpen.openInEditor(input),
+
+      [WS_METHODS.readWorkspaceFile]: (input) =>
+        readWorkspaceFileEffect(input),
 
       // ── getAvailableEditors — list detected editors (PAN-966) ───────────────
       [WS_METHODS.getAvailableEditors]: () =>
