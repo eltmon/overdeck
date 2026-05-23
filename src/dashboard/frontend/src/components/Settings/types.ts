@@ -101,6 +101,11 @@ export interface SettingsConfig {
   roles?: RolesConfig;
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
+  agents?: {
+    rtk?: {
+      enabled?: boolean;
+    };
+  };
   memory?: MemorySettingsConfig;
   openrouter?: {
     favorites?: string[];

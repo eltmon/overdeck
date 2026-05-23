@@ -175,6 +175,11 @@ export interface ApiSettingsConfig {
     nous?: string;
     dashscope?: string;
   };
+  agents?: {
+    rtk?: {
+      enabled?: boolean;
+    };
+  };
   tts?: ApiTtsConfig;
   openrouter?: {
     favorites?: string[];
@@ -529,6 +534,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
       default_conversation_model: getDefaultConversationModelApi(),
     },
     api_keys: config.apiKeys,
+    agents: {
+      rtk: {
+        enabled: config.rtk?.enabled ?? false,
+      },
+    },
     tts: toApiTtsConfig(config.tts),
     openrouter: {
       favorites: config.openrouterFavorites,
@@ -618,6 +628,10 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   }
 
+  if (config.agents?.rtk !== undefined) {
+    doc.setIn(['agents', 'rtk'], config.agents.rtk);
+  }
+
   if (config.tts !== undefined) {
     for (const [key, value] of Object.entries(config.tts)) {
       doc.setIn(['tts', key], value);
@@ -676,6 +690,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
     },
+    agents: settings.agents?.rtk !== undefined
+      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
+      : undefined,
     tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
@@ -740,6 +757,14 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    agents: {
+      ...current.agents,
+      ...updates.agents,
+      rtk: {
+        ...current.agents?.rtk,
+        ...updates.agents?.rtk,
+      },
     },
     tts: {
       ...current.tts,
@@ -854,6 +879,18 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     const level = settings.models.gemini_thinking_level;
     if (level < 1 || level > 4) {
       errors.push('Gemini thinking level must be between 1 and 4');
+    }
+  }
+
+  if (settings.agents !== undefined) {
+    if (!isRecord(settings.agents)) {
+      errors.push('agents must be an object');
+    } else if (settings.agents.rtk !== undefined) {
+      if (!isRecord(settings.agents.rtk)) {
+        errors.push('agents.rtk must be an object');
+      } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
+        errors.push('agents.rtk.enabled must be a boolean');
+      }
     }
   }
 
