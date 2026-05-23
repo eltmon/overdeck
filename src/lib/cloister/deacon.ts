@@ -151,6 +151,8 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { isAgentIdleForNudge } from './agent-idle.js';
+import { checkStuckAgentRemediation } from './stuck-remediation.js';
 
 // ============================================================================
 // Configuration
@@ -734,39 +736,6 @@ const isAgentActiveInTmuxProgram = (sessionName: string): Effect.Effect<boolean,
 
 export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
   return Effect.runPromise(isAgentActiveInTmuxProgram(sessionName));
-}
-
-/**
- * Determine if an agent is idle based on its runtime.json hook state.
- *
- * The Stop hook (fired by Claude Code's Stop lifecycle event) writes state='idle'
- * to runtime.json whenever Claude finishes a turn and returns to the prompt. This
- * is the authoritative idle signal — no pane parsing needed.
- *
- * Stale-active fallback: if Stop hook never fired (state='active' persists), treat
- * the agent as idle once the heartbeat is older than staleActiveThresholdMs. The
- * heartbeat-hook fires on PostToolUse, so a stale heartbeat means no tool calls
- * and therefore no active computation.
- *
- * Returns false if: no runtime state, suspended, completed, or recently active.
- */
-function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 1000): boolean {
-  const runtimeState = getAgentRuntimeStateSync(agentId);
-  if (!runtimeState) {
-    console.log(`[deacon] ${agentId}: no runtime.json — skipping (hook not yet fired)`);
-    return false;
-  }
-  if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
-  if (runtimeState.state === 'idle') return true;
-  // Stale-active fallback: only fires for 'uninitialized' agents — never for
-  // 'active'. An 'active' state means the pre-tool-hook fired and Stop hasn't,
-  // which by definition is mid-turn work. Nudging an active agent injects
-  // text into the pane mid-Bash and surfaces as `Interrupted · What should
-  // Claude do instead?` (PAN-1024 reproduced this with slow gpt-5 runtimes
-  // where the heartbeat between tool calls easily exceeds 5min).
-  if (runtimeState.state !== 'uninitialized') return false;
-  const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
-  return ageMs > staleActiveThresholdMs;
 }
 
 // ============================================================================
@@ -4689,6 +4658,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
+
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
     ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);

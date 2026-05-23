@@ -169,9 +169,9 @@ vi.mock('../../tmux.js', async () => {
   const actual = await vi.importActual<typeof import('../../tmux.js')>('../../tmux.js')
   return {
     ...actual,
-    createSessionAsync: vi.fn(async () => undefined),
-    sessionExistsAsync: vi.fn(async () => false),
-    killSessionAsync: vi.fn(async () => undefined),
+    createSession: vi.fn(() => Effect.succeed(undefined)),
+    sessionExists: vi.fn(() => Effect.succeed(false)),
+    killSession: vi.fn(() => Effect.succeed(undefined)),
   }
 })
 
