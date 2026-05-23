@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
+import { DialogProvider } from '../DialogProvider';
 import { PipelineView } from './PipelineView';
 
 function renderPipelineView() {
@@ -15,7 +16,9 @@ function renderPipelineView() {
 
   return render(
     <QueryClientProvider client={client}>
-      <PipelineView />
+      <DialogProvider>
+        <PipelineView />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
@@ -206,6 +209,26 @@ describe('PipelineView', () => {
     expect(within(workPhase).queryByText('Unknown agent work')).toBeNull();
     expect(within(planPhase).getByText('Errored agent work')).toBeInTheDocument();
     expect(within(planPhase).getByText('Unknown agent work')).toBeInTheDocument();
+  });
+
+  it('opens an overflow action menu from a Pipeline row trailing slot', () => {
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-2"]') as HTMLElement;
+
+    fireEvent.click(within(row).getByTestId('issue-action-overflow-button'));
+
+    const menu = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(menu).getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
+  });
+
+  it('opens the same Pipeline row action menu on right-click', () => {
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-3"]') as HTMLElement;
+
+    fireEvent.contextMenu(row);
+
+    const menu = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(menu).getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
   });
 
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {

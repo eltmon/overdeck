@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 
 import { PlanDialog } from '../PlanDialog';
@@ -17,6 +17,7 @@ export interface IssueActionMenuProps {
   pinRight?: IssueActionKey[];
   className?: string;
   agentScopeOnly?: boolean;
+  openSignal?: number;
 }
 
 const AGENT_SCOPE_ACTION_KEYS = new Set<IssueActionKey>([
@@ -74,8 +75,12 @@ function OverflowMenu({ views, onClose }: { views: IssueActionView[]; onClose: (
   );
 }
 
-function OverflowButton({ views, triggerRef }: { views: IssueActionView[]; triggerRef?: RefObject<HTMLButtonElement> }) {
+function OverflowButton({ views, triggerRef, openSignal }: { views: IssueActionView[]; triggerRef?: RefObject<HTMLButtonElement>; openSignal?: number }) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
 
   return (
     <div className="relative inline-flex">
@@ -157,7 +162,7 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
   );
 }
 
-export function IssueActionMenu({ issueId, mode, pinRight = [], className, agentScopeOnly = false }: IssueActionMenuProps) {
+export function IssueActionMenu({ issueId, mode, pinRight = [], className, agentScopeOnly = false, openSignal }: IssueActionMenuProps) {
   const actions = useIssueActions(issueId);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreOverflowFocus = () => overflowTriggerRef.current?.focus();
@@ -179,8 +184,8 @@ export function IssueActionMenu({ issueId, mode, pinRight = [], className, agent
       {mode !== 'overflow-only' ? primary.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
-      {mode === 'overflow-only' ? <OverflowButton views={overflowOnly} triggerRef={overflowTriggerRef} /> : null}
-      {mode === 'hybrid' && hybridOverflow.length > 0 ? <OverflowButton views={hybridOverflow} triggerRef={overflowTriggerRef} /> : null}
+      {mode === 'overflow-only' ? <OverflowButton views={overflowOnly} triggerRef={overflowTriggerRef} openSignal={openSignal} /> : null}
+      {mode === 'hybrid' && hybridOverflow.length > 0 ? <OverflowButton views={hybridOverflow} triggerRef={overflowTriggerRef} openSignal={openSignal} /> : null}
       {pinned.length > 0 ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {pinned.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />

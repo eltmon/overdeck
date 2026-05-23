@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
@@ -38,6 +38,8 @@ export type IssueRowProps = {
   assignee?: IssueRowAssignee;
   variant?: IssueRowVariant;
   onOpen?: (issueId: string) => void;
+  onContextMenu?: () => void;
+  actionMenu?: ReactNode;
   className?: string;
 };
 
@@ -93,29 +95,47 @@ export default function IssueRow({
   assignee,
   variant = 'pipeline',
   onOpen,
+  onContextMenu,
+  actionMenu,
   className,
 }: IssueRowProps) {
   const avatarName = assignee?.name ?? issueId;
   const avatarTone = AVATAR_TONE_CLASSES[hashString(avatarName) % AVATAR_TONE_CLASSES.length];
   const hasLedger = Boolean(ledger?.runtime || ledger?.cost);
   const hasAgent = Boolean(agent?.name);
+  const gridTemplateColumns = actionMenu ? `${GRID_TEMPLATES[variant]} 30px` : GRID_TEMPLATES[variant];
+  const open = () => onOpen?.(issueId);
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    open();
+  };
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       data-component="issue-row"
       data-issue-id={issueId}
       data-phase={phase}
       data-priority={priority}
       data-variant={variant}
       className={cn(
-        'relative grid w-full items-center border-b border-border text-left transition-colors duration-200 last:border-b-0 hover:bg-accent before:absolute before:bottom-[8px] before:left-[10px] before:top-[8px] before:w-[2px] before:rounded-[2px]',
+        'group relative grid w-full items-center border-b border-border text-left transition-colors duration-200 last:border-b-0 hover:bg-accent before:absolute before:bottom-[8px] before:left-[10px] before:top-[8px] before:w-[2px] before:rounded-[2px]',
         ROW_CLASSES[variant],
         PRIORITY_BORDER_CLASSES[priority],
         className,
       )}
-      style={{ gridTemplateColumns: GRID_TEMPLATES[variant] }}
-      onClick={() => onOpen?.(issueId)}
+      style={{ gridTemplateColumns }}
+      onClick={open}
+      onKeyDown={handleKeyDown}
+      onContextMenu={(event) => {
+        if (!onContextMenu) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onContextMenu();
+      }}
     >
       <span aria-hidden="true" />
       <span className="truncate font-mono text-[11px] leading-none tracking-[0.02em] text-muted-foreground">
@@ -180,6 +200,15 @@ export default function IssueRow({
       >
         {avatarInitials(avatarName)}
       </span>
-    </button>
+      {actionMenu ? (
+        <span
+          data-component="issue-row-action-menu"
+          className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {actionMenu}
+        </span>
+      ) : null}
+    </div>
   );
 }
