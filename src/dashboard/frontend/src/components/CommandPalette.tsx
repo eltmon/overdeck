@@ -141,6 +141,52 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+// ─── Highlighted text ─────────────────────────────────────────────────────────
+//
+// Wraps every case-insensitive occurrence of any query term in `text` with a
+// <mark>. Used for label + description on every palette row so the matched
+// substring is visually obvious. Memory excerpts keep their server-driven
+// FTS5 snippet highlighting (which understands stemming).
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractHighlightTerms(query: string): string[] {
+  const matches = query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
+  const dedup = new Set<string>();
+  for (const term of matches) {
+    if (term.length === 0) continue;
+    dedup.add(term);
+  }
+  // Match longer terms first so a query like "pan plan" highlights "plan"
+  // inside "planning" before "pan" greedily consumes part of "planning".
+  return [...dedup].sort((a, b) => b.length - a.length);
+}
+
+interface HighlightedProps {
+  text: string;
+  terms: string[];
+}
+
+function Highlighted({ text, terms }: HighlightedProps) {
+  if (!text) return null;
+  if (terms.length === 0) return <>{text}</>;
+  const pattern = new RegExp(`(${terms.map(escapeRegex).join('|')})`, 'gi');
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -436,6 +482,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     });
   }, [query, allActions]);
 
+  // Terms used to highlight every matched substring in label + description.
+  const highlightTerms = useMemo(() => extractHighlightTerms(query), [query]);
+
   // Display group ordering: Actions/Orchestration/Navigation first, then
   // Active Workspaces, Issues, Running Agents, Commands, Memory/Observations.
   const groupOrder = useMemo(() => {
@@ -516,10 +565,12 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                           <p className={`text-sm font-medium truncate ${
                             action.destructive ? 'text-destructive' : 'text-foreground'
                           }`}>
-                            {action.label}
+                            <Highlighted text={action.label} terms={highlightTerms} />
                           </p>
                           {action.description && (
-                            <p className="text-xs text-muted-foreground truncate">{action.description}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              <Highlighted text={action.description} terms={highlightTerms} />
+                            </p>
                           )}
                           {action.excerptSegments && action.excerptSegments.length > 0 && (
                             <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
