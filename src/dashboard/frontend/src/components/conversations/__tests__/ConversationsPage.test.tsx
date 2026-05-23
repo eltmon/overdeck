@@ -77,6 +77,14 @@ const SESSION_STUB = {
 
 const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1, total: 1 };
 const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts', durationMs: 2 };
+const ARCHIVED_RESPONSE = [{
+  ...SESSION_STUB,
+  id: 2,
+  source: 'managed-archived',
+  conversationName: 'Archived conversation',
+  archivedAt: '2025-01-02T00:00:00Z',
+  panopticonManaged: true,
+}];
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };
 const COST_RESPONSE = { sessionCount: 10, totalCost: 0.25, totalTokensIn: 1000, totalTokensOut: 2000 };
 const WORKSPACE_COST_RESPONSE = {
@@ -113,9 +121,14 @@ describe('ConversationsPage endpoint selection', () => {
     rpcMocks.cost.mockResolvedValue(COST_RESPONSE);
     rpcMocks.costByWorkspace.mockResolvedValue(WORKSPACE_COST_RESPONSE);
     rpcMocks.scan.mockResolvedValue({ inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(ARCHIVED_RESPONSE),
+    }));
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 

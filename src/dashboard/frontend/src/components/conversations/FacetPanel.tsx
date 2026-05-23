@@ -3,6 +3,7 @@
  */
 
 interface Filters {
+  source?: 'all' | 'discovered' | 'managed-archived';
   workspace?: string;
   since?: string;
   managed?: boolean;
@@ -48,11 +49,39 @@ const SINCE_OPTIONS = [
   { label: 'Last 90 days', value: '90d' },
 ];
 
+const SOURCE_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Discovered', value: 'discovered' },
+  { label: 'Managed-archived', value: 'managed-archived' },
+] as const;
+
 export function FacetPanel({ filters, facets, onChange }: Props) {
   return (
     <div className="w-48 shrink-0 border-r border-gray-800 bg-gray-950 p-3 overflow-auto">
       <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
         Filters
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Source</label>
+        <div className="flex flex-wrap gap-1">
+          {SOURCE_OPTIONS.map((source) => {
+            const active = (filters.source ?? 'all') === source.value;
+            return (
+              <button
+                key={source.value}
+                onClick={() => onChange('source', source.value === 'all' ? undefined : source.value)}
+                className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                  active
+                    ? 'bg-blue-900 text-blue-100'
+                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {source.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Time range */}

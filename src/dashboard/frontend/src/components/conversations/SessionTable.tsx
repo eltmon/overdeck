@@ -6,8 +6,9 @@ import { CheckCircle, Circle, Star } from 'lucide-react';
 
 interface Session {
   id: number;
+  source: 'discovered' | 'managed-archived';
   workspacePath: string | null;
-  jsonlPath: string;
+  jsonlPath: string | null;
   primaryModel: string | null;
   messageCount: number;
   lastTs: string | null;
@@ -22,8 +23,8 @@ interface Session {
 
 interface Props {
   sessions: Session[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }
 
 export function SessionTable({ sessions, selectedId, onSelect }: Props) {
@@ -42,14 +43,15 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
         </thead>
         <tbody>
           {sessions.map((session) => {
-            const isSelected = session.id === selectedId;
-            const workspace = session.workspacePath ?? session.jsonlPath;
+            const key = `${session.source}-${session.id}`;
+            const isSelected = key === selectedId;
+            const workspace = session.workspacePath ?? session.jsonlPath ?? 'Unknown session path';
             const shortWorkspace = workspace.split('/').slice(-2).join('/');
 
             return (
               <tr
-                key={session.id}
-                onClick={() => onSelect(isSelected ? null : session.id)}
+                key={key}
+                onClick={() => onSelect(isSelected ? null : key)}
                 className={`border-b border-gray-900 cursor-pointer transition-colors ${
                   isSelected
                     ? 'bg-blue-950 border-blue-900'

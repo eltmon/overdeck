@@ -12,7 +12,10 @@ import { useDashboardStore } from '../../lib/store';
 
 interface Session {
   id: number;
-  jsonlPath: string;
+  source?: 'discovered' | 'managed-archived';
+  conversationName?: string | null;
+  archivedAt?: string | null;
+  jsonlPath: string | null;
   workspacePath: string | null;
   primaryModel: string | null;
   messageCount: number;
@@ -277,7 +280,7 @@ export function SessionDetail({ session, onClose }: Props) {
           </div>
           <div className="flex items-start gap-1">
             <ExternalLink className="h-3 w-3 text-gray-600 mt-0.5 shrink-0" />
-            <span className="text-[10px] text-gray-600 font-mono break-all">{displaySession.jsonlPath}</span>
+            <span className="text-[10px] text-gray-600 font-mono break-all">{displaySession.jsonlPath ?? 'No JSONL path available'}</span>
           </div>
         </div>
       </div>

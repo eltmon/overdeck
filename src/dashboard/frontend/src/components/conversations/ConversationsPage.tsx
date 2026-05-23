@@ -18,9 +18,16 @@ import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
+type SessionSource = 'discovered' | 'managed-archived';
+
+type SourceFilter = 'all' | SessionSource;
+
 interface DiscoveredSession {
   id: number;
-  jsonlPath: string;
+  source: SessionSource;
+  conversationName?: string | null;
+  archivedAt?: string | null;
+  jsonlPath: string | null;
   workspacePath: string | null;
   primaryModel: string | null;
   messageCount: number;
@@ -81,6 +88,12 @@ interface SearchResponse {
   total: number;
   mode: string;
   error?: string;
+}
+
+interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source'> {
+  source: 'managed-archived';
+  conversationName: string;
+  archivedAt: string;
 }
 
 interface ScanResult {
@@ -144,6 +157,16 @@ function countTimeFacets(sessions: DiscoveredSession[]): FacetValue[] {
   });
 }
 
+function sessionKey(session: DiscoveredSession): string {
+  return `${session.source}-${session.id}`;
+}
+
+function compareSessionsByLastTs(a: DiscoveredSession, b: DiscoveredSession): number {
+  const aTime = a.lastTs ? Date.parse(a.lastTs) : 0;
+  const bTime = b.lastTs ? Date.parse(b.lastTs) : 0;
+  return bTime - aTime;
+}
+
 function countCostFacets(sessions: DiscoveredSession[]): FacetValue[] {
   const ranges = [
     { value: 'free', label: '$0', minCost: undefined, maxCost: '0' },
@@ -170,6 +193,7 @@ function countCostFacets(sessions: DiscoveredSession[]): FacetValue[] {
 }
 
 function buildFilterParams(filters: {
+  source?: SourceFilter;
   workspace?: string;
   since?: string;
   managed?: boolean;
@@ -227,6 +251,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
 function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
   return {
     id: session.id,
+    source: 'discovered',
     jsonlPath: session.jsonlPath,
     workspacePath: session.workspacePath ?? null,
     primaryModel: session.primaryModel ?? null,
@@ -256,6 +281,12 @@ async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
     }),
   );
   return { ...result, sessions: result.sessions.map(fromRpcSession) };
+}
+
+async function fetchArchivedConversations(): Promise<DiscoveredSession[]> {
+  const response = await fetch('/api/conversations/archived');
+  if (!response.ok) throw new Error(`Failed to load archived conversations: ${response.status}`);
+  return (await response.json()) as ArchivedConversationResponse[];
 }
 
 async function fetchSearch(
@@ -311,11 +342,12 @@ export function ConversationsPage() {
   const queryClient = useQueryClient();
   const scanProgress = useDashboardStore(selectScanProgress);
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [showFacets, setShowFacets] = useState(false);
   const [searchOffset, setSearchOffset] = useState(0);
   const [semanticSearch, setSemanticSearch] = useState(false);
   const [filters, setFilters] = useState<{
+    source?: SourceFilter;
     workspace?: string;
     since?: string;
     managed?: boolean;
@@ -329,9 +361,11 @@ export function ConversationsPage() {
     enrichmentLevel?: string;
   }>({});
 
+  const sourceFilter = filters.source ?? 'all';
   const trimmedQuery = query.trim();
   const [debouncedSemanticQuery, setDebouncedSemanticQuery] = useState(trimmedQuery);
-  const effectiveQuery = semanticSearch ? debouncedSemanticQuery : trimmedQuery;
+  const searchVisible = sourceFilter !== 'managed-archived';
+  const effectiveQuery = searchVisible ? (semanticSearch ? debouncedSemanticQuery : trimmedQuery) : '';
   const filterParams = buildFilterParams(filters);
 
   useEffect(() => {
@@ -351,7 +385,13 @@ export function ConversationsPage() {
   const { data: listData, isLoading: isListLoading } = useQuery({
     queryKey: ['discovered-sessions', listParams.toString()],
     queryFn: () => fetchSessions(listParams),
-    enabled: !trimmedQuery,
+    enabled: !effectiveQuery && sourceFilter !== 'managed-archived',
+  });
+
+  const { data: archivedSessions = [], isLoading: isArchivedLoading } = useQuery({
+    queryKey: ['archived-conversations'],
+    queryFn: fetchArchivedConversations,
+    enabled: !effectiveQuery && sourceFilter !== 'discovered',
   });
 
   const SEARCH_PAGE_SIZE = 50;
@@ -388,12 +428,19 @@ export function ConversationsPage() {
     },
   });
 
-  const isLoading = effectiveQuery ? isSearchLoading : isListLoading;
+  const isLoading = effectiveQuery
+    ? isSearchLoading
+    : (sourceFilter === 'all' ? isListLoading || isArchivedLoading : sourceFilter === 'managed-archived' ? isArchivedLoading : isListLoading);
+  const discoveredSessions = listData?.sessions ?? [];
   const sessions = effectiveQuery
     ? (searchData?.sessions ?? [])
-    : (listData?.sessions ?? []);
+    : sourceFilter === 'managed-archived'
+      ? archivedSessions
+      : sourceFilter === 'discovered'
+        ? discoveredSessions
+        : [...discoveredSessions, ...archivedSessions].sort(compareSessionsByLastTs);
 
-  const selected = selectedId != null ? sessions.find((s) => s.id === selectedId) ?? null : null;
+  const selected = selectedKey != null ? sessions.find((s) => sessionKey(s) === selectedKey) ?? null : null;
   const workspaceCostEntries = workspaceCost?.entries ?? [];
   const facetOptions = {
     models: countFacetValues(sessions.map((s) => s.primaryModel)),
@@ -408,6 +455,7 @@ export function ConversationsPage() {
     enrichmentLevels: countFacetValues(sessions.map((s) => String(s.enrichmentLevel))),
   };
   const activeFilterChips = [
+    sourceFilter !== 'all' ? { key: 'source', label: `Source: ${sourceFilter === 'discovered' ? 'Discovered' : 'Managed-archived'}` } : null,
     filters.workspace ? { key: 'workspace', label: `Workspace: ${filters.workspace}` } : null,
     filters.model ? { key: 'model', label: `Model: ${filters.model}` } : null,
     filters.tag ? { key: 'tag', label: `Tag: ${filters.tag}` } : null,
@@ -460,31 +508,35 @@ export function ConversationsPage() {
 
         <div className="flex-1" />
 
-        {/* Search bar */}
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search sessions…"
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-          />
-        </div>
+        {searchVisible && (
+          <>
+            {/* Search bar */}
+            <div className="relative w-72">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search sessions…"
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
 
-        <button
-          onClick={() => {
-            setSemanticSearch((v) => !v);
-            setSearchOffset(0);
-          }}
-          className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-            semanticSearch
-              ? 'bg-purple-900 border-purple-600 text-purple-200'
-              : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'
-          }`}
-        >
-          {semanticSearch ? 'Semantic' : 'Keyword'}
-        </button>
+            <button
+              onClick={() => {
+                setSemanticSearch((v) => !v);
+                setSearchOffset(0);
+              }}
+              className={`px-3 py-1.5 rounded text-xs border transition-colors ${
+                semanticSearch
+                  ? 'bg-purple-900 border-purple-600 text-purple-200'
+                  : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'
+              }`}
+            >
+              {semanticSearch ? 'Semantic' : 'Keyword'}
+            </button>
+          </>
+        )}
 
         {/* Filter toggle */}
         <button
@@ -542,7 +594,7 @@ export function ConversationsPage() {
 
         {/* Session list */}
         <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${selected ? 'border-r border-gray-800' : ''}`}>
-          {searchData?.error && (
+          {searchVisible && searchData?.error && (
             <div className="px-4 py-2 border-b border-amber-900 bg-amber-950/40 text-amber-200 text-xs">
               Semantic search unavailable: {searchData.error}
             </div>
@@ -562,10 +614,10 @@ export function ConversationsPage() {
             <>
               <SessionTable
                 sessions={sessions}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
+                selectedId={selectedKey}
+                onSelect={setSelectedKey}
               />
-              {trimmedQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
+              {effectiveQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 shrink-0 text-xs text-gray-400">
                   <span>
                     {searchOffset + 1}–{searchOffset + sessions.length} of {searchData.total} results
@@ -597,7 +649,7 @@ export function ConversationsPage() {
           <div className="w-96 shrink-0 overflow-auto">
             <SessionDetail
               session={selected}
-              onClose={() => setSelectedId(null)}
+              onClose={() => setSelectedKey(null)}
             />
           </div>
         )}
