@@ -53,6 +53,7 @@ function makeStatus(runId: string, startedAt: string): FlywheelStatus {
     substrateBugs: [],
     agents: [],
     parked: [],
+    suggestions: [],
     system: {
       mainHead: 'abc1234',
       ramUsedMb: 1024,

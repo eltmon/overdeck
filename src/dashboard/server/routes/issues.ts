@@ -98,7 +98,7 @@ export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
   issueId: string;
-  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult>;
+  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
 }): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
@@ -129,7 +129,8 @@ export async function completePlanningArtifacts(options: {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(withBdMutex(() => mod.createBeadsFromVBrief(path))));
   });
-  const beadsResult = await createBeads(workspacePath);
+  const beadsResultLike = createBeads(workspacePath);
+  const beadsResult = Effect.isEffect(beadsResultLike) ? await Effect.runPromise(beadsResultLike) : await beadsResultLike;
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0 || !beadsResult.success || beadsResult.created.length !== planItemCount) {
     const detail = beadsResult.errors.length > 0

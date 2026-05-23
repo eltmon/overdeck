@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const DASHBOARD_URL = process.env.DASHBOARD_URL ?? 'http://localhost:3010';
 
-const flywheelStatus = {
+const baseFlywheelStatus = {
   runId: 'RUN-7',
   startedAt: '2026-05-18T12:00:00.000Z',
   elapsedMs: 125000,
@@ -27,6 +27,7 @@ const flywheelStatus = {
     { id: 'flywheel-orchestrator', label: 'flywheel-orchestrator', status: 'running', role: 'flywheel', model: 'claude-opus-4-7' },
   ],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'cafebabefeed1234',
     ramUsedMb: 1024,
@@ -42,7 +43,17 @@ const flywheelStatus = {
 };
 
 test.describe('Flywheel page', () => {
+  test.use({ contextOptions: { storageState: undefined } });
+
   test('renders a live FlywheelStatus payload without browser console errors', async ({ page }, testInfo) => {
+    const status = {
+      ...baseFlywheelStatus,
+      lastTickAt: new Date().toISOString(),
+      suggestions: [
+        { action: 'start', issueId: 'PAN-1234', rationale: 'Oldest P1 substrate bug', priority: 'urgent' },
+        { action: 'review', issueId: 'PAN-1235', rationale: 'Review ready after worker fix', priority: 'medium' },
+      ],
+    };
     const consoleErrors: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text());
@@ -90,25 +101,42 @@ test.describe('Flywheel page', () => {
       window.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     });
 
+    let postedStatus: typeof status | null = null;
+
+    await page.route('**/__flywheel-seed', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><title>flywheel seed</title>',
+    }));
     await page.route('**/api/dashboard/session', (route) => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/flywheel/status', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().headers()['x-panopticon-internal-token']).toBe('test-token');
+      postedStatus = route.request().postDataJSON() as typeof status;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, runId: postedStatus.runId }),
+      });
+    });
     await page.route('**/api/flywheel/current', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(flywheelStatus),
+      body: JSON.stringify(postedStatus),
     }));
     await page.route('**/api/flywheel/runs?limit=10', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 'RUN-7', startedAt: flywheelStatus.startedAt, status: 'running' }]),
+      body: JSON.stringify(postedStatus ? [{ id: postedStatus.runId, startedAt: postedStatus.startedAt, status: 'running' }] : []),
     }));
     await page.route('**/api/flywheel/runs/RUN-7', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         id: 'RUN-7',
-        startedAt: flywheelStatus.startedAt,
+        startedAt: status.startedAt,
         status: 'running',
-        latest: flywheelStatus,
+        latest: status,
         paths: { latest: '/tmp/latest.json' },
       }),
     }));
@@ -123,13 +151,45 @@ test.describe('Flywheel page', () => {
       body: JSON.stringify({ roles: { flywheel: { model: 'claude-opus-4-7', effort: 'high' } } }),
     }));
 
+    await page.goto(`${DASHBOARD_URL}/__flywheel-seed`);
+    await page.evaluate(async ({ url, payload }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-panopticon-internal-token': 'test-token',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`status seed failed: ${response.status}`);
+    }, { url: `${DASHBOARD_URL}/api/flywheel/status`, payload: status });
+    expect(postedStatus).toEqual(status);
+
     await page.goto(`${DASHBOARD_URL}/flywheel`);
 
     await expect(page.getByLabel('Flywheel page')).toBeVisible();
     const statusPane = page.getByLabel('Flywheel status pane');
     await expect(statusPane.getByText('Live run')).toBeVisible();
     await expect(statusPane.getByText('RUN-7')).toBeVisible();
-    await expect(statusPane.getByText('PAN-1')).toBeVisible();
+    await expect(statusPane.getByText('PAN-1', { exact: true })).toBeVisible();
+    await expect(statusPane.getByText('live', { exact: true })).toBeVisible();
+
+    const suggestionsSection = statusPane.locator('section', { has: page.getByRole('heading', { name: 'Suggestions' }) });
+    await expect(suggestionsSection).toBeVisible();
+    await expect(suggestionsSection.getByTestId('flywheel-suggestion')).toHaveCount(2);
+    await expect(suggestionsSection.getByText('urgent')).toBeVisible();
+    await expect(suggestionsSection.getByText('start')).toBeVisible();
+    await expect(suggestionsSection.getByText('PAN-1234')).toBeVisible();
+    await expect(suggestionsSection.getByText('Oldest P1 substrate bug')).toBeVisible();
+    await expect(suggestionsSection.getByText('medium')).toBeVisible();
+    await expect(suggestionsSection.getByText('Review ready after worker fix')).toBeVisible();
+
+    const suggestionsBeforeMetrics = await suggestionsSection.evaluate((section) => {
+      const metrics = document.querySelector('[aria-label="Flywheel headline metrics"]');
+      return metrics ? Boolean(section.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
+    });
+    expect(suggestionsBeforeMetrics).toBe(true);
+
     await page.getByLabel('Flywheel page').screenshot({ path: testInfo.outputPath('flywheel-page-live.png') });
 
     expect(consoleErrors).toEqual([]);

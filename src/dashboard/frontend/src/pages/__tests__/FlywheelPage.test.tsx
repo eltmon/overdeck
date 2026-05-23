@@ -17,7 +17,7 @@ vi.mock('../../lib/wsTransport', () => ({
 }));
 
 vi.mock('../../components/flywheel/FlywheelStatusDetails', () => ({
-  FlywheelStatusDetails: (props: { status: FlywheelStatus; onNavigateAgent?: (agentId: string) => void }) => {
+  FlywheelStatusDetails: (props: { status: FlywheelStatus; onNavigateAgent?: (agentId: string) => void; onNavigateIssue?: (issueId: string) => void }) => {
     mocks.statusDetails(props);
     return <div data-testid="status-details">{props.status.runId}</div>;
   },
@@ -58,6 +58,7 @@ const status: FlywheelStatus = {
   substrateBugs: [],
   agents: [],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'cafebabefeed1234',
     ramUsedMb: 1024,
@@ -88,6 +89,7 @@ describe('FlywheelPage', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -95,7 +97,7 @@ describe('FlywheelPage', () => {
     render(<FlywheelPage />);
 
     expect(mocks.subscribeFlywheelStatus).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Flywheel page')).toHaveClass('grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]');
+    expect(screen.getByLabelText('Flywheel page')).toHaveClass('flex');
     expect(screen.getByLabelText('Flywheel status pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');
@@ -113,17 +115,41 @@ describe('FlywheelPage', () => {
   it('renders a real FlywheelStatus payload from the subscription without console errors', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onNavigateAgent = vi.fn();
+    const onNavigateIssue = vi.fn();
 
-    render(<FlywheelPage onNavigateAgent={onNavigateAgent} />);
+    render(<FlywheelPage onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />);
 
     act(() => {
       mocks.listener?.(status);
     });
 
     expect(screen.getByTestId('status-details')).toHaveTextContent('RUN-7');
-    expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent }));
+    expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent, onNavigateIssue }));
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it('updates the last tick freshness chip across live, aging, and stalled states', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:03:20.000Z'));
+    vi.mocked(fetch).mockImplementation(async () => Response.json(status));
+
+    render(<FlywheelPage />);
+
+    act(() => {
+      mocks.listener?.(status);
+    });
+    expect(screen.getByText('live')).toHaveClass('text-success');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(screen.getByText('last tick 35s ago')).toHaveClass('text-warning');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByText('stalled — last tick 1m ago')).toHaveClass('text-destructive');
   });
 
   it('clears stale live status when the subscription emits null', () => {

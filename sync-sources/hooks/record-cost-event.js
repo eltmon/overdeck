@@ -3429,8 +3429,8 @@ join(PRDS_DIR, "published");
 * hyphens when encoding the CWD into the project directory name under
 * ~/.claude/projects/. For example:
 *
-*   /Users/user/Projects → -Users-edward-becker-Projects
-*   /home/user/Projects         → -home-eltmon-Projects
+*   /Users/edward.becker/Projects → -Users-edward-becker-Projects
+*   /home/eltmon/Projects         → -home-eltmon-Projects
 *   /tmp/test_under.dot+plus@at   → -tmp-test-under-dot-plus-at
 *
 * This is critical for session file lookup — a mismatch means JSONL files
