@@ -73,6 +73,7 @@ const status: FlywheelStatus = {
     },
   ],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'cafebabefeed1234',
     ramUsedMb: 1024,

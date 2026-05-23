@@ -58,6 +58,7 @@ const status: FlywheelStatus = {
   substrateBugs: [],
   agents: [],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'cafebabefeed1234',
     ramUsedMb: 1024,
@@ -95,7 +96,7 @@ describe('FlywheelPage', () => {
     render(<FlywheelPage />);
 
     expect(mocks.subscribeFlywheelStatus).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Flywheel page')).toHaveClass('grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]');
+    expect(screen.getByLabelText('Flywheel page')).toHaveClass('flex');
     expect(screen.getByLabelText('Flywheel status pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');

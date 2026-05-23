@@ -27,6 +27,7 @@ const flywheelStatus = {
     { id: 'flywheel-orchestrator', label: 'flywheel-orchestrator', status: 'running', role: 'flywheel', model: 'claude-opus-4-7' },
   ],
   parked: [],
+  suggestions: [],
   system: {
     mainHead: 'cafebabefeed1234',
     ramUsedMb: 1024,

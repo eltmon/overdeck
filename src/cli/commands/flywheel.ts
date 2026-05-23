@@ -184,6 +184,7 @@ async function createInitialFlywheelStatus(
       model: agentModel,
     }],
     parked: [],
+    suggestions: [],
     system: {
       mainHead: await gitOutput('git rev-parse --short HEAD', cwd).catch(() => 'unknown'),
       ramUsedMb: Math.max(0, ramTotalMb - mb(freemem())),
