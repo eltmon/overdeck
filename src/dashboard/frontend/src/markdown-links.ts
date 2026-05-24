@@ -116,7 +116,14 @@ function isLikelyPathCandidate(path: string): boolean {
   if (WINDOWS_DRIVE_PATH_PATTERN.test(path) || WINDOWS_UNC_PATH_PATTERN.test(path)) return true;
   if (RELATIVE_PATH_PREFIX_PATTERN.test(path)) return true;
   if (path.startsWith('/')) return looksLikePosixFilesystemPath(path);
-  return RELATIVE_FILE_PATH_PATTERN.test(path) || RELATIVE_FILE_NAME_PATTERN.test(path);
+  if (RELATIVE_FILE_NAME_PATTERN.test(path)) return true;
+  return RELATIVE_FILE_PATH_PATTERN.test(path) && hasFileExtensionInLastSegment(path);
+}
+
+function hasFileExtensionInLastSegment(path: string): boolean {
+  const withoutPosition = path.replace(/(?::\d+){1,2}$/, '');
+  const lastSegment = withoutPosition.slice(withoutPosition.lastIndexOf('/') + 1);
+  return /\.[A-Za-z0-9_-]+$/.test(lastSegment);
 }
 
 function isRelativePath(path: string): boolean {

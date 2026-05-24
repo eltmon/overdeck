@@ -100,4 +100,34 @@ describe('resolveMarkdownFileLinkMeta', () => {
       { text: 'Open /home/eltmon/project/src/App.tsx:12' },
     ]);
   });
+
+  it.each([
+    'conv/2209',
+    'conv/2209:42',
+    'users/eltmon',
+    'cat/dog/bird',
+    'foo/bar:1:2',
+  ])(
+    'rejects bare relative word/word reference %s without a file extension',
+    (candidate) => {
+      expect(resolveMarkdownFileLinkMeta(candidate, cwd)).toBeNull();
+    },
+  );
+
+  it('still resolves bare relative paths whose last segment has an extension', () => {
+    expect(resolveMarkdownFileLinkMeta('src/lib/foo.ts:42', cwd)).toMatchObject({
+      filePath: '/home/eltmon/project/src/lib/foo.ts',
+      line: 42,
+    });
+  });
+
+  it('does not promote bare conv-style refs to chips in assistant prose', () => {
+    expect(
+      splitMarkdownTextFileLinks('See conv/2209 and src/App.tsx for context.', cwd),
+    ).toEqual([
+      { text: 'See conv/2209 and ' },
+      { text: 'src/App.tsx', href: 'src/App.tsx' },
+      { text: ' for context.' },
+    ]);
+  });
 });
