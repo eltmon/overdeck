@@ -1340,28 +1340,26 @@ const getConversationsRoute = HttpRouter.add(
             const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
             let isWorking = false;
             let currentTool: string | null = null;
-            let contextUsage = null;
             const convSf = await resolveSessionFile(conv);
 
-            if (convSf && existsSync(convSf)) {
-              if (sessionAlive) {
-                try {
-                  const summary = await summarizeConversationActivity(convSf);
-                  isWorking = summary.isWorking;
-                  currentTool = summary.currentTool;
-                } catch {
-                  // JSONL parse failure — fall back to defaults
-                }
-              }
+            // Context usage is intentionally NOT computed here — it requires a
+            // full JSONL scan per row (cold cache) and made the list endpoint
+            // O(seconds) on dashboards with hundreds of conversations. The
+            // single-conversation GET /:id and the /:name/messages stream both
+            // compute usage on-demand for the currently-open panel, which is
+            // the only place the indicator is actually shown.
+            if (sessionAlive && convSf && existsSync(convSf)) {
               try {
-                contextUsage = await computeContextUsage(convSf, conv.model);
+                const summary = await summarizeConversationActivity(convSf);
+                isWorking = summary.isWorking;
+                currentTool = summary.currentTool;
               } catch {
-                contextUsage = null;
+                // JSONL parse failure — fall back to defaults
               }
             }
 
             const compacting = convSf ? isCompacting(convSf) : false;
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage };
+            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage: null };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
         ));
