@@ -540,7 +540,19 @@ function isReviewerContextMessage(text: string): boolean {
   return text.startsWith('# Review Context\n');
 }
 
+// PAN-1458: Detect a Claude Code slash-command user message (the literal token Claude
+// Code writes when the user types /clear, /compact, /resume, etc.). Returned object
+// carries the command name (e.g. '/clear') so the divider can label itself.
+function parseSlashCommandMessage(text: string): { command: string } | null {
+  const match = text.trimStart().match(/^<command-name>([^<]+)<\/command-name>/);
+  return match ? { command: match[1] } : null;
+}
+
 function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage; cwd?: string; issueId?: string | null }) {
+  const slashCommand = parseSlashCommandMessage(message.text);
+  if (slashCommand) {
+    return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
+  }
   if (isSummaryForkMessage(message.text)) {
     return <ContextMessageBlock message={message} cwd={cwd} issueId={issueId} />;
   }
@@ -963,6 +975,31 @@ function SessionPermissionsRow({ message }: { message: ChatMessage }) {
       <ShieldCheck size={11} className={styles.sessionPermissionsIcon} />
       <span className={styles.sessionPermissionsLabel}>Permissions:</span>
       <span className={styles.sessionPermissionsTools}>{message.text}</span>
+    </div>
+  );
+}
+
+// ─── Slash-command divider (PAN-1458) ────────────────────────────────────────
+
+/**
+ * Renders a Claude Code slash command (the kind Claude Code emits as a user
+ * message wrapped in `<command-name>X</command-name>`) as a horizontal divider
+ * instead of a regular message bubble. Most relevant for `/clear`, which
+ * signals the JSONL boundary — see PAN-1458 — but applies to any slash command
+ * Claude Code happens to record this way.
+ */
+function SlashCommandDivider({ command, createdAt }: { command: string; createdAt: string }) {
+  const isClear = command === '/clear';
+  const label = isClear ? 'Conversation cleared' : `Slash command: ${command}`;
+  return (
+    <div className={styles.compactBoundaryDivider}>
+      <div className={styles.compactBoundaryLine} />
+      <div className={styles.compactBoundaryLabel}>
+        <RotateCcw size={12} />
+        <span>{label}</span>
+        <span className={styles.compactBoundaryDetail}>{formatTimestamp(createdAt)}</span>
+      </div>
+      <div className={styles.compactBoundaryLine} />
     </div>
   );
 }
