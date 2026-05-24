@@ -152,14 +152,16 @@ export async function injectPtyMessage(
   agentId: string,
   payload: PtySupervisorPayload,
 ): Promise<void> {
-  // Claude Code's TUI reads stdin in raw mode where `\n` is "newline inside
-  // the input box" and `\r` is the Enter / Submit keystroke. Writing
-  // `${content}\n` leaves the message sitting in Claude's prompt unsubmitted
-  // (matches the tmux fallback's `send-keys C-m` which emits `\r`). Strip any
-  // trailing newlines the caller appended, then send the content followed by
-  // an explicit carriage return so the message is actually delivered.
+  // Claude Code's TUI distinguishes "pasted text" from "Submit keystroke" by
+  // whether bytes arrive in the same PTY read. Writing content + `\r`
+  // back-to-back means the kernel batches them into one read and the `\r`
+  // is treated as part of the pasted text — the message lands in the input
+  // box but is never submitted. Mirror the tmux fallback's proven pattern:
+  // paste content, wait ~300ms for Claude to fully process the paste, then
+  // send `\r` as a standalone Enter keystroke arriving in its own read.
   const trimmed = payload.content.replace(/\n+$/, '');
   child.write(trimmed);
+  await new Promise(resolve => setTimeout(resolve, 300));
   child.write('\r');
   if (payload.echo !== false) {
     process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
