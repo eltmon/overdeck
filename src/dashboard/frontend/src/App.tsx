@@ -140,8 +140,9 @@ function normalizeCurrentRoute() {
 }
 
 function readSessionFeedSidebarOpen(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY) === 'true';
+  if (typeof window === 'undefined') return true;
+  const value = window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY);
+  return value === null ? true : value === 'true';
 }
 
 /** Extract conversation route key from /conv/:key path, or null if not matching. */
@@ -869,6 +870,7 @@ export default function App() {
               type="button"
               aria-label="Toggle activity feed"
               aria-pressed={isSessionFeedSidebarOpen}
+              title="Activity Feed"
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
             >

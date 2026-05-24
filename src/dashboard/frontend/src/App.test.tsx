@@ -354,19 +354,19 @@ describe('App session feed sidebar', () => {
     }));
   });
 
-  it('keeps the sidebar closed by default', () => {
+  it('keeps the sidebar open by default', () => {
     renderApp();
 
-    expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
+    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
   });
 
-  it('opens the sidebar from the toggle and persists the open state', () => {
+  it('closes the sidebar from the toggle and persists the closed state', () => {
     renderApp();
 
     fireEvent.click(screen.getByLabelText('Toggle activity feed'));
 
-    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
-    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('true');
+    expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
+    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
   });
 
   it('restores the open sidebar from localStorage on mount', () => {
