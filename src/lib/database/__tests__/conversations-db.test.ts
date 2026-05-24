@@ -173,4 +173,37 @@ describe('conversations-db', () => {
     const manual = getConversationByName('replaceable')!;
     expect(canReplaceTitle(manual)).toBe(false);
   });
+
+  describe('hasOtherActiveConversationOnTmuxSession (PAN-1458)', () => {
+    it('returns false when no other conversation references the tmux session', async () => {
+      const { createConversation, hasOtherActiveConversationOnTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'solo', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'solo')).toBe(false);
+    });
+
+    it('returns true when another active conversation shares the tmux session', async () => {
+      const { createConversation, hasOtherActiveConversationOnTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'parent', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      createConversation({ name: 'sibling', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'parent')).toBe(true);
+      expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'sibling')).toBe(true);
+    });
+
+    it('does not count ended conversations as active claimants', async () => {
+      const { createConversation, markConversationEnded, hasOtherActiveConversationOnTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'ended-parent', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      createConversation({ name: 'live-child', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      markConversationEnded('ended-parent');
+      // From the live child's perspective, the parent is ended → no shared active claimant.
+      expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'live-child')).toBe(false);
+    });
+
+    it('does not count archived conversations as active claimants', async () => {
+      const { createConversation, archiveConversation, hasOtherActiveConversationOnTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'archived', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      createConversation({ name: 'live', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      archiveConversation('archived');
+      expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'live')).toBe(false);
+    });
+  });
 });

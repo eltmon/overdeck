@@ -662,6 +662,31 @@ export function setClearedToConvId(name: string, convId: number): void {
   ).run(convId, name);
 }
 
+/**
+ * True if another non-archived, status='active' conversation references the same
+ * tmux session — i.e. someone else still depends on that tmux pane (PAN-1458).
+ *
+ * Used to guard destructive tmux operations (stop / archive / delete). When a
+ * Claude Code `/clear` produces a sibling row, the parent and child share the
+ * same `tmux_session`. Killing the tmux from the parent's stop button would
+ * tear down the live sibling's terminal. Refcount semantics: only the LAST
+ * active claimant gets to kill the shared tmux.
+ */
+export function hasOtherActiveConversationOnTmuxSession(tmuxSession: string, excludeName: string): boolean {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT 1 FROM conversations
+       WHERE tmux_session = ?
+         AND name != ?
+         AND status = 'active'
+         AND archived_at IS NULL
+       LIMIT 1`,
+    )
+    .get(tmuxSession, excludeName);
+  return row !== undefined;
+}
+
 export function updateSpawnError(name: string, error: string | null): void {
   const db = getDatabase();
   db.prepare(

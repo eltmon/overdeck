@@ -67,6 +67,7 @@ import {
   removeFavorite,
   updateForkStatus,
   updateSpawnError,
+  hasOtherActiveConversationOnTmuxSession,
   type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
   type Conversation,
@@ -1633,7 +1634,12 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        // Post-/clear sibling rows share the tmux pane with their parent — killing
+        // from one would tear down the live thread.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -2304,7 +2310,10 @@ const deleteConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
@@ -2344,8 +2353,10 @@ const postConversationArchiveRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
         }
 
-        // Kill tmux session if still alive
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
