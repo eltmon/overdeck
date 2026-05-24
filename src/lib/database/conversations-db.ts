@@ -60,6 +60,8 @@ export interface Conversation {
   handoffTargetConvId: number | null;
   /** Reason a requested fork mode fell back to summary fork. */
   forkFallbackReason: string | null;
+  /** If this conv was cleared via Claude Code's /clear, the sibling conv that continues it (PAN-1458). */
+  clearedToConvId: number | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -123,6 +125,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     handoffDocPath: (row['handoff_doc_path'] as string | null) ?? null,
     handoffTargetConvId: (row['handoff_target_conv_id'] as number | null) ?? null,
     forkFallbackReason: (row['fork_fallback_reason'] as string | null) ?? null,
+    clearedToConvId: (row['cleared_to_conv_id'] as number | null) ?? null,
   };
 }
 
@@ -142,7 +145,7 @@ export function listConversations(options?: { limit?: number; offset?: number })
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE archived_at IS NULL
          AND name NOT LIKE 'agent-%'
@@ -170,7 +173,7 @@ export function listActiveConversations(): Conversation[] {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE archived_at IS NULL AND status = 'active'
        ORDER BY created_at DESC`,
@@ -187,7 +190,7 @@ export function getConversationByName(name: string): Conversation | null {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE name = ?`,
     )
@@ -203,7 +206,7 @@ export function getConversationById(id: number): Conversation | null {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE id = ?`,
     )
@@ -219,7 +222,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE claude_session_id = ?`,
     )
@@ -235,7 +238,7 @@ export function listArchivedConversations(): Conversation[] {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
        WHERE archived_at IS NOT NULL
        ORDER BY archived_at DESC, created_at DESC`,
@@ -474,7 +477,7 @@ export function createConversation(opts: {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -644,6 +647,19 @@ export function recordConversationHandoff(sourceName: string, targetName: string
   ).run(target.id, sourceName);
 
   return getConversationByName(targetName) ?? target;
+}
+
+/**
+ * Link a parent conversation to its post-/clear sibling (PAN-1458). Called by the
+ * conversation-lifecycle orphan detector when it discovers a new JSONL whose first
+ * user-message is `<command-name>/clear</command-name>` and attributes it to this
+ * parent. The dashboard surfaces the link as a "continued in conv/N" footer.
+ */
+export function setClearedToConvId(name: string, convId: number): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET cleared_to_conv_id = ? WHERE name = ?`,
+  ).run(convId, name);
 }
 
 export function updateSpawnError(name: string, error: string | null): void {

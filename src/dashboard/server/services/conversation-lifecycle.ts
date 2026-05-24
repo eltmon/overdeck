@@ -15,15 +15,19 @@
  */
 
 import { readFile, readdir, stat } from 'fs/promises';
-import { existsSync } from 'fs';
+import { createReadStream, existsSync } from 'fs';
+import { createInterface } from 'readline';
 import { homedir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import {
   createConversation,
+  getConversationByClaudeSessionId,
   getConversationByName,
   listActiveConversations,
   markConversationEnded,
+  setClearedToConvId,
+  type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
@@ -90,6 +94,10 @@ export async function pollConversations(): Promise<void> {
     // missing them. Runs every poll so it converges over time even if any
     // single attempt fails partially.
     await backfillOrphanedSpecialistConversations(Array.from(aliveSessions));
+
+    // PAN-1458: detect Claude Code /clear orphans and link them to their parent.
+    // Reuses the conversations list already fetched above — do not re-query.
+    await detectOrphanedClaudeCodeSessions(conversations);
   } catch (err: unknown) {
     // Don't crash the server on poll errors
     console.error('[conversation-lifecycle] Poll error:', err);
@@ -146,6 +154,173 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
       console.warn(`[conversation-lifecycle] createConversation failed for ${sessionName}: ${(err as Error).message}`);
     }
   }
+}
+
+/**
+ * PAN-1458: Detect Claude Code `/clear` orphans and link them to their parent.
+ *
+ * When Claude Code receives `/clear`, the current JSONL stops being written and a
+ * new JSONL is created with a fresh session-id under the same project dir. The
+ * tmux session keeps running, so the parent `conversations` row is still active
+ * and pointing at the pre-clear `claude_session_id`. The new JSONL has no
+ * conversation row — it becomes an orphan that the dashboard cannot navigate to.
+ *
+ * Detection signal: any user-message in the first ~5 lines of a JSONL with
+ * `content: '<command-name>/clear</command-name>...'`. That's the literal token
+ * Claude Code writes when `/clear` kicks off a new session — unambiguous, no
+ * mtime guesswork.
+ *
+ * For each orphan found, attribute it to the parent conversation whose
+ * `claudeSessionId` JSONL has the most-recent mtime in the same `cwd` strictly
+ * before the orphan's first-message timestamp. If no Panopticon conversation
+ * owns that `cwd` (e.g., a standalone `claude` invocation outside Panopticon),
+ * skip — we only adopt orphans that descend from one of our conversations.
+ *
+ * Insert a sibling `conversations` row inheriting parent's `cwd`, `tmuxSession`,
+ * `issueId`, `model`, `harness`. Set an auto-derived title with
+ * `titleSource = 'auto'` so the existing AI title generator overwrites once the
+ * post-clear JSONL has enough content. Finally, write
+ * `parent.cleared_to_conv_id = sibling.id`.
+ */
+async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Promise<void> {
+  // Group by cwd so we readdir each project dir at most once per tick.
+  // Pi conversations don't use ~/.claude/projects; harness === 'pi' is filtered out.
+  // Legacy rows with harness === null predate the harness column and were all claude-code.
+  const cwdGroups = new Map<string, Conversation[]>();
+  for (const conv of activeConvs) {
+    if (!conv.cwd) continue;
+    if (!conv.claudeSessionId) continue;
+    if (conv.harness === 'pi') continue;
+    const list = cwdGroups.get(conv.cwd) ?? [];
+    list.push(conv);
+    cwdGroups.set(conv.cwd, list);
+  }
+
+  for (const [cwd, convs] of cwdGroups) {
+    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(cwd));
+    let entries: string[];
+    try {
+      entries = await readdir(projectDir);
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') continue;
+      console.warn(`[conversation-lifecycle] readdir(${projectDir}) failed: ${(err as Error).message}`);
+      continue;
+    }
+
+    for (const filename of entries) {
+      if (!filename.endsWith('.jsonl')) continue;
+      const sessionId = filename.slice(0, -'.jsonl'.length);
+
+      // Already linked to a conversation (either as a primary session or via a previous
+      // orphan-detect pass that adopted it).
+      if (getConversationByClaudeSessionId(sessionId)) continue;
+
+      const jsonlPath = join(projectDir, filename);
+      const firstClearTs = await readFirstClearTimestamp(jsonlPath);
+      if (firstClearTs === null) continue; // not a /clear orphan
+
+      // Parent attribution: among active convs in this cwd, pick the one whose
+      // own JSONL's mtime is the highest value strictly less than firstClearTs.
+      // Walks a chain naturally — if A→B→C all share this cwd, a new orphan D
+      // attaches to C (whichever has the freshest mtime under D's start).
+      let parent: Conversation | null = null;
+      let parentMtime = -Infinity;
+      for (const candidate of convs) {
+        if (!candidate.claudeSessionId) continue;
+        if (candidate.claudeSessionId === sessionId) continue;
+        const parentJsonl = join(projectDir, `${candidate.claudeSessionId}.jsonl`);
+        let mtimeMs: number;
+        try {
+          mtimeMs = (await stat(parentJsonl)).mtimeMs;
+        } catch {
+          continue; // parent's JSONL gone — can't use it as anchor
+        }
+        if (mtimeMs < firstClearTs && mtimeMs > parentMtime) {
+          parent = candidate;
+          parentMtime = mtimeMs;
+        }
+      }
+
+      if (!parent) {
+        // No Panopticon conversation owns the cwd-window before this orphan started.
+        // It's a standalone `claude` invocation — leave it alone.
+        continue;
+      }
+
+      const baseTitle = parent.title ?? 'Conversation';
+      const autoTitle = `[post-/clear] ${baseTitle}`;
+      let sibling: Conversation;
+      try {
+        sibling = createConversation({
+          name: `${parent.name}-post-clear-${sessionId.slice(0, 8)}`,
+          tmuxSession: parent.tmuxSession,
+          cwd: parent.cwd,
+          issueId: parent.issueId ?? undefined,
+          claudeSessionId: sessionId,
+          title: autoTitle,
+          titleSource: 'auto',
+          titleSeed: autoTitle,
+          model: parent.model ?? undefined,
+          effort: parent.effort ?? undefined,
+          harness: 'claude-code',
+        });
+      } catch (err) {
+        console.warn(`[conversation-lifecycle] Failed to create post-/clear sibling for ${sessionId}: ${(err as Error).message}`);
+        continue;
+      }
+
+      try {
+        setClearedToConvId(parent.name, sibling.id);
+      } catch (err) {
+        console.warn(`[conversation-lifecycle] Failed to link conv/${parent.id} → conv/${sibling.id}: ${(err as Error).message}`);
+      }
+
+      console.log(`[conversation-lifecycle] Adopted post-/clear orphan ${sessionId} → conv/${sibling.id} (parent: conv/${parent.id} "${parent.name}")`);
+    }
+  }
+}
+
+/**
+ * Read the first ~5 lines of a JSONL and return the timestamp (ms since epoch) of
+ * the first user-message whose content contains the literal `/clear` command
+ * sentinel that Claude Code writes when the user clears the session. Returns
+ * `null` if no such message is found in the early lines — i.e., this is not a
+ * post-`/clear` orphan.
+ *
+ * Uses a streaming line reader bounded at 5 lines so a multi-megabyte snapshot
+ * line at the head of the file doesn't load the whole transcript into memory.
+ */
+async function readFirstClearTimestamp(jsonlPath: string): Promise<number | null> {
+  const stream = createReadStream(jsonlPath, { encoding: 'utf-8' });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  let lineCount = 0;
+  try {
+    for await (const line of rl) {
+      lineCount++;
+      if (lineCount > 5) break;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let obj: any;
+      try {
+        obj = JSON.parse(trimmed);
+      } catch {
+        continue;
+      }
+      if (obj?.type !== 'user') continue;
+      const content = obj?.message?.content;
+      if (typeof content !== 'string') continue;
+      if (!content.includes('<command-name>/clear</command-name>')) continue;
+      const ts = obj?.timestamp;
+      if (typeof ts !== 'string') continue;
+      const ms = new Date(ts).getTime();
+      if (Number.isNaN(ms)) continue;
+      return ms;
+    }
+  } finally {
+    rl.close();
+    stream.destroy();
+  }
+  return null;
 }
 
 /**
