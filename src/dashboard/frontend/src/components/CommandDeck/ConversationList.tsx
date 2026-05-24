@@ -60,6 +60,8 @@ export interface Conversation {
   handoffTargetConvId?: number | null;
   /** Reason a requested handoff fork downgraded to summary mode. */
   forkFallbackReason?: string | null;
+  /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
+  clearedToConvId?: number | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

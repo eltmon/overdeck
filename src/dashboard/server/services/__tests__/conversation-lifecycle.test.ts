@@ -241,6 +241,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       }),
     );
     expect(mockSetClearedToConvId).toHaveBeenCalledWith('parent-conv', 200);
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('parent-conv');
   });
 
   it('skips JSONLs that are already linked to a conversation', async () => {

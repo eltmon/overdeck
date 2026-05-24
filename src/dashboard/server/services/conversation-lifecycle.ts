@@ -275,6 +275,16 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
         console.warn(`[conversation-lifecycle] Failed to link conv/${parent.id} → conv/${sibling.id}: ${(err as Error).message}`);
       }
 
+      // The /clear command IS the user closing this thread. Mark the parent ended
+      // so the chat panel stops waiting for an assistant response on a JSONL that
+      // will never receive one (the response went to the sibling's JSONL). The
+      // sibling stays 'active' and is the live thread going forward.
+      try {
+        markConversationEnded(parent.name);
+      } catch (err) {
+        console.warn(`[conversation-lifecycle] Failed to mark parent ${parent.name} ended: ${(err as Error).message}`);
+      }
+
       console.log(`[conversation-lifecycle] Adopted post-/clear orphan ${sessionId} → conv/${sibling.id} (parent: conv/${parent.id} "${parent.name}")`);
     }
   }
