@@ -72,6 +72,32 @@ workspaces (which is all of them). Candidate substrate fix: resolve the real git
 
 (none recorded yet — `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
 
+## RUN-9 observations (tick 1, 2026-05-24)
+
+### Zombie inspect sessions from RUN-8 still present
+Sessions `inspect-pan-1415-workspace-ce9s`, `inspect-pan-1415-workspace-psqu`,
+`inspect-pan-1419-workspace-6uj4`, `inspect-pan-1419-workspace-ie4o` were still
+running when RUN-9 started. PAN-1415 and PAN-1419 are both merged+verifying-on-main,
+so these inspect sessions are either completed zombies or orphaned from RUN-8's
+flywheel patrol. Worth a `pan kill` or investigating whether the inspect agents
+should self-terminate after their parent issue merges.
+
+### PAN-1418 parked but review convoy still live
+PAN-1418 has `needs-discussion` label and is effectively parked. Its full review
+convoy (agent-pan-1418 + 5 sub-reviewers + ship + test) was still running at
+tick 1. The work agent completed but the review is blocked on a human design
+decision. Suggestion: abort the review convoy or park explicitly.
+
+### 4 issues awaiting human UAT
+PAN-1419, 1417, 1415, 1414 are all `merged` + `verifying-on-main` — PRs closed,
+code on main, awaiting operator UAT and merge confirmation. The only required
+human input. All four show `ship` status passed; no PR number since merged.
+
+### `ctxPercent: 0` in orchestrator snapshot
+The orchestrator object in FlywheelStatus shows `ctxPercent: 0` — this is the
+Claude Code context percentage at spawn. Likely a schema mismatch or
+orchestrator not populating it correctly. Tracked implicitly; not filed as bug.
+
 ## Open questions for the human
 
 - **PAN-1229** is at the human merge gate (ship complete, `readyForMerge=true`, PR
