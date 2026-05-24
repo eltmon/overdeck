@@ -48,6 +48,10 @@ export const WS_METHODS = {
   getWorkspaceDetail: "pan.getWorkspaceDetail",
   readWorkspaceFile: "pan.readWorkspaceFile",
 
+  // File-path existence (PAN-1457) — used by MarkdownFileLink to decide
+  // whether a path candidate in chat markdown should render as a chip.
+  resolveFilePathExists: "pan.resolveFilePathExists",
+
   // Terminal control
   terminalOpen: "pan.terminalOpen",
   terminalWrite: "pan.terminalWrite",
@@ -293,6 +297,40 @@ export const ReadWorkspaceFileRpc = Rpc.make(WS_METHODS.readWorkspaceFile, {
   error: PanRpcError,
 })
 
+/**
+ * 10c. Resolve whether a file path candidate exists on disk (PAN-1457).
+ *
+ * Used by MarkdownFileLink to decide whether a path-like token in chat
+ * markdown should render as a clickable chip. Returns exists=false for
+ * phantom paths (`conv/2209`, `users/foo`) and exists=true with kind for
+ * real files and directories (including bare directory references like
+ * `src/components/Foo` that the regex heuristic alone cannot validate).
+ *
+ * Security:
+ *   - Pure stat — never reads file contents, never enumerates directories.
+ *   - Relative paths resolve under cwd; absolute paths are statted directly.
+ *   - Caller is responsible for sending only paths surfaced from their own
+ *     conversation context; the resolver does not gate by issueId because
+ *     chat happens outside any single workspace.
+ */
+export const ResolveFilePathExistsInput = Schema.Struct({
+  cwd: Schema.String,
+  path: Schema.String,
+})
+export type ResolveFilePathExistsInput = typeof ResolveFilePathExistsInput.Type
+
+export const ResolveFilePathExistsResult = Schema.Struct({
+  exists: Schema.Boolean,
+  kind: Schema.NullOr(Schema.Literals(['file', 'dir'])),
+})
+export type ResolveFilePathExistsResult = typeof ResolveFilePathExistsResult.Type
+
+export const ResolveFilePathExistsRpc = Rpc.make(WS_METHODS.resolveFilePathExists, {
+  payload: ResolveFilePathExistsInput,
+  success: ResolveFilePathExistsResult,
+  error: PanRpcError,
+})
+
 /** 11. Start planning for an issue (command) */
 export const StartPlanningRpc = Rpc.make(WS_METHODS.startPlanning, {
   payload: Schema.Struct({ issueId: IssueId, options: Schema.optional(Schema.Unknown) }),
@@ -497,6 +535,7 @@ export const PanRpcGroup = RpcGroup.make(
   ReplayEventsRpc,
   GetWorkspaceDetailRpc,
   ReadWorkspaceFileRpc,
+  ResolveFilePathExistsRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,

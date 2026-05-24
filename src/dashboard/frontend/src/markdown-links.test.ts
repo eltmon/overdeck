@@ -101,33 +101,28 @@ describe('resolveMarkdownFileLinkMeta', () => {
     ]);
   });
 
+  // PAN-1457: the regex heuristic now lets bare `word/word` refs through and
+  // defers to a server-side existence check (gated in ChatMarkdown via
+  // MaybeFileLinkChip). These cases used to be rejected by the regex tighten
+  // in 72a6bdd87; they now match here and are filtered downstream.
   it.each([
     'conv/2209',
     'conv/2209:42',
     'users/eltmon',
     'cat/dog/bird',
     'foo/bar:1:2',
+    'src/components/Foo', // bare directory ref
   ])(
-    'rejects bare relative word/word reference %s without a file extension',
+    'matches bare relative word/word reference %s — existence check decides downstream',
     (candidate) => {
-      expect(resolveMarkdownFileLinkMeta(candidate, cwd)).toBeNull();
+      expect(resolveMarkdownFileLinkMeta(candidate, cwd)).not.toBeNull();
     },
   );
 
-  it('still resolves bare relative paths whose last segment has an extension', () => {
+  it('resolves bare relative paths whose last segment has an extension', () => {
     expect(resolveMarkdownFileLinkMeta('src/lib/foo.ts:42', cwd)).toMatchObject({
       filePath: '/home/eltmon/project/src/lib/foo.ts',
       line: 42,
     });
-  });
-
-  it('does not promote bare conv-style refs to chips in assistant prose', () => {
-    expect(
-      splitMarkdownTextFileLinks('See conv/2209 and src/App.tsx for context.', cwd),
-    ).toEqual([
-      { text: 'See conv/2209 and ' },
-      { text: 'src/App.tsx', href: 'src/App.tsx' },
-      { text: ' for context.' },
-    ]);
   });
 });
