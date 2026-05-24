@@ -1744,7 +1744,7 @@ const postConversationResumeRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else {
-            await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000))).catch(() => false);
+            await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000)).catch(() => false);
           }
 
           markConversationActive(name);
@@ -1900,7 +1900,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(tmuxSession);
           } else {
-            await (await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000))).catch(() => false);
+            await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000)).catch(() => false);
           }
 
           markConversationActive(name);
@@ -2535,7 +2535,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
   } else {
-    const ready = await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000))).catch(() => false);
+    const ready = await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000)).catch(() => false);
     if (!ready) {
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }
