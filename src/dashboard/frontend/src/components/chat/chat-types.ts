@@ -25,6 +25,8 @@ export interface WorkLogEntry {
   changedFiles?: readonly string[];
   tone: 'thinking' | 'tool' | 'info' | 'error';
   toolTitle?: string;
+  /** Raw tool_use input dict — drives per-tool expanded rendering (PAN-1459). */
+  toolInput?: Record<string, unknown>;
   sequence?: number;
 }
 

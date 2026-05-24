@@ -2990,6 +2990,14 @@
   line-height: 1.4;
 }
 
+/* Tool-use header — e.g. Bash description above the command body (PAN-1459) */
+.workLogToolHeader {
+  margin: 4px 0 2px 18px;
+  font-size: 12px;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
 .workLogThinkingResult {
   margin: 2px 0 4px 18px;
   padding: 6px 8px;

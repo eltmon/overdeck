@@ -789,6 +789,158 @@ function WorkLogGroup({ entries, hideToolCalls, cwd, issueId }: { entries: WorkL
 
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Per-tool expanded body for a tool_use work-log entry. Reads structured
+ * fields out of `entry.toolInput` and renders them in a form that matches
+ * the tool's semantics (shell block for Bash, file chip for Read/Write/Edit,
+ * pattern + path for Grep/Glob, etc.). Unknown tools fall back to a
+ * pretty-printed JSON code block. See PAN-1459.
+ */
+function ToolUseExpanded({
+  entry,
+  cwd,
+  issueId,
+}: {
+  entry: WorkLogEntry;
+  cwd?: string;
+  issueId?: string | null;
+}) {
+  const tool = entry.toolTitle ?? entry.label;
+  const input = entry.toolInput;
+  if (!input) return null;
+
+  switch (tool) {
+    case 'Bash': {
+      const description = asString(input.description);
+      const command = asString(input.command);
+      return (
+        <>
+          {description && <div className={styles.workLogToolHeader}>{description}</div>}
+          {command && (
+            <pre className={styles.workLogResult}>
+              <code>{command}</code>
+            </pre>
+          )}
+        </>
+      );
+    }
+
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+    case 'NotebookEdit': {
+      const filePath = asString(input.file_path) ?? asString(input.notebook_path);
+      if (!filePath) break;
+      return (
+        <div className={styles.workLogResult}>
+          <ChatMarkdown text={`\`${filePath}\``} cwd={cwd} issueId={issueId} />
+        </div>
+      );
+    }
+
+    case 'Grep': {
+      const pattern = asString(input.pattern) ?? '';
+      const path = asString(input.path);
+      const glob = asString(input.glob);
+      const flags = [
+        asString(input.type) && `type=${input.type}`,
+        input['-i'] === true && 'case-insensitive',
+        input['-n'] === true && 'line-numbers',
+        glob && `glob=${glob}`,
+      ].filter(Boolean);
+      return (
+        <div className={styles.workLogResult}>
+          <code>{pattern}</code>
+          {path && <> in <code>{path}</code></>}
+          {flags.length > 0 && <> · {flags.join(' · ')}</>}
+        </div>
+      );
+    }
+
+    case 'Glob': {
+      const pattern = asString(input.pattern) ?? '';
+      const path = asString(input.path);
+      return (
+        <div className={styles.workLogResult}>
+          <code>{pattern}</code>
+          {path && <> in <code>{path}</code></>}
+        </div>
+      );
+    }
+
+    case 'WebFetch': {
+      const url = asString(input.url);
+      const prompt = asString(input.prompt);
+      return (
+        <div className={styles.workLogResult}>
+          {url && (
+            <div>
+              <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+            </div>
+          )}
+          {prompt && <div>{prompt}</div>}
+        </div>
+      );
+    }
+
+    case 'WebSearch': {
+      const query = asString(input.query);
+      return query ? <div className={styles.workLogResult}>{query}</div> : null;
+    }
+
+    case 'TodoWrite': {
+      const todos = Array.isArray(input.todos) ? input.todos : [];
+      return (
+        <ul className={styles.workLogResult}>
+          {todos.map((todo, i) => {
+            const t = todo as Record<string, unknown>;
+            const content = asString(t.content) ?? asString(t.activeForm) ?? '(empty)';
+            const status = asString(t.status) ?? 'pending';
+            return (
+              <li key={i}>
+                <span style={{ color: 'var(--muted-foreground)' }}>[{status}]</span> {content}
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+
+    case 'Task': {
+      const subagent = asString(input.subagent_type);
+      const description = asString(input.description);
+      const prompt = asString(input.prompt);
+      return (
+        <div className={styles.workLogResult}>
+          {(subagent || description) && (
+            <div className={styles.workLogToolHeader}>
+              {subagent && <code>{subagent}</code>}
+              {subagent && description && ' · '}
+              {description}
+            </div>
+          )}
+          {prompt && <ChatMarkdown text={prompt} cwd={cwd} issueId={issueId} />}
+        </div>
+      );
+    }
+
+    default:
+      break;
+  }
+
+  // Fallback: pretty-printed JSON. Replaces the previous behavior of stuffing
+  // JSON.stringify(input) into a one-line `detail` string with no formatting.
+  return (
+    <pre className={styles.workLogResult}>
+      <code>{JSON.stringify(input, null, 2)}</code>
+    </pre>
+  );
+}
+
 function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?: string; issueId?: string | null }) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
@@ -801,7 +953,8 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
   const isThinking = entry.tone === 'thinking';
   const hasResult = !!entry.result;
-  const isExpandable = hasResult || (isThinking && !!entry.detail);
+  const hasToolBody = !!entry.toolInput && entry.tone === 'tool';
+  const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
 
   return (
     <div>
@@ -849,17 +1002,23 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
         )}
       </div>
       {showResult && (
-        isTerminal && entry.result ? (
-          <pre className={styles.workLogResult}>{entry.result}</pre>
-        ) : isThinking && entry.detail ? (
-          <div className={styles.workLogResult}>
-            <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />
-          </div>
-        ) : entry.result ? (
-          <div className={styles.workLogResult}>
-            <ChatMarkdown text={entry.result} cwd={cwd} issueId={issueId} />
-          </div>
-        ) : null
+        <>
+          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} />}
+          {isThinking && entry.detail && (
+            <div className={styles.workLogResult}>
+              <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />
+            </div>
+          )}
+          {entry.result && (
+            isTerminal ? (
+              <pre className={styles.workLogResult}>{entry.result}</pre>
+            ) : (
+              <div className={styles.workLogResult}>
+                <ChatMarkdown text={entry.result} cwd={cwd} issueId={issueId} />
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );

@@ -143,6 +143,8 @@ export const WorkLogEntry = Schema.Struct({
   changedFiles: Schema.optional(Schema.Array(Schema.String)),
   tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
   toolTitle: Schema.optional(Schema.String),
+  /** Raw tool_use input dict — drives per-tool expanded rendering (PAN-1459). */
+  toolInput: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   sequence: Schema.optional(Schema.Number),
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type

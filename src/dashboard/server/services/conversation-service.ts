@@ -14,6 +14,7 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogE
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 
 /** Detect AI provider from model name */
 function providerFromModel(model: string): AIProvider {
@@ -515,14 +516,23 @@ export async function parseConversationMessages(
                 }
               }
             }
-            // WorkLogEntry for the tool call
+            // WorkLogEntry for the tool call. We pass the raw input dict
+            // through as `toolInput` so the frontend can render per-tool
+            // (Bash command as a fenced shell block, file tools as chips,
+            // etc.) and pre-compute a short one-line summary for the
+            // collapsed row via summarizeToolInputForWorkLog. See PAN-1459.
+            const inputDict =
+              block.input && typeof block.input === 'object' && !Array.isArray(block.input)
+                ? (block.input as Record<string, unknown>)
+                : undefined;
             const toolEntry: WorkLogEntry = {
               id: block.id,
               createdAt: entry.timestamp ?? new Date().toISOString(),
               label: block.name ?? 'tool',
               tone: 'tool',
               toolTitle: block.name,
-              detail: block.input ? JSON.stringify(block.input) : undefined,
+              detail: summarizeToolInputForWorkLog(block.name, inputDict),
+              toolInput: inputDict,
               sequence: lineSequence,
             };
             const unresolved = unresolvedResults.get(block.id);
