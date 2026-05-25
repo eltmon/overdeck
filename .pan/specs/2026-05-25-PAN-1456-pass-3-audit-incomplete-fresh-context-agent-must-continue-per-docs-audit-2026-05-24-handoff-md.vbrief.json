@@ -1,0 +1,449 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:26:07Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1456: Pass-3 audit incomplete — fresh-context agent must continue per docs/audit-2026-05-24/HANDOFF.md",
+    "updated": "2026-05-25T16:28:48.754Z"
+  },
+  "plan": {
+    "id": "pan-1456",
+    "title": "Pass-3 audit incomplete — fresh-context agent must continue per docs/audit-2026-05-24/HANDOFF.md",
+    "status": "proposed",
+    "uid": "a9066b60-91c3-4c07-89d6-04a5fad68798",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:26:07Z",
+    "updated": "2026-05-25T16:28:48.754Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1456",
+        "label": "PAN-1456",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/docs/audit-2026-05-24/HANDOFF.md",
+        "label": "Handoff doc",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/docs/audit-2026-05-24/prompt-template.md",
+        "label": "Pass-3 prompt template",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/docs/audit-2026-05-24/run-one.sh",
+        "label": "Per-issue runner",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "audit",
+      "operations",
+      "cliproxy",
+      "playwright",
+      "github-cli",
+      "customer-confidence"
+    ],
+    "narratives": {
+      "Problem": "Conversation 2193 burned ~890K tokens auditing 80 PAN issues closed in 2026-05-17..2026-05-24. Passes 1 and 2 (Claude Opus 4.7 subagents) systematically accepted proxy evidence; pass-3 (GPT-5.5 via CLIProxy + Playwright MCP, strict prompt) found 3 REOPENs in the first 5 re-audits — a 60% miss rate on the small sample. Pass-3 stopped after 5 of the 80 issues. Currently 36 of those issues remain in CLOSED state (the 8 trustworthy-reopens, 3 pass-3 reopens, and the remainder were either reopened or stayed closed); 2 of the 5 pass-3 results (PAN-1050, PAN-1331) are STAYS-CLOSED verdicts, leaving ~34 currently-closed issues that have no trustworthy verdict. Customer confidence depends on identifying and reopening any issue whose shipped behavior does not match its original acceptance criteria, before customers hit the next PAN-1391-shape failure.",
+      "Proposal": "Operational issue (no app code change): run pass-3 methodology against every currently-closed issue in the window that hasn't already been pass-3 audited, then post the agent's verdict to each (REOPEN + comment, STAYS-CLOSED + defensive comment, or SCOPE-AMEND + amendment comment), commit all screenshots into docs/audit-2026-05-24/screenshots/ first so raw GitHub URLs resolve, and post a final summary comment on PAN-1456. The committed deliverables that ship via PR are the new audit result files, screenshots, verdicts-summary.md, and the updated HANDOFF.md marking pass-3 complete. The reopen/comment actions are GitHub API mutations on individual issues, not workspace code changes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Re-audit every currently-closed issue in 2026-05-17..2026-05-25 that hasn't already received a pass-3 verdict — do not trust pass-1 or pass-2 GOOD verdicts.",
+        "rationale": "Handoff explicitly says pass-1/pass-2 are not trusted; 60% reopen rate on the 5 pass-3 re-audits validates the distrust. Extending the window cutoff to 2026-05-25 (today) catches issues closed since the handoff was written without changing methodology."
+      },
+      {
+        "summary": "Parallelism cap: 2 concurrent run-one.sh dispatches. No higher.",
+        "rationale": "Handoff records 6-concurrent killed 7 of 12 agents due to Playwright contention; 2-concurrent works. Serial would double wall time without benefit."
+      },
+      {
+        "summary": "Stage runtime artifacts under /tmp/audit-pass3/ (results, screenshots, stderr, contexts, prompt-template.md) — copy the prompt-template.md and run-one.sh from docs/audit-2026-05-24/ at session start.",
+        "rationale": "run-one.sh hardcodes OUT_DIR=/tmp/audit-pass3 and reads prompt-template.md from that path. /tmp was wiped since the original pass-3 run, so the working dir must be recreated before any audit runs. Modifying run-one.sh in place would diverge from the script committed to main and complicate diff review; the staging step is cheap."
+      },
+      {
+        "summary": "Commit screenshots into docs/audit-2026-05-24/screenshots/ and push BEFORE posting any STAYS-CLOSED defensive comment that references them.",
+        "rationale": "GitHub raw URLs in comment bodies (https://raw.githubusercontent.com/...) only resolve after the file lands on origin/main. Posting before push creates dead links. Pushing the feature branch first works because the URL still resolves once the branch is published; comments can also be edited after merge if needed."
+      },
+      {
+        "summary": "Use the GitHub CLI (gh issue reopen, gh issue comment) for all verdict actions — do not use the Panopticon dashboard.",
+        "rationale": "Scriptable, batchable, reproducible, and avoids triggering any dashboard side effects (workflow gates, re-spawn patrols) that mutate issue state beyond reopen+comment."
+      },
+      {
+        "summary": "0-byte audit results are retried serially (concurrency=1, one issue at a time) up to 2 times; after that the issue is flagged 'audit-failed' in verdicts-summary.md and listed for operator attention.",
+        "rationale": "Pass-3 saw 7 of 12 audit dispatches return 0 bytes at 6-concurrent. At 2-concurrent the rate should be low, but retries handle transient CLIProxy or Playwright hiccups without halting the whole run."
+      },
+      {
+        "summary": "Do NOT pause the Flywheel orchestrator during the audit run.",
+        "rationale": "Audit work is read-mostly on this workspace. The Flywheel may legitimately spawn unrelated work on main — none of that interferes with run-one.sh dispatches or gh API calls against other issues."
+      },
+      {
+        "summary": "Final summary comment on PAN-1456 lists every audited issue with its verdict and the rationale category (AC-not-met, scope-amend, ambiguous, audit-failed). HANDOFF.md is updated with a 'Pass-3 complete' header.",
+        "rationale": "Customer confidence framing requires a visible, auditable trail — this is what makes the issue closeable with a clear record."
+      }
+    ],
+    "items": [
+      {
+        "id": "prereq-validation",
+        "title": "Verify pass-3 prereqs and stage runtime working dir",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Confirm CLIProxy is reachable on 127.0.0.1:8317 and the Codex OAuth token is fresh (no recent refresh_token_reused in ~/.panopticon/cliproxy/cliproxy.log). Recreate /tmp/audit-pass3/{results,screenshots,stderr,contexts}/ and copy docs/audit-2026-05-24/prompt-template.md and docs/audit-2026-05-24/run-one.sh into /tmp/audit-pass3/ so run-one.sh resolves its OUT_DIR paths. If CLIProxy is down or the token is burned, HALT and write the failure into continue.json hazards — do not continue."
+        },
+        "subItems": [
+          {
+            "id": "prereq-validation.ac1",
+            "title": "curl -fsS http://127.0.0.1:8317/health (or equivalent) returns success within 5s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-validation.ac2",
+            "title": "tail -200 ~/.panopticon/cliproxy/cliproxy.log shows no refresh_token_reused entries within the last hour",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-validation.ac3",
+            "title": "/tmp/audit-pass3/{results,screenshots,stderr,contexts} all exist after the stage step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-validation.ac4",
+            "title": "/tmp/audit-pass3/prompt-template.md and /tmp/audit-pass3/run-one.sh are byte-identical to the docs/audit-2026-05-24/ originals; run-one.sh is chmod +x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-validation.ac5",
+            "title": "Smoke test: dispatch run-one.sh against PAN-1391 (known REOPEN), confirm result file is >500 bytes and contains 'Verdict' header within 7 minutes — this validates the full pipe end-to-end without re-auditing a fresh issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inventory-remaining-issues",
+        "title": "Build the list of remaining issues to pass-3 audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Query gh for issues with closed:2026-05-17..2026-05-25 that are still in CLOSED state (since-reopened ones are naturally excluded). Subtract PAN-1050 and PAN-1331 (the two pass-3 STAYS-CLOSED results that don't need re-audit). Write the remaining numbers, one per line, to docs/audit-2026-05-24/remaining-list.txt. Cross-check against the trustworthy-reopens list in HANDOFF.md to confirm none accidentally reappear (they shouldn't, because they're OPEN now)."
+        },
+        "subItems": [
+          {
+            "id": "inventory-remaining-issues.ac1",
+            "title": "docs/audit-2026-05-24/remaining-list.txt exists with one issue number per line, sorted ascending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-remaining-issues.ac2",
+            "title": "List excludes PAN-1050, PAN-1313, PAN-1331, PAN-1379, PAN-1391 (the five already pass-3 audited)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-remaining-issues.ac3",
+            "title": "List excludes the eight trustworthy-reopens (PAN-1408, PAN-1192, PAN-20, PAN-1103, PAN-1252, PAN-1251, PAN-1249, PAN-913) — they are OPEN so the gh CLOSED query should drop them automatically; assert their absence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-remaining-issues.ac4",
+            "title": "Expected list length is 30–45; if it falls outside that range, write a note in continue.json hazards explaining the deviation and proceed (do not halt)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "execute-pass3-audits",
+        "title": "Run pass-3 audits in 2-concurrent waves against the remaining list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Loop through remaining-list.txt in pairs. For each pair, dispatch /tmp/audit-pass3/run-one.sh <num> as two background processes; wait for both to exit; record exit code and result-file size into docs/audit-2026-05-24/progress.log. After every wave, monitor ~/.panopticon/cliproxy/cliproxy.log for refresh_token_reused — if seen, HALT and ask the operator to re-run codex login. Any result file under 500 bytes is queued for a serial retry pass at the end. Per-audit budget is the 600s timeout baked into run-one.sh. Track elapsed wall time; if it crosses 4 hours, write a progress note and continue rather than aborting."
+        },
+        "subItems": [
+          {
+            "id": "execute-pass3-audits.ac1",
+            "title": "Every issue in remaining-list.txt has a corresponding docs/audit-2026-05-24/results/PAN-<num>.md file written by the loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-pass3-audits.ac2",
+            "title": "Every result file is >500 bytes and contains a 'Verdict' line; any file failing this after 2 retries is recorded as 'audit-failed' but does not block the bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-pass3-audits.ac3",
+            "title": "Concurrency never exceeds 2 simultaneous run-one.sh processes (verifiable via timestamps in progress.log)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-pass3-audits.ac4",
+            "title": "If CLIProxy logs refresh_token_reused during the run, the loop halts and continue.json hazards records the timestamp + remaining list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-pass3-audits.ac5",
+            "title": "Final per-issue tally written to docs/audit-2026-05-24/progress.log: total dispatched, successful (≥500B), audit-failed, retry count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "commit-screenshots",
+        "title": "Commit pass-3 screenshots to docs/audit-2026-05-24/screenshots/ before posting any comment that references them",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Copy every PNG from /tmp/audit-pass3/screenshots/ to docs/audit-2026-05-24/screenshots/ (preserve filename). Commit them as a single 'docs(audit): pass-3 screenshots' commit and push the feature branch. Verify the feature-branch raw URLs resolve via a HEAD request for at least one freshly-pushed screenshot. This bead must complete before post-verdicts because defensive STAYS-CLOSED comments embed raw URLs."
+        },
+        "subItems": [
+          {
+            "id": "commit-screenshots.ac1",
+            "title": "Every PNG in /tmp/audit-pass3/screenshots/ exists at docs/audit-2026-05-24/screenshots/ with identical contents (cmp passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-screenshots.ac2",
+            "title": "Screenshots are committed (single commit) and pushed to the feature branch on origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-screenshots.ac3",
+            "title": "Raw URL https://raw.githubusercontent.com/eltmon/panopticon-cli/<feature-branch>/docs/audit-2026-05-24/screenshots/<one-new-file>.png returns HTTP 200 from a curl HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "post-verdicts",
+        "title": "Post the pass-3 verdict to each audited issue (REOPEN / STAYS-CLOSED / SCOPE-AMEND)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Parse each docs/audit-2026-05-24/results/PAN-<num>.md for its Verdict line and recommended comment body. For REOPEN: gh issue reopen <num> then gh issue comment <num> --body-file <result-file-or-extracted-body>. For STAYS-CLOSED: gh issue comment <num> --body-file <…> (issue stays closed). For SCOPE-AMEND: gh issue comment <num> --body-file <…>, issue stays closed. Rewrite raw screenshot URLs in the comment body to point at the feature branch (which exists after commit-screenshots) and let the merge cycle naturally promote them to main. Write docs/audit-2026-05-24/verdicts-summary.md as a table: issue | verdict | category (AC-not-met, scope-amend, ambiguous, audit-failed) | reopened (Y/N) | comment URL."
+        },
+        "subItems": [
+          {
+            "id": "post-verdicts.ac1",
+            "title": "For each result file with Verdict=REOPEN: the corresponding GitHub issue is in OPEN state AND has a new pass-3 audit comment timestamped today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-verdicts.ac2",
+            "title": "For each result file with Verdict=STAYS-CLOSED: the issue is still CLOSED AND has a new defensive comment with per-AC evidence (and screenshot links where applicable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-verdicts.ac3",
+            "title": "For each result file with Verdict=SCOPE-AMEND: the issue is still CLOSED AND has a new amendment comment naming what shipped vs the original AC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-verdicts.ac4",
+            "title": "audit-failed results (no Verdict line or <500B file) are NOT acted on — they're listed in verdicts-summary.md under 'requires operator attention' and the corresponding issue is left unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-verdicts.ac5",
+            "title": "docs/audit-2026-05-24/verdicts-summary.md exists with rows for every audited issue plus a totals footer (REOPEN N, STAYS-CLOSED N, SCOPE-AMEND N, audit-failed N)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-verdicts.ac6",
+            "title": "No comment is posted that references a screenshot URL whose raw-content fetch fails — verify with a HEAD before posting, or strip the broken reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "final-summary",
+        "title": "Post the pass-3 completion summary on PAN-1456 and update HANDOFF.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:26:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Compose a summary comment on PAN-1456: total audited (including the original 5), final REOPEN/STAYS-CLOSED/SCOPE-AMEND/audit-failed counts, the full list of issues now reopened by this work, cost approximation from progress.log, and pointers to verdicts-summary.md. Update docs/audit-2026-05-24/HANDOFF.md with a 'Pass-3 complete — YYYY-MM-DD' header at the top. Commit both the updated HANDOFF.md and the verdicts-summary.md as a single 'docs(audit): pass-3 complete' commit. Do NOT close PAN-1456 — let the merge pipeline close it after the PR lands."
+        },
+        "subItems": [
+          {
+            "id": "final-summary.ac1",
+            "title": "PAN-1456 has a new comment titled 'Pass-3 audit complete — YYYY-MM-DD' listing total audited, REOPEN count, STAYS-CLOSED count, SCOPE-AMEND count, audit-failed count, and every issue reopened by this work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-summary.ac2",
+            "title": "docs/audit-2026-05-24/HANDOFF.md has a 'Pass-3 complete' header at the top with the completion date, and notes any audit-failed issues left for operator attention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-summary.ac3",
+            "title": "docs/audit-2026-05-24/verdicts-summary.md is committed alongside the updated HANDOFF.md in a single commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-summary.ac4",
+            "title": "PAN-1456 is left in CLOSED-by-PR state (work agent calls pan done; merge pipeline closes the issue) — work agent does not call gh issue close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "prereq-validation",
+        "to": "execute-pass3-audits",
+        "type": "blocks"
+      },
+      {
+        "from": "inventory-remaining-issues",
+        "to": "execute-pass3-audits",
+        "type": "blocks"
+      },
+      {
+        "from": "execute-pass3-audits",
+        "to": "commit-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "execute-pass3-audits",
+        "to": "post-verdicts",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-screenshots",
+        "to": "post-verdicts",
+        "type": "blocks"
+      },
+      {
+        "from": "post-verdicts",
+        "to": "final-summary",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1456-pass-3-audit-incomplete-fresh-context-agent-must-continue-per-docs-audit-2026-05-24-handoff-md.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
