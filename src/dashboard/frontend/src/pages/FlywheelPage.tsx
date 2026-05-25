@@ -24,11 +24,20 @@ interface FlywheelConfigPatch {
   require_uat_before_merge?: boolean;
 }
 
+interface PendingAutoMerge {
+  id: number;
+  issueId: string;
+  prUrl: string;
+  scheduledMergeAt: string;
+  status: 'pending' | 'merging' | 'blocked' | 'failed' | 'merged' | 'cancelled';
+}
+
 const SPLIT_STORAGE_KEY = 'panopticon.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
 const SPLIT_MIN_RIGHT = 360;
 const SPLIT_DEFAULT_LEFT = 720;
 const FLYWHEEL_CONFIG_QUERY_KEY = ['flywheel', 'config'] as const;
+const PENDING_AUTO_MERGES_QUERY_KEY = ['flywheel', 'auto-merge', 'pending'] as const;
 const AUTO_PICKUP_BACKLOG_TITLE = 'Off: inventory is restricted to work in progress / in review / blocked / awaiting merge. On: also include READY backlog items bounded by maxAgents.';
 const REQUIRE_UAT_BEFORE_MERGE_TITLE = 'On: UAT remains required before merge. Off: eligible merges may be scheduled through the server-managed cooldown.';
 
@@ -45,6 +54,12 @@ async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
   return res.json() as Promise<FlywheelStatus | null>;
 }
 
+async function fetchPendingAutoMerges(): Promise<PendingAutoMerge[]> {
+  const res = await fetch('/api/flywheel/auto-merge/pending');
+  if (!res.ok) throw new Error(`GET /api/flywheel/auto-merge/pending → ${res.status}`);
+  return res.json() as Promise<PendingAutoMerge[]>;
+}
+
 export function useFlywheelConfig() {
   return useQuery({
     queryKey: FLYWHEEL_CONFIG_QUERY_KEY,
@@ -54,6 +69,30 @@ export function useFlywheelConfig() {
       return res.json();
     },
     staleTime: 5_000,
+  });
+}
+
+function usePendingAutoMerges() {
+  return useQuery({
+    queryKey: PENDING_AUTO_MERGES_QUERY_KEY,
+    queryFn: fetchPendingAutoMerges,
+    refetchInterval: 5_000,
+  });
+}
+
+function useCancelAutoMergeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (issueId: string): Promise<void> => {
+      const res = await fetch(`/api/flywheel/auto-merge/${encodeURIComponent(issueId)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(body || `DELETE /api/flywheel/auto-merge/${issueId} → ${res.status}`);
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PENDING_AUTO_MERGES_QUERY_KEY });
+    },
   });
 }
 
@@ -116,6 +155,83 @@ function getLastTickFreshness(lastTickAt: string, nowMs: number): { label: strin
     return { label: `last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-warning/30 bg-warning/15 text-warning' };
   }
   return { label: `stalled — last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-destructive/30 bg-destructive/15 text-destructive' };
+}
+
+function formatAutoMergeCountdown(scheduledMergeAt: string, nowMs: number): string {
+  const remainingMs = Date.parse(scheduledMergeAt) - nowMs;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 'merging…';
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `auto-merging in ${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function prLabel(prUrl: string): string {
+  const match = prUrl.match(/\/pull\/(\d+)(?:$|[/?#])/);
+  return match ? `PR #${match[1]}` : 'PR';
+}
+
+function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
+  const { data } = usePendingAutoMerges();
+  const cancelMutation = useCancelAutoMergeMutation();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [cancellingIssueId, setCancellingIssueId] = useState<string | null>(null);
+  const pendingEntries = Array.isArray(data) ? data.filter((entry) => entry.status === 'pending') : [];
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const cancel = (issueId: string) => {
+    setCancellingIssueId(issueId);
+    cancelMutation.mutate(issueId, {
+      onSettled: () => setCancellingIssueId(null),
+    });
+  };
+
+  if (pendingEntries.length === 0) return null;
+
+  return (
+    <section className="shrink-0 border-b border-warning/30 bg-warning/10 px-4 py-3" aria-label="Pending auto-merges">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div>
+          <h2 className="font-semibold text-foreground">Pending auto-merges</h2>
+          <p className="text-xs text-muted-foreground">Flywheel will merge eligible PRs when their cooldown expires.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {pendingEntries.map((entry) => {
+            const remainingMs = Date.parse(entry.scheduledMergeAt) - nowMs;
+            const isMerging = Number.isFinite(remainingMs) && remainingMs <= 0;
+            return (
+              <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/30 bg-background px-3 py-2">
+                <a
+                  href={`#${entry.issueId}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onNavigateIssue?.(entry.issueId);
+                  }}
+                  className="font-mono text-xs font-semibold text-primary hover:underline"
+                >
+                  {entry.issueId}
+                </a>
+                <span className="text-xs text-muted-foreground">{prLabel(entry.prUrl)}</span>
+                <span className="font-mono text-xs text-foreground">{formatAutoMergeCountdown(entry.scheduledMergeAt, nowMs)}</span>
+                <button
+                  type="button"
+                  disabled={cancellingIssueId !== null || cancelMutation.isPending || entry.status === 'merging' || isMerging}
+                  onClick={() => cancel(entry.issueId)}
+                  className="rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
@@ -205,13 +321,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
     <div
       ref={containerRef}
       aria-label="Flywheel page"
-      className="flex h-full w-full overflow-hidden bg-background"
+      className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      <section
-        className="relative shrink-0 overflow-y-auto border-r border-border"
-        style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
-        aria-label="Flywheel status pane"
-      >
+      <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <section
+          className="relative shrink-0 overflow-y-auto border-r border-border"
+          style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
+          aria-label="Flywheel status pane"
+        >
         <header className="sticky top-0 z-10 border-b border-border bg-card/60 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -339,8 +457,9 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
         <div className="h-8 w-0.5 rounded-full bg-border/70 transition-colors group-hover:bg-primary/70 group-active:bg-primary" />
       </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
-        <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+        <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
+          <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+        </div>
       </div>
     </div>
   );

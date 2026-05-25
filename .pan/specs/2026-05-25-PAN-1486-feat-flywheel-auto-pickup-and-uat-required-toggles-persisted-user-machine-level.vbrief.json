@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T10:39:13.460Z",
+    "updated": "2026-05-25T10:56:09.249Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -999,7 +999,7 @@
       {
         "id": "b14-dashboard-cancel-banner",
         "title": "Add pending auto-merges banner with countdown + cancel button to FlywheelPage",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -1015,7 +1015,7 @@
           {
             "id": "b14.ac1",
             "title": "Banner only renders when there is at least one entry with status='pending'; empty list renders nothing (no empty placeholder).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1023,7 +1023,7 @@
           {
             "id": "b14.ac2",
             "title": "Each row's countdown updates every second based on Date.parse(scheduledMergeAt) - Date.now(); when remaining <= 0 the row shows 'merging…' (executor will pick it up).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1031,7 +1031,7 @@
           {
             "id": "b14.ac3",
             "title": "Cancel button is disabled while the mutation is in flight and while the entry is in 'merging' state.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1039,7 +1039,7 @@
           {
             "id": "b14.ac4",
             "title": "Cancel mutation invalidates the pending query so the row disappears from all open tabs within the next refetch.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1047,7 +1047,7 @@
           {
             "id": "b14.ac5",
             "title": "issueId is a link that opens the issue's existing dashboard route.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1055,7 +1055,7 @@
           {
             "id": "b14.ac6",
             "title": "Verified manually in npm run dev: schedule via curl, observe banner appear, click cancel, banner row disappears.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1063,12 +1063,13 @@
           {
             "id": "b14.ac7",
             "title": "Vitest component test renders the banner with a fixed scheduledMergeAt, advances fake timers, and asserts cancel triggers the DELETE call.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completedAt": "2026-05-25T10:55:38.515Z"
       },
       {
         "id": "b15-integration-test",

@@ -185,6 +185,70 @@ describe('FlywheelPage', () => {
     expect(screen.getByText('save failed')).toHaveClass('text-destructive');
   });
 
+  it('renders pending auto-merges with a live countdown and cancels through DELETE', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const onNavigateIssue = vi.fn();
+    let cancelled = false;
+    let resolveDelete: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/flywheel/current') return Response.json(null);
+      if (url === '/api/flywheel/config') return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: true });
+      if (url === '/api/flywheel/auto-merge/pending') {
+        return Response.json(cancelled ? [] : [{
+          id: 41,
+          issueId: 'PAN-1486',
+          prUrl: 'https://github.com/eltmon/panopticon-cli/pull/123',
+          scheduledMergeAt: '2026-05-18T12:03:42.000Z',
+          status: 'pending',
+        }]);
+      }
+      if (url === '/api/flywheel/auto-merge/PAN-1486' && init?.method === 'DELETE') {
+        cancelled = true;
+        return new Promise<Response>((resolve) => {
+          resolveDelete = resolve;
+        });
+      }
+      return Response.json(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderFlywheelPage(<FlywheelPage onNavigateIssue={onNavigateIssue} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByLabelText('Pending auto-merges')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'PAN-1486' })).toBeInTheDocument();
+    expect(screen.getByText('PR #123')).toBeInTheDocument();
+    expect(screen.getByText('auto-merging in 3:42')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'PAN-1486' }));
+    expect(onNavigateIssue).toHaveBeenCalledWith('PAN-1486');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText('auto-merging in 3:41')).toBeInTheDocument();
+
+    const cancelButton = screen.getByRole('button', { name: 'Cancel' });
+    await act(async () => {
+      fireEvent.click(cancelButton);
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/auto-merge/PAN-1486', { method: 'DELETE' });
+    expect(cancelButton).toBeDisabled();
+
+    await act(async () => {
+      resolveDelete?.(Response.json({ issueId: 'PAN-1486' }));
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.queryByLabelText('Pending auto-merges')).not.toBeInTheDocument();
+  });
+
   it('renders a real FlywheelStatus payload from the subscription without console errors', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onNavigateAgent = vi.fn();
