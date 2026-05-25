@@ -1,0 +1,137 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:24:20.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1248: Substrate: root `tsc --noEmit` broken — FlywheelPipelineItem.conflictsWith mutable/readonly mismatch",
+    "updated": "2026-05-25T16:25:40.393Z"
+  },
+  "plan": {
+    "id": "pan-1248",
+    "title": "Substrate: root `tsc --noEmit` broken — FlywheelPipelineItem.conflictsWith mutable/readonly mismatch",
+    "status": "proposed",
+    "uid": "3d9af722-9278-4fb6-aff1-0e8dfd16bf2e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:24:20.000Z",
+    "updated": "2026-05-25T16:25:40.393Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1248",
+        "label": "PAN-1248",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/commit/56e29937a",
+        "label": "fix(contracts): make FlywheelPipelineItem.conflictsWith readonly",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "substrate",
+      "contracts",
+      "flywheel",
+      "typecheck",
+      "regression-guard"
+    ],
+    "narratives": {
+      "Problem": "PAN-1248 was filed when the root `npm run typecheck` failed: `FlywheelPipelineItem.conflictsWith` was declared as mutable `string[]` on the hand-written interface, but the paired `Schema.Struct` decoded `Schema.Array(Schema.String)` as `readonly string[]`. Consumers that built a `FlywheelStatus` from the decode output could not assign to the mutable-array interface, breaking the release-pipeline gate. The substantive fix shipped in commit 56e29937a (line 71: `conflictsWith?: readonly string[] | undefined`); root + contracts-package typechecks both pass; the 2026-05-24 audit confirmed COMPLETE. The issue is functionally resolved but has no regression test, so a future revert of the field to mutable would re-break the release pipeline before tsc caught it during human review.",
+      "Proposal": "Add a single type-level regression test to `packages/contracts/src/flywheel.test.ts` that asserts `NonNullable<FlywheelPipelineItem['conflictsWith']>` is exactly `readonly string[]`. The assertion runs at typecheck time (so reverting line 71 fails `npm run typecheck` immediately) and at vitest time (so it appears in the test suite). No production code changes; scope is contracts test file only. Out of scope: the 'wire contracts-package typecheck into the root gate' follow-up (explicitly marked out of scope in the issue body and no longer reproducible — contracts-package typecheck passes locally)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan PAN-1248 as a regression-guard rather than reopening implementation.",
+        "rationale": "Commit 56e29937a fixed `FlywheelPipelineItem.conflictsWith` to `readonly string[]`; the 2026-05-24 audit confirmed COMPLETE; root and contracts-package typechecks both exit 0 today. Reopening the original fix would be redundant rework. Leaving the issue with zero beads is not viable (work agents require beads), so the defensible default is one small bead that locks in the contract against future regression."
+      },
+      {
+        "summary": "Scope the bead to `packages/contracts/src/flywheel.test.ts` only — do not touch local mutable shapes in `src/lib/flywheel-merge-order.ts` or `src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx`.",
+        "rationale": "Those local types share the name `conflictsWith` but are not the contracts type. Touching them would expand scope into unrelated subsystems and risks regressing call sites that already work. The substrate bug was specifically the contracts-type mismatch."
+      },
+      {
+        "summary": "Exclude the 'wire contracts-package typecheck into root gate' follow-up.",
+        "rationale": "Issue body explicitly says 'out of scope for this fix' and 'filed and fixed in the same Flywheel run (RUN-3).' Additionally, contracts-package `tsc --noEmit` currently passes locally with no output — the event-reducers.ts and index.ts errors named in the follow-up text are no longer present, so there is nothing to fix here. Wiring an additional gate in the root npm scripts is a separate substrate change that should be filed as its own issue if still desired."
+      },
+      {
+        "summary": "Implementation approach for the type assertion is left to the work agent (vitest `expectTypeOf` vs. inline conditional-type alias vs. `satisfies` clause).",
+        "rationale": "All three approaches produce the same regression-guard semantics: tsc fails the build if the field is reverted to mutable. The acceptance criteria are gate-based (typecheck and vitest both pass; assertion catches mutable revert), so the agent can pick whichever fits the existing test-file style best."
+      },
+      {
+        "summary": "Did not run `pan plan finalize` interactively — auto mode finalizes once vBRIEF is written.",
+        "rationale": "Auto mode requires the planning agent to complete end-to-end without user interaction. The agent writes continue.json and spec.vbrief.json, then runs `pan plan finalize` to materialize beads and flip plan.status to 'proposed'."
+      }
+    ],
+    "items": [
+      {
+        "id": "lock-readonly-conflicts-with",
+        "title": "Add type-level regression test for FlywheelPipelineItem.conflictsWith readonly contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:24:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1248",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `packages/contracts/src/flywheel.test.ts`, add a regression-guard assertion that `NonNullable<FlywheelPipelineItem['conflictsWith']>` is exactly `readonly string[]`. The assertion must fail at typecheck time if the field is ever reverted to mutable `string[]`, locking in the fix from commit 56e29937a. Use whichever idiom matches the test-file style — vitest's `expectTypeOf().toEqualTypeOf<readonly string[]>()`, an inline conditional-type alias that resolves to `never` for mutable arrays, or a `satisfies readonly string[]` clause on a decoded value. Do NOT modify production code, do NOT touch local consumer types in `src/lib/flywheel-merge-order.ts` or `src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx` (they are intentionally local and out of scope)."
+        },
+        "subItems": [
+          {
+            "id": "lock-readonly-conflicts-with.ac1",
+            "title": "`packages/contracts/src/flywheel.test.ts` contains a type-level assertion that `NonNullable<FlywheelPipelineItem['conflictsWith']>` resolves to `readonly string[]` (not mutable `string[]`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-readonly-conflicts-with.ac2",
+            "title": "Reverting `packages/contracts/src/flywheel.ts:71` to `conflictsWith?: string[] | undefined` causes `npm run typecheck` to fail with a clear error pointing at the new assertion. (Demonstrate this temporarily during development; do not commit the revert.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-readonly-conflicts-with.ac3",
+            "title": "Root `npm run typecheck` exits 0 on the final tree.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-readonly-conflicts-with.ac4",
+            "title": "`cd packages/contracts && npx vitest run src/flywheel.test.ts` passes with all tests green and includes the new assertion (whether as a vitest case or as a top-level type-only declaration that the file compiles with).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-readonly-conflicts-with.ac5",
+            "title": "No production source files outside `packages/contracts/src/flywheel.test.ts` are modified. Specifically: `packages/contracts/src/flywheel.ts`, `src/lib/flywheel-merge-order.ts`, and `src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx` are untouched.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-readonly-conflicts-with.ac6",
+            "title": "`cd packages/contracts && npx tsc --noEmit` exits 0 (verifying the contracts-package typecheck stays clean and the new assertion compiles in the standalone package context).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1248-substrate-root-tsc-noemit-broken-flywheelpipelineitem-conflictswith-mutable-readonly-mismatch.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
