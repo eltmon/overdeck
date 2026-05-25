@@ -12,6 +12,7 @@ let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
+let activeFlywheelRunId: string | null;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
   return {
@@ -94,6 +95,9 @@ function mockSpawnDependencies(): void {
   vi.doMock('../claude-auth.js', () => ({
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
   }));
+  vi.doMock('../database/app-settings.js', () => ({
+    getFlywheelActiveRunId: () => activeFlywheelRunId,
+  }));
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
     findProjectByPathSync: vi.fn(() => null),
@@ -108,6 +112,7 @@ beforeEach(() => {
   process.env.PANOPTICON_HOME = tmpHome;
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
+  activeFlywheelRunId = null;
   delete process.env.PAN_DOCKER;
   delete process.env.PANOPTICON_DOCKER_WORKSPACE;
   mockSpawnDependencies();
@@ -122,6 +127,7 @@ afterEach(() => {
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
   vi.doUnmock('../claude-auth.js');
+  vi.doUnmock('../database/app-settings.js');
   vi.doUnmock('../projects.js');
   delete process.env.PANOPTICON_HOME;
   delete process.env.PAN_DOCKER;
@@ -230,6 +236,53 @@ describe('spawnAgent PTY supervisor wiring', () => {
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
     );
+  });
+
+  it('threads active flywheel provenance env into spawnRun work agents', async () => {
+    const supervisorScriptPath = writeSupervisorArtifact();
+    activeFlywheelRunId = 'RUN-777';
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
+    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_RUN_ID=RUN-777');
+    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_AGENT_ROLE=work');
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-1405',
+      workspace,
+      `bash ${join(agentDir, 'launcher.sh')}`,
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
+          PANOPTICON_FLYWHEEL_AGENT_ROLE: 'work',
+        }),
+      }),
+    );
+  });
+
+  it('omits flywheel provenance env when no canonical run is active', async () => {
+    writeSupervisorArtifact();
+    activeFlywheelRunId = 'not-a-run-id';
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const sessionOptions = createSessionMock.mock.calls[0][3] as { env: Record<string, string> };
+    expect(launcher).not.toContain('PANOPTICON_FLYWHEEL_RUN_ID');
+    expect(launcher).not.toContain('PANOPTICON_FLYWHEEL_AGENT_ROLE');
+    expect(sessionOptions.env.PANOPTICON_FLYWHEEL_RUN_ID).toBeUndefined();
+    expect(sessionOptions.env.PANOPTICON_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {

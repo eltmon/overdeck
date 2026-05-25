@@ -46,6 +46,7 @@ import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
+import { getFlywheelActiveRunId } from './database/app-settings.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -54,6 +55,31 @@ const toAgentFsError = (operation: string, path: string, cause: unknown): FsErro
   new FsError({ operation, path, cause });
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
+
+type FlywheelSpawnEnv = {
+  PANOPTICON_FLYWHEEL_RUN_ID?: string;
+  PANOPTICON_FLYWHEEL_AGENT_ROLE?: Role;
+};
+
+function normalizeFlywheelRunId(runId: string | null | undefined): string | undefined {
+  if (!runId) return undefined;
+  const trimmed = runId.trim();
+  return /^RUN-\d+$/.test(trimmed) ? trimmed : undefined;
+}
+
+function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
+  return runId
+    ? { PANOPTICON_FLYWHEEL_RUN_ID: runId, PANOPTICON_FLYWHEEL_AGENT_ROLE: role }
+    : {};
+}
+
+function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
+  return [
+    env.PANOPTICON_FLYWHEEL_RUN_ID ? `export PANOPTICON_FLYWHEEL_RUN_ID=${env.PANOPTICON_FLYWHEEL_RUN_ID}` : undefined,
+    env.PANOPTICON_FLYWHEEL_AGENT_ROLE ? `export PANOPTICON_FLYWHEEL_AGENT_ROLE=${env.PANOPTICON_FLYWHEEL_AGENT_ROLE}` : undefined,
+  ].filter((value): value is string => value !== undefined);
+}
 
 /**
  * Write an agent launcher script atomically. Every agent shares a fixed
@@ -1934,6 +1960,7 @@ export interface SpawnOptions {
   slotId?: number;
   swarmItemId?: string; // vBRIEF item ID this slot is working on
   allowHost?: boolean;
+  flywheelRunId?: string;
 }
 
 export interface SpawnRunOptions {
@@ -1961,6 +1988,7 @@ export interface SpawnRunOptions {
   registerConversation?: boolean;
   effort?: 'low' | 'medium' | 'high';
   resumeSessionId?: string;
+  flywheelRunId?: string;
 }
 
 /**
@@ -2140,6 +2168,7 @@ export async function buildAgentLaunchConfig(opts: {
    * no agent-definition system.
    */
   harness?: 'claude-code' | 'pi';
+  extraEnvExports?: string[];
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2219,6 +2248,7 @@ export async function buildAgentLaunchConfig(opts: {
       model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
+      extraEnvExports: opts.extraEnvExports,
       useSupervisor: opts.useSupervisor,
       supervisorScriptPath: opts.supervisorScriptPath,
       ...piLauncherFields,
@@ -2249,6 +2279,7 @@ export async function buildAgentLaunchConfig(opts: {
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
+    extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
     supervisorScriptPath: opts.supervisorScriptPath,
     ...piLauncherFields,
@@ -2385,8 +2416,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       prompt: options.prompt,
       role: 'work',
       allowHost: options.allowHost,
+      flywheelRunId: options.flywheelRunId,
     });
   }
+
+  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
 
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
@@ -2574,6 +2608,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
+    extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
@@ -2606,6 +2641,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       PANOPTICON_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
+      ...flywheelEnv,
       ...providerEnv,
     },
   }));
@@ -2874,6 +2910,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     saveAgentStateSync(state);
   }
 
+  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
     agentId,
     model: selectedModel,
@@ -2884,6 +2921,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     useSupervisor: supervisorLaunch.useSupervisor,
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
+    extraEnvExports: flywheelEnvExports(flywheelEnv),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -2927,6 +2965,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       PANOPTICON_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
+      ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   }));

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   activeRunId: null as string | null,
   paused: false,
-  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi' }) => ({
+  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi'; flywheelRunId?: string }) => ({
     id: options.agentId,
     issueId,
     workspace: options.workspace,
@@ -71,6 +71,7 @@ describe('flywheel lifecycle', () => {
       workspace: '/repo',
       allowHost: true,
       registerConversation: true,
+      flywheelRunId: 'RUN-1',
     }));
   });
 
