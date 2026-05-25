@@ -2,6 +2,7 @@
 // The Tab type is exported here since App.tsx and other components import it.
 
 export type Tab =
+  | 'home'
   | 'pipeline'
   | 'kanban'
   | 'command-deck'
