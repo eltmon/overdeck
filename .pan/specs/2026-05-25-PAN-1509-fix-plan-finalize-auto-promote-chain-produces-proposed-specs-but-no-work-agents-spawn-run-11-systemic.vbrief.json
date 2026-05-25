@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T20:16:33.615Z",
+    "updated": "2026-05-25T20:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 8,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T20:16:33.615Z",
+    "updated": "2026-05-25T20:40:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -579,7 +579,7 @@
       {
         "id": "regression-test-chain",
         "title": "test: end-to-end regression for plan-finalize → autoSpawn → running work agent",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -594,7 +594,7 @@
           {
             "id": "regression-test-chain.ac1",
             "title": "Happy-path test: plan-finalize end-to-end produces proposed spec + matching beads + running work agent within 60s",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -602,7 +602,7 @@
           {
             "id": "regression-test-chain.ac2",
             "title": "Atomicity test: deliberate bead failure leaves NO proposed spec on disk",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -610,7 +610,7 @@
           {
             "id": "regression-test-chain.ac3",
             "title": "Reconciler test: a manually-planted orphan proposed spec (no agent, beads match) is picked up by the reconciler and a work agent is spawned on the next cycle",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -618,7 +618,7 @@
           {
             "id": "regression-test-chain.ac4",
             "title": "Stack-health-rejection test: when stack-health gate rejects, the response carries workAgentSpawned=false + workAgentSkipReason='stack-unhealthy' (not a 4xx/5xx)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -626,7 +626,7 @@
           {
             "id": "regression-test-chain.ac5",
             "title": "All tests use vi.useFakeTimers() for retry/delay logic; no real setTimeout in test code paths (per CLAUDE.md)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -634,7 +634,7 @@
           {
             "id": "regression-test-chain.ac6",
             "title": "npm test passes from workspace root after bun install (no @slow exclusions in default run unless documented)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
