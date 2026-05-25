@@ -68,6 +68,22 @@ describe('role definitions', () => {
     }
   });
 
+  it.each(['flywheel', 'work', 'plan'] as const)(
+    'wires gh issue trailer hook before RTK Bash filtering for %s role',
+    (role) => {
+      const { frontmatter } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
+      const hooks = frontmatter.hooks as {
+        PreToolUse: Array<{ matcher: string; hooks: Array<{ command: string }> }>;
+      };
+      const bashMatcher = hooks.PreToolUse.find((entry) => entry.matcher === 'Bash');
+
+      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual([
+        '$HOME/.panopticon/bin/gh-issue-trailer-hook',
+        '$HOME/.panopticon/bin/rtk-bash-filter',
+      ]);
+    },
+  );
+
   it('ships a workflow-injected inspect prompt with the Jidoka sentinels', () => {
     // Sub-roles work.inspect and work.inspect-deep both inline this single
     // harness-agnostic prompt (no .claude/agents/*.md ambient subagent).

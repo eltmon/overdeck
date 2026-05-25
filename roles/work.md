@@ -19,6 +19,8 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
+          command: "$HOME/.panopticon/bin/gh-issue-trailer-hook"
+        - type: command
           command: "$HOME/.panopticon/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
