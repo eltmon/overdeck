@@ -1,0 +1,92 @@
+{
+  "version": "1",
+  "issueId": "PAN-1496",
+  "created": "2026-05-25T16:22:30.821Z",
+  "updated": "2026-05-25T16:25:39Z",
+  "gitState": {
+    "branch": "feature/pan-1496",
+    "sha": "102089513",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Add two new tiers (xhigh, max) to FlywheelEffort, mirroring the existing chat EffortPicker (low/medium/high/xhigh/max). Issue title says 'extra-high' but the established string ID in this codebase is 'xhigh' — that's what claude --effort accepts and what localStorage already stores.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Keep default Flywheel effort at 'high'. Don't silently upgrade existing operators' runtime cost — the bug is that 'xhigh'/'max' are unreachable, not that 'high' is the wrong default.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Don't gate Flywheel effort options by selected model in RolesPanel. The current dropdown shows all three tiers unconditionally; adding model-aware availableLevels gating (like chat composer does) is a separate UX improvement out of scope here.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Don't add a `pan flywheel start --effort` CLI flag. The flywheel orchestrator reads effort from role config (settings.json / config.yaml); there is no such flag today. Issue fix-sketch mentioning it was speculative. CLI changes are limited to widening existing `pan plan --effort` and `pan strike --effort` help strings + validation.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Canonical type for the wider literal lives in two places that must move together: `FlywheelEffort` Schema.Literals in packages/contracts/src/flywheel.ts and `RoleEffort` in src/lib/config-yaml.ts. The contract package is the foundation bead because the dashboard server, RolesPanel, and Flywheel status snapshot all import from @panctl/contracts.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Re-use the canonical `RoleEffort` type instead of duplicating the inline literal `'low' | 'medium' | 'high'` at every call site. Several spawn/CLI files currently inline the literal — widening to `RoleEffort` import is cheap, removes drift risk, and is the minimum needed for typecheck to pass after the literal grows.",
+      "recordedAt": "2026-05-25T16:25:39Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Five-tier literal must stay in lockstep across packages/contracts (FlywheelEffort), src/lib/config-yaml (RoleEffort), src/lib/settings-api validation, RolesPanel <select> options, and any inline `'low' | 'medium' | 'high'` types. A miss in any one place produces either a typecheck failure or a silent runtime rejection (the 422 'effort must be low, medium, or high' error).",
+      "mitigation": "B1 (contract) is foundationFor B2-B8. B2 widens RoleEffort and is foundationFor B3-B7. After both foundations land, downstream beads import the widened type and the literal cannot drift. work.inspect on B1 confirms the chosen IDs ('xhigh', 'max') match the chat EffortPicker exactly before any downstream bead is built on top."
+    },
+    {
+      "id": "H2",
+      "summary": "RolesPanel test at src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx:136 asserts `Flywheel effort` select has value 'high'. Adding options must not change the saved default.",
+      "mitigation": "B6 only adds <option> tags; default remains 'high' via DEFAULT_FLYWHEEL_CONFIG.effort. B9 adds explicit coverage that all five options are rendered without touching the existing default-value assertion."
+    },
+    {
+      "id": "H3",
+      "summary": "settings-api.test.ts:614 asserts the exact validation error string 'effort must be low, medium, or high'. B3 must update this string AND its test in the same bead so the suite stays green.",
+      "mitigation": "B3 explicitly bundles src/lib/settings-api.ts and src/lib/__tests__/settings-api.test.ts; CI failure would catch any miss but the bundling makes the change atomic."
+    },
+    {
+      "id": "H4",
+      "summary": "Model-aware effort gating is intentionally not added. If an operator selects Flywheel model = `claude-sonnet-4-6` (which doesn't accept xhigh/max thinking budgets per ModelPicker.tsx) AND effort = 'max', Claude Code's CLI silently caps to its own supported tier. Pre-existing behavior — chat composer relies on availableLevels to gate, but RolesPanel does not. Document for follow-up, do not paper over.",
+      "mitigation": "Record as a known limitation in continue.json. A follow-up bug can introduce ModelPicker-style availableLevels gating in RolesPanel. Out of scope here per D3."
+    },
+    {
+      "id": "H5",
+      "summary": "config.yaml schema is permissive (`effort: TEXT` in src/lib/database/schema.ts:424); no migration is required. The column comment must still be updated so future readers don't think the field is restricted to the old three values.",
+      "mitigation": "B8 is a single-line comment update. No schema migration is needed."
+    },
+    {
+      "id": "H6",
+      "summary": "FlywheelStatus.orchestrator.effort is rendered in a status report at src/cli/commands/flywheel.ts:618. Widening the schema literal lets new values flow through unchanged — but if Effect.Schema decoding is strict, an existing snapshot file written before this change containing only 'low'|'medium'|'high' must continue to decode. New values must round-trip correctly.",
+      "mitigation": "Schema.Literals decoding is backward-compatible — adding new accepted values does not reject existing ones. B9 includes a contract-level decoding test that round-trips all five tiers via FlywheelOrchestrator.decode."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T16:22:30.821Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-25T16:25:39Z",
+      "reason": "planning",
+      "note": "Auto-mode planning complete: traced effort plumbing across contracts → role config → settings-api → CLI → spawn paths → RolesPanel UI. Decomposed into 9 beads with B1 (contract widening) as the foundation requiring inspection. Decisions D1-D6 recorded; hazards H1-H6 mapped.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ]
+}
