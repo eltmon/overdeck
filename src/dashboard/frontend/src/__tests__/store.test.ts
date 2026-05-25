@@ -372,6 +372,30 @@ describe('applyEventReducer — review/pipeline events', () => {
     })
   })
 
+  it('review.status_changed clears stale auto-merge schedule state for terminal merge statuses', () => {
+    const state: DashboardState = { ...emptyState, issuesRaw: [{ identifier: 'PAN-1', title: 'Auto merge issue' }] }
+    const scheduled = applyEventReducer(state, makeEvent('merge.auto.scheduled', 9, {
+      issueId: 'PAN-1',
+      executeAt: '2026-05-23T12:05:00.000Z',
+      scheduledAt: '2026-05-23T12:00:00.000Z',
+      cooldownSeconds: 300,
+    }))
+    const next = applyEventReducer(scheduled, makeEvent('review.status_changed', 10, {
+      issueId: 'PAN-1',
+      status: {
+        issueId: 'PAN-1',
+        reviewStatus: 'passed' as const,
+        testStatus: 'passed' as const,
+        readyForMerge: false,
+        mergeStatus: 'failed' as const,
+        updatedAt: '2026-05-23T12:01:00.000Z',
+      },
+    }))
+
+    expect(next.reviewStatusByIssueId['PAN-1']?.autoMergeScheduled).toBeUndefined()
+    expect(next.issuesRaw[0]).toMatchObject({ identifier: 'PAN-1', autoMergeScheduled: null })
+  })
+
   it('terminal merge.auto events clear auto-merge schedule state', () => {
     const state: DashboardState = { ...emptyState, issuesRaw: [{ identifier: 'PAN-1', title: 'Auto merge issue' }] }
     const scheduled = applyEventReducer(state, makeEvent('merge.auto.scheduled', 9, {
@@ -380,9 +404,9 @@ describe('applyEventReducer — review/pipeline events', () => {
       scheduledAt: '2026-05-23T12:00:00.000Z',
       cooldownSeconds: 300,
     }))
-    const next = applyEventReducer(scheduled, makeEvent('merge.auto.aborted', 10, {
+    const next = applyEventReducer(scheduled, makeEvent('merge.auto.failed', 10, {
       issueId: 'PAN-1',
-      gateFailureReason: 'ci-failing',
+      reason: 'queue crashed',
     }))
 
     expect(next.reviewStatusByIssueId['PAN-1']?.autoMergeScheduled).toBeUndefined()

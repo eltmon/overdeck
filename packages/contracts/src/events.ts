@@ -450,6 +450,14 @@ export const MergeAutoAbortedEvent = Schema.Struct({
 })
 export type MergeAutoAbortedEvent = typeof MergeAutoAbortedEvent.Type
 
+export const MergeAutoFailedEvent = Schema.Struct({
+  type: Schema.Literal("merge.auto.failed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, reason: Schema.String }),
+})
+export type MergeAutoFailedEvent = typeof MergeAutoFailedEvent.Type
+
 /** New — review status changed */
 export const ReviewStatusChangedEvent = Schema.Struct({
   type: Schema.Literal("review.status_changed"),
@@ -1076,6 +1084,7 @@ export const DomainEvent = Schema.Union([
   MergeAutoCancelledEvent,
   MergeAutoExecutedEvent,
   MergeAutoAbortedEvent,
+  MergeAutoFailedEvent,
   ReviewStatusChangedEvent,
   PipelineReviewStartedEvent,
   PipelineReviewCompletedEvent,

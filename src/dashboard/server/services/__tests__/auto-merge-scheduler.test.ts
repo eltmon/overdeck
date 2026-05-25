@@ -244,6 +244,29 @@ describe('AutoMergeScheduler', () => {
   });
 
   it.each([
+    ['failed result', vi.fn().mockResolvedValue({ success: false, message: 'queue refused' }), 'queue refused'],
+    ['thrown error', vi.fn().mockRejectedValue(new Error('queue crashed')), 'queue crashed'],
+  ])('emits a terminal failed event when triggerMerge returns a %s', async (_name, triggerMerge, expectedReason) => {
+    const harness = createHarness({ triggerMerge });
+    await scheduleReadyIssue(harness);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'failed', abortReason: expectedReason });
+    expect(appendAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'merge.auto.failed',
+      payload: { issueId: 'PAN-1', reason: expectedReason },
+    }));
+    expectLastTts({
+      issueId: 'PAN-1',
+      utterance: 'PAN-1 auto merge failed',
+      priority: 0,
+      source: 'dashboard',
+      eventType: 'merge.auto.failed',
+    });
+  });
+
+  it.each([
     ['ready gate', { getStatus: vi.fn().mockResolvedValueOnce(reviewStatus()).mockResolvedValue(reviewStatus({ readyForMerge: false })) }, 'no-longer-ready'],
     ['label gate', { getLabels: vi.fn().mockResolvedValue(['do-not-merge']) }, 'blocker-label:do-not-merge'],
     ['CI gate', { getCombinedStatus: vi.fn().mockResolvedValue({ passing: false }) }, 'ci-failing'],

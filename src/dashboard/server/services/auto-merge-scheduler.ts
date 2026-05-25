@@ -24,9 +24,10 @@ type AutoMergeEventPayloads = {
   'merge.auto.cancelled': { issueId: string; reason: string; cancelledBy: string };
   'merge.auto.executed': { issueId: string };
   'merge.auto.aborted': { issueId: string; gateFailureReason: string };
+  'merge.auto.failed': { issueId: string; reason: string };
 };
 type AutoMergeEventType = keyof AutoMergeEventPayloads;
-type AutoMergeTtsEventType = AutoMergeEventType | 'merge.auto.executing' | 'merge.auto.failed';
+type AutoMergeTtsEventType = AutoMergeEventType | 'merge.auto.executing';
 
 export interface AutoMergeSchedulerDeps {
   now: () => Date;
@@ -316,6 +317,7 @@ export class AutoMergeScheduler {
         const reason = this.mergeResultMessage(result) ?? 'merge_trigger_failed';
         this.deps.markFailed(normalizedIssueId, reason);
         transitionLog(normalizedIssueId, 'failed', { reason });
+        emitAutoMergeEvent('merge.auto.failed', { issueId: normalizedIssueId, reason });
         emitAutoMergeActivity(normalizedIssueId, 'error', `Auto-merge failed for ${normalizedIssueId}: ${reason}`);
         emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge failed`, 'merge.auto.failed', 0);
       }
@@ -323,6 +325,7 @@ export class AutoMergeScheduler {
       const reason = error instanceof Error ? error.message : String(error);
       this.deps.markFailed(normalizedIssueId, reason);
       transitionLog(normalizedIssueId, 'failed', { reason });
+      emitAutoMergeEvent('merge.auto.failed', { issueId: normalizedIssueId, reason });
       emitAutoMergeActivity(normalizedIssueId, 'error', `Auto-merge failed for ${normalizedIssueId}: ${reason}`);
       emitAutoMergeTts(normalizedIssueId, `${normalizedIssueId} auto merge failed`, 'merge.auto.failed', 0);
     }

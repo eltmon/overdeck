@@ -509,10 +509,16 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'review.status_changed': {
       const { issueId, status } = event.payload
       const existing = state.reviewStatusByIssueId[issueId]
-      const nextStatus: ReviewStatusSnapshot =
-        status.autoMergeScheduled === undefined && status.mergeStatus !== 'merged' && existing?.autoMergeScheduled
-          ? { ...status, autoMergeScheduled: existing.autoMergeScheduled }
-          : status
+      const shouldPreserveAutoMergeSchedule = status.autoMergeScheduled === undefined && status.mergeStatus === 'pending' && existing?.autoMergeScheduled
+      const shouldClearAutoMergeSchedule = status.autoMergeScheduled === undefined && status.mergeStatus !== undefined && status.mergeStatus !== 'pending'
+      const nextStatus: ReviewStatusSnapshot = shouldPreserveAutoMergeSchedule
+        ? { ...status, autoMergeScheduled: existing.autoMergeScheduled }
+        : status
+      const issuesRaw = shouldClearAutoMergeSchedule
+        ? setIssueAutoMergeScheduled(state.issuesRaw, issueId, null)
+        : shouldPreserveAutoMergeSchedule
+          ? setIssueAutoMergeScheduled(state.issuesRaw, issueId, existing.autoMergeScheduled ?? null)
+          : state.issuesRaw
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
@@ -520,6 +526,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.reviewStatusByIssueId,
           [issueId]: nextStatus,
         },
+        issuesRaw,
       }
     }
 
@@ -611,7 +618,8 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'merge.auto.cancelled':
     case 'merge.auto.executed':
-    case 'merge.auto.aborted': {
+    case 'merge.auto.aborted':
+    case 'merge.auto.failed': {
       const { issueId } = event.payload
       const existing = state.reviewStatusByIssueId[issueId]
       if (!existing) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
