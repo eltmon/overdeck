@@ -29,7 +29,10 @@ export type ActivitySource =
   | 'test-specialist'
   | 'merge-agent'
   | 'tts-summarizer'
-  | 'deploy-script';
+  | 'deploy-script'
+  | 'plan-finalize'
+  | 'complete-planning'
+  | 'start-agent';
 
 export interface EmitActivityOptions {
   source: ActivitySource;

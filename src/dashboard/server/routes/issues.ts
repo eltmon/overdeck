@@ -104,6 +104,26 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'spawn-failed';
 }
 
+type CompletePlanningPhase = 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+function emitCompletePlanningPhase(
+  issueId: string,
+  phase: CompletePlanningPhase,
+  status: CompletePlanningPhaseStatus,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  const timestamp = new Date().toISOString();
+  emitActivityEntrySync({
+    source: 'complete-planning',
+    level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
+    message: `complete-planning.phase=${phase}`,
+    issueId: issueId.toUpperCase(),
+    details: JSON.stringify({ issueId: issueId.toUpperCase(), timestamp, phase, status, reason, ...details }),
+  });
+}
+
 export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
@@ -130,6 +150,7 @@ export async function completePlanningArtifacts(options: {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
   });
+  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from workspace vBRIEF', { workspacePath });
   const rawBeadsResult = createBeads(workspacePath);
   const beadsResult = Effect.isEffect(rawBeadsResult)
     ? await Effect.runPromise(rawBeadsResult)
@@ -141,19 +162,39 @@ export async function completePlanningArtifacts(options: {
     const detail = errors.length > 0
       ? errors.join('; ')
       : `created ${created.length} beads for ${planItemCount} plan items`;
+    emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'failure', detail, {
+      workspacePath,
+      beadCount: created.length,
+      planItemCount,
+    });
     throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
   }
+  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'success', 'beads materialized', {
+    workspacePath,
+    beadCount: created.length,
+    planItemCount,
+  });
 
-  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
-  const proposed = existingSpec
-    ? await (async () => {
-        const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
-        return { path: existingSpec.path, filename: existingSpec.filename };
-      })()
-    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
-
-  return { proposed, beadCount: created.length, beadsWarning: null };
+  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
+  try {
+    const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
+    const proposed = existingSpec
+      ? await (async () => {
+          const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+          await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
+          return { path: existingSpec.path, filename: existingSpec.filename };
+        })()
+      : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed vBRIEF spec written', {
+      path: proposed.path,
+      filename: proposed.filename,
+    });
+    return { proposed, beadCount: created.length, beadsWarning: null };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath });
+    throw error;
+  }
 }
 
 function getInternalDashboardOrigin(): string {
@@ -176,38 +217,54 @@ export async function completePlanningAutoSpawn(options: {
   fetchImpl?: typeof fetch;
   dashboardOrigin?: string;
 }): Promise<CompletePlanningAutoSpawnResult | null> {
-  if (options.autoSpawn !== true) return null;
-
-  const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
-  const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      origin: dashboardOrigin,
-    },
-    body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
-  });
-
-  const body = await response.json().catch(() => ({})) as Record<string, unknown>;
-  const agentId = typeof body['agentId'] === 'string'
-    ? body['agentId']
-    : `agent-${options.issueId.toLowerCase()}`;
-
-  if (response.ok && body['success'] !== false) {
-    return { workAgentSpawned: true, workAgentSession: agentId };
+  if (options.autoSpawn !== true) {
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', 'autoSpawn not requested');
+    return null;
   }
 
-  const error = typeof body['error'] === 'string'
-    ? body['error']
-    : typeof body['message'] === 'string'
-      ? body['message']
-      : `Work agent spawn returned HTTP ${response.status}`;
+  const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
+  emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
+  try {
+    const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: dashboardOrigin,
+      },
+      body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
+    });
 
-  return {
-    workAgentSpawned: false,
-    workAgentError: error,
-    workAgentSkipReason: classifyAutoSpawnSkip(response.status, body),
-  };
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const agentId = typeof body['agentId'] === 'string'
+      ? body['agentId']
+      : `agent-${options.issueId.toLowerCase()}`;
+
+    if (response.ok && body['success'] !== false) {
+      emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'work agent spawn requested', { agentId });
+      return { workAgentSpawned: true, workAgentSession: agentId };
+    }
+
+    const error = typeof body['error'] === 'string'
+      ? body['error']
+      : typeof body['message'] === 'string'
+        ? body['message']
+        : `Work agent spawn returned HTTP ${response.status}`;
+    const skipReason = classifyAutoSpawnSkip(response.status, body);
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', skipReason, {
+      httpStatus: response.status,
+      error,
+    });
+
+    return {
+      workAgentSpawned: false,
+      workAgentError: error,
+      workAgentSkipReason: skipReason,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'failure', reason, { dashboardOrigin });
+    throw error;
+  }
 }
 
 export async function completePlanningAutoSpawnAndKill(options: {
@@ -1384,6 +1441,11 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       skipKill,
       sessionName,
     }));
+    emitCompletePlanningPhase(id, 'terminal', 'success', autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
+      autoSpawn,
+      workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
+      workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
+    });
 
     return jsonResponse({
       success: true,

@@ -26,6 +26,26 @@ interface PromotePlanningResult {
   workAgentSkipReason: string | null;
 }
 
+type AutoPromotePhase = 'createBeads' | 'completePlanning' | 'done';
+type AutoPromotePhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+function emitAutoPromotePhase(
+  issueId: string,
+  phase: AutoPromotePhase,
+  status: AutoPromotePhaseStatus,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  const timestamp = new Date().toISOString();
+  emitActivityEntrySync({
+    source: 'plan-finalize',
+    level: status === 'failure' ? 'error' : 'info',
+    message: `auto-promote.phase=${phase}`,
+    issueId,
+    details: JSON.stringify({ issueId, timestamp, phase, status, reason, ...details }),
+  });
+}
+
 function findWorkspaceRoot(start: string): string | null {
   let dir = resolve(start);
   while (true) {
@@ -69,10 +89,16 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // vBRIEF before beads creation. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
+  emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
   const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
 
   if (!result.success || result.created.length === 0) {
     const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
+    emitAutoPromotePhase(issueId, 'createBeads', 'failure', errors.join('; '), {
+      workspacePath,
+      createdCount: result.created.length,
+    });
+    emitAutoPromotePhase(issueId, 'done', 'failure', 'beads creation failed', { workspacePath });
     if (options.json) {
       console.log(JSON.stringify({ success: false, created: result.created, errors }));
     } else {
@@ -81,6 +107,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     }
     process.exit(2);
   }
+  emitAutoPromotePhase(issueId, 'createBeads', 'success', 'beads created', {
+    workspacePath,
+    createdCount: result.created.length,
+  });
 
   emitActivityEntrySync({
     source: 'plan',
@@ -105,6 +135,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentSkipReason: string | null = null;
 
   if (!options.noPromote) {
+    emitAutoPromotePhase(issueId, 'completePlanning', 'start', 'posting complete-planning autoSpawn request');
     const promotion = await promotePlanning(issueId);
     promoted = promotion.success;
     promoteMessage = promotion.message;
@@ -114,7 +145,18 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     workAgentMessage = promotion.workAgentMessage;
     workAgentError = promotion.workAgentError;
     workAgentSkipReason = promotion.workAgentSkipReason;
+    emitAutoPromotePhase(issueId, 'completePlanning', promoted ? 'success' : 'failure', promoted ? 'complete-planning returned success' : (promoteError ?? 'complete-planning failed'), {
+      workAgentSpawned,
+      workAgentSkipReason,
+    });
+  } else {
+    emitAutoPromotePhase(issueId, 'completePlanning', 'skipped', 'promotion skipped by --no-promote');
   }
+
+  emitAutoPromotePhase(issueId, 'done', promoted || options.noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : options.noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
+    workAgentSpawned,
+    workAgentSkipReason,
+  });
 
   if (options.json) {
     console.log(JSON.stringify({

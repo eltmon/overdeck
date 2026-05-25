@@ -137,6 +137,26 @@ import { buildTmuxCommandString, capturePane, killSession, listSessions, session
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
+type StartAgentPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+function emitStartAgentPhase(
+  issueId: string,
+  phase: StartAgentPhase,
+  status: StartAgentPhaseStatus,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  const timestamp = new Date().toISOString();
+  emitActivityEntrySync({
+    source: 'start-agent',
+    level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
+    message: `start-agent.phase=${phase}`,
+    issueId: issueId.toUpperCase(),
+    details: JSON.stringify({ issueId: issueId.toUpperCase(), timestamp, phase, status, reason, ...details }),
+  });
+}
+
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
   const providedBuffer = Buffer.from(provided, 'utf8');
@@ -2558,8 +2578,13 @@ const postAgentsRoute = HttpRouter.add(
     const health = yield* readModel.getSnapshot.pipe(
       Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
     );
+    emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
     const spawnGuardrails = evaluateSpawnGuardrails(health);
     if (spawnGuardrails.blocked) {
+      emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error, {
+        status: spawnGuardrails.status,
+        hint: spawnGuardrails.hint,
+      });
       return jsonResponse({
         success: false,
         blocked: true,
@@ -2570,6 +2595,10 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: spawnGuardrails.status });
     }
     if (spawnGuardrails.requiresAcknowledgement && !guardrailAcknowledged) {
+      emitStartAgentPhase(issueId, 'guardrails', 'skipped', 'guardrail acknowledgement required', {
+        status: spawnGuardrails.status,
+        hint: spawnGuardrails.hint,
+      });
       return jsonResponse({
         success: false,
         blocked: false,
@@ -2579,6 +2608,7 @@ const postAgentsRoute = HttpRouter.add(
         guardrails: spawnGuardrails,
       }, { status: spawnGuardrails.status });
     }
+    emitStartAgentPhase(issueId, 'guardrails', 'success', 'spawn guardrails passed');
 
     let spawnModel: string;
     try {
@@ -2631,6 +2661,7 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!isRemote) {
+      emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
       const stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
@@ -2639,6 +2670,10 @@ const postAgentsRoute = HttpRouter.add(
           lastObserved: stackHealth.lastObserved,
         }));
         if (!allowHost) {
+          emitStartAgentPhase(issueId, 'stackHealthGate', 'failure', stackHealth.reasons.join('; '), {
+            workspacePath,
+            lastObserved: stackHealth.lastObserved,
+          });
           emitActivityEntrySync({
             source: 'dashboard',
             level: 'error',
@@ -2655,7 +2690,15 @@ const postAgentsRoute = HttpRouter.add(
             stackHealth,
           }, { status: 422 });
         }
+        emitStartAgentPhase(issueId, 'stackHealthGate', 'skipped', 'stack unhealthy but host override confirmed', {
+          workspacePath,
+          reasons: stackHealth.reasons,
+        });
+      } else {
+        emitStartAgentPhase(issueId, 'stackHealthGate', 'success', 'workspace docker stack healthy', { workspacePath });
       }
+    } else {
+      emitStartAgentPhase(issueId, 'stackHealthGate', 'skipped', 'remote workspace skips local stack-health gate', { workspacePath });
     }
 
     if (allowHost) {
@@ -2790,6 +2833,10 @@ const postAgentsRoute = HttpRouter.add(
         trackerContext,
       }));
 
+      emitStartAgentPhase(issueId, 'spawn', 'start', 'starting remote work agent', {
+        workspacePath,
+        vmName: workspaceMetadata.vmName,
+      });
       const state = yield* Effect.promise(() => spawnRemoteAgent({
         issueId,
         workspace: workspaceMetadata,
@@ -2845,6 +2892,10 @@ const postAgentsRoute = HttpRouter.add(
           },
         },
       })));
+      emitStartAgentPhase(issueId, 'spawn', 'success', 'remote work agent spawn requested', {
+        agentId: state.id,
+        vmName: workspaceMetadata.vmName,
+      });
       try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
       invalidateAgentsCache();
       return jsonResponse({
@@ -3224,15 +3275,21 @@ const postAgentsRoute = HttpRouter.add(
                     workspacePath,
                     harness: effectiveHarness,
                   });
-                  await spawnPanCommand(
+                  emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent after containers became healthy', { workspacePath });
+                  const activityId = await spawnPanCommand(
                     ['start', issueId, '--local', '--model', spawnModel,
                       ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
                       ...(allowHost ? ['--host', '--yes'] : [])],
                     workspacePath,
                   );
+                  emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
+                    workspacePath,
+                    activityId,
+                  });
                   await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
+                  emitStartAgentPhase(issueId, 'spawn', 'failure', errorMessage, { workspacePath });
                   await appendAgentLifecycleLog(earlyAgentId, 'agent.container_start_failed', {
                     issueId,
                     error: errorMessage,
@@ -3284,16 +3341,29 @@ const postAgentsRoute = HttpRouter.add(
     }));
     let activityId: string;
     try {
+      emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
       activityId = yield* Effect.promise(() => spawnPanCommand(
         ['start', issueId, '--local', '--model', spawnModel,
           ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
           ...(allowHost ? ['--host', '--yes'] : [])],
         workspacePath,
       ));
+      emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {
+        workspacePath,
+        activityId,
+      });
     } catch (error: any) {
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
         const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
+        emitStartAgentPhase(issueId, 'stackHealthGate', 'failure', failedStackHealth.reasons.length > 0 ? failedStackHealth.reasons.join('; ') : output.trim(), {
+          workspacePath,
+          activityId: error?.activityId,
+        });
+        emitStartAgentPhase(issueId, 'spawn', 'failure', output.trim() || `Failed to start agent for ${issueId}`, {
+          workspacePath,
+          activityId: error?.activityId,
+        });
         emitActivityEntrySync({
           source: 'dashboard',
           level: 'error',
@@ -3313,6 +3383,10 @@ const postAgentsRoute = HttpRouter.add(
           activityId: error?.activityId,
         }, { status: 422 });
       }
+      emitStartAgentPhase(issueId, 'spawn', 'failure', output.trim() || `Failed to start agent for ${issueId}`, {
+        workspacePath,
+        activityId: error?.activityId,
+      });
       return jsonResponse({
         success: false,
         blocked: true,

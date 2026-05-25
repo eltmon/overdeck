@@ -185,6 +185,15 @@ describe('plan-finalize auto-promote chain regression', () => {
     expect(agentState.status).toMatch(/^(starting|running)$/);
     expect(tmuxSessions.has(`agent-${issueId.toLowerCase()}`)).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const activityEvents = mocks.emitActivityEntrySync.mock.calls.map(([event]) => event);
+    expect(activityEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=createBeads', issueId }),
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=completePlanning', issueId }),
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=done', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=beadsMaterialize', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=specWrite', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=autoSpawn', issueId }),
+    ]));
   });
 
   it('leaves no proposed spec on disk when bead materialization fails', async () => {

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T20:40:00.000Z",
+    "updated": "2026-05-25T20:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8d4f1509-1509-4a2b-8c3d-f9e0f1a2b3c4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T20:40:00.000Z",
+    "updated": "2026-05-25T20:50:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -514,7 +514,7 @@
       {
         "id": "structured-logging-chain",
         "title": "feat(activity-log): structured events across plan-finalize → complete-planning → spawn chain",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -529,7 +529,7 @@
           {
             "id": "structured-logging-chain.ac1",
             "title": "plan-finalize CLI emits a structured event at each phase boundary (createBeads start/end, completePlanning start/end, terminal)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -537,7 +537,7 @@
           {
             "id": "structured-logging-chain.ac2",
             "title": "complete-planning route emits structured events for specWrite, beadsMaterialize, autoSpawn (when applicable), terminal",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -545,7 +545,7 @@
           {
             "id": "structured-logging-chain.ac3",
             "title": "POST /api/agents emits structured events at each rejection point (stack-health, guardrails) and success",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -553,7 +553,7 @@
           {
             "id": "structured-logging-chain.ac4",
             "title": "All events carry issueId, ISO timestamp, reason, and a stable source label suitable for grep/filter",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -561,7 +561,7 @@
           {
             "id": "structured-logging-chain.ac5",
             "title": "No logging change introduces synchronous file I/O in dashboard server code (must use emitActivityEntrySync or equivalent already-async-safe primitive)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -569,7 +569,7 @@
           {
             "id": "structured-logging-chain.ac6",
             "title": "npm run typecheck && npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
