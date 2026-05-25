@@ -108,3 +108,100 @@ orchestrator not populating it correctly. Tracked implicitly; not filed as bug.
 - `packages/contracts`' own `tsc --noEmit` is broken (pre-existing) and not part of
   the root typecheck gate — see PAN-1248. Wiring it in will surface
   `event-reducers.ts` / `index.ts` errors that need their own fix.
+
+## RUN-11 observations (tick 1, 2026-05-25)
+
+### 20-deep verifying-on-main backlog dominates the system
+
+At RUN-11 tick 1 there were 20 PAN issues in `verifying-on-main` simultaneously
+(PAN-829, 1052, 1053, 1059, 1111, 1139, 1140, 1141, 1148, 1158, 1189, 1190,
+1215, 1221, 1229, 1249, 1414, 1415, 1417, 1419). All merged, all awaiting the
+operator's UAT + close-out. No active work agents.
+
+**Why it matters.** Per `vision.mdx` the only required human input is UAT +
+merge. A 20-deep awaiting-UAT queue means the human checkpoint has become the
+bottleneck and is blocking the seven readiness criteria from being measured —
+specifically criterion #5 (operator intervention rate per pipeline run) cannot
+be cleanly measured when the operator is batch-UATing 20 issues at once.
+
+**How to apply.** Future runs should rank `merge`-action suggestions high but
+not urgent unless one of them is itself a substrate-bug fix. Surfacing the
+backlog ahead of new-work suggestions is the right ordering — the operator
+should not start new work while a 20-issue UAT batch is unresolved.
+
+### Tracker drift: `In Progress` + `closed-out` + `merged` simultaneously
+
+10 PAN issues are tracker-`In Progress` while carrying both `closed-out` and
+`merged` labels: PAN-457, 1358, 1379, 1381, 1385, 1389, 1391, 1393, 1407, 1408.
+These have completed the close-out ceremony but the tracker status was never
+flipped to `Done`. PAN-1381 has only `closed-out` (no `merged`) so its drift
+shape differs slightly.
+
+**Candidate root cause.** Close-out should be the canonical state transition
+that flips tracker status; somewhere between the close-out flow and the
+tracker-sync path the status update is dropped or overwritten. May be related
+to the substrate epic PAN-1454 (9 systemic failure patterns from the 80-issue
+audit) but that's `needs-design`-parked.
+
+**How to apply.** When inventorying `In Progress` issues, check the labels — an
+`In Progress + closed-out + merged` issue is almost certainly drift, not
+in-motion work, and should not be ranked for `start`/`resume` suggestions.
+Worth filing a dedicated substrate-improvement bug if PAN-1454's scope does not
+cover this specific gap.
+
+### v1.0-required MUST issues all unstarted
+
+PAN-1486 (toggles), PAN-1487 (telemetry), PAN-1491 (metric-aware
+prioritization) — all three MUST issues for the v1.0 readiness measurement
+program are open with no agent started. Until at least PAN-1487 lands, the
+seven readiness criteria in `vision.mdx` are aspirational; this run cannot
+self-measure intervention rate, bugs-per-run, etc.
+
+**How to apply.** PAN-1487 should remain a `start` suggestion at high priority
+every tick until it has an agent. PAN-1491 depends on PAN-1487 and should be
+medium-priority until 1487 ships.
+
+### Headline `awaitingUat` is now a load-bearing metric
+
+The FlywheelStatus headline's `awaitingUat` field at 20 is the first time this
+counter has carried real signal — earlier runs were dominated by in-flight
+agents. Confirms the suggestion in `vision.mdx` that this metric belongs in
+the UI as a first-class number rather than buried in `parked`/`activePipeline`.
+
+### Parked-item triage decisions (tick 2, 2026-05-25)
+
+The operator named all three parked items (PAN-1418, PAN-1454, PAN-1489) for
+unpark. The orchestrator's first pass surfaced the issues' sub-questions back
+to the operator, which the operator called out as a failure mode: the
+Flywheel must decide for itself on parked items, not delegate decisions back
+to the human. The discretion rule is now baked into `roles/flywheel.md` and
+`docs/flywheel-brief.md` so it travels to other machines.
+
+Decisions taken this tick:
+
+- **PAN-1418 collapsed into PAN-1486.** "Auto-merge enabled" and "UAT not
+  required" are the same decision viewed from two angles, not two orthogonal
+  toggles. PAN-1486 rewritten to be the single `require_uat_before_merge`
+  issue (default ON), with the cooldown + cancel mechanism folded in as
+  part of its scope when the toggle is OFF. PAN-1418 closed as superseded.
+- **PAN-1454 patterns 1, 2, 4, 8 chosen** as the prioritized substrate work
+  (silent-miss, transparent-deferral, scope-creep-stubs, test-plan-skip).
+  Filed PAN-1498 / PAN-1499 / PAN-1500 / PAN-1501 as focused fix issues.
+  Selection rationale: highest-frequency patterns in the audit + all four
+  have mechanical fixes (prompt edits + a regex/diff-scan gate). Patterns
+  3/5/6/7/9 stay in the META until the next 7-day audit window measures
+  whether the action-required rate drops below 15%.
+- **PAN-1489 stays parked.** Body explicitly says "do not action yet,
+  depends on telemetry + 30d of data." Nothing to discuss until PAN-1487
+  ships and ~30 days of data exists. Do not re-surface as a suggestion.
+
+### Substrate gap: discretion-on-unpark rule was only in user memory
+
+The original "decide, don't delegate" rule was first written into
+`~/.claude/projects/.../memory/feedback_flywheel_use_discretion.md`. The
+operator pointed out this is machine-local and will not travel when the
+Flywheel runs on other machines. Promoted the rule into
+`roles/flywheel.md` (the canonical role prompt) and
+`docs/flywheel-brief.md` (the runtime brief) in commit landing with this
+state update. Lesson: durable orchestration guidance belongs in the
+repo-tracked role/brief, not in agent memory.

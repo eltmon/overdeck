@@ -59,6 +59,22 @@ Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapsh
 
 The FlywheelStatus snapshot must include the current headline counts, active pipeline, substrate bugs, running agents, parked work, ranked suggestions, system status, open questions, tick count, and `lastTickAt`.
 
+## Discretion on parked items (decide, don't delegate)
+
+When the operator names a parked (`needs-discussion` / `needs-design`) item to unpark, **decide and act**. Do not bring the issue's sub-questions back to the operator. The operator authored ~99% of the open issues in this repo; the Flywheel role asking "which of these N options do you want" is the orchestrator delegating its own job back to the human, and that is a failure mode.
+
+Rules:
+
+- For each named parked issue: read the body, pick the simplest reasonable answer for every open sub-question, edit the issue body to reflect those decisions, and remove the parked label.
+- If two parked issues are conceptually the same decision viewed from different angles, **collapse them** — close one as superseded by the other and merge their bodies into the survivor.
+- If an issue's AC says "pick N of M to prioritize," pick N. Do not ask. File the focused sub-issues immediately.
+- Only escalate when the call is genuinely product/release judgment with no prior context (issue body, vision doc, prior closures) implying a default. Even then propose a default and ask for confirmation, never an open-ended question.
+- Record decisions in `docs/FLYWHEEL-STATE.md` so future runs inherit context.
+
+Counterexample (do not do this): "Here are 4 sub-questions about cooldown UX, multi-PR queue, failure mode, and mobile UX — which do you want?" The right move: pick reasonable defaults for each, write them into the issue body, ship it.
+
+The only required human input is UAT and merge approval. Everything else is the orchestrator's call.
+
 ## Substrate bug policy
 
 A workaround is a failed tick. When a failure blocks the pipeline, surface the root-cause work as an urgent suggestion and file a tracking issue as a supporting record. Filing is allowed recordkeeping; fixing is normal pipeline work that the operator starts from the suggestion list.

@@ -1132,7 +1132,7 @@
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.d.ts": {
-    "mtime": 1779691675.0006135,
+    "mtime": 1779695072.9807317,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notify-complete": {
@@ -1140,7 +1140,7 @@
     "hash": "373ba01f551cd1ff98252fd01e937ebd"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.js": {
-    "mtime": 1779691675.0006135,
+    "mtime": 1779695072.9807317,
     "hash": "376c3da1731ecd9eb6c128a8a21383c4"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notification-hook": {
@@ -6439,6 +6439,10 @@
     "mtime": 1779064153.7115428,
     "hash": "8a4fca37f65f46b6bffa1ea388ec6103"
   },
+  "/home/eltmon/Projects/panopticon-cli/vision.mdx": {
+    "mtime": 1779694983.9308057,
+    "hash": "d396169508c89e5679c31b3fadab5268"
+  },
   "/home/eltmon/Projects/panopticon-cli/CONTRIBUTING.md": {
     "mtime": 1778349942.5227036,
     "hash": "b33afab549f0d05b898124e8b2b1ab86"
@@ -6603,10 +6607,6 @@
     "mtime": 1778349942.657709,
     "hash": "a2f449818140e123a351c4f993c1527c"
   },
-  "/home/eltmon/Projects/panopticon-cli/docs/FLYWHEEL-VISION.md": {
-    "mtime": 1779690069.6713173,
-    "hash": "41140681a368cfc9048a4ad17808222d"
-  },
   "/home/eltmon/Projects/panopticon-cli/docs/SKILLS-CONVENTION.md": {
     "mtime": 1779172252.7283912,
     "hash": "1d844e3b3363cf5e9c6b823769722a53"
@@ -6724,8 +6724,8 @@
     "hash": "ba1a7c83fdb0aa9de28b15e265dfc906"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md": {
-    "mtime": 1779690069.6713173,
-    "hash": "9f7467b01662dc26f8bfdbecd8322c37"
+    "mtime": 1779694983.9308057,
+    "hash": "1e03523e4e9c741a53d389eb85fefc3b"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/HIERARCHICAL-PLANNING.md": {
     "mtime": 1778349942.5317042,
@@ -8348,8 +8348,8 @@
     "hash": "f97517cbc93424960342ea3f6eae6614"
   },
   "/home/eltmon/Projects/panopticon-cli/roles/flywheel.md": {
-    "mtime": 1779690069.6743174,
-    "hash": "9aa0a77854eb14acb3caae1a0fba1998"
+    "mtime": 1779694983.9308057,
+    "hash": "ac8f7c759c21afcba32108862be5dcef"
   },
   "/home/eltmon/Projects/panopticon-cli/benchmarks/templates/quantumllama.md": {
     "mtime": 1775883939.776186,

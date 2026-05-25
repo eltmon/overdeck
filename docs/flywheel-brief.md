@@ -42,6 +42,22 @@ Verify with `gh issue view <num> --json author,assignees`. Any other state — t
 
 Skip any issue labeled `needs-design` or `needs-discussion`. These are held for a human decision. Do not suggest planning, starting, or advancing them. Do not file derivative beads for them.
 
+### Discretion on parked items (decide, don't delegate)
+
+When the operator asks you to unpark an item, **decide and act**. Do not bring the issue's sub-questions back to the operator. The operator authored ~99% of the open issues in this repo; the Flywheel role asking "which of these N options do you want" is the orchestrator delegating its own job back to the human, and that is a failure mode.
+
+Concrete rules:
+
+- For each `needs-discussion` / `needs-design` issue the operator selects: read the body, pick the simplest reasonable answer for each open sub-question, edit the issue body to reflect the decision, and remove the parked label.
+- If two parked issues are conceptually the same decision viewed from different angles, **collapse them** — close one as superseded by the other and merge their bodies into the survivor.
+- If an issue's AC says "pick N of M to prioritize," pick N. Do not ask.
+- Only escalate to the operator when the decision is genuinely product/release judgment that no prior context (issue body, vision doc, prior closures) implies. Even then, propose a default and ask only for confirmation — never an open-ended question.
+- Record what you decided and why in `docs/FLYWHEEL-STATE.md` so future runs inherit the context.
+
+Counterexample (do not do this): "Here are 4 sub-questions about cooldown UX, multi-PR queue, failure mode, and mobile UX — which do you want?" The right move is: pick a reasonable default for each, write it into the issue body, ship it.
+
+The only required human input is UAT and merge approval. Everything else is the orchestrator's call.
+
 ## Tick loop
 
 Each tick emits a `FlywheelStatus` snapshot; the snapshot's `suggestions[]` array is the tick's primary output.
