@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStats, FlywheelStatus } from '@panctl/contracts';
 import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 
 const flywheelLifecycleMocks = vi.hoisted(() => ({
@@ -101,7 +101,9 @@ import {
   flywheelResumeCommand,
   formatFlywheelStateReport,
   flywheelStartCommand,
+  flywheelStatsCommand,
   flywheelStatusCommand,
+  formatFlywheelStats,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
   registerFlywheelCommands,
@@ -143,6 +145,20 @@ const validStatus: FlywheelStatus = {
   openQuestions: [],
   ticks: 1,
   lastTickAt: '2026-05-18T12:00:00.000Z',
+};
+
+const validStats: FlywheelStats = {
+  window: '30d',
+  generatedAt: '2026-05-25T10:00:00.000Z',
+  criteria: {
+    c1_bugRate: { label: 'Substrate-bug discovery rate', value: 0.01, target: 0.02, status: 'green', trend: 'down', sampleSize: 120, dataSufficient: true },
+    c2_p0Bugs: { label: 'Critical/P0 substrate bugs', value: 0, target: 0, status: 'green', sampleSize: 120, dataSufficient: true },
+    c3_passRate: { label: 'Pipeline pass success rate', value: 0.995, target: 0.99, status: 'green', trend: 'up', sampleSize: 120, dataSufficient: true },
+    c4_mttr: { label: 'MTTR for filed substrate bugs', value: { medianMs: 3_600_000, p95Ms: 86_400_000 }, target: { medianMs: 86_400_000, p95Ms: 604_800_000 }, status: 'yellow', trend: 'flat', sampleSize: 12, dataSufficient: true },
+    c5_intervention: { label: 'Operator intervention rate', value: 0.02, target: 0.05, status: 'green', sampleSize: 120, dataSufficient: true },
+    c6_timeConsistency: { label: 'Time-in-pipeline consistency', value: { simple: 1.1, medium: 1.4, complex: 1.8 }, target: { maxRatio: 2 }, status: 'green', sampleSize: 87, dataSufficient: true },
+    c7_flake: { label: 'Substrate-attributable flake rate', value: 0.03, target: 0.05, status: 'red', sampleSize: 20, dataSufficient: true },
+  },
 };
 
 async function git(cwd: string, args: string[]): Promise<string> {
@@ -289,6 +305,50 @@ describe('flywheel CLI commands', () => {
 
     const output = logSpy.mock.calls[0][0] as string;
     expect(JSON.parse(output)).toEqual(validStatus);
+  });
+
+  it('prints a seven-row stats table with the default 30-day window', async () => {
+    const fetchMock = vi.fn(async () => Response.json(validStats));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await flywheelStatsCommand({});
+
+    expect(fetchMock).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/stats?window=30d', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-panopticon-internal-token': expect.any(String) }),
+    }));
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain('Flywheel stats (30d)');
+    expect(output).toContain('| Criterion | Value | Target | Status | Trend | Sample |');
+    expect(output).toContain('| Substrate-bug discovery rate | 1.0% | 2.0% | ● green | ↘ down | 120 |');
+    expect(output).toContain('| Substrate-attributable flake rate | 3.0% | 5.0% | ● red | — | 20 |');
+    expect(output.split('\n').filter(line => line.startsWith('| ') && !line.startsWith('|---') && !line.startsWith('| Criterion'))).toHaveLength(7);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('queries stats with an explicit window', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ ...validStats, window: '7d' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await flywheelStatsCommand({ window: '7d' });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/stats?window=7d', expect.any(Object));
+    expect(logSpy.mock.calls[0][0]).toContain('Flywheel stats (7d)');
+  });
+
+  it('emits raw FlywheelStats JSON with --json', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(validStats)));
+
+    await flywheelStatsCommand({ json: true });
+
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(JSON.parse(output)).toEqual(validStats);
+  });
+
+  it('colors stats status glyphs when formatting for a TTY', () => {
+    const output = formatFlywheelStats(validStats, { color: true });
+
+    expect(output).toContain('\x1b[32m●\x1b[0m green');
+    expect(output).toContain('\x1b[31m●\x1b[0m red');
   });
 
   it('exits 1 when no active run exists', async () => {
@@ -626,6 +686,7 @@ describe('flywheel CLI commands', () => {
     const start = flywheel?.commands.find(command => command.name() === 'start');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
     const status = flywheel?.commands.find(command => command.name() === 'status');
+    const stats = flywheel?.commands.find(command => command.name() === 'stats');
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
@@ -633,6 +694,7 @@ describe('flywheel CLI commands', () => {
     expect(start?.options.map(option => option.long)).toContain('--brief');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
     expect(status?.options.map(option => option.long)).toContain('--json');
+    expect(stats?.options.map(option => option.long)).toEqual(expect.arrayContaining(['--window', '--json']));
     expect(pause).toBeDefined();
     expect(resume).toBeDefined();
     expect(report).toBeDefined();
