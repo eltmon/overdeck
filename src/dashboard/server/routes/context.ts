@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 
 import type { Harness } from '@panctl/contracts';
 import { Effect, Layer } from 'effect';
@@ -79,6 +81,24 @@ type ContextLayerSaveResponse = {
   savedAt: string;
 };
 
+type ContextSyncCommandResult = {
+  stdout: string;
+  stderr: string;
+};
+
+type ContextSyncResponse = {
+  operation: 'sync';
+  ok: boolean;
+  status: 'synced' | 'failed';
+  stdout: string;
+  stderr: string;
+  error?: string;
+  exitCode?: number;
+  syncedAt: string;
+};
+
+export type ContextSyncRunner = () => Promise<ContextSyncCommandResult>;
+
 type ProjectEntry = { key: string; config: ProjectConfig };
 
 type ContextCatalog = {
@@ -89,6 +109,7 @@ type ContextCatalog = {
 
 const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+const execFileAsync = promisify(execFile);
 
 type RuleScope = 'universal' | 'dev';
 
@@ -450,6 +471,53 @@ export async function saveContextLayer(
   };
 }
 
+async function runPanContextSync(): Promise<ContextSyncCommandResult> {
+  const { stdout, stderr } = await execFileAsync('pan', ['context', 'sync'], {
+    encoding: 'utf-8',
+  });
+  return { stdout, stderr };
+}
+
+function syncExitCode(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'number' ? code : undefined;
+}
+
+function syncOutput(error: unknown, key: 'stdout' | 'stderr'): string {
+  if (!error || typeof error !== 'object') return '';
+  const value = (error as Record<typeof key, unknown>)[key];
+  return typeof value === 'string' ? value : '';
+}
+
+export async function syncContextLayers(
+  runner: ContextSyncRunner = runPanContextSync,
+): Promise<ContextSyncResponse> {
+  const syncedAt = new Date().toISOString();
+  try {
+    const { stdout, stderr } = await runner();
+    return {
+      operation: 'sync',
+      ok: true,
+      status: 'synced',
+      stdout,
+      stderr,
+      syncedAt,
+    };
+  } catch (error) {
+    return {
+      operation: 'sync',
+      ok: false,
+      status: 'failed',
+      stdout: syncOutput(error, 'stdout'),
+      stderr: syncOutput(error, 'stderr'),
+      error: error instanceof Error ? error.message : 'pan context sync failed',
+      exitCode: syncExitCode(error),
+      syncedAt,
+    };
+  }
+}
+
 const getContextLayersRoute = HttpRouter.add(
   'GET',
   '/api/context/layers',
@@ -486,8 +554,18 @@ const putContextLayerRoute = HttpRouter.add(
   })),
 );
 
+const postContextSyncRoute = HttpRouter.add(
+  'POST',
+  '/api/context/sync',
+  httpHandler(Effect.gen(function* () {
+    const response = yield* Effect.promise(() => syncContextLayers());
+    return jsonResponse(response, { status: response.ok ? 200 : 500 });
+  })),
+);
+
 export const contextRouteLayer = Layer.mergeAll(
   getContextLayersRoute,
   postContextPreviewRoute,
   putContextLayerRoute,
+  postContextSyncRoute,
 );

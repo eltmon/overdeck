@@ -2,12 +2,13 @@ import { access, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildContextLayersResponse,
   previewContextLayers,
   saveContextLayer,
+  syncContextLayers,
 } from '../../../../../src/dashboard/server/routes/context.js';
 import type { ProjectConfig } from '../../../../../src/lib/projects.js';
 
@@ -95,9 +96,10 @@ describe('dashboard context routes helpers', () => {
     }));
   });
 
-  it('renders preview drafts per harness without writing files', async () => {
+  it('renders preview drafts per harness without writing files or syncing', async () => {
     const projects = await fixtureProject();
     const globalFile = join(tempRoot, 'home', 'context', 'global.md');
+    const syncRunner = vi.fn();
     const content = [
       'Shared guidance.',
       '{{#harness:claude}}',
@@ -120,6 +122,53 @@ describe('dashboard context routes helpers', () => {
     expect(response.previews.pi).toContain('Pi guidance.');
     expect(response.previews.pi).not.toContain('Claude guidance.');
     expect(response.previews.fullPrompt).toContain('Private harness base prompt: unavailable');
+    expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);
+  });
+
+  it('saves layer content without syncing', async () => {
+    const projects = await fixtureProject();
+    const syncRunner = vi.fn();
+
+    await saveContextLayer(projects, { kind: 'global' }, 'saved');
+
+    expect(syncRunner).not.toHaveBeenCalled();
+  });
+
+  it('runs context sync only through the explicit sync helper', async () => {
+    const runner = vi.fn().mockResolvedValue({ stdout: 'synced\n', stderr: '' });
+
+    const response = await syncContextLayers(runner);
+
+    expect(runner).toHaveBeenCalledOnce();
+    expect(response).toMatchObject({
+      operation: 'sync',
+      ok: true,
+      status: 'synced',
+      stdout: 'synced\n',
+      stderr: '',
+    });
+  });
+
+  it('returns structured context sync failures', async () => {
+    const error = Object.assign(new Error('sync failed'), {
+      code: 42,
+      stdout: 'partial output',
+      stderr: 'bad config',
+    });
+    const runner = vi.fn().mockRejectedValue(error);
+
+    const response = await syncContextLayers(runner);
+
+    expect(runner).toHaveBeenCalledOnce();
+    expect(response).toMatchObject({
+      operation: 'sync',
+      ok: false,
+      status: 'failed',
+      stdout: 'partial output',
+      stderr: 'bad config',
+      error: 'sync failed',
+      exitCode: 42,
+    });
   });
 });
