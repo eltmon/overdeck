@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
-    "updated": "2026-05-25T08:56:36.767Z"
+    "updated": "2026-05-25T09:05:36.911Z"
   },
   "plan": {
     "id": "pan-1418",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 44,
+    "sequence": 45,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-25T08:56:36.767Z",
+    "updated": "2026-05-25T09:05:36.911Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
@@ -1125,57 +1125,53 @@
     "metadata": {
       "canonicalFilename": "2026-05-23-PAN-1418-optional-opt-in-auto-merge-for-single-developer-workflow-configurable-per-project.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "review",
         "issueId": "PAN-1418",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T08:56:36.757Z",
+        "updatedAt": "2026-05-25T09:05:36.891Z",
         "work": {
-          "updatedAt": "2026-05-25T08:56:36.757Z",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T08:56:36.757Z",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T08:56:36.757Z",
+              "at": "2026-05-25T09:05:36.891Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-05-25T08:56:36.757Z",
-          "notes": "Review approved after cycle-8 convergence gate; no new cycle-diff blockers remain",
+          "status": "reviewing",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-25T08:56:36.757Z",
-              "notes": "Review approved after cycle-8 convergence gate; no new cycle-diff blockers remain"
+              "status": "reviewing",
+              "at": "2026-05-25T09:05:36.891Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T08:56:36.757Z",
-          "notes": "BLOCKER: Failed auto-merge executions leave stale countdown state (review finding c3dd750f, 2026-05-25T08:36:55Z). When triggerMerge() fails, the code calls markFailed() but does NOT emit a domain event to clear autoMergeScheduled from dashboard state. The countdown persists on dashboards even after merge failure and can survive reloads. Fix: (1) Emit merge.auto.aborted or terminal event on failure paths in fire(); (2) Update reducers to clear autoMergeScheduled for failed state; (3) Ensure bootstrap drops cached stale autoMergeScheduled entries for non-pending auto_merge DB rows. Code location: src/dashboard/server/services/auto-merge-scheduler.ts:316-327",
+          "status": "pending",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T08:56:36.757Z",
-              "notes": "BLOCKER: Failed auto-merge executions leave stale countdown state (review finding c3dd750f, 2026-05-25T08:36:55Z). When triggerMerge() fails, the code calls markFailed() but does NOT emit a domain event to clear autoMergeScheduled from dashboard state. The countdown persists on dashboards even after merge failure and can survive reloads. Fix: (1) Emit merge.auto.aborted or terminal event on failure paths in fire(); (2) Update reducers to clear autoMergeScheduled for failed state; (3) Ensure bootstrap drops cached stale autoMergeScheduled entries for non-pending auto_merge DB rows. Code location: src/dashboard/server/services/auto-merge-scheduler.ts:316-327"
+              "status": "pending",
+              "at": "2026-05-25T09:05:36.891Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T08:56:36.757Z",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-25T08:56:36.757Z",
+          "updatedAt": "2026-05-25T09:05:36.891Z",
           "history": [],
           "readyForMerge": false
         }
