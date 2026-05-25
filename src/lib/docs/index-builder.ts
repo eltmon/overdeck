@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, stat } from 'fs/promises';
 import { dirname, join } from 'path';
 import { createHash } from 'crypto';
 
-import type { NormalizedDocsConfig } from '../config-yaml.js';
+import type { DocsEmbeddingProvider, NormalizedDocsConfig } from '../config-yaml.js';
 import { getDefaultDocsConfig } from '../config-yaml.js';
 import { packageRoot } from '../paths.js';
 import { discoverDocsCorpusSources, chunkMarkdown, type DocsChunk } from './corpus.js';
@@ -16,9 +16,17 @@ export interface DocsEmbeddingInput {
   chunk: DocsChunk;
   dimensions: number;
   model: string;
+  provider: DocsEmbeddingProvider;
 }
 
-export type DocsEmbeddingFunction = (input: DocsEmbeddingInput) => Promise<Float32Array> | Float32Array;
+export interface DocsEmbeddingOutput {
+  embedding: Float32Array;
+  provider?: DocsEmbeddingProvider;
+  model?: string;
+}
+
+export type DocsEmbeddingFunction =
+  (input: DocsEmbeddingInput) => Promise<Float32Array | DocsEmbeddingOutput> | Float32Array | DocsEmbeddingOutput;
 
 export interface BuildDocsIndexOptions {
   outputPath?: string;
@@ -37,6 +45,7 @@ export interface BuildDocsIndexResult {
   embeddingCount: number;
   sizeBytes: number;
   builtAt: string;
+  embeddingProvider: DocsEmbeddingProvider;
   embeddingModel: string;
   embeddingDimensions: number;
 }
@@ -47,6 +56,7 @@ export interface DocsIndexMetadata {
   sourceCount: number;
   chunkCount: number;
   embeddingCount: number;
+  embeddingProvider: DocsEmbeddingProvider;
   embeddingModel: string;
   embeddingDimensions: number;
 }
@@ -57,6 +67,13 @@ interface BuildConfig {
 }
 
 const DEFAULT_CONFIG = getDefaultDocsConfig();
+const LOCAL_GTE_SMALL_MODEL_ID = 'Xenova/gte-small';
+
+type FeatureExtractionPipeline = (text: string, options: { pooling: 'mean'; normalize: boolean }) => Promise<{
+  data: Float32Array | number[];
+}>;
+
+const localEmbeddingPipelines = new Map<string, Promise<FeatureExtractionPipeline>>();
 
 function resolveBuildConfig(config?: Pick<NormalizedDocsConfig, 'corpus' | 'embedding'>): BuildConfig {
   return {
@@ -70,7 +87,9 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   const maxIndexBytes = options.maxIndexBytes ?? DEFAULT_DOCS_INDEX_MAX_BYTES;
   const builtAt = options.builtAt ?? new Date().toISOString();
   const config = resolveBuildConfig(options.config);
-  const embeddingFn = options.embeddingFn ?? deterministicDocsEmbedding;
+  const embeddingFn = options.embeddingFn ?? createDocsEmbeddingFunction(config.embedding);
+  let embeddingProvider: DocsEmbeddingProvider = config.embedding.provider;
+  let embeddingModel = config.embedding.model;
 
   await mkdir(dirname(outputPath), { recursive: true });
   await rm(outputPath, { force: true });
@@ -146,12 +165,16 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
 
     const items = [];
     for (const chunk of chunks) {
-      const embedding = await embeddingFn({
+      const output = await embeddingFn({
         chunk,
         dimensions: config.embedding.dimensions,
         model: config.embedding.model,
+        provider: config.embedding.provider,
       });
-      items.push({ chunk, embedding: normalizeFloat32Embedding(embedding, config.embedding.dimensions) });
+      const resolved = resolveDocsEmbeddingOutput(output);
+      embeddingProvider = resolved.provider ?? embeddingProvider;
+      embeddingModel = resolved.model ?? embeddingModel;
+      items.push({ chunk, embedding: normalizeFloat32Embedding(resolved.embedding, config.embedding.dimensions) });
     }
     insertAll(items);
 
@@ -163,7 +186,8 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
       sourceCount,
       chunkCount,
       embeddingCount,
-      embeddingModel: config.embedding.model,
+      embeddingProvider,
+      embeddingModel,
       embeddingDimensions: config.embedding.dimensions,
     });
   } finally {
@@ -182,7 +206,8 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
     embeddingCount,
     sizeBytes,
     builtAt,
-    embeddingModel: config.embedding.model,
+    embeddingProvider,
+    embeddingModel,
     embeddingDimensions: config.embedding.dimensions,
   };
 }
@@ -233,6 +258,7 @@ export function readDocsIndexMetadata(db: Database.Database): DocsIndexMetadata 
     sourceCount: Number(metadata.source_count),
     chunkCount: Number(metadata.chunk_count),
     embeddingCount: Number(metadata.embedding_count),
+    embeddingProvider: metadata.embedding_provider as DocsEmbeddingProvider,
     embeddingModel: metadata.embedding_model,
     embeddingDimensions: Number(metadata.embedding_dimensions),
   };
@@ -259,6 +285,56 @@ export function validateDocsIndex(db: Database.Database): DocsIndexMetadata {
   }
 
   return metadata;
+}
+
+export function createDocsEmbeddingFunction(config: NormalizedDocsConfig['embedding']): DocsEmbeddingFunction {
+  switch (config.provider) {
+    case 'local': return embedDocsWithLocalModel;
+    case 'openai': return embedDocsWithOpenAI;
+  }
+}
+
+export async function embedDocsWithLocalModel(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
+  const modelId = input.model === 'gte-small' ? LOCAL_GTE_SMALL_MODEL_ID : input.model;
+  const extractor = await getLocalEmbeddingPipeline(modelId);
+  const output = await extractor(input.chunk.content, { pooling: 'mean', normalize: true });
+  return {
+    embedding: output.data instanceof Float32Array ? output.data : new Float32Array(output.data),
+    provider: 'local',
+    model: input.model,
+  };
+}
+
+export async function embedDocsWithOpenAI(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is required to build docs embeddings with provider openai');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: input.model,
+      input: input.chunk.content,
+      encoding_format: 'float',
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`OpenAI docs embedding request failed (${response.status}): ${body.slice(0, 200)}`);
+  }
+
+  const data = await response.json() as { data: Array<{ embedding: number[]; model?: string }> };
+  return {
+    embedding: new Float32Array(data.data[0].embedding),
+    provider: 'openai',
+    model: input.model,
+  };
 }
 
 export function normalizeFloat32Embedding(embedding: Float32Array, dimensions: number): Float32Array {
@@ -289,7 +365,7 @@ export function bufferToFloat32Array(buffer: Buffer, dimensions: number): Float3
   return new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 }
 
-export function deterministicDocsEmbedding(input: DocsEmbeddingInput): Float32Array {
+export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
   const values = new Float32Array(input.dimensions);
   let seed = `${input.model}\n${input.chunk.docPath}\n${input.chunk.sectionAnchor ?? ''}\n${input.chunk.content}`;
 
@@ -304,6 +380,21 @@ export function deterministicDocsEmbedding(input: DocsEmbeddingInput): Float32Ar
   return normalizeFloat32Embedding(values, input.dimensions);
 }
 
+function resolveDocsEmbeddingOutput(output: Float32Array | DocsEmbeddingOutput): DocsEmbeddingOutput {
+  return output instanceof Float32Array ? { embedding: output } : output;
+}
+
+async function getLocalEmbeddingPipeline(modelId: string): Promise<FeatureExtractionPipeline> {
+  const cached = localEmbeddingPipelines.get(modelId);
+  if (cached) return cached;
+
+  const pipelinePromise = import('@xenova/transformers')
+    .then(({ pipeline }) => pipeline('feature-extraction', modelId))
+    .then((pipeline) => pipeline as FeatureExtractionPipeline);
+  localEmbeddingPipelines.set(modelId, pipelinePromise);
+  return pipelinePromise;
+}
+
 function writeDocsIndexMetadata(db: Database.Database, metadata: DocsIndexMetadata): void {
   const insert = db.prepare('INSERT INTO docs_index_metadata(key, value) VALUES (?, ?)');
   insert.run('schema_version', String(metadata.schemaVersion));
@@ -311,6 +402,7 @@ function writeDocsIndexMetadata(db: Database.Database, metadata: DocsIndexMetada
   insert.run('source_count', String(metadata.sourceCount));
   insert.run('chunk_count', String(metadata.chunkCount));
   insert.run('embedding_count', String(metadata.embeddingCount));
+  insert.run('embedding_provider', metadata.embeddingProvider);
   insert.run('embedding_model', metadata.embeddingModel);
   insert.run('embedding_dimensions', String(metadata.embeddingDimensions));
 }
