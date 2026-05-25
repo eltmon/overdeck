@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T10:29:58.792Z"
+    "updated": "2026-05-25T10:37:43.470Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T10:29:58.792Z",
+    "updated": "2026-05-25T10:37:43.470Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -917,7 +917,7 @@
       {
         "id": "b13-pan-merge-cancel-cli",
         "title": "Add `pan merge cancel <id>` CLI + DELETE /api/flywheel/auto-merge/:id route",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -933,7 +933,7 @@
           {
             "id": "b13.ac1",
             "title": "`pan merge cancel PAN-123` for a pending entry exits 0 and prints the cancellation confirmation; the entry is removed from the active list.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -941,7 +941,7 @@
           {
             "id": "b13.ac2",
             "title": "`pan merge cancel PAN-123` when the entry is already 'merging' exits non-zero with a message explaining the cooldown has expired and the merge is in progress.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -949,7 +949,7 @@
           {
             "id": "b13.ac3",
             "title": "`pan merge cancel PAN-999` for a non-pending issue exits non-zero with 'No pending auto-merge for PAN-999'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -957,7 +957,7 @@
           {
             "id": "b13.ac4",
             "title": "DELETE /api/flywheel/auto-merge/:id is origin-validated; non-trusted origin returns 403.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -965,7 +965,7 @@
           {
             "id": "b13.ac5",
             "title": "DELETE on a 'pending' entry returns 200 with the cancelled entry body; on 'merging' returns 409; on missing returns 404.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -973,7 +973,7 @@
           {
             "id": "b13.ac6",
             "title": "TTS announcement 'auto-merge cancelled for <issueId>' fires exactly once per cancellation.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -981,7 +981,7 @@
           {
             "id": "b13.ac7",
             "title": "sync-sources/skills/pan-merge/SKILL.md exists, documents `pan merge cancel <id>`, and `npm run lint` passes (skill ↔ CLI cross-check OK).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -989,7 +989,7 @@
           {
             "id": "b13.ac8",
             "title": "Vitest tests in src/cli/commands/__tests__/merge.test.ts and src/dashboard/server/routes/__tests__/flywheel.test.ts cover the happy / merging / missing / origin paths.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

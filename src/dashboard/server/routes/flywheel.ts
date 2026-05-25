@@ -41,6 +41,8 @@ import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/clo
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
+  cancelPending,
+  getPendingAutoMerge,
   listPendingAutoMerges,
   scheduleAutoMergeWithResult,
   type PendingAutoMerge,
@@ -238,6 +240,13 @@ interface AutoMergeScheduleDeps {
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
 }
 
+interface AutoMergeCancelDeps {
+  now?: () => Date;
+  getPending?: (issueId: string) => PendingAutoMerge | null;
+  cancel?: (id: number, cancelledBy: string) => boolean;
+  announce?: (issueId: string) => void;
+}
+
 function parsePrNumber(prUrl: string | undefined): number | undefined {
   const match = prUrl?.match(/\/pull\/(\d+)(?:$|[/?#])/);
   return match ? Number.parseInt(match[1], 10) : undefined;
@@ -250,6 +259,16 @@ function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): v
     issueId,
     source: 'dashboard',
     eventType: 'auto-merge-scheduled',
+  });
+}
+
+function announceAutoMergeCancelled(issueId: string): void {
+  emitActivityTtsSync({
+    utterance: `auto-merge cancelled for ${issueId}`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-cancelled',
   });
 }
 
@@ -309,6 +328,38 @@ export function getPendingAutoMergePayload(): PendingAutoMerge[] {
   return listPendingAutoMerges()
     .filter((entry) => entry.status === 'pending' || entry.status === 'merging')
     .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id);
+}
+
+export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
+  const issueId = issueIdParam.trim().toUpperCase();
+  if (!issueId) return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+
+  const entry = (deps.getPending ?? getPendingAutoMerge)(issueId);
+  if (!entry) return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  if (entry.status === 'merging') {
+    return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+  }
+
+  const cancelledAt = (deps.now ?? (() => new Date()))().toISOString();
+  const cancelled = (deps.cancel ?? cancelPending)(entry.id, 'operator');
+  if (!cancelled) {
+    const raced = (deps.getPending ?? getPendingAutoMerge)(issueId);
+    if (raced?.status === 'merging') {
+      return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+    }
+    return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  }
+
+  (deps.announce ?? announceAutoMergeCancelled)(issueId);
+  return {
+    status: 200,
+    body: {
+      ...entry,
+      status: 'cancelled' as const,
+      cancelledAt,
+      cancelledBy: 'operator',
+    },
+  };
 }
 
 export async function getFlywheelCurrentPayload() {
@@ -460,6 +511,20 @@ const postAutoMergeScheduleRoute = HttpRouter.add(
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
 
     const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const deleteAutoMergeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/flywheel/auto-merge/:id',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const result = deleteAutoMergePayload(params['id'] ?? '');
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -688,6 +753,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
   postAutoMergeScheduleRoute,
+  deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

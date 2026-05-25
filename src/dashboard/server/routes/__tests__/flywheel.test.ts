@@ -11,6 +11,7 @@ import {
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  deleteAutoMergePayload,
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelPausePayload,
@@ -25,7 +26,7 @@ import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../ser
 import { resetDatabase } from '../../../../lib/database/index.js';
 import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
-import { scheduleAutoMerge } from '../../../../lib/database/pending-auto-merges-db.js';
+import { scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
 
 interface RouteResult {
   status: number;
@@ -289,6 +290,67 @@ describe('flywheel auto-merge routes', () => {
         { issueId: 'PAN-2', scheduledMergeAt: '2026-05-25T10:10:00.000Z', status: 'pending', prNumber: 2 },
       ],
     });
+  });
+
+  it('origin-validates auto-merge cancellations', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+  });
+
+  it('cancels pending auto-merges, removes them from the active list, and announces once', () => {
+    scheduleAutoMerge({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const announce = vi.fn();
+
+    expect(deleteAutoMergePayload('pan-1486', {
+      now: () => new Date('2026-05-25T10:01:00.000Z'),
+      announce,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        issueId: 'PAN-1486',
+        status: 'cancelled',
+        cancelledAt: '2026-05-25T10:01:00.000Z',
+        cancelledBy: 'operator',
+      },
+    });
+    expect(getPendingAutoMergePayload()).toEqual([]);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('PAN-1486');
+  });
+
+  it('returns 409 when cancellation races a merging entry', async () => {
+    const entry = scheduleAutoMerge({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    transitionToMerging(entry.id);
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+      headers: { origin: 'http://localhost:3011' },
+    })).resolves.toEqual({
+      status: 409,
+      body: { error: 'Auto-merge cooldown has expired for PAN-1486; merge is in progress' },
+    });
+  });
+
+  it('returns 404 for missing pending auto-merges', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-999', {
+      method: 'DELETE',
+      headers: { origin: 'http://localhost:3011' },
+    })).resolves.toEqual({ status: 404, body: { error: 'No pending auto-merge for PAN-999' } });
   });
 });
 
