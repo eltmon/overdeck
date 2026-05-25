@@ -1,0 +1,97 @@
+{
+  "version": "1",
+  "issueId": "PAN-1509",
+  "created": "2026-05-25T17:30:00.000Z",
+  "updated": "2026-05-25T17:30:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1509",
+    "sha": "2fa6c5680",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Root cause is a fragile 3-step CLI-driven chain (plan-finalize → POST complete-planning → POST /api/agents) with no atomicity, no server-side reconciliation, and a 1.5s deferred killSession that races against the second POST.",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Atomicity fix in completePlanningArtifacts: materialize beads FIRST, then write the proposed spec ONLY on success. This eliminates the orphan-proposed-spec-without-matching-beads state confirmed in PAN-1450 (8/10), PAN-863 (1/12), PAN-1496 (0/9).",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Collapse the chain server-side: complete-planning route accepts autoSpawn=true and spawns the work agent in the same Effect after spec+beads succeed. Removes the CLI-to-CLI HTTP race entirely.",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Move the planning-session killSession out of complete-planning when autoSpawn=true; kill is deferred until after the work agent's tmux session is up so plan-finalize CLI survives long enough to surface spawn errors.",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Add a Deacon reconciliation patrol for orphan proposed specs — every cycle, scan .pan/specs/ for plan.status=proposed with no active agent-pan-<id> session and matching beads, then attempt spawn. This is the safety net that catches dashboard-restart-induced losses and any future regressions in the chain.",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Add `pan doctor` check for orphan proposed specs so operators see the state even when reconciliation is off or fails repeatedly (per acceptance criterion).",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Add structured activity-log events across each step of the chain (plan-finalize CLI emits 'auto-promote' phases; complete-planning emits 'spec-write', 'beads-materialize', 'auto-spawn'; agents route already emits start events). This makes future RUN-N debugging tractable without diffing logs.",
+      "recordedAt": "2026-05-25T17:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "complete-planning is ALSO called from the dashboard 'Done planning' kanban button via issueActions.ts — that call path must remain non-spawn (autoSpawn defaults to false for backward compat).",
+      "mitigation": "Make autoSpawn an opt-in request-body field; default false. Only plan-finalize CLI sets it to true. Add a test exercising both paths."
+    },
+    {
+      "id": "H2",
+      "summary": "The kill-deferral must not strand a planning session if autoSpawn fails after spec+beads succeed.",
+      "mitigation": "Always kill the planning session in a finally-style branch — either after spawn succeeds, or after spawn explicitly fails. The only path that skips kill is 'autoSpawn=false' (kanban button), where the planning session is killed at response time as today."
+    },
+    {
+      "id": "H3",
+      "summary": "Reconciler must respect pause/troubled/closed gates and not race with an in-flight spawn.",
+      "mitigation": "Reconciler uses the same evaluateAgentStartGate + spawnGuardrails checks as the direct POST /api/agents path. Also check for state.json existence with status='starting' to skip in-flight spawns. Only proceed when state is genuinely orphan."
+    },
+    {
+      "id": "H4",
+      "summary": "bd daemon flakiness — every `bd ping --json` failure triggers bd doctor --fix; createBeadsFromVBrief already handles this with retries. Don't simplify away that retry logic during the atomicity refactor.",
+      "mitigation": "Atomicity fix swaps the ORDER of spec-write vs beads-materialize inside completePlanningArtifacts but does NOT alter the bd-retry logic inside createBeadsFromVBrief. Existing bd-doctor recovery stays."
+    },
+    {
+      "id": "H5",
+      "summary": "ENOSPC (disk-full) is a real observed failure mode (saw it in dashboard.log during recent autonomous runs) — currently bubbles up as a generic 'Workspace creation failed' string.",
+      "mitigation": "When auto-spawn fails, structured log + activity event should include the underlying error message verbatim (not just 'spawn failed'). Doctor check should call out disk-full specifically so operators don't go looking in the wrong place."
+    },
+    {
+      "id": "H6",
+      "summary": "The chain's 30s timeout in plan-finalize.ts may be insufficient for autoSpawn=true since complete-planning now also runs the spawn (which includes docker stack-health probes, bd materialization, agent process start).",
+      "mitigation": "Increase the plan-finalize.ts fetch timeout to 90s when autoSpawn=true. Document in the bead."
+    },
+    {
+      "id": "H7",
+      "summary": "Stack-health gate may legitimately reject a spawn (workspace docker is unhealthy). Don't bypass — surface the rejection clearly so the reconciler picks it up after docker recovers.",
+      "mitigation": "autoSpawn server-side uses the same stack-health gate as direct POST. On rejection, return spec/beads success + spawn-skipped in the response so plan-finalize can print the actionable error. Reconciler re-attempts on subsequent cycles."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T17:30:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1509: investigated commit a3b0a857f (auto-spawn fix), traced the 3-step chain, confirmed atomicity bug in completePlanningArtifacts (spec written before beads), confirmed 3/10 failures from beads/plan mismatch in observed evidence (PAN-1450 8/10, PAN-863 1/12, PAN-1496 0/9), suspected deferred-kill race for the other 6/10. Planned 8 beads covering atomicity, server-side autoSpawn, kill-deferral, reconciler safety net, doctor check, structured logging, and a full-chain regression test.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
