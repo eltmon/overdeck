@@ -1,12 +1,26 @@
 import type Database from 'better-sqlite3';
 import { createRequire } from 'module';
 import { Worker } from 'worker_threads';
+import { fileURLToPath } from 'node:url';
 import { ensureParentDir, resolveFtsDbPath } from './paths.js';
 
 declare const Bun: unknown;
 
 const _require = createRequire(import.meta.url);
+const betterSqlite3Path = resolveBetterSqlite3Path();
 const databases = new Map<string, Database.Database>();
+
+function resolveBetterSqlite3Path(): string {
+  try {
+    return _require.resolve('better-sqlite3');
+  } catch (cause) {
+    const error = new Error(
+      `Cannot find better-sqlite3 from ${fileURLToPath(import.meta.url)}; run bun install in the workspace before starting Panopticon.`,
+    );
+    error.cause = cause;
+    throw error;
+  }
+}
 const openingDatabases = new Map<string, Promise<Database.Database>>();
 let worker: Worker | null = null;
 let nextRequestId = 1;
@@ -200,7 +214,7 @@ function postWorkerRequest<T>(payload: { projectId: string; statements: MemoryFt
 
 function getMemoryFtsWorker(): Worker {
   if (worker) return worker;
-  worker = new Worker(memoryFtsWorkerSource(), { eval: true });
+  worker = new Worker(memoryFtsWorkerSource(), { eval: true, workerData: { betterSqlite3Path } });
   const activeWorker = worker;
   worker.on('message', (message: { id: number; ok: boolean; result?: unknown; error?: string }) => {
     const request = pendingWorkerRequests.get(message.id);
@@ -239,12 +253,10 @@ function deferSqliteWork<T>(operation: () => T): Promise<T> {
 
 function memoryFtsWorkerSource(): string {
   return `
-const { parentPort } = require('node:worker_threads');
-const { createRequire } = require('node:module');
+const { parentPort, workerData } = require('node:worker_threads');
 const { dirname } = require('node:path');
 const { mkdirSync } = require('node:fs');
-const requireFromMain = createRequire(process.cwd() + '/package.json');
-const BetterSqlite3 = requireFromMain('better-sqlite3');
+const BetterSqlite3 = require(workerData.betterSqlite3Path);
 const databases = new Map();
 
 parentPort.on('message', (message) => {
