@@ -51,6 +51,7 @@ import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { projectsRouteLayer } from './routes/projects.js';
+import { contextRouteLayer } from './routes/context.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
@@ -310,6 +311,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   eventsRouteLayer,
   showRouteLayer,
   projectsRouteLayer,
+  contextRouteLayer,
   adminRouteLayer,
   prereqsRouteLayer,
   cliproxyRouteLayer,

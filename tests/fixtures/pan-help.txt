@@ -97,6 +97,8 @@ Commands:
                                   TLDR running)
   project                         Project registry for multi-project workspace
                                   support
+  projects                        Project registry for multi-project workspace
+                                  support
   health                          Show runtime health of Panopticon services
   doctor [options]                Check system health and dependencies
   resources [options]             Show RAM usage by agents, conversations, and
