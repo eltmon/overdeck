@@ -1,0 +1,202 @@
+# Flywheel Vision — Dev-Loop Today, User Pipeline at v1.0
+
+**Status:** Living document. Adopted 2026-05-25. Targets in this doc are **draft** until validated against ~1 month of real Flywheel telemetry.
+
+## TL;DR
+
+The Flywheel is a dev-loop for building Panopticon itself, not a feature for end users. Today it runs real Panopticon work through Panopticon's own pipeline so that substrate defects surface as the work flows, and we fix the substrate as the bugs appear. At v1.0, the substrate becomes reliable enough that end users get features and fixes into the pipeline and the system delivers them with only human UAT and merge in the loop.
+
+This document names what "v1.0-ready" means with measurable criteria, captures the immediate behavioral changes we need on the Flywheel to start measuring honestly, and lists the tracking issues that get us there.
+
+---
+
+## The mental model
+
+### Today: Flywheel as substrate dev-loop
+
+The Flywheel takes whatever work is moving through Panopticon and watches it flow. When a stage misbehaves — a review specialist fails to block obvious issues, a test agent loops, a merge gate confuses itself, a planning artifact gets written to the wrong path — the failure is a defect in Panopticon, not in the work. We call those **substrate bugs**.
+
+The work issue is almost a vehicle. The real product of a Flywheel pass is:
+
+1. A merged PR for the work itself (the issue gets done).
+2. Zero or more substrate bug issues filed against Panopticon.
+3. Zero or more substrate bug fixes merged (often before the original work merges).
+
+Every substrate bug is a step toward v1.0. The Flywheel exists to expose them faster than we'd find them with manual usage.
+
+### v1.0: Flywheel as user-facing pipeline
+
+When the substrate is solid, the Flywheel becomes a user-facing capability. Users (developers using Panopticon for their own projects) get features and bug fixes into the pipeline and the system delivers them end-to-end. The pipeline reliably:
+
+- Picks up backlog work.
+- Plans, implements, reviews, and tests it.
+- Surfaces merge-ready work for human UAT.
+- Merges when the human approves.
+
+At v1.0, **the only required human input is UAT (optional, per-issue) and merge approval.** Users who trust the system more can flip per-issue toggles to skip UAT for low-risk classes of work; users who trust it less keep UAT required for everything. The substrate doesn't change either way — only the human checkpoints do.
+
+### What changes between today and v1.0
+
+| Aspect | Today (dev-loop) | v1.0 (user pipeline) |
+|---|---|---|
+| Who files issues | Mostly us, often Panopticon agents | Mostly users |
+| Who picks up from backlog | Operator (human click) | Pipeline, when configured to |
+| Substrate-bug discovery rate | High — expected, that's the point | Low — bounded by error budget |
+| Required human input | UAT + merge + frequent intervention | UAT (optional) + merge |
+| Flywheel posture | Surface substrate defects | Deliver user work |
+
+The Flywheel doesn't disappear at v1.0. It changes role: from "exposes our own defects" to "drives the user's pipeline." The same orchestration loop, with different defaults and a much smaller intervention rate.
+
+---
+
+## Definitions
+
+- **Substrate bug** — a defect in Panopticon itself: a broken route, a misbehaving role prompt, a wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate bugs get filed against `eltmon/panopticon-cli` and fixed through the normal Panopticon pipeline.
+- **Work-code bug** — a defect in the application code that an issue agent is producing. Work-code bugs are part of normal pipeline operation and are not a v1.0 signal — review and test agents catch them.
+- **Pipeline run** — one issue's journey from `start` to `merged` (or to `parked`/`cancelled`). The Flywheel may have many issues in flight; each is its own run for measurement purposes.
+- **Pipeline pass** — a single end-to-end completion: plan → work → review → test → ship → merge. A run may go through multiple passes if review or test rejects work and the agent re-submits.
+- **Operator intervention** — any human action on a pipeline run beyond clicking merge. Includes: filing a substrate bug, telling an agent something, pausing/resuming, restarting a review cycle, editing a workspace file, deep-wipe, manual merge resolution. UAT itself is not an intervention — it's the expected human checkpoint.
+- **Substrate-bug discovery rate** — substrate bugs filed per pipeline run, measured over a rolling window. The headline v1.0 metric.
+
+A note on bug-filing provenance: today we cannot distinguish, from the issue alone, whether a substrate bug was filed by an agent during a Flywheel pass or by the operator who happened to ask an agent to file it. That's a measurement gap we need to close — see [Issue tracking](#tracking-issues) below.
+
+---
+
+## v1.0 readiness criteria (DRAFT)
+
+These are the proposed thresholds for declaring Panopticon's substrate "v1.0-ready." Targets are anchored to industry benchmarks (see [Methodology & Research](#methodology--research)); they are **draft** and should be refined after ~1 month of real Flywheel telemetry.
+
+We are v1.0-ready when **all** of the following hold for **30 consecutive days**:
+
+| # | Metric | Target | Anchor |
+|---|---|---|---|
+| 1 | Substrate-bug discovery rate (per pipeline run) | **< 2%** (≤ 1 substrate bug per 50 runs) | Best-in-class DRE escape rate (<2%, Capers Jones) |
+| 2 | Critical/P0 substrate bugs | **0** in rolling 30-day window | DRE convention: "zero critical escapes" at every tier above typical |
+| 3 | Pipeline pass success rate (substrate-attributable failures only) | **≥ 99%** | Google/Shopify CI SLO framing; carves out legitimate test failures |
+| 4 | MTTR for a filed substrate bug (filed → fix merged) | **< 24h median, < 1 week p95** | DORA Elite (<1hr) scaled for internal tooling |
+| 5 | Operator intervention rate per pipeline run | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified (80-88%); substrate must be stricter than the agent layer |
+| 6 | Time-in-pipeline consistency, per complexity bucket | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
+| 7 | Flake rate on substrate-attributable failures | **< 5%** | Tighter than Google's observed 16% / Microsoft's 13% (substrate flakes block the whole pipeline, so compound cost is higher) |
+
+Why "all of the above" and not a weighted score: a single metric can be gamed (fewer pipeline runs → fewer bugs) or hidden (operator intervenes constantly → success rate looks fine). The combination is harder to game and forces honest measurement.
+
+Why 30 consecutive days: gives statistical signal (dozens of pipeline runs at current cadence) without being a year-long wait. After 30 days, we can either re-affirm v1.0 or identify which criterion is the bottleneck.
+
+### What "v1.0" doesn't mean
+
+- Not "no bugs ever." Criterion 1 leaves room for an error budget (~1 per 50 runs). Bugs that show up after v1.0 get filed and fixed as before — the rate just stays bounded.
+- Not "no human in the loop." Humans still UAT and approve merges by default.
+- Not "all features done." v1.0 is about the substrate being reliable, not about feature parity with some hypothetical complete system. Feature work continues after v1.0.
+
+---
+
+## Immediate behavioral changes
+
+Two changes need to land on the Flywheel before the v1.0 telemetry is meaningful. Both convert current hardcoded role-prompt constraints into config-driven toggles.
+
+### Auto-pickup from backlog (default OFF)
+
+Today: `roles/flywheel.md` Inventory step explicitly lists only "in progress, in review, blocked, or awaiting merge" — backlog/Todo items are excluded. The forbidden list bars the orchestrator from running `pan start` or `pan plan` itself.
+
+After: a `flywheel.auto_pickup_backlog` config flag, default `false`. When true, the orchestrator includes ready backlog items in inventory and may apply `start`/`plan` suggestions automatically, bounded by `roles.flywheel.maxAgents`. When false (today's behavior), backlog items remain off the inventory and `start`/`plan` actions are operator-applied.
+
+### UAT-required-before-merge (default ON)
+
+Today: the role's forbidden list says "never auto-merge a PR without human UAT and merge approval." Two things are baked into one rule.
+
+After: a `flywheel.require_uat_before_merge` config flag, default `true`. When true (today's behavior), merge cannot proceed until a human marks UAT passed. When false, the merge gate only requires the configured CI checks (`panopticon/review` + `panopticon/test`); the human still clicks merge.
+
+This separation matters: "human merges" and "human UATs" are independent constraints. We may want to relax UAT but never auto-merge (the model we want for v1.0). The toggle reflects that.
+
+The "auto-merge" side — automatically clicking MERGE after a cooldown when every gate is green — is tracked separately in [PAN-1418](https://github.com/eltmon/panopticon-cli/issues/1418), and composes orthogonally with this UAT toggle:
+
+| `require_uat_before_merge` | PAN-1418 `autoMerge.enabled` | Behavior |
+|---|---|---|
+| `true` (default) | `false` (default) | Today: human UATs, human clicks merge |
+| `true` | `true` | Human UATs, system auto-merges after cooldown |
+| `false` | `false` | Human merges without requiring UAT |
+| `false` | `true` | Unattended merge after cooldown; only for trusted classes of work |
+
+PAN-1418 is currently labeled `needs-discussion` and is not in active development — listed here for orthogonal-design reasons, not as a dependency.
+
+### Persistence
+
+Both flags live in the `app_settings` SQLite table (same place as `flywheel.globally_paused`), which means they're user-machine level and survive Flywheel restarts. The FlywheelPage gets two checkboxes; toggling persists immediately and takes effect on the next Flywheel run.
+
+### Humans-only-merge — current state and the gap
+
+On `eltmon/panopticon-cli`, branch protection on `main` requires the two status checks (`panopticon/review`, `panopticon/test`) and conversation resolution. It does **not** include `required_pull_request_reviews`. The "only the owner merges" property is currently enforced by access (you're the sole push collaborator), not by policy.
+
+This is fine today and arguably right while we're in dev-loop mode (no second human to approve from). The policy gap matters later: the moment we add a trusted second person, they can merge without any human approval since the rule isn't there. Formalizing `required_pull_request_reviews: 1` now means the "humans only merge" property is owned by the repo's policy rather than its access list. See [Issue tracking](#tracking-issues) for the optional follow-up.
+
+---
+
+## Methodology & research
+
+The v1.0 targets are triangulated from three industry analogues, because "substrate-bug discovery rate per pipeline run" doesn't have a direct published benchmark.
+
+### Triangulation
+
+1. **Substrate-bug discovery rate ↔ defect escape rate.** Capers Jones' Defect Removal Efficiency (DRE) framework is the closest analogue: it measures defects caught in pipeline vs. defects escaping to production. Industry median DRE is ~85% (15% escape rate); best-in-class is >95% (<2% escape). We invert this for our metric: substrate bugs surfacing during pipeline runs are analogous to escape defects from the substrate's "manufacturing process." A <2% rate per pipeline run mirrors the best-in-class escape threshold.
+
+2. **Pipeline pass success rate ↔ CI/CD substrate SLO.** Google's SRE Workbook and Shopify's CI engineering posts both treat their CI/CD as a service with an SLO. The standard frame is 99% availability for substrate (with the remaining 1% being the error budget for known-acceptable failure modes). We adopt the 99% target, scoped to substrate-attributable failures specifically — legitimate test failures don't count.
+
+3. **Operator intervention rate ↔ agent autonomy benchmarks.** SWE-bench Verified is the cleanest public number for autonomous coding agent success. Top systems in 2026 sit at 80-94% on solvable, well-defined tasks. Our intervention rate target (<5%) is **stricter than the agent layer** because the substrate is supposed to be the reliable part — agents may fail at their tasks, but Panopticon shouldn't be the reason they fail.
+
+### Sources
+
+- DORA / Accelerate State of DevOps 2024 — [dora.dev/research/2024](https://dora.dev/research/2024/dora-report/)
+- Capers Jones, *Software Defect Removal Efficiency* — [PPI summary PDF](https://www.ppi-int.com/wp-content/uploads/2021/01/Software-Defect-Removal-Efficiency.pdf)
+- Google SRE Workbook — [sre.google/workbook/implementing-slos](https://sre.google/workbook/implementing-slos/)
+- Shopify Engineering, *Keeping Developers Happy with a Fast CI* — [shopify.engineering/faster-shopify-ci](https://shopify.engineering/faster-shopify-ci)
+- Atlassian Engineering, *Taming Test Flakiness* — flake-rate observations
+- SWE-bench Verified Leaderboard — [swebench.com](https://www.swebench.com/), [epoch.ai/benchmarks/swe-bench-verified](https://epoch.ai/benchmarks/swe-bench-verified)
+- Cognition Labs, SWE-bench Technical Report (Devin) — [cognition.ai/blog/swe-bench-technical-report](https://cognition.ai/blog/swe-bench-technical-report)
+- DORA 2024 highlights & analysis — [getdx.com](https://getdx.com/blog/2024-dora-report/), [redmonk.com](https://redmonk.com/rstephens/2024/11/26/dora2024/)
+
+### What the data does not cover
+
+We should be honest about what the targets are **not** anchored to:
+
+- **No published "intervention rate on internal dev tooling" benchmark.** The <5% target is derived from inverted-Elite-agent-autonomy on SWE-bench Verified, not from a published platform-engineering number. The literature on internal-tool maturity is qualitative (Bazel/Buck adoption stories) rather than numeric.
+- **DORA tier thresholds shifted to distributions in 2024.** The Elite/High/Medium/Low numbers we anchor to are synthesized from summary posts; treat the cutoffs as ±20% bands rather than bright lines.
+- **"Substrate-bug discovery rate per pipeline run" is a novel framing.** No direct industry equivalent exists. The closest analogues are escape defect rate (used here) and CI substrate-failure rate, which we triangulate against.
+
+These caveats are why the criteria are explicitly **DRAFT** and why we plan to refine them after ~1 month of real Flywheel data.
+
+---
+
+## Tracking issues
+
+These are the issues that get us to "tracking the vision fully." Issues marked **MUST** are the minimum bar — without them, we cannot honestly measure whether we're approaching v1.0.
+
+| Issue | Title | MUST? | Why |
+|---|---|---|---|
+| (this doc) | Codify Flywheel vision: dev-loop today → v1.0 user pipeline | — | The vision doc itself; merges via this PR |
+| [`#TBD-A`](#) | Flywheel toggles: `auto_pickup_backlog` + `require_uat_before_merge`, persisted at user-machine level, exposed on FlywheelPage | **MUST** | Without these toggles the Flywheel cannot be configured to behave like a v1.0 user pipeline, so we can't measure intervention rate honestly |
+| [`#TBD-B`](#) | Substrate-bug provenance + Flywheel telemetry (bugs-per-run, time-in-stage-vs-complexity, intervention count) | **MUST** | Without this we cannot measure any of the seven v1.0 criteria; everything else is aspirational |
+| [`#TBD-C`](#) | Formalize humans-only-merge in branch protection (`required_pull_request_reviews: 1` on main) | Nice-to-have | Policy hygiene; the property holds today via access but should be a rule before we trust a second collaborator |
+| [`#TBD-D`](#) | Tune v1.0 criteria with real data | Deferred | Only meaningful after ~30 days of telemetry from MUST issues above |
+
+Issue numbers will be filled in once the issues are filed alongside this PR.
+
+---
+
+## Open questions
+
+These are decisions we haven't made and don't need to make today, but should revisit before v1.0:
+
+- **Per-issue UAT override.** Once the global `require_uat_before_merge` flag exists, do we add a per-issue override (a label like `bypass-uat` or a vBRIEF field)? The v1.0 user model assumes some users will want this. Defer until after the global toggle ships.
+- **Substrate-bug labels.** Do we want a dedicated `substrate-bug` label on filed issues, separate from the bug provenance mechanism? Probably yes for visibility, but it shouldn't replace provenance — labels can be edited; commit-trailer-based provenance can't.
+- **What counts as "a pipeline run" for measurement?** Does a parked/cancelled issue count? Currently the Flywheel inventories all in-motion work; we may want to scope the denominator to runs that reach at least the work stage.
+- **When to retire this doc.** Once we hit v1.0, this doc transitions from "north star" to "history of how we got here." We should not delete it — keep it as a historical record of the dev-loop → v1.0 transition.
+
+---
+
+## Appendix: where this fits in the docs
+
+- [`docs/flywheel-brief.md`](./flywheel-brief.md) — the operational contract the Flywheel orchestrator reads at the start of every run. This vision doc explains *why* the brief looks the way it does; the brief itself does not need to change to reflect this doc.
+- [`docs/FLYWHEEL.md`](./FLYWHEEL.md) — technical reference for the Flywheel contract, lifecycle, and dashboard surfaces.
+- [`docs/FLYWHEEL-STATE.md`](./FLYWHEEL-STATE.md) — durable cumulative memory authored by the orchestrator across runs.
+- [`packages/contracts/src/flywheel.ts`](../packages/contracts/src/flywheel.ts) — the `FlywheelStatus` schema the orchestrator emits each tick.
+- [`roles/flywheel.md`](../roles/flywheel.md) — the role prompt that hardcodes the constraints this doc proposes to make config-driven.
