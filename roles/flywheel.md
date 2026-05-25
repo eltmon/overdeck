@@ -55,7 +55,8 @@ Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapsh
 2. **Diagnose** — classify each issue as healthy, stuck, cycling, stalled, wrong-column, ghost, or awaiting human UAT.
 3. **Emit suggestions** — produce a ranked `suggestions[]` array. Each suggestion has shape `{ action, issueId?, rationale, priority }`, where `action` is one of `start`, `resume`, `plan`, `review`, `merge`, `unblock`, `park`, `investigate`, `wait`, and `priority` is one of `urgent`, `high`, `medium`, `low`. Suggestions are recommendations for the operator; do not apply them yourself.
 4. **File substrate bugs as records** — when broken Panopticon behavior is discovered, file a substrate bug with `gh issue create` if no tracking issue exists. Suggest substrate fixes instead of editing code: a substrate bug becomes an `investigate` or `start` suggestion in `suggestions[]`. The orchestrator never edits substrate code itself.
-5. **Respect pauses** — if `pan flywheel pause` is issued, stop after emitting the current safe checkpoint and wait for `pan flywheel resume`.
+5. **Launch agents on the top suggestions** — for the highest-priority items in `suggestions[]` that need new work (action `start`, `plan`, or `investigate` on an unstarted issue), run `pan plan <id> --auto` directly. The orchestrator's #1 job is keeping the Command Deck non-empty. Suggestions without follow-through are reports, not orchestration. Cap concurrent launches by the configured `maxAgents` minus the orchestrator slot, and prefer planning (`pan plan --auto`) over `pan start --auto` so the planning role produces a real vBRIEF rather than synthesizing a minimal one. `merge` and `wait` suggestions are operator-only — never call `pan close` or click MERGE yourself unless `require_uat_before_merge=false` (see PAN-1486).
+6. **Respect pauses** — if `pan flywheel pause` is issued, stop after emitting the current safe checkpoint and wait for `pan flywheel resume`.
 
 The FlywheelStatus snapshot must include the current headline counts, active pipeline, substrate bugs, running agents, parked work, ranked suggestions, system status, open questions, tick count, and `lastTickAt`.
 
@@ -86,9 +87,14 @@ Allowed:
 - `pan flywheel emit-status` to publish every tick snapshot.
 - `pan flywheel report --force` to close out the run (the `--force` flag is required from inside the orchestrator session; without it the command refuses while the orchestrator is alive, to protect against external callers silently terminating a live run).
 
+Allowed for launching work:
+
+- `pan plan <id> --auto` to start a planning agent on a high-priority unstarted issue (preferred — produces a full vBRIEF, then auto-promotes to a work agent).
+- `pan start <id> --auto` for trivial issues where planning is overkill (typos, version bumps, single-line fixes).
+
 Never:
 
-- Run `pan start`, `pan plan`, `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
+- Run `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
 - Edit feature branches directly or commit code fixes from this role.
 - Merge PRs directly or auto-merge a PR without human UAT and merge approval.
 - Deep-wipe without explicit user approval.

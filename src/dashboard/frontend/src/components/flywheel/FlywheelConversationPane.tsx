@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, Pause, Play, Plus, RotateCcw, Settings } from 'lucide-react';
+import { ExternalLink, Loader2, Maximize2, Pause, Play, Plus, RotateCcw, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
@@ -111,6 +111,7 @@ type FlywheelPaneViewMode = 'conversation' | 'terminal';
 
 export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversationPaneProps) {
   const [viewMode, setViewMode] = useState<FlywheelPaneViewMode>('conversation');
+  const isPopoutWindow = typeof window !== 'undefined' && window.location.pathname === '/popout/flywheel-conversation';
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
     queryKey: ['flywheel-runs'],
@@ -300,6 +301,23 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               >
                 <Plus className="h-3.5 w-3.5" />
                 New Run
+              </button>
+            )}
+            {!isPopoutWindow && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+                onClick={() => {
+                  window.open(
+                    '/popout/flywheel-conversation',
+                    'flywheel-conversation-popout',
+                    'width=1100,height=750,menubar=no,toolbar=no,location=no,status=no',
+                  );
+                }}
+                title="Open this view in a separate window"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+                Pop out
               </button>
             )}
             <button

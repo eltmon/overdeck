@@ -1,0 +1,235 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T08:25:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
+    "updated": "2026-05-25T08:23:37.356Z"
+  },
+  "plan": {
+    "id": "pan-1495",
+    "title": "fix: resolve worker native modules from parent process, not process.cwd()",
+    "status": "proposed",
+    "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T08:25:00.000Z",
+    "updated": "2026-05-25T08:23:37.356Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
+        "label": "PAN-1495",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "session-context",
+      "feature-registry",
+      "memory-fts",
+      "worker-threads"
+    ],
+    "narratives": {
+      "Problem": "Two worker_threads workers — the feature-registry worker (src/lib/registry/feature-registry-storage.ts) and the memory FTS worker (src/lib/memory/fts-db.ts) — resolve better-sqlite3 inside the worker via `createRequire(process.cwd() + '/package.json')`. When the dashboard server is launched with a cwd outside the repo root (observed on 2026-05-25 with cwd = /home/eltmon/Projects), `node_modules/better-sqlite3` does not exist at that location and the worker throws `MODULE_NOT_FOUND`. The feature-registry crash is loud in the dashboard logs and silently disables the session-context feature-registry briefing (PAN-1204). The fts-db worker has the identical bug and is likely also broken under the same condition, silently degrading memory FTS.",
+      "Proposal": "Resolve `better-sqlite3` to an absolute file path in the PARENT process (where `import.meta.url` is reliable) using `createRequire(import.meta.url)` + `require.resolve('better-sqlite3')`, then pass that path to the worker via `workerData`. The worker source uses `const { workerData } = require('node:worker_threads')` and `require(workerData.betterSqlite3Path)` — no `process.cwd()` dependency. Apply the same patch to both workers. Add a regression test that runs the workers from a cwd outside the repo and asserts they still operate. Wrap `require.resolve` in the parent with a descriptive error so future regressions surface clearly. This is a one-line conceptual fix per worker; the diff is small and surgical to avoid colliding with the ongoing PAN-1204 cleanup."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve via workerData + parent-side require.resolve rather than passing __dirname/projectRoot and rebuilding createRequire inside the worker.",
+        "rationale": "The parent process is the only place where module resolution context is reliably correct (it just successfully loaded its own deps). Resolving once in the parent and passing an absolute path is strictly safer than re-deriving paths inside the worker, and it gives us a clear parent-side error if better-sqlite3 is genuinely missing."
+      },
+      {
+        "summary": "Keep `new Worker(source, { eval: true })` rather than switching to a file-based worker.",
+        "rationale": "The eval-based shape is intentional (avoids needing a separate bundled file in the dist tree). The bug isn't caused by eval mode — it's caused by cwd-based resolution. Adding workerData is the minimum viable fix."
+      },
+      {
+        "summary": "Patch both workers in separate beads rather than extracting a shared helper.",
+        "rationale": "The two workers are in unrelated subsystems (registry vs memory FTS) and the worker source bodies differ. A shared helper would create cross-subsystem coupling for a 3-line spawn-side fix. If a third worker ever appears, refactoring into a helper at that point is cheap; speculating now is YAGNI."
+      },
+      {
+        "summary": "Add regression coverage via a unit test that mutates process.cwd before exercising the worker, rather than a full integration test against the built dashboard.",
+        "rationale": "process.chdir() in a Vitest test is sufficient to reproduce the failure mode (worker inherits parent's cwd). A full-server boot test would be much slower and noisier; the unit-level reproduction directly targets the regression surface."
+      },
+      {
+        "summary": "Do not change the dashboard launch path or attempt to force cwd to the repo root from `pan up`.",
+        "rationale": "Even if `pan up` always chdir'd to the repo root, embedding a cwd dependency in worker code is fragile (other launch paths exist: PM2, systemd, manual node invocation). Fixing the worker resolution is the correct layer."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-feature-registry-worker",
+        "title": "Fix feature-registry worker to resolve better-sqlite3 from parent process",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1495",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/registry/feature-registry-storage.ts: (1) add `import { createRequire } from 'node:module'` and `import { fileURLToPath } from 'node:url'` at the top; (2) at module-load time, resolve `better-sqlite3` to an absolute path via `createRequire(import.meta.url).resolve('better-sqlite3')`, wrapped in try/catch that throws a descriptive Error if missing; (3) pass that absolute path to the worker via `new Worker(featureRegistryWorkerSource(), { eval: true, workerData: { betterSqlite3Path } })`; (4) in `featureRegistryWorkerSource()`, replace `const requireFromMain = createRequire(process.cwd() + '/package.json'); const BetterSqlite3 = requireFromMain('better-sqlite3');` with `const { workerData } = require('node:worker_threads'); const BetterSqlite3 = require(workerData.betterSqlite3Path);`. Make NO other changes to this file."
+        },
+        "subItems": [
+          {
+            "id": "fix-feature-registry-worker.ac1",
+            "title": "Worker source no longer references process.cwd() — grep `process\\.cwd` in feature-registry-storage.ts returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-feature-registry-worker.ac2",
+            "title": "Starting the dashboard server with cwd outside the repo (e.g. `cd /tmp && node /abs/path/to/dist/dashboard/server.js`) produces no '[session-context] Failed to load feature registry entries' log line and no MODULE_NOT_FOUND error in stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-feature-registry-worker.ac3",
+            "title": "Calling `listFeatureRegistryEntries({})` returns successfully (empty array or populated rows — does not throw) regardless of the dashboard's launch cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-feature-registry-worker.ac4",
+            "title": "If better-sqlite3 is genuinely missing from node_modules, the parent-side require.resolve throws a clear error message naming the missing module BEFORE the worker is spawned (not a cryptic MODULE_NOT_FOUND from inside the worker)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-feature-registry-worker.ac5",
+            "title": "`npm run typecheck` and `npm run lint` pass with no new warnings; `npm run build` produces a dist that still boots successfully under Node 22",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-fts-db-worker",
+        "title": "Fix memory FTS worker (fts-db.ts) to resolve better-sqlite3 from parent process",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1495",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Apply the identical resolution-pattern fix from `fix-feature-registry-worker` to src/lib/memory/fts-db.ts: parent-side `createRequire(import.meta.url).resolve('better-sqlite3')` (with try/catch + descriptive error), pass via `workerData.betterSqlite3Path`, worker source loads via `require(workerData.betterSqlite3Path)`. Confirm fts-db.ts already uses ESM (`import.meta.url` available) — if not, fall back to `createRequire(__filename)` shaped appropriately. Make NO other changes to fts-db.ts; do not refactor the memoryFtsWorkerSource() function body beyond the require line."
+        },
+        "subItems": [
+          {
+            "id": "fix-fts-db-worker.ac1",
+            "title": "Worker source no longer references process.cwd() — grep `process\\.cwd` in src/lib/memory/fts-db.ts returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-fts-db-worker.ac2",
+            "title": "Calling `pan memory search <query>` (or the underlying worker entrypoint) completes successfully when invoked from a process whose cwd is outside the repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-fts-db-worker.ac3",
+            "title": "Existing memory FTS unit tests still pass (`npm test -- fts-db` or the closest equivalent); no behavioral change to query results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-fts-db-worker.ac4",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm run build` all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-cwd-regression-test",
+        "title": "Add regression test: workers must operate regardless of parent process cwd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1495",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Vitest test file (e.g. src/lib/registry/__tests__/feature-registry-storage-cwd.test.ts and src/lib/memory/__tests__/fts-db-cwd.test.ts, or a single shared spec under src/lib/__tests__/) that: (1) records the original process.cwd(); (2) calls process.chdir(os.tmpdir()) to simulate the broken-cwd condition; (3) imports and exercises the worker (initializeFeatureRegistryStorage() + listFeatureRegistryEntries() for registry; equivalent entrypoint for fts-db); (4) asserts the operation completes without throwing MODULE_NOT_FOUND; (5) restores the original cwd in afterEach/afterAll. Use a unique PANOPTICON_HOME per test (os.tmpdir()/panopticon-test-<uuid>) to avoid clobbering the user's real registry. Use a small timeout — workers should respond in well under a second. Do NOT use real-wall-clock setTimeout retries; if any waiting is needed, use vi.useFakeTimers() per project test rules."
+        },
+        "subItems": [
+          {
+            "id": "add-cwd-regression-test.ac1",
+            "title": "Test file exists, runs under `npm test`, and exercises BOTH workers (feature-registry and memory FTS) with a mutated process.cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-cwd-regression-test.ac2",
+            "title": "Test PASSES on this branch (proving the fix works) and would FAIL on main pre-fix (proving the test actually exercises the regression — verifiable by temporarily reverting the storage-file changes and re-running)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-cwd-regression-test.ac3",
+            "title": "Test cleans up its temporary PANOPTICON_HOME directory and restores process.cwd in afterEach — no leaked state between test runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-cwd-regression-test.ac4",
+            "title": "Test does NOT mock better-sqlite3 — it uses the real native module to ensure the resolution path is genuinely exercised",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-feature-registry-worker",
+        "to": "add-cwd-regression-test",
+        "type": "informs"
+      },
+      {
+        "from": "fix-fts-db-worker",
+        "to": "add-cwd-regression-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

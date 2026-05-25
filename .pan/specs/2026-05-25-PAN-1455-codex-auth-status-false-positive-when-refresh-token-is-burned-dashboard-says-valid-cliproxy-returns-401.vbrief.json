@@ -1,0 +1,256 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T08:22:12.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
+    "updated": "2026-05-25T08:23:52.720Z"
+  },
+  "plan": {
+    "id": "pan-1455",
+    "title": "Codex auth status false-positive when refresh token is burned (dashboard says valid, CLIProxy returns 401)",
+    "status": "proposed",
+    "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T08:22:12.000Z",
+    "updated": "2026-05-25T08:23:52.720Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
+        "label": "PAN-1455",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
+        "label": "PAN-913 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codex-auth",
+      "cliproxy",
+      "bugfix",
+      "auth",
+      "regression"
+    ],
+    "narratives": {
+      "Problem": "/api/settings/codex-auth returns status: 'valid' while every actual CLIProxy call 401s with 'refresh_token_reused'. The burned-token override in src/lib/codex-auth.ts only matches the literal string 'refresh token has already been used' (line 151), but OpenAI's auth backend also emits the shape 'token refresh failed with status 401: { \"code\": \"refresh_token_reused\" }'. PAN-913 closed the first phrasing; this issue extends the same fix to the second. Result today: silent 401s on every GPT-5.x agent spawn, no banner, no notification.",
+      "Proposal": "Keep the existing log-tail architecture (the code's own comment at lines 110-112 explicitly rules out HTTP probing — /v1/models always 401s and would generate spurious log lines). Widen the matcher at codex-auth.ts:151 to match BOTH 'refresh token has already been used' AND 'refresh_token_reused'. Add lib-level tests covering both phrasings plus the existing burn-then-success suppression. Add a route-level integration test that points the codex-auth code at a temp log fixture containing 'refresh_token_reused' and asserts the endpoint returns status: 'burned'. No frontend change — CodexAuthBanner already renders for 'burned'."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose log-tail widening (option b in the issue) over HTTP probe (option a) and push-from-cliproxy (option c).",
+        "rationale": "The existing comment at src/lib/codex-auth.ts:110-112 documents that HTTP probing is rejected because GET /v1/models always 401s and would generate spurious log lines on every dashboard load. Option (c) requires modifying upstream CLIProxy (out-of-tree). Option (b) is the path the code is already on; this issue is simply that the matcher's literal is too narrow. Smallest blast radius, no new I/O paths, no CLIProxy changes."
+      },
+      {
+        "summary": "Match both 'refresh token has already been used' AND 'refresh_token_reused' as separate string disjuncts; do not collapse to a regex.",
+        "rationale": "Concrete literals are faster to scan than regex over 500 lines and make the two known shapes explicit in code. Future shapes can be added the same way."
+      },
+      {
+        "summary": "Adapt acceptance criterion AC3 from 'mock CLIProxy returning 401' to 'mock the log tail containing refresh_token_reused'.",
+        "rationale": "The existing implementation deliberately does not probe CLIProxy — it tails the log. Testing the actual code path that exists is preferable to introducing a probe path that the code's own comments rule out. Recorded as decision D3 in continue.json."
+      },
+      {
+        "summary": "Place tests at src/lib/__tests__/codex-auth.test.ts and src/dashboard/server/routes/__tests__/codex-auth.test.ts.",
+        "rationale": "Matches the project's existing __tests__/ co-located vitest convention (e.g., src/lib/__tests__/agent-directory-cleanup.test.ts, src/dashboard/server/routes/__tests__/issues-reopen.test.ts)."
+      },
+      {
+        "summary": "No frontend change required.",
+        "rationale": "src/dashboard/frontend/src/components/CodexAuthBanner.tsx:13 already renders for status === 'burned'. Fixing the backend matcher is sufficient to satisfy AC2 (banner renders) automatically."
+      }
+    ],
+    "items": [
+      {
+        "id": "widen-burn-matcher",
+        "title": "Widen applyBurnedTokenOverride to detect 'refresh_token_reused' in addition to 'refresh token has already been used'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:22:12.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/codex-auth.ts, modify the burn-line detection at line ~151. Replace the single `line.includes('refresh token has already been used')` check with a disjunction that ALSO matches `line.includes('refresh_token_reused')`. Keep the original literal — never remove it (H1: regression of PAN-913). Add a brief comment immediately above the check naming both known phrasings and citing the two issues (PAN-913 introduced the first, PAN-1455 extends to the second). Do not touch the suppression logic at lines 163-173 (burn-then-success), the staleness window (BURN_STALENESS_MS), or the ignoreBurnBefore handling. Do not introduce a regex — keep two literal `includes()` checks for clarity and speed."
+        },
+        "subItems": [
+          {
+            "id": "widen-burn-matcher.ac1",
+            "title": "Both literals are present in the source: 'refresh token has already been used' AND 'refresh_token_reused'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-burn-matcher.ac2",
+            "title": "A comment above the matcher names both phrasings and cites PAN-913 and PAN-1455.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-burn-matcher.ac3",
+            "title": "The burn-then-200-success suppression at lines 163-173 is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-burn-matcher.ac4",
+            "title": "Typecheck (`npm run typecheck`) and lint (`npm run lint`) pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lib-codex-auth-tests",
+        "title": "Add lib-level tests for checkCodexAuthStatus covering both burn phrasings and the suppression cases",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:22:12.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/__tests__/codex-auth.test.ts (vitest). Use vi.mock or env-var overrides for getCliproxyAuthDir / getCliproxyLogPath so the test writes a fake codex-primary.json (with a future-expiring JWT) and a fake cliproxy.log into a tmp dir. Use vi.setSystemTime so hard-coded log timestamps stay inside the 60-minute BURN_STALENESS_MS window (H5). Generate a JWT whose `exp` claim is ~1 hour in the future and whose `email` field is set. Test cases: (1) credentials missing → status: 'missing'; (2) valid JWT, empty log → status: 'valid'; (3) valid JWT, log contains 'refresh token has already been used' inside window, no later success → status: 'burned' (PAN-913 regression guard); (4) valid JWT, log contains 'refresh_token_reused' inside window, no later success → status: 'burned' (the new case for PAN-1455); (5) valid JWT, log contains 'refresh_token_reused' followed by a 200 on /v1/messages → status: 'valid' (auto-retry won, H3); (6) valid JWT, log contains 'refresh_token_reused' with timestamp older than 60 minutes → status: 'valid' (staleness suppression, H5)."
+        },
+        "subItems": [
+          {
+            "id": "lib-codex-auth-tests.ac1",
+            "title": "Test file exists at src/lib/__tests__/codex-auth.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-codex-auth-tests.ac2",
+            "title": "Test case asserts status: 'burned' when log tail contains 'refresh_token_reused' inside the staleness window with no later 200 on /v1/messages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-codex-auth-tests.ac3",
+            "title": "Test case asserts status: 'burned' when log tail contains 'refresh token has already been used' (PAN-913 regression guard).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-codex-auth-tests.ac4",
+            "title": "Test case asserts status: 'valid' when a 'refresh_token_reused' burn line is followed by a 200 on /v1/messages (suppression preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-codex-auth-tests.ac5",
+            "title": "Test case asserts status: 'valid' when the burn line is older than BURN_STALENESS_MS (60 min).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-codex-auth-tests.ac6",
+            "title": "All tests pass under `npm test` (root vitest run).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-codex-auth-test",
+        "title": "Add route-level integration test asserting GET /api/settings/codex-auth returns 'burned' when log tail contains 'refresh_token_reused'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:22:12.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/__tests__/codex-auth.test.ts (vitest). Follow the pattern of sibling route tests (e.g., issues-reopen.test.ts, request-review-nudge.test.ts). Point the cliproxy auth/log resolvers at a temp directory via env-var overrides or vi.mock. Write a fixture codex-primary.json with a future-expiring JWT and a fixture cliproxy.log whose tail contains a freshly-timestamped `refresh_token_reused` line. Invoke the GET handler for /api/settings/codex-auth (either by mounting the Effect HTTP route in a test harness or by directly calling the underlying checkCodexAuthStatus exported from src/lib/codex-auth.ts via the route's Effect — match the pattern used by neighbouring route tests). Assert the JSON response is { status: 'burned', email, expiresAt }. Cleanup the temp dir in afterEach."
+        },
+        "subItems": [
+          {
+            "id": "route-codex-auth-test.ac1",
+            "title": "Test file exists at src/dashboard/server/routes/__tests__/codex-auth.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-codex-auth-test.ac2",
+            "title": "Test exercises the route (or its handler Effect) end-to-end with a temp cliproxy log fixture; does NOT mutate the host's real ~/.panopticon/cliproxy directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-codex-auth-test.ac3",
+            "title": "With log tail containing a fresh 'refresh_token_reused' line and a JWT whose exp is in the future, the response JSON has status === 'burned'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-codex-auth-test.ac4",
+            "title": "Companion case: with no burn lines in the log, the same setup returns status === 'valid' (negative control).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-codex-auth-test.ac5",
+            "title": "Test passes under `npm test`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "widen-burn-matcher",
+        "to": "lib-codex-auth-tests",
+        "type": "informs"
+      },
+      {
+        "from": "widen-burn-matcher",
+        "to": "route-codex-auth-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1455-codex-auth-status-false-positive-when-refresh-token-is-burned-dashboard-says-valid-cliproxy-returns-401.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
