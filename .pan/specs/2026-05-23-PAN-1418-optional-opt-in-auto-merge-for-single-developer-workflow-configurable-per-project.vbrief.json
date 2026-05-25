@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
-    "updated": "2026-05-25T09:30:32.582Z"
+    "updated": "2026-05-25T09:42:02.867Z"
   },
   "plan": {
     "id": "pan-1418",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 51,
+    "sequence": 52,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-25T09:30:32.582Z",
+    "updated": "2026-05-25T09:42:02.867Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
@@ -1128,31 +1128,31 @@
         "phase": "review",
         "issueId": "PAN-1418",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T09:30:32.574Z",
+        "updatedAt": "2026-05-25T09:42:02.860Z",
         "work": {
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "status": "running",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/index.ts\n  - src/dashboard/server/services/__tests__/conversation-service.test.ts\n  - src/lib/database/schema.ts\n  - sync-sources/hooks/record-cost-event.js\n  - sync-sources/hooks/record-cost-event.js.map",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T09:30:32.574Z",
+              "status": "running",
+              "at": "2026-05-25T09:42:02.860Z",
               "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/index.ts\n  - src/dashboard/server/services/__tests__/conversation-service.test.ts\n  - src/lib/database/schema.ts\n  - sync-sources/hooks/record-cost-event.js\n  - sync-sources/hooks/record-cost-event.js.map"
             }
           ]
         },
         "review": {
           "status": "blocked",
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "notes": "Auto-merge cancel lacks dashboard auth; CI/status gates are not distinct",
           "history": [
             {
               "status": "blocked",
-              "at": "2026-05-25T09:30:32.574Z",
+              "at": "2026-05-25T09:42:02.860Z",
               "notes": "Auto-merge cancel lacks dashboard auth; CI/status gates are not distinct"
             }
           ],
@@ -1160,20 +1160,20 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:30:32.574Z"
+              "at": "2026-05-25T09:42:02.860Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-25T09:30:32.574Z",
+          "updatedAt": "2026-05-25T09:42:02.860Z",
           "history": [],
           "readyForMerge": false
         }
