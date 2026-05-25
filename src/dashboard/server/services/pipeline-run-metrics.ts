@@ -26,6 +26,27 @@ export interface PipelineRunMetricsReader {
   derivePipelineRunMetrics(issueId: string): PipelineRunMetrics;
 }
 
+export interface VerificationAttemptMetrics {
+  issueId: string;
+  stage: 'review' | 'test';
+  passed: boolean;
+  headSha?: string;
+  substrateAttributable?: boolean;
+}
+
+export interface PipelineRunStatsSample {
+  issueId: string;
+  metrics: PipelineRunMetrics;
+  beadsCount?: number;
+  planItemsCount?: number;
+}
+
+export interface PipelineRunStatsInputs {
+  completedPipelineRuns: number;
+  pipelineRuns: PipelineRunStatsSample[];
+  verificationAttempts: VerificationAttemptMetrics[];
+}
+
 const relevantEventTypes = [
   'agent.created',
   'agent.completed',
@@ -37,6 +58,8 @@ const relevantEventTypes = [
   'issue.closed',
   'issue.statusChanged',
   'issue.status_changed',
+  'plan.item_status_changed',
+  'plan.subitem_status_changed',
 ] as const;
 
 const eventTypePlaceholders = relevantEventTypes.map(() => '?').join(', ');
@@ -116,6 +139,52 @@ function headShaOf(event: StoredEvent): string | undefined {
   if (typeof payload['head_sha'] === 'string') return payload['head_sha'];
   if (typeof payload['commitSha'] === 'string') return payload['commitSha'];
   return undefined;
+}
+
+function issueIdOf(event: StoredEvent): string | null {
+  const issueId = payloadOf(event)['issueId'];
+  return typeof issueId === 'string' ? issueId : null;
+}
+
+function timestampInWindow(event: StoredEvent, since: string, until: string): boolean {
+  return event.timestamp >= since && event.timestamp <= until;
+}
+
+function optionalBoolean(payload: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
+}
+
+function verificationAttemptFromEvent(event: StoredEvent): VerificationAttemptMetrics | null {
+  if (event.type !== 'pipeline.review-completed' && event.type !== 'pipeline.test-completed') return null;
+  const issueId = issueIdOf(event);
+  if (!issueId) return null;
+  const payload = payloadOf(event);
+  const passed = payload['passed'];
+  if (typeof passed !== 'boolean') return null;
+  const attempt: VerificationAttemptMetrics = {
+    issueId,
+    stage: event.type === 'pipeline.review-completed' ? 'review' : 'test',
+    passed,
+  };
+  const headSha = headShaOf(event);
+  if (headSha) attempt.headSha = headSha;
+  const substrateAttributable = optionalBoolean(payload, 'substrateAttributable', 'substrate_attributable');
+  if (substrateAttributable !== undefined) attempt.substrateAttributable = substrateAttributable;
+  return attempt;
+}
+
+function countPlanItems(events: StoredEvent[], issueId: string): number | undefined {
+  const ids = new Set<string>();
+  for (const event of events) {
+    if (issueIdOf(event) !== issueId) continue;
+    const payload = payloadOf(event);
+    if (typeof payload['itemId'] === 'string') ids.add(payload['itemId']);
+  }
+  return ids.size > 0 ? ids.size : undefined;
 }
 
 export function derivePipelineRunMetricsFromEvents(events: StoredEvent[], issueId: string): PipelineRunMetrics {
@@ -210,6 +279,36 @@ export function derivePipelineRunMetricsFromEvents(events: StoredEvent[], issueI
   return metrics;
 }
 
+export function derivePipelineRunStatsInputsFromEvents(events: StoredEvent[], since: string, until: string): PipelineRunStatsInputs {
+  const completedIssueIds = new Set<string>();
+  for (const event of events) {
+    const issueId = issueIdOf(event);
+    if (!issueId || !timestampInWindow(event, since, until)) continue;
+    if (terminalOutcome(event)) completedIssueIds.add(issueId);
+  }
+
+  const pipelineRuns = [...completedIssueIds].sort().map((issueId) => {
+    const sample: PipelineRunStatsSample = {
+      issueId,
+      metrics: derivePipelineRunMetricsFromEvents(events, issueId),
+    };
+    const planItemsCount = countPlanItems(events, issueId);
+    if (planItemsCount !== undefined) sample.planItemsCount = planItemsCount;
+    return sample;
+  });
+
+  return {
+    completedPipelineRuns: pipelineRuns.length,
+    pipelineRuns,
+    verificationAttempts: events
+      .filter((event) => timestampInWindow(event, since, until))
+      .flatMap((event) => {
+        const attempt = verificationAttemptFromEvent(event);
+        return attempt ? [attempt] : [];
+      }),
+  };
+}
+
 export function createPipelineRunMetricsReader(db: DbAdapter): PipelineRunMetricsReader {
   const eventsForIssueStmt = db.prepare<EventRow>(
     `SELECT sequence, type, timestamp, payload
@@ -227,7 +326,29 @@ export function createPipelineRunMetricsReader(db: DbAdapter): PipelineRunMetric
   };
 }
 
+export function createPipelineRunStatsInputsReader(db: DbAdapter) {
+  const eventsUntilStmt = db.prepare<EventRow>(
+    `SELECT sequence, type, timestamp, payload
+     FROM events
+     WHERE type IN (${eventTypePlaceholders})
+       AND timestamp <= ?
+     ORDER BY sequence ASC`,
+  );
+
+  return {
+    derivePipelineRunStatsInputs(since: string, until: string): PipelineRunStatsInputs {
+      const rows = eventsUntilStmt.all([...relevantEventTypes, until]);
+      return derivePipelineRunStatsInputsFromEvents(rows.map(rowToStoredEvent), since, until);
+    },
+  };
+}
+
 export async function derivePipelineRunMetrics(issueId: string): Promise<PipelineRunMetrics> {
   await initEventStore();
   return createPipelineRunMetricsReader(getSharedDb()).derivePipelineRunMetrics(issueId);
+}
+
+export async function derivePipelineRunStatsInputs(since: string, until: string): Promise<PipelineRunStatsInputs> {
+  await initEventStore();
+  return createPipelineRunStatsInputsReader(getSharedDb()).derivePipelineRunStatsInputs(since, until);
 }

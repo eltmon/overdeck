@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.11.1",
     "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "updated": "2026-05-25T13:12:15.197Z"
+    "updated": "2026-05-25T13:15:05.055Z"
   },
   "plan": {
     "id": "pan-1487",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 32,
+    "sequence": 33,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T13:12:15.197Z",
+    "updated": "2026-05-25T13:15:05.055Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
@@ -1783,57 +1783,57 @@
         "phase": "review",
         "issueId": "PAN-1487",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T13:12:15.196Z",
+        "updatedAt": "2026-05-25T13:15:05.050Z",
         "work": {
-          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
           "notes": "Verification FAILED at test (25548ms):\n\nes, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > returns daemon defaults when config omits the tts section\nAssertionError: expected { enabled: false, …(13) } to deeply equal { enabled: false, voice: '', …(11) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": false,\n    \"daemonHost\": \"127.0.0.1\",\n    \"daemonPort\": 8787,\n    \"dropInfoWhenFull\": true,\n    \"enabled\": false,\n+   \"lifecycle\": true,\n    \"maxChars\": 140,\n    \"mutedIssues\": [],\n    \"mutedSources\": [],\n    \"rate\": 1,\n    \"utteranceTemplates\": {},\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:209:24\n    207|     const { config } = mergeConfigs({});\n    208|\n    209|     expect(config.tts).toEqual({\n       |                        ^\n    210|       enabled: false,\n    211|       voice: '',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-25T13:12:15.196Z",
+              "at": "2026-05-25T13:15:05.050Z",
               "notes": "Verification FAILED at test (25548ms):\n\nes, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > returns daemon defaults when config omits the tts section\nAssertionError: expected { enabled: false, …(13) } to deeply equal { enabled: false, voice: '', …(11) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": false,\n    \"daemonHost\": \"127.0.0.1\",\n    \"daemonPort\": 8787,\n    \"dropInfoWhenFull\": true,\n    \"enabled\": false,\n+   \"lifecycle\": true,\n    \"maxChars\": 140,\n    \"mutedIssues\": [],\n    \"mutedSources\": [],\n    \"rate\": 1,\n    \"utteranceTemplates\": {},\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:209:24\n    207|     const { config } = mergeConfigs({});\n    208|\n    209|     expect(config.tts).toEqual({\n       |                        ^\n    210|       enabled: false,\n    211|       voice: '',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T13:12:15.196Z",
-          "notes": "Verification failed at test",
+          "status": "blocked",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
+          "notes": "Production flywheel stats route reports placeholder data instead of persisted pipeline telemetry",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T13:12:15.196Z",
-              "notes": "Verification failed at test"
+              "status": "blocked",
+              "at": "2026-05-25T13:15:05.050Z",
+              "notes": "Production flywheel stats route reports placeholder data instead of persisted pipeline telemetry"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:12:15.196Z"
+              "at": "2026-05-25T13:15:05.050Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "updatedAt": "2026-05-25T13:15:05.050Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:12:15.196Z"
+              "at": "2026-05-25T13:15:05.050Z"
             }
           ],
           "readyForMerge": false,

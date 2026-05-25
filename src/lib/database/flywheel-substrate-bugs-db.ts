@@ -82,9 +82,9 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
             filed_by = excluded.filed_by,
             discovered_in_issue_id = excluded.discovered_in_issue_id,
             severity = excluded.severity,
-            status = excluded.status,
-            fix_merged_at = excluded.fix_merged_at,
-            fix_commit_sha = excluded.fix_commit_sha,
+            status = CASE WHEN ? = 1 THEN excluded.status ELSE flywheel_substrate_bugs.status END,
+            fix_merged_at = CASE WHEN ? = 1 THEN excluded.fix_merged_at ELSE flywheel_substrate_bugs.fix_merged_at END,
+            fix_commit_sha = CASE WHEN ? = 1 THEN excluded.fix_commit_sha ELSE flywheel_substrate_bugs.fix_commit_sha END,
             updated_at = excluded.updated_at
         `).run(
           input.issueId,
@@ -97,6 +97,9 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
           input.fixMergedAt ?? null,
           input.fixCommitSha ?? null,
           input.updatedAt,
+          input.status === undefined ? 0 : 1,
+          input.fixMergedAt === undefined ? 0 : 1,
+          input.fixCommitSha === undefined ? 0 : 1,
         );
 
         const row = db.prepare(`

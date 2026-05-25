@@ -6,6 +6,8 @@ export interface FlywheelStatsOptions {
   generatedAt?: Date;
   completedPipelineRuns?: number;
   substrateBugs?: readonly SubstrateBugStatsInput[];
+  pipelineRuns?: readonly (Criterion5PipelineRun & Criterion6PipelineRun)[];
+  verificationAttempts?: readonly Criterion7VerificationAttempt[];
 }
 
 export interface FiledSubstrateBug {
@@ -501,6 +503,8 @@ export async function computeFlywheelStats(
   const since = new Date(generatedAtDate.getTime() - parsedWindow.ms).toISOString();
   const completedPipelineRuns = options.completedPipelineRuns ?? 0;
   const substrateBugs = options.substrateBugs ?? (completedPipelineRuns >= 3 ? listInWindow(since, generatedAt) : []);
+  const pipelineRuns = options.pipelineRuns ?? [];
+  const verificationAttempts = options.verificationAttempts ?? [];
 
   return {
     window: parsedWindow.input,
@@ -508,11 +512,11 @@ export async function computeFlywheelStats(
     criteria: {
       c1_bugRate: computeBugRateCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
       c2_p0Bugs: computeP0BugsCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
-      c3_passRate: computePassRateCriterion(completedPipelineRuns),
+      c3_passRate: computePassRateCriterion(completedPipelineRuns, verificationAttempts),
       c4_mttr: computeMttrCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
-      c5_intervention: computeInterventionCriterion(completedPipelineRuns),
-      c6_timeConsistency: computeTimeConsistencyCriterion(completedPipelineRuns),
-      c7_flake: computeFlakeCriterion(completedPipelineRuns),
+      c5_intervention: computeInterventionCriterion(completedPipelineRuns, pipelineRuns),
+      c6_timeConsistency: computeTimeConsistencyCriterion(completedPipelineRuns, pipelineRuns),
+      c7_flake: computeFlakeCriterion(completedPipelineRuns, verificationAttempts),
     },
   };
 }

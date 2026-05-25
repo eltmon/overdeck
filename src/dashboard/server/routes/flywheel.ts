@@ -5,12 +5,14 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@panctl/contracts';
+import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
   isFlywheelRunId,
   listFlywheelRuns,
+  resolveLiveFlywheelRunId,
   writeLatestFlywheelStatus,
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
@@ -27,10 +29,33 @@ import {
   startFlywheelRunForDashboard,
 } from '../services/flywheel-actions.js';
 import { readFlywheelState } from '../services/flywheel-state.js';
-import { computeFlywheelStats } from '../services/flywheel-telemetry.js';
+import { computeFlywheelStats, parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
+import { derivePipelineRunStatsInputs } from '../services/pipeline-run-metrics.js';
+import {
+  isFlywheelAutoPickupBacklog,
+  isFlywheelGloballyPaused,
+  isFlywheelRequireUatBeforeMerge,
+  setFlywheelAutoPickupBacklog,
+  setFlywheelRequireUatBeforeMerge,
+} from '../../../lib/database/app-settings.js';
+import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
+import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
+import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
+import {
+  cancelPending,
+  getActionableAutoMerge,
+  listActiveAutoMerges,
+  listProblemAutoMerges,
+  scheduleAutoMergeWithResult,
+  type PendingAutoMerge,
+  type ScheduleAutoMergeInput,
+  type ScheduleAutoMergeResult,
+} from '../../../lib/database/pending-auto-merges-db.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
+const AUTO_MERGE_POLL_LIMIT = 100;
 
 interface BriefRequestBody {
   content?: unknown;
@@ -39,6 +64,20 @@ interface BriefRequestBody {
 
 interface StartRequestBody {
   brief?: unknown;
+}
+
+interface FlywheelConfigRequestBody {
+  auto_pickup_backlog?: unknown;
+  require_uat_before_merge?: unknown;
+}
+
+interface FlywheelConfigResponseBody {
+  auto_pickup_backlog: boolean;
+  require_uat_before_merge: boolean;
+}
+
+interface AutoMergeScheduleRequestBody {
+  issueId?: unknown;
 }
 
 interface ReportOpenRequestBody {
@@ -173,6 +212,168 @@ export async function getFlywheelRunPayload(runId: string, options: FlywheelRunS
   return getFlywheelRunDetail(runId, options);
 }
 
+export function getFlywheelConfigPayload(): FlywheelConfigResponseBody {
+  return {
+    auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
+    require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
+  };
+}
+
+export async function postFlywheelConfigPayload(payload: unknown) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+
+  const body = payload as FlywheelConfigRequestBody;
+  if (body.auto_pickup_backlog !== undefined && typeof body.auto_pickup_backlog !== 'boolean') {
+    return { status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } };
+  }
+  if (body.require_uat_before_merge !== undefined && typeof body.require_uat_before_merge !== 'boolean') {
+    return { status: 400, body: { error: 'require_uat_before_merge must be a boolean' } };
+  }
+
+  if (body.auto_pickup_backlog !== undefined) setFlywheelAutoPickupBacklog(body.auto_pickup_backlog);
+  if (body.require_uat_before_merge !== undefined) setFlywheelRequireUatBeforeMerge(body.require_uat_before_merge);
+
+  return { status: 200, body: getFlywheelConfigPayload() };
+}
+
+interface AutoMergeScheduleDeps {
+  now?: () => Date;
+  isRequireUatBeforeMerge?: () => boolean;
+  isFlywheelPaused?: () => boolean;
+  resolveLiveRunId?: () => Promise<string | null>;
+  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  getReviewStatus?: (issueId: string) => ReviewStatus | null;
+  resolveProject?: (issueId: string) => ResolvedProject | null;
+  schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
+  announce?: (issueId: string, entry: PendingAutoMerge) => void;
+}
+
+interface AutoMergeCancelDeps {
+  now?: () => Date;
+  getPending?: (issueId: string) => PendingAutoMerge | null;
+  cancel?: (id: number, cancelledBy: string) => boolean;
+  announce?: (issueId: string) => void;
+}
+
+function parsePrNumber(prUrl: string | undefined): number | undefined {
+  const match = prUrl?.match(/\/pull\/(\d+)(?:$|[/?#])/);
+  return match ? Number.parseInt(match[1], 10) : undefined;
+}
+
+function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
+  emitActivityTtsSync({
+    utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-scheduled',
+  });
+}
+
+function announceAutoMergeCancelled(issueId: string): void {
+  emitActivityTtsSync({
+    utterance: `auto-merge cancelled for ${issueId}`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-cancelled',
+  });
+}
+
+export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoMergeScheduleDeps = {}) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+
+  const body = payload as AutoMergeScheduleRequestBody;
+  if (typeof body.issueId !== 'string' || body.issueId.trim().length === 0) {
+    return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+  }
+  const issueId = body.issueId.trim().toUpperCase();
+
+  if ((deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
+    return { status: 412, body: { error: 'UAT is still required before merge' } };
+  }
+  if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {
+    return { status: 423, body: { error: 'Flywheel is paused' } };
+  }
+  if (!await (deps.resolveLiveRunId ?? resolveLiveFlywheelRunId)()) {
+    return { status: 412, body: { error: 'Flywheel is not running' } };
+  }
+
+  const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
+  if (!eligibility.eligible) {
+    return { status: 422, body: { error: eligibility.reason } };
+  }
+
+  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
+  if (!reviewStatus?.prUrl) {
+    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
+  }
+  const prNumber = parsePrNumber(reviewStatus.prUrl);
+  if (prNumber === undefined) {
+    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
+  }
+
+  const project = (deps.resolveProject ?? resolveProjectFromIssueSync)(issueId);
+  if (!project) return { status: 422, body: { error: `Unknown project for issue ${issueId}` } };
+
+  const scheduledAt = (deps.now ?? (() => new Date()))();
+  const scheduledMergeAt = new Date(scheduledAt.getTime() + AUTO_MERGE_COOLDOWN_MS);
+  const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
+    issueId,
+    prUrl: reviewStatus.prUrl,
+    prNumber,
+    projectKey: project.projectKey,
+    scheduledMergeAt: scheduledMergeAt.toISOString(),
+    scheduledAt: scheduledAt.toISOString(),
+  });
+  if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
+  return { status: 200, body: result.entry };
+}
+
+export function getPendingAutoMergePayload(): PendingAutoMerge[] {
+  return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
+}
+
+export function getAutoMergeProblemPayload(): PendingAutoMerge[] {
+  return listProblemAutoMerges(AUTO_MERGE_POLL_LIMIT);
+}
+
+export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
+  const issueId = issueIdParam.trim().toUpperCase();
+  if (!issueId) return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+
+  const entry = (deps.getPending ?? getActionableAutoMerge)(issueId);
+  if (!entry) return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  if (entry.status === 'merging') {
+    return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+  }
+
+  const cancelledAt = (deps.now ?? (() => new Date()))().toISOString();
+  const cancelled = (deps.cancel ?? cancelPending)(entry.id, 'operator');
+  if (!cancelled) {
+    const raced = (deps.getPending ?? getActionableAutoMerge)(issueId);
+    if (raced?.status === 'merging') {
+      return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+    }
+    return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  }
+
+  (deps.announce ?? announceAutoMergeCancelled)(issueId);
+  return {
+    status: 200,
+    body: {
+      ...entry,
+      status: 'cancelled' as const,
+      cancelledAt,
+      cancelledBy: 'operator',
+    },
+  };
+}
+
 export async function getFlywheelCurrentPayload() {
   return readCurrentFlywheelStatusForDashboard();
 }
@@ -200,12 +401,23 @@ interface FlywheelActionDeps {
 
 interface FlywheelStatsDeps {
   compute?: typeof computeFlywheelStats;
+  deriveInputs?: typeof derivePipelineRunStatsInputs;
+  now?: () => Date;
 }
 
 export async function getFlywheelStatsPayload(window: string | null | undefined, deps: FlywheelStatsDeps = {}): Promise<FlywheelStatsResponse> {
   const selectedWindow = window ?? '30d';
   try {
-    const stats = await (deps.compute ?? computeFlywheelStats)(selectedWindow);
+    const generatedAt = (deps.now ?? (() => new Date()))();
+    const parsedWindow = parseFlywheelStatsWindow(selectedWindow);
+    const since = new Date(generatedAt.getTime() - parsedWindow.ms).toISOString();
+    const until = generatedAt.toISOString();
+    const stats = deps.compute
+      ? await deps.compute(selectedWindow)
+      : await computeFlywheelStats(selectedWindow, {
+          generatedAt,
+          ...await (deps.deriveInputs ?? derivePipelineRunStatsInputs)(since, until),
+        });
     return { status: 200, body: decodeFlywheelStats(stats) };
   } catch (error) {
     return {
@@ -308,6 +520,76 @@ const getFlywheelStatsRoute = HttpRouter.add(
       onSome: (url) => url.searchParams.get('window'),
     }));
     const result = yield* Effect.promise(() => getFlywheelStatsPayload(window));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getFlywheelConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/config',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getFlywheelConfigPayload());
+  })),
+);
+
+const postFlywheelConfigRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/config',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+
+    const result = yield* Effect.promise(() => postFlywheelConfigPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getPendingAutoMergeRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/auto-merge/pending',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getPendingAutoMergePayload());
+  })),
+);
+
+const getAutoMergeProblemsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/auto-merge/problems',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getAutoMergeProblemPayload());
+  })),
+);
+
+const postAutoMergeScheduleRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/auto-merge/schedule',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+
+    const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const deleteAutoMergeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/flywheel/auto-merge/:id',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const result = deleteAutoMergePayload(params['id'] ?? '');
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -533,6 +815,12 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
   getFlywheelStatsRoute,
+  getFlywheelConfigRoute,
+  postFlywheelConfigRoute,
+  getPendingAutoMergeRoute,
+  getAutoMergeProblemsRoute,
+  postAutoMergeScheduleRoute,
+  deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

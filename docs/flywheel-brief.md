@@ -91,7 +91,12 @@ Do not:
 - Run `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
 - Hand-do work that a Panopticon command or role should do.
 - Edit feature branches directly or commit code fixes from this role.
-- Merge PRs directly or auto-merge without human UAT and merge approval.
+- Merge PRs without checking the configured policy.
+
+  Merge policy (PAN-1486):
+  - **Workflow auto-merge** (the orchestrator's normal `merge` action) is permitted only when `flywheel.require_uat_before_merge=false`. Schedule via `POST /api/flywheel/auto-merge/schedule`. Never call `gh pr merge` from the workflow path.
+  - **Operator override** is always permitted regardless of toggle. When the operator names a specific PR/issue and asks the orchestrator (or a strike) to merge it, `gh pr merge --admin --squash --delete-branch` is the right tool. `enforce_admins=false` on `main` is the design — operator-authorized merges bypass the workflow's required status checks intentionally, because the operator has already given the approval those checks exist to gate.
+  - **Strike agents** merge directly to main as part of their role contract (no PR ceremony). Nothing in this brief is meant to block strike merges.
 - Deep-wipe without explicit user approval.
 - Delete Claude JSONL session files.
 - Skip hooks or use `--no-verify`.
@@ -104,7 +109,7 @@ When you find a substrate bug: file or reference the tracking issue, keep the pr
 
 ## Human input invariant
 
-The only required human input is choosing whether to apply a suggestion and the merge decision after UAT.
+By default the required human input is choosing whether to apply a suggestion and the merge decision after UAT. When `flywheel.require_uat_before_merge=false` is set, even the merge gate is delegated to the orchestrator — the only intentional human-in-the-loop moments are issue creation and the optional configuration of the autonomy toggles.
 
 If you find yourself needing a human for anything else, first ask whether Panopticon is missing a surface, route, permission, prompt, or recovery rule — and emit that gap as a suggestion. Park an issue only when the decision is genuinely product or release judgment.
 

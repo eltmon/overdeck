@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DbAdapter, StoredEvent } from '../../event-store.js';
-import { createPipelineRunMetricsReader, derivePipelineRunMetricsFromEvents } from '../pipeline-run-metrics.js';
+import { createPipelineRunMetricsReader, derivePipelineRunMetricsFromEvents, derivePipelineRunStatsInputsFromEvents } from '../pipeline-run-metrics.js';
 
 function event(sequence: number, type: string, timestamp: string, payload: Record<string, unknown>): StoredEvent {
   return { sequence, type, timestamp, payload };
@@ -121,6 +121,26 @@ describe('pipeline run metrics', () => {
     expect(metrics.outcome).toBe('in_flight');
     expect(metrics.mergeMs).toBeNull();
     expect(metrics.ship).toBeNull();
+  });
+
+  it('derives stats inputs from completed runs and verification attempts in a window', () => {
+    const inputs = derivePipelineRunStatsInputsFromEvents([
+      event(1, 'plan.item_status_changed', '2026-05-25T09:00:00.000Z', { issueId: 'PAN-8', itemId: 'D1', status: 'done' }),
+      event(2, 'pipeline.review-started', '2026-05-25T09:01:00.000Z', { issueId: 'PAN-8' }),
+      event(3, 'pipeline.review-completed', '2026-05-25T09:02:00.000Z', { issueId: 'PAN-8', passed: false, substrateAttributable: true, headSha: 'abc123' }),
+      event(4, 'pipeline.test-started', '2026-05-25T09:03:00.000Z', { issueId: 'PAN-8' }),
+      event(5, 'pipeline.test-completed', '2026-05-25T09:04:00.000Z', { issueId: 'PAN-8', passed: true, headSha: 'abc123' }),
+      event(6, 'operator.intervention', '2026-05-25T09:05:00.000Z', { issueId: 'PAN-8', kind: 'tell' }),
+      event(7, 'issue.statusChanged', '2026-05-25T09:06:00.000Z', { issueId: 'PAN-8', canonicalStatus: 'verifying_on_main' }),
+      event(8, 'issue.statusChanged', '2026-04-01T09:06:00.000Z', { issueId: 'PAN-9', canonicalStatus: 'verifying_on_main' }),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(inputs.completedPipelineRuns).toBe(1);
+    expect(inputs.pipelineRuns).toMatchObject([{ issueId: 'PAN-8', planItemsCount: 1, metrics: { interventionCount: 1, outcome: 'merged' } }]);
+    expect(inputs.verificationAttempts).toEqual([
+      { issueId: 'PAN-8', stage: 'review', passed: false, headSha: 'abc123', substrateAttributable: true },
+      { issueId: 'PAN-8', stage: 'test', passed: true, headSha: 'abc123' },
+    ]);
   });
 
   it('queries the events table with parameterized issue id binding', () => {

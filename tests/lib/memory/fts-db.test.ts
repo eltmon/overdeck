@@ -2,20 +2,23 @@ import { mkdtemp, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { closeMemoryFtsDatabases, getMemoryFtsDatabase, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
+import { closeMemoryFtsDatabases, getMemoryFtsDatabase, runMemoryFtsStatement, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { resolveFtsDbPath } from '../../../src/lib/memory/paths.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
+let originalCwd: string;
 
 beforeEach(async () => {
   originalHome = process.env.PANOPTICON_HOME;
+  originalCwd = process.cwd();
   tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-fts-db-'));
   process.env.PANOPTICON_HOME = tempDir;
 });
 
 afterEach(async () => {
   closeMemoryFtsDatabases();
+  process.chdir(originalCwd);
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -23,6 +26,15 @@ afterEach(async () => {
 });
 
 describe('memory FTS database', () => {
+  it('runs the worker when process cwd is outside the repository', async () => {
+    process.chdir(tempDir!);
+
+    await expect(runMemoryFtsStatement('panopticon-cli', {
+      sql: 'SELECT COUNT(*) AS count FROM memory_fts',
+      method: 'get',
+    })).resolves.toEqual({ count: 0 });
+  });
+
   it('opens a project-scoped database lazily and caches the handle', async () => {
     const first = await getMemoryFtsDatabase('panopticon-cli');
     const second = await getMemoryFtsDatabase('panopticon-cli');

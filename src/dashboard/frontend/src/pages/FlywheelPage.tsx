@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
@@ -14,10 +15,32 @@ interface FlywheelPageProps {
 
 type FlywheelLeftTab = 'status' | 'state' | 'stats';
 
+interface FlywheelConfig {
+  auto_pickup_backlog: boolean;
+  require_uat_before_merge: boolean;
+}
+
+interface FlywheelConfigPatch {
+  auto_pickup_backlog?: boolean;
+  require_uat_before_merge?: boolean;
+}
+
+interface PendingAutoMerge {
+  id: number;
+  issueId: string;
+  prUrl: string;
+  scheduledMergeAt: string;
+  status: 'pending' | 'merging' | 'blocked' | 'failed' | 'merged' | 'cancelled';
+}
+
 const SPLIT_STORAGE_KEY = 'panopticon.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
 const SPLIT_MIN_RIGHT = 360;
 const SPLIT_DEFAULT_LEFT = 720;
+const FLYWHEEL_CONFIG_QUERY_KEY = ['flywheel', 'config'] as const;
+const PENDING_AUTO_MERGES_QUERY_KEY = ['flywheel', 'auto-merge', 'pending'] as const;
+const AUTO_PICKUP_BACKLOG_TITLE = 'Off: inventory is restricted to work in progress / in review / blocked / awaiting merge. On: also include READY backlog items bounded by maxAgents.';
+const REQUIRE_UAT_BEFORE_MERGE_TITLE = 'On: UAT remains required before merge. Off: eligible merges may be scheduled through the server-managed cooldown.';
 
 function getStoredSplitWidth(): number {
   const stored = localStorage.getItem(SPLIT_STORAGE_KEY);
@@ -30,6 +53,82 @@ async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
   const res = await fetch('/api/flywheel/current');
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json() as Promise<FlywheelStatus | null>;
+}
+
+async function fetchPendingAutoMerges(): Promise<PendingAutoMerge[]> {
+  const res = await fetch('/api/flywheel/auto-merge/pending');
+  if (!res.ok) throw new Error(`GET /api/flywheel/auto-merge/pending → ${res.status}`);
+  return res.json() as Promise<PendingAutoMerge[]>;
+}
+
+export function useFlywheelConfig() {
+  return useQuery({
+    queryKey: FLYWHEEL_CONFIG_QUERY_KEY,
+    queryFn: async (): Promise<FlywheelConfig> => {
+      const res = await fetch('/api/flywheel/config');
+      if (!res.ok) throw new Error(`GET /api/flywheel/config → ${res.status}`);
+      return res.json();
+    },
+    staleTime: 5_000,
+  });
+}
+
+function usePendingAutoMerges() {
+  return useQuery({
+    queryKey: PENDING_AUTO_MERGES_QUERY_KEY,
+    queryFn: fetchPendingAutoMerges,
+    refetchInterval: 5_000,
+  });
+}
+
+function useCancelAutoMergeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (issueId: string): Promise<void> => {
+      const res = await fetch(`/api/flywheel/auto-merge/${encodeURIComponent(issueId)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(body || `DELETE /api/flywheel/auto-merge/${issueId} → ${res.status}`);
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PENDING_AUTO_MERGES_QUERY_KEY });
+    },
+  });
+}
+
+export function useFlywheelConfigMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: FlywheelConfigPatch): Promise<FlywheelConfig> => {
+      const res = await fetch('/api/flywheel/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(body || `POST /api/flywheel/config → ${res.status}`);
+      }
+      return res.json();
+    },
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: FLYWHEEL_CONFIG_QUERY_KEY });
+      const previous = queryClient.getQueryData<FlywheelConfig>(FLYWHEEL_CONFIG_QUERY_KEY);
+      queryClient.setQueryData<FlywheelConfig>(FLYWHEEL_CONFIG_QUERY_KEY, {
+        auto_pickup_backlog: previous?.auto_pickup_backlog ?? false,
+        require_uat_before_merge: previous?.require_uat_before_merge ?? true,
+        ...patch,
+      });
+      return { previous };
+    },
+    onError: (_error, _patch, context) => {
+      queryClient.setQueryData(FLYWHEEL_CONFIG_QUERY_KEY, context?.previous);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(FLYWHEEL_CONFIG_QUERY_KEY, data);
+    },
+  });
 }
 
 function formatElapsed(ms: number): string {
@@ -65,6 +164,84 @@ function getTabPanelLabel(activeTab: FlywheelLeftTab): string {
   return 'Flywheel stats';
 }
 
+function formatAutoMergeCountdown(scheduledMergeAt: string, nowMs: number): string {
+  const remainingMs = Date.parse(scheduledMergeAt) - nowMs;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 'merging…';
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `auto-merging in ${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function prLabel(prUrl: string): string {
+  const match = prUrl.match(/\/pull\/(\d+)(?:$|[/?#])/);
+  return match ? `PR #${match[1]}` : 'PR';
+}
+
+function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
+  const { data } = usePendingAutoMerges();
+  const cancelMutation = useCancelAutoMergeMutation();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [cancellingIssueId, setCancellingIssueId] = useState<string | null>(null);
+  const pendingEntries = Array.isArray(data) ? data.filter((entry) => entry.status === 'pending') : [];
+
+  useEffect(() => {
+    if (pendingEntries.length === 0) return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [pendingEntries.length]);
+
+  const cancel = (issueId: string) => {
+    setCancellingIssueId(issueId);
+    cancelMutation.mutate(issueId, {
+      onSettled: () => setCancellingIssueId(null),
+    });
+  };
+
+  if (pendingEntries.length === 0) return null;
+
+  return (
+    <section className="shrink-0 border-b border-warning/30 bg-warning/10 px-4 py-3" aria-label="Pending auto-merges">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div>
+          <h2 className="font-semibold text-foreground">Pending auto-merges</h2>
+          <p className="text-xs text-muted-foreground">Flywheel will merge eligible PRs when their cooldown expires.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {pendingEntries.map((entry) => {
+            const remainingMs = Date.parse(entry.scheduledMergeAt) - nowMs;
+            const isMerging = Number.isFinite(remainingMs) && remainingMs <= 0;
+            return (
+              <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/30 bg-background px-3 py-2">
+                <a
+                  href={`#${entry.issueId}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onNavigateIssue?.(entry.issueId);
+                  }}
+                  className="font-mono text-xs font-semibold text-primary hover:underline"
+                >
+                  {entry.issueId}
+                </a>
+                <span className="text-xs text-muted-foreground">{prLabel(entry.prUrl)}</span>
+                <span className="font-mono text-xs text-foreground">{formatAutoMergeCountdown(entry.scheduledMergeAt, nowMs)}</span>
+                <button
+                  type="button"
+                  disabled={cancellingIssueId !== null || cancelMutation.isPending || entry.status === 'merging' || isMerging}
+                  onClick={() => cancel(entry.issueId)}
+                  className="rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
@@ -72,6 +249,12 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
   const [nowMs, setNowMs] = useState(() => Date.now());
   const leftWidthRef = useRef(leftWidth);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { data: flywheelConfig } = useFlywheelConfig();
+  const flywheelConfigMutation = useFlywheelConfigMutation();
+  const autoPickupBacklog = flywheelConfig?.auto_pickup_backlog ?? false;
+  const requireUatBeforeMerge = flywheelConfig?.require_uat_before_merge ?? true;
+  const configBusy = flywheelConfigMutation.isPending;
+  const configError = flywheelConfigMutation.error instanceof Error ? flywheelConfigMutation.error.message : null;
 
   const setLeftWidthClamped = useCallback((next: number) => {
     const container = containerRef.current;
@@ -146,13 +329,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
     <div
       ref={containerRef}
       aria-label="Flywheel page"
-      className="flex h-full w-full overflow-hidden bg-background"
+      className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      <section
-        className="relative shrink-0 overflow-y-auto border-r border-border"
-        style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
-        aria-label="Flywheel status pane"
-      >
+      <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <section
+          className="relative shrink-0 overflow-y-auto border-r border-border"
+          style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
+          aria-label="Flywheel status pane"
+        >
         <header className="sticky top-0 z-10 border-b border-border bg-card/60 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -167,12 +352,37 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
                 Flywheel docs
               </a>
             </div>
-            <div className="rounded-lg border border-border bg-background px-3 py-2 text-right">
-              <div className="flex items-center justify-end gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span className={status ? 'h-2 w-2 rounded-full bg-success' : 'h-2 w-2 rounded-full bg-muted-foreground'} />
-                {status ? 'Live run' : 'Idle'}
+            <div className="flex flex-wrap items-start justify-end gap-3">
+              <div className="rounded-lg border border-border bg-background px-3 py-2 text-left text-xs">
+                <label className="flex items-center gap-2 text-muted-foreground" title={AUTO_PICKUP_BACKLOG_TITLE}>
+                  <input
+                    type="checkbox"
+                    checked={autoPickupBacklog}
+                    disabled={configBusy}
+                    onChange={(event) => flywheelConfigMutation.mutate({ auto_pickup_backlog: event.currentTarget.checked })}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
+                  />
+                  <span>Auto-pickup backlog</span>
+                </label>
+                <label className="mt-2 flex items-center gap-2 text-muted-foreground" title={REQUIRE_UAT_BEFORE_MERGE_TITLE}>
+                  <input
+                    type="checkbox"
+                    checked={requireUatBeforeMerge}
+                    disabled={configBusy}
+                    onChange={(event) => flywheelConfigMutation.mutate({ require_uat_before_merge: event.currentTarget.checked })}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
+                  />
+                  <span>Require UAT before merge</span>
+                </label>
+                {configError && <div className="mt-2 max-w-64 text-xs text-destructive">{configError}</div>}
               </div>
-              <div className="mt-1 font-mono text-sm text-foreground">{status?.runId ?? 'No run'}</div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2 text-right">
+                <div className="flex items-center justify-end gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className={status ? 'h-2 w-2 rounded-full bg-success' : 'h-2 w-2 rounded-full bg-muted-foreground'} />
+                  {status ? 'Live run' : 'Idle'}
+                </div>
+                <div className="mt-1 font-mono text-sm text-foreground">{status?.runId ?? 'No run'}</div>
+              </div>
             </div>
           </div>
           {status && activeTab === 'status' && (
@@ -270,8 +480,9 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
         <div className="h-8 w-0.5 rounded-full bg-border/70 transition-colors group-hover:bg-primary/70 group-active:bg-primary" />
       </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
-        <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+        <div className="min-w-0 flex-1 overflow-hidden" aria-label="Flywheel conversation column">
+          <FlywheelConversationPane onOpenSettings={onOpenSettings} />
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdir, readFile, rm, stat } from 'fs/promises';
+import { mkdir, readFile, rename, rm, stat } from 'fs/promises';
 import { dirname, join } from 'path';
 import { createHash } from 'crypto';
 
@@ -88,16 +88,21 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   const builtAt = options.builtAt ?? new Date().toISOString();
   const config = resolveBuildConfig(options.config);
   const embeddingFn = options.embeddingFn ?? createDocsEmbeddingFunction(config.embedding);
+  const outputDir = dirname(outputPath);
+  const buildDir = join(outputDir, '..', '.pan-docs-index-tmp');
+  const buildPath = join(buildDir, `docs-index.${process.pid}.${Date.now()}.tmp.sqlite`);
   let embeddingProvider: DocsEmbeddingProvider = config.embedding.provider;
   let embeddingModel = config.embedding.model;
 
-  await mkdir(dirname(outputPath), { recursive: true });
-  await rm(outputPath, { force: true });
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(buildDir, { recursive: true });
+  await removeSqliteFiles(buildPath);
 
-  const db = new Database(outputPath);
+  const db = new Database(buildPath);
   let sourceCount = 0;
   let chunkCount = 0;
   let embeddingCount = 0;
+  let buildFailed = false;
 
   try {
     createDocsIndexSchema(db);
@@ -190,26 +195,39 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
       embeddingModel,
       embeddingDimensions: config.embedding.dimensions,
     });
+  } catch (error) {
+    buildFailed = true;
+    throw error;
   } finally {
     db.close();
+    if (buildFailed) await removeSqliteFiles(buildPath);
   }
 
-  const sizeBytes = (await stat(outputPath)).size;
-  if (sizeBytes > maxIndexBytes) {
-    throw new Error(`docs index ${outputPath} is ${sizeBytes} bytes, exceeding budget ${maxIndexBytes} bytes`);
-  }
+  try {
+    const sizeBytes = (await stat(buildPath)).size;
+    if (sizeBytes > maxIndexBytes) {
+      throw new Error(`docs index ${outputPath} is ${sizeBytes} bytes, exceeding budget ${maxIndexBytes} bytes`);
+    }
 
-  return {
-    outputPath,
-    sourceCount,
-    chunkCount,
-    embeddingCount,
-    sizeBytes,
-    builtAt,
-    embeddingProvider,
-    embeddingModel,
-    embeddingDimensions: config.embedding.dimensions,
-  };
+    await mkdir(outputDir, { recursive: true });
+    await rename(buildPath, outputPath);
+    await removeSqliteFiles(buildPath);
+
+    return {
+      outputPath,
+      sourceCount,
+      chunkCount,
+      embeddingCount,
+      sizeBytes,
+      builtAt,
+      embeddingProvider,
+      embeddingModel,
+      embeddingDimensions: config.embedding.dimensions,
+    };
+  } catch (error) {
+    await removeSqliteFiles(buildPath);
+    throw error;
+  }
 }
 
 export function createDocsIndexSchema(db: Database.Database): void {
@@ -382,6 +400,14 @@ export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float
 
 function resolveDocsEmbeddingOutput(output: Float32Array | DocsEmbeddingOutput): DocsEmbeddingOutput {
   return output instanceof Float32Array ? { embedding: output } : output;
+}
+
+async function removeSqliteFiles(path: string): Promise<void> {
+  await Promise.all([
+    rm(path, { force: true }),
+    rm(`${path}-shm`, { force: true }),
+    rm(`${path}-wal`, { force: true }),
+  ]);
 }
 
 async function getLocalEmbeddingPipeline(modelId: string): Promise<FeatureExtractionPipeline> {

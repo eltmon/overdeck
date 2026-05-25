@@ -224,6 +224,57 @@ describe('createSubstrateBugPoller', () => {
     expect(repository.bugs.get('PAN-101')?.status).toBe('fixed');
   });
 
+  it('keeps fixed lifecycle metadata after the fixed issue is seen again', async () => {
+    const repository = makeRepository();
+    const eventStore = makeEventStore();
+    const fetchImpl = makeFetch((url) => {
+      const query = url.searchParams.get('q') ?? '';
+      if (url.pathname === '/search/issues' && query.includes('is:issue')) {
+        return response({
+          items: [{
+            number: 101,
+            body: 'Flywheel-Run-Id: RUN-1\nFlywheel-Filed-By: agent',
+            created_at: '2026-05-25T12:00:00.000Z',
+            updated_at: '2026-05-25T12:01:00.000Z',
+            labels: [{ name: 'P1' }],
+            user: { login: 'panopticon-agent[bot]' },
+          }],
+        });
+      }
+      if (url.pathname === '/search/issues' && query.includes('is:pr')) return response({ items: [{ number: 9 }] });
+      if (url.pathname === '/repos/acme/panopticon/pulls/9/commits') {
+        return response([{ sha: 'commit-sha', commit: { message: 'refactor unrelated code' } }]);
+      }
+      if (url.pathname === '/repos/acme/panopticon/pulls/9') {
+        return response({
+          number: 9,
+          title: 'Fix substrate regression',
+          body: 'Fixes #101',
+          merged_at: '2026-05-25T12:10:00.000Z',
+          merge_commit_sha: 'merge-sha',
+        });
+      }
+      return response({ items: [] });
+    });
+    const poller = createSubstrateBugPoller({
+      fetchImpl,
+      repository,
+      eventStore,
+      getConfig: () => config,
+      now: () => new Date('2026-05-25T12:15:00.000Z'),
+    });
+
+    await poller.pollOnce();
+    await poller.pollOnce();
+
+    expect(repository.bugs.get('PAN-101')).toMatchObject({
+      status: 'fixed',
+      fixCommitSha: 'merge-sha',
+      fixMergedAt: '2026-05-25T12:10:00.000Z',
+    });
+    expect(eventStore.appendAsync).toHaveBeenCalledTimes(1);
+  });
+
   it('backs off when GitHub reports primary rate-limit exhaustion', async () => {
     let backedOff = false;
     const rateLimitStore = {

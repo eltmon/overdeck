@@ -24,6 +24,10 @@ The Flywheel is not an issue-scoped work agent. It runs as `flywheel-orchestrato
 ```bash
 pan flywheel start
 pan flywheel start --brief docs/flywheel-brief.md
+pan flywheel config --get
+pan flywheel config --get flywheel.require_uat_before_merge
+pan flywheel config --set flywheel.auto_pickup_backlog=true
+pan flywheel config --set flywheel.require_uat_before_merge=false
 pan flywheel status
 pan flywheel status --json
 pan flywheel pause
@@ -45,6 +49,19 @@ pan flywheel start --brief docs/flywheel-brief.md
 Starts `flywheel-orchestrator` and opens a new run under `~/.panopticon/flywheel/runs/<runId>/`.
 
 Use the default brief unless the user gives a specific markdown brief. The default is `docs/flywheel-brief.md`. The command validates that the brief path stays inside the project root.
+
+### Config
+
+```bash
+pan flywheel config --get
+pan flywheel config --get flywheel.require_uat_before_merge
+pan flywheel config --set flywheel.auto_pickup_backlog=true
+pan flywheel config --set flywheel.require_uat_before_merge=false
+```
+
+Reads or writes the two persisted Flywheel autonomy toggles. `--get` without a key prints both keys as `<key>=<bool>`; `--get <key>` prints one key; `--set <key>=<bool>` writes one key and prints the new value.
+
+Only these keys are accepted: `flywheel.auto_pickup_backlog` and `flywheel.require_uat_before_merge`.
 
 ### Status
 

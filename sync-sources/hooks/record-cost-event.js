@@ -4148,6 +4148,34 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_merge_queue_project
       ON merge_queue(project_key, status, position);
 
+    -- ===== Pending Auto-Merges (PAN-1486: Flywheel scheduled merge cooldown) =====
+    CREATE TABLE IF NOT EXISTS pending_auto_merges (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      issueId          TEXT NOT NULL,
+      prUrl            TEXT NOT NULL,
+      prNumber         INTEGER,
+      projectKey       TEXT NOT NULL,
+      "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+      scheduledMergeAt TEXT NOT NULL,
+      scheduledAt      TEXT NOT NULL,
+      mergedAt         TEXT,
+      failureReason    TEXT,
+      cancelledAt      TEXT,
+      cancelledBy      TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+      ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
+      ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
+      ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
+      ON pending_auto_merges("status", scheduledMergeAt, id);
+
     -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
     CREATE TABLE IF NOT EXISTS merge_sets (
       issue_id       TEXT PRIMARY KEY,
@@ -4285,7 +4313,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 44`);
+	db.pragma(`user_version = 46`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4293,7 +4321,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 44) return;
+	if (currentVersion === 46) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4783,6 +4811,53 @@ function runMigrations(db) {
 		} catch {}
 	}
 	if (currentVersion < 44) db.exec(`
+      CREATE TABLE IF NOT EXISTS pending_auto_merges (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        issueId          TEXT NOT NULL,
+        prUrl            TEXT NOT NULL,
+        prNumber         INTEGER,
+        projectKey       TEXT NOT NULL,
+        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+        scheduledMergeAt TEXT NOT NULL,
+        scheduledAt      TEXT NOT NULL,
+        mergedAt         TEXT,
+        failureReason    TEXT,
+        cancelledAt      TEXT,
+        cancelledBy      TEXT
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+    `);
+	if (currentVersion < 45) db.exec(`
+      CREATE TABLE IF NOT EXISTS pending_auto_merges (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        issueId          TEXT NOT NULL,
+        prUrl            TEXT NOT NULL,
+        prNumber         INTEGER,
+        projectKey       TEXT NOT NULL,
+        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+        scheduledMergeAt TEXT NOT NULL,
+        scheduledAt      TEXT NOT NULL,
+        mergedAt         TEXT,
+        failureReason    TEXT,
+        cancelledAt      TEXT,
+        cancelledBy      TEXT
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
+        ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
+
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
+        ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
+
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
+        ON pending_auto_merges("status", scheduledMergeAt, id);
+    `);
+	if (currentVersion < 46) db.exec(`
       CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
         issue_id               TEXT PRIMARY KEY,
         filed_at               TEXT NOT NULL,
@@ -4805,7 +4880,7 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
         ON flywheel_substrate_bugs(status, fix_merged_at);
     `);
-	db.pragma(`user_version = 44`);
+	db.pragma(`user_version = 46`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

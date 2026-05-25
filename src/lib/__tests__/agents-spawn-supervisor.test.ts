@@ -266,6 +266,34 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('threads flywheel orchestrator provenance env into launcher and tmux session', async () => {
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('RUN-777', 'flywheel', {
+      agentId: 'flywheel-orchestrator',
+      workspace,
+      model: 'claude-opus-4-7',
+      flywheelRunId: 'RUN-777',
+      allowHost: true,
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'flywheel-orchestrator');
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_RUN_ID=RUN-777');
+    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_AGENT_ROLE=flywheel');
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      workspace,
+      `bash ${join(agentDir, 'launcher.sh')}`,
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
+          PANOPTICON_FLYWHEEL_AGENT_ROLE: 'flywheel',
+        }),
+      }),
+    );
+  });
+
   it('omits flywheel provenance env when no canonical run is active', async () => {
     writeSupervisorArtifact();
     activeFlywheelRunId = 'not-a-run-id';

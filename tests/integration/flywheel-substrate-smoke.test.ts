@@ -54,15 +54,55 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   await symlink(resolve(projectRoot, 'node_modules/.bun/loose-envify@1.4.0/node_modules/loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
   await writeFile(join(root, 'index.html'), '<!doctype html><html><body><div id="root"></div><script type="module" src="/src/main.ts"></script></body></html>');
   await writeFile(join(root, 'src', 'wsTransport.ts'), 'export function subscribeFlywheelStatus() { return () => undefined; }\n');
+  await writeFile(join(root, 'src', 'reactQuery.ts'), `
+    import React, { useEffect, useState } from 'react';
+
+    export class QueryClient {}
+    export function QueryClientProvider({ children }: { children: React.ReactNode }) { return React.createElement(React.Fragment, null, children); }
+    export function useQuery(options: { queryFn: () => Promise<unknown>; queryKey?: unknown }) {
+      const [state, setState] = useState<{ data?: unknown; error?: unknown; pending: boolean }>({ pending: true });
+      useEffect(() => {
+        let cancelled = false;
+        options.queryFn().then(
+          (data) => { if (!cancelled) setState({ data, pending: false }); },
+          (error) => { if (!cancelled) setState({ error, pending: false }); },
+        );
+        return () => { cancelled = true; };
+      }, [JSON.stringify(options.queryKey)]);
+      return { data: state.data, error: state.error, isLoading: state.pending, isPending: state.pending, isError: state.error !== undefined };
+    }
+    export function useQueryClient() {
+      return { cancelQueries: async () => undefined, invalidateQueries: async () => undefined, getQueryData: () => undefined, setQueryData: () => undefined };
+    }
+    export function useMutation(options: { mutationFn: (input: unknown) => Promise<unknown>; onMutate?: (input: unknown) => unknown; onError?: (error: unknown, input: unknown, context: unknown) => unknown; onSuccess?: (data: unknown) => unknown }) {
+      const [isPending, setPending] = useState(false);
+      return {
+        isPending,
+        error: null,
+        mutate: (input: unknown, callbacks?: { onSettled?: () => void }) => {
+          setPending(true);
+          const context = options.onMutate?.(input);
+          options.mutationFn(input).then(
+            (data) => { options.onSuccess?.(data); },
+            (error) => { options.onError?.(error, input, context); },
+          ).finally(() => { setPending(false); callbacks?.onSettled?.(); });
+        },
+      };
+    }
+  `);
   await writeFile(join(root, 'src', 'FlywheelConversationPane.ts'), 'import React from \'react\'; export function FlywheelConversationPane() { return React.createElement(\'div\', { \'aria-label\': \'Flywheel conversation stub\' }, \'conversation\'); }\n');
   await writeFile(join(root, 'src', 'FlywheelStatePane.ts'), 'import React from \'react\'; export function FlywheelStatePane() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'FlywheelStatusDetails.ts'), 'import React from \'react\'; export function FlywheelStatusDetails() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'main.ts'), `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
     import { FlywheelPage } from '/src/dashboard-frontend/pages/FlywheelPage.tsx';
 
-    createRoot(document.getElementById('root')!).render(React.createElement(FlywheelPage));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    createRoot(document.getElementById('root')!).render(
+      React.createElement(QueryClientProvider, { client: queryClient }, React.createElement(FlywheelPage)),
+    );
   `);
 
   viteServer = await createServer({
@@ -82,6 +122,7 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
     resolve: {
       preserveSymlinks: true,
       alias: [
+        { find: '@tanstack/react-query', replacement: join(root, 'src', 'reactQuery.ts') },
         { find: /(^|\/)lib\/wsTransport$/, replacement: join(root, 'src', 'wsTransport.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelConversationPane$/, replacement: join(root, 'src', 'FlywheelConversationPane.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelStatePane$/, replacement: join(root, 'src', 'FlywheelStatePane.ts') },
@@ -129,6 +170,16 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
             res.end('null');
             return;
           }
+          if (req.url?.startsWith('/api/flywheel/config')) {
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({ auto_pickup_backlog: false, require_uat_before_merge: true }));
+            return;
+          }
+          if (req.url?.startsWith('/api/flywheel/auto-merge/pending')) {
+            res.setHeader('content-type', 'application/json');
+            res.end('[]');
+            return;
+          }
           next();
         });
       },
@@ -141,8 +192,27 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   browser = await chromium.launch({ headless: true });
   context = await browser.newContext();
   page = await context.newPage();
+  const browserErrors: string[] = [];
+  const responseErrors: Promise<void>[] = [];
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') browserErrors.push(message.text());
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      responseErrors.push(response.text()
+        .then((body) => browserErrors.push(`${response.status()} ${response.url()} ${body.slice(0, 500)}`))
+        .catch(() => browserErrors.push(`${response.status()} ${response.url()}`)));
+    }
+  });
   await page.goto(`http://127.0.0.1:${address.port}/`);
-  await page.getByRole('tab', { name: 'Stats' }).click({ timeout: 5000 });
+  try {
+    await page.getByRole('tab', { name: 'Stats' }).click({ timeout: 5000 });
+  } catch (error) {
+    await Promise.all(responseErrors);
+    const bodyText = await page.locator('body').textContent().catch(() => '');
+    throw new Error(`Stats tab did not render. Browser errors: ${browserErrors.join('\n') || 'none'}. Body: ${bodyText}`, { cause: error });
+  }
 }
 
 afterEach(async () => {

@@ -147,6 +147,38 @@ describe('flywheel substrate bugs db', () => {
     expect(getByIssueId('PAN-100')).toEqual(fixed);
   });
 
+  it('preserves fixed lifecycle metadata when issue polling upserts without lifecycle fields', async () => {
+    const { getByIssueId, markFixed, upsert } = await import('../flywheel-substrate-bugs-db.js');
+
+    upsert({
+      issueId: 'PAN-100',
+      filedAt: '2026-05-01T00:00:00.000Z',
+      runId: 'RUN-1',
+      filedBy: 'agent',
+      severity: 'P1',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    });
+    markFixed('PAN-100', 'abc123', '2026-05-03T00:00:00.000Z');
+
+    const repolled = upsert({
+      issueId: 'PAN-100',
+      filedAt: '2026-05-01T00:00:00.000Z',
+      runId: 'RUN-1',
+      filedBy: 'agent',
+      severity: 'P1',
+      updatedAt: '2026-05-04T00:00:00.000Z',
+    });
+
+    expect(repolled).toMatchObject({
+      issueId: 'PAN-100',
+      status: 'fixed',
+      fixCommitSha: 'abc123',
+      fixMergedAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-04T00:00:00.000Z',
+    });
+    expect(getByIssueId('PAN-100')).toEqual(repolled);
+  });
+
   it('rejects filed_by values other than agent or operator', async () => {
     const { upsert } = await import('../flywheel-substrate-bugs-db.js');
 
