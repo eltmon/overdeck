@@ -102,7 +102,12 @@ Never:
 
 - Run `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
 - Edit feature branches directly or commit code fixes from this role.
-- Merge PRs directly. Auto-merge is permitted only when the brief shows `Require UAT before merge: false`; schedule it via `POST /api/flywheel/auto-merge/schedule` and never invoke `gh pr merge` yourself.
+- Merge PRs without checking the configured policy.
+
+  Merge policy (PAN-1486):
+  - **Workflow auto-merge** (the normal `merge` action surface) is permitted only when `flywheel.require_uat_before_merge=false`. Schedule via `POST /api/flywheel/auto-merge/schedule`; never call `gh pr merge` from the workflow path.
+  - **Operator override** is always permitted regardless of toggle. When the operator names a specific PR/issue and asks the orchestrator (or a strike) to merge it, `gh pr merge --admin --squash --delete-branch` is the right tool. `enforce_admins=false` on `main` is the design — operator-authorized merges bypass the workflow's required status checks intentionally, because the operator has already given the approval the checks exist to gate.
+  - **Strike agents** merge directly to main as part of their role (no PR ceremony). That is the strike contract per `roles/strike.md`; nothing in this role is meant to block it.
 - Deep-wipe without explicit user approval.
 - Delete Claude JSONL session files.
 - Skip hooks or use `--no-verify`.
