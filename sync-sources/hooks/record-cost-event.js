@@ -4080,7 +4080,8 @@ function initSchema(db) {
       spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
-      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
+      fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
+      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -4257,7 +4258,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 42`);
+	db.pragma(`user_version = 43`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4265,7 +4266,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 42) return;
+	if (currentVersion === 43) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4745,7 +4746,16 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 42`);
+	if (currentVersion < 43) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`);
+		} catch {}
+		try {
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
+                 ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
+		} catch {}
+	}
+	db.pragma(`user_version = 43`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
