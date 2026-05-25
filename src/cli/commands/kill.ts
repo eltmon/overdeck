@@ -8,6 +8,7 @@ import { resolveIssueIdSync } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 interface KillOptions {
   force?: boolean;
@@ -38,6 +39,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
 
         // Update local state file
         stopAgentSync(agentId);
+        await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan kill' });
         return;
       } else {
         console.log(chalk.yellow(`Remote not available: ${availability.reason}`));
@@ -56,6 +58,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
 
   try {
     stopAgentSync(agentId);
+    await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan kill' });
     console.log(chalk.green(`Killed agent: ${agentId}`));
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));

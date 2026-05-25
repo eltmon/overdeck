@@ -1708,6 +1708,11 @@ const postAgentPauseRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
+    yield* eventStore.appendAsync(operatorInterventionEvent({
+      issueId: updatedState.issueId || stateBeforePause.issueId || id.replace(/^agent-/, '').toUpperCase(),
+      kind: 'pause',
+      source: 'dashboard',
+    }));
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -1994,6 +1999,11 @@ const postAgentRestartRoute = HttpRouter.add(
     }));
 
     if (graceful) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: agentState.issueId,
+        kind: 'restart',
+        source: 'dashboard',
+      }));
       // Kick off async restart — don't block the HTTP response for 30s
       (async () => {
         try {
@@ -2051,6 +2061,11 @@ const postAgentRestartRoute = HttpRouter.add(
 
     if (result.success) {
       const updatedState = yield* getAgentState(id);
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState?.issueId || agentState.issueId,
+        kind: 'restart',
+        source: 'dashboard',
+      }));
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),

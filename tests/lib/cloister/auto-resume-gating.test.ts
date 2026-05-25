@@ -52,6 +52,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/shadow-mode.js');
     vi.doUnmock('../../../src/lib/remote/index.js');
     vi.doUnmock('../../../src/lib/remote/workspace-metadata.js');
+    vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -106,6 +107,18 @@ describe('auto-resume gates', () => {
       emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../../../src/lib/operator-interventions.js', () => ({
+      appendOperatorInterventionEvent: vi.fn().mockResolvedValue(undefined),
+      operatorInterventionEvent: vi.fn((input) => ({
+        type: 'operator.intervention',
+        timestamp: input.timestamp ?? BASE_TIME.toISOString(),
+        payload: {
+          issueId: input.issueId,
+          kind: input.kind,
+          source: input.source,
+        },
+      })),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
