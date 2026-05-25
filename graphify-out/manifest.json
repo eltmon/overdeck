@@ -1132,7 +1132,7 @@
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.d.ts": {
-    "mtime": 1779700449.7354035,
+    "mtime": 1779711403.086929,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notify-complete": {
@@ -1140,7 +1140,7 @@
     "hash": "373ba01f551cd1ff98252fd01e937ebd"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.js": {
-    "mtime": 1779700449.7354035,
+    "mtime": 1779711403.086929,
     "hash": "376c3da1731ecd9eb6c128a8a21383c4"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notification-hook": {
@@ -4324,8 +4324,8 @@
     "hash": "52e96f4c99d664a4ab33f7a46a41c5ba"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx": {
-    "mtime": 1779577116.5602033,
-    "hash": "34fd75816e350a8435fc4c916a34f74a"
+    "mtime": 1779703996.7143772,
+    "hash": "4b68792c05a5d38bbbe00edc64cec2db"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx": {
     "mtime": 1779577116.5602033,
@@ -4708,8 +4708,8 @@
     "hash": "445513b70e570850fc82af1c320ff68d"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/primitives/AgentCard.tsx": {
-    "mtime": 1779577116.5642035,
-    "hash": "5578cc107e84e233c3b98eddab920869"
+    "mtime": 1779703988.9491112,
+    "hash": "d87d51a86121131d2f62f924b581d6ec"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/primitives/MetricTile.tsx": {
     "mtime": 1779212913.9852827,
@@ -4776,8 +4776,8 @@
     "hash": "c824e83a726b0d1897ee2d111402a657"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx": {
-    "mtime": 1779698327.102755,
-    "hash": "e48f38805b4c7d80f6b52af231fd9263"
+    "mtime": 1779711224.288636,
+    "hash": "07347007b3a64d60c6daa4bd37607be7"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx": {
     "mtime": 1779535911.838722,
