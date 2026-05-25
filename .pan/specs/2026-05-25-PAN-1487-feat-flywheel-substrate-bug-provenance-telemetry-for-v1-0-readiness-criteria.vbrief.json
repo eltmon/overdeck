@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.11.1",
     "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "updated": "2026-05-25T13:56:00.992Z"
+    "updated": "2026-05-25T14:03:40.997Z"
   },
   "plan": {
     "id": "pan-1487",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 36,
+    "sequence": 38,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T13:56:00.992Z",
+    "updated": "2026-05-25T14:03:40.997Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
@@ -1783,55 +1783,55 @@
         "phase": "review",
         "issueId": "PAN-1487",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T13:56:00.988Z",
+        "updatedAt": "2026-05-25T14:03:40.984Z",
         "work": {
-          "updatedAt": "2026-05-25T13:56:00.988Z",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T13:56:00.988Z",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T13:56:00.988Z"
+              "at": "2026-05-25T14:03:40.984Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-25T13:56:00.988Z",
-          "notes": "Stats endpoint performs unbounded synchronous event aggregation",
+          "status": "reviewing",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
+          "notes": "Agent re-review request (2/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-25T13:56:00.988Z",
-              "notes": "Stats endpoint performs unbounded synchronous event aggregation"
+              "status": "reviewing",
+              "at": "2026-05-25T14:03:40.984Z",
+              "notes": "Agent re-review request (2/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:56:00.988Z",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:56:00.988Z"
+              "at": "2026-05-25T14:03:40.984Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T13:56:00.988Z",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:56:00.988Z",
+          "updatedAt": "2026-05-25T14:03:40.984Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:56:00.988Z"
+              "at": "2026-05-25T14:03:40.984Z"
             }
           ],
           "readyForMerge": false,
