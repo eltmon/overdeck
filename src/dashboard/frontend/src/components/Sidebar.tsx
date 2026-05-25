@@ -4,7 +4,7 @@ import {
   Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic,
+  Hammer, Loader2, History, Mic, FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
@@ -106,6 +106,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'System',
     items: [
       { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
+      { id: 'context' as Tab, label: 'Context', icon: FileText },
       { id: 'settings' as Tab, label: 'Settings', icon: Settings },
       { id: 'god-view' as Tab, label: 'God View', icon: Zap },
     ],
