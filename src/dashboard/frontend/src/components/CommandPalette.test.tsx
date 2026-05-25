@@ -115,7 +115,7 @@ describe('CommandPalette issue results', () => {
   });
 });
 
-describe('CommandPalette flywheel action', () => {
+describe('CommandPalette navigation actions', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -134,6 +134,23 @@ describe('CommandPalette flywheel action', () => {
 
     await waitFor(() => {
       expect(onNavigate).toHaveBeenCalledWith('flywheel');
+    });
+  });
+
+  it('shows Context navigation and opens the Context page', async () => {
+    const user = userEvent.setup();
+    const { onNavigate } = renderPalette();
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), 'context');
+
+    expect(screen.getByText('Navigation')).toBeInTheDocument();
+    const contextOption = getOptionByValue('open-context');
+    expect(contextOption).toBeInTheDocument();
+
+    await user.click(contextOption);
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith('context');
     });
   });
 });

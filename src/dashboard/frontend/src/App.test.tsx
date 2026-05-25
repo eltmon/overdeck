@@ -81,6 +81,7 @@ vi.mock('./components/search/SearchModal', () => ({ SearchModal: () => null }));
 vi.mock('./components/CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
+vi.mock('./components/context/ContextPage', () => ({ ContextPage: () => <div data-testid="context-page" /> }));
 vi.mock('./components/flywheel/FlywheelConversationPane', () => ({ FlywheelConversationPane: () => <div data-testid="flywheel-page" /> }));
 vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
@@ -221,7 +222,7 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('resolves Pipeline as the default route and Board as /board', () => {
+  it('resolves Pipeline as the default route, Board as /board, and Context as /context', () => {
     window.history.replaceState(null, '', '/');
     expect(getConversationRouteState().tab).toBe('pipeline');
     window.history.replaceState(null, '', '/pipeline');
@@ -229,6 +230,9 @@ describe('conversation route helpers', () => {
 
     window.history.replaceState(null, '', '/board');
     expect(getConversationRouteState().tab).toBe('kanban');
+
+    window.history.replaceState(null, '', '/context');
+    expect(getConversationRouteState().tab).toBe('context');
 
     window.history.replaceState(null, '', '/unknown');
     expect(getConversationRouteState().tab).toBe('pipeline');
@@ -333,6 +337,12 @@ describe('App Pipeline routing', () => {
     window.history.replaceState(null, '', '/board');
     renderApp();
     expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+
+  it('renders ContextPage at /context', () => {
+    window.history.replaceState(null, '', '/context');
+    renderApp();
+    expect(screen.getByTestId('context-page')).toBeInTheDocument();
   });
 });
 

@@ -119,6 +119,18 @@ describe('Sidebar navigation', () => {
     fireEvent.click(commandDeckButton);
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
+
+  it('includes Context in System navigation without removing sibling pages', () => {
+    const { onTabChange } = renderSidebar({ activeTab: 'context' });
+
+    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-god-view')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sidebar-context'));
+    expect(onTabChange).toHaveBeenCalledWith('context');
+  });
 });
 
 describe('Sidebar pipeline filter groups', () => {

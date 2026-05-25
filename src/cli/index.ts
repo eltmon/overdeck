@@ -1205,38 +1205,44 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(restartCommand);
 
+function registerProjectCommands(command: Command): void {
+  command
+    .command('add <path>')
+    .description('Register a project with Panopticon')
+    .option('--name <name>', 'Project name')
+    .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
+    .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
+    .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
+    .action(projectAddCommand);
+
+  command
+    .command('list')
+    .description('List all registered projects')
+    .option('--json', 'Output as JSON')
+    .action(projectListCommand);
+
+  command
+    .command('show <key>')
+    .description('Show details for a specific project')
+    .action(projectShowCommand);
+
+  command
+    .command('remove <nameOrPath>')
+    .description('Remove a project from the registry')
+    .action(projectRemoveCommand);
+
+  command
+    .command('init')
+    .description('Initialize projects.yaml with example configuration')
+    .action(projectInitCommand);
+}
+
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');
+registerProjectCommands(project);
 
-project
-  .command('add <path>')
-  .description('Register a project with Panopticon')
-  .option('--name <name>', 'Project name')
-  .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
-  .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
-  .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
-  .action(projectAddCommand);
-
-project
-  .command('list')
-  .description('List all registered projects')
-  .option('--json', 'Output as JSON')
-  .action(projectListCommand);
-
-project
-  .command('show <key>')
-  .description('Show details for a specific project')
-  .action(projectShowCommand);
-
-project
-  .command('remove <nameOrPath>')
-  .description('Remove a project from the registry')
-  .action(projectRemoveCommand);
-
-project
-  .command('init')
-  .description('Initialize projects.yaml with example configuration')
-  .action(projectInitCommand);
+const projects = program.command('projects').description('Project registry for multi-project workspace support');
+registerProjectCommands(projects);
 
 // Health command
 program
