@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:16:40.071Z"
+    "updated": "2026-05-25T23:23:25.756Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 10,
+    "sequence": 18,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:16:40.071Z",
+    "updated": "2026-05-25T23:23:25.756Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -501,56 +501,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T23:16:40.053Z",
+        "updatedAt": "2026-05-25T23:23:25.751Z",
         "work": {
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "status": "passed",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-05-25T23:16:40.053Z"
+              "status": "passed",
+              "at": "2026-05-25T23:23:25.751Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "status": "blocked",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "notes": "Planning xhigh/max is accepted but rendered as low effort",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T23:16:40.053Z"
+              "status": "blocked",
+              "at": "2026-05-25T23:23:25.751Z",
+              "notes": "Planning xhigh/max is accepted but rendered as low effort"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T23:16:40.053Z"
+              "at": "2026-05-25T23:23:25.751Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T23:16:40.053Z",
+          "updatedAt": "2026-05-25T23:23:25.751Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T23:16:40.053Z"
+              "at": "2026-05-25T23:23:25.751Z"
             }
           ],
           "readyForMerge": false,

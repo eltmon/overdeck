@@ -4565,7 +4565,7 @@ function initSchema(db) {
       total_tokens     INTEGER DEFAULT 0,                  -- cached total tokens (input+output+cache read/write)
       archived_at      TEXT,                               -- ISO timestamp when archived, null = active
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
-      effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
+      effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high', 'xhigh', 'max')
       fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
       fork_error       TEXT,                               -- error message when fork_status='failed'
       harness          TEXT,                                -- coding harness used for conversation runtime

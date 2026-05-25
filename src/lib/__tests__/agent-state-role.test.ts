@@ -65,13 +65,18 @@ describe('AgentState role persistence', () => {
     expect(command).not.toContain('pan-review-agent');
   });
 
-  it('threads configured effort into claude-code role runtime commands', async () => {
-    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+  it('threads configured effort into claude-code runtime commands', async () => {
+    const { getAgentRuntimeBaseCommand, getRoleRuntimeBaseCommand } = await import('../agents.js');
 
-    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
-    expect(command).toContain('--agent roles/flywheel.md');
-    expect(command).toContain("--model 'claude-opus-4-7'");
-    expect(command).toContain('--effort low');
+    const roleCommand = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
+    expect(roleCommand).toContain('--agent roles/flywheel.md');
+    expect(roleCommand).toContain("--model 'claude-opus-4-7'");
+    expect(roleCommand).toContain('--effort low');
+
+    const agentCommand = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'strike-pan-1496', 'roles/strike.md', 'claude-code', 'max');
+    expect(agentCommand).toContain('--agent roles/strike.md');
+    expect(agentCommand).toContain("--model 'claude-opus-4-7'");
+    expect(agentCommand).toContain('--effort max');
   });
 
   it('preserves the flywheel singleton agent id during normalization', async () => {

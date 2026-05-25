@@ -247,22 +247,49 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
     childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the vBRIEF plan between the corresponding beads. Use \\\`informs\\\` for softer ordering hints.\n`;
   }
 
-  const effortSection = effort && effort !== 'medium' ? `
-## Planning Effort: ${effort === 'high' ? 'High (Deep Analysis)' : 'Low (Quick Planning)'}
-
-${effort === 'high'
-    ? `**The user has requested HIGH effort planning.** Be exceptionally thorough:
+  const planningEffortCopy: Record<Exclude<RoleEffort, 'medium'>, { label: string; guidance: string }> = {
+    low: {
+      label: 'Low (Quick Planning)',
+      guidance: `**The user has requested LOW effort planning.** Be concise and fast:
+- Focus on the most critical decisions only
+- Keep the task list tight — 3–5 items max unless truly necessary
+- Skip deep exploration; read only the directly relevant files
+- Ask only essential clarifying questions`,
+    },
+    high: {
+      label: 'High (Deep Analysis)',
+      guidance: `**The user has requested HIGH effort planning.** Be exceptionally thorough:
 - Explore more of the codebase before concluding — check adjacent files, not just the obvious ones
 - Identify edge cases, potential failure modes, and risks
 - Consider multiple implementation approaches and explain tradeoffs
 - Ask more clarifying questions when scope is ambiguous
-- Break down tasks into finer-grained subtasks`
-    : `**The user has requested LOW effort planning.** Be concise and fast:
-- Focus on the most critical decisions only
-- Keep the task list tight — 3–5 items max unless truly necessary
-- Skip deep exploration; read only the directly relevant files
-- Ask only essential clarifying questions`
-  }
+- Break down tasks into finer-grained subtasks`,
+    },
+    xhigh: {
+      label: 'Extra High (Deeper Analysis)',
+      guidance: `**The user has requested EXTRA HIGH effort planning.** Go beyond the high-effort pass:
+- Trace the relevant flows end-to-end before finalizing the plan
+- Check adjacent subsystems and tests for hidden coupling or drift
+- Identify rollback, migration, and verification risks explicitly
+- Break down work into independently reviewable beads with clear dependencies
+- Record assumptions and non-obvious decisions in the vBRIEF`,
+    },
+    max: {
+      label: 'Max (Maximum Analysis)',
+      guidance: `**The user has requested MAX effort planning.** Perform the deepest planning pass available:
+- Exhaustively inspect the impacted surfaces before choosing the implementation path
+- Validate requirements against issue history, comments, docs, and adjacent code behavior
+- Enumerate edge cases, operational hazards, and regression risks
+- Produce fine-grained beads with acceptance criteria that make missed scope obvious
+- Prefer surfacing contradictions over guessing when evidence conflicts`,
+    },
+  };
+
+  const effortCopy = effort && effort !== 'medium' ? planningEffortCopy[effort] : undefined;
+  const effortSection = effortCopy ? `
+## Planning Effort: ${effortCopy.label}
+
+${effortCopy.guidance}
 
 ` : '';
 

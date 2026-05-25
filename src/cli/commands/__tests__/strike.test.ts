@@ -45,7 +45,27 @@ describe('strikeCommand', () => {
     expect(prompt).toContain('strike/pan-1234');
     expect(prompt).toContain('/tmp/feature-pan-1234-strike');
     expect(prompt).toContain('merge fast-forward to `main`');
-    // Strike must explicitly not call pan done
     expect(prompt).toContain('Do NOT call `pan done`');
+  });
+
+  it('passes the selected effort into strike spawn options', () => {
+    const fakePlan = {
+      issueId: 'PAN-1234',
+      workspace: '/tmp/feature-pan-1234-strike',
+      branch: 'strike/pan-1234',
+      sessionName: 'strike-pan-1234',
+      projectRoot: '/tmp/project',
+    };
+
+    expect(__testInternals.buildStrikeSpawnOptions(fakePlan, { effort: 'xhigh' }, 'prompt')).toMatchObject({
+      issueId: 'PAN-1234',
+      workspace: '/tmp/feature-pan-1234-strike',
+      role: 'strike',
+      effort: 'xhigh',
+      prompt: 'prompt',
+    });
+    expect(__testInternals.buildStrikeSpawnOptions(fakePlan, { effort: 'max' }, 'prompt')).toMatchObject({
+      effort: 'max',
+    });
   });
 });

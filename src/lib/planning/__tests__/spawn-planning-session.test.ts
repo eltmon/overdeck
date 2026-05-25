@@ -69,6 +69,18 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).not.toContain('Child Stories');
   });
 
+  it('renders distinct planning instructions for widened effort tiers', async () => {
+    const xhighPrompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, 'xhigh');
+    const maxPrompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, 'max');
+
+    expect(xhighPrompt).toContain('Planning Effort: Extra High (Deeper Analysis)');
+    expect(xhighPrompt).toContain('requested EXTRA HIGH effort planning');
+    expect(xhighPrompt).not.toContain('Low (Quick Planning)');
+    expect(maxPrompt).toContain('Planning Effort: Max (Maximum Analysis)');
+    expect(maxPrompt).toContain('requested MAX effort planning');
+    expect(maxPrompt).not.toContain('Low (Quick Planning)');
+  });
+
   it('renders non-interactive auto-planning instructions', async () => {
     const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, true);
 
