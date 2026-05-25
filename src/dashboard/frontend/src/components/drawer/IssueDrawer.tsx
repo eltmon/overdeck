@@ -7,6 +7,7 @@ import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
+import DrawerArtifactsPanel from './DrawerArtifactsPanel';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
@@ -260,6 +261,8 @@ export function IssueDrawer() {
               <DrawerPlanPanel issueId={drawer.issueId} />
             ) : drawer.tab === 'activity' ? (
               <DrawerActivityPanel />
+            ) : drawer.tab === 'artifacts' ? (
+              <DrawerArtifactsPanel issueId={drawer.issueId} />
             ) : drawer.tab === 'conversation' ? (
               <DrawerAgentSession
                 view="conversation"

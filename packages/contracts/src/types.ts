@@ -429,6 +429,8 @@ export const EmbedProgressSnapshot = Schema.Struct({
 })
 export type EmbedProgressSnapshot = typeof EmbedProgressSnapshot.Type
 
+// ─── Dashboard Snapshot ──────────────────────────────────────────────────────
+
 export const DashboardSnapshot = Schema.Struct({
   sequence: SequenceNumber,
   agents: Schema.Array(AgentSnapshot),
