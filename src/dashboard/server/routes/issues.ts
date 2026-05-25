@@ -646,6 +646,21 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
+    // TTS announcement so the operator hears the lifecycle without watching the dashboard
+    emitActivityEntrySync({
+      source: 'plan',
+      level: 'info',
+      message: `${id} planning agent starting`,
+      issueId: id,
+    });
+    emitActivityTtsSync({
+      utterance: `Planning agent starting for ${id}`,
+      priority: 2,
+      issueId: id,
+      source: 'planning-agent',
+      eventType: 'planning.started',
+    });
+
     // Clear agents cache so the next dashboard poll sees the new planning agent
     invalidateAgentsCache();
 

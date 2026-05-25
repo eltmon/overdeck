@@ -9,6 +9,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
@@ -505,6 +506,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
+    emitActivityEntrySync({
+      source: 'work-agent',
+      level: 'info',
+      message: `${issueId} work complete — entering review pipeline`,
+      issueId,
+    });
+    emitActivityTtsSync({
+      utterance: `Work agent finished ${issueId}, entering review`,
+      priority: 2,
+      issueId,
+      source: 'work-agent',
+      eventType: 'workAgent.finished',
+    });
     console.log('');
 
     // Summary

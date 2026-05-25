@@ -95,9 +95,27 @@ async function drainQueue(): Promise<void> {
   }
 }
 
+// Lifecycle event types that the announce-lifecycle toggle controls. These are
+// the planning/work agent start+finish announcements added so the operator
+// hears the substrate breathe without watching the dashboard. Toggle off via
+// `tts.lifecycle = false` in panopticon.yaml when the announcements are noisy.
+const LIFECYCLE_EVENT_TYPES = new Set([
+  'planning.started',
+  'planning.finalized',
+  'workAgent.started',
+  'workAgent.finished',
+]);
+
 function enqueueActivityTts(event: StoredEvent): void {
   const config = getTtsRuntimeConfig();
   if (!config.enabled) return;
+
+  if (event.type === 'activity.tts') {
+    const eventType = (event.payload as { eventType?: string } | undefined)?.eventType;
+    if (eventType && LIFECYCLE_EVENT_TYPES.has(eventType) && config.lifecycle === false) {
+      return;
+    }
+  }
 
   if (state.queue.length >= MAX_TTS_QUEUE_LENGTH) {
     const priority = eventPriority(event) ?? 1;

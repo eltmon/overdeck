@@ -235,6 +235,8 @@ export interface TtsSummarizerConfig {
 
 export interface TtsDaemonConfig {
   enabled?: boolean;
+  /** Announce planning/work agent lifecycle (start + finish) via TTS. Default true. */
+  lifecycle?: boolean;
   voice?: string;
   statusVoice?: string;
   volume?: number;
@@ -254,6 +256,12 @@ export interface TtsDaemonConfig {
 
 export interface NormalizedTtsDaemonConfig {
   enabled: boolean;
+  /**
+   * Announce planning/work agent lifecycle events (start + finish) via TTS.
+   * Default true. Set false to mute the substrate-breathing announcements
+   * without disabling TTS overall.
+   */
+  lifecycle: boolean;
   voice: string;
   statusVoice?: string;
   volume: number;
@@ -926,6 +934,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   tts: {
     enabled: false,
+    lifecycle: true,
     voice: '',
     volume: 1,
     rate: 1,
@@ -1305,6 +1314,7 @@ function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | 
   if (!tts) return;
 
   if (tts.enabled !== undefined) result.enabled = tts.enabled;
+  if (tts.lifecycle !== undefined) result.lifecycle = tts.lifecycle;
   if (tts.voice !== undefined) result.voice = tts.voice;
   if (tts.statusVoice !== undefined) result.statusVoice = tts.statusVoice;
   if (tts.volume !== undefined) result.volume = tts.volume;
@@ -1323,6 +1333,7 @@ function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | 
 export function getDefaultTtsDaemonConfig(): NormalizedTtsDaemonConfig {
   return {
     enabled: DEFAULT_CONFIG.tts.enabled,
+    lifecycle: DEFAULT_CONFIG.tts.lifecycle ?? true,
     voice: DEFAULT_CONFIG.tts.voice,
     statusVoice: DEFAULT_CONFIG.tts.statusVoice,
     volume: DEFAULT_CONFIG.tts.volume,
