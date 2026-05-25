@@ -1,0 +1,139 @@
+{
+  "version": "1",
+  "issueId": "PAN-1486",
+  "created": "2026-05-25T08:20:28.118Z",
+  "updated": "2026-05-25T08:35:00.000Z",
+  "gitState": { "branch": "feature/pan-1486", "sha": "bfc0c1bc8", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Two toggles collapse to two boolean keys in the existing app_settings SQLite table: flywheel.auto_pickup_backlog (default false) and flywheel.require_uat_before_merge (default true). No schema migration required — app_settings exists at v27 and is already used for flywheel.globally_paused.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Auto-merge execution is server-side, not orchestrator-side. The orchestrator role schedules an auto-merge via POST /api/flywheel/auto-merge/schedule; a server scanner holds the entry through a fixed 5-minute wall-clock cooldown, emits the TTS announcement, then invokes the existing dashboard-merge code path (same internal function the human MERGE button calls). This lets the cancel UX and persistence work even if the orchestrator session restarts.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Pending auto-merges live in a new SQLite table (pending_auto_merges) so they survive dashboard restart. Cooldown is stored as an ISO scheduledMergeAt timestamp compared against Date.now(); sleep/wake does not reset the timer (per issue body). Schema bumps from v27 to v28.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Auto-merge eligibility predicate requires ALL of: review-status readyForMerge=true (review+test+ship all passed), GitHub PR checks green (prState.checksFailed === false), no blocker labels on the issue (needs-design, needs-discussion, do-not-merge). Implemented as a pure isAutoMergeEligible(issueId) function so it is unit-testable and reusable by tests.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Cancel path is the new CLI verb `pan merge cancel <id>` plus a DELETE /api/flywheel/auto-merge/:id route. Cancel removes the pending entry, emits a TTS 'auto-merge cancelled for <id>' announcement, and prevents the executor from firing for that PR. The same DELETE route backs the dashboard cancel button.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "On auto-merge failure (post-cooldown rebase conflict, CI flip, etc.), the executor marks the pending entry as failed and stops auto-merging that PR until the operator clears it. The next FlywheelStatus tick surfaces it as a suggestion with action='investigate' and a rationale naming the failure mode. The orchestrator role consumes pending entries via a new GET /api/flywheel/auto-merge/pending endpoint when assembling its status snapshot.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Auto-merge serialization piggybacks on the existing merge queue (src/lib/database/merge-queue-db.ts + workspaces.ts MERGE flow). The executor calls into the same internal merge function as the dashboard MERGE button, which already serializes per-project. We do not invent a second queue.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Auto-merge respects the flywheel pause gate: when isFlywheelGloballyPaused() is true, the scanner does NOT enqueue new entries and the executor does NOT fire pending entries — they simply wait. Pending entries persist across pause/resume; they only clear on explicit cancel or successful merge.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Toggle UI lives on FlywheelPage header (two checkboxes), wired via two new HTTP routes (GET/POST /api/flywheel/config) following the deacon/pause pattern: TanStack Query hook with optimistic update, origin-validated POST. Settings page is NOT touched — the issue body explicitly puts the UI on FlywheelPage.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "`pan flywheel config` is a new subcommand under the existing flywheel command group: `pan flywheel config --get [key]` and `pan flywheel config --set <key>=<bool>`. Only the two keys defined here are accepted; unknown keys return a clear error. The sync-sources/skills/pan-flywheel/SKILL.md is updated in the same bead.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Defaults preserve today's behavior exactly: auto_pickup_backlog=false (orchestrator excludes backlog), require_uat_before_merge=true (no auto-merge). A fresh install or a missing SQLite key both resolve to these defaults — the getter wraps catchTag('DatabaseError', () => false-or-true-as-appropriate).",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    },
+    {
+      "id": "D12",
+      "summary": "roles/flywheel.md is updated with two CONDITIONAL paragraphs: the Inventory step says 'when auto_pickup_backlog=true also include ready backlog items, bounded by maxAgents' and the forbidden list reads 'Merge PRs directly only when require_uat_before_merge=false AND the auto-merge cooldown has expired AND the operator has not cancelled'. The brief's configSection (defaultFlywheelPrompt) renders BOTH values verbatim so the role prompt sees the live setting at startup.",
+      "recordedAt": "2026-05-25T08:35:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Schema migration: adding pending_auto_merges table requires bumping the schema version. Earlier auto-resume / app_settings work bumped to v27; this bumps to v28. Forgetting the version bump means the table is never created on existing installs.",
+      "mitigation": "Add a v27→v28 migration block in src/lib/database/schema.ts following the existing pattern (CREATE TABLE IF NOT EXISTS). Update CURRENT_SCHEMA_VERSION. Add a schema test mirroring stuck-schema.test.ts."
+    },
+    {
+      "id": "H2",
+      "summary": "Sleep/wake clock semantics: macOS/Linux sleep should NOT extend the cooldown. Storing 'started at' and 'wait 5 min from now' as a delta drifts on sleep.",
+      "mitigation": "Store scheduledMergeAt as an absolute ISO timestamp at the moment of scheduling. Executor compares Date.now() >= Date.parse(scheduledMergeAt). Document this invariant in the table column comment and in tests."
+    },
+    {
+      "id": "H3",
+      "summary": "Race between schedule → cancel → executor tick. If the executor reads a pending entry, decides to fire, then loses to a concurrent cancel before invoking the merge code path, the merge fires anyway.",
+      "mitigation": "The executor must atomically transition the pending entry from 'pending' → 'merging' via a single UPDATE ... WHERE status='pending' AND id=?. Cancel uses DELETE ... WHERE status='pending' — it refuses to cancel an entry already in 'merging' state and returns 409 with a clear message."
+    },
+    {
+      "id": "H4",
+      "summary": "Auto-merge must not fire if the flywheel is paused or aborted. The scanner could theoretically run independently and merge while the operator believes everything is frozen.",
+      "mitigation": "Scanner consults isFlywheelGloballyPaused() before enqueueing. Executor consults isFlywheelGloballyPaused() AND resolveLiveFlywheelRunId() before firing. flywheel abort clears all pending entries with status='pending' before clearing the gate. Add a test for each of these gates."
+    },
+    {
+      "id": "H5",
+      "summary": "TTS spam: if 5 PRs become ready simultaneously, naive code announces 5 times in 30s.",
+      "mitigation": "Scanner enqueues all eligible PRs but the TTS announcement is rate-limited to one per PR per state-transition (scheduled / cancelled / failed / merged). The same flag prevents announcing 'scheduled' again on dashboard restart for an already-scheduled entry."
+    },
+    {
+      "id": "H6",
+      "summary": "Idempotency: scheduling the same PR twice (e.g. orchestrator re-reads its tick state after restart) must not create two pending entries with two cooldown timers.",
+      "mitigation": "The pending_auto_merges table has UNIQUE(issueId) WHERE status IN ('pending','merging'). Schedule endpoint returns 200 with the existing entry if one is already pending; 409 if status='merging'."
+    },
+    {
+      "id": "H7",
+      "summary": "PR state can flip from eligible to ineligible during the cooldown window (e.g. CI restarts and turns red, or a blocker label is added). Auto-merging an ineligible PR post-cooldown would surprise the operator.",
+      "mitigation": "Executor re-runs isAutoMergeEligible(issueId) immediately before transitioning to 'merging'. If no longer eligible, marks the entry status='blocked' with a reason and the orchestrator surfaces it as an 'investigate' suggestion on the next tick."
+    },
+    {
+      "id": "H8",
+      "summary": "Origin validation: the new POST/DELETE config and auto-merge routes need the same origin/auth guards as the existing flywheel routes — otherwise a CSRF on the dashboard could toggle UAT requirements off and merge a malicious PR.",
+      "mitigation": "Use requireTrustedOrigin() helper from src/dashboard/server/routes/flywheel.ts on every POST/DELETE. Tests assert 403 when origin is missing or wrong."
+    },
+    {
+      "id": "H9",
+      "summary": "The new flywheel.* keys are at user-machine scope (app_settings table), not per-project config.yaml. Confusing the two would either lose persistence across dashboard restarts (transient) or scope incorrectly across projects.",
+      "mitigation": "All getters/setters route through src/lib/database/app-settings.ts (proven survives-restart machinery). Do NOT add anything to src/lib/config-yaml.ts for these keys. Document this in the get/set function jsdoc."
+    },
+    {
+      "id": "H10",
+      "summary": "Skill ↔ CLI lint drift. scripts/lint-skills.sh enforces that every flag/subcommand mentioned in a wrapper skill exists in the actual CLI --help output. Adding `pan flywheel config` without updating pan-flywheel skill (or adding a `pan merge cancel` subcommand without a skill update) breaks CI lint.",
+      "mitigation": "Each CLI-touching bead's AC includes the corresponding skill update in the same commit. The bead is not done until `npm run lint` passes."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T08:20:28.118Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-25T08:35:00.000Z",
+      "reason": "planning",
+      "note": "Discovery complete; vBRIEF drafted with 15 beads spanning settings storage, role-prompt plumbing, auto-merge server-side state machine, cancel CLI/UI, and integration test.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
