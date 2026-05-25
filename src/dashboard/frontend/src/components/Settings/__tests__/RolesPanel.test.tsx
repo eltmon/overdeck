@@ -135,6 +135,16 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Flywheel model')).toHaveValue('claude-opus-4-7');
     expect(screen.getByLabelText('Flywheel harness')).toHaveValue('claude-code');
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
+    expect(within(screen.getByLabelText('Flywheel effort')).getAllByRole('option').map((option) => ({
+      value: option.getAttribute('value'),
+      label: option.textContent,
+    }))).toEqual([
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'xhigh', label: 'Extra High' },
+      { value: 'max', label: 'Max' },
+    ]);
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
     expect(screen.getByText('Changes apply on the next tick — no restart needed.')).toBeInTheDocument();

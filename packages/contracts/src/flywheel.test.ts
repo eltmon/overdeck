@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { FlywheelStatus } from "./flywheel"
+import { FlywheelEffort, FlywheelStatus } from "./flywheel"
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus)
+const decodeFlywheelEffort = Schema.decodeUnknownSync(FlywheelEffort)
 
 const validPayload = {
   runId: "RUN-1",
@@ -82,6 +83,18 @@ const validPayload = {
   ticks: 12,
   lastTickAt: "2026-05-18T15:05:00.000Z",
 } satisfies typeof FlywheelStatus.Encoded
+
+describe("FlywheelEffort", () => {
+  it("decodes supported effort tiers", () => {
+    for (const effort of ["low", "medium", "high", "xhigh", "max"] as const) {
+      expect(decodeFlywheelEffort(effort)).toBe(effort)
+    }
+  })
+
+  it("rejects unknown effort tiers", () => {
+    expect(() => decodeFlywheelEffort("extreme")).toThrow()
+  })
+})
 
 describe("FlywheelStatus", () => {
   it("roundtrips through parse and stringify", () => {

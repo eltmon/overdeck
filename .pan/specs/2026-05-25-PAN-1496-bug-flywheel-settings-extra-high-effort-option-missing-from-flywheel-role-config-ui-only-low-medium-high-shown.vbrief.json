@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:05:42.646Z"
+    "updated": "2026-05-25T23:15:12.382Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:05:42.646Z",
+    "updated": "2026-05-25T23:15:12.382Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -384,7 +384,7 @@
       {
         "id": "b9-coverage-tests",
         "title": "Add test coverage for the widened effort tier across contract decode, settings API, and RolesPanel UI",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -399,7 +399,7 @@
           {
             "id": "b9-coverage-tests.ac1",
             "title": "A contracts-layer test exists that decodes 'xhigh' and 'max' through FlywheelEffort and asserts they round-trip; same test asserts 'extreme' is rejected",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -407,7 +407,7 @@
           {
             "id": "b9-coverage-tests.ac2",
             "title": "settings-api.test.ts asserts validateSettings accepts roles.flywheel.effort = 'xhigh' and 'max' with empty errors array",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -415,7 +415,7 @@
           {
             "id": "b9-coverage-tests.ac3",
             "title": "RolesPanel.test.tsx asserts the Flywheel effort select renders five <option> tags whose values are exactly ['low','medium','high','xhigh','max'] in that order",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -423,7 +423,7 @@
           {
             "id": "b9-coverage-tests.ac4",
             "title": "Full suite `npm run typecheck && npm run lint && npm test` passes from the workspace root",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
