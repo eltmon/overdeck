@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -439,6 +439,25 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_merge_queue_project
       ON merge_queue(project_key, status, position);
+
+    -- ===== Pending Auto-Merges (PAN-1486: Flywheel scheduled merge cooldown) =====
+    CREATE TABLE IF NOT EXISTS pending_auto_merges (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      issueId          TEXT NOT NULL,
+      prUrl            TEXT NOT NULL,
+      prNumber         INTEGER,
+      projectKey       TEXT NOT NULL,
+      "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+      scheduledMergeAt TEXT NOT NULL,
+      scheduledAt      TEXT NOT NULL,
+      mergedAt         TEXT,
+      failureReason    TEXT,
+      cancelledAt      TEXT,
+      cancelledBy      TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+      ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
 
     -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
     CREATE TABLE IF NOT EXISTS merge_sets (
@@ -1215,6 +1234,29 @@ export function runMigrations(db: Database.Database): void {
       db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
                  ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
     } catch { /* already exists */ }
+  }
+
+  // v43 → v44: add Flywheel pending auto-merge schedule table (PAN-1486)
+  if (currentVersion < 44) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pending_auto_merges (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        issueId          TEXT NOT NULL,
+        prUrl            TEXT NOT NULL,
+        prNumber         INTEGER,
+        projectKey       TEXT NOT NULL,
+        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+        scheduledMergeAt TEXT NOT NULL,
+        scheduledAt      TEXT NOT NULL,
+        mergedAt         TEXT,
+        failureReason    TEXT,
+        cancelledAt      TEXT,
+        cancelledBy      TEXT
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+    `);
   }
 
   // After all migrations, set the version

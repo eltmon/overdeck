@@ -599,7 +599,7 @@
       {
         "id": "b09-pending-auto-merges-table",
         "title": "Add pending_auto_merges SQLite table (schema v28) + CRUD module",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -623,7 +623,7 @@
           {
             "id": "b09.ac1",
             "title": "CURRENT_SCHEMA_VERSION is 28 and a fresh-DB init creates the pending_auto_merges table with the schema described in the Action.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -631,7 +631,7 @@
           {
             "id": "b09.ac2",
             "title": "v27→v28 migration block runs on an existing v27 DB without dropping any existing data; the table appears after migration.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -639,7 +639,7 @@
           {
             "id": "b09.ac3",
             "title": "UNIQUE partial index prevents two simultaneously-active (pending OR merging) entries for the same issueId; a second scheduleAutoMerge for the same issue returns the existing entry rather than inserting.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -647,7 +647,7 @@
           {
             "id": "b09.ac4",
             "title": "transitionToMerging is atomic — uses UPDATE ... WHERE id=? AND status='pending' and returns boolean indicating whether the row transitioned; concurrent calls produce exactly one winner.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -655,7 +655,7 @@
           {
             "id": "b09.ac5",
             "title": "cancelPending refuses (returns false / 409-shape) when the entry is in 'merging' state; succeeds when status='pending'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -663,7 +663,7 @@
           {
             "id": "b09.ac6",
             "title": "clearAllPending() removes all entries whose status='pending' but leaves 'merging' / 'failed' / 'blocked' historical entries intact.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -671,7 +671,7 @@
           {
             "id": "b09.ac7",
             "title": "scheduledMergeAt and scheduledAt columns are documented (jsdoc on the type) as absolute ISO timestamps that survive process sleep; failureReason free-text up to 1024 chars.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -679,7 +679,7 @@
           {
             "id": "b09.ac8",
             "title": "Vitest tests in src/lib/database/__tests__/pending-auto-merges-db.test.ts cover: schedule + read-back; schedule-duplicate-idempotent; transition pending→merging exactly once across concurrent calls; cancelPending honors status; clearAllPending behavior.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -687,7 +687,7 @@
           {
             "id": "b09.ac9",
             "title": "Vitest schema test in src/lib/database/__tests__/stuck-schema.test.ts (or sibling) asserts CURRENT_SCHEMA_VERSION === 28 and that the table is present after migrate-from-v27.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
