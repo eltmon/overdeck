@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion5,
   computeCriterion6,
   computeCriterion7,
   computeFlakeCriterion,
@@ -25,20 +26,31 @@ type Criterion6BucketValue = {
   dataSufficient: boolean;
 };
 
+function metrics(overrides: { mergeMs?: number; interventionCount?: number; outcome?: 'merged' | 'parked' | 'cancelled' | 'in_flight' } = {}) {
+  return {
+    plan: null,
+    work: null,
+    review: 0,
+    test: 0,
+    ship: null,
+    mergeMs: overrides.mergeMs ?? 100,
+    outcome: overrides.outcome ?? 'merged',
+    interventionCount: overrides.interventionCount ?? 0,
+    passCount: 0,
+  };
+}
+
+function criterion5Run(interventionCount: number, options: { outcome?: 'merged' | 'parked' | 'cancelled' | 'in_flight'; uatActionCount?: number } = {}) {
+  return {
+    metrics: metrics({ interventionCount, ...(options.outcome ? { outcome: options.outcome } : {}) }),
+    ...(options.uatActionCount === undefined ? {} : { uatActionCount: options.uatActionCount }),
+  };
+}
+
 function criterion6Run(totalMs: number, counts: { beadsCount?: number; planItemsCount?: number }) {
   return {
     ...counts,
-    metrics: {
-      plan: null,
-      work: null,
-      review: 0,
-      test: 0,
-      ship: null,
-      mergeMs: totalMs,
-      outcome: 'merged' as const,
-      interventionCount: 0,
-      passCount: 0,
-    },
+    metrics: metrics({ mergeMs: totalMs }),
   };
 }
 
@@ -169,6 +181,48 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('computes criterion 5 as operator interventions per completed run', () => {
+    const criterion = computeCriterion5([
+      criterion5Run(1),
+      ...Array.from({ length: 9 }, () => criterion5Run(0)),
+    ]);
+
+    expect(criterion.value).toBe(0.1);
+    expect(criterion.target).toBe(0.05);
+    expect(criterion.status).toBe('yellow');
+    expect(criterion.sampleSize).toBe(10);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it.each([
+    [0, 20, 'green'],
+    [1, 20, 'yellow'],
+    [4, 20, 'yellow'],
+    [5, 20, 'red'],
+  ] as const)('maps criterion 5 thresholds for %d interventions over %d runs', (interventions, runs, status) => {
+    const criterion = computeCriterion5([
+      criterion5Run(interventions),
+      ...Array.from({ length: runs - 1 }, () => criterion5Run(0)),
+    ]);
+
+    expect(criterion.value).toBe(interventions / runs);
+    expect(criterion.status).toBe(status);
+  });
+
+  it('ignores in-flight runs and UAT-shaped actions for criterion 5', () => {
+    const criterion = computeCriterion5([
+      criterion5Run(0, { uatActionCount: 5 }),
+      criterion5Run(1, { outcome: 'in_flight' }),
+      criterion5Run(0),
+      criterion5Run(0),
+      criterion5Run(0),
+    ]);
+
+    expect(criterion.value).toBe(0);
+    expect(criterion.sampleSize).toBe(4);
+    expect(criterion.status).toBe('green');
   });
 
   it('computes criterion 6 medians, p95 values, and ratios per complexity bucket', () => {

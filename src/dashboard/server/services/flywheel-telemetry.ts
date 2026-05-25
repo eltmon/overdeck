@@ -6,6 +6,11 @@ export interface FlywheelStatsOptions {
   completedPipelineRuns?: number;
 }
 
+export interface Criterion5PipelineRun {
+  metrics: PipelineRunMetrics;
+  uatActionCount?: number;
+}
+
 export type Criterion6ComplexityBucket = 'simple' | 'medium' | 'complex';
 
 export interface Criterion6PipelineRun {
@@ -100,13 +105,38 @@ export function computeMttrCriterion(completedPipelineRuns: number): FlywheelSta
   );
 }
 
-export function computeInterventionCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Operator intervention rate',
-    0,
-    0.05,
-    completedPipelineRuns,
-  );
+function interventionStatus(rate: number): FlywheelStatsCriterion['status'] {
+  if (rate < 0.05) return 'green';
+  if (rate <= 0.20) return 'yellow';
+  return 'red';
+}
+
+export function computeCriterion5(runs: readonly Criterion5PipelineRun[]): FlywheelStatsCriterion {
+  const completedRuns = runs.filter((run) => run.metrics.outcome !== 'in_flight');
+  const interventionCount = completedRuns.reduce((sum, run) => sum + run.metrics.interventionCount, 0);
+  const rate = completedRuns.length === 0 ? 0 : interventionCount / completedRuns.length;
+
+  return {
+    label: 'Operator intervention rate',
+    value: rate,
+    target: 0.05,
+    status: completedRuns.length === 0 ? 'insufficient_data' : interventionStatus(rate),
+    sampleSize: completedRuns.length,
+    dataSufficient: completedRuns.length > 0,
+  };
+}
+
+export function computeInterventionCriterion(completedPipelineRuns: number, runs: readonly Criterion5PipelineRun[] = []): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Operator intervention rate',
+      0,
+      0.05,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion5(runs);
 }
 
 const complexityBuckets = ['simple', 'medium', 'complex'] as const satisfies readonly Criterion6ComplexityBucket[];
