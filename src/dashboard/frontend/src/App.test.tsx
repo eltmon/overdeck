@@ -133,6 +133,14 @@ vi.mock('./components/CommandDeck', () => ({
 vi.mock('./components/Pipeline/PipelineView', () => ({
   PipelineView: () => <div data-testid="pipeline-view" />,
 }));
+vi.mock('./pages/HomePage', () => ({
+  HomePage: ({ onOpenWorkspaceHome }: { onOpenWorkspaceHome?: (issueId: string) => void }) => (
+    <div>
+      <div data-testid="home-page" />
+      <button onClick={() => onOpenWorkspaceHome?.('PAN-123')}>Open Home workspace</button>
+    </div>
+  ),
+}));
 vi.mock('./components/drawer/IssueDrawer', () => ({
   IssueDrawer: () => null,
 }));
@@ -222,9 +230,10 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('resolves Pipeline as the default route, Board as /board, and Context as /context', () => {
+  it('resolves Home as the default route, Pipeline as /pipeline, Board as /board, and Context as /context', () => {
     window.history.replaceState(null, '', '/');
-    expect(getConversationRouteState().tab).toBe('pipeline');
+    expect(getConversationRouteState().tab).toBe('home');
+
     window.history.replaceState(null, '', '/pipeline');
     expect(getConversationRouteState().tab).toBe('pipeline');
 
@@ -235,7 +244,7 @@ describe('conversation route helpers', () => {
     expect(getConversationRouteState().tab).toBe('context');
 
     window.history.replaceState(null, '', '/unknown');
-    expect(getConversationRouteState().tab).toBe('pipeline');
+    expect(getConversationRouteState().tab).toBe('home');
   });
 
 });
@@ -297,7 +306,7 @@ describe('App conversation view routing', () => {
   });
 });
 
-describe('App Pipeline routing', () => {
+describe('App primary routing', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -314,10 +323,20 @@ describe('App Pipeline routing', () => {
     }));
   });
 
-  it('renders PipelineView at /', () => {
+  it('renders HomePage at /', () => {
     window.history.replaceState(null, '', '/');
     renderApp();
-    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+  });
+
+  it('opens a Home workspace card through the existing board drawer route', async () => {
+    window.history.replaceState(null, '', '/');
+    renderApp();
+
+    fireEvent.click(screen.getByText('Open Home workspace'));
+
+    expect(mockOpenIssue).toHaveBeenCalledWith('PAN-123');
+    await waitFor(() => expect(screen.getByText('Open issue')).toBeInTheDocument());
   });
 
   it('renders PipelineView at /pipeline', () => {

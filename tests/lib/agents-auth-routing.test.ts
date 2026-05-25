@@ -41,6 +41,7 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
+  CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
   bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   getCliproxyClientEnv: () => ({
