@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DbAdapter, StoredEvent } from '../../event-store.js';
-import { createPipelineRunMetricsReader, derivePipelineRunMetricsFromEvents, derivePipelineRunStatsInputsFromEvents } from '../pipeline-run-metrics.js';
+import { createPipelineRunMetricsReader, createPipelineRunStatsInputsReader, derivePipelineRunMetricsFromEvents, derivePipelineRunStatsInputsFromEvents } from '../pipeline-run-metrics.js';
 
 function event(sequence: number, type: string, timestamp: string, payload: Record<string, unknown>): StoredEvent {
   return { sequence, type, timestamp, payload };
@@ -154,5 +154,57 @@ describe('pipeline run metrics', () => {
     expect(getSql()).toContain("json_extract(payload, '$.issueId') = ?");
     expect(getSql()).not.toContain('PAN-7');
     expect(getParams().at(-1)).toBe('PAN-7');
+  });
+
+  it('derives stats with windowed terminal lookup and one relevant-issue history scan', () => {
+    const statements: string[] = [];
+    const calls: unknown[][] = [];
+    const completedIssueIds = [{ issueId: 'PAN-10' }];
+    const verificationRows = [
+      rowFrom(event(4, 'pipeline.review-completed', '2026-05-25T09:02:00.000Z', { issueId: 'PAN-10', passed: true, headSha: 'sha' })),
+    ];
+    const issueHistoryRows = [
+      rowFrom(event(1, 'agent.created', '2026-04-30T09:00:00.000Z', { issueId: 'PAN-10', agent: { role: 'plan' } })),
+      rowFrom(event(2, 'agent.completed', '2026-04-30T09:01:00.000Z', { issueId: 'PAN-10', role: 'plan' })),
+      rowFrom(event(3, 'pipeline.review-started', '2026-05-25T09:01:00.000Z', { issueId: 'PAN-10' })),
+      rowFrom(event(4, 'pipeline.review-completed', '2026-05-25T09:02:00.000Z', { issueId: 'PAN-10', passed: true, headSha: 'sha' })),
+      rowFrom(event(5, 'issue.statusChanged', '2026-05-25T09:03:00.000Z', { issueId: 'PAN-10', canonicalStatus: 'verifying_on_main' })),
+    ];
+    const db: DbAdapter = {
+      prepare<R>(statement: string) {
+        statements.push(statement);
+        return {
+          all(input?: unknown[]): R[] {
+            calls.push(input ?? []);
+            if (statement.includes('SELECT DISTINCT json_extract')) return completedIssueIds as R[];
+            if (statement.includes("type IN (?, ?)") && statement.includes('pipeline.review-completed')) return verificationRows as R[];
+            return issueHistoryRows as R[];
+          },
+          get(): R | undefined {
+            return undefined;
+          },
+          run() {
+            return { changes: 0 };
+          },
+        };
+      },
+      exec() {},
+    };
+
+    const inputs = createPipelineRunStatsInputsReader(db).derivePipelineRunStatsInputs(
+      '2026-05-01T00:00:00.000Z',
+      '2026-05-31T00:00:00.000Z',
+    );
+
+    expect(inputs.completedPipelineRuns).toBe(1);
+    expect(inputs.pipelineRuns[0]).toMatchObject({ issueId: 'PAN-10', metrics: { plan: 60_000, outcome: 'merged' } });
+    expect(inputs.verificationAttempts).toEqual([{ issueId: 'PAN-10', stage: 'review', passed: true, headSha: 'sha' }]);
+    expect(statements[0]).toContain('timestamp >= ?');
+    expect(statements[0]).toContain('timestamp <= ?');
+    expect(statements[2]).toContain("json_extract(payload, '$.issueId') IN (?)");
+    expect(statements[2]).toContain('timestamp <= ?');
+    expect(statements[2]).not.toMatch(/FROM events\s+WHERE type IN \([^)]*\)\s+AND timestamp <= \?\s+ORDER BY/s);
+    expect(calls[0].slice(-2)).toEqual(['2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z']);
+    expect(calls[2].at(-1)).toBe('PAN-10');
   });
 });

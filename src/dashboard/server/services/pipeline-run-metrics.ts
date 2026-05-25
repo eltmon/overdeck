@@ -22,6 +22,10 @@ interface EventRow {
   payload: string;
 }
 
+interface IssueIdRow {
+  issueId: string;
+}
+
 export interface PipelineRunMetricsReader {
   derivePipelineRunMetrics(issueId: string): PipelineRunMetrics;
 }
@@ -63,6 +67,10 @@ const relevantEventTypes = [
 ] as const;
 
 const eventTypePlaceholders = relevantEventTypes.map(() => '?').join(', ');
+const terminalEventTypes = ['issue.closed', 'issue.statusChanged', 'issue.status_changed'] as const;
+const terminalEventTypePlaceholders = terminalEventTypes.map(() => '?').join(', ');
+const verificationEventTypes = ['pipeline.review-completed', 'pipeline.test-completed'] as const;
+const verificationEventTypePlaceholders = verificationEventTypes.map(() => '?').join(', ');
 
 function rowToStoredEvent(row: EventRow): StoredEvent {
   return {
@@ -177,16 +185,6 @@ function verificationAttemptFromEvent(event: StoredEvent): VerificationAttemptMe
   return attempt;
 }
 
-function countPlanItems(events: StoredEvent[], issueId: string): number | undefined {
-  const ids = new Set<string>();
-  for (const event of events) {
-    if (issueIdOf(event) !== issueId) continue;
-    const payload = payloadOf(event);
-    if (typeof payload['itemId'] === 'string') ids.add(payload['itemId']);
-  }
-  return ids.size > 0 ? ids.size : undefined;
-}
-
 export function derivePipelineRunMetricsFromEvents(events: StoredEvent[], issueId: string): PipelineRunMetrics {
   let planStarted: StoredEvent | undefined;
   let planCompleted: StoredEvent | undefined;
@@ -281,31 +279,47 @@ export function derivePipelineRunMetricsFromEvents(events: StoredEvent[], issueI
 
 export function derivePipelineRunStatsInputsFromEvents(events: StoredEvent[], since: string, until: string): PipelineRunStatsInputs {
   const completedIssueIds = new Set<string>();
+  const eventsByIssueId = new Map<string, StoredEvent[]>();
+  const planItemIdsByIssueId = new Map<string, Set<string>>();
+  const verificationAttempts: VerificationAttemptMetrics[] = [];
+
   for (const event of events) {
     const issueId = issueIdOf(event);
-    if (!issueId || !timestampInWindow(event, since, until)) continue;
-    if (terminalOutcome(event)) completedIssueIds.add(issueId);
+    if (!issueId) continue;
+
+    const issueEvents = eventsByIssueId.get(issueId) ?? [];
+    issueEvents.push(event);
+    eventsByIssueId.set(issueId, issueEvents);
+
+    const payload = payloadOf(event);
+    const itemId = payload['itemId'];
+    if (typeof itemId === 'string') {
+      const itemIds = planItemIdsByIssueId.get(issueId) ?? new Set<string>();
+      itemIds.add(itemId);
+      planItemIdsByIssueId.set(issueId, itemIds);
+    }
+
+    if (timestampInWindow(event, since, until)) {
+      if (terminalOutcome(event)) completedIssueIds.add(issueId);
+      const attempt = verificationAttemptFromEvent(event);
+      if (attempt) verificationAttempts.push(attempt);
+    }
   }
 
   const pipelineRuns = [...completedIssueIds].sort().map((issueId) => {
     const sample: PipelineRunStatsSample = {
       issueId,
-      metrics: derivePipelineRunMetricsFromEvents(events, issueId),
+      metrics: derivePipelineRunMetricsFromEvents(eventsByIssueId.get(issueId) ?? [], issueId),
     };
-    const planItemsCount = countPlanItems(events, issueId);
-    if (planItemsCount !== undefined) sample.planItemsCount = planItemsCount;
+    const planItemsCount = planItemIdsByIssueId.get(issueId)?.size;
+    if (planItemsCount && planItemsCount > 0) sample.planItemsCount = planItemsCount;
     return sample;
   });
 
   return {
     completedPipelineRuns: pipelineRuns.length,
     pipelineRuns,
-    verificationAttempts: events
-      .filter((event) => timestampInWindow(event, since, until))
-      .flatMap((event) => {
-        const attempt = verificationAttemptFromEvent(event);
-        return attempt ? [attempt] : [];
-      }),
+    verificationAttempts,
   };
 }
 
@@ -327,18 +341,54 @@ export function createPipelineRunMetricsReader(db: DbAdapter): PipelineRunMetric
 }
 
 export function createPipelineRunStatsInputsReader(db: DbAdapter) {
-  const eventsUntilStmt = db.prepare<EventRow>(
+  const completedIssuesStmt = db.prepare<IssueIdRow>(
+    `SELECT DISTINCT json_extract(payload, '$.issueId') AS issueId
+     FROM events
+     WHERE type IN (${terminalEventTypePlaceholders})
+       AND timestamp >= ?
+       AND timestamp <= ?
+       AND json_type(payload, '$.issueId') = 'text'`,
+  );
+  const verificationWindowStmt = db.prepare<EventRow>(
     `SELECT sequence, type, timestamp, payload
      FROM events
-     WHERE type IN (${eventTypePlaceholders})
+     WHERE type IN (${verificationEventTypePlaceholders})
+       AND timestamp >= ?
        AND timestamp <= ?
      ORDER BY sequence ASC`,
   );
 
   return {
     derivePipelineRunStatsInputs(since: string, until: string): PipelineRunStatsInputs {
-      const rows = eventsUntilStmt.all([...relevantEventTypes, until]);
-      return derivePipelineRunStatsInputsFromEvents(rows.map(rowToStoredEvent), since, until);
+      const issueIds = completedIssuesStmt
+        .all([...terminalEventTypes, since, until])
+        .map((row) => row.issueId)
+        .filter((issueId) => issueId.length > 0);
+      const verificationRows = verificationWindowStmt.all([...verificationEventTypes, since, until]);
+
+      if (issueIds.length === 0) {
+        return derivePipelineRunStatsInputsFromEvents(verificationRows.map(rowToStoredEvent), since, until);
+      }
+
+      const issuePlaceholders = issueIds.map(() => '?').join(', ');
+      const issueHistoryStmt = db.prepare<EventRow>(
+        `SELECT sequence, type, timestamp, payload
+         FROM events
+         WHERE type IN (${eventTypePlaceholders})
+           AND timestamp <= ?
+           AND json_extract(payload, '$.issueId') IN (${issuePlaceholders})
+         ORDER BY sequence ASC`,
+      );
+      const issueHistoryRows = issueHistoryStmt.all([...relevantEventTypes, until, ...issueIds]);
+      const rowsBySequence = new Map<number, EventRow>();
+      for (const row of issueHistoryRows) rowsBySequence.set(row.sequence, row);
+      for (const row of verificationRows) rowsBySequence.set(row.sequence, row);
+
+      return derivePipelineRunStatsInputsFromEvents(
+        [...rowsBySequence.values()].sort((a, b) => a.sequence - b.sequence).map(rowToStoredEvent),
+        since,
+        until,
+      );
     },
   };
 }
