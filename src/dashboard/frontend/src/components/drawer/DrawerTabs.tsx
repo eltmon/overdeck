@@ -10,6 +10,7 @@ const DRAWER_TABS = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'activity', label: 'Activity' },
   { id: 'files', label: 'Files' },
+  { id: 'artifacts', label: 'Artifacts' },
 ] as const;
 
 function beadCount(beads: ReturnType<typeof useDrawerData>['beads']) {
