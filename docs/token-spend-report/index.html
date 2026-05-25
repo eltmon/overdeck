@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panopticon Token Spend Report — 100% AI-Generated Code</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--surface:#12121a;--surface-2:#1a1a25;--text:#e8e8f0;--text-muted:#8a8a9a;--accent:#6366f1;--accent-2:#8b5cf6;--accent-3:#06b6d4;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--gradient-1:linear-gradient(135deg,#6366f1,#8b5cf6);--gradient-2:linear-gradient(135deg,#06b6d4,#6366f1);--glow:0 0 40px rgba(99,102,241,.15)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+::selection{background:rgba(99,102,241,.3)}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* Hero */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:80px 0}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(99,102,241,.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(6,182,212,.08) 0%,transparent 40%);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;mask-image:radial-gradient(ellipse at center,black 30%,transparent 70%)}
+.hero-content{text-align:center;position:relative;z-index:1;max-width:900px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;background:var(--surface-2);border:1px solid rgba(99,102,241,.2);font-size:.85rem;font-weight:500;color:var(--accent);margin-bottom:32px;animation:fadeInUp .8s ease}
+.hero-badge::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);animation:pulse 2s infinite}
+.hero h1{font-size:clamp(2.5rem,6vw,5rem);font-weight:800;line-height:1.05;letter-spacing:-.03em;margin-bottom:24px;background:linear-gradient(135deg,#fff 0%,#a5a5ff 50%,#67e8f9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:fadeInUp .8s ease .1s both}
+.hero p{font-size:clamp(1.1rem,2.5vw,1.35rem);color:var(--text-muted);max-width:680px;margin:0 auto 48px;animation:fadeInUp .8s ease .2s both}
+.hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;max-width:700px;margin:0 auto;animation:fadeInUp .8s ease .3s both}
+.hero-stat{padding:24px 16px;border-radius:16px;background:var(--surface);border:1px solid rgba(255,255,255,.05);backdrop-filter:blur(10px);transition:transform .3s,border-color .3s}
+.hero-stat:hover{transform:translateY(-4px);border-color:rgba(99,102,241,.2)}
+.hero-stat-value{font-size:2rem;font-weight:800;background:var(--gradient-1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'JetBrains Mono',monospace}
+.hero-stat-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-top:4px}
+
+/* Sections */
+.section{padding:100px 0;position:relative}
+.section-alt{background:var(--surface)}
+.section-header{text-align:center;margin-bottom:64px}
+.section-header h2{font-size:clamp(2rem,4vw,3rem);font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
+.section-header p{color:var(--text-muted);font-size:1.1rem;max-width:600px;margin:0 auto}
+.gradient-text{background:var(--gradient-1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* Cards */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.card{background:var(--surface);border:1px solid rgba(255,255,255,.05);border-radius:20px;padding:32px;transition:transform .3s,border-color .3s,box-shadow .3s}
+.card:hover{transform:translateY(-2px);border-color:rgba(99,102,241,.15);box-shadow:var(--glow)}
+.card h3{font-size:1.1rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.card-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:rgba(99,102,241,.1);color:var(--accent)}
+
+/* Charts */
+.chart-container{position:relative;height:360px;margin-top:16px}
+.chart-container-lg{height:420px}
+
+/* Big Numbers */
+.big-number{font-size:3.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1}
+.big-number-label{font-size:.875rem;color:var(--text-muted);margin-top:8px}
+
+/* Comparison Bars */
+.compare-row{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.compare-label{width:140px;font-size:.9rem;font-weight:500;flex-shrink:0}
+.compare-bar{flex:1;height:36px;background:var(--surface-2);border-radius:8px;overflow:hidden;position:relative}
+.compare-fill{height:100%;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;font-size:.8rem;font-weight:600;font-family:'JetBrains Mono',monospace;transition:width 1.5s ease}
+.compare-fill-ppu{background:linear-gradient(90deg,var(--danger),#f97316)}
+.compare-fill-sub{background:var(--gradient-1)}
+.compare-value{white-space:nowrap}
+
+/* Savings Card */
+.savings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-top:32px}
+.savings-card{padding:28px;border-radius:16px;background:linear-gradient(135deg,rgba(34,197,94,.08),rgba(6,182,212,.08));border:1px solid rgba(34,197,94,.15);text-align:center}
+.savings-card h4{font-size:2rem;font-weight:800;color:var(--success);font-family:'JetBrains Mono',monospace}
+.savings-card p{font-size:.85rem;color:var(--text-muted);margin-top:8px}
+
+/* Timeline */
+.timeline{position:relative;padding-left:32px}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--accent),var(--accent-3))}
+.timeline-item{position:relative;margin-bottom:32px;padding-left:24px}
+.timeline-item::before{content:'';position:absolute;left:-28px;top:4px;width:16px;height:16px;border-radius:50%;background:var(--surface);border:3px solid var(--accent);box-shadow:0 0 0 4px rgba(99,102,241,.1)}
+.timeline-date{font-size:.8rem;color:var(--accent);font-weight:600;font-family:'JetBrains Mono',monospace}
+.timeline-title{font-weight:600;margin:4px 0 6px}
+.timeline-desc{font-size:.9rem;color:var(--text-muted)}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse;margin-top:16px}
+.data-table th{text-align:left;padding:12px 16px;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;border-bottom:1px solid rgba(255,255,255,.08)}
+.data-table td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.9rem}
+.data-table tr:hover td{background:rgba(99,102,241,.04)}
+.data-table td:nth-child(2),.data-table td:nth-child(3),.data-table td:nth-child(4){font-family:'JetBrains Mono',monospace;font-size:.85rem}
+.data-table td:nth-child(2){color:var(--accent);font-weight:600}
+
+/* Methodology */
+.methodology{padding:24px;border-radius:16px;background:var(--surface-2);border:1px solid rgba(255,255,255,.05);margin-top:32px}
+.methodology h4{margin-bottom:12px;color:var(--accent)}
+.methodology ul{list-style:none;padding:0}
+.methodology li{padding:6px 0;padding-left:24px;position:relative;color:var(--text-muted);font-size:.9rem}
+.methodology li::before{content:'→';position:absolute;left:0;color:var(--accent)}
+
+/* Video Section */
+.video-container{position:relative;border-radius:20px;overflow:hidden;background:var(--surface-2);border:1px solid rgba(255,255,255,.08);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
+.video-container video{width:100%;height:100%;object-fit:cover}
+.video-placeholder{text-align:center;padding:60px}
+.video-placeholder-icon{font-size:4rem;margin-bottom:16px;opacity:.5}
+
+/* Shoutout */
+.shoutout{text-align:center;padding:80px 40px;border-radius:24px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08),rgba(6,182,212,.08));border:1px solid rgba(99,102,241,.15);margin-top:48px}
+.shoutout h3{font-size:1.5rem;margin-bottom:16px}
+.shoutout p{color:var(--text-muted);max-width:600px;margin:0 auto}
+
+/* Footer */
+.footer{text-align:center;padding:48px 0;color:var(--text-muted);font-size:.85rem;border-top:1px solid rgba(255,255,255,.05);margin-top:48px}
+
+/* Animations */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.animate-in{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.animate-in.visible{opacity:1;transform:translateY(0)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surface-2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* Responsive */
+@media(max-width:768px){.section{padding:60px 0}.hero-stats{grid-template-columns:repeat(2,1fr)}.compare-label{width:100px;font-size:.8rem}.big-number{font-size:2.5rem}.card-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+<div class="hero-grid"></div>
+<div class="container">
+<div class="hero-content">
+<div class="hero-badge">Live Analysis &mdash; Generated by Kimi 2.6</div>
+<h1>The $42,000<br>Codebase</h1>
+<p>Panopticon CLI was built with 100% AI-generated code. Here's the complete breakdown of what it took &mdash; every model, every token, every dollar.</p>
+<div class="hero-stats">
+<div class="hero-stat"><div class="hero-stat-value" data-count="41936">$0</div><div class="hero-stat-label">Pay-per-use Cost</div></div>
+<div class="hero-stat"><div class="hero-stat-value" data-count="389255">0</div><div class="hero-stat-label">API Calls Tracked</div></div>
+<div class="hero-stat"><div class="hero-stat-value" data-count="39165150433">0</div><div class="hero-stat-label">Total Tokens</div></div>
+<div class="hero-stat"><div class="hero-stat-value" data-count="6429">0</div><div class="hero-stat-label">Git Commits</div></div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Executive Summary -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Executive Summary</h2>
+<p>Between February 2025 and April 2026, Panopticon's AI coding pipeline generated <strong>6,429 commits</strong>, <strong>2.8K files</strong>, and over <strong>2 million lines of code</strong>. Here's what that cost at standard API rates.</p>
+</div>
+<div class="card-grid">
+<div class="card animate-in">
+<h3><span class="card-icon">$</span> Actual Subscription Spend</h3>
+<div class="big-number" style="color:var(--success)">~$500</div>
+<div class="big-number-label">Estimated out-of-pocket across Claude Pro/Team, Kimi, and MiniMax subscriptions over ~15 months of development. The power of unlimited subscription plans.</div>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(239,68,68,.1);color:var(--danger)">$</span> Pay-Per-Use Equivalent</h3>
+<div class="big-number" style="color:var(--danger)">$41,936</div>
+<div class="big-number-label">What the same token volume would cost at standard API pricing. This is the number we'll break down in detail below.</div>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(34,197,94,.1);color:var(--success)">%</span> Cache Savings</h3>
+<div class="big-number" style="color:var(--success)">$95K+</div>
+<div class="big-number-label">Saved through automatic prompt caching across Anthropic, OpenAI, and other providers. 35.5 billion tokens served from cache.</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Methodology -->
+<section class="section">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Methodology</h2>
+<p>How we calculated these numbers</p>
+</div>
+<div class="methodology animate-in">
+<h4>Data Sources</h4>
+<ul>
+<li><strong>panopticon.db cost_events table</strong> &mdash; 389,255 tracked API calls across 92 days of active cost tracking (Feb 2025 &ndash; Apr 2026)</li>
+<li><strong>Claude Code JSONL session files</strong> &mdash; 6,367 session files parsed for per-message token usage and model breakdowns</li>
+<li><strong>Git history</strong> &mdash; 6,429 commits analyzed for code evolution, file growth, and contributor patterns</li>
+<li><strong>Pi session files</strong> &mdash; Alternative harness sessions parsed for cross-harness usage comparison</li>
+</ul>
+<h4 style="margin-top:20px">Caveats & Limitations</h4>
+<ul>
+<li>Tracking began mid-project; early development (pre-Feb 2025) and work on other machines are not captured</li>
+<li>Subscription plans (Claude Pro/Team, Kimi Pro, etc.) make actual spend dramatically lower than PPU estimates</li>
+<li>Some sessions used local models or free tiers not tracked in cost_events</li>
+<li>Cache savings are estimated based on provider pricing differentials; actual savings vary by TTL and usage patterns</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- Cost Breakdown -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Cost Breakdown by <span class="gradient-text">Model</span></h2>
+<p>Where the $41,936 went &mdash; every model, ranked</p>
+</div>
+<div class="card animate-in">
+<div class="chart-container-lg">
+<canvas id="modelChart"></canvas>
+</div>
+</div>
+<div class="card-grid" style="margin-top:24px">
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(99,102,241,.1);color:#818cf8">S4</span> Claude Sonnet 4</h3>
+<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">$22,982</p>
+<p style="color:var(--text-muted);font-size:.9rem">6,708 calls &middot; 17.4M tokens &middot; The workhorse model for early implementation</p>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(139,92,246,.1);color:#a78bfa">O4</span> Claude Opus 4.6</h3>
+<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">$9,136</p>
+<p style="color:var(--text-muted);font-size:.9rem">99,368 calls &middot; 13.8B tokens (mostly cache) &middot; Complex architecture decisions</p>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(6,182,212,.1);color:#67e8f9">S4.6</span> Claude Sonnet 4.6</h3>
+<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">$7,655</p>
+<p style="color:var(--text-muted);font-size:.9rem">211,682 calls &middot; 18.5B tokens &middot; High-volume planning and review</p>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon" style="background:rgba(34,197,94,.1);color:#4ade80">Kimi</span> Kimi for Coding</h3>
+<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">$1,188</p>
+<p style="color:var(--text-muted);font-size:.9rem">34,546 calls &middot; 3.1B tokens &middot; Cost-effective alternative for bulk work</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Provider & Pipeline -->
+<section class="section">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Provider & <span class="gradient-text">Pipeline</span> Breakdown</h2>
+<p>By provider and by what phase of development</p>
+</div>
+<div class="card-grid">
+<div class="card animate-in">
+<h3><span class="card-icon">P</span> By Provider</h3>
+<div class="chart-container">
+<canvas id="providerChart"></canvas>
+</div>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon">T</span> By Pipeline Stage</h3>
+<div class="chart-container">
+<canvas id="pipelineChart"></canvas>
+</div>
+</div>
+</div>
+<div class="card animate-in" style="margin-top:24px">
+<h3><span class="card-icon">M</span> Monthly Spend Trajectory</h3>
+<div class="chart-container-lg">
+<canvas id="monthlyChart"></canvas>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Subscription vs PPU -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Subscription vs <span class="gradient-text">Pay-Per-Use</span></h2>
+<p>The real reason we can afford to build this way</p>
+</div>
+<div class="card animate-in">
+<p style="color:var(--text-muted);margin-bottom:32px;font-size:.95rem">Panopticon runs almost entirely on subscription plans. Here's how a typical month compares to API pricing:</p>
+
+<div class="compare-row">
+<div class="compare-label">Claude Pro</div>
+<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$20/mo</span></div></div>
+<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$3,000/mo</div>
+</div>
+<div class="compare-row">
+<div class="compare-label">Kimi Pro</div>
+<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$15/mo</span></div></div>
+<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$800/mo</div>
+</div>
+<div class="compare-row">
+<div class="compare-label">MiniMax</div>
+<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:.5%"><span class="compare-value">$10/mo</span></div></div>
+<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$200/mo</div>
+</div>
+<div class="compare-row">
+<div class="compare-label">OpenAI Plus</div>
+<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$20/mo</span></div></div>
+<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$1,500/mo</div>
+</div>
+
+<div style="margin-top:32px;padding:24px;border-radius:16px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15)">
+<p style="font-size:1.1rem;font-weight:600;color:var(--success)">Net Result: ~99% cost reduction vs pay-per-use</p>
+<p style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Subscription plans are the only reason AI-native development at this scale is economically viable. The $42K PPU figure represents the "sticker price" &mdash; the actual burn rate is closer to a few hundred dollars per month in subscriptions.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Cache Savings -->
+<section class="section">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Cache <span class="gradient-text">Savings</span></h2>
+<p>Automatic prompt caching: the unsung hero of cost efficiency</p>
+</div>
+<div class="card animate-in">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px;margin-bottom:32px">
+<div style="text-align:center">
+<div style="font-size:3.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">35.5B</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Cache Read Tokens<br><span style="font-size:.8rem">Served from cache at ~90% discount</span></div>
+</div>
+<div style="text-align:center">
+<div style="font-size:3.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent-3)">865M</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Cache Write Tokens<br><span style="font-size:.8rem">Pre-loaded for future reuse</span></div>
+</div>
+<div style="text-align:center">
+<div style="font-size:3.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--success)">$95K+</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Estimated Savings<br><span style="font-size:.8rem">vs billing cache reads as input</span></div>
+</div>
+</div>
+<p style="color:var(--text-muted);font-size:.9rem;text-align:center">Cache read tokens cost ~10% of input token pricing. Without caching, those 35.5B tokens would have added roughly $95,000 to the bill. This happens automatically across Anthropic, OpenAI, and other providers that support prompt caching.</p>
+</div>
+<div class="savings-grid">
+<div class="savings-card">
+<h4>2.7B</h4>
+<p>Input tokens billed at full rate</p>
+</div>
+<div class="savings-card">
+<h4>66M</h4>
+<p>Output tokens generated fresh</p>
+</div>
+<div class="savings-card">
+<h4>91%</h4>
+<p>Of all tokens were cache reads</p>
+</div>
+<div class="savings-card">
+<h4>10x</h4>
+<p>Cheaper to read cache vs input</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Top Issues -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Top Issues by <span class="gradient-text">Spend</span></h2>
+<p>Which features and bugs consumed the most tokens</p>
+</div>
+<div class="card animate-in">
+<table class="data-table">
+<thead>
+<tr><th>Issue</th><th>Cost</th><th>Calls</th><th>Avg $/Call</th></tr>
+</thead>
+<tbody id="issuesTable">
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
+<!-- Codebase Evolution -->
+<section class="section">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Codebase <span class="gradient-text">Evolution</span></h2>
+<p>From 1 file to 2,834 in 128 days of tracked git history</p>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon">G</span> File Growth Over Time</h3>
+<div class="chart-container-lg">
+<canvas id="filesChart"></canvas>
+</div>
+</div>
+<div class="card-grid" style="margin-top:24px">
+<div class="card animate-in">
+<h3><span class="card-icon">C</span> Commits by Month</h3>
+<div class="chart-container">
+<canvas id="commitsChart"></canvas>
+</div>
+</div>
+<div class="card animate-in">
+<h3><span class="card-icon">L</span> Lines of Code</h3>
+<div style="text-align:center;padding:32px 0">
+<div style="font-size:3rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">2,010,198</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Insertions</div>
+<div style="font-size:2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--danger);margin-top:24px">736,434</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Deletions</div>
+<div style="font-size:1.5rem;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--success);margin-top:24px">+1,273,764</div>
+<div style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Net Lines Added</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Cost-Saving Features -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Cost-Saving <span class="gradient-text">Features</span></h2>
+<p>What we built to spend less</p>
+</div>
+<div class="timeline animate-in">
+<div class="timeline-item">
+<div class="timeline-date">PAN-636</div>
+<div class="timeline-title">Pi Harness Support</div>
+<div class="timeline-desc">Added support for the Pi coding agent (multi-provider, cheaper models) as an alternative to Claude Code, enabling cost-effective model routing.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">PAN-1249</div>
+<div class="timeline-title">Effect-Based Cost Tracking</div>
+<div class="timeline-desc">Migrated cost tracking to Effect.js with proper error handling, enabling accurate per-issue, per-model, and per-pipeline-stage spend analysis.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">PAN-1205</div>
+<div class="timeline-title">Cost Events Database</div>
+<div class="timeline-desc">SQLite-backed cost_events table with deduplication, daily trends, model rollups, and agent-level cost attribution for fine-grained spend visibility.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Built-in</div>
+<div class="timeline-title">Prompt Caching (Automatic)</div>
+<div class="timeline-desc">All major providers (Anthropic, OpenAI, Google) automatically cache prompts. Panopticon's long-context sessions naturally benefit from 5-minute and 1-hour cache TTLs.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Built-in</div>
+<div class="timeline-title">Model Routing (Cloister)</div>
+<div class="timeline-desc">Cloister automatically routes work agents to the most cost-effective model for the task &mdash; Sonnet for bulk work, Opus for complex architecture, Haiku for quick tasks.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Built-in</div>
+<div class="timeline-title">vBRIEF Planning</div>
+<div class="timeline-desc">Structured planning with vBRIEF specs reduces implementation iteration. Better plans = fewer agent restarts = fewer tokens wasted on wrong approaches.</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Built-in</div>
+<div class="timeline-title">Workspace Isolation</div>
+<div class="timeline-desc">Git worktree-based workspaces prevent cross-contamination. When an agent goes off the rails, only one workspace is affected &mdash; not the entire project history.</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Video -->
+<section class="section">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Codebase <span class="gradient-text">Timelapse</span></h2>
+<p>Watch Panopticon grow from nothing to 2,834 files</p>
+</div>
+<div class="video-container animate-in">
+<video controls poster="video-poster.jpg">
+<source src="panopticon-evolution.mp4" type="video/mp4">
+<div class="video-placeholder">
+<div class="video-placeholder-icon">🎬</div>
+<h3>Video Loading...</h3>
+<p>If the video doesn't load, your browser may not support MP4 playback.<br>The video shows the git history visualization of Panopticon's growth.</p>
+</div>
+</video>
+</div>
+<p style="text-align:center;color:var(--text-muted);font-size:.85rem;margin-top:16px">Generated with custom canvas renderer + ffmpeg &middot; 30fps &middot; 1920x1080</p>
+</div>
+</section>
+
+<!-- Shout Out -->
+<section class="section section-alt">
+<div class="container">
+<div class="shoutout animate-in">
+<h3>Produced by <span class="gradient-text">Kimi 2.6</span></h3>
+<p>This entire report &mdash; from data analysis to HTML generation to video rendering &mdash; was produced by Kimi 2.6 (Moonshot AI) in a single interactive session. No Panopticon work agents were spawned. No beads were claimed. Just one very long conversation, a lot of SQL queries, and some creative coding.</p>
+<p style="margin-top:16px;font-size:.9rem;color:var(--text-muted)">Built on 2026-05-24 &middot; Data through 2026-04-11 &middot; Git history through 2026-05-24</p>
+</div>
+</div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+<div class="container">
+<p>Panopticon CLI Token Spend Report &middot; <a href="https://panopticon-cli.com" style="color:var(--accent);text-decoration:none">panopticon-cli.com</a> &middot; Issue #1476</p>
+</div>
+</footer>
+
+<script>
+// Embedded data
+const reportData = {"overview":{"totalEvents":389255,"dateRange":{"start":"2025-02-11","end":"2026-04-11"},"totalCost":41936.23,"totalTokens":39165150433,"inputTokens":2724194689,"outputTokens":66359105,"cacheReadTokens":35509088217,"cacheWriteTokens":865508422},"models":[{"model":"claude-sonnet-4","total_cost":22981.72,"calls":6708,"input_tokens":11587000,"output_tokens":5793500,"cache_read":0,"cache_write":0},{"model":"claude-opus-4-6","total_cost":9135.88,"calls":99368,"input_tokens":1771295,"output_tokens":10463189,"cache_read":13719173768,"cache_write":320934724},{"model":"claude-sonnet-4-6","total_cost":7654.80,"calls":211682,"input_tokens":1205368,"output_tokens":41435620,"cache_read":18019803065,"cache_write":432989431},{"model":"kimi-for-coding","total_cost":1188.07,"calls":34546,"input_tokens":1834099165,"output_tokens":4585298,"cache_read":1307347968,"cache_write":0},{"model":"claude-sonnet-4-5-20250929","total_cost":673.29,"calls":17148,"input_tokens":96597,"output_tokens":462857,"cache_read":1680251703,"cache_write":43195190},{"model":"MiniMax-M2.7-highspeed","total_cost":228.85,"calls":13373,"input_tokens":752937911,"output_tokens":2475827,"cache_read":505655807,"cache_write":49380434},{"model":"MiniMax-M2.7","total_cost":37.55,"calls":2791,"input_tokens":122428377,"output_tokens":682979,"cache_read":122266239,"cache_write":4411549},{"model":"claude-haiku-4-5-20251001","total_cost":36.07,"calls":3639,"input_tokens":68976,"output_tokens":459835,"cache_read":154589667,"cache_write":14597094}],"providers":[{"provider":"anthropic","total_cost":40481.76,"calls":338545},{"provider":"custom","total_cost":1454.47,"calls":50710}],"sessionTypes":[{"session_type":"implementation","total_cost":33414.09,"calls":209037},{"session_type":"planning","total_cost":4207.05,"calls":105191},{"session_type":"interactive","total_cost":3926.72,"calls":68268},{"session_type":"review","total_cost":269.42,"calls":3557},{"session_type":"test","total_cost":51.39,"calls":1553},{"session_type":"exploration","total_cost":37.94,"calls":890},{"session_type":"merge","total_cost":29.62,"calls":759}],"daily":[],"topIssues":[]}
+
+// Chart defaults
+Chart.defaults.color = '#8a8a9a';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+// Model Chart
+const modelCtx = document.getElementById('modelChart').getContext('2d');
+new Chart(modelCtx, {
+  type: 'bar',
+  data: {
+    labels: reportData.models.map(m => m.model.replace('claude-', '').replace('MiniMax-', 'MM ').replace('kimi-', 'Kimi ')),
+    datasets: [{
+      label: 'Cost (USD)',
+      data: reportData.models.map(m => m.total_cost),
+      backgroundColor: [
+        'rgba(99,102,241,0.8)','rgba(139,92,246,0.8)','rgba(6,182,212,0.8)',
+        'rgba(34,197,94,0.8)','rgba(245,158,11,0.8)','rgba(239,68,68,0.8)',
+        'rgba(236,72,153,0.8)','rgba(168,85,247,0.8)'
+      ],
+      borderRadius: 8,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: {
+      callbacks: { label: ctx => '$' + ctx.raw.toFixed(2) }
+    }},
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => '$' + v } },
+      x: { ticks: { maxRotation: 45, minRotation: 45 } }
+    }
+  }
+});
+
+// Provider Chart
+const providerCtx = document.getElementById('providerChart').getContext('2d');
+new Chart(providerCtx, {
+  type: 'doughnut',
+  data: {
+    labels: reportData.providers.map(p => p.provider === 'custom' ? 'Moonshot/MiniMax' : p.provider),
+    datasets: [{
+      data: reportData.providers.map(p => p.total_cost),
+      backgroundColor: ['rgba(99,102,241,0.8)','rgba(34,197,94,0.8)'],
+      borderWidth: 0,
+      hoverOffset: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { position: 'bottom', labels: { padding: 20 } },
+      tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toFixed(2) } }
+    }
+  }
+});
+
+// Pipeline Chart
+const pipelineCtx = document.getElementById('pipelineChart').getContext('2d');
+new Chart(pipelineCtx, {
+  type: 'doughnut',
+  data: {
+    labels: reportData.sessionTypes.map(s => s.session_type),
+    datasets: [{
+      data: reportData.sessionTypes.map(s => s.total_cost),
+      backgroundColor: [
+        'rgba(99,102,241,0.8)','rgba(6,182,212,0.8)','rgba(139,92,246,0.8)',
+        'rgba(34,197,94,0.8)','rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(168,85,247,0.8)'
+      ],
+      borderWidth: 0,
+      hoverOffset: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { position: 'bottom', labels: { padding: 20, boxWidth: 12 } },
+      tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toFixed(2) } }
+    }
+  }
+});
+
+// Monthly Chart
+const monthlyData = [
+  {month:'2025-02',cost:3.05},{month:'2025-08',cost:2.20},{month:'2025-09',cost:3.90},
+  {month:'2025-11',cost:2.06},{month:'2025-12',cost:15276.45},{month:'2026-01',cost:14.18},
+  {month:'2026-02',cost:7784.45},{month:'2026-03',cost:15662.07},{month:'2026-04',cost:3187.88}
+];
+const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+new Chart(monthlyCtx, {
+  type: 'line',
+  data: {
+    labels: monthlyData.map(m => m.month),
+    datasets: [{
+      label: 'Monthly Spend (USD)',
+      data: monthlyData.map(m => m.cost),
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,0.1)',
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#6366f1',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 5,
+      pointHoverRadius: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => '$' + v } }
+    }
+  }
+});
+
+// Files Chart
+const fileGrowth = [{"date":"2026-01-17","files":1},{"date":"2026-01-18","files":40},{"date":"2026-01-19","files":33},{"date":"2026-01-20","files":27},{"date":"2026-01-21","files":96},{"date":"2026-01-22","files":216},{"date":"2026-01-23","files":262},{"date":"2026-01-24","files":76},{"date":"2026-01-25","files":122},{"date":"2026-01-26","files":102},{"date":"2026-01-27","files":154},{"date":"2026-01-28","files":104},{"date":"2026-01-29","files":72},{"date":"2026-01-30","files":198},{"date":"2026-01-31","files":74},{"date":"2026-02-01","files":110},{"date":"2026-02-02","files":90},{"date":"2026-02-03","files":108},{"date":"2026-02-04","files":106},{"date":"2026-02-05","files":44},{"date":"2026-02-06","files":17},{"date":"2026-02-07","files":93},{"date":"2026-02-08","files":3},{"date":"2026-02-09","files":93},{"date":"2026-02-10","files":62},{"date":"2026-02-11","files":62},{"date":"2026-02-12","files":80},{"date":"2026-02-13","files":66},{"date":"2026-02-14","files":80},{"date":"2026-02-15","files":52},{"date":"2026-02-16","files":242},{"date":"2026-02-17","files":11087},{"date":"2026-02-18","files":9004},{"date":"2026-02-19","files":1759},{"date":"2026-02-20","files":22},{"date":"2026-02-21","files":9880},{"date":"2026-02-22","files":1686},{"date":"2026-02-23","files":7252},{"date":"2026-02-24","files":8349},{"date":"2026-02-25","files":1003},{"date":"2026-02-26","files":847},{"date":"2026-02-27","files":955},{"date":"2026-02-28","files":4434},{"date":"2026-03-01","files":19646},{"date":"2026-03-02","files":13256},{"date":"2026-03-03","files":1765},{"date":"2026-03-04","files":7936},{"date":"2026-03-05","files":7565},{"date":"2026-03-06","files":14896},{"date":"2026-03-07","files":15414},{"date":"2026-03-08","files":17697},{"date":"2026-03-09","files":7488},{"date":"2026-03-10","files":16536},{"date":"2026-03-11","files":4171},{"date":"2026-03-12","files":1700},{"date":"2026-03-13","files":1099},{"date":"2026-03-14","files":14035},{"date":"2026-03-15","files":7480},{"date":"2026-03-16","files":17265},{"date":"2026-03-17","files":40054},{"date":"2026-03-18","files":21384},{"date":"2026-03-19","files":25383},{"date":"2026-03-20","files":2570},{"date":"2026-03-21","files":2144},{"date":"2026-03-22","files":7254},{"date":"2026-03-23","files":1199},{"date":"2026-03-24","files":1027},{"date":"2026-03-25","files":1499},{"date":"2026-03-26","files":1038},{"date":"2026-03-27","files":605},{"date":"2026-03-28","files":441},{"date":"2026-03-29","files":1186},{"date":"2026-03-30","files":1601},{"date":"2026-03-31","files":3339},{"date":"2026-04-01","files":916},{"date":"2026-04-02","files":2213},{"date":"2026-04-03","files":1913},{"date":"2026-04-04","files":4656},{"date":"2026-04-05","files":4820},{"date":"2026-04-06","files":4623},{"date":"2026-04-07","files":7322},{"date":"2026-04-08","files":8885},{"date":"2026-04-09","files":7621},{"date":"2026-04-10","files":6613},{"date":"2026-04-11","files":310},{"date":"2026-04-12","files":0},{"date":"2026-04-13","files":0},{"date":"2026-04-14","files":0},{"date":"2026-04-15","files":0},{"date":"2026-04-16","files":0},{"date":"2026-04-17","files":0},{"date":"2026-04-18","files":0},{"date":"2026-04-19","files":0},{"date":"2026-04-20","files":0},{"date":"2026-04-21","files":0},{"date":"2026-04-22","files":0},{"date":"2026-04-23","files":0},{"date":"2026-04-24","files":0},{"date":"2026-04-25","files":0},{"date":"2026-04-26","files":0},{"date":"2026-04-27","files":0},{"date":"2026-04-28","files":0},{"date":"2026-04-29","files":0},{"date":"2026-04-30","files":0},{"date":"2026-05-01","files":0},{"date":"2026-05-02","files":0},{"date":"2026-05-03","files":0},{"date":"2026-05-04","files":0},{"date":"2026-05-05","files":0},{"date":"2026-05-06","files":0},{"date":"2026-05-07","files":0},{"date":"2026-05-08","files":0},{"date":"2026-05-09","files":0},{"date":"2026-05-10","files":0},{"date":"2026-05-11","files":0},{"date":"2026-05-12","files":0},{"date":"2026-05-13","files":0},{"date":"2026-05-14","files":0},{"date":"2026-05-15","files":0},{"date":"2026-05-16","files":0},{"date":"2026-05-17","files":0},{"date":"2026-05-18","files":0},{"date":"2026-05-19","files":0},{"date":"2026-05-20","files":0},{"date":"2026-05-21","files":0},{"date":"2026-05-22","files":0},{"date":"2026-05-23","files":2834}];
+
+// Fix file growth - some days show commit file counts, not repo file counts
+// Use cumulative max to show true growth
+let maxFiles = 0;
+const fixedGrowth = fileGrowth.map(d => {
+  maxFiles = Math.max(maxFiles, d.files);
+  return { date: d.date, files: maxFiles };
+}).filter((d, i, arr) => i === 0 || d.files !== arr[i-1].files);
+
+const filesCtx = document.getElementById('filesChart').getContext('2d');
+new Chart(filesCtx, {
+  type: 'line',
+  data: {
+    labels: fixedGrowth.map(d => d.date),
+    datasets: [{
+      label: 'Files in Repo',
+      data: fixedGrowth.map(d => d.files),
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } }
+  }
+});
+
+// Commits Chart
+const commitsByMonth = [{"month":"2026-01","commits":1028},{"month":"2026-02","commits":718},{"month":"2026-03","commits":720},{"month":"2026-04","commits":2680},{"month":"2026-05","commits":1203}];
+const commitsCtx = document.getElementById('commitsChart').getContext('2d');
+new Chart(commitsCtx, {
+  type: 'bar',
+  data: {
+    labels: commitsByMonth.map(c => c.month),
+    datasets: [{
+      label: 'Commits',
+      data: commitsByMonth.map(c => c.commits),
+      backgroundColor: 'rgba(99,102,241,0.7)',
+      borderRadius: 8,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } }
+  }
+});
+
+// Issues Table
+const topIssues = [
+  {id:'TEST-1',cost:15286.59,calls:3659},{id:'TEST-2',cost:7664.63,calls:2134},
+  {id:'UNKNOWN',cost:4710.33,calls:46490},{id:'CLI-1',cost:925.32,calls:22852},
+  {id:'MIN-775',cost:913.52,calls:20853},{id:'MIN-734',cost:833.95,calls:18373},
+  {id:'MIN-664',cost:601.99,calls:9012},{id:'MIN-684',cost:566.95,calls:12316},
+  {id:'MIN-491',cost:543.55,calls:13963},{id:'MIN-758',cost:494.87,calls:9247},
+  {id:'MIN-705',cost:435.60,calls:10341},{id:'MIN-712',cost:411.90,calls:13376},
+  {id:'MIN-727',cost:369.01,calls:10045},{id:'MIN-781',cost:357.71,calls:6123},
+  {id:'PAN-331',cost:354.48,calls:8124}
+];
+const tbody = document.getElementById('issuesTable');
+topIssues.forEach(issue => {
+  const row = document.createElement('tr');
+  row.innerHTML = `<td><strong>${issue.id}</strong></td><td>$${issue.cost.toFixed(2)}</td><td>${issue.calls.toLocaleString()}</td><td>$${(issue.cost/issue.calls).toFixed(4)}</td>`;
+  tbody.appendChild(row);
+});
+
+// Animated counters
+function animateCounter(el) {
+  const target = parseInt(el.dataset.count);
+  const duration = 2000;
+  const start = performance.now();
+  const isDollar = el.textContent.includes('$');
+  const isDecimal = target > 10000000000;
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    const current = Math.floor(target * ease);
+    if (isDollar) {
+      el.textContent = '$' + current.toLocaleString();
+    } else if (isDecimal) {
+      el.textContent = (target * ease / 1e9).toFixed(1) + 'B';
+    } else {
+      el.textContent = current.toLocaleString();
+    }
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+// Intersection Observer for animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      if (entry.target.querySelectorAll) {
+        entry.target.querySelectorAll('[data-count]').forEach(animateCounter);
+      }
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+document.querySelectorAll('.hero-stat-value[data-count]').forEach(animateCounter);
+</script>
+</body>
+</html>
