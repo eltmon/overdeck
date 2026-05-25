@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:24:20.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1248: Substrate: root `tsc --noEmit` broken — FlywheelPipelineItem.conflictsWith mutable/readonly mismatch",
-    "updated": "2026-05-25T16:25:40.393Z"
+    "updated": "2026-05-25T23:39:48.356Z"
   },
   "plan": {
     "id": "pan-1248",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "3d9af722-9278-4fb6-aff1-0e8dfd16bf2e",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T16:24:20.000Z",
-    "updated": "2026-05-25T16:25:40.393Z",
+    "updated": "2026-05-25T23:39:48.356Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1248",
