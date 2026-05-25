@@ -4,7 +4,7 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1418: Optional opt-in auto-merge for single-developer workflow (configurable per-project)",
-    "updated": "2026-05-25T09:11:16.016Z"
+    "updated": "2026-05-25T09:18:31.047Z"
   },
   "plan": {
     "id": "pan-1418",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d9b158c8-ae1d-46c7-8e2c-d912bcdb3ba4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 46,
+    "sequence": 47,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-25T09:11:16.016Z",
+    "updated": "2026-05-25T09:18:31.047Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1418",
@@ -1128,42 +1128,42 @@
         "phase": "review",
         "issueId": "PAN-1418",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T09:11:16.001Z",
+        "updatedAt": "2026-05-25T09:18:31.022Z",
         "work": {
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": []
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-05-25T09:11:16.001Z"
+              "at": "2026-05-25T09:18:31.022Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:11:16.001Z"
+              "at": "2026-05-25T09:18:31.022Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-25T09:11:16.001Z",
+          "updatedAt": "2026-05-25T09:18:31.022Z",
           "history": [],
           "readyForMerge": false
         }
