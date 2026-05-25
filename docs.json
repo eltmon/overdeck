@@ -124,7 +124,8 @@
               "reference/harness-landscape",
               "reference/template-conversations",
               "reference/prompts",
-              "reference/troubleshooting"
+              "reference/troubleshooting",
+              "reference/token-spend-report"
             ]
           }
         ]
