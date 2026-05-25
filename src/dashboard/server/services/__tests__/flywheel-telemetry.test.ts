@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion6,
   computeCriterion7,
   computeFlakeCriterion,
   computeFlywheelStats,
@@ -14,6 +15,36 @@ import {
 } from '../flywheel-telemetry.js';
 
 const generatedAt = new Date('2026-05-25T10:00:00.000Z');
+
+type Criterion6BucketValue = {
+  medianMs: number;
+  p95Ms: number;
+  ratio: number;
+  status: string;
+  sampleSize: number;
+  dataSufficient: boolean;
+};
+
+function criterion6Run(totalMs: number, counts: { beadsCount?: number; planItemsCount?: number }) {
+  return {
+    ...counts,
+    metrics: {
+      plan: null,
+      work: null,
+      review: 0,
+      test: 0,
+      ship: null,
+      mergeMs: totalMs,
+      outcome: 'merged' as const,
+      interventionCount: 0,
+      passCount: 0,
+    },
+  };
+}
+
+function criterion6Value(criterion: ReturnType<typeof computeCriterion6>) {
+  return criterion.value as Record<'simple' | 'medium' | 'complex', Criterion6BucketValue>;
+}
 
 describe('flywheel telemetry', () => {
   it.each([
@@ -138,6 +169,63 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('computes criterion 6 medians, p95 values, and ratios per complexity bucket', () => {
+    const criterion = computeCriterion6([
+      criterion6Run(100, { planItemsCount: 2 }),
+      criterion6Run(200, { planItemsCount: 2 }),
+      criterion6Run(300, { planItemsCount: 2 }),
+      criterion6Run(100, { beadsCount: 6 }),
+      criterion6Run(250, { beadsCount: 6 }),
+      criterion6Run(800, { beadsCount: 6 }),
+    ]);
+    const value = criterion6Value(criterion);
+
+    expect(value.simple).toMatchObject({ medianMs: 200, p95Ms: 300, ratio: 1.5, status: 'green', sampleSize: 3, dataSufficient: true });
+    expect(value.medium).toMatchObject({ medianMs: 250, p95Ms: 800, ratio: 3.2, status: 'red', sampleSize: 3, dataSufficient: true });
+    expect(value.complex).toMatchObject({ medianMs: 0, p95Ms: 0, ratio: 0, status: 'insufficient_data', sampleSize: 0, dataSufficient: false });
+    expect(criterion.status).toBe('red');
+    expect(criterion.sampleSize).toBe(6);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it('uses beads count before falling back to vBRIEF plan item count for criterion 6 buckets', () => {
+    const criterion = computeCriterion6([
+      criterion6Run(100, { beadsCount: 9, planItemsCount: 2 }),
+      criterion6Run(110, { beadsCount: 9, planItemsCount: 2 }),
+      criterion6Run(120, { beadsCount: 9, planItemsCount: 2 }),
+      criterion6Run(200, { planItemsCount: 2 }),
+      criterion6Run(220, { planItemsCount: 2 }),
+      criterion6Run(240, { planItemsCount: 2 }),
+    ]);
+    const value = criterion6Value(criterion);
+
+    expect(value.simple.sampleSize).toBe(3);
+    expect(value.medium.sampleSize).toBe(0);
+    expect(value.complex.sampleSize).toBe(3);
+  });
+
+  it('does not mark undersampled criterion 6 buckets red', () => {
+    const criterion = computeCriterion6([
+      criterion6Run(100, { beadsCount: 9 }),
+      criterion6Run(1_000, { beadsCount: 9 }),
+    ]);
+    const value = criterion6Value(criterion);
+
+    expect(value.complex).toMatchObject({ status: 'insufficient_data', sampleSize: 2, dataSufficient: false });
+    expect(criterion.status).toBe('insufficient_data');
+    expect(criterion.dataSufficient).toBe(false);
+  });
+
+  it.each([
+    [[100, 110, 120], 'green'],
+    [[100, 100, 250], 'yellow'],
+    [[100, 100, 400], 'red'],
+  ] as const)('maps criterion 6 headline status for totals %j', (totals, status) => {
+    const criterion = computeCriterion6(totals.map((totalMs) => criterion6Run(totalMs, { beadsCount: 2 })));
+
+    expect(criterion.status).toBe(status);
   });
 
   it('detects same-issue same-head pass-then-fail verification flakes', () => {

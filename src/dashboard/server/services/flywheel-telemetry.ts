@@ -1,8 +1,17 @@
 import type { FlywheelStats, FlywheelStatsCriterion } from '@panctl/contracts';
+import type { PipelineRunMetrics } from './pipeline-run-metrics.js';
 
 export interface FlywheelStatsOptions {
   generatedAt?: Date;
   completedPipelineRuns?: number;
+}
+
+export type Criterion6ComplexityBucket = 'simple' | 'medium' | 'complex';
+
+export interface Criterion6PipelineRun {
+  metrics: PipelineRunMetrics;
+  beadsCount?: number;
+  planItemsCount?: number;
 }
 
 export interface Criterion7VerificationAttempt {
@@ -100,13 +109,129 @@ export function computeInterventionCriterion(completedPipelineRuns: number): Fly
   );
 }
 
-export function computeTimeConsistencyCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Time-in-pipeline consistency',
-    { simple: 0, medium: 0, complex: 0 },
-    { maxRatio: 2 },
-    completedPipelineRuns,
-  );
+const complexityBuckets = ['simple', 'medium', 'complex'] as const satisfies readonly Criterion6ComplexityBucket[];
+
+function criterion6Status(ratio: number): FlywheelStatsCriterion['status'] {
+  if (ratio <= 2) return 'green';
+  if (ratio <= 3) return 'yellow';
+  return 'red';
+}
+
+function percentile(values: readonly number[], percentileValue: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.max(0, Math.ceil((percentileValue / 100) * sorted.length) - 1);
+  return sorted[index]!;
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1]! + sorted[middle]!) / 2
+    : sorted[middle]!;
+}
+
+export function complexityBucketForItemCount(itemCount: number): Criterion6ComplexityBucket | null {
+  if (!Number.isSafeInteger(itemCount) || itemCount <= 0) return null;
+  if (itemCount <= 3) return 'simple';
+  if (itemCount <= 8) return 'medium';
+  return 'complex';
+}
+
+function bucketForRun(run: Criterion6PipelineRun): Criterion6ComplexityBucket | null {
+  return complexityBucketForItemCount(run.beadsCount ?? run.planItemsCount ?? 0);
+}
+
+function totalPipelineMs(metrics: PipelineRunMetrics): number | null {
+  if (metrics.outcome === 'in_flight') return null;
+  if (metrics.mergeMs !== null) return metrics.mergeMs;
+
+  const durations = [metrics.plan, metrics.work, metrics.review, metrics.test, metrics.ship]
+    .filter((duration): duration is number => typeof duration === 'number' && Number.isFinite(duration));
+  if (durations.length === 0) return null;
+  return durations.reduce((sum, duration) => sum + duration, 0);
+}
+
+function computeCriterion6Bucket(values: readonly number[]) {
+  if (values.length < 3) {
+    return {
+      medianMs: median(values),
+      p95Ms: percentile(values, 95),
+      ratio: 0,
+      status: 'insufficient_data' as const,
+      sampleSize: values.length,
+      dataSufficient: false,
+    };
+  }
+
+  const medianMs = median(values);
+  const p95Ms = percentile(values, 95);
+  const ratio = medianMs === 0
+    ? p95Ms === 0 ? 0 : Number.MAX_SAFE_INTEGER
+    : p95Ms / medianMs;
+
+  return {
+    medianMs,
+    p95Ms,
+    ratio,
+    status: criterion6Status(ratio),
+    sampleSize: values.length,
+    dataSufficient: true,
+  };
+}
+
+function worstCriterion6Status(statuses: readonly FlywheelStatsCriterion['status'][]): FlywheelStatsCriterion['status'] {
+  if (statuses.length === 0) return 'insufficient_data';
+  if (statuses.includes('red')) return 'red';
+  if (statuses.includes('yellow')) return 'yellow';
+  return 'green';
+}
+
+export function computeCriterion6(runs: readonly Criterion6PipelineRun[]): FlywheelStatsCriterion {
+  const bucketedRuns: Record<Criterion6ComplexityBucket, number[]> = {
+    simple: [],
+    medium: [],
+    complex: [],
+  };
+
+  for (const run of runs) {
+    const bucket = bucketForRun(run);
+    const totalMs = totalPipelineMs(run.metrics);
+    if (!bucket || totalMs === null) continue;
+    bucketedRuns[bucket].push(totalMs);
+  }
+
+  const value = Object.fromEntries(
+    complexityBuckets.map((bucket) => [bucket, computeCriterion6Bucket(bucketedRuns[bucket])]),
+  ) as Record<Criterion6ComplexityBucket, ReturnType<typeof computeCriterion6Bucket>>;
+  const sufficientStatuses = complexityBuckets
+    .map((bucket) => value[bucket])
+    .filter((bucket) => bucket.dataSufficient)
+    .map((bucket) => bucket.status);
+
+  return {
+    label: 'Time-in-pipeline consistency',
+    value,
+    target: { maxRatio: 2 },
+    status: worstCriterion6Status(sufficientStatuses),
+    sampleSize: complexityBuckets.reduce((sum, bucket) => sum + value[bucket].sampleSize, 0),
+    dataSufficient: sufficientStatuses.length > 0,
+  };
+}
+
+export function computeTimeConsistencyCriterion(completedPipelineRuns: number, runs: readonly Criterion6PipelineRun[] = []): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Time-in-pipeline consistency',
+      { simple: 0, medium: 0, complex: 0 },
+      { maxRatio: 2 },
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion6(runs);
 }
 
 function flakeStatus(rate: number): FlywheelStatsCriterion['status'] {
