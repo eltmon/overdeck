@@ -27,6 +27,7 @@ export interface FlywheelLifecycleOptions {
   model?: string;
   harness?: 'claude-code' | 'pi';
   effort?: RoleEffort;
+  minAgents?: number;
   maxAgents?: number;
   scope?: FlywheelScope;
   autoPickupBacklog?: boolean;
@@ -56,7 +57,8 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
   const configLines = [
     options.harness ? `Harness: ${options.harness}` : undefined,
     options.effort ? `Effort: ${options.effort}` : undefined,
-    options.maxAgents ? `Max concurrent agents: ${options.maxAgents}` : undefined,
+    options.minAgents ? `Min concurrent agents (target): ${options.minAgents}` : undefined,
+    options.maxAgents ? `Max concurrent agents (ceiling): ${options.maxAgents}` : undefined,
     options.scope ? `Scope: ${options.scope}` : undefined,
     typeof options.autoPickupBacklog === 'boolean'
       ? `Auto-pickup backlog: ${options.autoPickupBacklog}`

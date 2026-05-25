@@ -40,6 +40,7 @@ interface ResolvedFlywheelRoleConfig {
   harness: 'claude-code' | 'pi';
   model: string;
   effort: RoleEffort;
+  minAgents: number;
   maxAgents: number;
   scope: FlywheelScope;
 }
@@ -124,7 +125,8 @@ async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> 
     harness: flywheel?.harness ?? 'claude-code',
     model: resolveModel('flywheel', undefined, config),
     effort: flywheel?.effort ?? 'high',
-    maxAgents: flywheel?.maxAgents ?? 8,
+    minAgents: flywheel?.minAgents ?? 20,
+    maxAgents: flywheel?.maxAgents ?? 30,
     scope: flywheel?.scope ?? 'pan-only',
   };
 }
@@ -216,6 +218,7 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
   });
@@ -286,6 +289,7 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
     resumeSessionId,

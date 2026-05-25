@@ -300,6 +300,17 @@ export interface RoleConfig {
   model: ModelRef;
   harness?: 'claude-code' | 'pi';
   effort?: RoleEffort;
+  /**
+   * Target minimum concurrent agents the role should keep launched. The
+   * orchestrator MUST be aggressive about reaching this number — if the active
+   * count is below `minAgents`, launching new agents is the tick's primary
+   * action, not optional. For the flywheel role only.
+   */
+  minAgents?: number;
+  /**
+   * Hard ceiling on concurrent agents. The orchestrator never spawns past
+   * this number, even if more work is queued.
+   */
   maxAgents?: number;
   scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
@@ -353,7 +364,8 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
     harness: 'claude-code',
     model: 'claude-opus-4-7',
     effort: 'high',
-    maxAgents: 8,
+    minAgents: 20,
+    maxAgents: 30,
     scope: 'pan-only',
   },
 };
@@ -1464,6 +1476,16 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
+  }
+  if (roleConfig.minAgents !== undefined && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) {
+    throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
+  }
+  if (
+    roleConfig.minAgents !== undefined &&
+    roleConfig.maxAgents !== undefined &&
+    roleConfig.minAgents > roleConfig.maxAgents
+  ) {
+    throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
   }
   if (roleConfig.scope !== undefined && roleConfig.scope !== 'pan-only' && roleConfig.scope !== 'all-tracked-projects') {
     throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
