@@ -43,7 +43,8 @@ import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/
 import {
   cancelPending,
   getActionableAutoMerge,
-  listActionableAutoMerges,
+  listActiveAutoMerges,
+  listProblemAutoMerges,
   scheduleAutoMergeWithResult,
   type PendingAutoMerge,
   type ScheduleAutoMergeInput,
@@ -52,6 +53,7 @@ import {
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
+const AUTO_MERGE_POLL_LIMIT = 100;
 
 interface BriefRequestBody {
   content?: unknown;
@@ -325,7 +327,11 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
 }
 
 export function getPendingAutoMergePayload(): PendingAutoMerge[] {
-  return listActionableAutoMerges();
+  return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
+}
+
+export function getAutoMergeProblemPayload(): PendingAutoMerge[] {
+  return listProblemAutoMerges(AUTO_MERGE_POLL_LIMIT);
 }
 
 export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
@@ -494,6 +500,14 @@ const getPendingAutoMergeRoute = HttpRouter.add(
   '/api/flywheel/auto-merge/pending',
   httpHandler(Effect.gen(function* () {
     return jsonResponse(getPendingAutoMergePayload());
+  })),
+);
+
+const getAutoMergeProblemsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/auto-merge/problems',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getAutoMergeProblemPayload());
   })),
 );
 
@@ -750,6 +764,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
+  getAutoMergeProblemsRoute,
   postAutoMergeScheduleRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
   flywheelRouteLayer,
+  getAutoMergeProblemPayload,
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
@@ -298,7 +299,23 @@ describe('flywheel auto-merge routes', () => {
     });
   });
 
-  it('surfaces failed and blocked rows through the pending payload', () => {
+  it('bounds the pending auto-merge polling payload', () => {
+    for (let index = 0; index < 101; index += 1) {
+      scheduleAutoMerge({
+        issueId: `PAN-${1000 + index}`,
+        prUrl: `https://github.com/eltmon/panopticon-cli/pull/${1000 + index}`,
+        prNumber: 1000 + index,
+        projectKey: 'panopticon-cli',
+        scheduledAt: '2026-05-25T10:00:00.000Z',
+        scheduledMergeAt: new Date(Date.parse('2026-05-25T10:00:00.000Z') + index * 1000).toISOString(),
+      });
+    }
+
+    expect(getPendingAutoMergePayload()).toHaveLength(100);
+    expect(getPendingAutoMergePayload().at(-1)?.issueId).toBe('PAN-1099');
+  });
+
+  it('keeps failed and blocked rows out of polling while exposing them through problems', async () => {
     const failed = scheduleAutoMerge({
       issueId: 'PAN-3',
       prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
@@ -320,10 +337,18 @@ describe('flywheel auto-merge routes', () => {
     markFailed(failed.id, 'merge failed');
     markBlocked(blocked.id, 'CI checks failing');
 
-    expect(getPendingAutoMergePayload()).toMatchObject([
+    expect(getPendingAutoMergePayload()).toEqual([]);
+    expect(getAutoMergeProblemPayload()).toMatchObject([
       { issueId: 'PAN-3', status: 'failed', failureReason: 'merge failed' },
       { issueId: 'PAN-4', status: 'blocked', failureReason: 'CI checks failing' },
     ]);
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/problems')).resolves.toMatchObject({
+      status: 200,
+      body: [
+        { issueId: 'PAN-3', status: 'failed', failureReason: 'merge failed' },
+        { issueId: 'PAN-4', status: 'blocked', failureReason: 'CI checks failing' },
+      ],
+    });
   });
 
   it('origin-validates auto-merge cancellations', async () => {

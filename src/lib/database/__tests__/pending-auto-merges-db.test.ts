@@ -8,8 +8,10 @@ import {
   getActionableAutoMerge,
   getPendingAutoMerge,
   listActionableAutoMerges,
+  listActiveAutoMerges,
   listDuePendingAutoMerges,
   listPendingAutoMerges,
+  listProblemAutoMerges,
   markBlocked,
   markFailed,
   scheduleAutoMerge,
@@ -108,6 +110,24 @@ describe('pending auto-merges db', () => {
     expect(cancelPending(failed.id, 'operator')).toBe(true);
     expect(cancelPending(blocked.id, 'operator')).toBe(true);
     expect(listActionableAutoMerges()).toEqual([]);
+  });
+
+  it('bounds active and problem auto-merge reads with explicit limits', () => {
+    schedule('PAN-1', '2026-05-25T10:01:00.000Z');
+    schedule('PAN-2', '2026-05-25T10:02:00.000Z');
+    schedule('PAN-3', '2026-05-25T10:03:00.000Z');
+    const failed = schedule('PAN-4', '2026-05-25T10:04:00.000Z');
+    const blocked = schedule('PAN-5', '2026-05-25T10:05:00.000Z');
+    const extraBlocked = schedule('PAN-6', '2026-05-25T10:06:00.000Z');
+
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'merge failed');
+    markBlocked(blocked.id, 'blocked by label');
+    markBlocked(extraBlocked.id, 'blocked by label');
+
+    expect(listActiveAutoMerges(2).map((row) => row.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    expect(listProblemAutoMerges(2).map((row) => row.issueId)).toEqual(['PAN-4', 'PAN-5']);
+    expect(listActionableAutoMerges(2).map((row) => row.issueId)).toEqual(['PAN-1', 'PAN-2']);
   });
 
   it('lists only due pending rows from SQL-filtered hot-path reads', () => {

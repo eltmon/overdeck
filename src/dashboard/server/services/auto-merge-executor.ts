@@ -100,14 +100,16 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
     try {
       const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId);
-      if (result.success && result.mergeStatus === 'merged') {
-        (deps.markMerged ?? markMerged)(entry.id);
+      if (result.success) {
+        if (result.mergeStatus === 'merged') {
+          (deps.markMerged ?? markMerged)(entry.id);
+        } else {
+          log(`[auto-merge] merge accepted for ${entry.issueId} with non-terminal status ${result.mergeStatus ?? 'unknown'}`);
+        }
         continue;
       }
 
-      const reason = result.success
-        ? `merge accepted but did not complete: ${result.message ?? result.mergeStatus ?? 'unknown status'}`
-        : failureReason(result);
+      const reason = failureReason(result);
       (deps.markFailed ?? markFailed)(entry.id, reason);
       (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
     } catch (error) {

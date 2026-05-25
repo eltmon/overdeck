@@ -129,10 +129,11 @@ describe('auto-merge executor', () => {
     expect(markFailed).not.toHaveBeenCalled();
   });
 
-  it('does not mark queued merge results as merged', async () => {
+  it('leaves queued merge results non-terminal without recording a failure', async () => {
     const markMerged = vi.fn();
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
+    const log = vi.fn();
 
     await tickAutoMergeExecutor({
       now: () => NOW,
@@ -144,11 +145,13 @@ describe('auto-merge executor', () => {
       markMerged,
       markFailed,
       announceFailure,
+      log,
     });
 
     expect(markMerged).not.toHaveBeenCalled();
-    expect(markFailed).toHaveBeenCalledWith(1, 'merge accepted but did not complete: Queued for merge');
-    expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge accepted but did not complete: Queued for merge');
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('[auto-merge] merge accepted for PAN-1486 with non-terminal status queued');
   });
 
   it('marks failed merges as failed and announces the failure', async () => {

@@ -144,11 +144,29 @@ export function listPendingAutoMerges(): PendingAutoMerge[] {
   });
 }
 
-export function listActionableAutoMerges(): PendingAutoMerge[] {
+export function listActiveAutoMerges(limit = 100): PendingAutoMerge[] {
+  return runDb('listActiveAutoMerges', () => {
+    const rows = getDatabase()
+      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" IN ('pending','merging') ORDER BY scheduledMergeAt ASC, id ASC LIMIT ?")
+      .all(limit) as PendingAutoMergeRow[];
+    return rows.map(toPendingAutoMerge);
+  });
+}
+
+export function listProblemAutoMerges(limit = 100): PendingAutoMerge[] {
+  return runDb('listProblemAutoMerges', () => {
+    const rows = getDatabase()
+      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" IN ('blocked','failed') ORDER BY scheduledMergeAt ASC, id ASC LIMIT ?")
+      .all(limit) as PendingAutoMergeRow[];
+    return rows.map(toPendingAutoMerge);
+  });
+}
+
+export function listActionableAutoMerges(limit = 100): PendingAutoMerge[] {
   return runDb('listActionableAutoMerges', () => {
     const rows = getDatabase()
-      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" IN ('pending','merging','blocked','failed') ORDER BY scheduledMergeAt ASC, id ASC")
-      .all() as PendingAutoMergeRow[];
+      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" IN ('pending','merging','blocked','failed') ORDER BY scheduledMergeAt ASC, id ASC LIMIT ?")
+      .all(limit) as PendingAutoMergeRow[];
     return rows.map(toPendingAutoMerge);
   });
 }
