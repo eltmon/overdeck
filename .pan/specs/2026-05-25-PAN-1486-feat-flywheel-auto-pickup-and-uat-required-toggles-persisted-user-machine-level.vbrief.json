@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T11:16:50.885Z"
+    "updated": "2026-05-25T11:22:06.443Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 26,
+    "sequence": 32,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T11:16:50.885Z",
+    "updated": "2026-05-25T11:22:06.443Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -1239,34 +1239,32 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1486",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T11:16:50.856Z",
+        "updatedAt": "2026-05-25T11:22:06.394Z",
         "work": {
-          "updatedAt": "2026-05-25T11:16:50.856Z",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T11:16:50.856Z",
-          "notes": "Verification FAILED at test (41618ms):\n\n1/4]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/auto-merge-integration.test.ts > auto-merge schedule/cancel/executor integration > cancels during cooldown and never invokes merge after expiry\nAssertionError: expected 109 to be less than 100\n ❯ src/lib/cloister/__tests__/auto-merge-integration.test.ts:103:36\n    101|     expect(listPendingAutoMerges()).toHaveLength(1);\n    102|     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1…\n    103|     expect(realElapsedMs(started)).toBeLessThan(100);\n       |                                    ^\n    104|   });\n    105|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/auto-merge-integration.test.ts > auto-merge schedule/cancel/executor integration > fires one merge after the cooldown expires and records merged state\nAssertionError: expected 159 to be less than 100\n ❯ src/lib/cloister/__tests__/auto-merge-integration.test.ts:118:36\n    116|     expect(listPendingAutoMerges()).toHaveLength(1);\n    117|     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1…\n    118|     expect(realElapsedMs(started)).toBeLessThan(100);\n       |                                    ^\n    119|   });\n    120|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯\n\n",
+          "status": "pending",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T11:16:50.856Z",
-              "notes": "Verification FAILED at test (41618ms):\n\n1/4]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/auto-merge-integration.test.ts > auto-merge schedule/cancel/executor integration > cancels during cooldown and never invokes merge after expiry\nAssertionError: expected 109 to be less than 100\n ❯ src/lib/cloister/__tests__/auto-merge-integration.test.ts:103:36\n    101|     expect(listPendingAutoMerges()).toHaveLength(1);\n    102|     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1…\n    103|     expect(realElapsedMs(started)).toBeLessThan(100);\n       |                                    ^\n    104|   });\n    105|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/auto-merge-integration.test.ts > auto-merge schedule/cancel/executor integration > fires one merge after the cooldown expires and records merged state\nAssertionError: expected 159 to be less than 100\n ❯ src/lib/cloister/__tests__/auto-merge-integration.test.ts:118:36\n    116|     expect(listPendingAutoMerges()).toHaveLength(1);\n    117|     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1…\n    118|     expect(realElapsedMs(started)).toBeLessThan(100);\n       |                                    ^\n    119|   });\n    120|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯\n\n"
+              "status": "pending",
+              "at": "2026-05-25T11:22:06.394Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-25T11:16:50.856Z",
+          "status": "pending",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "notes": "Verification failed at lint",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-25T11:16:50.856Z",
+              "status": "pending",
+              "at": "2026-05-25T11:22:06.394Z",
               "notes": "Verification failed at lint"
             }
           ],
@@ -1274,25 +1272,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:16:50.856Z",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:16:50.856Z"
+              "at": "2026-05-25T11:22:06.394Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T11:16:50.856Z",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:16:50.856Z",
+          "updatedAt": "2026-05-25T11:22:06.394Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:16:50.856Z"
+              "at": "2026-05-25T11:22:06.394Z"
             }
           ],
           "readyForMerge": false,
