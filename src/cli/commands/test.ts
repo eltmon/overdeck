@@ -121,7 +121,7 @@ async function listTestsCommand(projectArg: string | undefined): Promise<void> {
 
   if (projects.length === 0) {
     console.log(chalk.yellow('No projects registered.'));
-    console.log(chalk.dim('Register a project with: pan project add <path>'));
+    console.log(chalk.dim('Register a project with: pan projects add <path>'));
     return;
   }
 

@@ -21,6 +21,10 @@ Panopticon at workspace creation — never hand-authored — and is gitignored.
 The global layer may also carry the user's own skills and agents under
 `~/.panopticon/context/global/{skills,agents}/`.
 
+Register projects with `pan projects add <path>`. The older singular
+`pan project add <path>` command remains available as a compatibility alias,
+but new docs and examples should use the plural command group.
+
 ## Authoring model: one source, N harnesses
 
 Each layer is a single canonical markdown file. Harness-specific divergence
@@ -97,6 +101,24 @@ pan context validate              # lint templates for malformed blocks
 pan context migrate               # one-shot migration off sync.devroot
 ```
 
+## Dashboard Context page
+
+The dashboard Context page edits the same layered files as the CLI. Use the
+layer selector to switch between Global, Project, and Workspace context; project
+and workspace selectors choose the registered project or workspace whose
+`.pan/context/project.md` or `.pan/context/workspace.md` file is loaded.
+
+The editor shows per-harness previews for Claude Code and Pi. A separate **Full
+injected prompt** pane shows the complete Panopticon-controlled bundle that will
+be injected, including rendered layer content and audit sections for memory,
+status, and workspace briefing. It does not fabricate private harness base
+prompts that Panopticon cannot read.
+
+Previewing is read-only. **Save** writes only the selected layer file. **Save &
+Sync** writes the selected layer first, then explicitly runs `pan context sync`
+so the rendered Claude Code target files update. Live preview and ordinary Save
+do not run sync.
+
 ## `sync-sources/` — Panopticon's own bundled content
 
 Everything `pan sync` distributes *from the package itself* lives under one
@@ -124,6 +146,10 @@ silently rot while the maintained rules accumulated elsewhere (#1359).
 2. copies `<devroot>/.claude/{skills,agents}/` → `~/.panopticon/context/global/`;
 3. offers to register each project found under `~/Projects/`;
 4. prints where the old location is preserved.
+
+If a non-interactive migration skips registration, register projects with
+`pan projects add <path>`. The singular `pan project ...` form remains available
+as a compatibility alias, but new docs and prompts prefer `pan projects ...`.
 
 It never overwrites an existing target (safe to re-run) and never deletes the
 source. After verifying the migration, delete the old location and set

@@ -15,12 +15,15 @@
  */
 
 import { existsSync, readdirSync, rmSync } from 'fs';
+import { access, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { listSessionNames } from './tmux.js';
 import { parseIssueIdSync } from './issue-id.js';
 import { FsError } from './errors.js';
+
+export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Valid agent directory naming patterns.
@@ -96,11 +99,33 @@ export function getPlanningIssueId(name: string): string | null {
   return issueId;
 }
 
+export function getAgentDirectoryIssueId(name: string): string | null {
+  const match = name.match(/^(?:agent|planning)-(.+)$/);
+  if (!match) return null;
+
+  const suffix = match[1]!;
+  if (suffix !== suffix.toLowerCase()) return null;
+
+  const direct = parseIssueIdSync(suffix);
+  if (direct) return direct.raw.toUpperCase();
+
+  const parts = suffix.split('-');
+  for (let i = 1; i <= parts.length; i++) {
+    const candidate = parts.slice(0, i).join('-');
+    const parsed = parseIssueIdSync(candidate);
+    if (parsed) return parsed.raw.toUpperCase();
+  }
+
+  return null;
+}
+
 export interface OrphanedAgentDir {
   name: string;
   path: string;
   hasRunningSession: boolean;
-}async function findOrphanedAgentDirsPromise(
+}
+
+async function findOrphanedAgentDirsPromise(
   agentsDir: string = AGENTS_DIR,
 ): Promise<OrphanedAgentDir[]> {
   if (!existsSync(agentsDir)) {
@@ -145,7 +170,9 @@ export interface CleanupResult {
   wouldRemove: string[];
   /** Total orphaned directories found */
   totalOrphaned: number;
-}async function cleanupAgentDirectoriesPromise(options: {
+}
+
+async function cleanupAgentDirectoriesPromise(options: {
   dryRun?: boolean;
   force?: boolean;
   agentsDir?: string;
@@ -189,6 +216,211 @@ export interface CleanupResult {
   return result;
 }
 
+type IssueReadSourceState = {
+  identifier?: unknown;
+  id?: unknown;
+  status?: unknown;
+  state?: unknown;
+  canonicalStatus?: unknown;
+  rawTrackerState?: unknown;
+  completedAt?: unknown;
+  closedAt?: unknown;
+};
+
+type AgentStateIssue = {
+  issueId?: unknown;
+};
+
+export interface ClosedIssueAgentDir {
+  name: string;
+  path: string;
+  issueId: string;
+  closedAt: string;
+  ageMs: number;
+  hasRunningSession: boolean;
+  hasStateFile: boolean;
+  containsJsonl: boolean;
+}
+
+export interface ClosedIssueAgentCleanupResult {
+  removed: string[];
+  protected: string[];
+  wouldRemove: string[];
+  totalCandidates: number;
+}
+
+function normalizeIssueId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = parseIssueIdSync(trimmed);
+  return (parsed?.raw ?? trimmed).toUpperCase();
+}
+
+function isClosedIssueState(issue: IssueReadSourceState): boolean {
+  const state = String(issue.state ?? '').toLowerCase();
+  const status = String(issue.status ?? '').toLowerCase();
+  const canonicalStatus = String(issue.canonicalStatus ?? '').toLowerCase();
+  const rawTrackerState = String(issue.rawTrackerState ?? '').toLowerCase();
+  return Boolean(
+    issue.completedAt ||
+    issue.closedAt ||
+    state === 'closed' ||
+    status === 'done' ||
+    status === 'closed' ||
+    status === 'cancelled' ||
+    status === 'canceled' ||
+    status === 'completed' ||
+    canonicalStatus === 'done' ||
+    canonicalStatus === 'closed' ||
+    canonicalStatus === 'cancelled' ||
+    canonicalStatus === 'canceled' ||
+    canonicalStatus === 'completed' ||
+    rawTrackerState === 'closed' ||
+    rawTrackerState === 'done' ||
+    rawTrackerState === 'completed',
+  );
+}
+
+function getClosedIssueTimes(issues: unknown[]): Map<string, number> {
+  const closed = new Map<string, number>();
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object') continue;
+    const item = issue as IssueReadSourceState;
+    const issueId = normalizeIssueId(item.identifier) ?? normalizeIssueId(item.id);
+    if (!issueId || !isClosedIssueState(item)) continue;
+
+    const closedTimestamp = item.completedAt ?? item.closedAt;
+    if (typeof closedTimestamp !== 'string') continue;
+
+    const closedAtMs = Date.parse(closedTimestamp);
+    if (!Number.isFinite(closedAtMs)) continue;
+    closed.set(issueId, closedAtMs);
+  }
+  return closed;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readAgentStateIssueId(dirPath: string): Promise<string | null> {
+  try {
+    const raw = await readFile(join(dirPath, 'state.json'), 'utf8');
+    const parsed = JSON.parse(raw) as AgentStateIssue;
+    return normalizeIssueId(parsed.issueId);
+  } catch {
+    return null;
+  }
+}
+
+async function directoryContainsJsonl(dirPath: string): Promise<boolean> {
+  let entries;
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+    if (entry.isFile() && entry.name.endsWith('.jsonl')) return true;
+    if (entry.isDirectory() && await directoryContainsJsonl(entryPath)) return true;
+  }
+
+  return false;
+}
+
+async function findClosedIssueAgentDirsPromise(options: {
+  issues: unknown[];
+  agentsDir?: string;
+  nowMs?: number;
+  graceMs?: number;
+}): Promise<ClosedIssueAgentDir[]> {
+  const agentsDir = options.agentsDir ?? AGENTS_DIR;
+  const nowMs = options.nowMs ?? Date.now();
+  const graceMs = options.graceMs ?? CLOSED_ISSUE_AGENT_DIR_GRACE_MS;
+  const closedIssueTimes = getClosedIssueTimes(options.issues);
+  if (closedIssueTimes.size === 0 || !await pathExists(agentsDir)) return [];
+
+  const sessionNames = await Effect.runPromise(listSessionNames());
+  const sessionSet = new Set(sessionNames);
+  const entries = await readdir(agentsDir, { withFileTypes: true });
+  const candidates: ClosedIssueAgentDir[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const dirPath = join(agentsDir, entry.name);
+    const stateIssueId = await readAgentStateIssueId(dirPath);
+    const issueId = stateIssueId ?? getAgentDirectoryIssueId(entry.name);
+    if (!issueId) continue;
+
+    const closedAtMs = closedIssueTimes.get(issueId);
+    if (closedAtMs === undefined) continue;
+
+    const ageMs = nowMs - closedAtMs;
+    if (ageMs <= graceMs) continue;
+
+    candidates.push({
+      name: entry.name,
+      path: dirPath,
+      issueId,
+      closedAt: new Date(closedAtMs).toISOString(),
+      ageMs,
+      hasRunningSession: sessionSet.has(entry.name),
+      hasStateFile: await pathExists(join(dirPath, 'state.json')),
+      containsJsonl: await directoryContainsJsonl(dirPath),
+    });
+  }
+
+  return candidates;
+}
+
+async function cleanupClosedIssueAgentDirectoriesPromise(options: {
+  issues: unknown[];
+  dryRun?: boolean;
+  force?: boolean;
+  agentsDir?: string;
+  nowMs?: number;
+  graceMs?: number;
+}): Promise<ClosedIssueAgentCleanupResult> {
+  const candidates = await findClosedIssueAgentDirsPromise(options);
+  const protectedDirs = candidates.filter((dir) => dir.hasRunningSession || dir.containsJsonl);
+  const removable = candidates.filter((dir) => !dir.hasRunningSession && !dir.containsJsonl);
+  const result: ClosedIssueAgentCleanupResult = {
+    removed: [],
+    protected: protectedDirs.map((dir) => dir.name),
+    wouldRemove: [],
+    totalCandidates: candidates.length,
+  };
+
+  if (options.dryRun) {
+    result.wouldRemove = removable.map((dir) => dir.name);
+    return result;
+  }
+
+  if (!options.force) {
+    // Startup owns the non-interactive cleanup path; CLI callers should use dry-run.
+  }
+
+  for (const dir of removable) {
+    try {
+      await rm(dir.path, { recursive: true, force: true });
+      result.removed.push(dir.name);
+    } catch {
+      // Non-fatal — directory may have already been removed or permissions changed.
+    }
+  }
+
+  return result;
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
@@ -222,6 +454,40 @@ export const cleanupAgentDirectories = (options: {
       new FsError({
         path: options.agentsDir ?? AGENTS_DIR,
         operation: 'cleanupAgentDirectories',
+        cause,
+      }),
+  });
+
+export const findClosedIssueAgentDirs = (options: {
+  issues: unknown[];
+  agentsDir?: string;
+  nowMs?: number;
+  graceMs?: number;
+}): Effect.Effect<readonly ClosedIssueAgentDir[], FsError> =>
+  Effect.tryPromise({
+    try: () => findClosedIssueAgentDirsPromise(options),
+    catch: (cause) =>
+      new FsError({
+        path: options.agentsDir ?? AGENTS_DIR,
+        operation: 'findClosedIssueAgentDirs',
+        cause,
+      }),
+  });
+
+export const cleanupClosedIssueAgentDirectories = (options: {
+  issues: unknown[];
+  dryRun?: boolean;
+  force?: boolean;
+  agentsDir?: string;
+  nowMs?: number;
+  graceMs?: number;
+}): Effect.Effect<ClosedIssueAgentCleanupResult, FsError> =>
+  Effect.tryPromise({
+    try: () => cleanupClosedIssueAgentDirectoriesPromise(options),
+    catch: (cause) =>
+      new FsError({
+        path: options.agentsDir ?? AGENTS_DIR,
+        operation: 'cleanupClosedIssueAgentDirectories',
         cause,
       }),
   });

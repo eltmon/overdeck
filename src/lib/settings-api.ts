@@ -980,7 +980,12 @@ export function getAvailableModelsApi(): {
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
     // Skip deprecated models — they should not appear in user-facing pickers.
+    // MODEL_DEPRECATIONS is the single source of truth for "this model has
+    // been retired and remapped to a current one"; capability entries are kept
+    // for back-compat (cost/capability lookups for old configs and historical
+    // conversations), but they must not surface in dropdowns.
     if (capability.displayName.includes('(deprecated)')) continue;
+    if (modelId in MODEL_DEPRECATIONS) continue;
     const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
     switch (capability.provider) {
       case 'anthropic':

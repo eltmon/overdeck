@@ -390,7 +390,12 @@ def play_audio(audio: np.ndarray, volume: float = 1.0) -> None:
         # players already keep the sink warm, so the fast path can skip the
         # extra pactl subprocess overhead.
         sink_state = _get_default_sink_state() if created else "RUNNING"
-        prepend_secs = 0.60 if sink_state == "SUSPENDED" else 0.05
+        # PAN-1028 regression: 600ms is enough for typical PipeWire+USB DAC resume,
+        # but DisplayPort/HDMI audio sinks (e.g. GA102 HDMI 2) take 1.0-1.5s to wake
+        # from suspend. Bump to 1.5s for SUSPENDED to cover the slower hardware path
+        # with margin. Cost: 1.5s of leading silence on cold-start utterances only —
+        # warm pw-play stays at 0.05s.
+        prepend_secs = 1.50 if sink_state == "SUSPENDED" else 0.05
         silence = np.zeros(int(SAMPLE_RATE * prepend_secs), dtype=audio.dtype)
         audio_to_play = np.concatenate([silence, audio])
 

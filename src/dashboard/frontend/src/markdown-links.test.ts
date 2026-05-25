@@ -100,4 +100,29 @@ describe('resolveMarkdownFileLinkMeta', () => {
       { text: 'Open /home/eltmon/project/src/App.tsx:12' },
     ]);
   });
+
+  // PAN-1457: the regex heuristic now lets bare `word/word` refs through and
+  // defers to a server-side existence check (gated in ChatMarkdown via
+  // MaybeFileLinkChip). These cases used to be rejected by the regex tighten
+  // in 72a6bdd87; they now match here and are filtered downstream.
+  it.each([
+    'conv/2209',
+    'conv/2209:42',
+    'users/eltmon',
+    'cat/dog/bird',
+    'foo/bar:1:2',
+    'src/components/Foo', // bare directory ref
+  ])(
+    'matches bare relative word/word reference %s — existence check decides downstream',
+    (candidate) => {
+      expect(resolveMarkdownFileLinkMeta(candidate, cwd)).not.toBeNull();
+    },
+  );
+
+  it('resolves bare relative paths whose last segment has an extension', () => {
+    expect(resolveMarkdownFileLinkMeta('src/lib/foo.ts:42', cwd)).toMatchObject({
+      filePath: '/home/eltmon/project/src/lib/foo.ts',
+      line: 42,
+    });
+  });
 });

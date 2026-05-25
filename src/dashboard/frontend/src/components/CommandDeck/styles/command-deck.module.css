@@ -2689,6 +2689,34 @@
   cursor: not-allowed;
 }
 
+/* PAN-1458: "Conversation cleared — continued in conv/N" banner shown at the
+   bottom of a conversation panel when conversation.clearedToConvId is set. */
+.conversationClearedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  width: 100%;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border: none;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.conversationClearedBanner:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.conversationClearedBannerText strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
 /* View toggle: [Conversation] [Terminal] */
 .viewToggle {
   display: flex;
@@ -2960,6 +2988,14 @@
   max-height: 200px;
   overflow-y: auto;
   line-height: 1.4;
+}
+
+/* Tool-use header — e.g. Bash description above the command body (PAN-1459) */
+.workLogToolHeader {
+  margin: 4px 0 2px 18px;
+  font-size: 12px;
+  color: var(--foreground);
+  font-weight: 500;
 }
 
 .workLogThinkingResult {

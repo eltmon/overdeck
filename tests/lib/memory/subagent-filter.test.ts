@@ -174,6 +174,7 @@ describe('memory subagent filter', () => {
       statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
       resolveTranscriptPath: async () => '/tmp/session-1.jsonl',
       registerTranscript,
+      recordBriefingSessionStart: async () => {},
     });
 
     expect(result).toEqual({ status: 'accepted', sessionId: 'session-1' });
@@ -206,6 +207,7 @@ describe('memory subagent filter', () => {
       areObservationsEnabled: () => false,
       statTranscript,
       registerTranscript,
+      recordBriefingSessionStart: async () => {},
     });
 
     expect(result).toEqual({ status: 'disabled' });

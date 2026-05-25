@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Universal Context System — Panopticon PR-FAQ</title>
+<meta name="description" content="Panopticon launches the Universal Context System: live session briefings, docs RAG, layered config distribution, and shareable HTML artifacts for every AI coding agent." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #FAFAF6;
+  --bg-elev: #FFFFFF;
+  --bg-soft: #F1F0EA;
+  --ink: #14110F;
+  --ink-soft: #4A4540;
+  --ink-mute: #8C857E;
+  --rule: #E5E2DA;
+  --accent: #D4541B;
+  --accent-soft: #FBEEE3;
+  --accent-strong: #A03B0E;
+  --code-bg: #F1F0EA;
+  --code-ink: #14110F;
+  --shadow-sm: 0 1px 2px rgba(20, 17, 15, 0.04), 0 1px 3px rgba(20, 17, 15, 0.03);
+  --shadow-md: 0 4px 12px rgba(20, 17, 15, 0.05), 0 2px 4px rgba(20, 17, 15, 0.04);
+  --shadow-lg: 0 18px 50px rgba(20, 17, 15, 0.08), 0 6px 18px rgba(20, 17, 15, 0.04);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --grad-1: linear-gradient(135deg, #FFE8D3 0%, #FFD2A3 40%, #FBA968 100%);
+  --grad-2: radial-gradient(circle at 20% 0%, rgba(212,84,27,0.10), transparent 50%),
+            radial-gradient(circle at 80% 30%, rgba(212,84,27,0.06), transparent 55%);
+}
+:root[data-theme="dark"] {
+  --bg: #0E0D0C;
+  --bg-elev: #161513;
+  --bg-soft: #1C1B19;
+  --ink: #F6F2EC;
+  --ink-soft: #C8C2BA;
+  --ink-mute: #88827B;
+  --rule: #2A2724;
+  --accent: #FF8A3D;
+  --accent-soft: #2A1A0F;
+  --accent-strong: #FFB07A;
+  --code-bg: #1C1B19;
+  --code-ink: #F6F2EC;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+  --shadow-lg: 0 18px 60px rgba(0,0,0,0.55), 0 6px 18px rgba(0,0,0,0.35);
+  --grad-1: linear-gradient(135deg, #2A1606 0%, #441C04 40%, #8A3A0B 100%);
+  --grad-2: radial-gradient(circle at 20% 0%, rgba(255,138,61,0.14), transparent 55%),
+            radial-gradient(circle at 80% 30%, rgba(255,138,61,0.08), transparent 60%);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #0E0D0C; --bg-elev: #161513; --bg-soft: #1C1B19;
+    --ink: #F6F2EC; --ink-soft: #C8C2BA; --ink-mute: #88827B;
+    --rule: #2A2724; --accent: #FF8A3D; --accent-soft: #2A1A0F;
+    --accent-strong: #FFB07A;
+    --code-bg: #1C1B19; --code-ink: #F6F2EC;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+    --shadow-lg: 0 18px 60px rgba(0,0,0,0.55), 0 6px 18px rgba(0,0,0,0.35);
+    --grad-1: linear-gradient(135deg, #2A1606 0%, #441C04 40%, #8A3A0B 100%);
+    --grad-2: radial-gradient(circle at 20% 0%, rgba(255,138,61,0.14), transparent 55%),
+              radial-gradient(circle at 80% 30%, rgba(255,138,61,0.08), transparent 60%);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease, color 0.15s ease; }
+a:hover { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+code, kbd {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 0.875em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.15em 0.45em;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+}
+hr { border: none; border-top: 1px solid var(--rule); margin: 4rem 0; }
+
+/* Layout */
+.container { max-width: 760px; margin: 0 auto; padding: 0 1.5rem; }
+.container-wide { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Nav */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in oklab, var(--bg) 92%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border-bottom: 1px solid var(--rule);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+.nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.85rem 1.5rem;
+  display: flex; align-items: center; gap: 1.5rem;
+}
+.brand {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  border: none;
+}
+.nav-links { display: flex; gap: 1.25rem; margin-left: auto; font-size: 0.9rem; }
+.nav-links a {
+  color: var(--ink-soft);
+  border: none;
+  font-weight: 500;
+}
+.nav-links a:hover { color: var(--accent); }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--bg-elev);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.4s ease;
+}
+.theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.theme-toggle svg { width: 14px; height: 14px; }
+
+/* Hero */
+.hero {
+  position: relative;
+  padding: 6rem 1.5rem 5rem;
+  overflow: hidden;
+  background: var(--bg);
+}
+.hero::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--grad-2);
+  pointer-events: none;
+}
+.hero-inner { position: relative; max-width: 900px; margin: 0 auto; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.4rem 0.85rem;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 25%, transparent);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 25%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in oklab, var(--accent) 10%, transparent); }
+}
+.hero h1 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  margin: 1.5rem 0 1.25rem;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.hero h1 .accent { color: var(--accent); }
+.hero .lede {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  max-width: 680px;
+  font-style: italic;
+  margin: 0 0 2rem;
+}
+.meta-row {
+  display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem;
+  font-size: 0.88rem; color: var(--ink-mute);
+}
+.meta-row strong { color: var(--ink); font-weight: 600; }
+
+/* Section */
+section { padding: 4rem 1.5rem; }
+.section-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+section h2 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3.4vw, 2.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.5rem;
+  color: var(--ink);
+}
+section h3 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  margin: 2.5rem 0 0.75rem;
+  color: var(--ink);
+}
+section p { margin: 0 0 1.1rem; color: var(--ink); }
+section p strong { color: var(--ink); font-weight: 600; }
+section ul, section ol { padding-left: 1.4rem; margin: 0 0 1.25rem; }
+section li { margin-bottom: 0.5rem; }
+section li strong { color: var(--ink); }
+
+/* Press Release */
+.press {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  padding: 3rem clamp(1.5rem, 3vw, 3rem);
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+.press::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--grad-1);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.press .for-release {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 1rem;
+}
+.press h2 {
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  margin-bottom: 0.85rem;
+}
+.press .subhead {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--ink-soft);
+  margin-bottom: 2.5rem;
+  line-height: 1.4;
+}
+.press .dateline {
+  font-weight: 600;
+  color: var(--ink);
+}
+.quote {
+  border-left: 3px solid var(--accent);
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  margin: 1.75rem 0;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--ink);
+  font-style: italic;
+}
+.quote .attribution {
+  display: block;
+  margin-top: 0.85rem;
+  font-style: normal;
+  font-size: 0.9rem;
+  color: var(--ink-mute);
+}
+.feature-list { margin: 1.5rem 0; padding: 0; list-style: none; }
+.feature-list li {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.75rem;
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--rule);
+}
+.feature-list li:first-child { border-top: none; }
+.feature-list .num {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.feature-list strong { display: block; margin-bottom: 0.25rem; color: var(--ink); }
+.feature-list span { color: var(--ink-soft); font-size: 0.95rem; line-height: 1.5; }
+
+/* FAQ Cards */
+.faq-grid { display: grid; gap: 1rem; margin-top: 2rem; }
+details.faq {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 0;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+details.faq:hover { border-color: color-mix(in oklab, var(--accent) 40%, var(--rule)); }
+details.faq[open] {
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
+}
+details.faq summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+details.faq summary::-webkit-details-marker { display: none; }
+details.faq summary::after {
+  content: "+";
+  margin-left: auto;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+details.faq[open] summary::after { transform: rotate(45deg); }
+details.faq .answer {
+  padding: 0 1.4rem 1.25rem;
+  color: var(--ink-soft);
+  font-size: 0.97rem;
+  line-height: 1.65;
+}
+details.faq .answer p { margin: 0 0 0.85rem; color: var(--ink-soft); }
+details.faq .answer p:last-child { margin-bottom: 0; }
+details.faq .answer code { font-size: 0.85em; }
+details.faq .answer ul { padding-left: 1.2rem; margin: 0.5rem 0 1rem; }
+
+/* KPI cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 1rem;
+}
+.kpi {
+  background: var(--bg-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+.kpi .kpi-num {
+  font-family: 'Source Serif 4', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+.kpi .kpi-label { font-weight: 600; color: var(--ink); font-size: 0.95rem; margin-bottom: 0.25rem; }
+.kpi .kpi-desc { color: var(--ink-mute); font-size: 0.85rem; }
+
+/* Children list */
+.children {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+}
+.child {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.child:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--rule));
+}
+.child .child-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 0.6rem;
+}
+.child h4 {
+  margin: 0 0 0.4rem;
+  font-family: 'Source Serif 4', serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.child p { font-size: 0.88rem; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 3rem 1.5rem 4rem;
+  text-align: center;
+  color: var(--ink-mute);
+  font-size: 0.88rem;
+}
+footer p { margin: 0.4rem 0; }
+footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+
+/* Reveal on scroll */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .hero { padding: 4rem 1.5rem 3rem; }
+  section { padding: 3rem 1.5rem; }
+  .press { padding: 2rem 1.25rem; }
+}
+@media print {
+  .nav, .theme-toggle, footer { display: none; }
+  body { background: white; color: black; }
+  details.faq { break-inside: avoid; }
+  details.faq summary::after { display: none; }
+  details.faq:not([open]) .answer { display: block; padding: 0 1.4rem 1.25rem; }
+  details.faq:not([open]) { box-shadow: none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">Panopticon</a>
+    <div class="nav-links">
+      <a href="#release">Press Release</a>
+      <a href="#external-faq">External FAQ</a>
+      <a href="#internal-faq">Internal FAQ</a>
+      <a href="#acceptance">Acceptance</a>
+    </div>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <span id="themeLabel">Auto</span>
+    </button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-inner">
+    <span class="eyebrow"><span class="dot"></span>PR-FAQ · Epic PAN-1200 · In Flight</span>
+    <h1>Every agent, every harness, <span class="accent">always briefed.</span></h1>
+    <p class="lede">No more cold starts. Panopticon ships the Universal Context System — live session briefings, layered configuration, on-demand docs retrieval, and shareable HTML artifacts. Four capabilities, one coherent launch.</p>
+    <div class="meta-row">
+      <div><strong>Target launch</strong><br>June 21, 2026</div>
+      <div><strong>Drafted</strong><br>May 24, 2026</div>
+      <div><strong>Children</strong><br>#1201 · #1203 · #1204 · #1205</div>
+      <div><strong>Model</strong><br>gpt-5.5 throughout</div>
+    </div>
+  </div>
+</header>
+
+<section class="container reveal" id="release">
+  <div class="section-label">Working Backwards</div>
+  <h2>Press Release</h2>
+  <p>The press release is the artifact we'd ship if the feature launched today. It frames the customer benefit, the hero quote, and the four parts as a single coherent capability — not four loose features.</p>
+
+  <div class="press" style="margin-top: 2rem;">
+    <div class="for-release">For Immediate Release</div>
+    <h2>Panopticon Launches Universal Context System: Every Agent, Every Harness, Always Briefed</h2>
+    <p class="subhead">No more cold starts. Live session briefings, on-demand documentation retrieval, layered configuration distribution, and shareable HTML artifacts ship together in Panopticon 0.6.</p>
+
+    <p><span class="dateline">SEATTLE — June 21, 2026 —</span> Today Panopticon ships the <strong>Universal Context System</strong> — four connected capabilities that end the cold-start problem for AI coding agents. Whether a developer is using Claude Code, Pi, or any future harness, every agent now arrives briefed on what's happening across the system, with on-demand access to Panopticon's own documentation, and the ability to publish its work as inspectable HTML artifacts shareable with humans and other agents.</p>
+
+    <blockquote class="quote">
+      We were rewriting the same context briefing every session. Now the orchestrator owns the briefing. Every agent that lands in a workspace already knows what the last session did, what its siblings are doing, and how to use the project's own conventions. The Home tab is the dashboard's new front door — one glance and you see everything in motion.
+      <span class="attribution">— Edward Becker, creator of Panopticon</span>
+    </blockquote>
+
+    <p>The Universal Context System has four parts that ship together:</p>
+
+    <ul class="feature-list">
+      <li>
+        <span class="num">01</span>
+        <span>
+          <strong>Hybrid Context Distribution</strong>
+          A layered model (global / project / workspace) replaces the legacy <code>sync.devroot</code> convention. Single canonical markdown sources render to harness-specific files via <code>{{#harness:claude}}</code> / <code>{{#harness:pi}}</code> templating. Projects can live anywhere on disk — register them with <code>pan projects add &lt;path&gt;</code>.
+        </span>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <span>
+          <strong>Panopticon Documentation RAG</strong>
+          Every install ships a prebuilt FTS5 + embedding index of Panopticon's own docs. When an agent's prompt mentions concepts like <em>"pan sync"</em>, <em>"workspace"</em>, or <em>"cloister"</em>, a UserPromptSubmit hook injects the top-k most relevant snippets. No first-run indexing cost. No token blowout.
+        </span>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <span>
+          <strong>Home Tab + Live Session Briefing</strong>
+          The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. <code>~/.panopticon/session-context.md</code> updates on every state change and re-injects when newer than session start — so context stays live, not stale.
+        </span>
+      </li>
+      <li>
+        <span class="num">04</span>
+        <span>
+          <strong>HTML Artifacts</strong>
+          Agents can publish their output as inspectable HTML artifacts via <code>pan artifacts</code>. Real validation — secret scanning, size cap, asset path linting — gates publication. Isolated origins (<code>/s/&lt;slug&gt;</code>, <code>/a/&lt;slug&gt;</code>) and full provenance (<code>{issueId, agentRole, runId, harness, supersedes}</code>).
+        </span>
+      </li>
+    </ul>
+
+    <blockquote class="quote">
+      What competitors do as a briefing-once-at-startup snapshot, we do as a live system. The dashboard is the source of truth and every agent — Claude Code, Pi, the next thing — gets the live view, refreshed on every change, with the same memory and docs and registry behind it.
+      <span class="attribution">— Edward Becker</span>
+    </blockquote>
+
+    <p><strong>Available now.</strong> <code>pan install</code> upgrades existing installations in place. New installs get the system by default. Source: <a href="https://github.com/eltmon/panopticon-cli">github.com/eltmon/panopticon-cli</a></p>
+  </div>
+</section>
+
+<section class="container reveal" id="children">
+  <div class="section-label">Four Children, One Launch</div>
+  <h2>What ships in PAN-1200</h2>
+  <div class="children">
+    <div class="child">
+      <span class="child-tag">PAN-1201</span>
+      <h4>Hybrid Context Distribution</h4>
+      <p>Layered <code>global / project / workspace</code> directories. Deprecates <code>sync.devroot</code>. Per-harness templating. New <code>pan context</code> CLI + dashboard Context tab.</p>
+    </div>
+    <div class="child">
+      <span class="child-tag">PAN-1203</span>
+      <h4>Panopticon Docs RAG</h4>
+      <p>Prebuilt FTS5 + embedding index ships in npm package. UserPromptSubmit hook injects top-k snippets on concept-trigger. Budget caps + telemetry.</p>
+    </div>
+    <div class="child">
+      <span class="child-tag">PAN-1204</span>
+      <h4>Home Tab + Briefing</h4>
+      <p>Dashboard landing page, live <code>session-context.md</code>, knowledge registry, advisory compliance audit hook with three modes.</p>
+    </div>
+    <div class="child">
+      <span class="child-tag">PAN-1205</span>
+      <h4>HTML Artifacts</h4>
+      <p><code>pan artifacts</code> CLI. Secret scan + size cap + asset lint. Isolated origins, full provenance. One URL to share, any time to audit.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container reveal" id="external-faq">
+  <div class="section-label">For Customers</div>
+  <h2>External FAQ</h2>
+  <div class="faq-grid">
+    <details class="faq">
+      <summary>What changes for an existing Panopticon user?</summary>
+      <div class="answer">
+        <p><code>pan install</code> migrates <code>~/Projects/.claude/{skills,agents,CLAUDE.md}</code> to <code>~/.panopticon/context/global/</code>. Existing projects under <code>~/Projects/</code> are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Does this work with my non-Anthropic model?</summary>
+      <div class="answer">
+        <p>Yes. The briefing is plain markdown — Claude Code reads it via <code>--append-system-prompt-file</code>, Pi reads it at session start. Any harness that accepts a system-prompt append can use it. Codex, Cursor, and Gemini are on the v2 roadmap.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What's the cost?</summary>
+      <div class="answer">
+        <p>Free. The docs RAG ships pre-built — no per-install indexing cost. The compliance audit is text-only with no extra LLM calls. The knowledge registry uses about <strong>$0.001 per new issue</strong> for one Haiku classification call, capped per-day; disable it entirely with <code>registry.classification.enabled = false</code> if you prefer.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Will the briefing leak my project secrets?</summary>
+      <div class="answer">
+        <p>No. The briefing pulls from the memory store (PAN-1052), which already scrubs and ranks observation content. HTML artifacts gate on a secret scanner before publish. Both are auditable via <code>pan briefing</code> and <code>pan artifacts list</code>.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>How do I disable the compliance audit?</summary>
+      <div class="answer">
+        <p><code>pan compliance set-mode off</code>. The default is <code>advisory</code> — logs misses, nudges next prompt, never blocks. <code>enforcing</code> mode — which blocks <code>git log</code>, <code>grep</code>, and <code>Read</code> calls until a memory search runs — ships in Phase 2.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Can I customize the briefing?</summary>
+      <div class="answer">
+        <p>Yes. <code>pan briefing edit</code> opens the global header template in your <code>$EDITOR</code>. The dynamic sections (workspaces, registry, recent activity) re-render automatically. The trigger phrase list for the compliance audit is editable via <code>pan compliance triggers add "&lt;phrase&gt;"</code>.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What about projects with no internet access?</summary>
+      <div class="answer">
+        <p>The docs index ships inside the npm package. Memory and briefing are local SQLite + markdown. No network required for the core loop. The Haiku classifier for the knowledge registry needs network; turn it off with <code>registry.classification.enabled = false</code> for fully offline operation.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Where can I see what an agent will actually receive at spawn?</summary>
+      <div class="answer">
+        <p><code>pan context diff</code> shows the full assembled prompt for each registered harness — system prompt, append, memory injection, briefing, docs preload. The dashboard's new Context tab renders the same view live with side-by-side per-harness panes.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="container reveal" id="internal-faq">
+  <div class="section-label">For Stakeholders</div>
+  <h2>Internal FAQ</h2>
+  <div class="faq-grid">
+    <details class="faq">
+      <summary>Why ship all four together instead of incrementally?</summary>
+      <div class="answer">
+        <p>They're coupled at the user-experience level. Shipping context distribution without the briefing leaves users with a layered config they can't see. Shipping the briefing without docs RAG means agents still guess at how to use Panopticon. Shipping artifacts without the briefing means there's no entry point on the Home tab to discover them. The four go together; users get one coherent capability rather than four half-features.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What's the parallelization strategy?</summary>
+      <div class="answer">
+        <p>All four issues planned in parallel with <strong>GPT-5.5</strong> (<code>pan plan --auto --model gpt-5.5</code>), then swarmed in parallel with wave-scheduled work agents (<code>pan swarm --model gpt-5.5 --auto-advance --max-slots 4</code>). Cloister auto-spawns review → test → ship. Merge coordination handled by the orchestrating session — a deliberate override of the standing humans-only-merge rule for this epic specifically. Risk of merge collisions is handled at review time; the workspaces are isolated git worktrees, so there's no live conflict surface.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What happens if one of the four fails?</summary>
+      <div class="answer">
+        <p>The epic is failure-isolated:</p>
+        <ul>
+          <li><strong>PAN-1201</strong> (distribution) is the only one with a hard downstream dependency. PAN-1204 prefers to write <code>session-context.md</code> inside the new <code>~/.panopticon/context/global/</code> directory; if PAN-1201 fails, PAN-1204 falls back to <code>~/.panopticon/session-context.md</code> at the root and is migratable later.</li>
+          <li><strong>PAN-1203</strong> and <strong>PAN-1205</strong> are independent; either can ship without the others.</li>
+          <li><strong>PAN-1204</strong> depends on <strong>PAN-1052</strong> (memory store), which is already on main and verified.</li>
+        </ul>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Why GPT-5.5 across the board instead of Claude Opus?</summary>
+      <div class="answer">
+        <p>Cost. The four issues together are roughly 50–80 beads of work. Opus on that scope is multiple hundreds of dollars; GPT-5.5 is a fraction. We've shown comparable correctness on Panopticon work of similar shape via Cloister telemetry. Sub-roles that need precision (<code>work.sub.inspect</code> = haiku for tight loops; security-review sub-role = expensive) keep their configured assignments rather than being force-overridden.</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>How does this differ from Subspace?</summary>
+      <div class="answer">
+        <p>Five things:</p>
+        <ul>
+          <li><strong>Live briefing</strong>, not snapshot-at-startup. Theirs goes stale within hours; ours updates on state change and re-injects when newer than session start.</li>
+          <li><strong>Honest framing.</strong> Theirs claims cross-workspace inlining but only delivers RAG. Ours explicitly says <em>"sibling state is queryable via <code>pan memory search</code>"</em> — no false promise.</li>
+          <li><strong>Implemented knowledge registry.</strong> Theirs is a stub that's always empty in the shipped runtime. Ours actually LLM-classifies on issue creation.</li>
+          <li><strong>Real artifact validation.</strong> Theirs validates JSON metadata only. Ours scans secrets, enforces size, lints asset paths.</li>
+          <li><strong>Compliance audit.</strong> Theirs has memory-first triggers in the prompt but no enforcement. Ours has a Stop-hook that observes misses and a UserPromptSubmit nudge with mode controls (<code>off</code> / <code>advisory</code> / <code>enforcing</code>).</li>
+        </ul>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What's out of scope for v1?</summary>
+      <div class="answer">
+        <p>Cross-harness beyond Claude Code + Pi (Codex / Cursor / Gemini follow in v2). Enforcing-mode compliance audit. Cross-repo docs RAG. Embedding model swaps without index rebuild. Dashboard inline-editing of the briefing template (CLI editing only in v1). Per-user briefing personalization (v1 is per-machine).</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>How will we measure success?</summary>
+      <div class="answer">
+        <p>Three KPIs over the first 30 days post-launch:</p>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi-num">−50%</div>
+            <div class="kpi-label">Cold-start friction</div>
+            <div class="kpi-desc">Median time from agent spawn to first non-discovery tool call</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-num">≥ 70%</div>
+            <div class="kpi-label">Docs RAG relevance</div>
+            <div class="kpi-desc">"How do I X" prompts where retrieved docs were rated relevant</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-num">↓ MoM</div>
+            <div class="kpi-label">Compliance misses</div>
+            <div class="kpi-desc">Past-tense triggers where memory search was skipped</div>
+          </div>
+        </div>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>What's the rollback plan?</summary>
+      <div class="answer">
+        <p>Per-feature:</p>
+        <ul>
+          <li><strong>PAN-1201:</strong> <code>pan context migrate --rollback</code> restores <code>~/Projects/.claude/</code> from the backup taken on initial migration.</li>
+          <li><strong>PAN-1203:</strong> <code>pan docs disable</code> silences the hook globally; <code>npm run build:docs-index</code> regenerates if the shipped index goes bad.</li>
+          <li><strong>PAN-1204:</strong> the briefing file is just markdown; delete it and wrapper injection is a no-op. Compliance audit has an <code>off</code> mode.</li>
+          <li><strong>PAN-1205:</strong> artifact publication is opt-in per-call (<code>pan artifacts publish</code>); existing files are not touched.</li>
+        </ul>
+        <p>Epic-wide rollback: <code>pan release stable --version 0.5.X</code> reverts the npm package to the prior stable release. User-side state migrations are forward-compatible (additive only).</p>
+      </div>
+    </details>
+    <details class="faq">
+      <summary>Why is merge coordination automated for this epic specifically?</summary>
+      <div class="answer">
+        <p>User-explicit override of the standing humans-only-merge rule. The orchestration session is babysitting all four through plan → swarm → review → test → ship → merge as a single coordinated launch. Standard human-merge resumes after PAN-1200 closes.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="container reveal" id="acceptance">
+  <div class="section-label">Epic-Wide Acceptance Criteria</div>
+  <h2>When PAN-1200 is done</h2>
+  <ul>
+    <li>All four children merged to main (#1201, #1203, #1204, #1205)</li>
+    <li><code>pan sync</code> no longer references <code>sync.devroot</code></li>
+    <li><code>~/.panopticon/context/global.md</code> round-trips to <code>~/.claude/CLAUDE.md</code> and Pi's equivalent</li>
+    <li>A newly-spawned agent in any registered project receives the live session-context briefing</li>
+    <li>Asking an agent <em>"how do I X in Panopticon?"</em> triggers docs-RAG injection</li>
+    <li>An agent can produce an HTML artifact, validate it, publish it, and the dashboard renders the workspace-record card linking to it</li>
+    <li>Compliance audit hook fires when past-tense triggers match without a preceding <code>pan memory search</code>; observations logged</li>
+  </ul>
+</section>
+
+<footer>
+  <p><span class="gh">github.com/eltmon/panopticon-cli</span></p>
+  <p>Working-backwards artifact · written before the feature ships · finalized when PAN-1200 closes.</p>
+</footer>
+
+<script>
+(function () {
+  const btn = document.getElementById('themeBtn');
+  const label = document.getElementById('themeLabel');
+  const icon = document.getElementById('themeIcon');
+  const root = document.documentElement;
+  const ICONS = {
+    auto: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    light: '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>',
+    dark: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
+  };
+  const ORDER = ['auto', 'light', 'dark'];
+  const LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+
+  function apply(mode) {
+    if (mode === 'auto') {
+      root.setAttribute('data-theme', 'auto');
+    } else {
+      root.setAttribute('data-theme', mode);
+    }
+    label.textContent = LABELS[mode];
+    icon.innerHTML = ICONS[mode];
+    try { localStorage.setItem('panopticon-prfaq-theme', mode); } catch (e) {}
+  }
+
+  let current = 'auto';
+  try {
+    const saved = localStorage.getItem('panopticon-prfaq-theme');
+    if (saved && ORDER.includes(saved)) current = saved;
+  } catch (e) {}
+  apply(current);
+
+  btn.addEventListener('click', function () {
+    const idx = ORDER.indexOf(current);
+    current = ORDER[(idx + 1) % ORDER.length];
+    apply(current);
+  });
+
+  // Reveal-on-scroll
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+  }
+})();
+</script>
+
+</body>
+</html>

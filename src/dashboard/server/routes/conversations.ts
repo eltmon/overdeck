@@ -67,6 +67,7 @@ import {
   removeFavorite,
   updateForkStatus,
   updateSpawnError,
+  hasOtherActiveConversationOnTmuxSession,
   type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
   type Conversation,
@@ -99,6 +100,8 @@ import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -894,6 +897,23 @@ void backfillConversationModels().catch((err: unknown) => {
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
 
+async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(cwd);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 export async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
@@ -1065,6 +1085,7 @@ export async function spawnConversationSession(
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
+      appendSystemPromptFiles: piFields ? [] : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
       ...(piFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
@@ -1340,28 +1361,26 @@ const getConversationsRoute = HttpRouter.add(
             const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
             let isWorking = false;
             let currentTool: string | null = null;
-            let contextUsage = null;
             const convSf = await resolveSessionFile(conv);
 
-            if (convSf && existsSync(convSf)) {
-              if (sessionAlive) {
-                try {
-                  const summary = await summarizeConversationActivity(convSf);
-                  isWorking = summary.isWorking;
-                  currentTool = summary.currentTool;
-                } catch {
-                  // JSONL parse failure — fall back to defaults
-                }
-              }
+            // Context usage is intentionally NOT computed here — it requires a
+            // full JSONL scan per row (cold cache) and made the list endpoint
+            // O(seconds) on dashboards with hundreds of conversations. The
+            // single-conversation GET /:id and the /:name/messages stream both
+            // compute usage on-demand for the currently-open panel, which is
+            // the only place the indicator is actually shown.
+            if (sessionAlive && convSf && existsSync(convSf)) {
               try {
-                contextUsage = await computeContextUsage(convSf, conv.model);
+                const summary = await summarizeConversationActivity(convSf);
+                isWorking = summary.isWorking;
+                currentTool = summary.currentTool;
               } catch {
-                contextUsage = null;
+                // JSONL parse failure — fall back to defaults
               }
             }
 
             const compacting = convSf ? isCompacting(convSf) : false;
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage };
+            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage: null };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
         ));
@@ -1635,7 +1654,12 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        // Post-/clear sibling rows share the tmux pane with their parent — killing
+        // from one would tear down the live thread.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -1746,7 +1770,7 @@ const postConversationResumeRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else {
-            await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000))).catch(() => false);
+            await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000)).catch(() => false);
           }
 
           markConversationActive(name);
@@ -1902,7 +1926,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(tmuxSession);
           } else {
-            await (await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000))).catch(() => false);
+            await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000)).catch(() => false);
           }
 
           markConversationActive(name);
@@ -2306,7 +2330,10 @@ const deleteConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
@@ -2346,8 +2373,10 @@ const postConversationArchiveRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
         }
 
-        // Kill tmux session if still alive
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        // PAN-1458: only kill the tmux if no other active conversation shares it.
+        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        }
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
@@ -2537,7 +2566,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
   } else {
-    const ready = await (await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000))).catch(() => false);
+    const ready = await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000)).catch(() => false);
     if (!ready) {
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }

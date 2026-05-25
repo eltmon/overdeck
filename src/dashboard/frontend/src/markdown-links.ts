@@ -116,6 +116,11 @@ function isLikelyPathCandidate(path: string): boolean {
   if (WINDOWS_DRIVE_PATH_PATTERN.test(path) || WINDOWS_UNC_PATH_PATTERN.test(path)) return true;
   if (RELATIVE_PATH_PREFIX_PATTERN.test(path)) return true;
   if (path.startsWith('/')) return looksLikePosixFilesystemPath(path);
+  // Bare relative `word/word` and bare `word.ext` are both let through here.
+  // PAN-1457 made the server-side existence check the authoritative gate, so
+  // this regex only needs to discard obviously non-path text. Phantom paths
+  // (`conv/2209`, `users/foo`) and bare directory references that don't exist
+  // are filtered downstream in ChatMarkdown's MaybeFileLinkChip.
   return RELATIVE_FILE_PATH_PATTERN.test(path) || RELATIVE_FILE_NAME_PATTERN.test(path);
 }
 

@@ -93,6 +93,10 @@ import { reloadCommand } from './commands/reload.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
+import { createBriefingCommand } from './commands/briefing.js';
+import { createComplianceCommand } from './commands/compliance.js';
+import { createRegistryCommand } from './commands/registry.js';
+import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
@@ -105,6 +109,7 @@ import { openCommand } from './commands/open.js';
 import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
+import { registerArtifactCommands } from './commands/artifacts.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -519,6 +524,10 @@ registerTtsCommands(program);
 registerReleaseCommands(program);
 
 program.addCommand(createMemoryCommand());
+program.addCommand(createBriefingCommand());
+program.addCommand(createComplianceCommand());
+program.addCommand(createRegistryCommand());
+program.addCommand(createDocsCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
@@ -537,6 +546,7 @@ registerCavemanCommands(program);
 registerScopeCommands(program);
 registerFlywheelCommands(program);
 registerMergeCommands(program);
+registerArtifactCommands(program);
 
 // Shorthand: pan status = pan status
 program
@@ -1207,38 +1217,44 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(restartCommand);
 
+function registerProjectCommands(command: Command): void {
+  command
+    .command('add <path>')
+    .description('Register a project with Panopticon')
+    .option('--name <name>', 'Project name')
+    .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
+    .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
+    .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
+    .action(projectAddCommand);
+
+  command
+    .command('list')
+    .description('List all registered projects')
+    .option('--json', 'Output as JSON')
+    .action(projectListCommand);
+
+  command
+    .command('show <key>')
+    .description('Show details for a specific project')
+    .action(projectShowCommand);
+
+  command
+    .command('remove <nameOrPath>')
+    .description('Remove a project from the registry')
+    .action(projectRemoveCommand);
+
+  command
+    .command('init')
+    .description('Initialize projects.yaml with example configuration')
+    .action(projectInitCommand);
+}
+
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');
+registerProjectCommands(project);
 
-project
-  .command('add <path>')
-  .description('Register a project with Panopticon')
-  .option('--name <name>', 'Project name')
-  .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
-  .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
-  .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
-  .action(projectAddCommand);
-
-project
-  .command('list')
-  .description('List all registered projects')
-  .option('--json', 'Output as JSON')
-  .action(projectListCommand);
-
-project
-  .command('show <key>')
-  .description('Show details for a specific project')
-  .action(projectShowCommand);
-
-project
-  .command('remove <nameOrPath>')
-  .description('Remove a project from the registry')
-  .action(projectRemoveCommand);
-
-project
-  .command('init')
-  .description('Initialize projects.yaml with example configuration')
-  .action(projectInitCommand);
+const projects = program.command('projects').description('Project registry for multi-project workspace support');
+registerProjectCommands(projects);
 
 // Health command
 program

@@ -152,10 +152,19 @@ export async function injectPtyMessage(
   agentId: string,
   payload: PtySupervisorPayload,
 ): Promise<void> {
-  const content = payload.content.endsWith('\n') ? payload.content : `${payload.content}\n`;
-  child.write(content);
+  // Claude Code's TUI distinguishes "pasted text" from "Submit keystroke" by
+  // whether bytes arrive in the same PTY read. Writing content + `\r`
+  // back-to-back means the kernel batches them into one read and the `\r`
+  // is treated as part of the pasted text — the message lands in the input
+  // box but is never submitted. Mirror the tmux fallback's proven pattern:
+  // paste content, wait ~300ms for Claude to fully process the paste, then
+  // send `\r` as a standalone Enter keystroke arriving in its own read.
+  const trimmed = payload.content.replace(/\n+$/, '');
+  child.write(trimmed);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  child.write('\r');
   if (payload.echo !== false) {
-    process.stdout.write(content);
+    process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
   }
   await appendSocketWriteLog(agentId, payload);
 }

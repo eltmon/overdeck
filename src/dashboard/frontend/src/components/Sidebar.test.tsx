@@ -74,14 +74,15 @@ describe('Sidebar navigation', () => {
     }));
   });
 
-  it('orders Operations as Command Deck, Board, Pipeline, Awaiting Merge, Agents, AutoPreso, Flywheel', () => {
+  it('orders Operations as Home, Command Deck, Board, Pipeline, Awaiting Merge, Agents, AutoPreso, Flywheel', () => {
     const { container, onTabChange } = renderSidebar({ activeTab: 'command-deck' });
 
     const operationLabels = Array.from(container.querySelectorAll('nav [data-testid^="sidebar-"]'))
-      .slice(0, 7)
+      .slice(0, 8)
       .map((button) => button.textContent?.trim());
 
     expect(operationLabels).toEqual([
+      'Home',
       'Command Deck',
       'Board',
       'Pipeline',
@@ -96,21 +97,21 @@ describe('Sidebar navigation', () => {
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
 
-  it('routes the expanded logo to Pipeline', () => {
+  it('routes the expanded logo to Home', () => {
     const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 
-    const logo = screen.getByTitle('Go to Pipeline');
+    const logo = screen.getByTitle('Go to Home');
     fireEvent.click(logo);
-    expect(onTabChange).toHaveBeenCalledWith('pipeline');
+    expect(onTabChange).toHaveBeenCalledWith('home');
   });
 
   it('keeps collapsed-mode icons clickable', () => {
     localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true');
     const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 
-    const logo = screen.getByTitle('Go to Pipeline');
+    const logo = screen.getByTitle('Go to Home');
     fireEvent.click(logo);
-    expect(onTabChange).toHaveBeenCalledWith('pipeline');
+    expect(onTabChange).toHaveBeenCalledWith('home');
 
     const commandDeckButton = screen.getByTestId('sidebar-command-deck');
     expect(commandDeckButton).toHaveAttribute('title', 'Command Deck');
@@ -118,6 +119,18 @@ describe('Sidebar navigation', () => {
 
     fireEvent.click(commandDeckButton);
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
+  });
+
+  it('includes Context in System navigation without removing sibling pages', () => {
+    const { onTabChange } = renderSidebar({ activeTab: 'context' });
+
+    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-god-view')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sidebar-context'));
+    expect(onTabChange).toHaveBeenCalledWith('context');
   });
 });
 

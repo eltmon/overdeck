@@ -206,11 +206,12 @@ describe('applyEventReducer — agent events', () => {
     expect(Object.keys(next.agentsById)).toHaveLength(0)
   })
 
-  it('agent.status_changed updates agent status', () => {
+  it('agent.status_changed updates agent status and tmux liveness', () => {
     const state: DashboardState = { ...emptyState, agentsById: { 'agent-1': baseAgent } }
-    const event = makeEvent('agent.status_changed', 4, { agentId: 'agent-1', status: 'stopped' })
+    const event = makeEvent('agent.status_changed', 4, { agentId: 'agent-1', status: 'stopped', hasLiveTmuxSession: false })
     const next = applyEventReducer(state, event)
     expect(next.agentsById['agent-1']!.status).toBe('stopped')
+    expect(next.agentsById['agent-1']!.hasLiveTmuxSession).toBe(false)
   })
 
   it('agent.status_changed leaves agentsById unchanged if agent not found', () => {

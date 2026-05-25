@@ -54,6 +54,8 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
 import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
 import { listProjectsSync, resolveProjectFromIssueSync, findProjectByTeamSync, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -997,10 +999,10 @@ const getPlanningStatusRoute = HttpRouter.add(
           }
         } catch {}
 
-        let sessionExists = false;
+        let tmuxSessionAlive = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExists(sessionName));
+            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
@@ -1021,7 +1023,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           : false;
 
         return jsonResponse({
-          active: sessionExists || agentStarting,
+          active: tmuxSessionAlive || agentStarting,
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
@@ -1043,6 +1045,23 @@ const getPlanningStatusRoute = HttpRouter.add(
     })
   }),
 );
+
+async function claudePlanningSystemPromptFiles(workspacePath: string): Promise<string[]> {
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(workspacePath);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
 
 // ─── Route: POST /api/planning/:issueId/message ──────────────────────────────
 
@@ -1113,14 +1132,14 @@ const postPlanningMessageRoute = HttpRouter.add(
         } catch {}
 
         // Check if local session exists (skip remote for now)
-        let sessionExists = false;
+        let tmuxSessionAlive = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExists(sessionName));
+            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
-        if (sessionExists) {
+        if (tmuxSessionAlive) {
           await Effect.runPromise(sendKeys(sessionName, message, 'planning user message'));
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
@@ -1223,6 +1242,7 @@ Continue the PLANNING session. Do NOT implement anything.
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
+            appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
           }),
           { mode: 0o755 },

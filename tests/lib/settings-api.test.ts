@@ -273,8 +273,8 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const anthropicIds = models.anthropic.map(m => m.id);
-      expect(anthropicIds).toContain('claude-opus-4-6');
-      expect(anthropicIds).toContain('claude-sonnet-4-5');
+      expect(anthropicIds).toContain('claude-opus-4-7');
+      expect(anthropicIds).toContain('claude-sonnet-4-6');
       expect(anthropicIds).toContain('claude-haiku-4-5');
     });
 
@@ -291,8 +291,9 @@ describe('settings-api', () => {
       const openaiIds = models.openai.map(m => m.id);
       expect(openaiIds).toContain('gpt-5.5');
       expect(openaiIds).toContain('gpt-5.4');
-      expect(openaiIds).toContain('o3');
-      expect(openaiIds).toContain('o4-mini');
+      expect(openaiIds).toContain('gpt-5.4-mini');
+      expect(openaiIds).toContain('gpt-5.3-codex');
+      expect(openaiIds).toContain('gpt-5.2');
     });
   });
 

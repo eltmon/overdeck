@@ -10,7 +10,7 @@ import {
   schedulePendingAutoMerge,
   type AutoMergeRow,
 } from '../../../lib/database/auto-merge-db.js';
-import { getCombinedCommitStatus, getPrLabels } from '../../../lib/forge.js';
+import { getCommitStatusChecks, getGitHubCiStatus, getPrLabels } from '../../../lib/forge.js';
 import { listProjects, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { getReviewStatus, type ReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
@@ -44,7 +44,8 @@ export interface AutoMergeSchedulerDeps {
   markAborted: (issueId: string, reason: string) => void;
   markFailed: (issueId: string, reason: string) => void;
   getLabels: (prUrl: string) => Promise<string[]>;
-  getCombinedStatus: (prUrl: string) => Promise<{ passing: boolean }>;
+  getGitHubCiStatus: (prUrl: string) => Promise<{ passing: boolean }>;
+  getCommitStatusChecks: (prUrl: string) => Promise<{ passing: boolean }>;
   triggerMerge: (issueId: string) => Promise<unknown>;
 }
 
@@ -63,7 +64,8 @@ const DEFAULT_DEPS: AutoMergeSchedulerDeps = {
   markAborted: markAutoMergeAborted,
   markFailed: markAutoMergeFailed,
   getLabels: getPrLabels,
-  getCombinedStatus: getCombinedCommitStatus,
+  getGitHubCiStatus,
+  getCommitStatusChecks,
   triggerMerge: triggerRegisteredMerge,
 };
 
@@ -350,12 +352,21 @@ export class AutoMergeScheduler {
       }
     }
 
-    if (status.prUrl && (config.requireGitHubCiPassing || config.requireAllCommitStatusChecks)) {
+    if (status.prUrl && config.requireGitHubCiPassing) {
       try {
-        const combinedStatus = await this.deps.getCombinedStatus(status.prUrl);
-        if (!combinedStatus.passing) return 'ci-failing';
+        const ciStatus = await this.deps.getGitHubCiStatus(status.prUrl);
+        if (!ciStatus.passing) return 'ci-failing';
       } catch (error) {
         return isTimeoutError(error) ? 'ci-check-timeout' : `ci-check-failed:${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+
+    if (status.prUrl && config.requireAllCommitStatusChecks) {
+      try {
+        const statusChecks = await this.deps.getCommitStatusChecks(status.prUrl);
+        if (!statusChecks.passing) return 'status-check-failing';
+      } catch (error) {
+        return isTimeoutError(error) ? 'status-check-timeout' : `status-check-failed:${error instanceof Error ? error.message : String(error)}`;
       }
     }
 

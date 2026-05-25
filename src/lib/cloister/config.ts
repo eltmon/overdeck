@@ -35,6 +35,13 @@ export interface AutoActions {
   poke_cooldown_ms: number;
 }
 
+export interface StuckRemediationConfig {
+  enabled: boolean;
+  stage1_minutes: number;
+  stage2_minutes: number;
+  stage3_minutes: number;
+}
+
 /**
  * Monitoring configuration
  */
@@ -224,6 +231,7 @@ export interface CloisterConfig {
   startup: StartupConfig;
   thresholds: HealthThresholds;
   auto_actions: AutoActions;
+  stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
@@ -254,6 +262,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     kill_on_stuck: false,  // Manual by default for safety
     restart_on_kill: false,
     poke_cooldown_ms: 30 * 60 * 1000, // 30 min between pokes for the same agent
+  },
+  stuck_remediation: {
+    enabled: true,
+    stage1_minutes: 20,
+    stage2_minutes: 45,
+    stage3_minutes: 90,
   },
   monitoring: {
     check_interval: 60, // 1 minute

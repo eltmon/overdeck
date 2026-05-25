@@ -171,6 +171,44 @@ api_keys:
         ).enabled,
       ).toBe(false);
     });
+
+    it('normalizes compliance mode with advisory as the default', () => {
+      expect(mergeConfigs().config.compliance.mode).toBe('advisory');
+      expect(mergeConfigs({ compliance: { mode: 'off' } }).config.compliance.mode).toBe('off');
+      expect(mergeConfigs({ compliance: { mode: 'advisory' } }).config.compliance.mode).toBe('advisory');
+      expect(mergeConfigs({ compliance: { mode: 'enforcing' } }).config.compliance.mode).toBe('enforcing');
+    });
+
+    it('rejects unknown compliance modes', () => {
+      expect(() => mergeConfigs({ compliance: { mode: 'strict' } } as never)).toThrow(
+        'config.yaml: compliance.mode must be off, advisory, enforcing',
+      );
+    });
+
+    it('normalizes low-cost registry classification config', () => {
+      expect(mergeConfigs().config.registry.classification).toEqual({
+        enabled: true,
+        provider: 'cliproxy',
+        model: 'gpt-4.1-nano',
+        perDayCostCapUsd: 1,
+      });
+
+      expect(mergeConfigs({
+        registry: {
+          classification: {
+            enabled: false,
+            provider: 'anthropic',
+            model: 'claude-haiku-4-5',
+            per_day_cost_cap_usd: 0.25,
+          },
+        },
+      }).config.registry.classification).toEqual({
+        enabled: false,
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5',
+        perDayCostCapUsd: 0.25,
+      });
+    });
   });
 
   describe('hasGlobalConfig', () => {

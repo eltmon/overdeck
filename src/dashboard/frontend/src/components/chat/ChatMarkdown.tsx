@@ -27,8 +27,9 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { DiffsThemeNames } from '@pierre/diffs';
-import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks } from '../../markdown-links';
+import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
 import { MarkdownFileLink } from './MarkdownFileLink';
+import { useFilePathExists } from '../../hooks/useFilePathExists';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
@@ -267,6 +268,32 @@ interface MarkdownNode {
 
 const TEXT_LINK_SKIP_NODE_TYPES = new Set(['code', 'inlineCode', 'link', 'linkReference', 'definition']);
 
+/**
+ * Gates MarkdownFileLink chip rendering on a server-side existence check
+ * (PAN-1457). The regex heuristic in markdown-links.ts decides whether a
+ * token looks path-shaped; this component asks the server whether the
+ * candidate actually resolves to a file or directory under cwd. Phantom
+ * paths like `conv/2209` render as plain text via the fallback prop;
+ * confirmed files and directories render as the full chip.
+ */
+function MaybeFileLinkChip({
+  meta,
+  cwd,
+  issueId,
+  fallback,
+}: {
+  meta: MarkdownFileLinkMeta;
+  cwd?: string;
+  issueId?: string | null;
+  fallback: ReactNode;
+}) {
+  const { state } = useFilePathExists(cwd, meta.filePath) as { state: string };
+  if (state === 'exists') {
+    return <MarkdownFileLink {...meta} issueId={issueId} />;
+  }
+  return <>{fallback}</>;
+}
+
 function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   return (tree: MarkdownNode) => {
     const visit = (node: MarkdownNode) => {
@@ -328,7 +355,14 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
     a({ href, children }) {
       const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
       if (fileLinkMeta) {
-        return <MarkdownFileLink {...fileLinkMeta} issueId={issueId} />;
+        return (
+          <MaybeFileLinkChip
+            meta={fileLinkMeta}
+            cwd={cwd}
+            issueId={issueId}
+            fallback={children}
+          />
+        );
       }
 
       // Block javascript: and data: URIs to prevent XSS from assistant markdown

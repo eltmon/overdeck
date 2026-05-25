@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, readdirSync, unlinkSync, rmdirSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { randomUUID } from 'crypto';
 
 // Import the functions we're testing
 import {
@@ -49,15 +50,13 @@ function cleanupTestFiles() {
 }
 
 // Unique ID generator for test isolation
-let testIdCounter = 0;
 function getUniqueId(base: string): string {
-  return `${TEST_PREFIX}-${base}-${Date.now()}-${++testIdCounter}`;
+  return `${TEST_PREFIX}-${base}-${process.pid}-${randomUUID()}`;
 }
 
 describe('shadow-state', () => {
   beforeEach(() => {
     cleanupTestFiles();
-    testIdCounter = 0;
   });
 
   afterEach(() => {

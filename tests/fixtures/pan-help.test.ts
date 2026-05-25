@@ -33,7 +33,11 @@ const FIXTURE_PATH = join(__dirname, 'pan-help.txt');
 const CLI_PATH = join(__dirname, '../../dist/cli/index.js');
 
 function captureHelp(): string {
-  return execSync(`node ${CLI_PATH} --help`, {
+  return captureCommandHelp('--help');
+}
+
+function captureCommandHelp(args: string): string {
+  return execSync(`node ${CLI_PATH} ${args}`, {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -51,5 +55,20 @@ describe('pan --help fixture', () => {
 
     const expected = readFileSync(FIXTURE_PATH, 'utf-8');
     expect(actual).toBe(expected);
+  });
+
+  it('exposes the plural projects command in root help', () => {
+    expect(captureHelp()).toContain('projects                        Project registry for multi-project workspace');
+  });
+
+  it('keeps singular and plural project add options in sync', () => {
+    const singular = captureCommandHelp('project add --help').replaceAll('pan project add', 'pan projects add');
+    const plural = captureCommandHelp('projects add --help');
+
+    expect(plural).toBe(singular);
+    expect(plural).toContain('--name <name>');
+    expect(plural).toContain('--type <type>');
+    expect(plural).toContain('--linear-team <team>');
+    expect(plural).toContain('--rally-project <oid>');
   });
 });

@@ -1,11 +1,12 @@
-import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { mkdtemp, readFile, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
-import { handleMemoryInjectBody } from '../../../src/dashboard/server/routes/hooks.js';
+import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../src/dashboard/server/routes/hooks.js';
+import { COMPLIANCE_ADVISORY_WARNING } from '../../../src/lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
 
 let tempDir: string | null = null;
@@ -117,9 +118,10 @@ async function readRagEntries() {
 }
 
 describe('prompt-time memory injection', () => {
-  it('accepts hook receiver input and returns promptly without blocking the agent', async () => {
+  it('accepts hook receiver input and returns prompt-time context', async () => {
     const started = performance.now();
     const calls: Array<{ prompt: string; identity: MemoryIdentity }> = [];
+    const briefingCalls: Array<{ sessionId: string; context: string }> = [];
     const result = await handleMemoryInjectBody({
       prompt: 'Need memory context for receiver test',
       sessionId: 'session-1',
@@ -129,13 +131,116 @@ describe('prompt-time memory injection', () => {
         calls.push(input);
         return { status: 'injected', reason: null, context: '<panopticon-memory-context>ok</panopticon-memory-context>', decision: {} as never };
       },
+      injectBriefing: async (input) => {
+        briefingCalls.push({ sessionId: input.sessionId, context: input.context });
+        return { context: `${input.context}\n<panopticon-briefing-update>briefing</panopticon-briefing-update>`, injected: true, briefingMtimeMs: 1 };
+      },
+      resolveComplianceWarning: async () => null,
     });
     const elapsed = performance.now() - started;
 
     expect('error' in result).toBe(false);
     expect(elapsed).toBeLessThan(1000);
     expect(result.context).toContain('<panopticon-memory-context>');
+    expect(result.context).toContain('<panopticon-briefing-update>briefing</panopticon-briefing-update>');
     expect(calls).toEqual([{ prompt: 'Need memory context for receiver test', identity }]);
+    expect(briefingCalls).toEqual([{ sessionId: 'session-1', context: '<panopticon-memory-context>ok</panopticon-memory-context>' }]);
+  });
+
+  it('records briefing freshness on SessionStart even when memory observations are disabled', async () => {
+    const recordBriefingSessionStart = vi.fn(async () => {});
+
+    const result = await handleMemorySessionStartBody({
+      session_id: 'session-1',
+      transcript_path: '/tmp/session-1.jsonl',
+    }, {
+      areObservationsEnabled: async () => false,
+      recordBriefingSessionStart,
+    });
+
+    expect(result).toEqual({ status: 'disabled' });
+    expect(recordBriefingSessionStart).toHaveBeenCalledWith({ sessionId: 'session-1' });
+  });
+
+  it('prepends a compliance warning before memory context when a current-session miss is pending', async () => {
+    const result = await handleMemoryInjectBody({
+      prompt: 'Continue from last session',
+      sessionId: 'session-1',
+      identity,
+    }, {
+      injectMemory: async () => ({
+        status: 'injected',
+        reason: null,
+        context: '<panopticon-memory-context>ok</panopticon-memory-context>',
+        decision: {} as never,
+      }),
+      resolveComplianceWarning: async () => COMPLIANCE_ADVISORY_WARNING,
+      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
+    });
+
+    expect('error' in result).toBe(false);
+    expect(result.context).toBe(`${COMPLIANCE_ADVISORY_WARNING}\n\n<panopticon-memory-context>ok</panopticon-memory-context>`);
+  });
+
+  it('appends one fresh briefing update after session start and waits for the briefing mtime to advance again', async () => {
+    const sessionId = 'session-briefing';
+    const transcriptPath = join(tempDir!, 'session.jsonl');
+    const briefingPath = join(tempDir!, 'session-context.md');
+    const start = new Date('2026-05-25T10:00:00.000Z');
+    const beforeStart = new Date('2026-05-25T09:59:00.000Z');
+    const firstUpdate = new Date('2026-05-25T10:01:00.000Z');
+    const secondUpdate = new Date('2026-05-25T10:02:00.000Z');
+
+    await writeFile(transcriptPath, '', 'utf8');
+    await writeFile(briefingPath, 'Initial briefing', 'utf8');
+    await utimes(briefingPath, beforeStart, beforeStart);
+
+    await expect(handleMemorySessionStartBody({
+      session_id: sessionId,
+      transcript_path: transcriptPath,
+      identity,
+    }, {
+      areObservationsEnabled: async () => true,
+      resolveTranscriptPath: async () => transcriptPath,
+      statTranscript: async () => ({ size: 0, mtimeMs: start.getTime() }),
+      registerTranscript: vi.fn(),
+      now: start,
+    })).resolves.toMatchObject({ status: 'accepted', sessionId });
+
+    await writeFile(briefingPath, 'Fresh briefing\n</panopticon-briefing-update>', 'utf8');
+    await utimes(briefingPath, firstUpdate, firstUpdate);
+
+    const injectMemory = vi.fn(async () => ({
+      status: 'injected' as const,
+      reason: null,
+      context: '<panopticon-memory-context>memory</panopticon-memory-context>',
+      decision: {} as never,
+    }));
+    const first = await handleMemoryInjectBody({
+      prompt: 'user prompt stays intact',
+      sessionId,
+      identity,
+    }, { injectMemory, now: firstUpdate });
+
+    expect('error' in first).toBe(false);
+    expect(first.context.indexOf('<panopticon-memory-context>')).toBeLessThan(first.context.indexOf('<panopticon-briefing-update'));
+    expect(first.context.match(/<panopticon-briefing-update\b/g)).toHaveLength(1);
+    expect(first.context.match(/<\/panopticon-briefing-update>/g)).toHaveLength(1);
+    expect(first.context).toContain('Fresh briefing');
+    expect(first.context).toContain('\\u003c/panopticon-briefing-update\\u003e');
+    expect(injectMemory).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'user prompt stays intact' }));
+
+    const repeated = await handleMemoryInjectBody({ prompt: 'repeat prompt', sessionId, identity }, { injectMemory, now: firstUpdate });
+    expect('error' in repeated).toBe(false);
+    expect(repeated.context.match(/<panopticon-briefing-update\b/g)).toBeNull();
+
+    await writeFile(briefingPath, 'Second briefing update', 'utf8');
+    await utimes(briefingPath, secondUpdate, secondUpdate);
+    const afterChange = await handleMemoryInjectBody({ prompt: 'after change', sessionId, identity }, { injectMemory, now: secondUpdate });
+
+    expect('error' in afterChange).toBe(false);
+    expect(afterChange.context.match(/<panopticon-briefing-update\b/g)).toHaveLength(1);
+    expect(afterChange.context).toContain('Second briefing update');
   });
 
   it('returns injectable context within budgets and logs the RAG decision', async () => {

@@ -97,6 +97,16 @@ export interface CombinedCommitStatusCheck {
   conclusion: string;
 }
 
+type StatusCheckRollupEntry = {
+  __typename?: unknown;
+  name?: unknown;
+  context?: unknown;
+  conclusion?: unknown;
+  state?: unknown;
+  status?: unknown;
+  bucket?: unknown;
+};
+
 export interface CombinedCommitStatus {
   passing: boolean;
   checks: CombinedCommitStatusCheck[];
@@ -385,6 +395,53 @@ const githubForgeAdapter: ForgeAdapter = {
   },
 };
 
+function normalizeStatusCheck(entry: StatusCheckRollupEntry): CombinedCommitStatusCheck {
+  return {
+    name: typeof entry.name === 'string'
+      ? entry.name
+      : typeof entry.context === 'string'
+        ? entry.context
+        : 'unknown',
+    conclusion: String(entry.conclusion ?? entry.state ?? entry.status ?? entry.bucket ?? '').toLowerCase(),
+  };
+}
+
+function statusFromRollup(entries: StatusCheckRollupEntry[]): CombinedCommitStatus {
+  const checks = entries.map(normalizeStatusCheck);
+  return {
+    passing: checks.every((check) => PASSING_CHECK_CONCLUSIONS.has(check.conclusion)),
+    checks,
+    queriedAt: new Date().toISOString(),
+  };
+}
+
+function isStatusContext(entry: StatusCheckRollupEntry): boolean {
+  return entry.__typename === 'StatusContext' || (typeof entry.context === 'string' && entry.conclusion === undefined);
+}
+
+async function getStatusCheckRollup(prUrl: string, operation: string): Promise<StatusCheckRollupEntry[]> {
+  const target = requirePrUrl(prUrl, operation);
+  requireGitHubPrGateTarget(target, operation);
+
+  const stdout = await runForgeJsonCommand(
+    'github',
+    operation,
+    `gh pr view ${shellQuote(target)} --json statusCheckRollup`,
+  );
+
+  try {
+    const parsed = JSON.parse(stdout) as { statusCheckRollup?: StatusCheckRollupEntry[] };
+    return Array.isArray(parsed.statusCheckRollup) ? parsed.statusCheckRollup : [];
+  } catch (cause) {
+    throw new ForgeCommandError({
+      forge: 'github',
+      operation,
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    });
+  }
+}
+
 export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCommitStatus> {
   const target = requirePrUrl(prUrl, 'getCombinedCommitStatus');
   requireGitHubPrGateTarget(target, 'getCombinedCommitStatus');
@@ -396,20 +453,8 @@ export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCo
   );
 
   try {
-    const parsed = JSON.parse(stdout) as Array<{ name?: unknown; conclusion?: unknown; state?: unknown; bucket?: unknown }>;
-    const checks = parsed.map((check) => {
-      const conclusion = String(check.conclusion ?? check.state ?? check.bucket ?? '').toLowerCase();
-      return {
-        name: typeof check.name === 'string' ? check.name : 'unknown',
-        conclusion,
-      };
-    });
-
-    return {
-      passing: checks.every((check) => PASSING_CHECK_CONCLUSIONS.has(check.conclusion)),
-      checks,
-      queriedAt: new Date().toISOString(),
-    };
+    const parsed = JSON.parse(stdout) as StatusCheckRollupEntry[];
+    return statusFromRollup(parsed);
   } catch (cause) {
     throw new ForgeCommandError({
       forge: 'github',
@@ -418,6 +463,16 @@ export async function getCombinedCommitStatus(prUrl: string): Promise<CombinedCo
       cause,
     });
   }
+}
+
+export async function getGitHubCiStatus(prUrl: string): Promise<CombinedCommitStatus> {
+  const rollup = await getStatusCheckRollup(prUrl, 'getGitHubCiStatus');
+  return statusFromRollup(rollup.filter((entry) => !isStatusContext(entry)));
+}
+
+export async function getCommitStatusChecks(prUrl: string): Promise<CombinedCommitStatus> {
+  const rollup = await getStatusCheckRollup(prUrl, 'getCommitStatusChecks');
+  return statusFromRollup(rollup.filter(isStatusContext));
 }
 
 export async function getPrLabels(prUrl: string): Promise<string[]> {

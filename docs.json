@@ -45,6 +45,17 @@
         ]
       },
       {
+        "tab": "Vision",
+        "groups": [
+          {
+            "group": "Vision",
+            "pages": [
+              "vision"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "CLI Reference",
         "groups": [
           {

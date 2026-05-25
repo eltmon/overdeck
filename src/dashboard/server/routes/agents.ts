@@ -109,12 +109,13 @@ import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
 import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
+import { recordFeatureRegistryLifecycle } from '../../../lib/registry/feature-registry-population.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
-import { ReadModelService } from '../read-model.js';
+import { getClosedIssueIdsForReadSource, ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
@@ -156,6 +157,15 @@ async function appendAgentLifecycleLog(agentId: string, event: string, details: 
   await appendFile(join(agentDir, 'lifecycle.log'), logLine + '\n');
 }
 
+function updateRegistryForAgentStart(issueId: string, workspacePath: string, agentId: string): void {
+  void recordFeatureRegistryLifecycle({
+    issueId,
+    workspacePath,
+    agentId,
+    status: 'active',
+  });
+}
+
 async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
   const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
   if (!existsSync(continuePath)) return null;
@@ -195,6 +205,16 @@ let agentsCache: { data: unknown[] | null; timestamp: number } = { data: null, t
 /** Invalidate the agents cache so the next request re-reads all agent state. */
 export function invalidateAgentsCache(): void {
   agentsCache = { data: null, timestamp: 0 };
+}
+
+function filterClosedIssueAgents<T>(agents: T[], issues: unknown[]): T[] {
+  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
+  if (closedIssueIds.size === 0) return agents;
+  return agents.filter((agent) => {
+    if (!agent || typeof agent !== 'object') return true;
+    const issueId = (agent as { issueId?: unknown }).issueId;
+    return typeof issueId !== 'string' || !closedIssueIds.has(issueId.toUpperCase());
+  });
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -881,8 +901,9 @@ const getAgentsRoute = HttpRouter.add(
         })))).filter(Boolean);
 
         const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
-        agentsCache = { data: allAgents, timestamp: now };
-        return jsonResponse(allAgents);
+        const visibleAgents = filterClosedIssueAgents(allAgents, getIssueDataService().getIssues());
+        agentsCache = { data: visibleAgents, timestamp: now };
+        return jsonResponse(visibleAgents);
   })),
 );
 
@@ -2764,6 +2785,7 @@ const postAgentsRoute = HttpRouter.add(
         startedAt: state.startedAt,
         harness: 'claude-code',
       });
+      updateRegistryForAgentStart(state.issueId, workspacePath, state.id);
 
       // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
       // The redundant issue.statusChanged emit was racing with reactive Cloister:
@@ -3075,6 +3097,7 @@ const postAgentsRoute = HttpRouter.add(
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
             ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
+          updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
             featureName,
@@ -3296,6 +3319,7 @@ const postAgentsRoute = HttpRouter.add(
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
       ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
+    updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
       role,

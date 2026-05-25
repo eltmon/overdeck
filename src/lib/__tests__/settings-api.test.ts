@@ -706,3 +706,50 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('memory.sidebar_refresh_interval_ms must be a positive integer');
   });
 });
+
+describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-up)', () => {
+  // Regression guard: PR #1425 added the dropped OpenAI models to
+  // MODEL_DEPRECATIONS but did not update this endpoint, so the dropdown
+  // continued to surface them. Settings picker reads from this endpoint.
+  // We use a scoped vi.doMock here so the test exercises the filter against
+  // a CAPABILITIES catalog that actually contains a deprecated model — the
+  // file-level mock at the top of this file doesn't.
+  it('excludes any model whose ID appears in MODEL_DEPRECATIONS', async () => {
+    vi.resetModules();
+    vi.doMock('../model-capabilities.js', () => ({
+      MODEL_CAPABILITIES: {
+        'gpt-5.5': { provider: 'openai', displayName: 'GPT-5.5', costPer1MTokens: 1 },
+        'gpt-5.4': { provider: 'openai', displayName: 'GPT-5.4', costPer1MTokens: 1 },
+        'gpt-4o': { provider: 'openai', displayName: 'GPT-4o', costPer1MTokens: 1 },
+        'gpt-5.5-pro': { provider: 'openai', displayName: 'GPT-5.5 Pro', costPer1MTokens: 1 },
+        'o4-mini': { provider: 'openai', displayName: 'O4 Mini', costPer1MTokens: 1 },
+      },
+      MODEL_DEPRECATIONS: {
+        'gpt-4o': 'gpt-5.4',
+        'gpt-5.5-pro': 'gpt-5.5',
+        'o4-mini': 'gpt-5.4-mini',
+      },
+      getModelCapability: vi.fn(),
+      getModelCapabilitySync: vi.fn(),
+      hasModelCapability: () => true,
+      hasModelCapabilitySync: () => true,
+      resolveModelId: (modelId: string) => modelId,
+      resolveModelIdSync: (modelId: string) => modelId,
+    }));
+
+    const { getAvailableModelsApi } = await import('../settings-api.js');
+    const openaiIds = getAvailableModelsApi().openai.map(m => m.id);
+
+    // Kept models pass through.
+    expect(openaiIds).toContain('gpt-5.5');
+    expect(openaiIds).toContain('gpt-5.4');
+    // Dropped models — present in capabilities for back-compat (cost lookups
+    // on historical conversations) but excluded from user-facing pickers.
+    expect(openaiIds).not.toContain('gpt-4o');
+    expect(openaiIds).not.toContain('gpt-5.5-pro');
+    expect(openaiIds).not.toContain('o4-mini');
+
+    vi.doUnmock('../model-capabilities.js');
+    vi.resetModules();
+  });
+});

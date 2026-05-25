@@ -8,7 +8,7 @@ import { Effect } from 'effect';
  * forever — review/test green, readyForMerge false, Merge button never lights.
  * checkUndispatchedShip() is the backstop.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
@@ -119,12 +119,17 @@ import { onIssueStateChange } from '../service.js';
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
 const mockOnIssueStateChange = vi.mocked(onIssueStateChange);
 
-// A status updated long enough ago to clear the 2-min staleness guard.
+// A status updated long enough ago to clear the 30 s staleness guard.
 const STALE_TS = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
 describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('re-dispatches ship when review+test passed but readyForMerge is false', async () => {
@@ -202,8 +207,6 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
   });
 
   it('applies a per-issue cooldown so a ship run in flight is not re-poked every tick', async () => {
-    // Distinct issueId — the module-level cooldown map persists across tests in
-    // this file, so the first test's PAN-977 entry would mask this assertion.
     mockLoadReviewStatuses.mockReturnValue({
       'PAN-888': {
         issueId: 'PAN-888',
@@ -221,5 +224,123 @@ describe('checkUndispatchedShip — undispatched-ship safety-net', () => {
     // Immediate second patrol tick — cooldown must suppress the re-dispatch.
     await checkUndispatchedShip();
     expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches stale ship-eligible statuses within the next 60s patrol window', async () => {
+    const now = new Date('2026-05-23T13:00:00.000Z');
+    vi.setSystemTime(now);
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-1414-PATROL': {
+        issueId: 'PAN-1414-PATROL',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+        mergeStatus: 'pending',
+        updatedAt: now.toISOString(),
+      },
+    } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+    await checkUndispatchedShip();
+    expect(mockOnIssueStateChange).not.toHaveBeenCalled();
+
+    vi.setSystemTime(new Date(now.getTime() + 60_000));
+    await checkUndispatchedShip();
+
+    expect(mockOnIssueStateChange).toHaveBeenCalledWith('PAN-1414-PATROL', 'shipping');
+  });
+
+  it('logs the per-issue re-dispatch count after each fired shipping trigger', async () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-05-23T12:00:00.000Z');
+    vi.setSystemTime(now);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    try {
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-COUNTER': {
+          issueId: 'PAN-1414-COUNTER',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-COUNTER)',
+      );
+
+      vi.setSystemTime(new Date(now.getTime() + 91_000));
+      await checkUndispatchedShip();
+
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(2);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (2 total for issue PAN-1414-COUNTER)',
+      );
+    } finally {
+      logSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops re-dispatch counters when issues leave the ship-eligible state', async () => {
+    const now = new Date('2026-05-23T14:00:00.000Z');
+    vi.setSystemTime(now);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    try {
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-PRUNE)',
+      );
+
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() - 60_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+      await checkUndispatchedShip();
+
+      mockOnIssueStateChange.mockClear();
+      logSpy.mockClear();
+      vi.setSystemTime(new Date(now.getTime() + 91_000));
+      mockLoadReviewStatuses.mockReturnValue({
+        'PAN-1414-PRUNE': {
+          issueId: 'PAN-1414-PRUNE',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          updatedAt: new Date(now.getTime() + 31_000).toISOString(),
+        },
+      } as unknown as ReturnType<typeof loadReviewStatuses>);
+
+      await checkUndispatchedShip();
+      expect(mockOnIssueStateChange).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        '[deacon] Ship re-dispatched (1 total for issue PAN-1414-PRUNE)',
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });

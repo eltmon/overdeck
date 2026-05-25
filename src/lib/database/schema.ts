@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -399,7 +399,8 @@ export function initSchema(db: Database.Database): void {
       spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
-      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
+      fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
+      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -1217,12 +1218,21 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`); } catch { /* already exists */ }
   }
 
-  // v42 → v43: add auto_merge table for pending cooldown persistence
+  // v42 → v43: track post-/clear sibling relationship for Claude Code conversations (PAN-1458).
+  // When Claude Code receives /clear, a new JSONL is created with a fresh session-id. The
+  // background orphan detector in conversation-lifecycle.ts creates a sibling conversation row
+  // for the new JSONL and links the parent via this column. UI can then surface the boundary.
   if (currentVersion < 43) {
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
-        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`); } catch { /* already exists */ }
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
+                 ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
+    } catch { /* already exists */ }
+  }
 
+  // v43 → v44: add auto_merge table for pending cooldown persistence
+  if (currentVersion < 44) {
+    db.exec(`
       CREATE TABLE IF NOT EXISTS auto_merge (
         issue_id      TEXT PRIMARY KEY,
         scheduled_at  TEXT NOT NULL,

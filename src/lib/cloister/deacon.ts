@@ -145,12 +145,14 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { isAgentIdleForNudge } from './agent-idle.js';
+import { checkStuckAgentRemediation } from './stuck-remediation.js';
 
 // ============================================================================
 // Configuration
@@ -734,39 +736,6 @@ const isAgentActiveInTmuxProgram = (sessionName: string): Effect.Effect<boolean,
 
 export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
   return Effect.runPromise(isAgentActiveInTmuxProgram(sessionName));
-}
-
-/**
- * Determine if an agent is idle based on its runtime.json hook state.
- *
- * The Stop hook (fired by Claude Code's Stop lifecycle event) writes state='idle'
- * to runtime.json whenever Claude finishes a turn and returns to the prompt. This
- * is the authoritative idle signal — no pane parsing needed.
- *
- * Stale-active fallback: if Stop hook never fired (state='active' persists), treat
- * the agent as idle once the heartbeat is older than staleActiveThresholdMs. The
- * heartbeat-hook fires on PostToolUse, so a stale heartbeat means no tool calls
- * and therefore no active computation.
- *
- * Returns false if: no runtime state, suspended, completed, or recently active.
- */
-function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 1000): boolean {
-  const runtimeState = getAgentRuntimeStateSync(agentId);
-  if (!runtimeState) {
-    console.log(`[deacon] ${agentId}: no runtime.json — skipping (hook not yet fired)`);
-    return false;
-  }
-  if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
-  if (runtimeState.state === 'idle') return true;
-  // Stale-active fallback: only fires for 'uninitialized' agents — never for
-  // 'active'. An 'active' state means the pre-tool-hook fired and Stop hasn't,
-  // which by definition is mid-turn work. Nudging an active agent injects
-  // text into the pane mid-Bash and surfaces as `Interrupted · What should
-  // Claude do instead?` (PAN-1024 reproduced this with slow gpt-5 runtimes
-  // where the heartbeat between tool calls easily exceeds 5min).
-  if (runtimeState.state !== 'uninitialized') return false;
-  const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
-  return ageMs > staleActiveThresholdMs;
 }
 
 // ============================================================================
@@ -2493,7 +2462,7 @@ const mergeStuckCooldowns = new Map<string, number>();
 // Callback set by the server layer to emit domain events when agents are stopped.
 // Deacon is a library module and does not own the event store directly.
 let agentStoppedNotifier: ((agentId: string) => void) | null = null;
-let agentStatusChangedNotifier: ((state: AgentState, previousStatus?: AgentState['status']) => void) | null = null;
+let agentStatusChangedNotifier: ((state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void) | null = null;
 const orphanFailureRecordedForAutoResume = new Set<string>();
 
 /**
@@ -2506,13 +2475,13 @@ export function setAgentStoppedNotifier(fn: (agentId: string) => void): void {
 }
 
 /** Register a callback for Deacon-owned AgentState changes that must reach live clients. */
-export function setAgentStatusChangedNotifier(fn: (state: AgentState, previousStatus?: AgentState['status']) => void): void {
+export function setAgentStatusChangedNotifier(fn: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void): void {
   agentStatusChangedNotifier = fn;
 }
 
-function notifyAgentStatusChanged(state: AgentState, previousStatus?: AgentState['status']): void {
+function notifyAgentStatusChanged(state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean): void {
   if (!agentStatusChangedNotifier) return;
-  try { agentStatusChangedNotifier(state, previousStatus); } catch { /* non-fatal */ }
+  try { agentStatusChangedNotifier(state, previousStatus, hasLiveTmuxSession); } catch { /* non-fatal */ }
 }
 
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
@@ -2612,12 +2581,13 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 // Wait this long after the review/test status last changed before the patrol
 // steps in — long enough that the reactive scheduler's primary
 // onIssueStateChange('shipping') trigger has had every chance to fire first.
-const SHIP_DISPATCH_STALENESS_MS = 2 * 60 * 1000; // 2 min
+const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
 // Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
 // is already idempotent (activeRoleRunExists skips a live, current ship run),
 // so this is purely to keep the patrol log quiet while a ship run is in flight.
-const SHIP_DISPATCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
+const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
 const shipDispatchCooldowns = new Map<string, number>();
+const shipDispatchCounts = new Map<string, number>();
 
 /**
  * Safety-net patrol: re-dispatch the ship role for issues where review and
@@ -2639,8 +2609,8 @@ const shipDispatchCooldowns = new Map<string, number>();
  * Guards:
  *   - review + test both 'passed', not yet readyForMerge
  *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
- *   - staleness: status at least 2 min old (don't race the primary trigger)
- *   - per-issue cooldown: 5 min between re-dispatch attempts
+ *   - staleness: status at least 30 s old (don't race the primary trigger)
+ *   - per-issue cooldown: 90 s between re-dispatch attempts
  */
 export async function checkUndispatchedShip(): Promise<string[]> {
   const actions: string[] = [];
@@ -2648,16 +2618,31 @@ export async function checkUndispatchedShip(): Promise<string[]> {
   try {
     const statuses = loadReviewStatuses();
     const now = Date.now();
+    const shipEligibleKeys = new Set<string>();
 
     for (const [key, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'passed') continue;
       if (status.readyForMerge) continue;
       if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
+      if (!status.updatedAt) continue;
+      shipEligibleKeys.add(key);
+    }
+
+    for (const key of new Set([...shipDispatchCooldowns.keys(), ...shipDispatchCounts.keys()])) {
+      if (!shipEligibleKeys.has(key)) {
+        shipDispatchCooldowns.delete(key);
+        shipDispatchCounts.delete(key);
+      }
+    }
+
+    for (const [key, status] of Object.entries(statuses)) {
+      if (!shipEligibleKeys.has(key)) continue;
 
       // Give the reactive scheduler's primary trigger time to land first.
-      if (!status.updatedAt) continue;
-      if (now - new Date(status.updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
+      const updatedAt = status.updatedAt;
+      if (!updatedAt) continue;
+      if (now - new Date(updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
 
       // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
       const lastAttempt = shipDispatchCooldowns.get(key);
@@ -2673,6 +2658,9 @@ export async function checkUndispatchedShip(): Promise<string[]> {
       try {
         const { onIssueStateChange } = await import('./service.js');
         await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
+        const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
+        shipDispatchCounts.set(key, dispatchCount);
+        console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
         actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
       } catch (err) {
         console.error(
@@ -4690,6 +4678,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
 
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
+
   const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
     ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
   const stashJanitorEveryCycles = configuredStashJanitorEveryCycles > 0
@@ -5102,7 +5094,7 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       if (state.stoppedByUser !== true) {
         const failedState = await Effect.runPromise(recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
         if (failedState) {
-          notifyAgentStatusChanged(failedState, oldStatus);
+          notifyAgentStatusChanged(failedState, oldStatus, false);
           orphanFailureRecordedForAutoResume.add(dir);
         }
       }
@@ -5600,6 +5592,17 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
+    if (hasLiveTmuxSession) {
+      const previousStatus = state.status;
+      markAgentRunningState(state);
+      await Effect.runPromise(saveAgentState(state));
+      notifyAgentStatusChanged(state, previousStatus, true);
+      const msg = `Reconciled ${agentId} (${previousStatus}→running; tmux session alive)`;
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${msg}`);
+      continue;
+    }
+
     if (state.lastFailureNextRetryAt !== undefined) {
       const nextRetryMs = Date.parse(state.lastFailureNextRetryAt);
       if (Number.isFinite(nextRetryMs) && nextRetryMs > Date.now()) {
@@ -5697,7 +5700,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         resumed.push(agentId);
         const resumedState = await Effect.runPromise(getAgentState(agentId));
         if (resumedState) {
-          notifyAgentStatusChanged(resumedState, state.status);
+          notifyAgentStatusChanged(resumedState, state.status, true);
         }
         const msg = `Auto-resumed ${agentId} (was orphaned by system event)`;
         console.log(`[deacon] ${msg}`);
@@ -5726,7 +5729,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         if (!orphanFailureRecordedForAutoResume.has(agentId)) {
           const failedState = await Effect.runPromise(recordAgentFailure(agentId, msg));
           if (failedState) {
-            notifyAgentStatusChanged(failedState, state.status);
+            notifyAgentStatusChanged(failedState, state.status, false);
           }
         }
         console.warn(`[deacon] ${msg}`);
@@ -5738,7 +5741,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       if (!orphanFailureRecordedForAutoResume.has(agentId)) {
         const failedState = await Effect.runPromise(recordAgentFailure(agentId, `Auto-resume error for ${agentId}: ${msg}`));
         if (failedState) {
-          notifyAgentStatusChanged(failedState, state.status);
+          notifyAgentStatusChanged(failedState, state.status, false);
         }
       }
       console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);

@@ -63,7 +63,8 @@ function createHarness(options: {
   resolveProjectKey?: AutoMergeSchedulerDeps['resolveProjectKey'];
   getStatus?: AutoMergeSchedulerDeps['getStatus'];
   getLabels?: AutoMergeSchedulerDeps['getLabels'];
-  getCombinedStatus?: AutoMergeSchedulerDeps['getCombinedStatus'];
+  getGitHubCiStatus?: AutoMergeSchedulerDeps['getGitHubCiStatus'];
+  getCommitStatusChecks?: AutoMergeSchedulerDeps['getCommitStatusChecks'];
   triggerMerge?: AutoMergeSchedulerDeps['triggerMerge'];
 } = {}) {
   const rows = new Map<string, AutoMergeRow>();
@@ -107,7 +108,8 @@ function createHarness(options: {
       rows.set(issueId, { ...current, status: 'failed', abortReason: reason });
     }),
     getLabels: options.getLabels ?? vi.fn().mockResolvedValue([]),
-    getCombinedStatus: options.getCombinedStatus ?? vi.fn().mockResolvedValue({ passing: true }),
+    getGitHubCiStatus: options.getGitHubCiStatus ?? vi.fn().mockResolvedValue({ passing: true }),
+    getCommitStatusChecks: options.getCommitStatusChecks ?? vi.fn().mockResolvedValue({ passing: true }),
     triggerMerge: options.triggerMerge ?? vi.fn().mockResolvedValue({ success: true }),
   };
 
@@ -269,8 +271,10 @@ describe('AutoMergeScheduler', () => {
   it.each([
     ['ready gate', { getStatus: vi.fn().mockResolvedValueOnce(reviewStatus()).mockResolvedValue(reviewStatus({ readyForMerge: false })) }, 'no-longer-ready'],
     ['label gate', { getLabels: vi.fn().mockResolvedValue(['do-not-merge']) }, 'blocker-label:do-not-merge'],
-    ['CI gate', { getCombinedStatus: vi.fn().mockResolvedValue({ passing: false }) }, 'ci-failing'],
-    ['timeout gate', { getCombinedStatus: vi.fn().mockRejectedValue(new Error('timeout')) }, 'ci-check-timeout'],
+    ['CI gate', { getGitHubCiStatus: vi.fn().mockResolvedValue({ passing: false }) }, 'ci-failing'],
+    ['CI timeout gate', { getGitHubCiStatus: vi.fn().mockRejectedValue(new Error('timeout')) }, 'ci-check-timeout'],
+    ['commit status gate', { getCommitStatusChecks: vi.fn().mockResolvedValue({ passing: false }) }, 'status-check-failing'],
+    ['commit status timeout gate', { getCommitStatusChecks: vi.fn().mockRejectedValue(new Error('timeout')) }, 'status-check-timeout'],
   ])('aborts after cooldown when the %s fails', async (_name, options, expectedReason) => {
     const harness = createHarness(options);
     await scheduleReadyIssue(harness);
@@ -290,6 +294,53 @@ describe('AutoMergeScheduler', () => {
       source: 'dashboard',
       eventType: 'merge.auto.aborted',
     });
+  });
+
+  it('checks CI before commit statuses and short-circuits on the first failure', async () => {
+    const getGitHubCiStatus = vi.fn().mockResolvedValue({ passing: false });
+    const getCommitStatusChecks = vi.fn().mockResolvedValue({ passing: false });
+    const harness = createHarness({ getGitHubCiStatus, getCommitStatusChecks });
+    await scheduleReadyIssue(harness);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'aborted', abortReason: 'ci-failing' });
+    expect(getGitHubCiStatus).toHaveBeenCalledWith('https://github.com/acme/app/pull/1');
+    expect(getCommitStatusChecks).not.toHaveBeenCalled();
+  });
+
+  it('honors disabled CI and enabled commit-status gates independently', async () => {
+    const getGitHubCiStatus = vi.fn().mockResolvedValue({ passing: false });
+    const getCommitStatusChecks = vi.fn().mockResolvedValue({ passing: false });
+    const harness = createHarness({
+      config: config({ requireGitHubCiPassing: false, requireAllCommitStatusChecks: true }),
+      getGitHubCiStatus,
+      getCommitStatusChecks,
+    });
+    await scheduleReadyIssue(harness);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'aborted', abortReason: 'status-check-failing' });
+    expect(getGitHubCiStatus).not.toHaveBeenCalled();
+    expect(getCommitStatusChecks).toHaveBeenCalledWith('https://github.com/acme/app/pull/1');
+  });
+
+  it('honors enabled CI and disabled commit-status gates independently', async () => {
+    const getGitHubCiStatus = vi.fn().mockResolvedValue({ passing: true });
+    const getCommitStatusChecks = vi.fn().mockResolvedValue({ passing: false });
+    const harness = createHarness({
+      config: config({ requireGitHubCiPassing: true, requireAllCommitStatusChecks: false }),
+      getGitHubCiStatus,
+      getCommitStatusChecks,
+    });
+    await scheduleReadyIssue(harness);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    expect(harness.rows.get('PAN-1')).toMatchObject({ status: 'executed' });
+    expect(getGitHubCiStatus).toHaveBeenCalledWith('https://github.com/acme/app/pull/1');
+    expect(getCommitStatusChecks).not.toHaveBeenCalled();
   });
 
   it('re-arms pending rows on boot', async () => {

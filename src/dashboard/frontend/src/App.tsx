@@ -21,10 +21,13 @@ import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
+import { ContextPage } from './components/context/ContextPage';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
+import { FlywheelConversationPane } from './components/flywheel/FlywheelConversationPane';
+import { HomePage } from './pages/HomePage';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -37,6 +40,7 @@ import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
+import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
@@ -63,7 +67,8 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
-  pipeline: '/',
+  home: '/',
+  pipeline: '/pipeline',
   kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
@@ -74,6 +79,7 @@ const TAB_PATHS: Record<Tab, string> = {
   metrics: '/metrics',
   costs: '/costs',
   skills: '/skills',
+  context: '/context',
   health: '/health',
   settings: '/settings',
   'god-view': '/god-view',
@@ -85,7 +91,6 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ...Object.fromEntries(
     Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
   ) as Record<string, Tab>,
-  '/pipeline': 'pipeline',
 };
 
 export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarOpen';
@@ -93,7 +98,7 @@ export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedS
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'pipeline';
+  return PATH_TO_TAB[path] || 'home';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
@@ -139,8 +144,9 @@ function normalizeCurrentRoute() {
 }
 
 function readSessionFeedSidebarOpen(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY) === 'true';
+  if (typeof window === 'undefined') return true;
+  const value = window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY);
+  return value === null ? true : value === 'true';
 }
 
 /** Extract conversation route key from /conv/:key path, or null if not matching. */
@@ -282,6 +288,16 @@ function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; 
   );
 }
 
+function StandaloneFlywheelPopoutRoute() {
+  useCodexAutoRetry();
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      <EventRouter />
+      <FlywheelConversationPane />
+    </div>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
@@ -294,6 +310,10 @@ export default function App() {
       : terminalSession!;
     const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
     return <StandaloneTerminalRoute sessionName={sessionName} token={token} />;
+  }
+
+  if (terminalPath === '/popout/flywheel-conversation') {
+    return <StandaloneFlywheelPopoutRoute />;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
@@ -743,6 +763,11 @@ export default function App() {
     openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
+  const handleOpenWorkspaceHome = useCallback((issueId: string) => {
+    setActiveTab('kanban');
+    openIssue(issueId);
+  }, [openIssue, setActiveTab]);
+
   return (
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
@@ -767,6 +792,7 @@ export default function App() {
 
         {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
         <StoppedAgentsBanner />
+        <OrphanTestAgentsSurface />
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
         <CodexAuthBanner />
@@ -867,6 +893,7 @@ export default function App() {
               type="button"
               aria-label="Toggle activity feed"
               aria-pressed={isSessionFeedSidebarOpen}
+              title="Activity Feed"
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
             >
@@ -881,6 +908,11 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
+          {activeTab === 'home' && (
+            <div className="w-full h-full overflow-hidden">
+              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
+            </div>
+          )}
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
               <CommandDeck
@@ -892,7 +924,7 @@ export default function App() {
               />
             </div>
           )}
-        {activeTab === 'pipeline' && (
+          {activeTab === 'pipeline' && (
           <BootstrapGate fallback={<PipelineSkeleton />}>
             <div className="w-full h-full overflow-hidden">
               <PipelineView onSearchOpen={() => setIsSearchOpen(true)} onTabChange={(tab) => setActiveTab(tab as Parameters<typeof setActiveTab>[0])} />
@@ -944,6 +976,11 @@ export default function App() {
         {activeTab === 'skills' && (
           <div className="p-6 w-full overflow-auto">
             <SkillsList />
+          </div>
+        )}
+        {activeTab === 'context' && (
+          <div className="w-full h-full overflow-hidden">
+            <ContextPage />
           </div>
         )}
         {activeTab === 'health' && (

@@ -3420,9 +3420,14 @@ join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(S
 join(PANOPTICON_HOME, "agent-definitions");
 join(PANOPTICON_HOME, "rules");
 join(PANOPTICON_HOME, ".manifest.json");
-const PRDS_DIR = join(join(PANOPTICON_HOME, "docs"), "prds");
+const DOCS_DIR = join(PANOPTICON_HOME, "docs");
+const PRDS_DIR = join(DOCS_DIR, "prds");
 join(PRDS_DIR, "drafts");
 join(PRDS_DIR, "published");
+join(DOCS_DIR, "index.sqlite");
+join(DOCS_DIR, "budget-state.json");
+join(DOCS_DIR, "disable-state.json");
+join(DOCS_DIR, "telemetry.jsonl");
 /**
 * Encode a filesystem path to match Claude Code's project directory naming.
 *
@@ -4080,7 +4085,8 @@ function initSchema(db) {
       spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
-      fork_fallback_reason TEXT                            -- reason a requested fork mode fell back to summary fork
+      fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
+      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -4270,7 +4276,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 43`);
+	db.pragma(`user_version = 44`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4278,7 +4284,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 43) return;
+	if (currentVersion === 44) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4758,10 +4764,16 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
 		} catch {}
 	}
-	if (currentVersion < 43) db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
-        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-
+	if (currentVersion < 43) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`);
+		} catch {}
+		try {
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
+                 ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
+		} catch {}
+	}
+	if (currentVersion < 44) db.exec(`
       CREATE TABLE IF NOT EXISTS auto_merge (
         issue_id      TEXT PRIMARY KEY,
         scheduled_at  TEXT NOT NULL,
@@ -4774,7 +4786,7 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_auto_merge_pending_execute
         ON auto_merge(status, execute_at);
     `);
-	db.pragma(`user_version = 43`);
+	db.pragma(`user_version = 44`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

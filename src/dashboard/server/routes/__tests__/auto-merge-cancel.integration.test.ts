@@ -21,6 +21,7 @@ import {
 import { resetDatabase } from '../../../../lib/database/index.js';
 import type { NormalizedAutoMergeConfig } from '../../../../lib/config-yaml.js';
 import type { ReviewStatus } from '../../../../lib/review-status.js';
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 
 let testHome: string;
 let server: Server | null = null;
@@ -121,7 +122,8 @@ async function scheduleViaScheduler(issueId: string): Promise<void> {
     markAborted: markAutoMergeAborted,
     markFailed: markAutoMergeFailed,
     getLabels: vi.fn().mockResolvedValue([]),
-    getCombinedStatus: vi.fn().mockResolvedValue({ passing: true }),
+    getGitHubCiStatus: vi.fn().mockResolvedValue({ passing: true }),
+    getCommitStatusChecks: vi.fn().mockResolvedValue({ passing: true }),
     triggerMerge: triggerMergeMock,
   };
   const scheduler = new AutoMergeScheduler(deps);
@@ -132,10 +134,13 @@ async function scheduleViaScheduler(issueId: string): Promise<void> {
   }
 }
 
-async function postCancel(issueId: string): Promise<{ status: number; body: { cancelled?: boolean; error?: string } }> {
+async function postCancel(
+  issueId: string,
+  headers: Record<string, string> = { [INTERNAL_TOKEN_HEADER]: 'test-token' },
+): Promise<{ status: number; body: { cancelled?: boolean; error?: string } }> {
   const response = await fetch(`${baseUrl}/api/issues/${issueId}/merge/cancel`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', origin: baseUrl },
+    headers: { 'content-type': 'application/json', origin: baseUrl, ...headers },
     body: JSON.stringify({ reason: 'integration-test' }),
   });
   return { status: response.status, body: await response.json() };
@@ -145,6 +150,8 @@ beforeEach(async () => {
   testHome = join(tmpdir(), `pan-1418-auto-merge-cancel-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
   process.env.PANOPTICON_HOME = testHome;
+  process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+  _resetInternalTokenCacheForTests();
   triggerMergeMock.mockReset();
   await startHttpRouteServer();
 });
@@ -154,10 +161,22 @@ afterEach(async () => {
   resetDatabase();
   delete process.env.API_PORT;
   delete process.env.PANOPTICON_HOME;
+  delete process.env.PANOPTICON_INTERNAL_TOKEN;
+  _resetInternalTokenCacheForTests();
   rmSync(testHome, { recursive: true, force: true });
 });
 
 describe('POST /api/issues/:issueId/merge/cancel', () => {
+  it('rejects requests that only spoof a trusted origin', async () => {
+    await scheduleViaScheduler('PAN-2000');
+
+    const result = await postCancel('PAN-2000', {});
+
+    expect(result).toEqual({ status: 401, body: { error: 'unauthorized' } });
+    expect(getAutoMergeStatus('PAN-2000')).toMatchObject({ status: 'pending' });
+    expect(triggerMergeMock).not.toHaveBeenCalled();
+  });
+
   it('cancels a pending auto-merge row through real HTTP and SQLite', async () => {
     await scheduleViaScheduler('PAN-2001');
 

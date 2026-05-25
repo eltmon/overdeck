@@ -13,6 +13,7 @@ import { Effect, Layer, Queue, Context, Stream } from 'effect';
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
+import { startSessionContextWriter } from './session-context-writer.js';
 import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
 import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
 import { randomUUID } from 'crypto';
@@ -40,6 +41,21 @@ export class EventStoreService extends Context.Service<
 >()('panopticon/dashboard/EventStoreService') {}
 
 /** Map a domain event to a detailed activity log entry. Returns null for uninteresting events. */
+function shouldRefreshSessionContext(type: string): boolean {
+  return type === 'issues.snapshot' ||
+    type.startsWith('agent.') ||
+    type.startsWith('review.') ||
+    type.startsWith('pipeline.') ||
+    type.startsWith('planning.') ||
+    type.startsWith('plan.') ||
+    type.startsWith('workspace.') ||
+    type.startsWith('issue.') ||
+    type.startsWith('memory.') ||
+    type.startsWith('cost.') ||
+    type.startsWith('merge.') ||
+    type.startsWith('system.health_');
+}
+
 function mapDomainEventToDetailed(event: StoredEvent): {
   source: string;
   level: 'info' | 'warn' | 'error' | 'success';
@@ -156,6 +172,13 @@ export const EventStoreServiceLive = Layer.effect(
         timestamp: event.timestamp,
         payload: event.payload,
       } as any);
+    });
+
+    startSessionContextWriter({
+      readSnapshot: () => Effect.runPromise(readModel.getSnapshot),
+      subscribe: (listener) => store.subscribe((event) => {
+        if (shouldRefreshSessionContext(event.type)) listener();
+      }),
     });
 
     // Auto-emit detailed activity entries for state-change domain events.

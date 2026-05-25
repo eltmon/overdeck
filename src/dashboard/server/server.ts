@@ -51,6 +51,7 @@ import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { projectsRouteLayer } from './routes/projects.js';
+import { contextRouteLayer } from './routes/context.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
@@ -62,6 +63,8 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
+import { artifactsRouteLayer } from './routes/artifacts.js';
+import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
@@ -310,6 +313,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   eventsRouteLayer,
   showRouteLayer,
   projectsRouteLayer,
+  contextRouteLayer,
   adminRouteLayer,
   prereqsRouteLayer,
   cliproxyRouteLayer,
@@ -321,6 +325,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   swarmRouteLayer,
   discoveredSessionsRouteLayer,
   flywheelRouteLayer,
+  artifactsRouteLayer,
+  featureRegistryRouteLayer,
   staticRouteLayer,
 );
 

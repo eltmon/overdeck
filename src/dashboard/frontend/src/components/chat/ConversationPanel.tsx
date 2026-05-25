@@ -3,7 +3,7 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -1083,7 +1083,25 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           workingPhase={workingPhase}
         />
       )}
-      {isForking ? null : onResume ? (
+      {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a
+          banner linking to the sibling that continues the work. The composer/resume bar
+          is suppressed because the conversation is permanently ended — interacting here
+          would either fail or branch off historical content. */}
+      {conversation.clearedToConvId ? (
+        <button
+          type="button"
+          className={styles.conversationClearedBanner}
+          onClick={() => { window.location.href = `/conv/${conversation.clearedToConvId}`; }}
+          title={`Open conv/${conversation.clearedToConvId}`}
+          aria-label={`Open conversation that continues after /clear (conv/${conversation.clearedToConvId})`}
+        >
+          <RotateCcw size={14} />
+          <span className={styles.conversationClearedBannerText}>
+            Conversation cleared — continued in <strong>conv/{conversation.clearedToConvId}</strong>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+      ) : isForking ? null : onResume ? (
         <div className={styles.conversationResumeBar}>
           {modelPicker}
           <button

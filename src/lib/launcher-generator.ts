@@ -60,6 +60,7 @@ export interface LauncherConfig {
    * for Pi launchers — the Pi extension loads workspace.md at session_start.
    */
   appendSystemPromptFile?: string;
+  appendSystemPromptFiles?: string[];
 
   /**
    * Review sub-role launcher contract (PAN-977). When set, the launcher does
@@ -477,11 +478,6 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
   cmd += buildChannelsArgs(config);
 
-  // PAN-1201: fold the layered workspace context bundle into the system prompt.
-  if (config.appendSystemPromptFile) {
-    cmd += ` --append-system-prompt-file ${shellQuote(config.appendSystemPromptFile)}`;
-  }
-
   // Append session args
   if (config.resumeSessionId) {
     cmd += ` --resume ${shellQuote(config.resumeSessionId)}`;
@@ -494,6 +490,10 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
+  }
+  // PAN-1201: fold the layered workspace context bundle into the system prompt.
+  for (const file of systemPromptFiles(config)) {
+    cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
   }
 
   // Append prompt reference
@@ -538,6 +538,13 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
  * dropped (AC4). baseCommand is ignored — Pi launchers always start with
  * the literal `pi` so callers cannot accidentally smuggle in claude flags.
  */
+function systemPromptFiles(config: LauncherConfig): string[] {
+  return [
+    ...(config.appendSystemPromptFile ? [config.appendSystemPromptFile] : []),
+    ...(config.appendSystemPromptFiles ?? []),
+  ];
+}
+
 function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {

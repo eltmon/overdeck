@@ -78,6 +78,45 @@ export interface MemoryConfig {
   worker_concurrency?: number;
 }
 
+export const COMPLIANCE_MODES = ['off', 'advisory', 'enforcing'] as const;
+export type ComplianceMode = typeof COMPLIANCE_MODES[number];
+
+export interface ComplianceConfig {
+  mode?: ComplianceMode;
+}
+
+export interface NormalizedComplianceConfig {
+  mode: ComplianceMode;
+}
+
+export interface FeatureRegistryClassificationConfig {
+  enabled?: boolean;
+  provider?: 'anthropic' | 'cliproxy';
+  model?: string;
+  per_day_cost_cap_usd?: number;
+}
+
+export interface FeatureRegistryConfig {
+  classification?: FeatureRegistryClassificationConfig;
+}
+
+export interface NormalizedFeatureRegistryConfig {
+  classification: {
+    enabled: boolean;
+    provider: 'anthropic' | 'cliproxy';
+    model: string;
+    perDayCostCapUsd: number;
+  };
+}
+
+function isComplianceMode(value: unknown): value is ComplianceMode {
+  return typeof value === 'string' && (COMPLIANCE_MODES as readonly string[]).includes(value);
+}
+
+function isFeatureRegistryClassificationProvider(value: unknown): value is NormalizedFeatureRegistryConfig['classification']['provider'] {
+  return value === 'anthropic' || value === 'cliproxy';
+}
+
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
 
 export interface ConversationsConfig {
@@ -103,6 +142,86 @@ export interface ConversationsConfig {
   };
 }
 
+export type DocsEmbeddingProvider = 'local' | 'openai';
+export type DocsClassifierProvider = 'anthropic' | 'cliproxy';
+export type DocsPrdStatus = 'active' | 'planned' | 'completed';
+
+export interface DocsConfig {
+  enabled?: boolean;
+  prompt_injection?: boolean;
+  cli?: boolean;
+  trigger?: {
+    regexes?: string[];
+    case_sensitive?: boolean;
+  };
+  corpus?: {
+    docs?: boolean;
+    skills?: boolean;
+    rules?: boolean;
+    claude_md?: boolean;
+    prds?: boolean;
+    prd_statuses?: DocsPrdStatus[];
+    max_chunk_tokens?: number;
+  };
+  budget?: {
+    injection_rate?: number;
+    turn_window?: number;
+    max_tokens_per_injection?: number;
+    max_chunks_per_injection?: number;
+    bypass_classifier_threshold?: number;
+  };
+  embedding?: {
+    provider?: DocsEmbeddingProvider;
+    model?: string;
+    dimensions?: number;
+  };
+  classifier?: {
+    enabled?: boolean;
+    provider?: DocsClassifierProvider;
+    model?: string;
+    threshold?: number;
+    timeout_ms?: number;
+  };
+}
+
+export interface NormalizedDocsConfig {
+  enabled: boolean;
+  promptInjectionEnabled: boolean;
+  cliEnabled: boolean;
+  trigger: {
+    regexes: string[];
+    caseSensitive: boolean;
+  };
+  corpus: {
+    docs: boolean;
+    skills: boolean;
+    rules: boolean;
+    claudeMd: boolean;
+    prds: boolean;
+    prdStatuses: DocsPrdStatus[];
+    maxChunkTokens: number;
+  };
+  budget: {
+    injectionRate: number;
+    turnWindow: number;
+    maxTokensPerInjection: number;
+    maxChunksPerInjection: number;
+    bypassClassifierThreshold: number;
+  };
+  embedding: {
+    provider: DocsEmbeddingProvider;
+    model: string;
+    dimensions: number;
+  };
+  classifier: {
+    enabled: boolean;
+    provider: DocsClassifierProvider;
+    model: string;
+    threshold: number;
+    timeoutMs: number;
+  };
+}
+
 /**
  * TTS summarizer configuration
  */
@@ -117,6 +236,8 @@ export interface TtsSummarizerConfig {
 
 export interface TtsDaemonConfig {
   enabled?: boolean;
+  /** Announce planning/work agent lifecycle (start + finish) via TTS. Default true. */
+  lifecycle?: boolean;
   voice?: string;
   statusVoice?: string;
   volume?: number;
@@ -136,6 +257,12 @@ export interface TtsDaemonConfig {
 
 export interface NormalizedTtsDaemonConfig {
   enabled: boolean;
+  /**
+   * Announce planning/work agent lifecycle events (start + finish) via TTS.
+   * Default true. Set false to mute the substrate-breathing announcements
+   * without disabling TTS overall.
+   */
+  lifecycle: boolean;
   voice: string;
   statusVoice?: string;
   volume: number;
@@ -337,8 +464,17 @@ export interface YamlConfig {
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
 
+  /** Panopticon docs RAG configuration */
+  docs?: DocsConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
+
+  /** Memory-first compliance audit configuration */
+  compliance?: ComplianceConfig;
+
+  /** Knowledge registry population configuration */
+  registry?: FeatureRegistryConfig;
 
   /** Multi-tool sync configuration */
   tools?: {
@@ -547,6 +683,9 @@ export interface NormalizedConfig {
     };
   };
 
+  /** Panopticon docs RAG behavior */
+  docs: NormalizedDocsConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory: {
     extraction: {
@@ -561,6 +700,12 @@ export interface NormalizedConfig {
     sidebarRefreshIntervalMs: number;
     workerConcurrency: number;
   };
+
+  /** Memory-first compliance audit configuration */
+  compliance: NormalizedComplianceConfig;
+
+  /** Knowledge registry population configuration */
+  registry: NormalizedFeatureRegistryConfig;
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
@@ -692,6 +837,20 @@ export interface ConfigLoadResult {
 /**
  * Default configuration (used when no config files exist)
  */
+const DEFAULT_DOCS_TRIGGER_REGEXES = [
+  'pan',
+  'panopticon',
+  'cloister',
+  'deacon',
+  'workspace',
+  'specialist',
+  'harness',
+  'bd',
+  'beads',
+  'vbrief',
+  'workhorse',
+];
+
 const DEFAULT_CONFIG: NormalizedConfig = {
   tmux: {
     configMode: 'managed',
@@ -724,6 +883,43 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       costConfirmThreshold: 1.00,
     },
   },
+  docs: {
+    enabled: true,
+    promptInjectionEnabled: true,
+    cliEnabled: true,
+    trigger: {
+      regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
+      caseSensitive: false,
+    },
+    corpus: {
+      docs: true,
+      skills: true,
+      rules: true,
+      claudeMd: true,
+      prds: false,
+      prdStatuses: ['active', 'planned'],
+      maxChunkTokens: 500,
+    },
+    budget: {
+      injectionRate: 1,
+      turnWindow: 10,
+      maxTokensPerInjection: 3000,
+      maxChunksPerInjection: 5,
+      bypassClassifierThreshold: 0.85,
+    },
+    embedding: {
+      provider: 'local',
+      model: 'gte-small',
+      dimensions: 384,
+    },
+    classifier: {
+      enabled: false,
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      threshold: 0.85,
+      timeoutMs: 1500,
+    },
+  },
   memory: {
     extraction: {
       fallbackChain: [],
@@ -733,6 +929,17 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
+  },
+  compliance: {
+    mode: 'advisory',
+  },
+  registry: {
+    classification: {
+      enabled: true,
+      provider: 'cliproxy',
+      model: 'gpt-4.1-nano',
+      perDayCostCapUsd: 1,
+    },
   },
   shadow: {
     enabled: false,
@@ -758,6 +965,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   tts: {
     enabled: false,
+    lifecycle: true,
     voice: '',
     volume: 1,
     rate: 1,
@@ -1060,11 +1268,94 @@ export function mergeRtkConfigs(...configs: (YamlConfig | null)[]): NormalizedRt
   return result;
 }
 
+function cloneDocsConfig(config: NormalizedDocsConfig): NormalizedDocsConfig {
+  return {
+    enabled: config.enabled,
+    promptInjectionEnabled: config.promptInjectionEnabled,
+    cliEnabled: config.cliEnabled,
+    trigger: {
+      regexes: [...config.trigger.regexes],
+      caseSensitive: config.trigger.caseSensitive,
+    },
+    corpus: {
+      docs: config.corpus.docs,
+      skills: config.corpus.skills,
+      rules: config.corpus.rules,
+      claudeMd: config.corpus.claudeMd,
+      prds: config.corpus.prds,
+      prdStatuses: [...config.corpus.prdStatuses],
+      maxChunkTokens: config.corpus.maxChunkTokens,
+    },
+    budget: { ...config.budget },
+    embedding: { ...config.embedding },
+    classifier: { ...config.classifier },
+  };
+}
+
+function mergeDocsConfig(result: NormalizedDocsConfig, config: YamlConfig | null): void {
+  const docs = config?.docs;
+  if (!docs) return;
+
+  if (docs.enabled !== undefined) result.enabled = docs.enabled;
+  if (docs.prompt_injection !== undefined) result.promptInjectionEnabled = docs.prompt_injection;
+  if (docs.cli !== undefined) result.cliEnabled = docs.cli;
+
+  if (docs.trigger) {
+    if (docs.trigger.regexes !== undefined) result.trigger.regexes = [...docs.trigger.regexes];
+    if (docs.trigger.case_sensitive !== undefined) result.trigger.caseSensitive = docs.trigger.case_sensitive;
+  }
+
+  if (docs.corpus) {
+    if (docs.corpus.docs !== undefined) result.corpus.docs = docs.corpus.docs;
+    if (docs.corpus.skills !== undefined) result.corpus.skills = docs.corpus.skills;
+    if (docs.corpus.rules !== undefined) result.corpus.rules = docs.corpus.rules;
+    if (docs.corpus.claude_md !== undefined) result.corpus.claudeMd = docs.corpus.claude_md;
+    if (docs.corpus.prds !== undefined) result.corpus.prds = docs.corpus.prds;
+    if (docs.corpus.prd_statuses !== undefined) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
+    if (docs.corpus.max_chunk_tokens !== undefined) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
+  }
+
+  if (docs.budget) {
+    if (docs.budget.injection_rate !== undefined) result.budget.injectionRate = docs.budget.injection_rate;
+    if (docs.budget.turn_window !== undefined) result.budget.turnWindow = docs.budget.turn_window;
+    if (docs.budget.max_tokens_per_injection !== undefined) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
+    if (docs.budget.max_chunks_per_injection !== undefined) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
+    if (docs.budget.bypass_classifier_threshold !== undefined) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
+  }
+
+  if (docs.embedding) {
+    if (docs.embedding.provider !== undefined) result.embedding.provider = docs.embedding.provider;
+    if (docs.embedding.model !== undefined) result.embedding.model = docs.embedding.model;
+    if (docs.embedding.dimensions !== undefined) result.embedding.dimensions = docs.embedding.dimensions;
+  }
+
+  if (docs.classifier) {
+    if (docs.classifier.enabled !== undefined) result.classifier.enabled = docs.classifier.enabled;
+    if (docs.classifier.provider !== undefined) result.classifier.provider = docs.classifier.provider;
+    if (docs.classifier.model !== undefined) result.classifier.model = docs.classifier.model;
+    if (docs.classifier.threshold !== undefined) result.classifier.threshold = docs.classifier.threshold;
+    if (docs.classifier.timeout_ms !== undefined) result.classifier.timeoutMs = docs.classifier.timeout_ms;
+  }
+}
+
+export function getDefaultDocsConfig(): NormalizedDocsConfig {
+  return cloneDocsConfig(DEFAULT_CONFIG.docs);
+}
+
+export function mergeDocsConfigs(...configs: (YamlConfig | null)[]): NormalizedDocsConfig {
+  const result = getDefaultDocsConfig();
+  for (const config of configs) {
+    mergeDocsConfig(result, config);
+  }
+  return result;
+}
+
 function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {
   const tts = config?.tts;
   if (!tts) return;
 
   if (tts.enabled !== undefined) result.enabled = tts.enabled;
+  if (tts.lifecycle !== undefined) result.lifecycle = tts.lifecycle;
   if (tts.voice !== undefined) result.voice = tts.voice;
   if (tts.statusVoice !== undefined) result.statusVoice = tts.statusVoice;
   if (tts.volume !== undefined) result.volume = tts.volume;
@@ -1083,6 +1374,7 @@ function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | 
 export function getDefaultTtsDaemonConfig(): NormalizedTtsDaemonConfig {
   return {
     enabled: DEFAULT_CONFIG.tts.enabled,
+    lifecycle: DEFAULT_CONFIG.tts.lifecycle ?? true,
     voice: DEFAULT_CONFIG.tts.voice,
     statusVoice: DEFAULT_CONFIG.tts.statusVoice,
     volume: DEFAULT_CONFIG.tts.volume,
@@ -1333,6 +1625,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
       workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
     },
+    compliance: {
+      mode: DEFAULT_CONFIG.compliance.mode,
+    },
+    registry: {
+      classification: { ...DEFAULT_CONFIG.registry.classification },
+    },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -1345,8 +1643,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     rtk: {
       enabled: DEFAULT_CONFIG.rtk.enabled,
     },
+    docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
+      lifecycle: DEFAULT_CONFIG.tts.lifecycle ?? true,
       voice: DEFAULT_CONFIG.tts.voice,
       volume: DEFAULT_CONFIG.tts.volume,
       rate: DEFAULT_CONFIG.tts.rate,
@@ -1589,6 +1889,31 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
+    if (config.compliance?.mode !== undefined) {
+      if (!isComplianceMode(config.compliance.mode)) {
+        throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(', ')}`);
+      }
+      result.compliance.mode = config.compliance.mode;
+    }
+
+    if (config.registry?.classification) {
+      const classification = config.registry.classification;
+      if (classification.enabled !== undefined) result.registry.classification.enabled = classification.enabled;
+      if (classification.provider !== undefined) {
+        if (!isFeatureRegistryClassificationProvider(classification.provider)) {
+          throw new Error('config.yaml: registry.classification.provider must be anthropic or cliproxy');
+        }
+        result.registry.classification.provider = classification.provider;
+      }
+      if (classification.model !== undefined) result.registry.classification.model = classification.model;
+      if (classification.per_day_cost_cap_usd !== undefined) {
+        if (typeof classification.per_day_cost_cap_usd !== 'number' || classification.per_day_cost_cap_usd < 0) {
+          throw new Error('config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number');
+        }
+        result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
+      }
+    }
+
     // Merge OpenRouter favorites
     if (config.openrouter?.favorites) {
       result.openrouterFavorites = config.openrouter.favorites;
@@ -1701,6 +2026,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge RTK configuration
     mergeRtkConfig(result.rtk, config);
+
+    // Merge docs RAG configuration
+    mergeDocsConfig(result.docs, config);
 
     // Merge TTS daemon configuration
     mergeTtsConfig(result.tts, config);

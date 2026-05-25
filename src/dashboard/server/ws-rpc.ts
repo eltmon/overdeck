@@ -32,6 +32,7 @@ import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
+import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -674,6 +675,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       [WS_METHODS.readWorkspaceFile]: (input) =>
         readWorkspaceFileEffect(input),
+
+      [WS_METHODS.resolveFilePathExists]: (input) =>
+        resolveFilePathExistsEffect(input),
 
       // ── getAvailableEditors — list detected editors (PAN-966) ───────────────
       [WS_METHODS.getAvailableEditors]: () =>

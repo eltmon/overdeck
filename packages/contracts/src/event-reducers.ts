@@ -464,7 +464,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const nextAgent: AgentSnapshot = (() => {
         const base: Record<string, unknown> = { ...agent, status: event.payload.status }
         const optionalFields = [
-          'stoppedByUser', 'paused', 'pausedReason', 'pausedAt',
+          'hasLiveTmuxSession', 'stoppedByUser', 'paused', 'pausedReason', 'pausedAt',
           'troubled', 'troubledAt', 'consecutiveFailures',
           'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason', 'lastFailureNextRetryAt',
         ] as const

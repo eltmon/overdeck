@@ -767,7 +767,10 @@ export const sendKeys = (
 
         const lines = keys.split('\n');
         const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
-        const VERIFY_TIMEOUT_MS = 8_000;
+        // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
+        // caused user-visible "Enter not sent" lag whenever the 10-line tail check
+        // missed the verify line (e.g. tall Claude input box or wrapped paste).
+        const VERIFY_TIMEOUT_MS = 1_500;
         const VERIFY_INTERVAL_MS = 50;
         const PASTE_MAX_ATTEMPTS = 2;
         let pasteVerified = false;
@@ -790,12 +793,16 @@ export const sendKeys = (
               await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
             }
 
+            // Wide-window fallback on every attempt (including the last) so we
+            // catch pastes that landed off-screen of the 10-line tail before
+            // giving up and stranding Enter.
+            const wideCheck = await capturePaneText(sessionName, 200);
+            if (wideCheck.includes(verifyLine.slice(0, 40))) {
+              pasteVerified = true;
+              break attemptLoop;
+            }
+
             if (attempt < PASTE_MAX_ATTEMPTS) {
-              const wideCheck = await capturePaneText(sessionName, 200);
-              if (wideCheck.includes(verifyLine.slice(0, 40))) {
-                pasteVerified = true;
-                break attemptLoop;
-              }
               console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
               await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
             }

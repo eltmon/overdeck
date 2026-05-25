@@ -1,9 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { existsSync } from 'fs';
+import { Effect } from 'effect';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+const mocks = vi.hoisted(() => ({
+  cleanupClosedIssueAgentDirectories: vi.fn(),
+  getAgentSessionsSync: vi.fn(),
+  listSessionNamesSync: vi.fn(),
+}));
 
 // Mock dependencies
 vi.mock('execa', () => ({
   execa: vi.fn().mockResolvedValue({ stdout: '', exitCode: 0 }),
+}));
+
+vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
+  cleanupClosedIssueAgentDirectories: mocks.cleanupClosedIssueAgentDirectories,
+}));
+
+vi.mock('../../../src/lib/tmux.js', () => ({
+  getAgentSessionsSync: mocks.getAgentSessionsSync,
+  listSessionNamesSync: mocks.listSessionNamesSync,
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
@@ -29,9 +47,43 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
+const tempDirs: string[] = [];
+
+function makeAgentsDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
+  tempDirs.push(dir);
+  return dir;
+}
+
+function writeAgentState(agentsDir: string, agentId: string, state: object): void {
+  const agentDir = join(agentsDir, agentId);
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state), 'utf8');
+}
+
 describe('doctor command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(existsSync).mockImplementation((path) => {
+      if (typeof path === 'string' && path.includes('pan-doctor-agents-')) {
+        return true;
+      }
+      return true;
+    });
+    mocks.cleanupClosedIssueAgentDirectories.mockReturnValue(Effect.succeed({
+      removed: [],
+      protected: [],
+      wouldRemove: [],
+      totalCandidates: 0,
+    }));
+    mocks.getAgentSessionsSync.mockReturnValue([]);
+    mocks.listSessionNamesSync.mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   describe('configuration checks', () => {
@@ -122,6 +174,97 @@ describe('doctor command', () => {
       mockExistsSync.mockReturnValue(true);
 
       expect(existsSync('/home/test/.panopticon/commands')).toBe(true);
+    });
+  });
+
+  describe('closed issue agent directory checks', () => {
+    it('reports stale closed-issue agent directories', async () => {
+      mocks.cleanupClosedIssueAgentDirectories.mockReturnValueOnce(Effect.succeed({
+        removed: [],
+        protected: [],
+        wouldRemove: ['agent-pan-1052-ship'],
+        totalCandidates: 1,
+      }));
+
+      const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
+      const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');
+
+      expect(result).toMatchObject({
+        name: 'Closed-Issue Agent Dirs',
+        status: 'warn',
+      });
+      expect(result.message).toContain('1 old closed-issue agent dir');
+      expect(result.fix).toContain('agent-pan-1052-ship');
+    });
+
+    it('passes when no stale closed-issue agent directories exist', async () => {
+      const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
+      const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');
+
+      expect(result).toMatchObject({
+        name: 'Closed-Issue Agent Dirs',
+        status: 'ok',
+        message: 'No old closed-issue agent dirs detected',
+      });
+    });
+  });
+
+  describe('stopped-list classification checks', () => {
+    it('passes when running tmux agents classify as active', async () => {
+      const agentsDir = makeAgentsDir();
+      writeAgentState(agentsDir, 'agent-pan-1419', {
+        id: 'agent-pan-1419',
+        issueId: 'PAN-1419',
+        status: 'running',
+        startedAt: '2026-05-23T00:00:00.000Z',
+      });
+
+      const { checkStoppedListClassification } = await import('../../../src/cli/commands/doctor.js');
+      const result = checkStoppedListClassification({
+        agentsDir,
+        tmuxSessionNames: ['agent-pan-1419'],
+        dashboardAgents: [{
+          id: 'agent-pan-1419',
+          issueId: 'PAN-1419',
+          status: 'running',
+          hasLiveTmuxSession: true,
+        }],
+      });
+
+      expect(result).toMatchObject({
+        name: 'Stopped-List Classification',
+        status: 'ok',
+        message: 'Running agents with live tmux classify as active',
+      });
+    });
+
+    it('warns when a running tmux agent is missing from active dashboard data', async () => {
+      const agentsDir = makeAgentsDir();
+      writeAgentState(agentsDir, 'agent-pan-1419', {
+        id: 'agent-pan-1419',
+        issueId: 'PAN-1419',
+        status: 'running',
+        startedAt: '2026-05-23T00:00:00.000Z',
+      });
+
+      const { checkStoppedListClassification } = await import('../../../src/cli/commands/doctor.js');
+      const result = checkStoppedListClassification({
+        agentsDir,
+        tmuxSessionNames: ['agent-pan-1419'],
+        dashboardAgents: [{
+          id: 'agent-pan-1419',
+          issueId: 'PAN-1419',
+          status: 'stopped',
+          hasLiveTmuxSession: false,
+        }],
+      });
+
+      expect(result).toMatchObject({
+        name: 'Stopped-List Classification',
+        status: 'warn',
+      });
+      expect(result.message).toContain('agent-pan-1419');
+      expect(result.fix).toContain('PAN-1419');
     });
   });
 });

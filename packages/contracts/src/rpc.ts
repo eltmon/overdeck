@@ -48,6 +48,10 @@ export const WS_METHODS = {
   getWorkspaceDetail: "pan.getWorkspaceDetail",
   readWorkspaceFile: "pan.readWorkspaceFile",
 
+  // File-path existence (PAN-1457) — used by MarkdownFileLink to decide
+  // whether a path candidate in chat markdown should render as a chip.
+  resolveFilePathExists: "pan.resolveFilePathExists",
+
   // Terminal control
   terminalOpen: "pan.terminalOpen",
   terminalWrite: "pan.terminalWrite",
@@ -143,6 +147,8 @@ export const WorkLogEntry = Schema.Struct({
   changedFiles: Schema.optional(Schema.Array(Schema.String)),
   tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
   toolTitle: Schema.optional(Schema.String),
+  /** Raw tool_use input dict — drives per-tool expanded rendering (PAN-1459). */
+  toolInput: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   sequence: Schema.optional(Schema.Number),
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
@@ -288,6 +294,40 @@ export type ReadWorkspaceFileResult = typeof ReadWorkspaceFileResult.Type
 export const ReadWorkspaceFileRpc = Rpc.make(WS_METHODS.readWorkspaceFile, {
   payload: ReadWorkspaceFileInput,
   success: ReadWorkspaceFileResult,
+  error: PanRpcError,
+})
+
+/**
+ * 10c. Resolve whether a file path candidate exists on disk (PAN-1457).
+ *
+ * Used by MarkdownFileLink to decide whether a path-like token in chat
+ * markdown should render as a clickable chip. Returns exists=false for
+ * phantom paths (`conv/2209`, `users/foo`) and exists=true with kind for
+ * real files and directories (including bare directory references like
+ * `src/components/Foo` that the regex heuristic alone cannot validate).
+ *
+ * Security:
+ *   - Pure stat — never reads file contents, never enumerates directories.
+ *   - Relative paths resolve under cwd; absolute paths are statted directly.
+ *   - Caller is responsible for sending only paths surfaced from their own
+ *     conversation context; the resolver does not gate by issueId because
+ *     chat happens outside any single workspace.
+ */
+export const ResolveFilePathExistsInput = Schema.Struct({
+  cwd: Schema.String,
+  path: Schema.String,
+})
+export type ResolveFilePathExistsInput = typeof ResolveFilePathExistsInput.Type
+
+export const ResolveFilePathExistsResult = Schema.Struct({
+  exists: Schema.Boolean,
+  kind: Schema.NullOr(Schema.Literals(['file', 'dir'])),
+})
+export type ResolveFilePathExistsResult = typeof ResolveFilePathExistsResult.Type
+
+export const ResolveFilePathExistsRpc = Rpc.make(WS_METHODS.resolveFilePathExists, {
+  payload: ResolveFilePathExistsInput,
+  success: ResolveFilePathExistsResult,
   error: PanRpcError,
 })
 
@@ -495,6 +535,7 @@ export const PanRpcGroup = RpcGroup.make(
   ReplayEventsRpc,
   GetWorkspaceDetailRpc,
   ReadWorkspaceFileRpc,
+  ResolveFilePathExistsRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,

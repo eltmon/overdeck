@@ -11,6 +11,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
   let originalHome: string | undefined;
   let originalNoResume: string | undefined;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  let sessionExistsMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -24,6 +25,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     process.env.PANOPTICON_HOME = tempHome;
     delete process.env.PANOPTICON_NO_RESUME;
     resumeAgentMock = vi.fn();
+    sessionExistsMock = vi.fn(() => Effect.succeed(false));
   });
 
   afterEach(() => {
@@ -137,7 +139,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
-      sessionExists: vi.fn().mockReturnValue(false),
+      sessionExists: (...args: unknown[]) => sessionExistsMock(...args),
       sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
       sendKeysAsync: vi.fn().mockResolvedValue(undefined),
@@ -145,7 +147,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
 
     const agents = await import('../../../src/lib/agents.js');
     const deacon = await import('../../../src/lib/cloister/deacon.js');
-    return { agents, autoResumeStoppedWorkAgents: deacon.autoResumeStoppedWorkAgents };
+    return { agents, deacon, autoResumeStoppedWorkAgents: deacon.autoResumeStoppedWorkAgents };
   }
 
   it('increments the counter when resumeAgent fails during auto-resume', async () => {
@@ -171,6 +173,35 @@ describe('agent failure tracking and auto-resume backoff', () => {
     expect(state?.consecutiveFailures).toBe(1);
     expect(state?.lastFailureReason).toContain('tmux crashed');
     expect(state?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 5_000).toISOString());
+  });
+
+  it('reconciles a stopped agent with a live tmux session to running', async () => {
+    const agentId = 'agent-pan-1141-live-tmux';
+    sessionExistsMock.mockReturnValue(Effect.succeed(true));
+    const { agents, deacon, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    const notifications: Array<{ status: string; previousStatus?: string; hasLiveTmuxSession?: boolean }> = [];
+    deacon.setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
+      notifications.push({ status: state.status, previousStatus, hasLiveTmuxSession });
+    });
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+    const state = agents.getAgentStateSync(agentId);
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+    expect(state?.status).toBe('running');
+    expect(state?.stoppedAt).toBeUndefined();
+    expect(notifications).toEqual([{ status: 'running', previousStatus: 'stopped', hasLiveTmuxSession: true }]);
   });
 
   it('increments the counter for orphan-crash observations', async () => {
