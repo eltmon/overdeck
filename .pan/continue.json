@@ -1,0 +1,97 @@
+{
+  "version": "1",
+  "issueId": "PAN-1203",
+  "created": "2026-05-25T00:36:28.471Z",
+  "updated": "2026-05-25T00:43:04.024559Z",
+  "gitState": {
+    "branch": "feature/pan-1203",
+    "sha": "b26a4ed86",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Plan a complete docs-RAG feature: prebuilt SQLite index, `pan docs` retrieval commands, install-time index materialization, and prompt-time injection for Claude Code and Pi.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Use the existing `sync-sources` package layout for skill and hook corpus files; the docs corpus includes `docs/**/*.md`, `sync-sources/skills/*/SKILL.md`, `CLAUDE.md`, `.claude/rules/*.md`, and optionally PRDs per docs config.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Keep model work at build/reindex time only: `pan docs query` and the prompt hook read the shipped SQLite index and must not call embedding models or remote APIs during user prompt submission.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Extend the existing Claude Code `user-prompt-submit-hook` instead of replacing it, preserving waiting-state events and current memory injection output before adding a `<panopticon-docs>` block.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Represent docs-RAG settings in `config.yaml` under `docs.*`, normalized through `src/lib/config-yaml.ts`, with global/project enablement, trigger regexes, budget caps, corpus toggles, and classifier disabled by default.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    },
+    {
+      "id": "D6",
+      "summary": "For auto-planning ambiguity around the Pi prompt hook API, require implementation to add the best available Pi extension prompt-submit interception and tests; if Pi exposes no such API, the work agent must stop and report the blocker rather than silently shipping Claude-only behavior.",
+      "recordedAt": "2026-05-25T00:43:04.024559Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "The current Claude Code UserPromptSubmit hook prints context only; printing the original prompt would likely duplicate the user prompt.",
+      "mitigation": "Hook changes must preserve the current stdout contract: emit only supplemental context blocks, with existing memory context first and docs context second when triggered."
+    },
+    {
+      "id": "H2",
+      "summary": "Hook execution is on the hot path for every user prompt and must fail open quickly.",
+      "mitigation": "Use short timeouts, no network/model calls in prompt-time docs retrieval, and return no docs context on errors while still emitting existing Panopticon events."
+    },
+    {
+      "id": "H3",
+      "summary": "FTS5 MATCH syntax rejects some arbitrary user prompts.",
+      "mitigation": "Retriever must sanitize/tokenize user text into safe MATCH expressions and return no results, not throw, for malformed or empty queries."
+    },
+    {
+      "id": "H4",
+      "summary": "Embedding dependencies can bloat the package or introduce native/runtime install failures.",
+      "mitigation": "Keep embedding generation isolated to build/reindex, make the shipped index self-contained for query-time use, verify package size/index size budgets, and avoid first-run model downloads."
+    },
+    {
+      "id": "H5",
+      "summary": "The existing setup hooks path mutates `~/.claude/settings.json` and already has safety guarantees against clobbering user settings.",
+      "mitigation": "Reuse `readSettingsOrAbortSync`, backups, atomic writes, and delta hook registration; add docs hook registration without resetting or rewriting unrelated hook arrays."
+    },
+    {
+      "id": "H6",
+      "summary": "Pi extension prompt-submit capabilities are not established in the current codebase.",
+      "mitigation": "Implementation must verify the Pi extension API and either wire a tested prompt injection path or stop with a clear blocker before marking the Pi acceptance criterion complete."
+    },
+    {
+      "id": "H7",
+      "summary": "Session-scoped disable and budget state need a reliable conversation/session key, but hook payloads can vary across harness versions.",
+      "mitigation": "Parse `session_id`/equivalent from hook input when present, record fallback behavior explicitly, and cover missing-session payloads in tests."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:gpt-5.5",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T00:36:28.471Z",
+      "reason": "planning",
+      "note": "Auto-planning session started for PAN-1203 from existing orchestration context.",
+      "agentModel": "agent:gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-25T00:43:04.024559Z",
+      "reason": "planning-discovery",
+      "note": "Read PAN-1203 PRD and inspected CLI registration, install/setup hooks, Claude UserPromptSubmit hook, Pi extension hooks, config normalization, package build scripts, and existing SQLite FTS/embedding patterns.",
+      "agentModel": "agent:gpt-5.5"
+    }
+  ]
+}
