@@ -62,6 +62,7 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
+import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
@@ -321,6 +322,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   swarmRouteLayer,
   discoveredSessionsRouteLayer,
   flywheelRouteLayer,
+  featureRegistryRouteLayer,
   staticRouteLayer,
 );
 

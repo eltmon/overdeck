@@ -132,6 +132,7 @@ vi.mock('./components/CommandDeck', () => ({
 vi.mock('./components/Pipeline/PipelineView', () => ({
   PipelineView: () => <div data-testid="pipeline-view" />,
 }));
+vi.mock('./pages/HomePage', () => ({ HomePage: () => <div data-testid="home-page" /> }));
 vi.mock('./components/drawer/IssueDrawer', () => ({
   IssueDrawer: () => null,
 }));
@@ -221,9 +222,10 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('resolves Pipeline as the default route and Board as /board', () => {
+  it('resolves Home as the default route, Pipeline as /pipeline, and Board as /board', () => {
     window.history.replaceState(null, '', '/');
-    expect(getConversationRouteState().tab).toBe('pipeline');
+    expect(getConversationRouteState().tab).toBe('home');
+
     window.history.replaceState(null, '', '/pipeline');
     expect(getConversationRouteState().tab).toBe('pipeline');
 
@@ -231,7 +233,7 @@ describe('conversation route helpers', () => {
     expect(getConversationRouteState().tab).toBe('kanban');
 
     window.history.replaceState(null, '', '/unknown');
-    expect(getConversationRouteState().tab).toBe('pipeline');
+    expect(getConversationRouteState().tab).toBe('home');
   });
 
 });
@@ -293,7 +295,7 @@ describe('App conversation view routing', () => {
   });
 });
 
-describe('App Pipeline routing', () => {
+describe('App primary routing', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -310,10 +312,10 @@ describe('App Pipeline routing', () => {
     }));
   });
 
-  it('renders PipelineView at /', () => {
+  it('renders HomePage at /', () => {
     window.history.replaceState(null, '', '/');
     renderApp();
-    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
   });
 
   it('renders PipelineView at /pipeline', () => {
