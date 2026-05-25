@@ -39,6 +39,61 @@ export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<stri
   return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
 }
 
+// PAN-1510: bootstrap previously only seeded `issuesRaw` from the projection
+// cache or replaced it wholesale from `issueService.getIssues()`. Both paths
+// missed issues filed during the previous dashboard's poll-write window — the
+// projection cache flush is debounced at 2s, so a fresh `cache.set('github',
+// 'issues', ...)` in IssueDataService can survive a restart while the
+// projection cache entry remains stale. The helpers below mirror PAN-1506's
+// `discoverNewAgentIds`/merge pattern for issues.
+
+export function getIssueIdentifierKey(issue: unknown): string | null {
+  if (!issue || typeof issue !== 'object') return null;
+  const item = issue as { identifier?: unknown; id?: unknown };
+  if (typeof item.identifier === 'string' && item.identifier.length > 0) {
+    return item.identifier.toLowerCase();
+  }
+  if (typeof item.id === 'string' && item.id.length > 0) {
+    return item.id.toLowerCase();
+  }
+  return null;
+}
+
+export function discoverNewIssues(
+  cachedIssues: unknown[],
+  currentIssues: unknown[],
+): unknown[] {
+  const cachedIds = new Set<string>();
+  for (const issue of cachedIssues) {
+    const id = getIssueIdentifierKey(issue);
+    if (id !== null) cachedIds.add(id);
+  }
+  const newIssues: unknown[] = [];
+  for (const issue of currentIssues) {
+    const id = getIssueIdentifierKey(issue);
+    if (id !== null && !cachedIds.has(id)) newIssues.push(issue);
+  }
+  return newIssues;
+}
+
+export function mergeIssuesByIdentifier(
+  cachedIssues: unknown[],
+  currentIssues: unknown[],
+): unknown[] {
+  const merged = new Map<string, unknown>();
+  const unidentified: unknown[] = [];
+  for (const issue of cachedIssues) {
+    const id = getIssueIdentifierKey(issue);
+    if (id !== null) merged.set(id, issue);
+    else unidentified.push(issue);
+  }
+  for (const issue of currentIssues) {
+    const id = getIssueIdentifierKey(issue);
+    if (id !== null) merged.set(id, issue);
+  }
+  return [...unidentified, ...merged.values()];
+}
+
 export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 'status' | 'workspace'>): boolean {
   return !agent.workspace || isTerminalTurnDiffSummaryStatus(agent.status)
 }
@@ -342,6 +397,15 @@ export const ReadModelServiceLive = Layer.effect(
       // Refresh issues from the shared issue service before building snapshot.
       // IssueDataService polls trackers in the background; its cached issues are
       // the freshest available without blocking on API calls.
+      //
+      // PAN-1510: merge issueService's view with the current state.issuesRaw
+      // so a hard browser reload always reflects the union of (projection
+      // cache + freshest issueService data). issueService entries win on
+      // identifier conflicts (fresher status, labels, etc.), and cached
+      // entries that issueService is missing (transient empty fetch,
+      // partial poll, single-tracker failure) are preserved instead of
+      // dropped. Identifier-based merge is the same shape PAN-1506 used to
+      // surface newly-spawned agents through the bootstrap fast-path.
       try {
         const { getSharedIssueService } = yield* Effect.promise(
           () => import('./services/issue-service-singleton.js'),
@@ -349,7 +413,10 @@ export const ReadModelServiceLive = Layer.effect(
         const issueService = getSharedIssueService();
         const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
-          state = { ...state, issuesRaw: currentIssues };
+          state = {
+            ...state,
+            issuesRaw: mergeIssuesByIdentifier(state.issuesRaw, currentIssues),
+          };
         }
       } catch (err) {
         console.error('[ReadModel] Failed to refresh issues for snapshot:', err);
@@ -766,10 +833,33 @@ export const ReadModelServiceLive = Layer.effect(
         );
         const issueService = getSharedIssueService();
 
-        // Get current issues (may already have fresh data from background fetch)
+        // PAN-1510: merge issueService's view with whatever the projection
+        // cache loaded so newly-filed issues (filed during the previous
+        // session's debounced-flush window, or already loaded into
+        // IssueDataService's in-memory cache before the read model bootstrap
+        // wired its onIssuesChanged callback) reach `issuesRaw`. Without the
+        // merge, the bootstrap window between issueService.start() loading
+        // its SQLite cache and read-model wiring `onIssuesChanged` could
+        // strand fresh issues — the subsequent `pushSnapshot` would either
+        // hit a null callback or be skipped by `issuesChanged()` because
+        // `lastFetchedIssues` already matched the new GitHub fetch.
         const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || !usedProjectionCache) {
-          state = { ...state, issuesRaw: currentIssues };
+          const newIssues = discoverNewIssues(state.issuesRaw, currentIssues);
+          if (newIssues.length > 0) {
+            const sample = newIssues
+              .slice(0, 5)
+              .map(i => getIssueIdentifierKey(i) ?? 'unknown')
+              .join(', ');
+            const more = newIssues.length > 5 ? `, +${newIssues.length - 5} more` : '';
+            console.log(
+              `[ReadModel] Bootstrap: merging ${newIssues.length} new issue(s) from issueService not in projection cache (${sample}${more})`,
+            );
+          }
+          state = {
+            ...state,
+            issuesRaw: mergeIssuesByIdentifier(state.issuesRaw, currentIssues),
+          };
         }
 
         // Wire live issue updates — when IssueDataService polls new data,
