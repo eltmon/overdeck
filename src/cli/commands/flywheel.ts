@@ -12,10 +12,14 @@ import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } fro
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
 import {
+  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
+  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
   isFlywheelGloballyPaused,
   isFlywheelRequireUatBeforeMerge,
+  setFlywheelAutoPickupBacklog,
+  setFlywheelRequireUatBeforeMerge,
 } from '../../lib/database/app-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
@@ -29,6 +33,11 @@ interface EmitStatusOptions {
 
 interface StatusOptions {
   json?: boolean;
+}
+
+interface ConfigOptions {
+  get?: true | string;
+  set?: string;
 }
 
 interface StartOptions {
@@ -102,7 +111,85 @@ export function validateFlywheelStatusPayload(payload: unknown): FlywheelStatus 
   }
 }
 
+function isFlywheelConfigKey(key: string): key is FlywheelConfigKey {
+  return FLYWHEEL_CONFIG_KEYS.includes(key as FlywheelConfigKey);
+}
+
+function parseFlywheelConfigKey(key: string): FlywheelConfigKey {
+  if (!isFlywheelConfigKey(key)) throw new Error(`Unknown flywheel config key: ${key}`);
+  return key;
+}
+
+function readFlywheelConfigValue(key: FlywheelConfigKey): boolean {
+  switch (key) {
+    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
+      return isFlywheelAutoPickupBacklog();
+    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
+      return isFlywheelRequireUatBeforeMerge();
+  }
+}
+
+function writeFlywheelConfigValue(key: FlywheelConfigKey, value: boolean): void {
+  switch (key) {
+    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
+      setFlywheelAutoPickupBacklog(value);
+      return;
+    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
+      setFlywheelRequireUatBeforeMerge(value);
+      return;
+  }
+}
+
+function formatFlywheelConfigValue(key: FlywheelConfigKey): string {
+  return `${key}=${readFlywheelConfigValue(key)}`;
+}
+
+function parseConfigBoolean(key: string, rawValue: string): boolean {
+  if (rawValue === 'true') return true;
+  if (rawValue === 'false') return false;
+  throw new Error(`Boolean value required for ${key}: ${rawValue}`);
+}
+
+function parseFlywheelConfigAssignment(assignment: string): { key: FlywheelConfigKey; value: boolean } {
+  const separator = assignment.indexOf('=');
+  if (separator === -1) throw new Error('Flywheel config assignment must use <key>=<bool>');
+  const key = parseFlywheelConfigKey(assignment.slice(0, separator));
+  const value = parseConfigBoolean(key, assignment.slice(separator + 1));
+  return { key, value };
+}
+
+export async function flywheelConfigCommand(options: ConfigOptions = {}): Promise<void> {
+  try {
+    if (options.get !== undefined && options.set !== undefined) {
+      throw new Error('Use either --get or --set, not both');
+    }
+
+    if (options.set !== undefined) {
+      const { key, value } = parseFlywheelConfigAssignment(options.set);
+      writeFlywheelConfigValue(key, value);
+      console.log(`${key}=${value}`);
+      return;
+    }
+
+    if (typeof options.get === 'string') {
+      console.log(formatFlywheelConfigValue(parseFlywheelConfigKey(options.get)));
+      return;
+    }
+
+    console.log(FLYWHEEL_CONFIG_KEYS.map(formatFlywheelConfigValue).join('\n'));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
+const FLYWHEEL_CONFIG_KEYS = [
+  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
+  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
+] as const;
+
+type FlywheelConfigKey = typeof FLYWHEEL_CONFIG_KEYS[number];
 
 function isInsideRoot(projectRoot: string, candidate: string): boolean {
   const relativePath = relative(projectRoot, candidate);
@@ -697,6 +784,13 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Validate and publish a FlywheelStatus JSON snapshot to the local dashboard')
     .requiredOption('--file <path>', 'Path to FlywheelStatus JSON, or - to read from stdin')
     .action(emitStatusCommand);
+
+  flywheel
+    .command('config')
+    .description('Get or set Flywheel autonomy configuration')
+    .option('--get [key]', 'Print Flywheel config values')
+    .option('--set <key=value>', 'Set a Flywheel config boolean')
+    .action(flywheelConfigCommand);
 
   flywheel
     .command('status')

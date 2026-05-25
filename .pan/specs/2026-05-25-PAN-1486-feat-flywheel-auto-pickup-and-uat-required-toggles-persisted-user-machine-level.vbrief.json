@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:14:47.974Z"
+    "updated": "2026-05-25T09:22:27.826Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:14:47.974Z",
+    "updated": "2026-05-25T09:22:27.826Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -426,7 +426,7 @@
       {
         "id": "b07-pan-flywheel-config-cli",
         "title": "Add `pan flywheel config --get/--set` CLI subcommand + skill update",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -442,7 +442,7 @@
           {
             "id": "b07.ac1",
             "title": "`pan flywheel config --get` prints both keys with their current values in `<key>=<bool>` form on stdout, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -450,7 +450,7 @@
           {
             "id": "b07.ac2",
             "title": "`pan flywheel config --get flywheel.require_uat_before_merge` prints only that key, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -458,7 +458,7 @@
           {
             "id": "b07.ac3",
             "title": "`pan flywheel config --set flywheel.auto_pickup_backlog=true` sets the value (writes through app_settings), prints the new value, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -466,7 +466,7 @@
           {
             "id": "b07.ac4",
             "title": "`pan flywheel config --set unknown.key=true` exits non-zero with stderr 'Unknown flywheel config key: unknown.key'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -474,7 +474,7 @@
           {
             "id": "b07.ac5",
             "title": "`pan flywheel config --set flywheel.auto_pickup_backlog=maybe` exits non-zero with stderr explaining boolean is required.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -482,7 +482,7 @@
           {
             "id": "b07.ac6",
             "title": "sync-sources/skills/pan-flywheel/SKILL.md documents both `--get` and `--set` forms with an example for each key; `npm run lint` (which includes scripts/lint-skills.sh) passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -490,7 +490,7 @@
           {
             "id": "b07.ac7",
             "title": "Vitest tests in src/cli/commands/__tests__/flywheel.test.ts cover get-all, get-one, set-valid, set-unknown-key, set-non-boolean.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

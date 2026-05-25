@@ -45,6 +45,8 @@ vi.mock('../../../lib/cloister/flywheel.js', () => ({
 }));
 
 vi.mock('../../../lib/database/app-settings.js', () => ({
+  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY: 'flywheel.auto_pickup_backlog',
+  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY: 'flywheel.require_uat_before_merge',
   getFlywheelActiveRunId: () => flywheelLifecycleMocks.activeRunId,
   isFlywheelGloballyPaused: () => flywheelLifecycleMocks.paused,
   isFlywheelAutoPickupBacklog: () => flywheelLifecycleMocks.autoPickupBacklog,
@@ -52,8 +54,14 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
   setFlywheelActiveRunId: (runId: string | null) => {
     flywheelLifecycleMocks.activeRunId = runId;
   },
+  setFlywheelAutoPickupBacklog: (enabled: boolean) => {
+    flywheelLifecycleMocks.autoPickupBacklog = enabled;
+  },
   setFlywheelGloballyPaused: (paused: boolean) => {
     flywheelLifecycleMocks.paused = paused;
+  },
+  setFlywheelRequireUatBeforeMerge: (required: boolean) => {
+    flywheelLifecycleMocks.requireUatBeforeMerge = required;
   },
 }));
 
@@ -100,6 +108,7 @@ vi.mock('../../../lib/config-yaml.js', () => ({
 import {
   emitStatusCommand,
   flywheelAbortCommand,
+  flywheelConfigCommand,
   flywheelPauseCommand,
   flywheelReportCommand,
   flywheelResumeCommand,
@@ -302,6 +311,45 @@ describe('flywheel CLI commands', () => {
 
     expect(process.exitCode).toBe(1);
     expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
+  });
+
+  it('prints all flywheel config values', async () => {
+    await flywheelConfigCommand({ get: true });
+
+    expect(logSpy).toHaveBeenCalledWith([
+      'flywheel.auto_pickup_backlog=false',
+      'flywheel.require_uat_before_merge=true',
+    ].join('\n'));
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('prints one flywheel config value', async () => {
+    await flywheelConfigCommand({ get: 'flywheel.require_uat_before_merge' });
+
+    expect(logSpy).toHaveBeenCalledWith('flywheel.require_uat_before_merge=true');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('sets one flywheel config value', async () => {
+    await flywheelConfigCommand({ set: 'flywheel.auto_pickup_backlog=true' });
+
+    expect(flywheelLifecycleMocks.autoPickupBacklog).toBe(true);
+    expect(logSpy).toHaveBeenCalledWith('flywheel.auto_pickup_backlog=true');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('rejects unknown flywheel config keys', async () => {
+    await flywheelConfigCommand({ set: 'unknown.key=true' });
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('Unknown flywheel config key: unknown.key');
+  });
+
+  it('rejects non-boolean flywheel config values', async () => {
+    await flywheelConfigCommand({ set: 'flywheel.auto_pickup_backlog=maybe' });
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('Boolean value required for flywheel.auto_pickup_backlog: maybe');
   });
 
   it('starts a flywheel run with the default brief and writes initial state', async () => {
@@ -635,6 +683,7 @@ describe('flywheel CLI commands', () => {
     const flywheel = program.commands.find(command => command.name() === 'flywheel');
     const start = flywheel?.commands.find(command => command.name() === 'start');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
+    const config = flywheel?.commands.find(command => command.name() === 'config');
     const status = flywheel?.commands.find(command => command.name() === 'status');
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
@@ -642,6 +691,7 @@ describe('flywheel CLI commands', () => {
     const abort = flywheel?.commands.find(command => command.name() === 'abort');
     expect(start?.options.map(option => option.long)).toContain('--brief');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
+    expect(config?.options.map(option => option.long)).toEqual(expect.arrayContaining(['--get', '--set']));
     expect(status?.options.map(option => option.long)).toContain('--json');
     expect(pause).toBeDefined();
     expect(resume).toBeDefined();
