@@ -355,7 +355,7 @@
       {
         "id": "reconciler-patrol",
         "title": "feat(deacon): reconcile orphan proposed specs (auto-spawn safety net)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -375,7 +375,7 @@
           {
             "id": "reconciler-patrol.ac1",
             "title": "Reconciler patrol runs on the existing Deacon cycle at no more than 1 attempt per issue per 5 minutes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -383,7 +383,7 @@
           {
             "id": "reconciler-patrol.ac2",
             "title": "Reconciler scans <projectRoot>/.pan/specs/ for plan.status='proposed' and identifies orphans (no active session, no in-flight state.json, beads match plan items, not paused/troubled/closed)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -391,7 +391,7 @@
           {
             "id": "reconciler-patrol.ac3",
             "title": "Orphan spawn uses the SAME gate/guardrail/stack-health checks as direct POST /api/agents — no bypasses",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -399,7 +399,7 @@
           {
             "id": "reconciler-patrol.ac4",
             "title": "Paused, troubled, or closed issues are skipped (respects existing gates)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -407,7 +407,7 @@
           {
             "id": "reconciler-patrol.ac5",
             "title": "Reconciler emits structured activity-log events: scan-start, orphan-detected, spawn-attempt, spawn-success, spawn-skipped (with reason)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -415,7 +415,7 @@
           {
             "id": "reconciler-patrol.ac6",
             "title": "Reconciler can be disabled via config (cloister.orphanProposedReconciler.enabled=false); default is enabled",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -423,7 +423,7 @@
           {
             "id": "reconciler-patrol.ac7",
             "title": "Unit test exercises orphan-detection logic against a tmp .pan/specs/ fixture with mixed states (proposed-orphan, proposed-with-agent, proposed-paused, completed)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -431,7 +431,7 @@
           {
             "id": "reconciler-patrol.ac8",
             "title": "npm run typecheck && npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
