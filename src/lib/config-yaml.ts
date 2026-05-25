@@ -77,6 +77,21 @@ export interface MemoryConfig {
   worker_concurrency?: number;
 }
 
+export const COMPLIANCE_MODES = ['off', 'advisory', 'enforcing'] as const;
+export type ComplianceMode = typeof COMPLIANCE_MODES[number];
+
+export interface ComplianceConfig {
+  mode?: ComplianceMode;
+}
+
+export interface NormalizedComplianceConfig {
+  mode: ComplianceMode;
+}
+
+function isComplianceMode(value: unknown): value is ComplianceMode {
+  return typeof value === 'string' && (COMPLIANCE_MODES as readonly string[]).includes(value);
+}
+
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
 
 export interface ConversationsConfig {
@@ -317,6 +332,9 @@ export interface YamlConfig {
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
 
+  /** Memory-first compliance audit configuration */
+  compliance?: ComplianceConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -536,6 +554,9 @@ export interface NormalizedConfig {
     workerConcurrency: number;
   };
 
+  /** Memory-first compliance audit configuration */
+  compliance: NormalizedComplianceConfig;
+
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
 
@@ -702,6 +723,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
+  },
+  compliance: {
+    mode: 'advisory',
   },
   shadow: {
     enabled: false,
@@ -1219,6 +1243,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
       workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
     },
+    compliance: {
+      mode: DEFAULT_CONFIG.compliance.mode,
+    },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -1470,6 +1497,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (config.memory.worker_concurrency !== undefined) {
         result.memory.workerConcurrency = config.memory.worker_concurrency;
       }
+    }
+
+    if (config.compliance?.mode !== undefined) {
+      if (!isComplianceMode(config.compliance.mode)) {
+        throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(', ')}`);
+      }
+      result.compliance.mode = config.compliance.mode;
     }
 
     // Merge OpenRouter favorites

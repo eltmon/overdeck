@@ -170,6 +170,19 @@ api_keys:
         ).enabled,
       ).toBe(false);
     });
+
+    it('normalizes compliance mode with advisory as the default', () => {
+      expect(mergeConfigs().config.compliance.mode).toBe('advisory');
+      expect(mergeConfigs({ compliance: { mode: 'off' } }).config.compliance.mode).toBe('off');
+      expect(mergeConfigs({ compliance: { mode: 'advisory' } }).config.compliance.mode).toBe('advisory');
+      expect(mergeConfigs({ compliance: { mode: 'enforcing' } }).config.compliance.mode).toBe('enforcing');
+    });
+
+    it('rejects unknown compliance modes', () => {
+      expect(() => mergeConfigs({ compliance: { mode: 'strict' } } as never)).toThrow(
+        'config.yaml: compliance.mode must be off, advisory, enforcing',
+      );
+    });
   });
 
   describe('hasGlobalConfig', () => {
