@@ -1,0 +1,188 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1316: Stopped agents leave orphaned Docker workspace stacks — runaway dev server degrades the whole host",
+    "updated": "2026-05-25T16:27:18.399Z"
+  },
+  "plan": {
+    "id": "pan-1316",
+    "title": "Stopped agents leave orphaned Docker workspace stacks — runaway dev server degrades the whole host",
+    "status": "proposed",
+    "uid": "7b2e9a4d-3c81-4f15-9b6e-2d8c4f1a3b5e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 3,
+    "created": "2026-05-25T16:35:00.000Z",
+    "updated": "2026-05-25T16:27:18.399Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1316",
+        "label": "PAN-1316",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/commit/2d0c4df4a",
+        "label": "Round-1 fix (stop/kill/delete paths)",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "bug",
+      "docker",
+      "lifecycle",
+      "workspace",
+      "pause",
+      "audit-followup"
+    ],
+    "narratives": {
+      "Problem": "When a work agent is stopped, its Docker workspace stack is not torn down. Containers — particularly the frontend dev-server container — keep running indefinitely. In the reported incident, an orphaned Vite dev server ran for 17 hours and degraded the entire host via a chokidar polling storm (136% CPU, 258k context switches/s, ~57k TLB-shootdown IPIs/s invisible in `top`). Round 1 (commit 2d0c4df4a) closed the dashboard stop, dashboard delete, and `pan kill` paths via stopWorkspaceDocker calls. An audit (2026-05-24) found that the dashboard pause route (src/dashboard/server/routes/agents.ts:1664-1700) and the `pan pause` CLI command (src/cli/commands/pause.ts:20-30) still kill the tmux session and mark the runtime stopped without touching the workspace Docker stack. A user can therefore still strand a runaway dev-server container by clicking Pause.",
+      "Proposal": "Close both remaining pause paths by mirroring the round-1 pattern: after persisting pause state and killing the live tmux session, call stopWorkspaceDocker(workspace, issueId) when (and only when) the pause actually halted a live agent. Both fixes are mechanical mirrors of code that already exists for stop/kill — same gating boolean, same try/catch envelope, same helper. Each bead lands fix + test together. Scope is narrow on purpose: orphan surfacing in the dashboard (issue item #2) and `pan doctor` warnings (issue item #3) remain valid but out of scope for this round."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Match round-1 semantics: use stopWorkspaceDocker (docker compose down -v --remove-orphans) on pause, not a softer 'docker compose stop'.",
+        "rationale": "Pause already kills the tmux session and marks the runtime stopped — there is no state-preservation guarantee today. Diverging the Docker semantics from stop/kill would create surprising asymmetry. The reopening audit framed pause as 'leaving the stack running through a stop equivalent,' which is the same invariant violation as the round-1 paths. If volume-preserving pause is later wanted, it can be a new flag (e.g. `pan pause --preserve-state`)."
+      },
+      {
+        "summary": "Keep teardown at the call site; do not centralize it inside stopAgent/stopAgentAsync.",
+        "rationale": "Restart paths (agent-spawner.ts:244, flywheel.ts:148) call stopAgentAsync as part of a stop-then-respawn cycle. Centralizing teardown there would run `docker compose down -v` on every restart and destroy named volumes (DB data, redis state, etc.). The explicit call-site pattern established in round 1 is the right one and is repeated here verbatim."
+      },
+      {
+        "summary": "Scope strictly to the audit-flagged pause gap; defer dashboard orphan-surfacing and pan-doctor warnings.",
+        "rationale": "The reopening audit specifically called out the pause path and nothing else. The issue body itself notes 'a teardown-on-stop fix alone resolves the reported symptom (system-wide lag from orphaned dev servers).' Surfacing and doctor warnings are valuable hardening but are independent of the root-cause fix and would inflate this round into a larger refactor."
+      },
+      {
+        "summary": "Split the two pause fixes into separate beads rather than a single combined bead.",
+        "rationale": "They touch different files (one server route under Effect, one CLI command), use different test scaffolding (Effect handler harness vs. plain pauseCommand call), and can land independently. Independent reviewability is the planning-guidance preference."
+      },
+      {
+        "summary": "Bundle the unit test with each fix in the same bead (as an acceptance criterion) rather than carving out separate test beads.",
+        "rationale": "The test is the verification mechanism for the gating-boolean logic, which is the single tricky decision in each bead. Splitting fix from test risks landing the fix without a regression guard. The acceptance criteria explicitly require the test."
+      }
+    ],
+    "items": [
+      {
+        "id": "pause-route-teardown",
+        "title": "Tear down workspace Docker stack on dashboard pause",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1316",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts (postAgentPauseRoute, around line 1664-1700), after the existing block that captures output, kills the session, and marks the runtime stopped (conditional on `hasLiveSession`), add a stopWorkspaceDocker call gated on the same `stoppedByPause` boolean already computed at line 1644. Mirror the exact shape from lines 1077-1088 of the same file (the stop-route fix from commit 2d0c4df4a): try/catch envelope, console.log on success when containers were found, console.warn on failure. Use stateBeforePause.workspace and stateBeforePause.issueId.toLowerCase(). Do NOT centralize this into setAgentPausedAsync — restart paths must not get Docker teardown. Add a unit test in src/dashboard/server/routes/__tests__/ (sibling of agents-lifecycle-event.test.ts) that mocks `../../../../lib/workspace-manager.js` and exercises both branches via the postAgentPauseRoute handler."
+        },
+        "subItems": [
+          {
+            "id": "pause-route-teardown.ac1",
+            "title": "POST /api/agents/:id/pause calls stopWorkspaceDocker(workspace, issueId.toLowerCase()) after the existing killSessionAsync/stoppedState block when stoppedByPause is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-route-teardown.ac2",
+            "title": "POST /api/agents/:id/pause does NOT call stopWorkspaceDocker when stoppedByPause is false (i.e., pausing an agent that was already stopped/idle)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-route-teardown.ac3",
+            "title": "stopWorkspaceDocker exceptions are caught and logged via console.warn; the route still returns 200 with the updated agent state and still emits agent.status_changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-route-teardown.ac4",
+            "title": "A new vitest file exercises postAgentPauseRoute with stopWorkspaceDocker mocked, asserting it is called once with the correct args when stoppedByPause is true and not called when stoppedByPause is false; the existing tests in agents-lifecycle-event.test.ts continue to pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-route-teardown.ac5",
+            "title": "npm run typecheck and npm run lint pass; npm test passes locally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pause-cli-teardown",
+        "title": "Tear down workspace Docker stack on `pan pause`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1316",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/pause.ts, after the existing `if (shouldStop) { stopAgent(agentId); }` block (line 24-26), add a stopWorkspaceDocker call gated on the same `shouldStop` boolean. Mirror the exact shape from src/cli/commands/kill.ts:65-74 (the round-1 fix): try/catch, chalk.gray summary log on success when containers were found, chalk.yellow warning on failure. Import stopWorkspaceDocker from '../../lib/workspace-manager.js'. Use state.workspace and state.issueId.toLowerCase(). Read state.workspace/state.issueId from the existing `state` variable already in scope (line 13). Add a unit test in src/cli/commands/__tests__/ that mocks both '../../lib/agents.js' and '../../lib/workspace-manager.js' and asserts stopWorkspaceDocker is called when shouldStop is true and not called when shouldStop is false."
+        },
+        "subItems": [
+          {
+            "id": "pause-cli-teardown.ac1",
+            "title": "`pan pause <id>` calls stopWorkspaceDocker(state.workspace, state.issueId.toLowerCase()) after stopAgent(agentId) when shouldStop is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-cli-teardown.ac2",
+            "title": "`pan pause <id>` does NOT call stopWorkspaceDocker when shouldStop is false (sessionExists false AND status not running/starting)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-cli-teardown.ac3",
+            "title": "stopWorkspaceDocker exceptions are caught and printed via chalk.yellow; the command still exits 0 and the 'Paused' confirmation line still prints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-cli-teardown.ac4",
+            "title": "A new vitest file exercises pauseCommand with stopWorkspaceDocker mocked, asserting it is called once with the correct args when shouldStop is true and not called when shouldStop is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-cli-teardown.ac5",
+            "title": "npm run typecheck and npm run lint pass; npm test passes locally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1316-stopped-agents-leave-orphaned-docker-workspace-stacks-runaway-dev-server-degrades-the-whole-host.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
