@@ -5,6 +5,14 @@ export interface FlywheelStatsOptions {
   completedPipelineRuns?: number;
 }
 
+export interface Criterion7VerificationAttempt {
+  issueId: string;
+  stage: 'review' | 'test';
+  passed: boolean;
+  headSha?: string;
+  substrateAttributable?: boolean;
+}
+
 export interface ParsedFlywheelStatsWindow {
   input: string;
   ms: number;
@@ -101,13 +109,53 @@ export function computeTimeConsistencyCriterion(completedPipelineRuns: number): 
   );
 }
 
-export function computeFlakeCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Substrate-attributable flake rate',
-    0,
-    0.05,
-    completedPipelineRuns,
-  );
+function flakeStatus(rate: number): FlywheelStatsCriterion['status'] {
+  if (rate < 0.05) return 'green';
+  if (rate <= 0.10) return 'yellow';
+  return 'red';
+}
+
+export function computeCriterion7(attempts: readonly Criterion7VerificationAttempt[]): FlywheelStatsCriterion {
+  const lastAttemptByStage = new Map<string, Criterion7VerificationAttempt>();
+  let flakeCount = 0;
+  let substrateFailureCount = 0;
+
+  for (const attempt of attempts) {
+    const key = `${attempt.issueId}:${attempt.stage}`;
+    const previous = lastAttemptByStage.get(key);
+
+    if (!attempt.passed && attempt.substrateAttributable === true) {
+      substrateFailureCount += 1;
+      if (attempt.headSha && previous?.passed === true && previous.headSha === attempt.headSha) {
+        flakeCount += 1;
+      }
+    }
+
+    lastAttemptByStage.set(key, attempt);
+  }
+
+  const rate = substrateFailureCount === 0 ? 0 : flakeCount / substrateFailureCount;
+  return {
+    label: 'Substrate-attributable flake rate',
+    value: rate,
+    target: 0.05,
+    status: flakeStatus(rate),
+    sampleSize: substrateFailureCount,
+    dataSufficient: substrateFailureCount > 0,
+  };
+}
+
+export function computeFlakeCriterion(completedPipelineRuns: number, attempts: readonly Criterion7VerificationAttempt[] = []): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Substrate-attributable flake rate',
+      0,
+      0.05,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion7(attempts);
 }
 
 export async function computeFlywheelStats(

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion7,
   computeFlakeCriterion,
   computeFlywheelStats,
   computeInterventionCriterion,
@@ -137,5 +138,55 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('detects same-issue same-head pass-then-fail verification flakes', () => {
+    const criterion = computeCriterion7([
+      { issueId: 'PAN-1', stage: 'review', passed: true, headSha: 'abc123' },
+      { issueId: 'PAN-1', stage: 'review', passed: false, headSha: 'abc123', substrateAttributable: true },
+    ]);
+
+    expect(criterion.value).toBe(1);
+    expect(criterion.sampleSize).toBe(1);
+    expect(criterion.status).toBe('red');
+  });
+
+  it('excludes failures where the head commit changed between cycles', () => {
+    const criterion = computeCriterion7([
+      { issueId: 'PAN-2', stage: 'test', passed: true, headSha: 'abc123' },
+      { issueId: 'PAN-2', stage: 'test', passed: true, headSha: 'def456' },
+      { issueId: 'PAN-2', stage: 'test', passed: false, headSha: 'ghi789', substrateAttributable: true },
+    ]);
+
+    expect(criterion.value).toBe(0);
+    expect(criterion.sampleSize).toBe(1);
+    expect(criterion.status).toBe('green');
+  });
+
+  it.each([
+    [0, 20, 'green'],
+    [1, 20, 'yellow'],
+    [2, 20, 'yellow'],
+    [3, 20, 'red'],
+  ] as const)('maps criterion 7 rate thresholds for %d flakes out of %d failures', (flakes, failures, status) => {
+    const attempts = Array.from({ length: failures }, (_, index) => {
+      const issueId = `PAN-${index}`;
+      const headSha = `sha-${index}`;
+      return index < flakes
+        ? [
+            { issueId, stage: 'review' as const, passed: true, headSha },
+            { issueId, stage: 'review' as const, passed: false, headSha, substrateAttributable: true },
+          ]
+        : [
+            { issueId, stage: 'review' as const, passed: true, headSha },
+            { issueId, stage: 'review' as const, passed: false, headSha: `${headSha}-next`, substrateAttributable: true },
+          ];
+    }).flat();
+
+    const criterion = computeCriterion7(attempts);
+
+    expect(criterion.target).toBe(0.05);
+    expect(criterion.value).toBe(flakes / failures);
+    expect(criterion.status).toBe(status);
   });
 });
