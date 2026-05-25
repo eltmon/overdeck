@@ -210,6 +210,52 @@ export async function completePlanningAutoSpawn(options: {
   };
 }
 
+export async function completePlanningAutoSpawnAndKill(options: {
+  issueId: string;
+  autoSpawn: boolean;
+  skipKill: boolean;
+  sessionName: string;
+  fetchImpl?: typeof fetch;
+  dashboardOrigin?: string;
+  killSessionImpl?: (sessionName: string) => Promise<void>;
+  scheduleKill?: (callback: () => void, delayMs: number) => unknown;
+  logError?: (message?: unknown, ...optionalParams: unknown[]) => void;
+}): Promise<CompletePlanningAutoSpawnResult | null> {
+  const autoSpawnResult = await completePlanningAutoSpawn({
+    issueId: options.issueId,
+    autoSpawn: options.autoSpawn,
+    fetchImpl: options.fetchImpl,
+    dashboardOrigin: options.dashboardOrigin,
+  }).catch((error: unknown): CompletePlanningAutoSpawnResult => ({
+    workAgentSpawned: false,
+    workAgentError: error instanceof Error ? error.message : String(error),
+    workAgentSkipReason: 'spawn-failed',
+  }));
+
+  if (options.skipKill) return autoSpawnResult;
+
+  const killSessionImpl = options.killSessionImpl ?? ((target: string) => Effect.runPromise(killSession(target)));
+  const logError = options.logError ?? console.error;
+  const runKill = async (): Promise<void> => {
+    try {
+      await killSessionImpl(options.sessionName);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!/can't find session|session not found|no session found/i.test(msg)) {
+        logError(`[complete-planning] deferred kill-session failed for ${options.sessionName}:`, msg);
+      }
+    }
+  };
+
+  if (options.autoSpawn) {
+    await runKill();
+  } else {
+    (options.scheduleKill ?? setTimeout)(() => { void runKill(); }, 1500);
+  }
+
+  return autoSpawnResult;
+}
+
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 function isGitHubIssue(issueId: string): {
@@ -1332,27 +1378,12 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
-    const autoSpawnResult = yield* Effect.promise(() => completePlanningAutoSpawn({ issueId: id, autoSpawn })
-      .catch((error: unknown): CompletePlanningAutoSpawnResult => ({
-        workAgentSpawned: false,
-        workAgentError: error instanceof Error ? error.message : String(error),
-        workAgentSkipReason: 'spawn-failed',
-      })));
-
-    // Deferred session kill: schedule after the response is flushed so a chained
-    // `pan plan finalize` call from inside the planning session can read its own
-    // success response before its tmux pane is destroyed. ~1.5s is enough for the
-    // body to leave the kernel buffer and for plan-finalize to print.
-    if (!skipKill) {
-      setTimeout(() => {
-        Effect.runPromise(killSession(sessionName)).catch((error: unknown) => {
-          const msg = error instanceof Error ? error.message : String(error);
-          if (!/can't find session|session not found|no session found/i.test(msg)) {
-            console.error(`[complete-planning] deferred kill-session failed for ${sessionName}:`, msg);
-          }
-        });
-      }, 1500);
-    }
+    const autoSpawnResult = yield* Effect.promise(() => completePlanningAutoSpawnAndKill({
+      issueId: id,
+      autoSpawn,
+      skipKill,
+      sessionName,
+    }));
 
     return jsonResponse({
       success: true,

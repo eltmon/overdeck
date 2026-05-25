@@ -225,7 +225,7 @@
       {
         "id": "kill-deferral",
         "title": "fix(complete-planning): defer planning-session kill until after autoSpawn completes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -240,7 +240,7 @@
           {
             "id": "kill-deferral.ac1",
             "title": "When autoSpawn=true, planning-pan-<id> tmux session is killed AFTER the spawn step has resolved (success or fail), not on a 1.5s timer",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -248,7 +248,7 @@
           {
             "id": "kill-deferral.ac2",
             "title": "When autoSpawn=false, the existing 1.5s deferred kill behavior is preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -256,7 +256,7 @@
           {
             "id": "kill-deferral.ac3",
             "title": "When skipKill=true, no kill happens (existing behavior preserved in both branches)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -264,7 +264,7 @@
           {
             "id": "kill-deferral.ac4",
             "title": "If the spawn throws/rejects, the planning session is STILL killed (no leaked tmux session)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -272,7 +272,7 @@
           {
             "id": "kill-deferral.ac5",
             "title": "Unit test in __tests__/complete-planning.test.ts asserts kill timing in both autoSpawn=true success and failure paths",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

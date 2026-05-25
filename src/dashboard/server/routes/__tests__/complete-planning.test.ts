@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.js';
+import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill } from '../issues.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
 let projectRoot: string | null = null;
@@ -169,5 +169,85 @@ describe('completePlanningArtifacts', () => {
       workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
       workAgentSkipReason: 'stack-unhealthy',
     });
+  });
+
+  it('kills the planning session immediately after autoSpawn succeeds', async () => {
+    const events: string[] = [];
+    const fetchImpl: typeof fetch = async () => {
+      events.push('spawn');
+      return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1148' }), { status: 200 });
+    };
+
+    await expect(completePlanningAutoSpawnAndKill({
+      issueId: 'PAN-1148',
+      autoSpawn: true,
+      skipKill: false,
+      sessionName: 'planning-pan-1148',
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+      killSessionImpl: async (sessionName) => { events.push(`kill:${sessionName}`); },
+      scheduleKill: () => { throw new Error('kill should not be delayed'); },
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1148',
+    });
+    expect(events).toEqual(['spawn', 'kill:planning-pan-1148']);
+  });
+
+  it('kills the planning session immediately after autoSpawn fails', async () => {
+    const events: string[] = [];
+    const fetchImpl: typeof fetch = async () => {
+      events.push('spawn');
+      throw new Error('network unavailable');
+    };
+
+    await expect(completePlanningAutoSpawnAndKill({
+      issueId: 'PAN-1149',
+      autoSpawn: true,
+      skipKill: false,
+      sessionName: 'planning-pan-1149',
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+      killSessionImpl: async (sessionName) => { events.push(`kill:${sessionName}`); },
+      scheduleKill: () => { throw new Error('kill should not be delayed'); },
+    })).resolves.toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'network unavailable',
+      workAgentSkipReason: 'spawn-failed',
+    });
+    expect(events).toEqual(['spawn', 'kill:planning-pan-1149']);
+  });
+
+  it('preserves the delayed kill when autoSpawn is false', async () => {
+    const events: string[] = [];
+    await expect(completePlanningAutoSpawnAndKill({
+      issueId: 'PAN-1150',
+      autoSpawn: false,
+      skipKill: false,
+      sessionName: 'planning-pan-1150',
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => { throw new Error('fetch should not be called'); },
+      killSessionImpl: async (sessionName) => { events.push(`kill:${sessionName}`); },
+      scheduleKill: (_callback, delayMs) => { events.push(`schedule:${delayMs}`); },
+    })).resolves.toBeNull();
+    expect(events).toEqual(['schedule:1500']);
+  });
+
+  it('does not kill the planning session when skipKill is true', async () => {
+    const events: string[] = [];
+    await expect(completePlanningAutoSpawnAndKill({
+      issueId: 'PAN-1151',
+      autoSpawn: true,
+      skipKill: true,
+      sessionName: 'planning-pan-1151',
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1151' }), { status: 200 }),
+      killSessionImpl: async (sessionName) => { events.push(`kill:${sessionName}`); },
+      scheduleKill: () => { throw new Error('kill should not be scheduled'); },
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1151',
+    });
+    expect(events).toEqual([]);
   });
 });
