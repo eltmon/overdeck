@@ -32,7 +32,7 @@ export type ActivitySource =
   | 'deploy-script';
 
 export interface EmitActivityOptions {
-  source: Role | 'cloister' | 'dashboard';
+  source: ActivitySource;
   level: ActivityLevel;
   message: string;
   details?: string;
