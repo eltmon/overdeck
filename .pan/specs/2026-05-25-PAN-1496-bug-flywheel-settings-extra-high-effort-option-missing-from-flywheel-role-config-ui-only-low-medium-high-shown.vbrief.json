@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:03:10.302Z"
+    "updated": "2026-05-25T23:04:30.598Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:03:10.302Z",
+    "updated": "2026-05-25T23:04:30.598Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -277,7 +277,7 @@
       {
         "id": "b6-roles-panel-effort-options",
         "title": "Add 'Extra High' and 'Max' options to the Flywheel effort dropdown in RolesPanel",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -292,7 +292,7 @@
           {
             "id": "b6-roles-panel-effort-options.ac1",
             "title": "Settings → Roles → Flywheel role card renders a 'Flywheel effort' select with exactly five options in this order: Low, Medium, High, Extra High, Max",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -300,7 +300,7 @@
           {
             "id": "b6-roles-panel-effort-options.ac2",
             "title": "Selecting 'Extra High' triggers a PUT /api/settings with `roles.flywheel.effort: 'xhigh'`; selecting 'Max' sends `roles.flywheel.effort: 'max'`. Both succeed (200) and the value persists across page reload",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -308,7 +308,7 @@
           {
             "id": "b6-roles-panel-effort-options.ac3",
             "title": "Existing RolesPanel.test.tsx default-value assertion (`Flywheel effort` toHaveValue 'high') continues to pass — the saved default is unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -316,7 +316,7 @@
           {
             "id": "b6-roles-panel-effort-options.ac4",
             "title": "When the Flywheel orchestrator is then spawned via `pan flywheel start`, the resulting claude command line contains `--effort xhigh` (or `--effort max`) — verifiable by inspecting the launched tmux session's command or the spawnRun call args",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
