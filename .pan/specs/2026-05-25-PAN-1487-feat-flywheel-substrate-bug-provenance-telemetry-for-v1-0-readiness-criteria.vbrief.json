@@ -1,0 +1,1785 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T08:45:00.000Z",
+    "author": "panopticon-cli/0.11.1",
+    "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
+    "updated": "2026-05-25T08:32:32.564Z"
+  },
+  "plan": {
+    "id": "pan-1487",
+    "title": "feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
+    "status": "proposed",
+    "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T08:45:00.000Z",
+    "updated": "2026-05-25T08:32:32.564Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
+        "label": "PAN-1487",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/vision/flywheel-dev-loop-to-v1/docs/FLYWHEEL-VISION.md",
+        "label": "FLYWHEEL-VISION.md",
+        "type": "design"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
+        "label": "PAN-1486 (sibling — flywheel toggles)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "telemetry",
+      "v1.0",
+      "substrate-bugs",
+      "provenance"
+    ],
+    "narratives": {
+      "Problem": "Without substrate-bug provenance and per-run telemetry, none of the seven v1.0 readiness criteria in FLYWHEEL-VISION.md can be measured. Today: (a) substrate bugs filed by an agent during a Flywheel pass are indistinguishable from operator-asked-agent filings (same author, same shape), so we can't compute 'agent-discovered substrate bug rate'; (b) per-issue stage timing, intervention count, pass count, and outcome are scattered across the events table with no aggregator, so we can't compute pass-rate, MTTR, intervention-rate, time-consistency, or flake-rate. Everything else in the v1.0 vision is aspirational until this lands.",
+      "Proposal": "Three layers: (1) Provenance — Cloister threads PANOPTICON_FLYWHEEL_RUN_ID into every agent spawned while a Flywheel run is active; a Claude Code PreToolUse Bash hook intercepts `gh issue create` and appends a trailer block (Flywheel-Run-Id, Flywheel-Filed-By, Flywheel-Discovered-In) to the issue body. (2) Telemetry events + storage — new SubstrateBugFiledEvent and OperatorInterventionEvent domain events, plus a flywheel_substrate_bugs SQLite projection populated by a 60s GitHub poller. (3) Aggregation + surfaces — flywheel-telemetry service derives the 7 criteria from events + substrate bugs over a 30-day rolling window; GET /api/flywheel/stats route, `pan flywheel stats` CLI, and a new Stats tab on FlywheelPage render each criterion as value-vs-target with green/yellow/red status."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Filed-By: agent only when flywheel-orchestrator itself filed; operator-via-agent → operator.",
+        "rationale": "Matches the PRD's 'operator asks agent to file → operator' rule and is the only classification we can detect reliably without explicit intent signaling."
+      },
+      {
+        "summary": "Trailer block (not labels) as provenance carrier.",
+        "rationale": "Labels can be edited post-hoc; the initial issue body is immutable for forensic purposes. Matches the PRD-proposed format verbatim."
+      },
+      {
+        "summary": "PreToolUse Bash hook (not $PATH gh shim).",
+        "rationale": "Agents may invoke `/usr/bin/gh` with a full path, bypassing a shim. PreToolUse runs unconditionally regardless of how the agent spelled the command."
+      },
+      {
+        "summary": "Stats UI placement = third tab on FlywheelPage left pane (Status / State / Stats).",
+        "rationale": "Tab pattern already exists in the page header; adding a third tab is minimal incremental UI surface and preserves the operator-comment requirement to not crowd primary outputs."
+      },
+      {
+        "summary": "Substrate-attributable failure = review/test failure followed within 24h by a substrate bug with Flywheel-Discovered-In pointing at this issue.",
+        "rationale": "Conservative: misses substrate failures that were never filed (rare in practice) but never falsely blames code-defect failures."
+      },
+      {
+        "summary": "Complexity buckets: simple=1-3 beads, medium=4-8, complex=9+.",
+        "rationale": "Beads count is the only post-planning complexity signal we have; bucket boundaries are heuristic and tunable without schema changes."
+      },
+      {
+        "summary": "30-day rolling window default, --window arg accepts Go-style duration.",
+        "rationale": "30 days matches the FLYWHEEL-VISION readiness-criteria window verbatim."
+      },
+      {
+        "summary": "No historical backfill.",
+        "rationale": "Explicitly out-of-scope in the issue body."
+      },
+      {
+        "summary": "messageAgent emits operator.intervention only for user-source callers (pan tell, dashboard message), not internal automation callers (review nudges, poke).",
+        "rationale": "Internal callers would inflate intervention count and break criterion #5; the existing caller string distinguishes them."
+      }
+    ],
+    "items": [
+      {
+        "id": "provenance-env-vars",
+        "title": "Thread PANOPTICON_FLYWHEEL_RUN_ID + AGENT_ROLE into every agent spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "provenance-hook-script",
+            "provenance-role-hooks",
+            "substrate-bug-projection"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnRun() (src/lib/agents.ts) read getFlywheelActiveRunId() from app_settings at spawn time. If a run id is present and validates as RUN-<digits>, set PANOPTICON_FLYWHEEL_RUN_ID and PANOPTICON_FLYWHEEL_AGENT_ROLE=<role> in the spawned process env. spawnFlywheelAgent (src/lib/cloister/flywheel.ts) sets both unconditionally for the orchestrator since it owns the run."
+        },
+        "subItems": [
+          {
+            "id": "provenance-env-vars.ac1",
+            "title": "spawnRun sets PANOPTICON_FLYWHEEL_RUN_ID when getFlywheelActiveRunId() returns a value at spawn time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-env-vars.ac2",
+            "title": "spawnRun sets PANOPTICON_FLYWHEEL_AGENT_ROLE to the role string passed to it (work|plan|review|test|ship|flywheel)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-env-vars.ac3",
+            "title": "spawnFlywheelAgent always sets both env vars for the flywheel-orchestrator agent (with role=flywheel)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-env-vars.ac4",
+            "title": "Unit tests cover (a) Flywheel run active → env vars set; (b) no active run → env vars NOT set; (c) orchestrator always has both vars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-env-vars.ac5",
+            "title": "agents.ts changes use async fs only (no execSync/readFileSync) per CLAUDE.md dashboard-server rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provenance-hook-script",
+        "title": "gh-issue-trailer-hook: PreToolUse hook that appends Flywheel-* trailers to gh issue create body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "provenance-role-hooks",
+            "substrate-bug-projection",
+            "provenance-doc"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/hooks/gh-issue-trailer-hook.ts (compiled to bin/) that reads Claude Code PreToolUse JSON payload from stdin. If tool_name=='Bash' and the command is `gh issue create` (recognize flags --title/--body/--body-file), parse out the body, append '\\n\\n---\\nFlywheel-Run-Id: <PANOPTICON_FLYWHEEL_RUN_ID>\\nFlywheel-Filed-By: <agent|operator>\\nFlywheel-Discovered-In: <PANOPTICON_AGENT_ID's issueId>\\n' to it, and emit modifiedToolInput JSON. Filed-By=agent ONLY when PANOPTICON_FLYWHEEL_AGENT_ROLE=='flywheel'; everything else → operator. Install via pan admin hooks install (existing infra)."
+        },
+        "subItems": [
+          {
+            "id": "provenance-hook-script.ac1",
+            "title": "Hook handles `gh issue create --title X --body Y` and `--body-file path` and stdin-based body input; injects trailer correctly in each shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac2",
+            "title": "Idempotent: if body already contains a 'Flywheel-Run-Id:' line, hook returns input unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac3",
+            "title": "Non-Bash tools and non-issue-create Bash invocations pass through unchanged (emit empty `{}` and exit 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac4",
+            "title": "PANOPTICON_FLYWHEEL_AGENT_ROLE=='flywheel' produces Filed-By: agent; any other role (or unset) produces Filed-By: operator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac5",
+            "title": "Discovered-In resolves from PANOPTICON_AGENT_ID's state.json issueId field; if unresolvable, line is omitted (not left blank)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac6",
+            "title": "Unit tests cover all 6 above cases via stdin/stdout JSON shape; tests use vi.useFakeTimers if any retry/timer logic is added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-hook-script.ac7",
+            "title": "Hook is installable via `pan admin hooks install` (registers into the standard host hooks directory)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provenance-role-hooks",
+        "title": "Wire gh-issue-trailer-hook into roles/flywheel.md, roles/work.md, roles/plan.md PreToolUse Bash matchers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Append a new PreToolUse Bash hook entry referencing $HOME/.panopticon/bin/gh-issue-trailer-hook to the existing matcher arrays in roles/flywheel.md, roles/work.md, roles/plan.md. Order it BEFORE rtk-bash-filter so the rewritten command is what later hooks see. Do not remove or reorder existing hooks."
+        },
+        "subItems": [
+          {
+            "id": "provenance-role-hooks.ac1",
+            "title": "All three role files (flywheel, work, plan) have the trailer hook in their PreToolUse Bash matcher",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-role-hooks.ac2",
+            "title": "Existing hooks (pre-tool-hook, rtk-bash-filter, heartbeat-hook, etc.) are preserved verbatim — only addition, no edits or reorders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-role-hooks.ac3",
+            "title": "Trailer hook entry appears before rtk-bash-filter in the array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-role-hooks.ac4",
+            "title": "Snapshot test asserts the full PreToolUse Bash matcher order for each of the three role files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "events-substrate-bug-filed",
+        "title": "Add SubstrateBugFiledEvent to @panctl/contracts DomainEvent union",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/events.ts add SubstrateBugFiledEvent Schema.Struct with type='substrate.bug_filed', payload={issueId, runId?, filedBy: 'agent'|'operator', discoveredIn?: issueId, severity: 'P0'|'P1'|'P2'}. Add to DomainEvent union. Export type."
+        },
+        "subItems": [
+          {
+            "id": "events-substrate-bug-filed.ac1",
+            "title": "SubstrateBugFiledEvent matches the contract shape above and decodes/encodes round-trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-substrate-bug-filed.ac2",
+            "title": "Added to DomainEvent union and to event-reducers.ts as a no-op reducer (event is read-only telemetry, no state mutation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-substrate-bug-filed.ac3",
+            "title": "Schema test covers happy-path decode + decode with missing optional fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "events-operator-intervention",
+        "title": "Add OperatorInterventionEvent to @panctl/contracts DomainEvent union",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/events.ts add OperatorInterventionEvent Schema.Struct with type='operator.intervention', payload={issueId, kind: 'tell'|'pause'|'restart'|'manual_edit'|'deep_wipe'|'unpause'|'untroubled', source: string}. Add to DomainEvent union. Export type."
+        },
+        "subItems": [
+          {
+            "id": "events-operator-intervention.ac1",
+            "title": "OperatorInterventionEvent matches contract shape; kind is a closed enum literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-operator-intervention.ac2",
+            "title": "Added to DomainEvent union and reducers (no-op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-operator-intervention.ac3",
+            "title": "Schema test covers decode of each kind variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schema-substrate-bugs-table",
+        "title": "SQLite migration v44: flywheel_substrate_bugs table + repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "substrate-bug-projection",
+            "telemetry-criterion-1-bug-rate",
+            "telemetry-criterion-2-p0-bugs",
+            "telemetry-criterion-4-mttr"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/schema.ts add migration v44 creating table `flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, filed_at TEXT NOT NULL, run_id TEXT, filed_by TEXT NOT NULL CHECK (filed_by IN ('agent','operator')), discovered_in_issue_id TEXT, severity TEXT NOT NULL DEFAULT 'P2', status TEXT NOT NULL DEFAULT 'open', fix_merged_at TEXT, fix_commit_sha TEXT, updated_at TEXT NOT NULL)`. Index on (filed_at), (filed_by, filed_at), (status, fix_merged_at). Create src/lib/database/flywheel-substrate-bugs-db.ts with upsert, getByIssueId, listInWindow(since), markFixed(issueId, commitSha, mergedAt) repository methods using Effect.runSync wrappers."
+        },
+        "subItems": [
+          {
+            "id": "schema-substrate-bugs-table.ac1",
+            "title": "Migration v44 creates the table with the exact columns above and three indexes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-substrate-bugs-table.ac2",
+            "title": "Migration is idempotent (re-run on a v44+ database is a no-op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-substrate-bugs-table.ac3",
+            "title": "Repository module exports upsert / getByIssueId / listInWindow / markFixed with typed return values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-substrate-bugs-table.ac4",
+            "title": "Unit tests cover upsert (insert + update), listInWindow filter by filed_at range, markFixed sets status='fixed' + fix_merged_at + fix_commit_sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-substrate-bugs-table.ac5",
+            "title": "filed_by CHECK constraint rejects values other than 'agent' or 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-intervention-tell",
+        "title": "Emit operator.intervention from messageAgent (pan tell + dashboard message)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts messageAgent and the dashboard message route, after a successful message delivery, emit OperatorInterventionEvent{issueId: derivedFromAgentState, kind:'tell', source: callerString} via the event store. Only emit when the caller string matches a user-source whitelist ('pan-tell', 'dashboard:user-message'); skip for internal callers ('review:nudge', 'automation:poke')."
+        },
+        "subItems": [
+          {
+            "id": "emit-intervention-tell.ac1",
+            "title": "Calling messageAgent with caller='pan-tell' emits an OperatorInterventionEvent with kind='tell'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-tell.ac2",
+            "title": "Calling messageAgent with an internal caller (e.g. 'review:nudge') does NOT emit an intervention event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-tell.ac3",
+            "title": "issueId on the emitted event is resolved from the target agent's state.json; if state has no issueId, the event is skipped (with a debug log)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-tell.ac4",
+            "title": "Tests cover both emission and skip paths via mocked event store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-intervention-pause-restart",
+        "title": "Emit operator.intervention from pause/restart/deep-wipe agent endpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In the dashboard routes for pause (/api/agents/:id/pause), restart (/api/agents/:id/restart), and deep-wipe (/api/agents/:id/deep-wipe), emit OperatorInterventionEvent with kind='pause'/'restart'/'deep_wipe' and source='dashboard'. Also instrument the CLI commands pan pause, pan restart, pan wipe so they emit when invoked from the user's terminal."
+        },
+        "subItems": [
+          {
+            "id": "emit-intervention-pause-restart.ac1",
+            "title": "Pause / restart / deep-wipe HTTP routes each emit exactly one OperatorInterventionEvent on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-pause-restart.ac2",
+            "title": "Failed requests (404, validation error) emit NO intervention event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-pause-restart.ac3",
+            "title": "CLI variants (pan pause, pan kill, pan wipe) emit the same events via dashboard internal-token POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-pause-restart.ac4",
+            "title": "Route tests assert event payload matches expected shape per kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-intervention-manual-edit",
+        "title": "Emit operator.intervention from unpause/untroubled + workspace file-edit endpoints",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Emit OperatorInterventionEvent with kind='unpause'/'untroubled'/'manual_edit' from pan unpause, pan untroubled, and the workspace file-edit dashboard endpoint (if it exists; if not, skip 'manual_edit' for v1 and document in hazards)."
+        },
+        "subItems": [
+          {
+            "id": "emit-intervention-manual-edit.ac1",
+            "title": "pan unpause and pan untroubled emit kind='unpause' / 'untroubled' events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-intervention-manual-edit.ac2",
+            "title": "If a workspace-file-edit dashboard endpoint exists, it emits kind='manual_edit'; otherwise that path is explicitly documented as not yet instrumented and a follow-up TODO is added in docs/FLYWHEEL.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "substrate-bug-projection",
+        "title": "GitHub poller projects new substrate bugs into flywheel_substrate_bugs + emits SubstrateBugFiledEvent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/substrate-bug-poller.ts: poll every 60s for GitHub issues authored by panopticon-agent[bot] OR labelled 'substrate' created/updated in the last 5 minutes. For each, parse the trailer block from the body (regex over Flywheel-Run-Id, Flywheel-Filed-By, Flywheel-Discovered-In lines). Upsert into flywheel_substrate_bugs (idempotent via PRIMARY KEY). On first insert, emit SubstrateBugFiledEvent. Severity from labels (P0/P1/P2 → severity, default P2). Also watch for merged PRs with 'fix(es)? #NNNN' / 'close(s|d)? #NNNN' / 'resolve(s|d)? #NNNN' referencing a substrate bug; if found, call markFixed(issueId, commitSha, mergedAt) to populate MTTR. Register the poller in src/dashboard/server/main.ts boot sequence, respecting the rate_limits table."
+        },
+        "subItems": [
+          {
+            "id": "substrate-bug-projection.ac1",
+            "title": "Poller runs every 60s while dashboard server is up, no execSync/readFileSync (Node.js event-loop safe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac2",
+            "title": "Trailer regex correctly extracts runId, filedBy, discoveredIn from the canonical trailer block; handles missing lines gracefully",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac3",
+            "title": "Idempotent: poller re-seeing the same issue does NOT emit a duplicate SubstrateBugFiledEvent (verified by emit count after running poller twice on same fixture)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac4",
+            "title": "PR-merge scan correctly resolves closes/fixes/resolves references and calls markFixed only for issues present in flywheel_substrate_bugs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac5",
+            "title": "Severity is read from labels (P0/P1/P2); absent → default P2; tests cover all four cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac6",
+            "title": "Poller respects existing rate_limits table — backs off when GitHub returns 403 with X-RateLimit-Remaining=0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-bug-projection.ac7",
+            "title": "Vitest tests for poller use vi.useFakeTimers + vi.advanceTimersByTimeAsync — never real setTimeout-based delays (per CLAUDE.md test rules)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-timing-derivation",
+        "title": "derivePipelineRunMetrics: per-issue stage durations from events table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/server/services/pipeline-run-metrics.ts exporting derivePipelineRunMetrics(issueId): {plan, work, review, test, ship, mergeMs, outcome, interventionCount, passCount, headSha?} computed from the existing `events` table. Plan: agent.created(role=plan) → agent.completed(role=plan). Work: agent.created(role=work) → first pipeline.review-started. Review: pipeline.review-started → pipeline.review-completed (sum across cycles). Test: pipeline.test-started → pipeline.test-completed (sum). Ship: last passing review/test → merge-complete-event. PassCount: count of pipeline.review-completed{passed:false} + pipeline.test-completed{passed:false} for this issue. InterventionCount: count of operator.intervention events for this issue. Outcome: merged|parked|cancelled from issue.closed/issue.status_changed."
+        },
+        "subItems": [
+          {
+            "id": "stage-timing-derivation.ac1",
+            "title": "derivePipelineRunMetrics returns correct stage durations for a happy-path single-pass issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-timing-derivation.ac2",
+            "title": "Multi-cycle review/test correctly sums durations across cycles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-timing-derivation.ac3",
+            "title": "passCount counts review+test failed completions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-timing-derivation.ac4",
+            "title": "interventionCount counts operator.intervention events scoped to this issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-timing-derivation.ac5",
+            "title": "outcome resolves to merged|parked|cancelled from terminal event; in-flight issues return outcome='in_flight' and are excluded from window-bound aggregates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-timing-derivation.ac6",
+            "title": "All SQL queries are parameterized; no string concatenation of issueId into SQL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-service-scaffold",
+        "title": "flywheel-telemetry service scaffold: 7-criterion stats interface returning placeholders",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "telemetry-criterion-1-bug-rate",
+            "telemetry-criterion-2-p0-bugs",
+            "telemetry-criterion-3-pass-rate",
+            "telemetry-criterion-4-mttr",
+            "telemetry-criterion-5-intervention",
+            "telemetry-criterion-6-time-consistency",
+            "telemetry-criterion-7-flake",
+            "stats-route",
+            "stats-contracts",
+            "stats-cli",
+            "stats-frontend-component"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/flywheel-telemetry.ts exporting computeFlywheelStats(window: Duration): Promise<FlywheelStats>. Returns the full FlywheelStats shape (defined in stats-contracts bead) with each of seven criteria as {value, target, status, trend, sampleSize, dataSufficient}. Initial implementation returns dataSufficient=false placeholder rows for all 7. Subsequent beads (telemetry-criterion-N-*) each replace one placeholder with a real computation. Each criterion has its own private helper so beads stay independently mergeable."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-service-scaffold.ac1",
+            "title": "computeFlywheelStats(window) returns a structurally complete FlywheelStats with all 7 criteria populated (placeholder rows allowed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-service-scaffold.ac2",
+            "title": "Window arg accepts Go-style duration strings (30d, 7d, 24h, 1h)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-service-scaffold.ac3",
+            "title": "Each criterion is computed by a separate exported helper function so subsequent beads can implement them in isolation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-service-scaffold.ac4",
+            "title": "When fewer than 3 completed pipeline runs exist in the window, every criterion returns dataSufficient=false (per D11)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-service-scaffold.ac5",
+            "title": "Snapshot test on the placeholder response pins the shape so frontend can render against it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-1-bug-rate",
+        "title": "Criterion 1: substrate-bug discovery rate (agent-filed bugs / pipeline runs)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion1 in flywheel-telemetry.ts: numerator = COUNT(*) from flywheel_substrate_bugs WHERE filed_by='agent' AND filed_at BETWEEN since AND now; denominator = COUNT(DISTINCT issue_id) of completed pipeline runs in same window. Target: <2%. Status green if <2%, yellow 2-5%, red >5%."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-1-bug-rate.ac1",
+            "title": "value = agentBugsCount / completedRunsCount, returned as a fraction (e.g. 0.018 = 1.8%)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-1-bug-rate.ac2",
+            "title": "target=0.02, status thresholds: green<0.02, yellow 0.02-0.05, red>0.05",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-1-bug-rate.ac3",
+            "title": "Test with fixture: 100 runs + 1 agent-filed substrate bug → value=0.01, status=green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-1-bug-rate.ac4",
+            "title": "Operator-filed bugs are EXCLUDED from numerator (only agent-discovered counts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-2-p0-bugs",
+        "title": "Criterion 2: critical/P0 substrate bug count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion2: COUNT(*) FROM flywheel_substrate_bugs WHERE severity='P0' AND filed_at BETWEEN since AND now. Target: 0. Status green if 0, red if >=1."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-2-p0-bugs.ac1",
+            "title": "value = count of P0 substrate bugs in window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-2-p0-bugs.ac2",
+            "title": "target=0; status=green when value=0, red when value>=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-2-p0-bugs.ac3",
+            "title": "Test fixture: 1 P0 → red; 0 P0 → green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-3-pass-rate",
+        "title": "Criterion 3: pipeline pass success rate (substrate-attributable failures only)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion3: 1 - (substrate-attributable failures / total review/test attempts). Substrate-attributable failure = pipeline.{review,test}-completed{passed:false} where within 24h after the failure event, a flywheel_substrate_bugs row was created with discovered_in_issue_id=issueId. Target: ≥99%. Status green ≥0.99, yellow 0.95-0.99, red <0.95."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-3-pass-rate.ac1",
+            "title": "Numerator counts ONLY substrate-attributable failures (per D13); legitimate code-defect failures are excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-3-pass-rate.ac2",
+            "title": "Denominator = total review attempts + test attempts in window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-3-pass-rate.ac3",
+            "title": "Target=0.99; green>=0.99, yellow [0.95, 0.99), red <0.95",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-3-pass-rate.ac4",
+            "title": "Test fixture: 100 attempts, 1 substrate-attributable failure → 0.99 → green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-4-mttr",
+        "title": "Criterion 4: MTTR for filed substrate bugs (median + p95)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion4: from flywheel_substrate_bugs WHERE status='fixed' AND fix_merged_at BETWEEN since AND now, compute durations = fix_merged_at - filed_at. Report {medianMs, p95Ms}. Target: median<24h, p95<7d. Status green if both met, yellow if median<24h but p95<14d, red otherwise."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-4-mttr.ac1",
+            "title": "value = {medianMs, p95Ms} computed from fix_merged_at - filed_at across all fixed bugs in window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-4-mttr.ac2",
+            "title": "target = {medianMs: 86400000 (24h), p95Ms: 604800000 (7d)}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-4-mttr.ac3",
+            "title": "Status green if median<24h AND p95<7d; yellow if median<24h AND p95<14d; red otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-4-mttr.ac4",
+            "title": "If fewer than 3 fixed bugs in window → dataSufficient=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-4-mttr.ac5",
+            "title": "Test fixture: 5 fixed bugs with known fix_merged_at - filed_at yields correct median + p95",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-5-intervention",
+        "title": "Criterion 5: operator intervention rate per pipeline run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion5: numerator = COUNT(*) operator.intervention events for issues whose pipeline run completed in window; denominator = COUNT(DISTINCT issueId) of completed runs in window. Value = numerator/denominator (interventions per run, NOT a fraction). Target: <5% — interpreted as <0.05 interventions/run on average (since 'rate per run' is the headline framing). Status green <0.05, yellow 0.05-0.20, red >0.20. UAT is explicitly NOT counted (no event emitted for UAT)."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-5-intervention.ac1",
+            "title": "value = total interventions / completed runs in window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-5-intervention.ac2",
+            "title": "target=0.05; thresholds green<0.05, yellow [0.05,0.20], red>0.20",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-5-intervention.ac3",
+            "title": "Fixture: 10 runs, 1 'tell' event total → value=0.10 → yellow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-5-intervention.ac4",
+            "title": "UAT actions (whatever UAT events are recorded) do NOT contribute to numerator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-6-time-consistency",
+        "title": "Criterion 6: time-in-pipeline consistency per complexity bucket (p95 <= 2x median)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion6: for each completed run in window, sum stage durations (plan+work+review+test+ship+merge) to get totalMs. Bucket by beads count: simple=1-3, medium=4-8, complex=9+. For each bucket compute median + p95 of totalMs; check p95/median ratio. Return {simple: {medianMs, p95Ms, ratio, status}, medium: {...}, complex: {...}}. Target per bucket: ratio<=2.0. Status: green if all three buckets <=2.0, yellow if any bucket 2-3, red if any bucket >3."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-6-time-consistency.ac1",
+            "title": "Bucket assignment uses beads count from .beads/issues.jsonl OR (fallback) plan_items count from the vBRIEF spec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-6-time-consistency.ac2",
+            "title": "Per-bucket median + p95 computed correctly; ratio = p95/median",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-6-time-consistency.ac3",
+            "title": "Buckets with fewer than 3 runs are marked dataSufficient=false, not red",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-6-time-consistency.ac4",
+            "title": "Headline status = worst-bucket status (green if all <=2.0, yellow if any 2-3, red if any >3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-6-time-consistency.ac5",
+            "title": "Test fixture: 6 runs across 2 buckets with known totalMs distribution produces correct ratios",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-criterion-7-flake",
+        "title": "Criterion 7: flake rate on substrate-attributable failures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Implement computeCriterion7: flake = a review or test that PASSED on one cycle and FAILED on the next within the same pipeline run with no intervening commit (same head SHA). Per H9 hazard. Numerator = flake count; denominator = total substrate-attributable failures. Target: <5%. Status green <0.05, yellow 0.05-0.10, red >0.10."
+        },
+        "subItems": [
+          {
+            "id": "telemetry-criterion-7-flake.ac1",
+            "title": "Flake detection correctly identifies same-issue, same-head-SHA review/test with divergent outcomes across cycles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-7-flake.ac2",
+            "title": "Numerator excludes failures where commit changed between cycles (legitimate fix attempts, not flakes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-7-flake.ac3",
+            "title": "target=0.05; green<0.05, yellow [0.05,0.10], red>0.10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-criterion-7-flake.ac4",
+            "title": "Test fixture: same SHA pass-then-fail produces 1 flake; pass-fix-pass-fail across different SHAs produces 0 flakes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-contracts",
+        "title": "Add FlywheelStats schema to @panctl/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stats-route",
+            "stats-cli",
+            "stats-frontend-component"
+          ]
+        },
+        "narrative": {
+          "Action": "Add packages/contracts/src/flywheel-stats.ts exporting FlywheelStats Schema.Struct: { window: string, generatedAt: string, criteria: { c1_bugRate: FlywheelStatsCriterion, c2_p0Bugs: FlywheelStatsCriterion, c3_passRate: FlywheelStatsCriterion, c4_mttr: FlywheelStatsCriterion, c5_intervention: FlywheelStatsCriterion, c6_timeConsistency: FlywheelStatsCriterion, c7_flake: FlywheelStatsCriterion } }. FlywheelStatsCriterion = { label, value (number | object), target (number | object), status: 'green'|'yellow'|'red'|'insufficient_data', trend?: 'up'|'down'|'flat', sampleSize: number, dataSufficient: boolean }. Export TypeScript types and the decoder. Re-export from contracts/src/index.ts."
+        },
+        "subItems": [
+          {
+            "id": "stats-contracts.ac1",
+            "title": "FlywheelStats Schema.Struct matches the shape above and round-trips through decode/encode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-contracts.ac2",
+            "title": "All 7 criteria keys are present (c1_..c7_) and each has the FlywheelStatsCriterion shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-contracts.ac3",
+            "title": "FlywheelStatsCriterion.value supports both scalar (number) and object (e.g. {medianMs, p95Ms} for criterion 4) via Schema.Union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-contracts.ac4",
+            "title": "Types re-exported from packages/contracts/src/index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-contracts.ac5",
+            "title": "Snapshot test pins the JSON shape so frontend + CLI can decode against it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-route",
+        "title": "GET /api/flywheel/stats?window=30d route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/flywheel.ts add a GET /api/flywheel/stats handler. Parse ?window= (default '30d'), call computeFlywheelStats(window), return FlywheelStats JSON. Validate response with the FlywheelStats schema before sending."
+        },
+        "subItems": [
+          {
+            "id": "stats-route.ac1",
+            "title": "GET /api/flywheel/stats with no query returns 30-day stats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-route.ac2",
+            "title": "GET /api/flywheel/stats?window=7d returns 7-day stats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-route.ac3",
+            "title": "Invalid window (e.g. ?window=abc) returns 400 with error body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-route.ac4",
+            "title": "Response is validated against the FlywheelStats schema before send (catches accidental shape drift)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-route.ac5",
+            "title": "Route test asserts 200 + decoded body shape for a fixture event store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-cli",
+        "title": "pan flywheel stats [--window 30d] CLI command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel.ts register a new subcommand `stats` with option --window <duration> (default 30d). Implementation calls GET /api/flywheel/stats?window=<X> via the dashboard's internal-token client, prints a colored ASCII table with rows for each of 7 criteria: label | value | target | status (green/yellow/red glyph) | trend | sampleSize. Supports --json for raw output. Also update the pan-flywheel skill SKILL.md to document the new subcommand (per the SKILLS-CONVENTION rule)."
+        },
+        "subItems": [
+          {
+            "id": "stats-cli.ac1",
+            "title": "`pan flywheel stats` prints 7-row table with default 30-day window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-cli.ac2",
+            "title": "`pan flywheel stats --window 7d` queries with 7-day window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-cli.ac3",
+            "title": "`pan flywheel stats --json` emits raw FlywheelStats JSON to stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-cli.ac4",
+            "title": "Status column uses color (green/yellow/red) when stdout is a TTY; plain text when piped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-cli.ac5",
+            "title": "skills/pan-flywheel/SKILL.md documents the `stats` subcommand with example output; scripts/lint-skills.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-cli.ac6",
+            "title": "CLI test covers all three modes (default, --window, --json) with a mock dashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-frontend-component",
+        "title": "FlywheelStatsPanel React component rendering the 7 criteria cards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/flywheel/FlywheelStatsPanel.tsx. Fetches GET /api/flywheel/stats on mount (and on a 60s interval). Renders 7 cards in a responsive grid: each card shows label, large value, target line, status indicator (colored dot + label), trend arrow if present, sampleSize footer. Insufficient-data state shows 'collecting since <date>' instead of a value. Tooltip on each card explains how the criterion is computed (per D12 / H9 notes). Component tests with fixture FlywheelStats."
+        },
+        "subItems": [
+          {
+            "id": "stats-frontend-component.ac1",
+            "title": "Renders 7 cards, one per criterion, with label / value / target / status / trend / sampleSize",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-component.ac2",
+            "title": "dataSufficient=false renders 'collecting since <date>' instead of a value, and status indicator shows neutral (not red)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-component.ac3",
+            "title": "Tooltip on each card explains the metric (taken from a constants map, not inline strings)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-component.ac4",
+            "title": "Auto-refreshes every 60s; handles fetch error gracefully (keeps last good data, shows banner)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-component.ac5",
+            "title": "Vitest component test with fixture FlywheelStats asserts all 7 cards render correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-component.ac6",
+            "title": "Accessibility: each card uses role=region with aria-label; status indicators have text labels in addition to color",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-frontend-tab",
+        "title": "Add Stats tab to FlywheelPage left pane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/FlywheelPage.tsx extend FlywheelLeftTab type to 'status' | 'state' | 'stats'. Add a third tab button after State. When active, render <FlywheelStatsPanel /> in the tabpanel area. Preserve the existing Status / State tabs verbatim. Update FlywheelPage.test.tsx for the new tab."
+        },
+        "subItems": [
+          {
+            "id": "stats-frontend-tab.ac1",
+            "title": "Third tab labelled 'Stats' appears after 'State' with aria-selected wiring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-tab.ac2",
+            "title": "Clicking Stats tab renders FlywheelStatsPanel; clicking Status / State switches back without losing fetched data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-tab.ac3",
+            "title": "Existing Status and State tab behavior is preserved (verified by existing FlywheelPage tests still passing unmodified except for the new tab assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-frontend-tab.ac4",
+            "title": "Layout: stats panel does not crowd the primary right-pane outputs (per operator comment) — uses the existing left-pane split width",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provenance-doc",
+        "title": "Document trailer convention in FLYWHEEL.md and flywheel-brief.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Add a 'Substrate-bug provenance' section to docs/FLYWHEEL.md explaining the trailer block, what each line means, when Filed-By is 'agent' vs 'operator', how the hook injects it, and how telemetry consumes it. Update docs/flywheel-brief.md to reference provenance as part of the substrate-bug filing workflow."
+        },
+        "subItems": [
+          {
+            "id": "provenance-doc.ac1",
+            "title": "docs/FLYWHEEL.md has a 'Substrate-bug provenance' section with the trailer block example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-doc.ac2",
+            "title": "docs/flywheel-brief.md references provenance rules in the substrate-bug section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-doc.ac3",
+            "title": "Writing follows the clear-writing skill conventions (no AI-tells, no hedging)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-readiness",
+        "title": "Document the Stats tab + 7 criteria interpretation",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Add a 'Reading the Stats panel' section to docs/FLYWHEEL.md describing each of the 7 criteria, how it's computed, what status thresholds mean, and the 30-day window. Cross-link from FLYWHEEL-VISION.md v1.0 readiness criteria table to this doc (anchor link)."
+        },
+        "subItems": [
+          {
+            "id": "docs-readiness.ac1",
+            "title": "docs/FLYWHEEL.md has a 'Reading the Stats panel' section listing all 7 criteria with formula + threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-readiness.ac2",
+            "title": "FLYWHEEL-VISION.md v1.0 readiness table has anchor links to the new section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-readiness.ac3",
+            "title": "Lists the substrate-attributable heuristic (D13), complexity buckets (D12), flake definition (H9) so operators know what's measured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-acceptance",
+        "title": "End-to-end smoke: file a fake substrate bug, verify trailer + projection + stats row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1487",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
+        },
+        "narrative": {
+          "Action": "Add an integration test (Vitest + a Playwright check) that: (1) simulates a Flywheel-orchestrator agent invoking `gh issue create` with PANOPTICON_FLYWHEEL_RUN_ID set — verifies trailer block is appended; (2) drives the substrate-bug poller against a fixture GitHub response containing the trailer — verifies the row appears in flywheel_substrate_bugs and SubstrateBugFiledEvent is emitted; (3) calls /api/flywheel/stats — verifies criterion 1 (bug-rate) value reflects the inserted bug; (4) Playwright opens FlywheelPage Stats tab in an isolated browser instance and asserts the criterion card renders the new value."
+        },
+        "subItems": [
+          {
+            "id": "e2e-acceptance.ac1",
+            "title": "End-to-end test runs in CI and exercises all four stages (hook → poller → stats route → UI)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-acceptance.ac2",
+            "title": "Playwright uses an isolated browser instance/profile (per Playwright Isolation rule); does not share state with other agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-acceptance.ac3",
+            "title": "Test uses vi.useFakeTimers + vi.advanceTimersByTimeAsync for the poller delays — no real wall-clock waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-acceptance.ac4",
+            "title": "Provenance flows correctly: trailer says Filed-By=agent only because PANOPTICON_FLYWHEEL_AGENT_ROLE=flywheel was set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "provenance-env-vars",
+        "to": "provenance-hook-script",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-env-vars",
+        "to": "provenance-role-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-hook-script",
+        "to": "provenance-role-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-hook-script",
+        "to": "substrate-bug-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-role-hooks",
+        "to": "e2e-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "events-substrate-bug-filed",
+        "to": "substrate-bug-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "events-operator-intervention",
+        "to": "emit-intervention-tell",
+        "type": "blocks"
+      },
+      {
+        "from": "events-operator-intervention",
+        "to": "emit-intervention-pause-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "events-operator-intervention",
+        "to": "emit-intervention-manual-edit",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-substrate-bugs-table",
+        "to": "substrate-bug-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-substrate-bugs-table",
+        "to": "telemetry-criterion-1-bug-rate",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-substrate-bugs-table",
+        "to": "telemetry-criterion-2-p0-bugs",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-substrate-bugs-table",
+        "to": "telemetry-criterion-4-mttr",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-1-bug-rate",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-2-p0-bugs",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-3-pass-rate",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-4-mttr",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-5-intervention",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-6-time-consistency",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "telemetry-criterion-7-flake",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-timing-derivation",
+        "to": "telemetry-criterion-3-pass-rate",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-timing-derivation",
+        "to": "telemetry-criterion-5-intervention",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-timing-derivation",
+        "to": "telemetry-criterion-6-time-consistency",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-timing-derivation",
+        "to": "telemetry-criterion-7-flake",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-contracts",
+        "to": "stats-route",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-contracts",
+        "to": "stats-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-contracts",
+        "to": "stats-frontend-component",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-service-scaffold",
+        "to": "stats-route",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-route",
+        "to": "stats-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-route",
+        "to": "stats-frontend-component",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-frontend-component",
+        "to": "stats-frontend-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-frontend-tab",
+        "to": "e2e-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "stats-route",
+        "to": "e2e-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "substrate-bug-projection",
+        "to": "e2e-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-criterion-1-bug-rate",
+        "to": "e2e-acceptance",
+        "type": "informs"
+      },
+      {
+        "from": "stats-cli",
+        "to": "docs-readiness",
+        "type": "informs"
+      },
+      {
+        "from": "stats-frontend-tab",
+        "to": "docs-readiness",
+        "type": "informs"
+      },
+      {
+        "from": "provenance-hook-script",
+        "to": "provenance-doc",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1487-feat-flywheel-substrate-bug-provenance-telemetry-for-v1-0-readiness-criteria.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
