@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
+import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDetails';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
@@ -11,7 +12,7 @@ interface FlywheelPageProps {
   onNavigateIssue?: (issueId: string) => void;
 }
 
-type FlywheelLeftTab = 'status' | 'state';
+type FlywheelLeftTab = 'status' | 'state' | 'stats';
 
 const SPLIT_STORAGE_KEY = 'panopticon.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
@@ -56,6 +57,12 @@ function getLastTickFreshness(lastTickAt: string, nowMs: number): { label: strin
     return { label: `last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-warning/30 bg-warning/15 text-warning' };
   }
   return { label: `stalled — last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-destructive/30 bg-destructive/15 text-destructive' };
+}
+
+function getTabPanelLabel(activeTab: FlywheelLeftTab): string {
+  if (activeTab === 'status') return 'Flywheel status';
+  if (activeTab === 'state') return 'Flywheel state';
+  return 'Flywheel stats';
 }
 
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
@@ -216,11 +223,24 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
               >
                 State
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'stats'}
+                onClick={() => setActiveTab('stats')}
+                className={
+                  activeTab === 'stats'
+                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
+                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
+                }
+              >
+                Stats
+              </button>
             </div>
           </div>
         </header>
 
-        <div className="p-6" role="tabpanel" aria-label={activeTab === 'status' ? 'Flywheel status' : 'Flywheel state'}>
+        <div className="p-6" role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
           {activeTab === 'status' ? (
             status ? (
               <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
@@ -232,8 +252,10 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
                 </div>
               </div>
             )
-          ) : (
+          ) : activeTab === 'state' ? (
             <FlywheelStatePane />
+          ) : (
+            <FlywheelStatsPanel />
           )}
         </div>
       </section>
