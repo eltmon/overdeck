@@ -114,6 +114,7 @@ import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
+import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import { getClosedIssueIdsForReadSource, ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
@@ -1745,6 +1746,13 @@ const postAgentUnpauseRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.unpause_requested'));
+    if (stateBeforeUnpause.paused === true) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState.issueId || stateBeforeUnpause.issueId || id.replace(/^agent-/, '').toUpperCase(),
+        kind: 'unpause',
+        source: 'dashboard:agent-unpause',
+      }));
+    }
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -1783,6 +1791,13 @@ const postAgentUntroubledRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.untroubled_requested'));
+    if (stateBeforeClear.troubled === true || (stateBeforeClear.consecutiveFailures ?? 0) > 0) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState.issueId || stateBeforeClear.issueId || id.replace(/^agent-/, '').toUpperCase(),
+        kind: 'untroubled',
+        source: 'dashboard:agent-untroubled',
+      }));
+    }
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),

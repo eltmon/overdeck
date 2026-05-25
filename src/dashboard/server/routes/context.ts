@@ -29,7 +29,9 @@ import {
 } from '../../../lib/context-layers/layers.js';
 import { getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
+import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { jsonResponse } from '../http-helpers.js';
+import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
 type ProjectEntry = { key: string; config: ProjectConfig };
@@ -518,6 +520,11 @@ export async function syncContextLayers(
   }
 }
 
+function issueIdFromWorkspacePath(workspacePath: string): string | null {
+  const match = /(?:^|[^a-z0-9])([a-z]+-\d+)(?:[^a-z0-9]|$)/i.exec(workspacePath);
+  return match ? match[1]!.toUpperCase() : null;
+}
+
 function readJsonBody() {
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -565,7 +572,19 @@ const putContextLayerRoute = HttpRouter.add(
       catch: (error) => new Error(error instanceof Error ? error.message : String(error)),
     });
     const projects = yield* loadProjectsForRoute();
-    return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, parsed)));
+    const eventStore = yield* EventStoreService;
+    const response = yield* Effect.promise(() => saveContextLayer(projects, parsed));
+    if (parsed.target.kind === 'workspace') {
+      const issueId = issueIdFromWorkspacePath(parsed.target.workspacePath);
+      if (issueId) {
+        yield* eventStore.appendAsync(operatorInterventionEvent({
+          issueId,
+          kind: 'manual_edit',
+          source: 'dashboard:context-layer-save',
+        }));
+      }
+    }
+    return jsonResponse(response);
   })),
 );
 
