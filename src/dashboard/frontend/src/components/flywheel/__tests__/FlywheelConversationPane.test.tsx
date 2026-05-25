@@ -248,8 +248,6 @@ describe('FlywheelConversationPane', () => {
     renderPane();
 
     await screen.findByText('RUN-2');
-    // In 'running' state only Pause and Open Run Report are visible
-    expect(screen.queryByRole('button', { name: /^New Run$/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Pause/i }));
     fireEvent.click(screen.getByRole('button', { name: /Open Run Report/i }));
 
@@ -285,8 +283,122 @@ describe('FlywheelConversationPane', () => {
     expect(await screen.findByText('RUN-2 (complete)')).toBeInTheDocument();
     expect(screen.getByText('Model: claude-opus-4-7')).toBeInTheDocument();
     expect(screen.getByText('Effort: high')).toBeInTheDocument();
-    // Completed runs show no active controls — Pause/Resume are not rendered
-    expect(screen.queryByRole('button', { name: /Pause/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Resume/i })).not.toBeInTheDocument();
+    // Completed runs still show every action button — they are present-but-disabled
+    // so operators always see the same affordances regardless of run state.
+    // See "Flywheel toolbar regression guard" tests below for the contract this
+    // upholds. Pause/Resume are present but disabled here because the run is complete.
+    expect(screen.getByRole('button', { name: /Pause/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Resume/i })).toBeDisabled();
+  });
+
+  /**
+   * REGRESSION GUARD — Flywheel toolbar action buttons.
+   *
+   * Background: commit a67ee20a9 (2026-05-20, "feat(flywheel): session
+   * continuity via claude --resume on flywheel resume") gated nearly every
+   * toolbar button behind `runState === <X>` checks. The visible button set
+   * collapsed depending on state — operators correctly reported "where are
+   * my actions?" because Pause, Resume, Abort, and Write Report disappeared
+   * entirely depending on the active run's state. The original test suite
+   * silently encoded this regression with `expect(...).not.toBeInTheDocument()`,
+   * making it self-reinforcing.
+   *
+   * Contract going forward (PAN RUN-11 restoration): the seven action
+   * buttons — Pause, Resume, New Run, Pop out, Write Report, Abort, and
+   * Open Run Report — are ALWAYS rendered. Each button's `disabled` prop
+   * reflects whether the action is legal in the current run state. If a
+   * future change re-introduces conditional rendering of these buttons,
+   * these tests fail loudly.
+   *
+   * DO NOT change these assertions to query-by-role-with-not-in-document.
+   * If a button needs to be hidden, remove it deliberately and update both
+   * the documentation in docs/flywheel-brief.md and these tests in the
+   * same PR.
+   */
+  describe('toolbar action-button regression guard', () => {
+    const ALWAYS_VISIBLE_BUTTONS = [
+      /^Pause$/i,
+      /^Resume$/i,
+      /^New Run$/i,
+      /^Pop out$/i,
+      /^Write Report$/i,
+      /^Abort$/i,
+      /^Open Run Report$/i,
+    ] as const;
+
+    async function expectAllButtonsRendered() {
+      for (const name of ALWAYS_VISIBLE_BUTTONS) {
+        await waitFor(() => {
+          expect(screen.getByRole('button', { name })).toBeInTheDocument();
+        });
+      }
+    }
+
+    function stubRunStatus(status: 'running' | 'paused' | 'complete' | 'aborted' | 'none') {
+      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === 'POST') return Response.json({ ok: true });
+        if (url === '/api/flywheel/runs?limit=10') {
+          return Response.json(status === 'none' ? [] : [{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status }]);
+        }
+        if (url === '/api/flywheel/runs/RUN-2') {
+          return Response.json({
+            id: 'RUN-2',
+            startedAt: flywheelStatus.startedAt,
+            status,
+            latest: flywheelStatus,
+            paths: { latest: '/tmp/latest.json', report: '/tmp/report.md' },
+          });
+        }
+        if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
+        if (url === '/api/settings') return Response.json({ roles: {} });
+        if (url === '/api/flywheel/merge-queue') return Response.json([]);
+        return Response.json({ error: 'not found' }, { status: 404 });
+      }));
+    }
+
+    it('renders all seven action buttons when run is RUNNING', async () => {
+      stubRunStatus('running');
+      renderPane();
+      await screen.findByText('RUN-2');
+      await expectAllButtonsRendered();
+
+      // Disabled state contract for running:
+      expect(screen.getByRole('button', { name: /^Pause$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Resume$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^New Run$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Abort$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Write Report$/i })).not.toBeDisabled();
+    });
+
+    it('renders all seven action buttons when run is PAUSED', async () => {
+      stubRunStatus('paused');
+      renderPane();
+      await screen.findByText(/RUN-2/);
+      await expectAllButtonsRendered();
+
+      expect(screen.getByRole('button', { name: /^Pause$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Resume$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^New Run$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Abort$/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Write Report$/i })).not.toBeDisabled();
+    });
+
+    it('renders all seven action buttons when there is NO active run', async () => {
+      stubRunStatus('none');
+      renderPane();
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /^New Run$/i })).toBeInTheDocument();
+      });
+      await expectAllButtonsRendered();
+
+      // With no run, all destructive/active-run-only actions disabled:
+      expect(screen.getByRole('button', { name: /^Pause$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Resume$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Abort$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Write Report$/i })).toBeDisabled();
+      // New Run remains enabled — that's the whole point of the none state.
+      expect(screen.getByRole('button', { name: /^New Run$/i })).not.toBeDisabled();
+    });
   });
 });
