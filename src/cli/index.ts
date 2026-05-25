@@ -32,6 +32,7 @@ if (existsSync(PANOPTICON_ENV_FILE)) {
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import type { RoleEffort } from '../lib/config-yaml.js';
 import { initCommand } from './commands/init.js';
 import { syncCommand } from './commands/sync.js';
 import {
@@ -367,7 +368,7 @@ const planCmd = program
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
-  .option('--effort <level>', 'Planning effort: low | medium | high')
+  .option('--effort <level>', 'Planning effort: low | medium | high | xhigh | max')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
   .action(planCommand);

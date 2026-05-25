@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
+import type { RoleEffort } from '../../lib/config-yaml.js';
 
 interface PlanOptions {
   auto?: boolean;
   model?: string;
   harness?: 'claude-code' | 'pi' | 'codex';
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   remote?: boolean;
   local?: boolean;
 }

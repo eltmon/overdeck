@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:01:13.898Z"
+    "updated": "2026-05-25T23:03:10.302Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:01:13.898Z",
+    "updated": "2026-05-25T23:03:10.302Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -236,7 +236,7 @@
       {
         "id": "b5-cli-effort-flag-strings",
         "title": "Widen effort types in CLI plan + strike commands and update --effort option help strings",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -251,7 +251,7 @@
           {
             "id": "b5-cli-effort-flag-strings.ac1",
             "title": "`pan plan <id> --effort xhigh` and `pan plan <id> --effort max` parse without commander rejecting the value, and the parsed effort reaches buildPlanningPrompt unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
           {
             "id": "b5-cli-effort-flag-strings.ac2",
             "title": "`pan strike <ids…> --effort xhigh` and `--effort max` parse and reach the spawnRun call site at the action handler",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -267,7 +267,7 @@
           {
             "id": "b5-cli-effort-flag-strings.ac3",
             "title": "`pan plan --help` and `pan strike --help` both show the widened option description `low | medium | high | xhigh | max`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

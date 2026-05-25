@@ -6,8 +6,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 import { spawnAgent } from '../../lib/agents.js';
-import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 
 const execAsync = promisify(exec);
 
