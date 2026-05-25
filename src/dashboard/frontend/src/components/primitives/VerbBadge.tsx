@@ -4,6 +4,7 @@ export type VerbBadgeVariant =
   | 'WORK RUNNING'
   | 'REVIEW RUNNING'
   | 'SHIP RUNNING'
+  | 'STRIKE RUNNING'
   | 'PLANNING'
   | 'INPUT'
   | 'READY TO MERGE'
@@ -34,6 +35,14 @@ const STATIC_VARIANTS = {
   'SHIP RUNNING': {
     label: 'SHIP RUNNING',
     className: 'badge-bg-signal-review badge-border-signal-review text-signal-review-foreground',
+    pulse: true,
+  },
+  'STRIKE RUNNING': {
+    label: 'STRIKE RUNNING',
+    // Bright orange — distinct from WORK RUNNING (blue), REVIEW RUNNING (amber),
+    // SHIP RUNNING (purple). Inline because Tailwind theme tokens don't yet have
+    // a dedicated "strike" signal slot.
+    className: 'border-[#ff6a00] bg-[#ff6a00]/15 text-[#ff6a00]',
     pulse: true,
   },
   PLANNING: {

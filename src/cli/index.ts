@@ -98,6 +98,7 @@ import { createComplianceCommand } from './commands/compliance.js';
 import { createRegistryCommand } from './commands/registry.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
+import { strikeCommand } from './commands/strike.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
@@ -457,6 +458,7 @@ program
   .description('Mark work complete, move to review')
   .option('-c, --comment <message>', 'Comment for the tracker')
   .option('--force', 'Skip pre-flight completion checks')
+  .option('--strike', 'Strike-agent shape: skip review-pipeline dispatch (used by `pan strike` agents that merged directly to main)')
   .option('--json', 'Output as JSON')
   .action(doneCommand);
 
@@ -508,6 +510,17 @@ program
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
+
+program
+  .command('strike <ids...>')
+  .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
+  .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Strike effort: low | medium | high (default medium)')
+  .option('--dry-run', 'Print what would happen without spawning')
+  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: 'low' | 'medium' | 'high'; dryRun?: boolean }) =>
+    strikeCommand(ids, options),
+  );
 
 registerSwarmCommands(program);
 

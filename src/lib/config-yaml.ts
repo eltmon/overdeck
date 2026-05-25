@@ -314,6 +314,9 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   test: 'workhorse:mid',
   ship: 'workhorse:mid',
   flywheel: 'claude-opus-4-7',
+  // Strike merges directly to main — precision matters, so default to the
+  // expensive workhorse slot (same as plan/review).
+  strike: 'workhorse:expensive',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
@@ -343,6 +346,9 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   },
   test: { model: 'workhorse:mid' },
   ship: { model: 'workhorse:mid' },
+  // Strike (precision-merge-to-main role) — defaults to the expensive workhorse
+  // slot because strike skips the normal review pipeline and lands directly.
+  strike: { model: 'workhorse:expensive' },
   flywheel: {
     harness: 'claude-code',
     model: 'claude-opus-4-7',
