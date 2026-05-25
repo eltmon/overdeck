@@ -1132,7 +1132,7 @@
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.d.ts": {
-    "mtime": 1779660611.2943943,
+    "mtime": 1779691675.0006135,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notify-complete": {
@@ -1140,7 +1140,7 @@
     "hash": "373ba01f551cd1ff98252fd01e937ebd"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.js": {
-    "mtime": 1779690029.1959305,
+    "mtime": 1779691675.0006135,
     "hash": "376c3da1731ecd9eb6c128a8a21383c4"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notification-hook": {
@@ -5808,8 +5808,8 @@
     "hash": "18b92af7bb40ed0815d36fc0c805cf53"
   },
   "/home/eltmon/Projects/panopticon-cli/src/cli/index.ts": {
-    "mtime": 1779690069.6753175,
-    "hash": "99f0f6b578df84123c6290ae7038c07b"
+    "mtime": 1779691141.3802028,
+    "hash": "818da3808db095c6ec59aff54cdc031a"
   },
   "/home/eltmon/Projects/panopticon-cli/src/cli/commands/fork.ts": {
     "mtime": 1779577116.559677,
@@ -6022,6 +6022,10 @@
   "/home/eltmon/Projects/panopticon-cli/src/cli/commands/plan-done.ts": {
     "mtime": 1779509145.5615528,
     "hash": "05ddfa4aecdeec7f62d0ddbcb7b10609"
+  },
+  "/home/eltmon/Projects/panopticon-cli/src/cli/commands/docs.ts": {
+    "mtime": 1779691116.9643607,
+    "hash": "19e0992a69ca6a0bbb4ff37b2bc7bdce"
   },
   "/home/eltmon/Projects/panopticon-cli/src/cli/commands/plan.ts": {
     "mtime": 1779509145.5615528,
