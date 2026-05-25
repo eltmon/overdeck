@@ -123,11 +123,63 @@ export const CACHE_AGENTS_DIR = join(PANOPTICON_HOME, 'agent-definitions');  // 
 export const CACHE_RULES_DIR = join(PANOPTICON_HOME, 'rules');
 export const CACHE_MANIFEST = join(PANOPTICON_HOME, '.manifest.json');
 
-// Pre-workspace PRD directory (for PRDs created before workspace exists)
+// Pre-workspace PRD directory and docs RAG state directory
 export const DOCS_DIR = join(PANOPTICON_HOME, 'docs');
 export const PRDS_DIR = join(DOCS_DIR, 'prds');
 export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
 export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
+export const DOCS_INDEX_FILE = join(DOCS_DIR, 'index.sqlite');
+export const DOCS_BUDGET_STATE_FILE = join(DOCS_DIR, 'budget-state.json');
+export const DOCS_DISABLE_STATE_FILE = join(DOCS_DIR, 'disable-state.json');
+export const DOCS_TELEMETRY_FILE = join(DOCS_DIR, 'telemetry.jsonl');
+
+export interface DocsPathOverrides {
+  panopticonHome?: string;
+  docsDir?: string;
+  indexPath?: string;
+  budgetStatePath?: string;
+  disableStatePath?: string;
+  telemetryPath?: string;
+}
+
+export interface DocsPaths {
+  docsDir: string;
+  indexPath: string;
+  budgetStatePath: string;
+  disableStatePath: string;
+  telemetryPath: string;
+}
+
+export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
+  const docsDir = overrides.docsDir ?? join(overrides.panopticonHome ?? getPanopticonHome(), 'docs');
+  return {
+    docsDir,
+    indexPath: overrides.indexPath ?? join(docsDir, 'index.sqlite'),
+    budgetStatePath: overrides.budgetStatePath ?? join(docsDir, 'budget-state.json'),
+    disableStatePath: overrides.disableStatePath ?? join(docsDir, 'disable-state.json'),
+    telemetryPath: overrides.telemetryPath ?? join(docsDir, 'telemetry.jsonl'),
+  };
+}
+
+export function getDocsDir(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir'> = {}): string {
+  return getDocsPaths(overrides).docsDir;
+}
+
+export function getDocsIndexPath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'indexPath'> = {}): string {
+  return getDocsPaths(overrides).indexPath;
+}
+
+export function getDocsBudgetStatePath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'budgetStatePath'> = {}): string {
+  return getDocsPaths(overrides).budgetStatePath;
+}
+
+export function getDocsDisableStatePath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'disableStatePath'> = {}): string {
+  return getDocsPaths(overrides).disableStatePath;
+}
+
+export function getDocsTelemetryPath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'telemetryPath'> = {}): string {
+  return getDocsPaths(overrides).telemetryPath;
+}
 
 // Project-relative docs paths (subdirectory names for project-level docs)
 export const PROJECT_DOCS_SUBDIR = 'docs';
