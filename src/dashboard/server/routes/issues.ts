@@ -796,7 +796,7 @@ const postIssuesRoute = HttpRouter.add(
     const createdIssue = createResult.issue;
     const identifier = getCreatedIssueIdentifier(validation.value.projectKey, project, createdIssue);
     const { updateShadowState } = yield* Effect.promise(() => import('../../../lib/shadow-state.js'));
-    yield* Effect.promise(() => updateShadowState(identifier, 'open', 'dashboard-new-issue', validation.value.targetStatus));
+    yield* updateShadowState(identifier, 'open', 'dashboard-new-issue', validation.value.targetStatus);
 
     const issueDataService = getIssueDataService();
     yield* Effect.promise(() => issueDataService.refreshShadowStatesCache());
