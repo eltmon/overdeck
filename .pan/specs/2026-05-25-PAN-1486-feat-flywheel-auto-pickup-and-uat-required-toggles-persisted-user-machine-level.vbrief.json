@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T11:10:44.540Z"
+    "updated": "2026-05-25T11:12:32.045Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 19,
+    "sequence": 25,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T11:10:44.540Z",
+    "updated": "2026-05-25T11:12:32.045Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -1239,60 +1239,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1486",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T11:10:44.479Z",
+        "updatedAt": "2026-05-25T11:12:32.003Z",
         "work": {
-          "updatedAt": "2026-05-25T11:10:44.479Z",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T11:10:44.479Z",
-          "notes": "Verification FAILED at typecheck (5018ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n",
+          "status": "running",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T11:10:44.479Z",
-              "notes": "Verification FAILED at typecheck (5018ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n"
+              "status": "running",
+              "at": "2026-05-25T11:12:32.003Z"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-05-25T11:10:44.479Z",
+          "status": "pending",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "notes": "Verification failed at typecheck",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-05-25T11:10:44.479Z",
+              "status": "pending",
+              "at": "2026-05-25T11:12:32.003Z",
               "notes": "Verification failed at typecheck"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:10:44.479Z",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:10:44.479Z"
+              "at": "2026-05-25T11:12:32.003Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T11:10:44.479Z",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:10:44.479Z",
+          "updatedAt": "2026-05-25T11:12:32.003Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:10:44.479Z"
+              "at": "2026-05-25T11:12:32.003Z"
             }
           ],
           "readyForMerge": false,
