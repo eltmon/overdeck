@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T19:24:26.195Z",
+    "updated": "2026-05-25T19:27:24.488Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8d4f1509-1509-4a2b-8c3d-f9e0f1a2b3c4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T19:24:26.195Z",
+    "updated": "2026-05-25T19:27:24.488Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -695,7 +695,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1509-fix-plan-finalize-auto-promote-chain-produces-proposed-specs-but-no-work-agents-spawn-run-11-systemic.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1509-fix-plan-finalize-auto-promote-chain-produces-proposed-specs-but-no-work-agents-spawn-run-11-systemic.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1509",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T19:27:24.487Z",
+        "work": {
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T19:27:24.487Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T19:27:24.487Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-25T19:27:24.487Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"
