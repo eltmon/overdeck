@@ -225,18 +225,21 @@ models:
 
 ### Register Projects
 
-Register your local project directories:
+Register your local project directories with the plural `projects` command group:
 
 ```bash
 # Register a project
-pan project add /path/to/your/project --name myproject
+pan projects add /path/to/your/project --name myproject
 
 # Register with Rally project mapping
-pan project add /path/to/hsv3 --name "HSv3" --rally-project "/project/822404704163"
+pan projects add /path/to/hsv3 --name "HSv3" --rally-project "/project/822404704163"
 
 # List registered projects
-pan project list
+pan projects list
 ```
+
+The older singular `pan project` command group remains available as a
+compatibility alias.
 
 ### Map Linear Projects to Local Directories
 
@@ -349,22 +352,24 @@ pan done PAN-123 -c "Brief summary of changes"
 
 ```bash
 # Add project
-pan project add /path/to/project --name myproject
+pan projects add /path/to/project --name myproject
 
 # Add project with Rally project mapping
-pan project add /path/to/project --name myproject --rally-project "/project/822404704163"
+pan projects add /path/to/project --name myproject --rally-project "/project/822404704163"
 
 # List projects
-pan project list
+pan projects list
 
 # Remove project
-pan project remove myproject
+pan projects remove myproject
 ```
+
+The singular `pan project` form is a compatibility alias.
 
 ### Skills Commands
 
 ```bash
-# Sync skills to Claude Code
+# Sync layered context and bundled skills to Claude Code
 pan sync
 
 # List available skills

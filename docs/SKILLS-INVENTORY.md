@@ -80,7 +80,7 @@ Claude Code gives user-level skills precedence over project-level skills when na
 | `/pan-new-project` | Project | Complete setup for registering a new project with Panopticon. Handles project registration, issue prefix, workspace config, trust setup, beads init, tracker config, and validates against working projects. |
 | `/pan-oversee` | Project | Test the Panopticon framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered |
 | `/pan-plan` | Project | pan plan <id> — start issue planning, including non-interactive --auto mode; also finalize/done planning artifacts |
-| `/pan-projects` | Project | pan project <subcommand> — add, remove, and manage Panopticon-monitored projects |
+| `/pan-projects` | Project | pan projects <subcommand> — add, remove, and manage Panopticon-monitored projects |
 | `/pan-quickstart` | Project | Quick start guide combining installation, setup, and first workspace |
 | `/pan-release` | Project | Panopticon-specific stable vs canary release workflow from main |
 | `/pan-reload` | Project | Rebuild Panopticon and restart the dashboard after code changes. |
@@ -94,7 +94,7 @@ Claude Code gives user-level skills precedence over project-level skills when na
 | `/pan-status` | Project | pan status — show running agents overview and system health |
 | `/pan-stop-all-agents` | Project | Drain Panopticon: kill every running work agent and its review/test specialists, optionally stop the dashboard, and preserve conversation tmux sessions and shared sidecars. |
 | `/pan-subagent-creator` | Project | Create custom Claude Code subagents with isolated context windows, specific tool permissions, and specialized prompts. Use when users want to create a new subagent, configure agent delegation, set up task-specific agents, or define specialized assistants. |
-| `/pan-sync` | Project | pan sync — sync skills and agents from devroot to ~/.claude/ |
+| `/pan-sync` | Project | pan sync — render layered context and install bundled skills and agents into Claude Code |
 | `/pan-sync-main` | Project | pan sync-main <id> — merge latest main into the feature branch for an active workspace |
 | `/pan-tell` | Project | pan tell <id> <msg> — send a message to a running agent's tmux session |
 | `/pan-test-config` | Project | Configure test suites for Panopticon projects in projects.yaml. |
@@ -139,4 +139,4 @@ These skills exist in both user and project scopes. Claude Code resolves those n
 
 ## Maintenance
 
-Keep this page in sync when skills are added, removed, renamed, or materially changed. For Panopticon-owned skills, `skills/` in the repo is the source of truth and `pan sync` installs them into Claude Code's skill directories.
+Keep this page in sync when skills are added, removed, renamed, or materially changed. For Panopticon-owned distribution content, `sync-sources/` is the source that `pan sync` installs into Claude Code's skill and agent directories.
