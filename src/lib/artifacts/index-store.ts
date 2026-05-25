@@ -174,6 +174,11 @@ export class ArtifactIndexRepository {
     return rows.map(rowToEntry);
   }
 
+  listAll(): ArtifactIndexEntry[] {
+    const rows = this.db.prepare('SELECT * FROM artifacts ORDER BY created_at DESC').all() as ArtifactRow[];
+    return rows.map(rowToEntry);
+  }
+
   updateCurrentHash(artifactId: string, currentHash: string): ArtifactIndexEntry | null {
     this.db.prepare('UPDATE artifacts SET current_hash = ? WHERE artifact_id = ?').run(currentHash, artifactId);
     return this.getByArtifactId(artifactId);
