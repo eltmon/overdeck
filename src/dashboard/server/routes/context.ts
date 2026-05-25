@@ -3,7 +3,21 @@ import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { Harness } from '@panctl/contracts';
+import type {
+  ContextEditableLayerRecord,
+  ContextLayerDraft,
+  ContextLayerSaveRequest,
+  ContextLayerSaveResponse,
+  ContextLayerTarget,
+  ContextLayersResponse,
+  ContextPreviewDiagnostic,
+  ContextPreviewRequest,
+  ContextPreviewResponse,
+  ContextProjectSummary,
+  ContextSyncResponse,
+  ContextWorkspaceSummary,
+  Harness,
+} from '@panctl/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -19,82 +33,9 @@ import { isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 
-type ContextLayerTarget =
-  | { kind: 'global' }
-  | { kind: 'project'; projectKey: string }
-  | { kind: 'workspace'; projectKey: string; workspacePath: string };
-
-type ContextProjectSummary = {
-  projectKey: string;
-  name: string;
-  path: string;
-  issuePrefix?: string;
-  tracker?: ProjectConfig['tracker'];
-  workspaceRoot?: string;
-};
-
-type ContextWorkspaceSummary = {
-  projectKey: string;
-  path: string;
-  name: string;
-  issueId?: string;
-  branch?: string;
-};
-
-type ContextEditableLayerRecord = {
-  kind: ContextLayerKind;
-  file: string;
-  exists: boolean;
-  content: string;
-  editable: boolean;
-  projectKey?: string;
-  workspacePath?: string;
-};
-
-type ContextLayerDraft = {
-  target: ContextLayerTarget;
-  content: string;
-};
-
-type ContextLayersResponse = {
-  operation: 'load';
-  projects: ContextProjectSummary[];
-  workspaces: ContextWorkspaceSummary[];
-  layers: ContextEditableLayerRecord[];
-};
-
-type ContextPreviewDiagnostic = {
-  level: 'info' | 'warning' | 'error';
-  message: string;
-  layer?: ContextLayerTarget;
-};
-
-type ContextPreviewResponse = {
-  operation: 'preview';
-  previews: Record<Harness | 'fullPrompt', string>;
-  diagnostics: ContextPreviewDiagnostic[];
-};
-
-type ContextLayerSaveResponse = {
-  operation: 'save';
-  layer: ContextEditableLayerRecord;
-  savedAt: string;
-};
-
 type ContextSyncCommandResult = {
   stdout: string;
   stderr: string;
-};
-
-type ContextSyncResponse = {
-  operation: 'sync';
-  ok: boolean;
-  status: 'synced' | 'failed';
-  stdout: string;
-  stderr: string;
-  error?: string;
-  exitCode?: number;
-  syncedAt: string;
 };
 
 export type ContextSyncRunner = () => Promise<ContextSyncCommandResult>;
@@ -148,8 +89,8 @@ function summarizeProject({ key, config }: ProjectEntry): ContextProjectSummary 
     projectKey: key,
     name: config.name,
     path: resolve(config.path),
-    issuePrefix: config.issue_prefix,
-    tracker: config.tracker,
+    ...(config.issue_prefix ? { issuePrefix: config.issue_prefix } : {}),
+    ...(config.tracker ? { tracker: config.tracker } : {}),
     workspaceRoot: workspaceRootForProject(config),
   };
 }
@@ -169,7 +110,7 @@ async function discoverWorkspacesForProject(projectKey: string, config: ProjectC
 
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   return entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     .map((entry) => {
       const path = resolve(root, entry.name);
       assertPathInside(root, path);
@@ -177,22 +118,22 @@ async function discoverWorkspacesForProject(projectKey: string, config: ProjectC
         projectKey,
         path,
         name: entry.name,
-        issueId: workspaceIssueId(entry.name),
-        branch: workspaceBranch(entry.name),
-      };
+        ...(workspaceIssueId(entry.name) ? { issueId: workspaceIssueId(entry.name)! } : {}),
+        ...(workspaceBranch(entry.name) ? { branch: workspaceBranch(entry.name)! } : {}),
+      } satisfies ContextWorkspaceSummary;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function buildContextCatalog(projects: ProjectEntry[]): Promise<ContextCatalog> {
-  const summaries = projects.map(summarizeProject);
+  const summaries = projects.map(summarizeProject).sort((a, b) => a.projectKey.localeCompare(b.projectKey));
   const workspaceGroups = await Promise.all(
     projects.map((project) => discoverWorkspacesForProject(project.key, project.config)),
   );
   return {
     projects,
     summaries,
-    workspaces: workspaceGroups.flat(),
+    workspaces: workspaceGroups.flat().sort((a, b) => a.path.localeCompare(b.path)),
   };
 }
 
@@ -202,7 +143,9 @@ async function layerRecord(
   extras: { projectKey?: string; workspacePath?: string } = {},
 ): Promise<ContextEditableLayerRecord> {
   const { exists, content } = await readOptionalFile(file);
-  return { kind, file, exists, content, editable: true, ...extras };
+  if (kind === 'global') return { kind, file, exists, content, editable: true };
+  if (kind === 'project') return { kind, projectKey: extras.projectKey!, file, exists, content, editable: true };
+  return { kind, projectKey: extras.projectKey!, workspacePath: extras.workspacePath!, file, exists, content, editable: true };
 }
 
 export async function buildContextLayersResponse(projects: ProjectEntry[]): Promise<ContextLayersResponse> {
@@ -211,16 +154,16 @@ export async function buildContextLayersResponse(projects: ProjectEntry[]): Prom
     await layerRecord('global', globalContextFile()),
   ];
 
-  for (const project of catalog.projects) {
-    layers.push(await layerRecord('project', projectContextFile(project.config.path), { projectKey: project.key }));
-  }
+  layers.push(...await Promise.all(
+    catalog.projects.map((project) => layerRecord('project', projectContextFile(project.config.path), { projectKey: project.key })),
+  ));
 
-  for (const workspace of catalog.workspaces) {
-    layers.push(await layerRecord('workspace', workspaceContextFile(workspace.path), {
+  layers.push(...await Promise.all(
+    catalog.workspaces.map((workspace) => layerRecord('workspace', workspaceContextFile(workspace.path), {
       projectKey: workspace.projectKey,
       workspacePath: workspace.path,
-    }));
-  }
+    })),
+  ));
 
   return {
     operation: 'load',
@@ -229,6 +172,8 @@ export async function buildContextLayersResponse(projects: ProjectEntry[]): Prom
     layers,
   };
 }
+
+export const loadContextLayers = buildContextLayersResponse;
 
 function findProject(projects: ProjectEntry[], projectKey: string): ProjectEntry {
   const project = projects.find((entry) => entry.key === projectKey);
@@ -391,25 +336,49 @@ function formatFullPrompt(previews: Record<Harness, string>): string {
   ].join('\n');
 }
 
+function normalizePreviewArgs(
+  requestOrTarget: ContextPreviewRequest | ContextLayerTarget,
+  drafts: ContextLayerDraft[] = [],
+): { selectedLayer: ContextLayerTarget; drafts: ContextLayerDraft[] } {
+  if ('operation' in requestOrTarget) {
+    return { selectedLayer: requestOrTarget.selectedLayer, drafts: requestOrTarget.drafts };
+  }
+  return { selectedLayer: requestOrTarget, drafts };
+}
+
+export async function previewContextLayers(
+  projects: ProjectEntry[],
+  request: ContextPreviewRequest,
+): Promise<ContextPreviewResponse>;
 export async function previewContextLayers(
   projects: ProjectEntry[],
   selectedLayer: ContextLayerTarget,
   drafts: ContextLayerDraft[],
+): Promise<ContextPreviewResponse>;
+export async function previewContextLayers(
+  projects: ProjectEntry[],
+  requestOrTarget: ContextPreviewRequest | ContextLayerTarget,
+  draftArg: ContextLayerDraft[] = [],
 ): Promise<ContextPreviewResponse> {
+  const { selectedLayer, drafts } = normalizePreviewArgs(requestOrTarget, draftArg);
   const catalog = await buildContextCatalog(projects);
   const draftByKey = new Map<string, string>();
   for (const draft of drafts) {
     const resolved = await resolveLayerFile(draft.target, projects, catalog);
     const normalizedTarget = resolved.kind === 'workspace'
       ? { kind: 'workspace' as const, projectKey: resolved.projectKey!, workspacePath: resolved.workspacePath! }
-      : draft.target;
+      : resolved.kind === 'project'
+        ? { kind: 'project' as const, projectKey: resolved.projectKey! }
+        : { kind: 'global' as const };
     draftByKey.set(layerKey(normalizedTarget), draft.content);
   }
 
   const resolvedSelected = await resolveLayerFile(selectedLayer, projects, catalog);
   const selectedTarget = resolvedSelected.kind === 'workspace'
     ? { kind: 'workspace' as const, projectKey: resolvedSelected.projectKey!, workspacePath: resolvedSelected.workspacePath! }
-    : selectedLayer;
+    : resolvedSelected.kind === 'project'
+      ? { kind: 'project' as const, projectKey: resolvedSelected.projectKey! }
+      : { kind: 'global' as const };
 
   const targets: Array<{ title: string; target: ContextLayerTarget }> = [{ title: 'Global context layer', target: { kind: 'global' } }];
   if (selectedTarget.kind === 'project') {
@@ -453,11 +422,32 @@ export async function previewContextLayers(
   };
 }
 
+function normalizeSaveArgs(
+  requestOrTarget: ContextLayerSaveRequest | ContextLayerTarget,
+  content?: string,
+): { target: ContextLayerTarget; content: string } {
+  if ('operation' in requestOrTarget) {
+    return { target: requestOrTarget.target, content: requestOrTarget.content };
+  }
+  if (typeof content !== 'string') throw new Error('content must be a string');
+  return { target: requestOrTarget, content };
+}
+
+export async function saveContextLayer(
+  projects: ProjectEntry[],
+  request: ContextLayerSaveRequest,
+): Promise<ContextLayerSaveResponse>;
 export async function saveContextLayer(
   projects: ProjectEntry[],
   target: ContextLayerTarget,
   content: string,
+): Promise<ContextLayerSaveResponse>;
+export async function saveContextLayer(
+  projects: ProjectEntry[],
+  requestOrTarget: ContextLayerSaveRequest | ContextLayerTarget,
+  contentArg?: string,
 ): Promise<ContextLayerSaveResponse> {
+  const { target, content } = normalizeSaveArgs(requestOrTarget, contentArg);
   const resolved = await resolveLayerFile(target, projects);
   await mkdir(dirname(resolved.file), { recursive: true });
   await writeFile(resolved.file, content, 'utf-8');
@@ -498,8 +488,7 @@ export async function syncContextLayers(
     const { stdout, stderr } = await runner();
     return {
       operation: 'sync',
-      ok: true,
-      status: 'synced',
+      success: true,
       stdout,
       stderr,
       syncedAt,
@@ -507,15 +496,19 @@ export async function syncContextLayers(
   } catch (error) {
     return {
       operation: 'sync',
-      ok: false,
-      status: 'failed',
+      success: false,
       stdout: syncOutput(error, 'stdout'),
-      stderr: syncOutput(error, 'stderr'),
-      error: error instanceof Error ? error.message : 'pan context sync failed',
-      exitCode: syncExitCode(error),
+      stderr: syncOutput(error, 'stderr') || (error instanceof Error ? error.message : 'pan context sync failed'),
+      ...(syncExitCode(error) !== undefined ? { exitCode: syncExitCode(error)! } : {}),
       syncedAt,
     };
   }
+}
+
+function readJsonBody(request: HttpServerRequest.HttpServerRequest): Effect.Effect<Record<string, unknown>> {
+  return Effect.gen(function* () {
+    return parseJsonBody(yield* request.text);
+  });
 }
 
 const getContextLayersRoute = HttpRouter.add(
@@ -531,12 +524,17 @@ const postContextPreviewRoute = HttpRouter.add(
   'POST',
   '/api/context/preview',
   httpHandler(Effect.gen(function* () {
-    const projects = yield* listProjects();
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const body = parseJsonBody(yield* request.text);
-    const selectedLayer = parseTarget(body['selectedLayer']);
-    const drafts = parseDrafts(body['drafts']);
-    return jsonResponse(yield* Effect.promise(() => previewContextLayers(projects, selectedLayer, drafts)));
+    try {
+      const projects = yield* listProjects();
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const body = yield* readJsonBody(request);
+      const selectedLayer = parseTarget(body['selectedLayer']);
+      const drafts = parseDrafts(body['drafts']);
+      return jsonResponse(yield* Effect.promise(() => previewContextLayers(projects, selectedLayer, drafts)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: message }, { status: 400 });
+    }
   })),
 );
 
@@ -544,13 +542,18 @@ const putContextLayerRoute = HttpRouter.add(
   'PUT',
   '/api/context/layers',
   httpHandler(Effect.gen(function* () {
-    const projects = yield* listProjects();
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const body = parseJsonBody(yield* request.text);
-    const target = parseTarget(body['target']);
-    const content = body['content'];
-    if (typeof content !== 'string') throw new Error('content must be a string');
-    return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, target, content)));
+    try {
+      const projects = yield* listProjects();
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const body = yield* readJsonBody(request);
+      const target = parseTarget(body['target']);
+      const content = body['content'];
+      if (typeof content !== 'string') throw new Error('content must be a string');
+      return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, target, content)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: message }, { status: 400 });
+    }
   })),
 );
 
@@ -559,7 +562,7 @@ const postContextSyncRoute = HttpRouter.add(
   '/api/context/sync',
   httpHandler(Effect.gen(function* () {
     const response = yield* Effect.promise(() => syncContextLayers());
-    return jsonResponse(response, { status: response.ok ? 200 : 500 });
+    return jsonResponse(response, { status: response.success ? 200 : 500 });
   })),
 );
 
@@ -569,3 +572,5 @@ export const contextRouteLayer = Layer.mergeAll(
   putContextLayerRoute,
   postContextSyncRoute,
 );
+
+export default contextRouteLayer;
