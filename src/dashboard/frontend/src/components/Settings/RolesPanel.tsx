@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
+type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 type Harness = 'claude-code' | 'pi';
@@ -101,6 +101,13 @@ const ROLES: RoleDefinition[] = [
       { id: 'inspect', name: 'Inspect', description: 'Fast per-bead inspection.', defaultModel: 'workhorse:cheap' },
       { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex bead diffs.', defaultModel: 'workhorse:mid' },
     ],
+  },
+  {
+    id: 'strike',
+    name: 'Strike',
+    icon: 'bolt',
+    description: 'Precision agent — drop in, implement, land directly on main, verify on main. Bypasses plan/review/test/ship.',
+    defaultModel: 'workhorse:expensive',
   },
   {
     id: 'review',

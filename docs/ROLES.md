@@ -8,12 +8,13 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 ---
 
-## The five roles
+## The six roles
 
 | Role | File | Purpose |
 |------|------|---------|
 | `plan` | `roles/plan.md` | Read issue, research codebase, write vBRIEF, create beads |
 | `work` | `roles/work.md` | Claim beads, write code, commit per bead, self-inspect (Jidoka) |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses plan/review/test/ship. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
 | `ship` | `roles/ship.md` | Rebase, resolve conflicts, run verification, prep for merge |

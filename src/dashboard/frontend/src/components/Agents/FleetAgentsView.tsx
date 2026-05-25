@@ -17,14 +17,15 @@ import { IssueActionMenu } from '../IssueActionMenu';
 const ROLE_ORDER = {
   plan: 0,
   work: 1,
-  review: 2,
-  test: 3,
-  ship: 4,
-  flywheel: 5,
+  strike: 2,
+  review: 3,
+  test: 4,
+  ship: 5,
+  flywheel: 6,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed', 'error', 'unknown']);
-const PHASE_FILTERS = ['work', 'review', 'ship', 'plan', 'stuck'] as const;
+const PHASE_FILTERS = ['work', 'strike', 'review', 'ship', 'plan', 'stuck'] as const;
 type AgentPhaseFilter = typeof PHASE_FILTERS[number];
 
 type AgentsFilterState = {
@@ -140,6 +141,8 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
       return { variant: 'REVIEW RUNNING' };
     case 'ship':
       return { variant: 'SHIP RUNNING' };
+    case 'strike':
+      return { variant: 'STRIKE RUNNING' };
     case 'work':
     default:
       return { variant: 'WORK RUNNING' };
@@ -151,6 +154,7 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
   const role = agentRole(agent);
   if (role === 'test') return 'review';
   if (role === 'flywheel') return 'work';
+  if (role === 'strike') return 'strike';
   return role;
 }
 

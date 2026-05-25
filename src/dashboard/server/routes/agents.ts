@@ -620,7 +620,7 @@ const getAgentsRoute = HttpRouter.add(
 
         const sessions = yield* listSessions();
         const agentLines = sessions
-          .filter((session) => session.name.startsWith('agent-') || session.name.startsWith('planning-'))
+          .filter((session) => session.name.startsWith('agent-') || session.name.startsWith('planning-') || session.name.startsWith('strike-'))
           .map((session) => `${session.name}|${Math.floor(session.created.getTime() / 1000)}`);
 
         const agentsDir = join(homedir(), '.panopticon', 'agents');
@@ -629,7 +629,7 @@ const getAgentsRoute = HttpRouter.add(
         const failedAgentIds: string[] = [];
 
         if (existsSync(agentsDir)) {
-          const dirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+          const dirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-') || d.startsWith('strike-'));
           for (const dir of dirs) {
             const inLocalList = agentLines.some(line => line.startsWith(dir + '|'));
             const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
@@ -667,6 +667,7 @@ const getAgentsRoute = HttpRouter.add(
             const [name, created] = line.split('|');
             const startedAt = new Date(parseInt(created) * 1000).toISOString();
             const isPlanning = name.startsWith('planning-');
+            const isStrike = name.startsWith('strike-');
             const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
             let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
@@ -682,7 +683,9 @@ const getAgentsRoute = HttpRouter.add(
             const gitStatus = state.workspace ? await getGitStatusAsync(state.workspace) : null;
             const issueId = isPlanning
               ? name.replace('planning-', '').toUpperCase()
-              : name.replace('agent-', '').toUpperCase();
+              : isStrike
+                ? name.replace('strike-', '').toUpperCase()
+                : name.replace('agent-', '').toUpperCase();
 
             const runtimeState = await Effect.runPromise(getAgentRuntimeState(name));
 
@@ -717,7 +720,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              role: state.role,
+              role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
               hasPendingQuestion: enrichment.hasPendingQuestion,
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
@@ -734,10 +737,11 @@ const getAgentsRoute = HttpRouter.add(
           remoteAgentIds.map(async (name) => {
             const remoteStateFile = join(homedir(), '.panopticon', 'agents', name, 'remote-state.json');
             const isPlanning = name.startsWith('planning-');
+            const isStrike = name.startsWith('strike-');
             try {
               const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
               const persistedState = await readPersistedAgentState(name);
-              const issueId = state.issueId?.toUpperCase() || persistedState.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
+              const issueId = state.issueId?.toUpperCase() || persistedState.issueId?.toUpperCase() || name.replace(/^(agent-|planning-|strike-)/, '').toUpperCase();
               const workspaceLocation = await getWorkspaceLocation(issueId);
               return {
                 id: name,
@@ -753,7 +757,7 @@ const getAgentsRoute = HttpRouter.add(
                 vmName: state.vmName,
                 git: null,
                 type: 'agent',
-                role: state.role ?? (isPlanning ? 'plan' : 'work'),
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: false,
                 pendingQuestionCount: 0,
                 remote: true,
@@ -764,7 +768,7 @@ const getAgentsRoute = HttpRouter.add(
 
         const stoppedAgents: any[] = [];
         if (existsSync(agentsDir)) {
-          const allDirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+          const allDirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-') || d.startsWith('strike-'));
           const alreadyListed = new Set([
             ...agentLines.map(l => l.split('|')[0]),
             ...remoteAgentIds,
@@ -787,8 +791,9 @@ const getAgentsRoute = HttpRouter.add(
                 (runtimeIdle && state.status !== 'starting');
               if (!isStopped) continue;
               const isPlanning = dir.startsWith('planning-');
+              const isStrike = dir.startsWith('strike-');
               const issueId = state.issueId?.toUpperCase() ||
-                (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+                (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
               const stoppedTimestamp = state.stoppedAt || runtimeData.lastActivity || state.lastActivity;
               const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
               const reviewStatus = getReviewStatusSync(issueId);
@@ -830,7 +835,7 @@ const getAgentsRoute = HttpRouter.add(
                 workspaceLocation: 'local',
                 git: null,
                 type: 'agent',
-                role: state.role ?? (isPlanning ? 'plan' : 'work'),
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
                 pendingQuestionPrompt,
@@ -849,8 +854,9 @@ const getAgentsRoute = HttpRouter.add(
           try {
             const state = JSON.parse(await readFile(stateFile, 'utf-8'));
             const isPlanning = dir.startsWith('planning-');
+            const isStrike = dir.startsWith('strike-');
             const issueId = state.issueId?.toUpperCase() ||
-              (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+              (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
             return {
               id: dir,
               issueId,
@@ -877,8 +883,9 @@ const getAgentsRoute = HttpRouter.add(
           try {
             const state = JSON.parse(await readFile(stateFile, 'utf-8'));
             const isPlanning = dir.startsWith('planning-');
+            const isStrike = dir.startsWith('strike-');
             const issueId = state.issueId?.toUpperCase() ||
-              (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+              (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
             return {
               id: dir,
               issueId,

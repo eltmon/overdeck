@@ -40,7 +40,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
 
 describe('role model configuration', () => {
   it('exports default model refs for every role', () => {
-    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'test', 'work']);
+    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'strike', 'test', 'work']);
   });
 
   it('dereferences workhorse refs and passes literal model ids through', () => {

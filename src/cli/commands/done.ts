@@ -24,6 +24,14 @@ import type { MergeSet } from '../../lib/merge-set.js';
 interface DoneOptions {
   comment?: string;
   force?: boolean;
+  /**
+   * Strike-agent shape (PAN strike role). When true, `pan done` short-circuits
+   * the review-pipeline dispatch: the strike has already merged to main and
+   * verified there, so there is no PR to open, no review specialists to spawn,
+   * and no tracker `in_review` transition. We only emit a completion activity
+   * entry and exit cleanly.
+   */
+  strike?: boolean;
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -178,6 +186,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
+
+  // Strike-agent shape: the strike already merged to main and verified there,
+  // so there is no review pipeline to dispatch. Emit an activity event and exit.
+  if (options.strike) {
+    emitActivityEntrySync({
+      source: 'strike',
+      level: 'info',
+      issueId,
+      message: `Strike ${issueId} reported done${options.comment ? `: ${options.comment}` : ''}`,
+    });
+    console.log(chalk.green(`✓ Strike ${issueId} acknowledged (review pipeline skipped)`));
+    return;
+  }
 
   // Guard: reject completion for already-closed issues
   if (!options.force) {

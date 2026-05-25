@@ -53,7 +53,7 @@ const execAsync = promisify(exec);
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
   new FsError({ operation, path, cause });
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 
 /**
  * Write an agent launcher script atomically. Every agent shares a fixed
@@ -359,7 +359,7 @@ export async function getRoleRuntimeBaseCommand(
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-'];
 const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator']);
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
@@ -1916,7 +1916,12 @@ export interface SpawnOptions {
   harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
-  role?: 'work';
+  /**
+   * Spawn role. Defaults to 'work'. The 'strike' role is the bypass path that
+   * skips plan/review/test/ship and lands directly on main — see roles/strike.md.
+   * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
+   */
+  role?: 'work' | 'strike';
   difficulty?: ComplexityLevel;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
@@ -2665,10 +2670,11 @@ if (prompt) {
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
+  const role: 'work' | 'strike' = options.role ?? 'work';
+  const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.slotId != null
-    ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
-    : `agent-${options.issueId.toLowerCase()}`;
-  const role: 'work' = options.role ?? 'work';
+    ? `${sessionPrefix}-${options.issueId.toLowerCase()}-${options.slotId}`
+    : `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {
@@ -2680,7 +2686,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);
 
-  await Effect.runPromise(assertIssueHasBeads(options.workspace, options.issueId));
+  // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
+  // see roles/strike.md. The beads gate is the only thing we skip; everything
+  // else (workspace health, supervisor wiring, launcher) is identical.
+  if (role !== 'strike') {
+    await Effect.runPromise(assertIssueHasBeads(options.workspace, options.issueId));
+  }
 
   // Determine model based on role configuration
   const selectedModel = determineModel({ model: options.model, role });
@@ -2715,7 +2726,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
   // runs before we persist the resolved harness or hand it to the launcher.
   const requestedHarness: 'claude-code' | 'pi' = options.harness
-    ?? loadYamlConfig().config.roles?.work?.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness
     ?? 'claude-code';
   const resolvedHarness: 'claude-code' | 'pi' = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
@@ -2867,7 +2878,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     agentId,
     model: selectedModel,
     workspace: options.workspace,
-    role: 'work',
+    role,
     isPlanning: false,
     channelsBridgeMcpConfig,
     useSupervisor: supervisorLaunch.useSupervisor,

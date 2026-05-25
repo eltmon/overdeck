@@ -92,6 +92,7 @@ Allowed for launching work:
 
 - `pan plan <id> --auto` to start a planning agent on a high-priority unstarted issue (preferred — produces a full vBRIEF, then auto-promotes to a work agent).
 - `pan start <id> --auto` for trivial issues where planning is overkill (typos, version bumps, single-line fixes).
+- `pan strike <id> [<id>...]` for issues with a clear, isolated single-file or small-diff fix. The strike role bypasses the normal pipeline (no plan, no review, no test pre-merge): it implements, merges directly to main, and verifies on main. Use sparingly — anything broader than a precision fix belongs in `pan plan --auto`.
 
 Allowed when `require_uat_before_merge=false`:
 
