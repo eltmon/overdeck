@@ -3,6 +3,14 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+const activityLogger = vi.hoisted(() => ({
+  emitActivityEntrySync: vi.fn(),
+}));
+
+vi.mock('../../activity-logger.js', () => ({
+  emitActivityEntrySync: activityLogger.emitActivityEntrySync,
+}));
+
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
@@ -42,6 +50,7 @@ function writeBeads(projectPath: string, issueId: string, beadCount = 2): void {
 describe('orphan proposed spec reconciler', () => {
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), 'orphan-proposed-reconciler-'));
+    activityLogger.emitActivityEntrySync.mockReset();
     clearOrphanProposedAttemptCooldowns();
   });
 
@@ -110,6 +119,50 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual([]);
 
     expect(spawnWorkAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits structured reconciler activity metadata for scan and spawn lifecycle', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3151', 'proposed');
+    writeBeads(projectPath, 'PAN-3151');
+
+    await reconcileOrphanProposedSpecs({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: async () => ({ spawned: true, agentId: 'agent-pan-3151' }),
+    });
+
+    const events = activityLogger.emitActivityEntrySync.mock.calls.map(([event]) => ({
+      ...event,
+      details: JSON.parse(String(event.details)),
+    }));
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        issueId: 'ALL',
+        message: 'orphan-proposed-reconciler.scan-start',
+        details: expect.objectContaining({ issueId: 'ALL', reason: expect.any(String), timestamp: expect.any(String) }),
+      }),
+      expect.objectContaining({
+        issueId: 'PAN-3151',
+        message: 'orphan-proposed-reconciler.orphan-detected',
+        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
+      }),
+      expect.objectContaining({
+        issueId: 'PAN-3151',
+        message: 'orphan-proposed-reconciler.spawn-attempt',
+        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
+      }),
+      expect.objectContaining({
+        issueId: 'PAN-3151',
+        message: 'orphan-proposed-reconciler.spawn-success',
+        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
+      }),
+    ]));
   });
 
   it('does not scan or spawn when disabled by config', async () => {

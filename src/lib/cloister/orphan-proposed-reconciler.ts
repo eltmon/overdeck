@@ -11,7 +11,7 @@ import { listProjects, type ProjectConfig } from '../projects.js';
 import { getShadowState } from '../shadow-state.js';
 import { listSessionNames } from '../tmux.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { loadCloisterConfigSync } from './config.js';
+import { loadCloisterConfig } from './config.js';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
@@ -246,65 +246,91 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
   };
 }
 
-function emitReconcilerEvent(level: 'info' | 'warn' | 'error' | 'success', message: string, details: Record<string, unknown>, issueId?: string): void {
+function emitReconcilerEvent(
+  level: 'info' | 'warn' | 'error' | 'success',
+  message: string,
+  reason: string,
+  details: Record<string, unknown> = {},
+  issueId = 'ALL',
+): void {
+  const eventIssueId = issueId.toUpperCase();
   emitActivityEntrySync({
     source: 'cloister',
     level,
-    issueId,
+    issueId: eventIssueId,
     message,
-    details: JSON.stringify(details),
+    details: JSON.stringify({
+      ...details,
+      issueId: eventIssueId,
+      timestamp: new Date().toISOString(),
+      reason,
+    }),
   });
 }
 
 export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanProposedOptions = {}): Promise<string[]> {
-  const loadedConfig = options.config ?? loadCloisterConfigSync().orphanProposedReconciler ?? { enabled: true };
+  const loadedConfig = options.config ?? await Effect.runPromise(
+    loadCloisterConfig().pipe(
+      Effect.map(config => config.orphanProposedReconciler ?? { enabled: true, minAttemptIntervalMs: DEFAULT_ATTEMPT_INTERVAL_MS }),
+      Effect.catch(() => Effect.succeed({ enabled: true, minAttemptIntervalMs: DEFAULT_ATTEMPT_INTERVAL_MS })),
+    ),
+  );
   if (loadedConfig.enabled === false) return [];
 
   const now = options.now ?? new Date();
   const minAttemptIntervalMs = Math.max(loadedConfig.minAttemptIntervalMs ?? DEFAULT_ATTEMPT_INTERVAL_MS, DEFAULT_ATTEMPT_INTERVAL_MS);
   const actions: string[] = [];
 
-  emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-start', { at: now.toISOString() });
+  emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-start', 'scanning proposed specs for missing work agents', { scanAt: now.toISOString() });
   const candidates = await findOrphanProposedSpecsForReconciler(options);
 
   for (const candidate of candidates) {
-    emitReconcilerEvent('warn', 'orphan-proposed-reconciler.orphan-detected', { ...candidate }, candidate.issueId);
+    emitReconcilerEvent(
+      'warn',
+      'orphan-proposed-reconciler.orphan-detected',
+      'proposed spec has matching beads but no running work agent',
+      { ...candidate },
+      candidate.issueId,
+    );
 
     const lastAttempt = attemptCooldowns.get(candidate.issueId);
     if (lastAttempt !== undefined && now.getTime() - lastAttempt < minAttemptIntervalMs) {
       const remainingMs = minAttemptIntervalMs - (now.getTime() - lastAttempt);
-      emitReconcilerEvent('info', 'orphan-proposed-reconciler.spawn-skipped', {
+      emitReconcilerEvent('info', 'orphan-proposed-reconciler.spawn-skipped', 'cooldown', {
         ...candidate,
-        reason: 'cooldown',
         remainingMs,
       }, candidate.issueId);
       continue;
     }
 
     attemptCooldowns.set(candidate.issueId, now.getTime());
-    emitReconcilerEvent('info', 'orphan-proposed-reconciler.spawn-attempt', { ...candidate }, candidate.issueId);
+    emitReconcilerEvent(
+      'info',
+      'orphan-proposed-reconciler.spawn-attempt',
+      'attempting work-agent spawn for orphan proposed spec',
+      { ...candidate },
+      candidate.issueId,
+    );
 
     try {
       const spawn = await (options.spawnWorkAgent ?? ((issueId) => spawnWorkAgentThroughAgentsEndpoint(issueId, options.dashboardOrigin)))(candidate.issueId);
       if (spawn.spawned) {
-        emitReconcilerEvent('success', 'orphan-proposed-reconciler.spawn-success', {
+        emitReconcilerEvent('success', 'orphan-proposed-reconciler.spawn-success', 'work-agent spawn accepted', {
           ...candidate,
           agentId: spawn.agentId,
         }, candidate.issueId);
         actions.push(`Spawned work agent for orphan proposed spec ${candidate.issueId}`);
       } else {
-        emitReconcilerEvent('warn', 'orphan-proposed-reconciler.spawn-skipped', {
+        emitReconcilerEvent('warn', 'orphan-proposed-reconciler.spawn-skipped', spawn.skippedReason ?? 'spawn-failed', {
           ...candidate,
-          reason: spawn.skippedReason ?? 'spawn-failed',
           error: spawn.error,
         }, candidate.issueId);
         actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${spawn.skippedReason ?? 'spawn-failed'}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      emitReconcilerEvent('error', 'orphan-proposed-reconciler.spawn-skipped', {
+      emitReconcilerEvent('error', 'orphan-proposed-reconciler.spawn-skipped', 'spawn-failed', {
         ...candidate,
-        reason: 'spawn-failed',
         error: message,
       }, candidate.issueId);
       actions.push(`Skipped orphan proposed spec ${candidate.issueId}: spawn-failed`);

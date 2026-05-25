@@ -128,7 +128,7 @@ export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
   issueId: string;
-  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
+  createBeads?: (workspacePath: string, planPath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
 }): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
@@ -146,12 +146,12 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const createBeads = options.createBeads ?? (async (path: string) => {
+  const createBeads = options.createBeads ?? (async (path: string, planPath: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
-    return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
+    return (await Effect.runPromise(mod.createBeadsFromVBrief(path, planPath)));
   });
   emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from workspace vBRIEF', { workspacePath });
-  const rawBeadsResult = createBeads(workspacePath);
+  const rawBeadsResult = createBeads(workspacePath, workspacePlanPath);
   const beadsResult = Effect.isEffect(rawBeadsResult)
     ? await Effect.runPromise(rawBeadsResult)
     : await rawBeadsResult;

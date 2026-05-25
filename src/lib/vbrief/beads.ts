@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
-import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
+import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import type { VBriefDocument, VBriefInspectionPolicy, VBriefItem, VBriefItemStatus } from './types.js';
@@ -131,7 +131,7 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   return { requiresInspection, inspectionDepth };
 }
 
-async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+async function createBeadsFromVBriefPromise(workspacePath: string, planPath?: string): Promise<CreateBeadsResult> {
   return withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
@@ -177,7 +177,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
   }
 
   // Read the vBRIEF plan — must be spec-compliant format
-  const doc = readWorkspacePlanSync(workspacePath);
+  const doc = planPath ? readPlanSync(planPath) : readWorkspacePlanSync(workspacePath);
   if (!doc) {
     return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
   }
@@ -559,9 +559,10 @@ export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')
  */
 export const createBeadsFromVBrief = (
   workspacePath: string,
+  planPath?: string,
 ): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>
   Effect.tryPromise({
-    try: () => createBeadsFromVBriefPromise(workspacePath),
+    try: () => createBeadsFromVBriefPromise(workspacePath, planPath),
     catch: (cause) =>
       new BeadsOperationError({
         operation: 'createBeadsFromVBrief',

@@ -196,6 +196,39 @@ describe('plan-finalize auto-promote chain regression', () => {
     ]));
   });
 
+  it('materializes beads from the workspace draft when an existing proposed spec is stale', async () => {
+    const issueId = 'PAN-3405';
+    const { projectPath, workspacePath } = makeProject(issueId);
+    const specsDir = join(projectPath, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    const staleDoc = makeDoc(issueId, 'proposed');
+    staleDoc.plan.items = staleDoc.plan.items.slice(0, 1);
+    const existingSpecPath = join(specsDir, `2026-05-25-${issueId}-stale.vbrief.json`);
+    writeFileSync(existingSpecPath, JSON.stringify({ ...staleDoc, status: 'proposed' }, null, 2));
+
+    const createBeads = vi.fn(async (_workspacePath: string, planPath: string) => {
+      const beadSource = readJson<VBriefDocument>(planPath);
+      return {
+        success: true,
+        created: beadSource.plan.items.map((item) => item.title),
+        errors: [],
+        beadIds: new Map(),
+      };
+    });
+
+    const artifacts = await completePlanningArtifacts({
+      projectPath,
+      workspacePath,
+      issueId,
+      createBeads,
+    });
+
+    expect(createBeads).toHaveBeenCalledWith(workspacePath, join(workspacePath, '.pan', 'spec.vbrief.json'));
+    expect(artifacts.beadCount).toBe(2);
+    const proposed = readJson<{ plan: { items: unknown[] } }>(existingSpecPath);
+    expect(proposed.plan.items).toHaveLength(2);
+  });
+
   it('leaves no proposed spec on disk when bead materialization fails', async () => {
     const issueId = 'PAN-3402';
     const { projectPath, workspacePath } = makeProject(issueId);
