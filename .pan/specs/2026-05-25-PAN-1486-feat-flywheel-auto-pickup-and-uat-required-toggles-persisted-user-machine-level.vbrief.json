@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T08:34:19.937Z"
+    "updated": "2026-05-25T09:08:31.422Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T08:34:19.937Z",
+    "updated": "2026-05-25T09:08:31.422Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -86,7 +86,7 @@
       {
         "id": "b01-app-settings-keys",
         "title": "Add flywheel.auto_pickup_backlog and flywheel.require_uat_before_merge keys to app-settings.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -102,7 +102,7 @@
           {
             "id": "b01.ac1",
             "title": "FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog' is exported; getter returns false on a fresh DB and after explicit set false; returns true after set true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -110,7 +110,7 @@
           {
             "id": "b01.ac2",
             "title": "FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge' is exported; getter returns true on a fresh DB (preserves today's behavior) and after explicit set true; returns false after set false.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -118,7 +118,7 @@
           {
             "id": "b01.ac3",
             "title": "Both getters route through Effect.runSync(getSettingProgram(...).pipe(catchTag('DatabaseError', () => Effect.succeed(<default>)))), matching the existing isFlywheelGloballyPaused pattern.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -126,7 +126,7 @@
           {
             "id": "b01.ac4",
             "title": "Vitest unit tests in src/lib/database/__tests__/app-settings.test.ts cover: default-on-empty-db, round-trip set/get for both booleans, both keys, and that the two keys are independent (setting one does not affect the other).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -134,7 +134,7 @@
           {
             "id": "b01.ac5",
             "title": "npm run typecheck and npm test pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
