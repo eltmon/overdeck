@@ -54,6 +54,8 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
 import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
 import { listProjectsSync, resolveProjectFromIssueSync, findProjectByTeamSync, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -1044,6 +1046,23 @@ const getPlanningStatusRoute = HttpRouter.add(
   }),
 );
 
+async function claudePlanningSystemPromptFiles(workspacePath: string): Promise<string[]> {
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(workspacePath);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 // ─── Route: POST /api/planning/:issueId/message ──────────────────────────────
 
 const postPlanningMessageRoute = HttpRouter.add(
@@ -1223,6 +1242,7 @@ Continue the PLANNING session. Do NOT implement anything.
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
+            appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
           }),
           { mode: 0o755 },

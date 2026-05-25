@@ -30,6 +30,7 @@ import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
+import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -442,6 +443,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     try {
       await transitionIssueToVerifyingOnMain(issueId, projectPath);
+      void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);

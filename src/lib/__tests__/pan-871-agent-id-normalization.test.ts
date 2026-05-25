@@ -63,7 +63,7 @@ vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })),
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
 vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));
-vi.mock('../cliproxy.js', () => ({ getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
+vi.mock('../cliproxy.js', () => ({ CLIPROXY_BASE_URL: 'http://127.0.0.1:8317', getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
 vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), createTracker: vi.fn() }));
 vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn() }));
 vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));

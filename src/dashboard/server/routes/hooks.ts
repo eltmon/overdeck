@@ -25,6 +25,8 @@ import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
+import { resolveComplianceAdvisoryWarning } from '../../../lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
@@ -71,9 +73,11 @@ export interface HandleMemorySessionStartBodyOptions {
   resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
   statTranscript?: (transcriptPath: string) => Promise<{ size: number; mtimeMs: number }>;
   registerTranscript?: typeof registerTranscriptForPolling;
+  recordBriefingSessionStart?: typeof recordBriefingSessionStart;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  now?: Date;
 }
 
 export type HandleMemoryTurnBodyResult =
@@ -156,7 +160,6 @@ export async function handleMemorySessionStartBody(
   options: HandleMemorySessionStartBodyOptions = {},
 ): Promise<HandleMemorySessionStartBodyResult> {
   if (isSubagentHookPayload(body)) return { status: 'subagent' };
-  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const payloadResult = Schema.decodeUnknownResult(MemorySessionStartHookPayload)(body);
   if (payloadResult._tag === 'Failure') {
@@ -169,6 +172,10 @@ export async function handleMemorySessionStartBody(
   if (!sessionId || !transcriptPath) {
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
+
+  const recordBriefingStart = options.recordBriefingSessionStart ?? recordBriefingSessionStart;
+  await recordBriefingStart(options.now ? { sessionId, now: options.now } : { sessionId }).catch(() => {});
+  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const trustedTranscriptPath = options.resolveTranscriptPath
     ? await options.resolveTranscriptPath(body, sessionId)
@@ -201,7 +208,10 @@ export async function handleMemorySessionStartBody(
 
 export interface HandleMemoryInjectBodyOptions {
   injectMemory?: typeof injectPromptTimeMemory;
+  injectBriefing?: typeof appendFreshBriefingUpdate;
+  resolveComplianceWarning?: typeof resolveComplianceAdvisoryWarning;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  now?: Date;
 }
 
 export async function handleMemoryInjectBody(
@@ -229,7 +239,18 @@ export async function handleMemoryInjectBody(
     return { error: 'memory identity could not be resolved', status: 202 } as const;
   }
 
-  return await (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity });
+  const [memoryResult, complianceWarning] = await Promise.all([
+    (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity }),
+    (options.resolveComplianceWarning ?? resolveComplianceAdvisoryWarning)({ identity }).catch(() => null),
+  ]);
+  const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)(
+    options.now ? { sessionId, context: memoryResult.context, now: options.now } : { sessionId, context: memoryResult.context },
+  );
+
+  return {
+    ...memoryResult,
+    context: [complianceWarning, briefing.context].filter((part): part is string => !!part).join('\n\n'),
+  };
 }
 
 const postMemoryInjectRoute = HttpRouter.add(
@@ -248,13 +269,28 @@ const postMemoryInjectRoute = HttpRouter.add(
     }
 
     const readModel = yield* ReadModelService;
-    // Fire-and-forget: prompt-time injection can exceed the 1 s client hook
-    // timeout (query expansion + FTS search). Return 202 immediately so the
-    // hook client doesn't abort and waste the in-flight LLM call.
+    const resolveAgentIdBySessionId = async (sessionId: string) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId));
+    const warningResult = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+      resolveAgentIdBySessionId,
+      injectMemory: async () => ({
+        status: 'skipped',
+        reason: 'compliance-warning-only',
+        context: '',
+        decision: {} as never,
+      }),
+      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
+    }));
+
+    // Fire-and-forget: prompt-time memory injection can exceed the 1 s client hook
+    // timeout (query expansion + FTS search). Return any fast advisory warning now.
     void Effect.runPromise(Effect.promise(() => handleMemoryInjectBody(body, {
-      resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
+      resolveAgentIdBySessionId,
+      resolveComplianceWarning: async () => null,
     })));
-    return jsonResponse({ ok: true }, { status: 202 });
+    return jsonResponse({
+      ok: true,
+      context: 'error' in warningResult ? '' : warningResult.context,
+    }, { status: 202 });
   })),
 );
 

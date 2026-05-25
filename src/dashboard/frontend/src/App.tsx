@@ -26,6 +26,7 @@ import { ConversationsPage } from './components/conversations/ConversationsPage'
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
+import { HomePage } from './pages/HomePage';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -65,7 +66,8 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
-  pipeline: '/',
+  home: '/',
+  pipeline: '/pipeline',
   kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
@@ -88,7 +90,6 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ...Object.fromEntries(
     Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
   ) as Record<string, Tab>,
-  '/pipeline': 'pipeline',
 };
 
 export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarOpen';
@@ -96,7 +97,7 @@ export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedS
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'pipeline';
+  return PATH_TO_TAB[path] || 'home';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
@@ -747,6 +748,11 @@ export default function App() {
     openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
+  const handleOpenWorkspaceHome = useCallback((issueId: string) => {
+    setActiveTab('kanban');
+    openIssue(issueId);
+  }, [openIssue, setActiveTab]);
+
   return (
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
@@ -887,6 +893,11 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
+          {activeTab === 'home' && (
+            <div className="w-full h-full overflow-hidden">
+              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
+            </div>
+          )}
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
               <CommandDeck
@@ -898,7 +909,7 @@ export default function App() {
               />
             </div>
           )}
-        {activeTab === 'pipeline' && (
+          {activeTab === 'pipeline' && (
           <BootstrapGate fallback={<PipelineSkeleton />}>
             <div className="w-full h-full overflow-hidden">
               <PipelineView onSearchOpen={() => setIsSearchOpen(true)} onTabChange={(tab) => setActiveTab(tab as Parameters<typeof setActiveTab>[0])} />
