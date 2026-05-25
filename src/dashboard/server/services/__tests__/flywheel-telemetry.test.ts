@@ -1,0 +1,141 @@
+import { describe, expect, it } from 'vitest';
+import { decodeFlywheelStats } from '@panctl/contracts';
+import {
+  computeBugRateCriterion,
+  computeFlakeCriterion,
+  computeFlywheelStats,
+  computeInterventionCriterion,
+  computeMttrCriterion,
+  computeP0BugsCriterion,
+  computePassRateCriterion,
+  computeTimeConsistencyCriterion,
+  parseFlywheelStatsWindow,
+} from '../flywheel-telemetry.js';
+
+const generatedAt = new Date('2026-05-25T10:00:00.000Z');
+
+describe('flywheel telemetry', () => {
+  it.each([
+    ['30d', 30 * 24 * 60 * 60 * 1000],
+    ['7d', 7 * 24 * 60 * 60 * 1000],
+    ['24h', 24 * 60 * 60 * 1000],
+    ['1h', 60 * 60 * 1000],
+  ])('parses stats window %s', (window, ms) => {
+    expect(parseFlywheelStatsWindow(window)).toEqual({ input: window, ms });
+  });
+
+  it('rejects invalid stats windows', () => {
+    expect(() => parseFlywheelStatsWindow('0h')).toThrow('Invalid Flywheel stats window');
+    expect(() => parseFlywheelStatsWindow('30days')).toThrow('Invalid Flywheel stats window');
+    expect(() => parseFlywheelStatsWindow('soon')).toThrow('Invalid Flywheel stats window');
+  });
+
+  it('returns a complete placeholder FlywheelStats response', async () => {
+    const stats = await computeFlywheelStats('30d', { generatedAt, completedPipelineRuns: 2 });
+
+    expect(decodeFlywheelStats(stats)).toEqual(stats);
+    expect(stats).toMatchInlineSnapshot(`
+      {
+        "criteria": {
+          "c1_bugRate": {
+            "dataSufficient": false,
+            "label": "Substrate-bug discovery rate",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": 0.02,
+            "value": 0,
+          },
+          "c2_p0Bugs": {
+            "dataSufficient": false,
+            "label": "Critical/P0 substrate bugs",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": 0,
+            "value": 0,
+          },
+          "c3_passRate": {
+            "dataSufficient": false,
+            "label": "Pipeline pass success rate",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": 0.99,
+            "value": 0,
+          },
+          "c4_mttr": {
+            "dataSufficient": false,
+            "label": "MTTR for filed substrate bugs",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": {
+              "medianMs": 86400000,
+              "p95Ms": 604800000,
+            },
+            "value": {
+              "medianMs": 0,
+              "p95Ms": 0,
+            },
+          },
+          "c5_intervention": {
+            "dataSufficient": false,
+            "label": "Operator intervention rate",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": 0.05,
+            "value": 0,
+          },
+          "c6_timeConsistency": {
+            "dataSufficient": false,
+            "label": "Time-in-pipeline consistency",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": {
+              "maxRatio": 2,
+            },
+            "value": {
+              "complex": 0,
+              "medium": 0,
+              "simple": 0,
+            },
+          },
+          "c7_flake": {
+            "dataSufficient": false,
+            "label": "Substrate-attributable flake rate",
+            "sampleSize": 2,
+            "status": "insufficient_data",
+            "target": 0.05,
+            "value": 0,
+          },
+        },
+        "generatedAt": "2026-05-25T10:00:00.000Z",
+        "window": "30d",
+      }
+    `);
+  });
+
+  it('exports one helper per readiness criterion', () => {
+    const helpers = [
+      computeBugRateCriterion,
+      computeP0BugsCriterion,
+      computePassRateCriterion,
+      computeMttrCriterion,
+      computeInterventionCriterion,
+      computeTimeConsistencyCriterion,
+      computeFlakeCriterion,
+    ];
+
+    for (const helper of helpers) {
+      expect(helper(2)).toMatchObject({
+        status: 'insufficient_data',
+        sampleSize: 2,
+        dataSufficient: false,
+      });
+    }
+  });
+
+  it('marks every criterion as insufficient when fewer than three runs exist', async () => {
+    const stats = await computeFlywheelStats('7d', { generatedAt, completedPipelineRuns: 2 });
+
+    expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
+    expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+});
