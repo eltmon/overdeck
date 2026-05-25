@@ -89,12 +89,26 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let promoted = false;
   let promoteMessage: string | null = null;
   let promoteError: string | null = null;
+  let workAgentSpawned = false;
+  let workAgentMessage: string | null = null;
+  let workAgentError: string | null = null;
 
   if (!options.noPromote) {
     const promotion = await promotePlanning(issueId);
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
+
+    // After successful promotion, chain through to spawning the work agent.
+    // Auto-planned issues should run end-to-end without waiting for a human
+    // Done click or a separate Start Agent click. --no-promote opts out of
+    // both the spec promotion AND the work-agent spawn.
+    if (promoted) {
+      const spawn = await spawnWorkAgent(issueId);
+      workAgentSpawned = spawn.success;
+      workAgentMessage = spawn.message;
+      workAgentError = spawn.error;
+    }
   }
 
   if (options.json) {
@@ -105,8 +119,11 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       canonicalFilename,
       planStatus: 'proposed',
       promoted,
+      workAgentSpawned,
       ...(promoteMessage ? { promoteMessage } : {}),
       ...(promoteError ? { promoteError } : {}),
+      ...(workAgentMessage ? { workAgentMessage } : {}),
+      ...(workAgentError ? { workAgentError } : {}),
     }));
   } else {
     console.log(chalk.green(`✓ Created ${result.created.length} beads task${result.created.length === 1 ? '' : 's'}`));
@@ -119,6 +136,14 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     } else if (promoted) {
       console.log(chalk.green('✓ Planning promoted to main — issue is ready for implementation.'));
       if (promoteMessage) console.log(chalk.dim('  ' + promoteMessage));
+      if (workAgentSpawned) {
+        console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
+        if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
+      } else {
+        console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn failed.'));
+        if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
+        console.log(chalk.dim('Run `pan start ' + issueId + '` to spawn the work agent.'));
+      }
     } else {
       console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
@@ -158,6 +183,46 @@ async function promotePlanning(issueId: string): Promise<{ success: boolean; mes
       return { success: false, message: null, error: String(err) };
     }
     return { success: true, message: parsed?.message ?? null, error: null };
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : String(err);
+    return { success: false, message: null, error: `Dashboard unreachable: ${message}` };
+  }
+}
+
+/**
+ * Spawn the work agent for the just-promoted issue. Auto-planned issues should
+ * run end-to-end (plan → work → review → test → ship) without a separate human
+ * click. Mirrors promotePlanning's error-shape so the caller can format
+ * consistently.
+ */
+async function spawnWorkAgent(issueId: string): Promise<{ success: boolean; message: string | null; error: string | null }> {
+  try {
+    const url = `${getDashboardApiUrlSync()}/api/agents`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, role: 'work', auto: true, guardrailAcknowledged: true }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    const text = await response.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+    if (!response.ok) {
+      const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
+      return { success: false, message: null, error: String(err) };
+    }
+    return {
+      success: true,
+      message: parsed?.sessionName ? `Session: ${parsed.sessionName}` : (parsed?.message ?? null),
+      error: null,
+    };
   } catch (err: any) {
     const message = err?.message ? String(err.message) : String(err);
     return { success: false, message: null, error: `Dashboard unreachable: ${message}` };
