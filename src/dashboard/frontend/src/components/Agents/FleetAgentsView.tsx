@@ -159,6 +159,12 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
 }
 
 function isFleetAgent(agent: Agent) {
+  // Strike agents are intentionally short-lived — they exit cleanly after their
+  // analyze/implement/merge/verify cycle. Keep finished strikes visible so the
+  // operator can review what each one decided (PR landed vs. self-aborted with
+  // recommendation) instead of losing them off the dashboard the moment Claude
+  // exits. Work/review/test agents still get the strict isFleetAgent filter.
+  if (agent.role === 'strike') return agent.status !== 'dead';
   return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || FLEET_STATUSES.has(agent.status));
 }
 

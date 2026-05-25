@@ -571,6 +571,10 @@
     "mtime": 1772211497.1027362,
     "hash": "b5d00495a4eb2d29041cd145badbce93"
   },
+  "/home/eltmon/Projects/panopticon-cli/tests/lib/agents-strike-role-parse.test.ts": {
+    "mtime": 1779718984.4051297,
+    "hash": "67a1b83063de02708dece418968e1a60"
+  },
   "/home/eltmon/Projects/panopticon-cli/tests/lib/claude-mcp.test.ts": {
     "mtime": 1779509145.5925536,
     "hash": "ca5557c79e3900dac3a838c0bba12755"
@@ -656,8 +660,8 @@
     "hash": "140cb233c2b20f7db519be92d0bd1e84"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/lib/registry/feature-registry-storage.test.ts": {
-    "mtime": 1779690069.68595,
-    "hash": "cb51e558834ec78f119e94921f4bdfc3"
+    "mtime": 1779718984.4051297,
+    "hash": "2742b024b18daef57f460d30657925e7"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/lib/registry/feature-registry-population.test.ts": {
     "mtime": 1779690069.6854954,
@@ -836,8 +840,8 @@
     "hash": "38808d1e03405a21487cf48c263b41c0"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/lib/memory/fts-db.test.ts": {
-    "mtime": 1779392553.5591674,
-    "hash": "daa13dbc61f4970ba968743b5a4c10d8"
+    "mtime": 1779718984.4051297,
+    "hash": "15505b2d6c3269f52dfb94a2e4798c6f"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/lib/memory/providers.test.ts": {
     "mtime": 1779392553.5591674,
@@ -976,8 +980,8 @@
     "hash": "69b728a5388e4f606bbec68932d177f5"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/dashboard/read-model-validators.test.ts": {
-    "mtime": 1778465956.348894,
-    "hash": "86f8c984af36a7a4bce0ef42909ee038"
+    "mtime": 1779718984.4051297,
+    "hash": "9437fcb861e71f9cf974b97eb8a0f6c5"
   },
   "/home/eltmon/Projects/panopticon-cli/tests/dashboard/version-api.test.ts": {
     "mtime": 1778349942.8569396,
@@ -1132,7 +1136,7 @@
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.d.ts": {
-    "mtime": 1779712184.4591186,
+    "mtime": 1779719049.7404165,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notify-complete": {
@@ -1140,7 +1144,7 @@
     "hash": "373ba01f551cd1ff98252fd01e937ebd"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.js": {
-    "mtime": 1779714514.1702554,
+    "mtime": 1779719049.7404165,
     "hash": "fb3f9034cc0f633407ae0769d8b64d39"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notification-hook": {
@@ -1428,8 +1432,8 @@
     "hash": "e428ffe61ac7296d0ce926f3ddd5df55"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/agents.ts": {
-    "mtime": 1779712268.6080315,
-    "hash": "c1eb4f85974109b9076199a718e58323"
+    "mtime": 1779718984.4041295,
+    "hash": "1332e299fcc1fcdbf8ecc84975c75c93"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/git-activity.ts": {
     "mtime": 1779509145.5785532,
@@ -1716,8 +1720,8 @@
     "hash": "265aa1cfaed09755123287c540d65f68"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/config-yaml.ts": {
-    "mtime": 1779714514.1692553,
-    "hash": "024797f36d594aa2dd73f4997e33aec7"
+    "mtime": 1779718984.4041295,
+    "hash": "779aac6f534a15c3548916b6ec92c164"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/format-duration.ts": {
     "mtime": 1779381725.4322762,
@@ -1920,8 +1924,8 @@
     "hash": "975b3351a0421dd6e12f3bf4938b019d"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/registry/feature-registry-storage.ts": {
-    "mtime": 1779690069.680992,
-    "hash": "0a228d887bba9088f7e50e970242676d"
+    "mtime": 1779718984.4051297,
+    "hash": "b4ed81d96a00ea0cfc54bbef7218956b"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/docs/query.ts": {
     "mtime": 1779690029.1952615,
@@ -1936,8 +1940,8 @@
     "hash": "342512ea02d94cf79da50d3dd63707f7"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/docs/index-builder.ts": {
-    "mtime": 1779690029.1952615,
-    "hash": "c289923c3faf6b31ed3e189c49590b08"
+    "mtime": 1779718984.4041295,
+    "hash": "a1b39f38a0836efadd369d3e9119fdf9"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/docs/__tests__/query.test.ts": {
     "mtime": 1779690029.1952615,
@@ -1948,8 +1952,8 @@
     "hash": "c3eb0d198095d2e87bec37e83ef5d481"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/docs/__tests__/index-builder.test.ts": {
-    "mtime": 1779690029.1952615,
-    "hash": "796f520a98d3498c607f3541ed842aa9"
+    "mtime": 1779718984.4041295,
+    "hash": "46f02f5e0946baf0ef1390426424300f"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/docs/__tests__/state.test.ts": {
     "mtime": 1779690029.1952615,
@@ -2776,8 +2780,8 @@
     "hash": "bf993c7c70121cca7a54f2165c8c61af"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/__tests__/config-yaml-roles.test.ts": {
-    "mtime": 1779714514.1682553,
-    "hash": "7ee1bcc97fbcec0feaa2cfc12b1900e2"
+    "mtime": 1779718984.4031296,
+    "hash": "1d30cf565a900ff5b4acbfb809888097"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/__tests__/remote-settings-no-leak.test.ts": {
     "mtime": 1778519403.485591,
@@ -3128,8 +3132,8 @@
     "hash": "62e1f21dac03c67e05b11de444e4b902"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/memory/fts-db.ts": {
-    "mtime": 1779392553.555657,
-    "hash": "7e933dcd83bda9d57edf1b42bda4ea7e"
+    "mtime": 1779718984.4041295,
+    "hash": "ff3a4a6995805222eb231391aeab4c20"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/memory/settings.ts": {
     "mtime": 1779392553.5560706,
@@ -5180,8 +5184,8 @@
     "hash": "2a42cc37a574ada8b9d5fc3cbcf03b46"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/server/read-model.ts": {
-    "mtime": 1779577116.5652034,
-    "hash": "ffe575822c8140c1bff66d9704f4ee54"
+    "mtime": 1779718984.4031296,
+    "hash": "1b5f4c1d6966aaf5ec1c9ecd2e54cf9b"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/server/http-helpers.ts": {
     "mtime": 1779381725.4012754,
@@ -6720,8 +6724,8 @@
     "hash": "65d43fa512e987fd5822cbe593d31f52"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/ROLES.md": {
-    "mtime": 1779712268.6050315,
-    "hash": "281198891c0a1c39adc6a895299565ec"
+    "mtime": 1779718984.4031296,
+    "hash": "b2d228d8801cf7d6058d9561ce427edb"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/PRD-CLOISTER.md": {
     "mtime": 1778349942.532704,
@@ -6780,8 +6784,8 @@
     "hash": "ba1a7c83fdb0aa9de28b15e265dfc906"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md": {
-    "mtime": 1779712268.6050315,
-    "hash": "f90050f92c9f4366e3d31b30fa1fe084"
+    "mtime": 1779714693.23442,
+    "hash": "c763d0c3b5d0f4a9ffdb8ab14f407768"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/HIERARCHICAL-PLANNING.md": {
     "mtime": 1778349942.5317042,
@@ -8412,8 +8416,8 @@
     "hash": "f97517cbc93424960342ea3f6eae6614"
   },
   "/home/eltmon/Projects/panopticon-cli/roles/flywheel.md": {
-    "mtime": 1779714514.1662552,
-    "hash": "8ef6ea282579b60d7a8059072d463f66"
+    "mtime": 1779714665.8214762,
+    "hash": "65035713d9691e38a44c7db64a0d46b6"
   },
   "/home/eltmon/Projects/panopticon-cli/benchmarks/templates/quantumllama.md": {
     "mtime": 1775883939.776186,
@@ -8562,6 +8566,10 @@
   "/home/eltmon/Projects/panopticon-cli/favicon.svg": {
     "mtime": 1773676181.9564672,
     "hash": "2648874174aef7c21ecbda3d101b2298"
+  },
+  "/home/eltmon/Projects/panopticon-cli/agents-page-state.png": {
+    "mtime": 1779718505.039324,
+    "hash": "0e294e488d68834b7a633d7157a37bd6"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/screenshot-agents.png": {
     "mtime": 1772573531.9868505,
