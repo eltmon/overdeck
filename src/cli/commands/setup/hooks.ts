@@ -314,6 +314,8 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator
     'post-compact-hook',           // PostCompact — emits activity=idle to clear compacting state
     'record-cost-event.js',
+    'gh-issue-trailer-hook',
+    'gh-issue-trailer-hook.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
     'rtk-bash-filter',
@@ -419,6 +421,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // PAN-982, but Claude Code did not honor them when Panopticon invoked agents
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
+  addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
   addHookIfMissing('PostToolUse', 'heartbeat-hook');
   addHookIfMissing('PostToolUse', 'permission-event-hook');
   addHookIfMissing('Stop', 'stop-hook');

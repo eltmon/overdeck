@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['record-cost-event.ts'],
+  entry: ['record-cost-event.ts', 'gh-issue-trailer-hook.ts'],
   format: 'esm',
   platform: 'node',
   shims: true,
