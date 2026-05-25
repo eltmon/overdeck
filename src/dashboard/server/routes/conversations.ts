@@ -100,6 +100,8 @@ import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -895,6 +897,23 @@ void backfillConversationModels().catch((err: unknown) => {
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
 
+async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(cwd);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 export async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
@@ -1066,6 +1085,7 @@ export async function spawnConversationSession(
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
+      appendSystemPromptFiles: piFields ? [] : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
       ...(piFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,

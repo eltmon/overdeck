@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import panopticonPiExtension, {
@@ -7,6 +7,8 @@ import panopticonPiExtension, {
   handleToolExecutionEnd,
   handleTurnEnd,
   handlePanDone,
+  handleSessionBriefingContext,
+  handleWorkspaceContext,
   panopticonPathsFor,
   type PiExtensionAPI,
   type PiCommand,
@@ -166,6 +168,27 @@ describe('handleSessionStart', () => {
     )
     expect(fetchCalls[0]!.url).toBe('http://dashboard.local:9999/api/agents/agent-pan-636/heartbeat')
     vi.unstubAllEnvs()
+  })
+})
+
+describe('Pi system prompt context', () => {
+  let h: ReturnType<typeof makeFakeHome>
+  beforeEach(() => { h = makeFakeHome() })
+  afterEach(() => h.cleanup())
+
+  it('appends workspace context and session briefing in order', async () => {
+    const cwd = join(h.home, 'workspace')
+    mkdirSync(join(cwd, '.pan', 'context'), { recursive: true })
+    writeFileSync(join(cwd, '.pan', 'context', 'workspace.md'), 'workspace context')
+    writeFileSync(join(h.home, 'session-context.md'), 'live briefing context')
+    const appended: string[] = []
+    const ctx = { appendSystemPrompt: vi.fn(async (text: string) => { appended.push(text) }) }
+
+    await handleWorkspaceContext(ctx, cwd)
+    await handleSessionBriefingContext(ctx, h.home)
+
+    expect(appended).toEqual(['workspace context', 'live briefing context'])
+    expect(ctx.appendSystemPrompt).toHaveBeenCalledTimes(2)
   })
 })
 
