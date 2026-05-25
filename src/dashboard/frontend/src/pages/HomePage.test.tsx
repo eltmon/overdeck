@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@panctl/contracts';
+import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@panctl/contracts';
 import { INITIAL_READ_MODEL_STATE } from '@panctl/contracts';
 
 import { HomePage } from './HomePage';
@@ -37,6 +37,15 @@ const memoryStatus: MemoryStatus = {
   workingSet: [],
   tags: [],
 };
+
+function makeAgent(overrides: Partial<AgentSnapshot> = {}): AgentSnapshot {
+  return {
+    id: 'agent-1',
+    issueId: 'PAN-1204',
+    status: 'running',
+    ...overrides,
+  };
+}
 
 function makeObservation(overrides: Partial<MemoryObservation> = {}): MemoryObservation {
   return {
@@ -95,7 +104,59 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function summaryCard(label: string): HTMLElement {
+  const card = screen.getByText(label).closest('div');
+  if (!card) throw new Error(`Missing summary card: ${label}`);
+  return card;
+}
+
 describe('HomePage', () => {
+  it('renders header summary cards from live read-model and metrics state', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/metrics/summary') return Response.json({ today: { totalCost: 12.345 } });
+      return Response.json({ entries: [] });
+    }));
+    useDashboardStore.setState({
+      agentsById: {
+        running: makeAgent({ id: 'running', status: 'running' }),
+        liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLiveTmuxSession: true }),
+        paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
+        troubled: makeAgent({ id: 'troubled', status: 'stopped', consecutiveFailures: 2 }),
+      },
+      reviewStatusByIssueId: {
+        recentMerge: { issueId: 'PAN-1', mergeStatus: 'merged', updatedAt: '2026-05-25T00:00:00.000Z' },
+        oldMerge: { issueId: 'PAN-2', mergeStatus: 'merged', updatedAt: '2026-05-23T00:00:00.000Z' },
+        failedVerification: { issueId: 'PAN-3', verificationStatus: 'failed' },
+        blocked: {
+          issueId: 'PAN-4',
+          blockerReasons: [{ type: 'merge_conflict', summary: 'Conflicts', detectedAt: '2026-05-25T00:00:00.000Z' }],
+        },
+      },
+    });
+
+    renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
+
+    expect(summaryCard('Running agents')).toHaveTextContent('2');
+    expect(summaryCard('Paused / troubled')).toHaveTextContent('2');
+    expect(summaryCard('Merged today')).toHaveTextContent('1');
+    expect(summaryCard('Needs verification')).toHaveTextContent('2');
+    expect(await screen.findByText('$12.35')).toBeInTheDocument();
+  });
+
+  it('renders cost as unavailable when metrics summary is absent', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/metrics/summary') return new Response(null, { status: 500 });
+      return Response.json({ entries: [] });
+    }));
+
+    renderHomePage();
+
+    expect(await screen.findByText('Unavailable')).toBeInTheDocument();
+    expect(summaryCard('Cost today')).toHaveTextContent('UTC daily cost summary');
+  });
+
   it('renders workspace status cards from read-model memory state', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
     const onOpenWorkspaceHome = vi.fn();

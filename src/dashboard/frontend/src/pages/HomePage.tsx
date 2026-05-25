@@ -9,6 +9,27 @@ interface FeatureRegistryResponse {
   entries: FeatureRegistryEntry[];
 }
 
+interface MetricsSummaryResponse {
+  today?: {
+    totalCost?: number;
+  };
+}
+
+interface HomeSummaryCards {
+  runningAgents: number;
+  gatedAgents: number;
+  recentMerges: number;
+  failedVerifications: number;
+  dailyCost: number | null;
+}
+
+interface SummaryCardView {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+}
+
 interface HomePageProps {
   onOpenWorkspaceHome?: (issueId: string) => void;
   now?: Date;
@@ -36,10 +57,22 @@ async function fetchFeatureRegistry(): Promise<FeatureRegistryEntry[]> {
   return Array.isArray(data.entries) ? data.entries : [];
 }
 
+async function fetchMetricsSummary(): Promise<MetricsSummaryResponse> {
+  const response = await fetch('/api/metrics/summary');
+  if (!response.ok) throw new Error(`Metrics summary request failed (${response.status})`);
+  return response.json() as Promise<MetricsSummaryResponse>;
+}
+
 export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
   const registryQuery = useQuery({
     queryKey: ['feature-registry'],
     queryFn: fetchFeatureRegistry,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const metricsQuery = useQuery({
+    queryKey: ['metrics-summary'],
+    queryFn: fetchMetricsSummary,
     staleTime: 30_000,
     retry: false,
   });
@@ -48,6 +81,7 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
   const agentsById = useDashboardStore((state) => state.agentsById);
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const currentTime = now ?? new Date();
   const workspaceCards = useMemo(() => buildHomeWorkspaceCards({
     issuesRaw,
     statusByIssueId,
@@ -55,6 +89,12 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
     agentsById,
     reviewStatusByIssueId,
   }), [agentsById, issuesRaw, observationsByIssueId, reviewStatusByIssueId, statusByIssueId]);
+  const summaryCards = useMemo(() => buildSummaryCardViews(buildHomeSummaryCards({
+    agentsById,
+    reviewStatusByIssueId,
+    dailyCost: metricsQuery.data?.today?.totalCost,
+    now: currentTime,
+  })), [agentsById, currentTime, metricsQuery.data?.today?.totalCost, reviewStatusByIssueId]);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
@@ -66,6 +106,16 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
             A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
           </p>
         </header>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Home summary">
+          {summaryCards.map((card) => (
+            <div key={card.label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
+              <p className={`mt-2 text-2xl font-semibold tabular-nums ${card.tone ?? 'text-foreground'}`}>{card.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+            </div>
+          ))}
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="workspace-status-title">
           <div>
@@ -130,6 +180,84 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
       </div>
     </div>
   );
+}
+
+function buildHomeSummaryCards({
+  agentsById = {},
+  reviewStatusByIssueId = {},
+  dailyCost,
+  now,
+}: {
+  agentsById?: Record<string, AgentSnapshot>;
+  reviewStatusByIssueId?: Record<string, ReviewStatusSnapshot>;
+  dailyCost?: number;
+  now: Date;
+}): HomeSummaryCards {
+  const agents = Object.values(agentsById);
+  const reviewStatuses = Object.values(reviewStatusByIssueId);
+  return {
+    runningAgents: agents.filter(isRunningAgent).length,
+    gatedAgents: agents.filter(isGatedAgent).length,
+    recentMerges: reviewStatuses.filter((status) => isRecentMerge(status, now)).length,
+    failedVerifications: reviewStatuses.filter(needsVerificationAttention).length,
+    dailyCost: typeof dailyCost === 'number' && Number.isFinite(dailyCost) ? dailyCost : null,
+  };
+}
+
+function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
+  return [
+    {
+      label: 'Running agents',
+      value: String(summary.runningAgents),
+      detail: 'Live or starting sessions',
+      tone: summary.runningAgents > 0 ? 'text-primary' : undefined,
+    },
+    {
+      label: 'Paused / troubled',
+      value: String(summary.gatedAgents),
+      detail: 'Agents gated by pause or failures',
+      tone: summary.gatedAgents > 0 ? 'text-warning' : undefined,
+    },
+    {
+      label: 'Merged today',
+      value: String(summary.recentMerges),
+      detail: 'Merges in the last 24 hours',
+      tone: summary.recentMerges > 0 ? 'text-success' : undefined,
+    },
+    {
+      label: 'Needs verification',
+      value: String(summary.failedVerifications),
+      detail: 'Failed checks or merge blockers',
+      tone: summary.failedVerifications > 0 ? 'text-destructive' : undefined,
+    },
+    {
+      label: 'Cost today',
+      value: summary.dailyCost === null ? 'Unavailable' : `$${summary.dailyCost.toFixed(2)}`,
+      detail: 'UTC daily cost summary',
+      tone: summary.dailyCost === null ? 'text-muted-foreground' : 'text-success',
+    },
+  ];
+}
+
+function isRunningAgent(agent: AgentSnapshot): boolean {
+  return agent.hasLiveTmuxSession === true || agent.status === 'running' || agent.status === 'starting';
+}
+
+function isGatedAgent(agent: AgentSnapshot): boolean {
+  return agent.paused === true || agent.troubled === true || (agent.consecutiveFailures ?? 0) > 0;
+}
+
+function isRecentMerge(status: ReviewStatusSnapshot, now: Date): boolean {
+  if (status.mergeStatus !== 'merged' || !status.updatedAt) return false;
+  const timestamp = Date.parse(status.updatedAt);
+  return !Number.isNaN(timestamp) && now.getTime() - timestamp <= 24 * 60 * 60 * 1000;
+}
+
+function needsVerificationAttention(status: ReviewStatusSnapshot): boolean {
+  return status.verificationStatus === 'failed' ||
+    status.testStatus === 'failed' ||
+    status.uatStatus === 'failed' ||
+    (status.blockerReasons?.length ?? 0) > 0;
 }
 
 function buildHomeWorkspaceCards({
