@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.11.1",
     "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "updated": "2026-05-25T09:06:39.999Z"
+    "updated": "2026-05-25T08:32:32.564Z"
   },
   "plan": {
     "id": "pan-1487",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 2,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T09:06:39.999Z",
+    "updated": "2026-05-25T08:32:32.564Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
@@ -1778,51 +1778,7 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1487-feat-flywheel-substrate-bug-provenance-telemetry-for-v1-0-readiness-criteria.vbrief.json",
-      "pipeline": {
-        "phase": "work",
-        "issueId": "PAN-1487",
-        "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T09:06:39.998Z",
-        "work": {
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": []
-        },
-        "verification": {
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": []
-        },
-        "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": [
-            {
-              "status": "pending",
-              "at": "2026-05-25T09:06:39.998Z"
-            }
-          ],
-          "approval": "pending"
-        },
-        "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": [
-            {
-              "status": "pending",
-              "at": "2026-05-25T09:06:39.998Z"
-            }
-          ]
-        },
-        "uat": {
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": []
-        },
-        "merge": {
-          "updatedAt": "2026-05-25T09:06:39.998Z",
-          "history": [],
-          "readyForMerge": false
-        }
-      }
+      "canonicalFilename": "2026-05-25-PAN-1487-feat-flywheel-substrate-bug-provenance-telemetry-for-v1-0-readiness-criteria.vbrief.json"
     }
   },
   "status": "proposed"
