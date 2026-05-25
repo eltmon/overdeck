@@ -272,6 +272,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="chart-container-lg">
 <canvas id="monthlyChart"></canvas>
 </div>
+<div style="margin-top:16px;padding:12px 16px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:12px">
+<span style="font-size:1.2rem">&#x26A0;</span>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0"><strong>January 2026 underreported:</strong> Cost tracking transitioned from SQLite to JSONL on Jan 31. Only 6 days of data were captured that month, causing the artificially low bar. Feb onward uses the canonical JSONL pipeline.</p>
+</div>
 </div>
 </div>
 </section>
@@ -284,29 +288,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <p>The real reason we can afford to build this way</p>
 </div>
 <div class="card animate-in">
-<p style="color:var(--text-muted);margin-bottom:32px;font-size:.95rem">Panopticon runs almost entirely on subscription plans. Here's how a typical month compares to API pricing:</p>
-
-<div class="compare-row">
-<div class="compare-label">Claude Pro</div>
-<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$20/mo</span></div></div>
-<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$3,000/mo</div>
+<p style="color:var(--text-muted);margin-bottom:32px;font-size:.95rem">Panopticon runs almost entirely on subscription plans. The grouped bars below show what we actually pay (subscription) vs what the same usage would cost at API rates:</p>
+<div class="chart-container-lg">
+<canvas id="subscriptionChart"></canvas>
 </div>
-<div class="compare-row">
-<div class="compare-label">Kimi Pro</div>
-<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$15/mo</span></div></div>
-<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$800/mo</div>
-</div>
-<div class="compare-row">
-<div class="compare-label">MiniMax</div>
-<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:.5%"><span class="compare-value">$10/mo</span></div></div>
-<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$200/mo</div>
-</div>
-<div class="compare-row">
-<div class="compare-label">OpenAI Plus</div>
-<div class="compare-bar"><div class="compare-fill compare-fill-sub" style="width:1%"><span class="compare-value">$20/mo</span></div></div>
-<div style="width:100px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--danger);font-weight:600">~$1,500/mo</div>
-</div>
-
 <div style="margin-top:32px;padding:24px;border-radius:16px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15)">
 <p style="font-size:1.1rem;font-weight:600;color:var(--success)">Net Result: ~99% cost reduction vs pay-per-use</p>
 <p style="color:var(--text-muted);font-size:.9rem;margin-top:8px">Subscription plans are the only reason AI-native development at this scale is economically viable. The $54K PPU figure represents the "sticker price" &mdash; the actual burn rate is closer to a few hundred dollars per month in subscriptions.</p>
@@ -360,6 +345,117 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 </div>
 </section>
 
+<!-- Cost Reduction Features -->
+<section class="section section-alt">
+<div class="container">
+<div class="section-header animate-in">
+<h2>Cost Reduction <span class="gradient-text">Features</span></h2>
+<p>RTK, Caveman, TLDR, and Graphify — how well are they working?</p>
+</div>
+<div class="grid-2" style="margin-bottom:24px">
+<div class="card animate-in">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<div style="width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#9874;</div>
+<h3 style="margin:0">RTK — Bash Output Compression</h3>
+</div>
+<p style="color:var(--text-muted);font-size:.9rem">PreToolUse hook that rewrites Bash commands to compress or filter expensive output (e.g., <code>git log</code> → <code>git log --oneline -20</code>) before it reaches the model.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Commands Rewritten</div>
+</div>
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Tokens Saved</div>
+</div>
+</div>
+<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)">
+<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Tracking gap:</strong> RTK rewrites commands at the hook layer before cost events are generated. No telemetry captures pre-RTK vs post-RTK token counts. Impact is unmeasured.</p>
+</div>
+</div>
+<div class="card animate-in">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<div style="width:40px;height:40px;border-radius:10px;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128172;</div>
+<h3 style="margin:0">Caveman — Prompt Compression</h3>
+</div>
+<p style="color:var(--text-muted);font-size:.9rem">Injects terse-response rules into Claude Code sessions. Reduces output verbosity by enforcing fragments, dropping articles, and eliminating hedging.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--success)">5,758</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Sessions with Caveman</div>
+</div>
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--success)">1.4%</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Of Total Events</div>
+</div>
+</div>
+<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2)">
+<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Active but unmeasured:</strong> Caveman is tracked (variant field present) but token savings are not captured. We know it's enabled but cannot quantify savings without pre/post comparison.</p>
+</div>
+</div>
+</div>
+<div class="grid-2" style="margin-bottom:24px">
+<div class="card animate-in">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128220;</div>
+<h3 style="margin:0">TLDR — Structured Code Summaries</h3>
+</div>
+<p style="color:var(--text-muted);font-size:.9rem">Replaces full file reads with 500–1,200 token structured summaries. Intended to slash context size when agents read large source files.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--danger)">11</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Interceptions</div>
+</div>
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--danger)">140</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Bypasses</div>
+</div>
+</div>
+<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)">
+<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Not working:</strong> 93% bypass rate across all workspaces. TLDR is almost never triggering. Either file-size thresholds are too high, the daemon is not running, or the read-enforcer is missing hooks. Cost impact: effectively zero.</p>
+</div>
+</div>
+<div class="card animate-in">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<div style="width:40px;height:40px;border-radius:10px;background:rgba(236,72,153,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#127760;</div>
+<h3 style="margin:0">Graphify — Knowledge Graph</h3>
+</div>
+<p style="color:var(--text-muted);font-size:.9rem">Converts conversation context into a queryable knowledge graph. Replaces repeated full-context scans with targeted graph traversals.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Graphs Built</div>
+</div>
+<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
+<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
+<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Tokens Saved</div>
+</div>
+</div>
+<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)">
+<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Tracking gap:</strong> Graphify is invoked via /graphify skill. No cost-event integration exists to measure graph lookups vs full-context reads. Impact is unmeasured.</p>
+</div>
+</div>
+</div>
+<div class="card animate-in" style="margin-top:24px">
+<h3><span class="card-icon">!</span> Summary &amp; Recommendations</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:16px">
+<div style="padding:16px;border-radius:12px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15)">
+<div style="font-weight:600;color:var(--danger);margin-bottom:6px">TLDR Needs Fixing</div>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0">93% bypass rate means TLDR is effectively dead. Investigate daemon health, hook wiring, and file-size thresholds. This is the highest-potential fix.</p>
+</div>
+<div style="padding:16px;border-radius:12px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15)">
+<div style="font-weight:600;color:var(--warning);margin-bottom:6px">Add Telemetry</div>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0">RTK, Caveman, and Graphify all lack pre/post token counts. Add a <code>tokensSaved</code> field to cost events or emit separate metrics events for each feature.</p>
+</div>
+<div style="padding:16px;border-radius:12px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15)">
+<div style="font-weight:600;color:var(--success);margin-bottom:6px">Cache Is Carrying Us</div>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0">Cache reads (65.2B tokens) are doing almost all the heavy lifting. The $174K+ cache savings dwarfs anything these features could deliver. Don't lose sight of that.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
 <!-- Top Issues -->
 <section class="section section-alt">
 <div class="container">
@@ -370,7 +466,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="card animate-in">
 <table class="data-table">
 <thead>
-<tr><th>Issue</th><th>Cost</th><th>Calls</th><th>Avg $/Call</th></tr>
+<tr><th>Issue</th><th>Description</th><th>Cost</th><th>Calls</th><th>Avg $/Call</th></tr>
 </thead>
 <tbody id="issuesTable">
 </tbody>
@@ -599,21 +695,27 @@ const monthlyData = [
 ];
 const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
 new Chart(monthlyCtx, {
-  type: 'line',
+  type: 'bar',
   data: {
     labels: monthlyData.map(m => m.month),
     datasets: [{
       label: 'Monthly Spend (USD)',
       data: monthlyData.map(m => m.cost),
-      borderColor: '#6366f1',
-      backgroundColor: 'rgba(99,102,241,0.1)',
-      fill: true,
-      tension: 0.4,
-      pointBackgroundColor: '#6366f1',
-      pointBorderColor: '#fff',
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      pointHoverRadius: 8
+      backgroundColor: monthlyData.map(m =>
+        m.month === '2026-01' ? 'rgba(245,158,11,0.7)' :
+        m.cost > 10000 ? 'rgba(239,68,68,0.7)' :
+        m.cost > 5000 ? 'rgba(245,158,11,0.7)' :
+        'rgba(99,102,241,0.7)'
+      ),
+      borderColor: monthlyData.map(m =>
+        m.month === '2026-01' ? '#f59e0b' :
+        m.cost > 10000 ? '#ef4444' :
+        m.cost > 5000 ? '#f59e0b' :
+        '#6366f1'
+      ),
+      borderWidth: 1,
+      borderRadius: 6,
+      borderSkipped: false
     }]
   },
   options: {
@@ -621,7 +723,63 @@ new Chart(monthlyCtx, {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, ticks: { callback: v => '$' + v } }
+      y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }
+    }
+  }
+});
+
+// Subscription vs PPU Chart
+const subCtx = document.getElementById('subscriptionChart').getContext('2d');
+new Chart(subCtx, {
+  type: 'bar',
+  data: {
+    labels: ['Claude Pro', 'Kimi Pro', 'MiniMax', 'OpenAI Plus'],
+    datasets: [
+      {
+        label: 'Subscription',
+        data: [20, 15, 10, 20],
+        backgroundColor: 'rgba(99,102,241,0.8)',
+        borderColor: '#6366f1',
+        borderWidth: 1,
+        borderRadius: 6
+      },
+      {
+        label: 'Pay-Per-Use Equivalent',
+        data: [3000, 800, 200, 1500],
+        backgroundColor: 'rgba(239,68,68,0.8)',
+        borderColor: '#ef4444',
+        borderWidth: 1,
+        borderRadius: 6
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: { color: '#94a3b8', font: { family: 'Inter' } }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label + ': $' + ctx.raw.toLocaleString() + '/mo'
+        }
+      }
+    },
+    scales: {
+      y: {
+        type: 'logarithmic',
+        ticks: {
+          callback: v => '$' + v.toLocaleString(),
+          color: '#64748b'
+        },
+        grid: { color: 'rgba(148,163,184,0.1)' }
+      },
+      x: {
+        ticks: { color: '#94a3b8', font: { family: 'Inter', weight: '600' } },
+        grid: { display: false }
+      }
     }
   }
 });
@@ -686,19 +844,27 @@ new Chart(commitsCtx, {
 
 // Issues Table
 const topIssues = [
-  {id:'TEST-1',cost:15286.59,calls:3659},{id:'TEST-2',cost:7664.63,calls:2134},
-  {id:'UNKNOWN',cost:4710.33,calls:46490},{id:'CLI-1',cost:925.32,calls:22852},
-  {id:'MIN-775',cost:913.52,calls:20853},{id:'MIN-734',cost:833.95,calls:18373},
-  {id:'MIN-664',cost:601.99,calls:9012},{id:'MIN-684',cost:566.95,calls:12316},
-  {id:'MIN-491',cost:543.55,calls:13963},{id:'MIN-758',cost:494.87,calls:9247},
-  {id:'MIN-705',cost:435.60,calls:10341},{id:'MIN-712',cost:411.90,calls:13376},
-  {id:'MIN-727',cost:369.01,calls:10045},{id:'MIN-781',cost:357.71,calls:6123},
-  {id:'PAN-331',cost:354.48,calls:8124}
+  {id:'TEST-1',desc:'Synthetic test issue (no tracker)',cost:15286.59,calls:3659},
+  {id:'TEST-2',desc:'Synthetic test issue (no tracker)',cost:7664.63,calls:2134},
+  {id:'UNKNOWN',desc:'Unattributed cost events',cost:4710.33,calls:46490},
+  {id:'CLI-1',desc:'CLI command invocation (no tracker)',cost:925.32,calls:22852},
+  {id:'MIN-775',desc:'Fix remaining 450 unit test failures across frontend codebase',cost:913.52,calls:20853},
+  {id:'MIN-734',desc:'Kaia ↔ OpenClaw: Bidirectional Agent-to-Agent (A2A) Integration',cost:833.95,calls:18373},
+  {id:'MIN-664',desc:'Fix remaining 650 unit test failures',cost:601.99,calls:9012},
+  {id:'MIN-684',desc:'Hume EVI Voice Overhaul — Complete Voice Experience Redesign',cost:566.95,calls:12316},
+  {id:'MIN-491',desc:'YNAB Integration: Budget-Aware Task Management (OAuth + Full API)',cost:543.55,calls:13963},
+  {id:'MIN-758',desc:'Rebrand "Compass" to "Daily Debrief" across entire stack',cost:494.87,calls:9247},
+  {id:'MIN-705',desc:'API key auth overhaul: enable full API access for OpenClaw plugin',cost:435.60,calls:10341},
+  {id:'MIN-712',desc:'POC: Hybrid voice — cheap Qwen TTS for quick commands (CANCELLED)',cost:411.90,calls:13376},
+  {id:'MIN-727',desc:'Auto-save everywhere + universal undo',cost:369.01,calls:10045},
+  {id:'MIN-781',desc:'Solid E2E and unit test scaffolding for Kaia chat with LLM response mocking',cost:357.71,calls:6123},
+  {id:'PAN-331',desc:'Port PAN-103 progressive disclosure UI to current codebase',cost:354.48,calls:8124}
 ];
 const tbody = document.getElementById('issuesTable');
 topIssues.forEach(issue => {
   const row = document.createElement('tr');
-  row.innerHTML = `<td><strong>${issue.id}</strong></td><td>$${issue.cost.toFixed(2)}</td><td>${issue.calls.toLocaleString()}</td><td>$${(issue.cost/issue.calls).toFixed(4)}</td>`;
+  const shortDesc = issue.desc.length > 60 ? issue.desc.slice(0,60) + '…' : issue.desc;
+  row.innerHTML = `<td><strong>${issue.id}</strong></td><td style="color:var(--text-muted);font-size:.85rem;max-width:400px" title="${issue.desc}">${shortDesc}</td><td>$${issue.cost.toFixed(2)}</td><td>${issue.calls.toLocaleString()}</td><td>$${(issue.cost/issue.calls).toFixed(4)}</td>`;
   tbody.appendChild(row);
 });
 
