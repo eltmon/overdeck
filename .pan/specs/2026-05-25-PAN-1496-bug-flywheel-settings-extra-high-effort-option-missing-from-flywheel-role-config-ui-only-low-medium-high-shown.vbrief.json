@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T16:28:27.860Z"
+    "updated": "2026-05-25T22:55:11.431Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T16:28:27.860Z",
+    "updated": "2026-05-25T22:55:11.431Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -499,7 +499,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1496",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T22:55:11.425Z",
+        "work": {
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T22:55:11.425Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T22:55:11.425Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-25T22:55:11.425Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"

@@ -100,7 +100,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
   const [harnessOverride, setHarnessOverride] = useState<Harness>('claude-code');
   const harnessOverrideTouched = useRef(false);
-  const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
+  const [effort, setEffort] = useState<'low' | 'medium' | 'high' | 'xhigh' | 'max'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);

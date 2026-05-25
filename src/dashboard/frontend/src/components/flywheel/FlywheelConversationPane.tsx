@@ -37,7 +37,7 @@ interface FlywheelRunDetail extends FlywheelRunSummary {
 interface FlywheelRoleConfig {
   harness?: 'claude-code' | 'pi' | 'codex';
   model?: string;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   maxAgents?: number;
   scope?: 'pan-only' | 'all-tracked-projects';
 }
