@@ -94,6 +94,7 @@ import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
+import { createComplianceCommand } from './commands/compliance.js';
 import { planCommand } from './commands/plan.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
@@ -520,6 +521,7 @@ registerReleaseCommands(program);
 
 program.addCommand(createMemoryCommand());
 program.addCommand(createBriefingCommand());
+program.addCommand(createComplianceCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
