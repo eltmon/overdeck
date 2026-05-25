@@ -1,0 +1,681 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T00:42:21Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1201: Hybrid context distribution: deprecate devroot, layered global/project/workspace, multi-harness sync",
+    "updated": "2026-05-25T00:47:07.905Z"
+  },
+  "plan": {
+    "id": "pan-1201",
+    "title": "Hybrid context distribution: deprecate devroot, layered global/project/workspace, multi-harness sync",
+    "status": "proposed",
+    "uid": "d2405074-36a4-4519-8fd8-1983d59edf20",
+    "author": "agent:gpt-5.5",
+    "sequence": 2,
+    "created": "2026-05-25T00:42:21Z",
+    "updated": "2026-05-25T00:47:07.905Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1201",
+        "label": "PAN-1201",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1201/docs/prds/planned/PAN-1201-hybrid-context-distribution.md",
+        "label": "PAN-1201-hybrid-context-distribution.md",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/PAN-1201-hybrid-context-distribution.md",
+        "label": "PAN-1201-hybrid-context-distribution.md",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "context",
+      "dashboard",
+      "cli",
+      "harnesses",
+      "pan-sync"
+    ],
+    "narratives": {
+      "Problem": "PAN-1201 was reopened because two original user-visible contracts remain unmet: the plural `pan projects add <path>` registration command is absent, and the dashboard has no Context tab/page that edits the global/project/workspace context layers with Claude/Pi previews and an injected prompt audit. The branch already contains the layered context CLI/sync implementation, workspace context assembly, Pi loading, and sync-sources consolidation, so the remaining plan must finish the surfaced gaps without regressing those implemented contracts.",
+      "Proposal": "Add a plural `pan projects` command group as the preferred alias over the existing singular project group. Then add typed dashboard context APIs, async server routes, a Monaco-backed Context page, live per-harness previews, explicit Save & Sync behavior, navigation integration, tests, docs, and isolated browser UAT. Preserve `.pan/context` as the implemented project/workspace path convention and keep server routes free of synchronous filesystem/process calls.",
+      "Constraint": "Do not rewrite already-shipped PAN-1201 subsystems unless a regression test fails. Dashboard server code must use async filesystem/process APIs and path allowlists. Save/sync operations are explicit user actions only. Existing singular `pan project` remains supported for backwards compatibility.",
+      "Risk": "The highest-risk bead is the dashboard context route because it writes user/project context files and could become an arbitrary file write if path validation is wrong. The second risk is frontend bundle/test churn from Monaco. The plan isolates these behind contracts, route tests, and a mockable editor wrapper.",
+      "Alternative": "A smaller textarea-only dashboard page was considered, but the PRD explicitly calls for Monaco. A frontend-only preview renderer was also considered, but a server preview route keeps the frontend from duplicating Panopticon context rendering semantics."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope this reopened plan to the two unmet issue-comment surfaces plus regression tests/docs rather than redoing the existing layered sync implementation.",
+        "rationale": "The latest issue comment is authoritative about why PAN-1201 was reopened, and discovery found current code/tests/docs for most original acceptance criteria. Replanning the whole feature would create unnecessary churn and increase risk of content loss."
+      },
+      {
+        "summary": "Preserve `.pan/context` for project/workspace layers despite older PRD text mentioning `.panopticon/context`.",
+        "rationale": "Current implementation comments and project rules follow PAN-967's `.pan/` lifecycle convention. Splitting dashboard work onto `.panopticon/` would create two context systems and regress existing tests."
+      },
+      {
+        "summary": "Use a debounced server preview API instead of duplicating the templating engine in the browser.",
+        "rationale": "The existing renderer lives in Node-side code and can stay authoritative; live preview still feels live with debounce while preserving one set of semantics for Claude/Pi harness blocks."
+      },
+      {
+        "summary": "Use `@monaco-editor/react` plus `monaco-editor` for the editor.",
+        "rationale": "No code editor dependency currently exists, and the PRD specifically requests Monaco. The wrapper can be mocked in tests to avoid brittle worker setup."
+      }
+    ],
+    "items": [
+      {
+        "id": "cli-projects-alias",
+        "title": "PAN-1201: Add plural `pan projects` command group",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Modify `src/cli/index.ts` around the existing `const project = program.command('project')` registration. Add a sibling plural command group `program.command('projects')` that registers `add`, `list`, `show`, `remove`, and `init` with the same options and action handlers (`projectAddCommand`, `projectListCommand`, `projectShowCommand`, `projectRemoveCommand`, `projectInitCommand`). Keep the singular group working unchanged for backwards compatibility. Add or update a CLI command test/fixture so `pan projects add <path>` is recognized and dispatches to the same handler shape as `pan project add <path>`. Do not change project registration semantics in `src/cli/commands/project.ts` in this bead."
+        },
+        "subItems": [
+          {
+            "id": "cli-projects-alias.ac1",
+            "title": "`pan projects add <path>` is registered with the same options as `pan project add <path>`: `--name`, `--type`, `--linear-team`, and `--rally-project`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-projects-alias.ac2",
+            "title": "The existing singular `pan project add <path>` command still works and is not removed or renamed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-projects-alias.ac3",
+            "title": "CLI help/test fixtures expose the plural `projects` command so the issue's documented registration surface is discoverable.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plural-command-copy",
+        "title": "PAN-1201: Prefer plural project command in copy and docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update user-facing text that instructs users how to register projects so it uses `pan projects ...` as the preferred command. Touch known references from discovery: `src/cli/commands/project.ts` messages at the existing `pan project remove/list/add` guidance, `src/cli/commands/context-layers.ts` migration hint, `src/cli/commands/test.ts` project registration hint, `docs/CONTEXT-LAYERS.md`, and the relevant generated/help fixture if needed. Preserve mention of singular `pan project` only where documenting backwards compatibility."
+        },
+        "subItems": [
+          {
+            "id": "plural-command-copy.ac1",
+            "title": "New or changed user-facing registration guidance says `pan projects add <path>` rather than `pan project add <path>`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plural-command-copy.ac2",
+            "title": "Migration output in `pan context migrate` suggests the plural command for skipped non-interactive registration.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plural-command-copy.ac3",
+            "title": "Docs explain that singular `pan project` remains a compatibility alias if mentioned at all.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-dashboard-contracts",
+        "title": "PAN-1201: Define dashboard context API contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "context-dashboard-routes",
+            "context-sync-endpoint",
+            "context-frontend-api",
+            "context-frontend-page",
+            "context-preview-save"
+          ]
+        },
+        "narrative": {
+          "Action": "Add typed context API shapes in `packages/contracts/src/context-layers.ts` (or an equivalent clearly named contracts module) and export them from `packages/contracts/src/index.ts`. Include types/schemas for `ContextLayerKind` (`global`, `project`, `workspace`), registered project summaries, workspace summaries, editable layer records (`kind`, `file`, `exists`, `content`, `editable`, optional `projectKey`/`workspacePath`), preview request/response, save request/response, and sync response. Name harness preview fields explicitly for `claude-code`, `pi`, and `fullPrompt`. Keep these contracts UI-agnostic and aligned with existing `Harness` values from `packages/contracts/src/types.ts`. Add package-level unit tests only if this package has nearby schema/type tests; otherwise ensure the root typecheck exercises the exports."
+        },
+        "subItems": [
+          {
+            "id": "context-dashboard-contracts.ac1",
+            "title": "Contracts represent all three editable layers and both v1 harness previews without frontend/server-only naming drift.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-contracts.ac2",
+            "title": "The contracts distinguish preview-only operations from save/sync operations so the frontend cannot accidentally write during live preview.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-contracts.ac3",
+            "title": "`npm run typecheck` can import the new context contracts from `@panctl/contracts` in both dashboard server and frontend code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-dashboard-routes",
+        "title": "PAN-1201: Add async dashboard context layer routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1201",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "context-sync-endpoint",
+            "context-frontend-api",
+            "context-frontend-page",
+            "context-preview-save"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/server/routes/context.ts` and register `contextRouteLayer` in `src/dashboard/server/server.ts`. Implement async, allowlisted endpoints for the dashboard page: `GET /api/context/layers` returns registered projects from the async `listProjects()` Effect API, workspace candidates under each project's configured workspaces directory, current global/project/workspace layer file paths, existence flags, and content read with `fs/promises`; `POST /api/context/preview` accepts draft layer content and returns rendered `claude-code`, `pi`, and `fullPrompt` previews using pure `renderForHarness` plus explicit Panopticon-injected prompt sections; `PUT /api/context/layers` writes only the selected canonical layer file after resolving it from the allowlist. Do not import `src/lib/sync.ts` or call `renderGlobalLayer`/`renderProjectLayer` in this route because those paths use sync FS. Add route/helper tests under `tests/dashboard/context-routes.test.ts` (or nearby route test location) with temporary PANOPTICON_HOME/project/workspace fixtures."
+        },
+        "subItems": [
+          {
+            "id": "context-dashboard-routes.ac1",
+            "title": "Route handlers use `fs/promises`/Effect async project APIs and contain no `readFileSync`, `writeFileSync`, `readdirSync`, `statSync`, or `execSync` in dashboard-reachable code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-routes.ac2",
+            "title": "Saving a global, project, or workspace layer writes only `~/.panopticon/context/global.md`, `<project>/.pan/context/project.md`, or `<workspace>/.pan/context/workspace.md` selected through allowlisted registry/workspace data.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-routes.ac3",
+            "title": "Previewing draft content renders `{{#harness:claude}}` and `{{#harness:pi}}` blocks consistently with `src/lib/context-layers/harness.ts` and does not write files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-routes.ac4",
+            "title": "The `fullPrompt` preview clearly shows the complete Panopticon-injected bundle Panopticon controls and labels any unavailable private harness base prompt as unavailable rather than fabricating it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-sync-endpoint",
+        "title": "PAN-1201: Add explicit dashboard Save & Sync endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/dashboard/server/routes/context.ts`, add `POST /api/context/sync` that runs `pan context sync` only when the user explicitly clicks Save & Sync. Use async child process execution (`execFile` promisified or `spawn` with Promise wrapping), return stdout/stderr/status in the typed response, and never use `execSync`. Add tests that mock the async runner and verify the route is not called by preview/save endpoints."
+        },
+        "subItems": [
+          {
+            "id": "context-sync-endpoint.ac1",
+            "title": "`POST /api/context/sync` runs `pan context sync` asynchronously and reports success/failure without blocking the dashboard event loop.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-sync-endpoint.ac2",
+            "title": "Live preview and ordinary save requests do not invoke sync; sync occurs only through the explicit sync endpoint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-sync-endpoint.ac3",
+            "title": "Errors from `pan context sync` surface as a structured error response the frontend can display in a toast.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-frontend-api",
+        "title": "PAN-1201: Add frontend context API client and hooks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/lib/contextApi.ts` (or colocate in the new context page directory) with typed fetch helpers for `GET /api/context/layers`, `POST /api/context/preview`, `PUT /api/context/layers`, and `POST /api/context/sync`. Use the contracts from `@panctl/contracts`. Add React Query hooks or plain helpers used by the page; keep path/query construction in one place. Tests should mock `fetch` and assert request methods/bodies for load, preview, save, and sync."
+        },
+        "subItems": [
+          {
+            "id": "context-frontend-api.ac1",
+            "title": "Frontend API helpers use the shared contract types and do not hardcode divergent layer/harness string shapes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-frontend-api.ac2",
+            "title": "Preview helper sends draft content to `POST /api/context/preview`; save helper sends writes only to `PUT /api/context/layers`; sync helper calls only `POST /api/context/sync`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-frontend-api.ac3",
+            "title": "API helper tests cover non-OK responses so ContextPage can display meaningful errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-frontend-page",
+        "title": "PAN-1201: Build Context page editor shell",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `@monaco-editor/react` and `monaco-editor` using Bun, then create `src/dashboard/frontend/src/components/context/ContextPage.tsx` and a small `ContextEditor.tsx` wrapper around Monaco. The page layout should have a left rail with layer selector (Global, Project, Workspace), project/workspace selectors populated from the API, file path/existence labels, a center Monaco markdown editor, and loading/error/empty states. For workspace layer, explain that `.pan/context/workspace.md` is auto-assembled and may not exist until a workspace is created. Mock the editor wrapper in tests to avoid Monaco worker brittleness."
+        },
+        "subItems": [
+          {
+            "id": "context-frontend-page.ac1",
+            "title": "The page can load and edit global, selected project, and selected workspace layer content from the context API.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-frontend-page.ac2",
+            "title": "The center editor uses Monaco through a wrapper component and falls back cleanly in tests via a mock, not through duplicated page logic.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-frontend-page.ac3",
+            "title": "The UI labels project/workspace paths as `.pan/context/project.md` and `.pan/context/workspace.md`, matching the current implementation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-preview-save",
+        "title": "PAN-1201: Add live previews and Save & Sync behavior",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend `ContextPage.tsx` with the right preview rail and footer actions. Debounce editor changes and call `POST /api/context/preview` to update three tabs: `Claude Code output`, `Pi output`, and `Full injected prompt`. Add dirty-state tracking, `Save` (PUT only), `Save & Sync` (PUT then POST sync), toast success/error messages, disabled states while requests run, and a visible validation/error area for malformed harness blocks returned by the API. Ensure preview remains read-only and never writes."
+        },
+        "subItems": [
+          {
+            "id": "context-preview-save.ac1",
+            "title": "Editing a `{{#harness:claude}}` or `{{#harness:pi}}` block updates the appropriate preview tab after debounce without saving to disk.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-preview-save.ac2",
+            "title": "`Save` writes the selected layer through `PUT /api/context/layers`; `Save & Sync` writes first and then calls `POST /api/context/sync` exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-preview-save.ac3",
+            "title": "The Full injected prompt preview includes rendered layer content and explicit memory/status/briefing sections or placeholders for auditability.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-preview-save.ac4",
+            "title": "Errors from save, preview, or sync are visible to the user and do not discard unsaved editor content.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-navigation",
+        "title": "PAN-1201: Integrate Context page into dashboard navigation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the new page into dashboard navigation. Update `src/dashboard/frontend/src/components/Header.tsx` `Tab` union with `context`; add `/context` to `TAB_PATHS`/`PATH_TO_TAB` and an `activeTab === 'context'` render branch in `src/dashboard/frontend/src/App.tsx`; import the page; add a System nav item in `src/dashboard/frontend/src/components/Sidebar.tsx` with an appropriate lucide icon; add a CommandPalette navigation action if built-in navigation actions list tabs explicitly. Update `src/dashboard/frontend/src/App.test.tsx`, Sidebar tests if present, and route-normalization tests so `/context` loads the page."
+        },
+        "subItems": [
+          {
+            "id": "context-navigation.ac1",
+            "title": "Navigating to `/context` selects the Context tab and renders ContextPage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-navigation.ac2",
+            "title": "The sidebar exposes a Context navigation item under System without removing Skills, Settings, or God View.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-navigation.ac3",
+            "title": "Command palette or route tests that enumerate tabs include Context and continue passing for existing tabs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-dashboard-tests",
+        "title": "PAN-1201: Cover Context dashboard behavior with tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add focused automated tests for the new dashboard Context feature. Server tests should exercise path allowlisting, preview rendering for Claude/Pi blocks, preview read-only behavior, and save writes to the expected temp files. Frontend tests under `src/dashboard/frontend/src/components/context/__tests__/ContextPage.test.tsx` should mock the API/editor and verify layer switching, preview tab updates, dirty state, Save, Save & Sync sequencing, and error handling. Navigation tests should assert `/context` and sidebar access. Keep tests deterministic; if any debounced timers are used in frontend tests, use `vi.useFakeTimers()` and `vi.advanceTimersByTimeAsync()` rather than real timeouts."
+        },
+        "subItems": [
+          {
+            "id": "context-dashboard-tests.ac1",
+            "title": "Server tests prove preview requests do not write files and save requests cannot escape the context layer allowlist.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-tests.ac2",
+            "title": "Frontend tests cover all three preview tabs, layer selection, dirty state, Save, Save & Sync, and error preservation of unsaved content.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-dashboard-tests.ac3",
+            "title": "Tests that involve debounce or retry timing use Vitest fake timers per project rules.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-docs-regression",
+        "title": "PAN-1201: Update context docs and regression guardrails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update `docs/CONTEXT-LAYERS.md` and any relevant skill/help inventory text to describe the dashboard Context page, the plural `pan projects` command, the current `.pan/context` project/workspace paths, the Save vs Save & Sync behavior, and the Full injected prompt pane's scope. Preserve existing `sync-sources/` and layered CLI documentation. If `docs/SKILLS-INVENTORY.md` or pan-sync skill text still says devroot is the source, update it to layered context terminology."
+        },
+        "subItems": [
+          {
+            "id": "context-docs-regression.ac1",
+            "title": "Docs mention `pan projects add <path>` as the project registration command and describe singular `pan project` only as compatibility if at all.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-docs-regression.ac2",
+            "title": "Docs describe the dashboard Context page, layer selector, per-harness previews, Full injected prompt pane, and Save & Sync semantics.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-docs-regression.ac3",
+            "title": "No updated doc tells users that `sync.devroot` or top-level `skills/`/`rules/` are the current source of truth for PAN-1201 context distribution.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-final-verification",
+        "title": "PAN-1201: Verify CLI, tests, build, and isolated browser UAT",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:42:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Run the required quality gates and manual dashboard verification after implementation. Commands: run `bun install` if Monaco dependencies changed; run `npm run typecheck`, `npm run lint`, `npm test`, and targeted tests for context layers/dashboard if useful during debugging. Build the dashboard with `npm run build` before running it. For UI verification, start the dashboard using the Node 22 built dist path via the existing project workflow (`pan up` or the documented Node 22 command, never Bun), open `/context` in an isolated Playwright browser/profile, edit sample harness blocks, confirm Claude/Pi/full previews update, save a temp fixture layer if the route supports fixture mode or otherwise use a safe temporary PANOPTICON_HOME/project fixture, and confirm Save & Sync feedback appears."
+        },
+        "subItems": [
+          {
+            "id": "context-final-verification.ac1",
+            "title": "`pan projects add --help` and `pan project add --help` both work, with plural documented as preferred.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-final-verification.ac2",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` pass after implementation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-final-verification.ac3",
+            "title": "Browser UAT uses an isolated Playwright browser/profile and verifies `/context` loads, layer switching works, live previews update, and Save/Save & Sync show correct success/error feedback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-final-verification.ac4",
+            "title": "Dashboard server is run under Node 22 built dist for verification; no Bun dashboard server is used.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-projects-alias",
+        "to": "plural-command-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "context-dashboard-contracts",
+        "to": "context-dashboard-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "context-dashboard-contracts",
+        "to": "context-frontend-api",
+        "type": "blocks"
+      },
+      {
+        "from": "context-dashboard-routes",
+        "to": "context-sync-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "context-dashboard-routes",
+        "to": "context-frontend-api",
+        "type": "blocks"
+      },
+      {
+        "from": "context-frontend-api",
+        "to": "context-frontend-page",
+        "type": "blocks"
+      },
+      {
+        "from": "context-frontend-page",
+        "to": "context-preview-save",
+        "type": "blocks"
+      },
+      {
+        "from": "context-preview-save",
+        "to": "context-navigation",
+        "type": "blocks"
+      },
+      {
+        "from": "context-navigation",
+        "to": "context-dashboard-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "plural-command-copy",
+        "to": "context-docs-regression",
+        "type": "informs"
+      },
+      {
+        "from": "context-preview-save",
+        "to": "context-docs-regression",
+        "type": "informs"
+      },
+      {
+        "from": "context-dashboard-tests",
+        "to": "context-final-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "context-docs-regression",
+        "to": "context-final-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1201-hybrid-context-distribution-deprecate-devroot-layered-global-project-workspace-multi-harness-sync.vbrief.json"
+    }
+  }
+}
