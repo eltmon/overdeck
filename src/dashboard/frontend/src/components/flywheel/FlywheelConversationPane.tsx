@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, Maximize2, Pause, Play, Plus, RotateCcw, Settings } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, Maximize2, Pause, Play, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
@@ -204,6 +204,44 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     mutationFn: () => postFlywheelAction('/api/flywheel/report/open', { runId: run?.id }),
     onError: (error: Error) => toast.error(`Failed to open run report: ${error.message}`),
   });
+  const reportMutation = useMutation({
+    mutationFn: () => postFlywheelAction('/api/flywheel/report'),
+    onSuccess: async () => {
+      toast.success('Flywheel run reported');
+      await refreshFlywheel();
+    },
+    onError: (error: Error) => toast.error(`Failed to report Flywheel run: ${error.message}`),
+  });
+  const abortMutation = useMutation({
+    mutationFn: () => postFlywheelAction('/api/flywheel/abort'),
+    onSuccess: async () => {
+      toast.success('Flywheel run aborted');
+      await refreshFlywheel();
+    },
+    onError: (error: Error) => toast.error(`Failed to abort Flywheel: ${error.message}`),
+  });
+
+  const handleAbort = async () => {
+    const ok = await confirm({
+      title: 'Abort Flywheel Run',
+      message: `${run?.id ?? 'The active run'} will be discarded without a report. Continue?`,
+      confirmLabel: 'Abort Run',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    abortMutation.mutate();
+  };
+
+  const handleReport = async () => {
+    const ok = await confirm({
+      title: 'Finalize Run Report',
+      message: `Write the report for ${run?.id ?? 'the active run'} and close it out. The orchestrator session must be paused or stopped first; if it is alive, this will fail.`,
+      confirmLabel: 'Write Report',
+      variant: 'default',
+    });
+    if (!ok) return;
+    reportMutation.mutate();
+  };
 
   const handleNewRun = async () => {
     if (runState === 'paused') {
@@ -218,7 +256,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     newRunMutation.mutate();
   };
 
-  const actionPending = startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || newRunMutation.isPending || openReportMutation.isPending;
+  const actionPending = startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || newRunMutation.isPending || openReportMutation.isPending || abortMutation.isPending || reportMutation.isPending;
   const topBarLoading = runsQuery.isLoading || runDetailQuery.isLoading;
 
   return (
@@ -301,6 +339,30 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               >
                 <Plus className="h-3.5 w-3.5" />
                 New Run
+              </button>
+            )}
+            {(runState === 'paused' || runState === 'running') && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                onClick={handleReport}
+                disabled={actionPending}
+                title="Finalize the run report and close out (orchestrator must be paused/stopped)"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Write Report
+              </button>
+            )}
+            {(runState === 'paused' || runState === 'running') && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/10 disabled:opacity-50"
+                onClick={handleAbort}
+                disabled={actionPending}
+                title="Discard this run without writing a report"
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                Abort
               </button>
             )}
             {!isPopoutWindow && (
