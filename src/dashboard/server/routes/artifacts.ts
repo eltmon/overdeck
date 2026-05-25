@@ -5,8 +5,13 @@ import type {
   WorkspaceArtifactsResponse,
 } from '@panctl/contracts';
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { ArtifactIndexEntry } from '../../../lib/artifacts/index-store.js';
+import {
+  getOrCreateArtifactThumbnail,
+  resolveArtifactThumbnailUrl,
+  type ArtifactThumbnailRenderer,
+} from '../../../lib/artifacts/thumbnails.js';
 import { jsonResponse } from '../http-helpers.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -26,6 +31,7 @@ export interface ArtifactRouteDeps {
   getBySlug?: (slug: string) => Promise<ArtifactIndexEntry | null>;
   listForWorkspaceOrIssue?: (selector: string) => Promise<ArtifactIndexEntry[]>;
   unshareBySlug?: (slug: string) => Promise<ArtifactIndexEntry | null>;
+  thumbnailRenderer?: ArtifactThumbnailRenderer;
   baseDomain?: string;
 }
 
@@ -51,6 +57,7 @@ function toListEntry(entry: ArtifactIndexEntry, baseDomain?: string): ArtifactLi
     urls: resolveArtifactUrls(entry.artifact.slug, baseDomain),
     status: entry.status,
     pendingChanges: entry.pendingChanges,
+    thumbnailUrl: resolveArtifactThumbnailUrl(entry.artifact),
   };
 }
 
@@ -117,6 +124,28 @@ export async function postArtifactUnsharePayload(slug: string, deps: ArtifactRou
   return { status: 200, body: { artifact: updated.artifact, unshared: true } };
 }
 
+export type ArtifactThumbnailPayload =
+  | { kind: 'json'; status: number; body: { error: string; slug?: string } }
+  | { kind: 'file'; status: 200; path: string; cacheHit: boolean }
+  | { kind: 'placeholder'; status: 200; contentType: 'image/svg+xml'; body: string; error: string };
+
+export async function getArtifactThumbnailPayload(slug: string, deps: ArtifactRouteDeps = {}): Promise<ArtifactThumbnailPayload> {
+  if (!isValidArtifactSlug(slug)) {
+    return { kind: 'json', status: 400, body: { error: 'Artifact slug must be 8 URL-safe characters', slug } };
+  }
+
+  const entry = await (deps.getBySlug ?? defaultGetBySlug)(slug);
+  if (!entry) return { kind: 'json', status: 404, body: { error: 'Artifact not found', slug } };
+  if (entry.status === 'unshared') return { kind: 'json', status: 410, body: { error: 'Artifact is unshared', slug } };
+
+  const thumbnail = await getOrCreateArtifactThumbnail(entry.artifact, {
+    rawUrl: resolveArtifactUrls(entry.artifact.slug, deps.baseDomain).rawUrl,
+    renderer: deps.thumbnailRenderer,
+  });
+  if (thumbnail.kind === 'file') return { kind: 'file', status: 200, path: thumbnail.path, cacheHit: thumbnail.cacheHit };
+  return { kind: 'placeholder', status: 200, contentType: thumbnail.contentType, body: thumbnail.body, error: thumbnail.error };
+}
+
 const getArtifactDetailRoute = HttpRouter.add(
   'GET',
   '/api/artifacts/:slug',
@@ -145,6 +174,32 @@ const getWorkspaceArtifactsRoute = HttpRouter.add(
   })),
 );
 
+const getArtifactThumbnailRoute = HttpRouter.add(
+  'GET',
+  '/api/artifacts/:slug/thumbnail',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
+    const params = yield* HttpRouter.params;
+    const result = yield* Effect.promise(() => getArtifactThumbnailPayload(params['slug'] ?? ''));
+    if (result.kind === 'json') return jsonResponse(result.body, { status: result.status });
+    if (result.kind === 'placeholder') {
+      return HttpServerResponse.text(result.body, {
+        status: result.status,
+        contentType: result.contentType,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+
+    const response = yield* HttpServerResponse.file(result.path).pipe(
+      Effect.catchAll(() => Effect.succeed(HttpServerResponse.text('', { status: 204 }))),
+    );
+    return HttpServerResponse.setHeader(response, 'Cache-Control', 'public, max-age=31536000, immutable');
+  })),
+);
+
 const postArtifactUnshareRoute = HttpRouter.add(
   'POST',
   '/api/artifacts/:slug/unshare',
@@ -162,6 +217,7 @@ const postArtifactUnshareRoute = HttpRouter.add(
 export const artifactsRouteLayer = Layer.mergeAll(
   getArtifactDetailRoute,
   getWorkspaceArtifactsRoute,
+  getArtifactThumbnailRoute,
   postArtifactUnshareRoute,
 );
 

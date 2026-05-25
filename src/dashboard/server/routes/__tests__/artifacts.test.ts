@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArtifactIndexEntry } from '../../../../lib/artifacts/index-store.js';
 import {
   getArtifactDetailPayload,
+  getArtifactThumbnailPayload,
   getWorkspaceArtifactsPayload,
   postArtifactUnsharePayload,
 } from '../artifacts.js';
@@ -83,11 +84,13 @@ describe('artifact route payloads', () => {
           artifact: { artifactId: 'workspace-artifact', workspaceId: 'PAN-1205', issueId: 'PAN-1', agentRole: 'work' },
           status: 'published',
           pendingChanges: false,
+          thumbnailUrl: '/api/artifacts/Work1234/thumbnail?hash=sha256-current',
         },
         {
           artifact: { artifactId: 'issue-artifact', workspaceId: 'feature-pan-1205-slot-2', issueId: 'PAN-1205', agentHarness: 'claude-code' },
           status: 'pending_changes',
           pendingChanges: true,
+          thumbnailUrl: '/api/artifacts/Issu1234/thumbnail?hash=sha256-current',
         },
       ],
     });
@@ -95,6 +98,20 @@ describe('artifact route payloads', () => {
 
   it('rejects invalid workspace artifact selectors', async () => {
     await expect(getWorkspaceArtifactsPayload('../PAN-1205')).resolves.toMatchObject({ status: 400 });
+  });
+
+  it('returns a thumbnail placeholder for artifacts without a published hash', async () => {
+    const placeholder = await getArtifactThumbnailPayload('AbCd123_', {
+      getBySlug: async () => artifactEntry({ lastPublishedHash: null }),
+    });
+
+    expect(placeholder).toMatchObject({ kind: 'placeholder', status: 200, contentType: 'image/svg+xml' });
+  });
+
+  it('maps invalid, missing, and unshared thumbnail requests to route statuses', async () => {
+    await expect(getArtifactThumbnailPayload('bad')).resolves.toMatchObject({ kind: 'json', status: 400 });
+    await expect(getArtifactThumbnailPayload('AbCd123_', { getBySlug: async () => null })).resolves.toMatchObject({ kind: 'json', status: 404 });
+    await expect(getArtifactThumbnailPayload('AbCd123_', { getBySlug: async () => artifactEntry({}, 'unshared') })).resolves.toMatchObject({ kind: 'json', status: 410 });
   });
 
   it('unshares artifacts by slug while preserving metadata', async () => {
