@@ -1132,7 +1132,7 @@
     "hash": "c6d0201648bee1dace1c179230552744"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/gh-issue-trailer-hook.js": {
-    "mtime": 1779720328.895127,
+    "mtime": 1779727084.3170562,
     "hash": "74c339cffcf6d689686c9ba6deb5164c"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/session-start-hook": {
@@ -1152,7 +1152,7 @@
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.d.ts": {
-    "mtime": 1779720291.3528156,
+    "mtime": 1779727084.3170562,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notify-complete": {
@@ -1164,7 +1164,7 @@
     "hash": "be6f1f923df12d1b57ea31891e339746"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/record-cost-event.js": {
-    "mtime": 1779720328.896127,
+    "mtime": 1779727084.3170562,
     "hash": "d6c0f876e2c61cd0808d7ef359351e32"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/notification-hook": {
@@ -1176,7 +1176,7 @@
     "hash": "ebb4f23be84b8444d41fa79b53540503"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/gh-issue-trailer-hook.d.ts": {
-    "mtime": 1779720328.895127,
+    "mtime": 1779727084.3170562,
     "hash": "c89d8eb5ded641a6f65b89d2fa7f607e"
   },
   "/home/eltmon/Projects/panopticon-cli/sync-sources/hooks/rtk-bash-filter": {
@@ -1744,8 +1744,8 @@
     "hash": "265aa1cfaed09755123287c540d65f68"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/config-yaml.ts": {
-    "mtime": 1779720328.894127,
-    "hash": "47558fa3e85514108a6f04ff12fe7dc8"
+    "mtime": 1779724597.2248676,
+    "hash": "b89f29719d60d69164a8145d0d0be559"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/format-duration.ts": {
     "mtime": 1779381725.4322762,
@@ -2200,8 +2200,8 @@
     "hash": "b57552369220c5153810bd177d5613f3"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/cloister/flywheel.ts": {
-    "mtime": 1779720328.894127,
-    "hash": "8d78606443fa9c98249d3742a7347da1"
+    "mtime": 1779724611.7113621,
+    "hash": "9d572ea784112336daf9cddf62b03c1c"
   },
   "/home/eltmon/Projects/panopticon-cli/src/lib/cloister/auto-merge-eligibility.ts": {
     "mtime": 1779714514.1692553,
@@ -5212,8 +5212,8 @@
     "hash": "7ed20a054a8a0fa9884f9d281a7789fa"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/pages/FlywheelPage.tsx": {
-    "mtime": 1779720328.8921268,
-    "hash": "3628f8a3508a1ccfb6dd77bfa0788b57"
+    "mtime": 1779726920.9503698,
+    "hash": "a0468026987493c74999df9ff0e460ab"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/src/pages/HomePage.tsx": {
     "mtime": 1779690069.6759608,
@@ -5724,8 +5724,8 @@
     "hash": "d3851aaf5023283cbf79cf18324df388"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/server/services/flywheel-actions.ts": {
-    "mtime": 1779535911.843722,
-    "hash": "7564244ca974df7a5b9a3c2ade2831ba"
+    "mtime": 1779724650.6715453,
+    "hash": "031596b8aa956ec02c579d6ac979b354"
   },
   "/home/eltmon/Projects/panopticon-cli/src/dashboard/server/services/session-context-writer.ts": {
     "mtime": 1779690069.677971,
@@ -6200,8 +6200,8 @@
     "hash": "1ef7030c069f33ac17ae58fa10d7bf76"
   },
   "/home/eltmon/Projects/panopticon-cli/src/cli/commands/flywheel.ts": {
-    "mtime": 1779720328.8911269,
-    "hash": "c9c114cd01993074e7f8c7a3434b0a83"
+    "mtime": 1779724681.9957612,
+    "hash": "ff59b380e0d1e8c40925355d540e4f2c"
   },
   "/home/eltmon/Projects/panopticon-cli/src/cli/commands/workspace-render-devcontainer.ts": {
     "mtime": 1779509145.5625527,
@@ -6880,8 +6880,8 @@
     "hash": "ba1a7c83fdb0aa9de28b15e265dfc906"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md": {
-    "mtime": 1779720328.8881269,
-    "hash": "5214bd316832a970846f78c0f474f91e"
+    "mtime": 1779725875.213522,
+    "hash": "af28b08137405c0656f0ae29eeb0c29f"
   },
   "/home/eltmon/Projects/panopticon-cli/docs/HIERARCHICAL-PLANNING.md": {
     "mtime": 1778349942.5317042,
@@ -8516,8 +8516,8 @@
     "hash": "00955b0309bb78b9992b0c487f8a154b"
   },
   "/home/eltmon/Projects/panopticon-cli/roles/flywheel.md": {
-    "mtime": 1779720328.890127,
-    "hash": "0394be3dbdfcb4eddc5a4771d037f108"
+    "mtime": 1779725889.0295837,
+    "hash": "81c75fd57baeb0e76ecda1794ebfbd3b"
   },
   "/home/eltmon/Projects/panopticon-cli/benchmarks/templates/quantumllama.md": {
     "mtime": 1775883939.776186,
