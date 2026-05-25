@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 10,
+    "sequence": 11,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T10:56:09.249Z",
+    "updated": "2026-05-25T11:08:07.825Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -1074,7 +1074,7 @@
       {
         "id": "b15-integration-test",
         "title": "End-to-end integration test: cooldown respected, cancel works, executor fires on expiry",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -1090,7 +1090,7 @@
           {
             "id": "b15.ac1",
             "title": "Test uses vi.useFakeTimers() and vi.advanceTimersByTimeAsync — no real-wall-clock delays.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1098,7 +1098,7 @@
           {
             "id": "b15.ac2",
             "title": "Scenario 1 (cancel during cooldown): cancel returns 200, the pending list becomes empty, the mocked merge function is never invoked even after the cooldown elapses.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1106,7 +1106,7 @@
           {
             "id": "b15.ac3",
             "title": "Scenario 2 (cooldown expires): the mocked merge function is invoked exactly once, the entry transitions pending→merging→merged.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1114,7 +1114,7 @@
           {
             "id": "b15.ac4",
             "title": "Scenario 3 (eligibility flips during cooldown): the entry transitions pending→blocked with the eligibility reason; merge function is never invoked.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1122,7 +1122,7 @@
           {
             "id": "b15.ac5",
             "title": "All three scenarios run in under 100ms wall-clock thanks to fake timers.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1130,12 +1130,13 @@
           {
             "id": "b15.ac6",
             "title": "npm run typecheck and npm test pass; full suite is green.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completedAt": "2026-05-25T11:08:07.825Z"
       }
     ],
     "edges": [
