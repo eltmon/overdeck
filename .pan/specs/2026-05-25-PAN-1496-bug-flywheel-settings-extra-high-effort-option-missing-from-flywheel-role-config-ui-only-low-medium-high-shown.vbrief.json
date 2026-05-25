@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:04:30.598Z"
+    "updated": "2026-05-25T23:05:42.646Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:04:30.598Z",
+    "updated": "2026-05-25T23:05:42.646Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -359,7 +359,7 @@
       {
         "id": "b8-db-schema-comment",
         "title": "Update effort column comment in src/lib/database/schema.ts so it reflects the widened tier list",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -374,7 +374,7 @@
           {
             "id": "b8-db-schema-comment.ac1",
             "title": "Comment text on the effort column in schema.ts mentions all five tiers ('low', 'medium', 'high', 'xhigh', 'max')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
