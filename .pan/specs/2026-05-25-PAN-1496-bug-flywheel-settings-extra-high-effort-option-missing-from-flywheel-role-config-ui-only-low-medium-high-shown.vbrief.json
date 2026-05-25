@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T22:55:11.431Z"
+    "updated": "2026-05-25T22:58:48.334Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T22:55:11.431Z",
+    "updated": "2026-05-25T22:58:48.334Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -113,7 +113,7 @@
       {
         "id": "b2-role-effort-config-yaml",
         "title": "Widen RoleEffort type and config.yaml validator in src/lib/config-yaml.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -128,7 +128,7 @@
           {
             "id": "b2-role-effort-config-yaml.ac1",
             "title": "`RoleEffort` type union is `'low' | 'medium' | 'high' | 'xhigh' | 'max'`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -136,7 +136,7 @@
           {
             "id": "b2-role-effort-config-yaml.ac2",
             "title": "config.yaml validator accepts `roles.flywheel.effort: xhigh` and `roles.flywheel.effort: max` without throwing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -144,7 +144,7 @@
           {
             "id": "b2-role-effort-config-yaml.ac3",
             "title": "Validator error message text is updated so it no longer claims 'must be low, medium, or high' — the new text enumerates all five tiers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -195,7 +195,7 @@
       {
         "id": "b4-spawn-paths-effort-type",
         "title": "Widen effort types in src/lib/agents.ts and src/lib/planning/spawn-planning-session.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -210,7 +210,7 @@
           {
             "id": "b4-spawn-paths-effort-type.ac1",
             "title": "`getRoleRuntimeBaseCommand` accepts `effort = 'xhigh'` and `effort = 'max'` at the type level and emits `--effort xhigh` / `--effort max` in the returned shell command (verifiable by unit-testing the returned string)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -218,7 +218,7 @@
           {
             "id": "b4-spawn-paths-effort-type.ac2",
             "title": "SpawnRunOptions.effort field type matches RoleEffort; agents.ts compiles under `npm run typecheck` with no `Type '\"xhigh\"' is not assignable` errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -226,7 +226,7 @@
           {
             "id": "b4-spawn-paths-effort-type.ac3",
             "title": "spawn-planning-session.ts buildPlanningPrompt and exported types accept all five effort tiers; typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -29,6 +29,7 @@ import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
+import type { RoleEffort } from '../config-yaml.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -118,7 +119,7 @@ export interface SpawnPlanningOptions {
   /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
   harness?: 'claude-code' | 'pi' | 'codex';
   /** Optional effort level — controls how thorough the planning agent is. */
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
   /** Optional callback for streaming progress events to the client. */
@@ -162,7 +163,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, memoryContext = ''): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: RoleEffort, auto = false, memoryContext = ''): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
