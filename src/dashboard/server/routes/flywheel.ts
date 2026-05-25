@@ -4,7 +4,7 @@ import { Effect, Layer, Option, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
-import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
+import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@panctl/contracts';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
 import {
@@ -27,6 +27,7 @@ import {
   startFlywheelRunForDashboard,
 } from '../services/flywheel-actions.js';
 import { readFlywheelState } from '../services/flywheel-state.js';
+import { computeFlywheelStats } from '../services/flywheel-telemetry.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -49,7 +50,13 @@ interface FlywheelStatusResponse {
   body: { ok: true; runId: string } | { error: string; details: string[] };
 }
 
+interface FlywheelStatsResponse {
+  status: number;
+  body: FlywheelStatsPayload | { error: string; details?: string[] };
+}
+
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
+const decodeFlywheelStats = Schema.decodeUnknownSync(FlywheelStats);
 const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
@@ -191,6 +198,26 @@ interface FlywheelActionDeps {
   openReport?: typeof openFlywheelRunReportForDashboard;
 }
 
+interface FlywheelStatsDeps {
+  compute?: typeof computeFlywheelStats;
+}
+
+export async function getFlywheelStatsPayload(window: string | null | undefined, deps: FlywheelStatsDeps = {}): Promise<FlywheelStatsResponse> {
+  const selectedWindow = window ?? '30d';
+  try {
+    const stats = await (deps.compute ?? computeFlywheelStats)(selectedWindow);
+    return { status: 200, body: decodeFlywheelStats(stats) };
+  } catch (error) {
+    return {
+      status: 400,
+      body: {
+        error: 'Invalid Flywheel stats window or payload',
+        details: [error instanceof Error ? error.message : String(error)],
+      },
+    };
+  }
+}
+
 export async function postFlywheelStartPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
   const body = (payload ?? {}) as StartRequestBody;
   if (body.brief !== undefined && typeof body.brief !== 'string') {
@@ -268,6 +295,20 @@ const getFlywheelCurrentRoute = HttpRouter.add(
   '/api/flywheel/current',
   httpHandler(Effect.gen(function* () {
     return yield* Effect.promise(async () => jsonResponse(await getFlywheelCurrentPayload()));
+  })),
+);
+
+const getFlywheelStatsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/stats',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const window = HttpServerRequest.toURL(request).pipe(Option.match({
+      onNone: () => undefined,
+      onSome: (url) => url.searchParams.get('window'),
+    }));
+    const result = yield* Effect.promise(() => getFlywheelStatsPayload(window));
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -491,6 +532,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunRoute,
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
+  getFlywheelStatsRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

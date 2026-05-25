@@ -2,11 +2,12 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { FlywheelStatus } from '@panctl/contracts';
+import { decodeFlywheelStats, type FlywheelStats, type FlywheelStatus } from '@panctl/contracts';
 import {
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  getFlywheelStatsPayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -16,6 +17,71 @@ import {
 } from '../flywheel.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
+
+function makeStats(window: string): FlywheelStats {
+  return {
+    window,
+    generatedAt: '2026-05-25T10:00:00.000Z',
+    criteria: {
+      c1_bugRate: {
+        label: 'Substrate-bug discovery rate',
+        value: 0,
+        target: 0.02,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c2_p0Bugs: {
+        label: 'Critical/P0 substrate bugs',
+        value: 0,
+        target: 0,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c3_passRate: {
+        label: 'Pipeline pass success rate',
+        value: 0,
+        target: 0.99,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c4_mttr: {
+        label: 'MTTR for filed substrate bugs',
+        value: { medianMs: 0, p95Ms: 0 },
+        target: { medianMs: 86400000, p95Ms: 604800000 },
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c5_intervention: {
+        label: 'Operator intervention rate',
+        value: 0,
+        target: 0.05,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c6_timeConsistency: {
+        label: 'Time-in-pipeline consistency',
+        value: { simple: 0, medium: 0, complex: 0 },
+        target: { maxRatio: 2 },
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c7_flake: {
+        label: 'Substrate-attributable flake rate',
+        value: 0,
+        target: 0.05,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+    },
+  };
+}
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -84,6 +150,47 @@ describe('resolveFlywheelBriefPath', () => {
     } finally {
       await rm(outsideDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('flywheel stats payload helper', () => {
+  it('defaults missing window to 30d and validates the response shape', async () => {
+    const seenWindows: string[] = [];
+    const result = await getFlywheelStatsPayload(undefined, {
+      compute: async (window) => {
+        seenWindows.push(window);
+        return makeStats(window);
+      },
+    });
+
+    expect(result.status).toBe(200);
+    expect(seenWindows).toEqual(['30d']);
+    expect(decodeFlywheelStats(result.body)).toEqual(makeStats('30d'));
+  });
+
+  it('passes explicit 7d windows through to telemetry', async () => {
+    const result = await getFlywheelStatsPayload('7d', {
+      compute: async (window) => makeStats(window),
+    });
+
+    expect(result.status).toBe(200);
+    expect(decodeFlywheelStats(result.body).window).toBe('7d');
+  });
+
+  it('returns 400 for invalid windows', async () => {
+    const result = await getFlywheelStatsPayload('abc');
+
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({ error: 'Invalid Flywheel stats window or payload' });
+  });
+
+  it('returns 400 when telemetry returns a schema-invalid response', async () => {
+    const result = await getFlywheelStatsPayload('30d', {
+      compute: async () => ({ ...makeStats('30d'), criteria: {} }) as FlywheelStats,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({ error: 'Invalid Flywheel stats window or payload' });
   });
 });
 
