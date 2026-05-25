@@ -173,12 +173,15 @@ These are the issues that get us to "tracking the vision fully." Issues marked *
 | Issue | Title | MUST? | Why |
 |---|---|---|---|
 | (this doc) | Codify Flywheel vision: dev-loop today → v1.0 user pipeline | — | The vision doc itself; merges via this PR |
-| [`#TBD-A`](#) | Flywheel toggles: `auto_pickup_backlog` + `require_uat_before_merge`, persisted at user-machine level, exposed on FlywheelPage | **MUST** | Without these toggles the Flywheel cannot be configured to behave like a v1.0 user pipeline, so we can't measure intervention rate honestly |
-| [`#TBD-B`](#) | Substrate-bug provenance + Flywheel telemetry (bugs-per-run, time-in-stage-vs-complexity, intervention count) | **MUST** | Without this we cannot measure any of the seven v1.0 criteria; everything else is aspirational |
-| [`#TBD-C`](#) | Formalize humans-only-merge in branch protection (`required_pull_request_reviews: 1` on main) | Nice-to-have | Policy hygiene; the property holds today via access but should be a rule before we trust a second collaborator |
-| [`#TBD-D`](#) | Tune v1.0 criteria with real data | Deferred | Only meaningful after ~30 days of telemetry from MUST issues above |
+| [#1486](https://github.com/eltmon/panopticon-cli/issues/1486) | Flywheel toggles: `auto_pickup_backlog` + `require_uat_before_merge`, persisted at user-machine level, exposed on FlywheelPage | **MUST** | Without these toggles the Flywheel cannot be configured to behave like a v1.0 user pipeline, so we can't measure intervention rate honestly |
+| [#1487](https://github.com/eltmon/panopticon-cli/issues/1487) | Substrate-bug provenance + Flywheel telemetry (bugs-per-run, time-in-stage-vs-complexity, intervention count) | **MUST** | Without this we cannot measure any of the seven v1.0 criteria; everything else is aspirational |
+| [#1491](https://github.com/eltmon/panopticon-cli/issues/1491) | Metric-aware prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect | **MUST** | Today's P-level-only ranking can't actively push us toward v1.0; metric-derived weight makes the bottleneck criterion bubble up. Depends on #1487 |
+| [#1488](https://github.com/eltmon/panopticon-cli/issues/1488) | Formalize humans-only-merge in branch protection (`required_pull_request_reviews: 1` on main) | Nice-to-have | Policy hygiene; the property holds today via access but should be a rule before we trust a second collaborator |
+| [#1489](https://github.com/eltmon/panopticon-cli/issues/1489) | Tune v1.0 readiness criteria after 30 days of telemetry | Deferred | Only meaningful after ~30 days of telemetry from MUST issues above |
 
-Issue numbers will be filled in once the issues are filed alongside this PR.
+**See also (orthogonal, not on the v1.0 critical path):**
+
+- [PAN-1418](https://github.com/eltmon/panopticon-cli/issues/1418) — opt-in auto-merge with cooldown. Composes with #1486's `require_uat_before_merge` per the truth table above. Currently `needs-discussion`.
 
 ---
 
