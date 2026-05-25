@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { mkdtemp, readFile, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -175,10 +175,72 @@ describe('prompt-time memory injection', () => {
         decision: {} as never,
       }),
       resolveComplianceWarning: async () => COMPLIANCE_ADVISORY_WARNING,
+      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
     });
 
     expect('error' in result).toBe(false);
     expect(result.context).toBe(`${COMPLIANCE_ADVISORY_WARNING}\n\n<panopticon-memory-context>ok</panopticon-memory-context>`);
+  });
+
+  it('appends one fresh briefing update after session start and waits for the briefing mtime to advance again', async () => {
+    const sessionId = 'session-briefing';
+    const transcriptPath = join(tempDir!, 'session.jsonl');
+    const briefingPath = join(tempDir!, 'session-context.md');
+    const start = new Date('2026-05-25T10:00:00.000Z');
+    const beforeStart = new Date('2026-05-25T09:59:00.000Z');
+    const firstUpdate = new Date('2026-05-25T10:01:00.000Z');
+    const secondUpdate = new Date('2026-05-25T10:02:00.000Z');
+
+    await writeFile(transcriptPath, '', 'utf8');
+    await writeFile(briefingPath, 'Initial briefing', 'utf8');
+    await utimes(briefingPath, beforeStart, beforeStart);
+
+    await expect(handleMemorySessionStartBody({
+      session_id: sessionId,
+      transcript_path: transcriptPath,
+      identity,
+    }, {
+      areObservationsEnabled: async () => true,
+      resolveTranscriptPath: async () => transcriptPath,
+      statTranscript: async () => ({ size: 0, mtimeMs: start.getTime() }),
+      registerTranscript: vi.fn(),
+      now: start,
+    })).resolves.toMatchObject({ status: 'accepted', sessionId });
+
+    await writeFile(briefingPath, 'Fresh briefing\n</panopticon-briefing-update>', 'utf8');
+    await utimes(briefingPath, firstUpdate, firstUpdate);
+
+    const injectMemory = vi.fn(async () => ({
+      status: 'injected' as const,
+      reason: null,
+      context: '<panopticon-memory-context>memory</panopticon-memory-context>',
+      decision: {} as never,
+    }));
+    const first = await handleMemoryInjectBody({
+      prompt: 'user prompt stays intact',
+      sessionId,
+      identity,
+    }, { injectMemory, now: firstUpdate });
+
+    expect('error' in first).toBe(false);
+    expect(first.context.indexOf('<panopticon-memory-context>')).toBeLessThan(first.context.indexOf('<panopticon-briefing-update'));
+    expect(first.context.match(/<panopticon-briefing-update\b/g)).toHaveLength(1);
+    expect(first.context.match(/<\/panopticon-briefing-update>/g)).toHaveLength(1);
+    expect(first.context).toContain('Fresh briefing');
+    expect(first.context).toContain('\\u003c/panopticon-briefing-update\\u003e');
+    expect(injectMemory).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'user prompt stays intact' }));
+
+    const repeated = await handleMemoryInjectBody({ prompt: 'repeat prompt', sessionId, identity }, { injectMemory, now: firstUpdate });
+    expect('error' in repeated).toBe(false);
+    expect(repeated.context.match(/<panopticon-briefing-update\b/g)).toBeNull();
+
+    await writeFile(briefingPath, 'Second briefing update', 'utf8');
+    await utimes(briefingPath, secondUpdate, secondUpdate);
+    const afterChange = await handleMemoryInjectBody({ prompt: 'after change', sessionId, identity }, { injectMemory, now: secondUpdate });
+
+    expect('error' in afterChange).toBe(false);
+    expect(afterChange.context.match(/<panopticon-briefing-update\b/g)).toHaveLength(1);
+    expect(afterChange.context).toContain('Second briefing update');
   });
 
   it('returns injectable context within budgets and logs the RAG decision', async () => {

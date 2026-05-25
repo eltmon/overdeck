@@ -44,4 +44,19 @@ if [ -n "$MODEL" ]; then
   pan_emit_event "$AGENT_ID" "$BODY"
 fi
 
+INTERNAL_TOKEN="${PANOPTICON_INTERNAL_TOKEN:-}"
+if [ -z "$INTERNAL_TOKEN" ]; then
+  TOKEN_PATH="${PANOPTICON_HOME:-$HOME/.panopticon}/internal-token"
+  if [ -f "$TOKEN_PATH" ]; then
+    INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
+  fi
+fi
+
+if command -v jq >/dev/null 2>&1; then
+  SESSION_BODY=$(printf '%s' "$INPUT" | jq -c --arg agentId "$AGENT_ID" '. + {agentId: $agentId}' 2>/dev/null)
+  if [ -n "$SESSION_BODY" ]; then
+    curl -s -m 0.5 -o /dev/null -X POST -H 'Content-Type: application/json' -H "x-panopticon-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true
+  fi
+fi
+
 exit 0

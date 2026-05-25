@@ -73,10 +73,11 @@ export interface HandleMemorySessionStartBodyOptions {
   resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
   statTranscript?: (transcriptPath: string) => Promise<{ size: number; mtimeMs: number }>;
   registerTranscript?: typeof registerTranscriptForPolling;
+  recordBriefingSessionStart?: typeof recordBriefingSessionStart;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
-  recordBriefingSessionStart?: typeof recordBriefingSessionStart;
+  now?: Date;
 }
 
 export type HandleMemoryTurnBodyResult =
@@ -172,7 +173,8 @@ export async function handleMemorySessionStartBody(
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
 
-  await (options.recordBriefingSessionStart ?? recordBriefingSessionStart)({ sessionId }).catch(() => {});
+  const recordBriefingStart = options.recordBriefingSessionStart ?? recordBriefingSessionStart;
+  await recordBriefingStart(options.now ? { sessionId, now: options.now } : { sessionId }).catch(() => {});
   if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const trustedTranscriptPath = options.resolveTranscriptPath
@@ -209,6 +211,7 @@ export interface HandleMemoryInjectBodyOptions {
   injectBriefing?: typeof appendFreshBriefingUpdate;
   resolveComplianceWarning?: typeof resolveComplianceAdvisoryWarning;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  now?: Date;
 }
 
 export async function handleMemoryInjectBody(
@@ -240,7 +243,9 @@ export async function handleMemoryInjectBody(
     (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity }),
     (options.resolveComplianceWarning ?? resolveComplianceAdvisoryWarning)({ identity }).catch(() => null),
   ]);
-  const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)({ sessionId, context: memoryResult.context });
+  const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)(
+    options.now ? { sessionId, context: memoryResult.context, now: options.now } : { sessionId, context: memoryResult.context },
+  );
 
   return {
     ...memoryResult,
