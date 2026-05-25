@@ -6,6 +6,7 @@ import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
 import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../src/dashboard/server/routes/hooks.js';
+import { COMPLIANCE_ADVISORY_WARNING } from '../../../src/lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
 
 let tempDir: string | null = null;
@@ -134,6 +135,7 @@ describe('prompt-time memory injection', () => {
         briefingCalls.push({ sessionId: input.sessionId, context: input.context });
         return { context: `${input.context}\n<panopticon-briefing-update>briefing</panopticon-briefing-update>`, injected: true, briefingMtimeMs: 1 };
       },
+      resolveComplianceWarning: async () => null,
     });
     const elapsed = performance.now() - started;
 
@@ -158,6 +160,25 @@ describe('prompt-time memory injection', () => {
 
     expect(result).toEqual({ status: 'disabled' });
     expect(recordBriefingSessionStart).toHaveBeenCalledWith({ sessionId: 'session-1' });
+  });
+
+  it('prepends a compliance warning before memory context when a current-session miss is pending', async () => {
+    const result = await handleMemoryInjectBody({
+      prompt: 'Continue from last session',
+      sessionId: 'session-1',
+      identity,
+    }, {
+      injectMemory: async () => ({
+        status: 'injected',
+        reason: null,
+        context: '<panopticon-memory-context>ok</panopticon-memory-context>',
+        decision: {} as never,
+      }),
+      resolveComplianceWarning: async () => COMPLIANCE_ADVISORY_WARNING,
+    });
+
+    expect('error' in result).toBe(false);
+    expect(result.context).toBe(`${COMPLIANCE_ADVISORY_WARNING}\n\n<panopticon-memory-context>ok</panopticon-memory-context>`);
   });
 
   it('returns injectable context within budgets and logs the RAG decision', async () => {

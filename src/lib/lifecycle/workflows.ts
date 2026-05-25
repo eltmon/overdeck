@@ -29,6 +29,7 @@ import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
+import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 
 const execAsync = promisify(exec);
 
@@ -216,6 +217,7 @@ export function closeOut(
     allSteps.push(clearResult);
 
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
+    yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
     return buildResult('close-out', ctx.issueId, allSteps, start);
   });

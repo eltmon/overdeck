@@ -43,6 +43,7 @@ import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
+import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -752,12 +753,23 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
       catch: (cause) => toAgentFsError('write', stateFile, cause),
     });
+    recordFeatureRegistryAgentState(state);
 
     if (oldStatus && oldStatus !== state.status) {
       logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }
   });
 };
+
+function recordFeatureRegistryAgentState(state: AgentState): void {
+  const status = state.status === 'starting' || state.status === 'running' ? 'active' : 'deferred';
+  void recordFeatureRegistryLifecycle({
+    issueId: state.issueId,
+    workspacePath: state.workspace,
+    agentId: state.id,
+    status,
+  });
+}
 
 function clearFailureTrackingFields(state: AgentState): void {
   state.consecutiveFailures = 0;
