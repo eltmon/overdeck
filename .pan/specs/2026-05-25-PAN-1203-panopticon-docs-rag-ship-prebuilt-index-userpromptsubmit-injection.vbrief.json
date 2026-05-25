@@ -1,0 +1,743 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T00:43:04.024559Z",
+    "updated": "2026-05-25T00:49:43.861Z",
+    "author": "panopticon-cli/plan-agent",
+    "description": "Plan for PAN-1203: Panopticon-docs RAG: ship prebuilt index, UserPromptSubmit injection"
+  },
+  "plan": {
+    "id": "pan-1203",
+    "title": "Panopticon-docs RAG: ship prebuilt index, UserPromptSubmit injection",
+    "status": "proposed",
+    "uid": "6aa46b33-11dc-467c-a608-c4c7f7a41d51",
+    "author": "agent:gpt-5.5",
+    "sequence": 2,
+    "created": "2026-05-25T00:43:04.024559Z",
+    "updated": "2026-05-25T00:49:43.861Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1203",
+        "label": "PAN-1203",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/PAN-1203-panopticon-docs-rag.md",
+        "label": "PAN-1203 PRD in workspace",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/PAN-1203-panopticon-docs-rag.md",
+        "label": "PAN-1203 PRD in project root",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "rag",
+      "hooks",
+      "cli",
+      "sqlite",
+      "pi"
+    ],
+    "narratives": {
+      "Problem": "Panopticon agents often need repo-specific documentation, skills, rules, and PRD context at prompt time, but today that context depends on manual recall, broad file reads, or stale prompt context. The desired behavior is a packaged docs RAG system that can answer `pan docs` queries and inject concise, relevant documentation snippets into agent prompts automatically.",
+      "Proposal": "Ship a self-contained SQLite docs index with FTS5 and precomputed embeddings, materialize it during install, add `pan docs` commands for query/reindex/status/enable/disable, and extend prompt submission hooks to emit a bounded `<panopticon-docs>` context block after existing memory context. Query-time and prompt-time retrieval must be local, fast, fail-open, and free of embedding model or network calls.",
+      "Constraints": "Planning is for the complete feature. Do not ship Claude-only behavior if Pi prompt interception is unavailable; the implementation agent must verify the Pi extension API and report that as a blocker if no prompt-submit path exists. Preserve the existing Claude UserPromptSubmit stdout contract by emitting supplemental context only, never reprinting the user prompt. Hook execution is hot-path and must keep short timeouts and fail open.",
+      "Risks": "FTS5 MATCH syntax can reject arbitrary prompts, embedding dependencies can bloat the package, install/setup code can clobber user Claude settings if it bypasses existing safe settings helpers, and session-scoped disable/budget accounting depends on hook payload fields that may vary by harness version. Tests must cover these hazards directly."
+    },
+    "autoDecisions": [
+      {
+        "id": "D1",
+        "summary": "Plan a complete docs-RAG feature: prebuilt SQLite index, `pan docs` retrieval commands, install-time index materialization, and prompt-time injection for Claude Code and Pi.",
+        "rationale": "The PRD acceptance criteria describe one end-to-end feature; partial delivery would not provide useful autonomous prompt context.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      },
+      {
+        "id": "D2",
+        "summary": "Use the existing `sync-sources` package layout for skill and hook corpus files; the docs corpus includes `docs/**/*.md`, `sync-sources/skills/*/SKILL.md`, `CLAUDE.md`, `.claude/rules/*.md`, and optionally PRDs per docs config.",
+        "rationale": "The package already ships sync sources and hooks, so corpus discovery should align with existing install/package boundaries instead of inventing a parallel layout.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      },
+      {
+        "id": "D3",
+        "summary": "Keep model work at build/reindex time only: `pan docs query` and the prompt hook read the shipped SQLite index and must not call embedding models or remote APIs during user prompt submission.",
+        "rationale": "Prompt hooks run on every user message and must be fast, deterministic, and fail-open without network/model dependency.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      },
+      {
+        "id": "D4",
+        "summary": "Extend the existing Claude Code `user-prompt-submit-hook` instead of replacing it, preserving waiting-state events and current memory injection output before adding a `<panopticon-docs>` block.",
+        "rationale": "The existing hook already owns Panopticon prompt-submit side effects and stdout supplemental context; adding another hook risks ordering and duplication bugs.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      },
+      {
+        "id": "D5",
+        "summary": "Represent docs-RAG settings in `config.yaml` under `docs.*`, normalized through `src/lib/config-yaml.ts`, with global/project enablement, trigger regexes, budget caps, corpus toggles, and classifier disabled by default.",
+        "rationale": "Existing runtime config normalization is the central source for Panopticon feature settings and already has embedding-related precedent under conversations.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      },
+      {
+        "id": "D6",
+        "summary": "For auto-planning ambiguity around the Pi prompt hook API, require implementation to add the best available Pi extension prompt-submit interception and tests; if Pi exposes no such API, the work agent must stop and report the blocker rather than silently shipping Claude-only behavior.",
+        "rationale": "The current Pi extension code shows session/tool/turn hooks but no prompt-submit API, while the issue acceptance criteria explicitly require Pi hook registration.",
+        "recordedAt": "2026-05-25T00:43:04.024559Z"
+      }
+    ],
+    "items": [
+      {
+        "id": "docs-config",
+        "title": "Add docs RAG configuration and state paths",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "standard",
+          "foundationFor": [
+            "docs-corpus",
+            "docs-index-builder",
+            "docs-query-library",
+            "docs-cli",
+            "docs-hook-injection"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend YAML config normalization with a `docs` section covering enablement scopes, trigger regexes, corpus toggles, token/result budgets, embedding provider/model choices for build-time/reindex work, and classifier defaults. Add or reuse path helpers for `~/.panopticon/docs/index.sqlite`, budget/disable state, and telemetry without changing dashboard-server-reachable code to blocking sync APIs."
+        },
+        "subItems": [
+          {
+            "id": "docs-config.ac1",
+            "title": "Normalized config exposes docs enablement, trigger, corpus, budget, and classifier defaults",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-config.ac2",
+            "title": "Docs path helpers resolve under PANOPTICON_HOME and support test overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-config.ac3",
+            "title": "Config tests cover defaults, YAML overrides, and disabled classifier behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-corpus",
+        "title": "Implement docs corpus discovery and markdown chunking",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-index-builder",
+            "docs-query-library"
+          ]
+        },
+        "narrative": {
+          "Action": "Create docs corpus code that discovers configured markdown sources from docs, sync-sources skills, CLAUDE.md, .claude/rules, and optional PRD locations. Chunk markdown by heading hierarchy, retain doc kind/path/heading/anchor metadata, enforce the PRD token-size target, and skip generated or irrelevant files intentionally rather than through brittle fallback chains."
+        },
+        "subItems": [
+          {
+            "id": "docs-corpus.ac1",
+            "title": "Corpus discovery includes docs, skills, global/project rules, CLAUDE.md, and optional PRDs with correct doc_kind values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-corpus.ac2",
+            "title": "Markdown chunking preserves heading paths and anchors and keeps chunks within the configured budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-corpus.ac3",
+            "title": "Corpus tests cover nested headings, empty files, large sections, rule frontmatter, and skill documents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-index-builder",
+        "title": "Build and package the SQLite docs index",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-query-library",
+            "docs-install-materialization"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a docs index build/reindex pipeline that writes a separate SQLite database with `docs_chunks`, `docs_fts`, and `docs_embeddings`, stores normalized Float32 embeddings as blobs, validates schema metadata, and produces `dist/docs-index.sqlite` as part of the build/package path. Keep embedding generation isolated to build-time and explicit reindex commands, with injectable embedding functions for tests."
+        },
+        "subItems": [
+          {
+            "id": "docs-index-builder.ac1",
+            "title": "Index builder creates the PRD schema with FTS5 rows synchronized to docs_chunks and embeddings keyed by chunk_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-index-builder.ac2",
+            "title": "Build scripts generate and ship `dist/docs-index.sqlite` without first-run model downloads at install or query time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-index-builder.ac3",
+            "title": "Package/index size checks enforce the configured budget and fail loudly when exceeded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-index-builder.ac4",
+            "title": "Builder tests cover schema creation, rebuild idempotency, embedding blob round trips, and package artifact presence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-query-library",
+        "title": "Implement local docs retrieval and formatting",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs-cli",
+            "docs-budget-telemetry",
+            "docs-hook-injection",
+            "pi-docs-injection"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the runtime query library that opens the materialized docs SQLite index read-only, sanitizes arbitrary prompts into safe FTS5 MATCH expressions, computes BM25 and embedding result sets from stored vectors, combines rankings with reciprocal rank fusion and doc-kind priority, truncates to top-N and token budget, and formats both markdown and JSON responses. Query-time code must not call embedding models or remote APIs."
+        },
+        "subItems": [
+          {
+            "id": "docs-query-library.ac1",
+            "title": "FTS query sanitization returns no results instead of throwing for malformed, empty, or punctuation-only prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-query-library.ac2",
+            "title": "Retrieval combines BM25 and stored-vector similarity with reciprocal rank fusion and doc_kind priority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-query-library.ac3",
+            "title": "Markdown formatter emits bounded `<panopticon-docs>` snippets with path, heading, and anchor provenance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-query-library.ac4",
+            "title": "Runtime query tests prove no embedding provider or network calls occur during normal query execution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-budget-telemetry",
+        "title": "Add docs trigger, budget, disable, and telemetry state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "standard",
+          "foundationFor": [
+            "docs-cli",
+            "docs-hook-injection",
+            "pi-docs-injection"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement local state for global/project/session enablement, prompt trigger matching, token/result budget accounting, explicit `pan docs disable/enable` effects, and telemetry under `~/.panopticon/docs/`. Ensure missing hook session IDs have documented fallback behavior and that all prompt-time errors fail open without suppressing existing Panopticon hook events."
+        },
+        "subItems": [
+          {
+            "id": "docs-budget-telemetry.ac1",
+            "title": "Trigger logic matches configured Panopticon/documentation patterns and avoids injection when disabled or over budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-budget-telemetry.ac2",
+            "title": "Disable/enable state supports session, project, and global scopes with predictable precedence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-budget-telemetry.ac3",
+            "title": "Telemetry records query count, injected token estimates, hit/miss status, and disable/budget reasons without storing full prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-budget-telemetry.ac4",
+            "title": "Tests cover session-id present and missing hook payloads, budget exhaustion, and scope precedence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cli",
+        "title": "Add `pan docs` commands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "standard",
+          "foundationFor": [
+            "docs-install-materialization",
+            "docs-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "Register a grouped `pan docs` command in the CLI with `query`, `reindex`, `status`, `disable`, and `enable` subcommands. Match the PRD command surface, support markdown/json query output, top-N and kind filters, invoke build-time embedding only in `reindex`, and make status explain index location, freshness, enabled scopes, budgets, and telemetry counters."
+        },
+        "subItems": [
+          {
+            "id": "docs-cli.ac1",
+            "title": "`pan docs query` supports quoted text, `--top`, `--kind`, and `--format markdown|json` using only the local index",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli.ac2",
+            "title": "`pan docs reindex` rebuilds the materialized index and reports source/chunk/embedding counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli.ac3",
+            "title": "`pan docs status`, `disable`, and `enable` reflect global, project, and session state accurately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli.ac4",
+            "title": "CLI tests cover command registration, output formats, invalid options, missing index, and disabled-state messaging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-install-materialization",
+        "title": "Materialize the shipped docs index during install and setup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "standard",
+          "foundationFor": [
+            "docs-hook-injection"
+          ]
+        },
+        "narrative": {
+          "Action": "Update install/setup paths so `dist/docs-index.sqlite` is copied or refreshed into `~/.panopticon/docs/index.sqlite` using atomic writes and clear freshness checks. Reuse existing hook setup safety primitives for any Claude settings mutation, and avoid overwriting user-managed state unnecessarily."
+        },
+        "subItems": [
+          {
+            "id": "docs-install-materialization.ac1",
+            "title": "`pan install` creates the docs directory and materializes the packaged index atomically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-install-materialization.ac2",
+            "title": "Install detects stale or missing materialized indexes and refreshes without clobbering disable/telemetry state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-install-materialization.ac3",
+            "title": "Install tests cover first install, upgrade refresh, missing packaged index, and PANOPTICON_HOME overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-hook-injection",
+        "title": "Extend Claude Code UserPromptSubmit docs injection",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "verification"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend `sync-sources/hooks/user-prompt-submit-hook` so it preserves waiting-state event emission and existing memory injection output, then conditionally appends docs context returned by a local query path. The hook must parse prompt/session/project fields safely, never echo the original user prompt, use short timeouts, avoid network/model calls for docs retrieval, and return no docs block on errors. Setup tests must prove the existing UserPromptSubmit registration is preserved rather than replaced or duplicated."
+        },
+        "subItems": [
+          {
+            "id": "docs-hook-injection.ac1",
+            "title": "Hook stdout order remains existing memory context first, then optional `<panopticon-docs>` context only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hook-injection.ac2",
+            "title": "Hook docs retrieval fails open quickly on missing jq, missing index, malformed payloads, disabled state, and query errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hook-injection.ac3",
+            "title": "Setup hooks tests prove UserPromptSubmit registration remains idempotent and does not clobber unrelated settings or hook arrays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hook-injection.ac4",
+            "title": "Hook integration tests cover triggered prompts, non-triggered prompts, budget exhaustion, and memory-plus-docs output ordering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-docs-injection",
+        "title": "Add Pi prompt-time docs injection or report API blocker",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "verification"
+          ]
+        },
+        "narrative": {
+          "Action": "Investigate the actual Pi extension prompt interception API and wire the docs query path into the best available prompt-submit/context injection mechanism with tests. If Pi exposes no way to add prompt-time context, stop and report that blocker explicitly before marking this bead complete; do not silently satisfy the feature with Claude Code only."
+        },
+        "subItems": [
+          {
+            "id": "pi-docs-injection.ac1",
+            "title": "Pi extension implementation documents and tests the chosen prompt interception or context injection event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-docs-injection.ac2",
+            "title": "Pi docs injection uses the same local retrieval, trigger, budget, disable, and fail-open behavior as Claude Code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-docs-injection.ac3",
+            "title": "If Pi lacks prompt-time context support, the agent reports a blocker instead of marking the Pi acceptance criterion complete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-docs",
+        "title": "Document docs RAG operations and configuration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "standard",
+          "foundationFor": [
+            "verification"
+          ]
+        },
+        "narrative": {
+          "Action": "Update existing user/operator documentation for the docs corpus, build/reindex workflow, `pan docs` commands, hook behavior, enable/disable scopes, telemetry, budget settings, troubleshooting, and packaging expectations. Keep documentation concise and linked from existing docs surfaces rather than creating an unreferenced island."
+        },
+        "subItems": [
+          {
+            "id": "docs-docs.ac1",
+            "title": "Docs explain query/reindex/status/enable/disable commands with examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-docs.ac2",
+            "title": "Docs explain hook injection behavior, budgets, telemetry, and how to disable docs context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-docs.ac3",
+            "title": "Skill/CLI convention documentation is updated if the new `pan docs` surface affects wrapper skill expectations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification",
+        "title": "Verify the complete docs RAG feature",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-25T00:43:04.024559Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Run the repository quality gates and feature-specific checks after the implementation is complete. Verify that the prebuilt index is generated, materialized, queried locally, used by Claude Code prompt submission, and either used by Pi prompt submission or blocked with a clear API limitation. Confirm no prompt-time embedding/network path exists and no existing hook/memory behavior regressed."
+        },
+        "subItems": [
+          {
+            "id": "verification.ac1",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` pass after `bun install` in the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification.ac2",
+            "title": "Feature-specific tests cover chunking, indexing, retrieval ranking, budgets, CLI commands, install materialization, Claude hook injection, and Pi behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification.ac3",
+            "title": "Manual smoke test demonstrates `pan docs query` returns relevant local snippets and hook injection emits bounded `<panopticon-docs>` context for a triggered prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification.ac4",
+            "title": "Package verification confirms the shipped docs index is below the size budget and included in publish artifacts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "docs-config",
+        "to": "docs-corpus",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-config",
+        "to": "docs-index-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-corpus",
+        "to": "docs-index-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-index-builder",
+        "to": "docs-query-library",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-config",
+        "to": "docs-budget-telemetry",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-query-library",
+        "to": "docs-budget-telemetry",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-query-library",
+        "to": "docs-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-budget-telemetry",
+        "to": "docs-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-index-builder",
+        "to": "docs-install-materialization",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-cli",
+        "to": "docs-install-materialization",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-install-materialization",
+        "to": "docs-hook-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-budget-telemetry",
+        "to": "docs-hook-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-query-library",
+        "to": "docs-hook-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-query-library",
+        "to": "pi-docs-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-budget-telemetry",
+        "to": "pi-docs-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-cli",
+        "to": "docs-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-hook-injection",
+        "to": "verification",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-docs-injection",
+        "to": "verification",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-docs",
+        "to": "verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1203-panopticon-docs-rag-ship-prebuilt-index-userpromptsubmit-injection.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
