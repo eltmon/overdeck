@@ -725,7 +725,7 @@ const postIssuesRoute = HttpRouter.add(
     }
 
     const projectsConfig = yield* loadProjectsConfig().pipe(
-      Effect.catchAll((error) => Effect.succeed({ error } as const)),
+      Effect.catch((error) => Effect.succeed({ error } as const)),
     );
     if ('error' in projectsConfig) {
       return jsonResponse({ error: `Failed to load projects config: ${trackerErrorMessage(projectsConfig.error)}` }, { status: 500 });
@@ -745,7 +745,7 @@ const postIssuesRoute = HttpRouter.add(
     }
 
     const configResult = yield* loadConfigNoMigration().pipe(
-      Effect.catchAll((error) => Effect.succeed({ error } as const)),
+      Effect.catch((error) => Effect.succeed({ error } as const)),
     );
     if ('error' in configResult) {
       return jsonResponse({ error: `Failed to load tracker config: ${trackerErrorMessage(configResult.error)}` }, { status: 500 });
@@ -781,7 +781,7 @@ const postIssuesRoute = HttpRouter.add(
 
     const createResult = yield* tracker.createIssue(createPayload).pipe(
       Effect.map((issue) => ({ ok: true as const, issue })),
-      Effect.catchAll((error) => Effect.succeed({ ok: false as const, error })),
+      Effect.catch((error) => Effect.succeed({ ok: false as const, error })),
     );
     if (!createResult.ok) {
       const tag = createResult.error && typeof createResult.error === 'object' && '_tag' in createResult.error
