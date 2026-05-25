@@ -11,7 +11,12 @@ import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelR
 import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
+import {
+  getFlywheelActiveRunId,
+  isFlywheelAutoPickupBacklog,
+  isFlywheelGloballyPaused,
+  isFlywheelRequireUatBeforeMerge,
+} from '../../lib/database/app-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
@@ -58,6 +63,8 @@ interface ResolvedFlywheelRoleConfig {
   effort: RoleEffort;
   maxAgents: number;
   scope: FlywheelScope;
+  autoPickupBacklog: boolean;
+  requireUatBeforeMerge: boolean;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -146,6 +153,8 @@ function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
     effort: flywheel?.effort ?? 'high',
     maxAgents: flywheel?.maxAgents ?? 8,
     scope: flywheel?.scope ?? 'pan-only',
+    autoPickupBacklog: isFlywheelAutoPickupBacklog(),
+    requireUatBeforeMerge: isFlywheelRequireUatBeforeMerge(),
   };
 }
 
@@ -253,6 +262,8 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
     effort: roleConfig.effort,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
+    autoPickupBacklog: roleConfig.autoPickupBacklog,
+    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
   });
   await writeLatestFlywheelStatus(await createInitialFlywheelStatus(
     runId,
@@ -528,6 +539,8 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
     effort: roleConfig.effort,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
+    autoPickupBacklog: roleConfig.autoPickupBacklog,
+    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
   });
   return { before, after: readFlywheelGateSnapshot(), changed: true };
 }

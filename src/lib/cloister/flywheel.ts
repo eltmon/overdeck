@@ -8,6 +8,8 @@ import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import {
   getFlywheelActiveRunId,
+  isFlywheelAutoPickupBacklog,
+  isFlywheelRequireUatBeforeMerge,
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../database/app-settings.js';
@@ -27,6 +29,8 @@ export interface FlywheelLifecycleOptions {
   effort?: RoleEffort;
   maxAgents?: number;
   scope?: FlywheelScope;
+  autoPickupBacklog?: boolean;
+  requireUatBeforeMerge?: boolean;
   env?: NodeJS.ProcessEnv;
   resumeSessionId?: string;
 }
@@ -54,6 +58,12 @@ function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions,
     options.effort ? `Effort: ${options.effort}` : undefined,
     options.maxAgents ? `Max concurrent agents: ${options.maxAgents}` : undefined,
     options.scope ? `Scope: ${options.scope}` : undefined,
+    typeof options.autoPickupBacklog === 'boolean'
+      ? `Auto-pickup backlog: ${options.autoPickupBacklog}`
+      : undefined,
+    typeof options.requireUatBeforeMerge === 'boolean'
+      ? `Require UAT before merge: ${options.requireUatBeforeMerge}`
+      : undefined,
   ].filter(Boolean).join('\n');
   const configSection = configLines ? `\n\nRun configuration:\n${configLines}` : '';
   const briefSection = options.briefPath
@@ -115,6 +125,14 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
   });
 }
 
+function withFlywheelAutonomyOptions(options: FlywheelLifecycleOptions): FlywheelLifecycleOptions {
+  return {
+    ...options,
+    autoPickupBacklog: options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog(),
+    requireUatBeforeMerge: options.requireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge(),
+  };
+}
+
 export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
   if (isFlywheelDevcontainerRuntime(options.env)) {
     throw new Error('Refusing to spawn flywheel-orchestrator inside a workspace devcontainer');
@@ -130,7 +148,7 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
   }
 
   const runId = options.runId ? parseRunId(options.runId) : defaultFlywheelRunId();
-  const agent = await spawnFlywheelAgent(runId, options);
+  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions(options));
   setFlywheelActiveRunId(runId);
   setFlywheelGloballyPaused(false);
   return agent;
@@ -161,7 +179,7 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   const runId = parseRunId(activeRunId);
 
   const resumeSessionId = options.resumeSessionId ?? await loadResumeSessionId(runId) ?? undefined;
-  const agent = await spawnFlywheelAgent(runId, { ...options, resumeSessionId });
+  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({ ...options, resumeSessionId }));
   setFlywheelGloballyPaused(false);
   return { activeRunId, agent };
 }

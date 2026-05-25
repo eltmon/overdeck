@@ -13,6 +13,8 @@ import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelS
 const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
   activeRunId: null as string | null,
+  autoPickupBacklog: false,
+  requireUatBeforeMerge: true,
   sessionExists: false,
   sessionExistsSync: false,
   stoppedAgents: [] as string[],
@@ -45,6 +47,8 @@ vi.mock('../../../lib/cloister/flywheel.js', () => ({
 vi.mock('../../../lib/database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => flywheelLifecycleMocks.activeRunId,
   isFlywheelGloballyPaused: () => flywheelLifecycleMocks.paused,
+  isFlywheelAutoPickupBacklog: () => flywheelLifecycleMocks.autoPickupBacklog,
+  isFlywheelRequireUatBeforeMerge: () => flywheelLifecycleMocks.requireUatBeforeMerge,
   setFlywheelActiveRunId: (runId: string | null) => {
     flywheelLifecycleMocks.activeRunId = runId;
   },
@@ -202,6 +206,8 @@ describe('flywheel CLI commands', () => {
     vi.stubEnv('GIT_COMMITTER_EMAIL', 'test@example.com');
     flywheelLifecycleMocks.paused = false;
     flywheelLifecycleMocks.activeRunId = null;
+    flywheelLifecycleMocks.autoPickupBacklog = false;
+    flywheelLifecycleMocks.requireUatBeforeMerge = true;
     flywheelLifecycleMocks.sessionExists = false;
     flywheelLifecycleMocks.stoppedAgents = [];
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
@@ -313,6 +319,8 @@ describe('flywheel CLI commands', () => {
       effort: 'low',
       maxAgents: 3,
       scope: 'all-tracked-projects',
+      autoPickupBacklog: false,
+      requireUatBeforeMerge: true,
     }));
     const latest = JSON.parse(await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'latest.json'), 'utf8')) as FlywheelStatus;
     const launch = await readFlywheelLaunchMetadata('RUN-1');
@@ -424,6 +432,8 @@ describe('flywheel CLI commands', () => {
       effort: 'low',
       maxAgents: 3,
       scope: 'all-tracked-projects',
+      autoPickupBacklog: false,
+      requireUatBeforeMerge: true,
     }));
     expect(logSpy).toHaveBeenCalledWith('Flywheel resumed: before paused=true active_run_id=RUN-1; after paused=false active_run_id=RUN-1');
     expect(process.exitCode).toBeUndefined();
