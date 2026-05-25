@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion1,
   computeCriterion2,
   computeCriterion3,
   computeCriterion4,
@@ -67,12 +68,13 @@ function criterion4Bug(
   fixMergedAt: string | null,
   status: 'open' | 'fixed' = 'fixed',
   severity = 'P2',
+  filedBy: 'agent' | 'operator' = 'agent',
 ) {
   return {
     issueId,
     filedAt,
     runId: null,
-    filedBy: 'agent' as const,
+    filedBy,
     discoveredInIssueId: null,
     severity,
     status,
@@ -205,6 +207,45 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('computes criterion 1 as agent-filed substrate bugs per completed pipeline run', () => {
+    const criterion = computeCriterion1(100, [
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', null),
+      criterion4Bug('PAN-2', '2026-04-30T23:59:59.999Z', null),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toBe(0.01);
+    expect(criterion.target).toBe(0.02);
+    expect(criterion.status).toBe('green');
+    expect(criterion.sampleSize).toBe(100);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it('excludes operator-filed substrate bugs from criterion 1 numerator', () => {
+    const criterion = computeCriterion1(100, [
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', null, 'open', 'P2', 'operator'),
+      criterion4Bug('PAN-2', '2026-05-02T00:00:00.000Z', null, 'open', 'P2', 'agent'),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toBe(0.01);
+    expect(criterion.status).toBe('green');
+  });
+
+  it.each([
+    [1, 100, 'green'],
+    [2, 100, 'yellow'],
+    [5, 100, 'yellow'],
+    [6, 100, 'red'],
+  ] as const)('maps criterion 1 thresholds for %d agent-filed bugs over %d runs', (bugs, runs, status) => {
+    const criterion = computeCriterion1(runs, Array.from({ length: bugs }, (_, index) => criterion4Bug(
+      `PAN-${index}`,
+      '2026-05-01T00:00:00.000Z',
+      null,
+    )), '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toBe(bugs / runs);
+    expect(criterion.status).toBe(status);
   });
 
   it('computes criterion 2 as P0 substrate bugs filed in the window', () => {

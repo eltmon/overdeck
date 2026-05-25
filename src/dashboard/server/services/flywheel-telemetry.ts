@@ -6,8 +6,15 @@ export interface FlywheelStatsOptions {
   completedPipelineRuns?: number;
 }
 
-export interface Criterion2SubstrateBug {
+export interface FiledSubstrateBug {
   filedAt: string;
+}
+
+export interface Criterion1SubstrateBug extends FiledSubstrateBug {
+  filedBy: 'agent' | 'operator';
+}
+
+export interface Criterion2SubstrateBug extends FiledSubstrateBug {
   severity: string;
 }
 
@@ -80,16 +87,51 @@ function placeholderCriterion(
   };
 }
 
-export function computeBugRateCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Substrate-bug discovery rate',
-    0,
-    0.02,
-    completedPipelineRuns,
-  );
+function bugRateStatus(rate: number): FlywheelStatsCriterion['status'] {
+  if (rate < 0.02) return 'green';
+  if (rate <= 0.05) return 'yellow';
+  return 'red';
 }
 
-function substrateBugsInFiledWindow<T extends Criterion2SubstrateBug>(
+export function computeCriterion1(
+  completedPipelineRuns: number,
+  bugs: readonly Criterion1SubstrateBug[],
+  since: string,
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  const agentFiledBugCount = substrateBugsInFiledWindow(bugs, since, until)
+    .filter((bug) => bug.filedBy === 'agent').length;
+  const rate = completedPipelineRuns === 0 ? 0 : agentFiledBugCount / completedPipelineRuns;
+
+  return {
+    label: 'Substrate-bug discovery rate',
+    value: rate,
+    target: 0.02,
+    status: completedPipelineRuns === 0 ? 'insufficient_data' : bugRateStatus(rate),
+    sampleSize: completedPipelineRuns,
+    dataSufficient: completedPipelineRuns > 0,
+  };
+}
+
+export function computeBugRateCriterion(
+  completedPipelineRuns: number,
+  bugs: readonly Criterion1SubstrateBug[] = [],
+  since = '1970-01-01T00:00:00.000Z',
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Substrate-bug discovery rate',
+      0,
+      0.02,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion1(completedPipelineRuns, bugs, since, until);
+}
+
+function substrateBugsInFiledWindow<T extends FiledSubstrateBug>(
   bugs: readonly T[],
   since: string,
   until: string,
