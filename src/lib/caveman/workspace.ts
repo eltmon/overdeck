@@ -193,7 +193,7 @@ process.stdin.on('end', async () => {
         sessionId: input.session_id || input.sessionId || '',
         agentId: input.agent_id || input.agentId,
         identity: input.identity,
-      }, 1000);
+      }, 1800);
       const json = await response.json().catch(() => null);
       if (json && json.ok === true && typeof json.context === 'string' && json.context.length > 0) {
         process.stdout.write(json.context + '\\n');

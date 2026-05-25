@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
-import { handleMemoryInjectBody } from '../../../src/dashboard/server/routes/hooks.js';
+import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../src/dashboard/server/routes/hooks.js';
 import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
 
 let tempDir: string | null = null;
@@ -117,9 +117,10 @@ async function readRagEntries() {
 }
 
 describe('prompt-time memory injection', () => {
-  it('accepts hook receiver input and returns promptly without blocking the agent', async () => {
+  it('accepts hook receiver input and returns prompt-time context', async () => {
     const started = performance.now();
     const calls: Array<{ prompt: string; identity: MemoryIdentity }> = [];
+    const briefingCalls: Array<{ sessionId: string; context: string }> = [];
     const result = await handleMemoryInjectBody({
       prompt: 'Need memory context for receiver test',
       sessionId: 'session-1',
@@ -129,13 +130,34 @@ describe('prompt-time memory injection', () => {
         calls.push(input);
         return { status: 'injected', reason: null, context: '<panopticon-memory-context>ok</panopticon-memory-context>', decision: {} as never };
       },
+      injectBriefing: async (input) => {
+        briefingCalls.push({ sessionId: input.sessionId, context: input.context });
+        return { context: `${input.context}\n<panopticon-briefing-update>briefing</panopticon-briefing-update>`, injected: true, briefingMtimeMs: 1 };
+      },
     });
     const elapsed = performance.now() - started;
 
     expect('error' in result).toBe(false);
     expect(elapsed).toBeLessThan(1000);
     expect(result.context).toContain('<panopticon-memory-context>');
+    expect(result.context).toContain('<panopticon-briefing-update>briefing</panopticon-briefing-update>');
     expect(calls).toEqual([{ prompt: 'Need memory context for receiver test', identity }]);
+    expect(briefingCalls).toEqual([{ sessionId: 'session-1', context: '<panopticon-memory-context>ok</panopticon-memory-context>' }]);
+  });
+
+  it('records briefing freshness on SessionStart even when memory observations are disabled', async () => {
+    const recordBriefingSessionStart = vi.fn(async () => {});
+
+    const result = await handleMemorySessionStartBody({
+      session_id: 'session-1',
+      transcript_path: '/tmp/session-1.jsonl',
+    }, {
+      areObservationsEnabled: async () => false,
+      recordBriefingSessionStart,
+    });
+
+    expect(result).toEqual({ status: 'disabled' });
+    expect(recordBriefingSessionStart).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
   it('returns injectable context within budgets and logs the RAG decision', async () => {
