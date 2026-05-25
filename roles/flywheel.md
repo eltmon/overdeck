@@ -92,11 +92,15 @@ Allowed for launching work:
 - `pan plan <id> --auto` to start a planning agent on a high-priority unstarted issue (preferred — produces a full vBRIEF, then auto-promotes to a work agent).
 - `pan start <id> --auto` for trivial issues where planning is overkill (typos, version bumps, single-line fixes).
 
+Allowed when `require_uat_before_merge=false`:
+
+- `POST /api/flywheel/auto-merge/schedule` schedules eligible auto-merges through the server-managed, operator-cancellable cooldown.
+
 Never:
 
 - Run `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
 - Edit feature branches directly or commit code fixes from this role.
-- Merge PRs directly or auto-merge a PR without human UAT and merge approval.
+- Merge PRs directly. Auto-merge is permitted only when the brief shows `Require UAT before merge: false`; schedule it via `POST /api/flywheel/auto-merge/schedule` and never invoke `gh pr merge` yourself.
 - Deep-wipe without explicit user approval.
 - Delete Claude JSONL session files.
 - Skip hooks or use `--no-verify`.

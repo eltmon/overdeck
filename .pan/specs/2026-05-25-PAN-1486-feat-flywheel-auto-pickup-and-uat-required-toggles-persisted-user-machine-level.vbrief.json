@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:45:21.974Z"
+    "updated": "2026-05-25T09:46:47.974Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:45:21.974Z",
+    "updated": "2026-05-25T09:46:47.974Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -257,7 +257,7 @@
       {
         "id": "b04-role-prompt-forbidden-conditional",
         "title": "Update roles/flywheel.md forbidden list to gate merge action on require_uat_before_merge",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -273,36 +273,41 @@
           {
             "id": "b04.ac1",
             "title": "Forbidden bullet is rewritten as a conditional and references both the brief config line and the schedule endpoint by name.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac2",
             "title": "The orchestrator is still forbidden from invoking gh pr merge directly under any setting; only the schedule endpoint is allowed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac3",
             "title": "An 'Allowed' subsection names the new schedule endpoint and clarifies that the operator-cancellable cooldown is server-managed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac4",
             "title": "No other section of roles/flywheel.md is changed by this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:46:47.974Z"
       },
       {
         "id": "b05-config-http-routes",
