@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion2,
   computeCriterion3,
   computeCriterion4,
   computeCriterion5,
@@ -60,14 +61,20 @@ function criterion6Value(criterion: ReturnType<typeof computeCriterion6>) {
   return criterion.value as Record<'simple' | 'medium' | 'complex', Criterion6BucketValue>;
 }
 
-function criterion4Bug(issueId: string, filedAt: string, fixMergedAt: string | null, status: 'open' | 'fixed' = 'fixed') {
+function criterion4Bug(
+  issueId: string,
+  filedAt: string,
+  fixMergedAt: string | null,
+  status: 'open' | 'fixed' = 'fixed',
+  severity = 'P2',
+) {
   return {
     issueId,
     filedAt,
     runId: null,
     filedBy: 'agent' as const,
     discoveredInIssueId: null,
-    severity: 'P2',
+    severity,
     status,
     fixMergedAt,
     fixCommitSha: fixMergedAt ? 'abc123' : null,
@@ -198,6 +205,31 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('computes criterion 2 as P0 substrate bugs filed in the window', () => {
+    const criterion = computeCriterion2([
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', null, 'open', 'P0'),
+      criterion4Bug('PAN-2', '2026-05-02T00:00:00.000Z', null, 'open', 'P1'),
+      criterion4Bug('PAN-3', '2026-04-30T23:59:59.999Z', null, 'open', 'P0'),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toBe(1);
+    expect(criterion.target).toBe(0);
+    expect(criterion.status).toBe('red');
+    expect(criterion.sampleSize).toBe(2);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it('marks criterion 2 green when no P0 substrate bugs were filed in the window', () => {
+    const criterion = computeCriterion2([
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', null, 'open', 'P1'),
+      criterion4Bug('PAN-2', '2026-05-02T00:00:00.000Z', null, 'open', 'P2'),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toBe(0);
+    expect(criterion.target).toBe(0);
+    expect(criterion.status).toBe('green');
   });
 
   it('computes criterion 3 from substrate-attributable failures over all verification attempts', () => {

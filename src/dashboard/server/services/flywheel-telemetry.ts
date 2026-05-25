@@ -6,6 +6,11 @@ export interface FlywheelStatsOptions {
   completedPipelineRuns?: number;
 }
 
+export interface Criterion2SubstrateBug {
+  filedAt: string;
+  severity: string;
+}
+
 export interface Criterion4SubstrateBug {
   filedAt: string;
   status: 'open' | 'fixed';
@@ -84,13 +89,53 @@ export function computeBugRateCriterion(completedPipelineRuns: number): Flywheel
   );
 }
 
-export function computeP0BugsCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Critical/P0 substrate bugs',
-    0,
-    0,
-    completedPipelineRuns,
-  );
+function substrateBugsInFiledWindow<T extends Criterion2SubstrateBug>(
+  bugs: readonly T[],
+  since: string,
+  until: string,
+): T[] {
+  const sinceMs = Date.parse(since);
+  const untilMs = Date.parse(until);
+  return bugs.filter((bug) => {
+    const filedAtMs = Date.parse(bug.filedAt);
+    return Number.isFinite(filedAtMs) && filedAtMs >= sinceMs && filedAtMs <= untilMs;
+  });
+}
+
+export function computeCriterion2(
+  bugs: readonly Criterion2SubstrateBug[],
+  since: string,
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  const windowBugs = substrateBugsInFiledWindow(bugs, since, until);
+  const p0Count = windowBugs.filter((bug) => bug.severity === 'P0').length;
+
+  return {
+    label: 'Critical/P0 substrate bugs',
+    value: p0Count,
+    target: 0,
+    status: p0Count === 0 ? 'green' : 'red',
+    sampleSize: windowBugs.length,
+    dataSufficient: true,
+  };
+}
+
+export function computeP0BugsCriterion(
+  completedPipelineRuns: number,
+  bugs: readonly Criterion2SubstrateBug[] = [],
+  since = '1970-01-01T00:00:00.000Z',
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Critical/P0 substrate bugs',
+      0,
+      0,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion2(bugs, since, until);
 }
 
 function passRateStatus(rate: number): FlywheelStatsCriterion['status'] {
