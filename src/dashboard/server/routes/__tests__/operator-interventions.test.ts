@@ -14,6 +14,7 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentState: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
+  messageAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -65,6 +66,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentState: agentMocks.saveAgentState,
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
+    messageAgent: agentMocks.messageAgent,
   };
 });
 
@@ -192,6 +194,7 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
+    agentMocks.messageAgent.mockResolvedValue(undefined);
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
     tmuxMocks.killSession.mockReturnValue(Effect.succeed(undefined));
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
@@ -242,6 +245,15 @@ describe('operator.intervention dashboard routes', () => {
 
     expect(response.status).toBe(404);
     expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
+  });
+
+  it('sends dashboard messages with the user-message caller source', async () => {
+    const { response } = await requestAgents('/api/agents/agent-pan-1/message', {
+      body: JSON.stringify({ message: 'please continue' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-1', 'please continue', 'dashboard:user-message');
   });
 
   it('emits deep_wipe from the successful dashboard deep-wipe route', async () => {

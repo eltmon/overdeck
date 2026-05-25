@@ -47,6 +47,7 @@ import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelId
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
 import { getFlywheelActiveRunId } from './database/app-settings.js';
+import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -3311,7 +3312,25 @@ function queueAgentMail(agentId: string, message: string): void {
   );
 }
 
-export async function messageAgent(agentId: string, message: string): Promise<void> {
+const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
+
+async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
+  if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
+
+  const agentState = getAgentStateSync(normalizedId);
+  if (!agentState?.issueId) {
+    console.debug(`[agents] Skipping tell intervention for ${normalizedId}; state.json has no issueId`);
+    return;
+  }
+
+  await appendOperatorInterventionEvent({
+    issueId: agentState.issueId,
+    kind: 'tell',
+    source: caller,
+  });
+}
+
+export async function messageAgent(agentId: string, message: string, caller = 'internal'): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
   const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
@@ -3334,6 +3353,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       throw new Error(`Agent resumed but ready signal did not fire — message not delivered. Feedback is in the mail queue.`);
     }
     // Message already sent during resume
+    await appendTellInterventionForUserSource(normalizedId, caller);
     return;
   }
 
@@ -3359,6 +3379,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     queueAgentMail(normalizedId, message);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
+      await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
       return;
     }
@@ -3449,6 +3470,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
       await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+      await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -3466,6 +3488,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 
     // Also save to mail queue for persistence
     queueAgentMail(normalizedId, message);
+    await appendTellInterventionForUserSource(normalizedId, caller);
     return;
   }
 
@@ -3486,6 +3509,9 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
     const resumeResult = await resumeAgent(normalizedId, message);
     if (resumeResult.success) {
+      if (resumeResult.messageDelivered !== false) {
+        await appendTellInterventionForUserSource(normalizedId, caller);
+      }
       return;
     }
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
@@ -3499,10 +3525,11 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   }
 
   const deliveryMethod = agentState?.deliveryMethod;
-  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
+  await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
   // Also save to mail queue
   queueAgentMail(normalizedId, message);
+  await appendTellInterventionForUserSource(normalizedId, caller);
 }
 
 /**

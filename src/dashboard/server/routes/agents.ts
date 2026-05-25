@@ -1018,26 +1018,16 @@ async function sendAgentMessage(id: string, message: string) {
   const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
   const remoteStateFile = join(agentStateDir, 'remote-state.json');
   let isRemote = false;
-  let vmName = '';
 
   if (existsSync(remoteStateFile)) {
     try {
       const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-      if (state.location === 'remote' && state.vmName) {
-        isRemote = true;
-        vmName = state.vmName;
-      }
+      isRemote = state.location === 'remote' && Boolean(state.vmName);
     } catch {}
   }
 
-  if (isRemote && vmName) {
-    const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
-    await sendToRemoteAgent(id, vmName, message);
-    return { success: true, remote: true };
-  }
-
-  await messageAgent(id, message);
-  return { success: true };
+  await messageAgent(id, message, 'dashboard:user-message');
+  return isRemote ? { success: true, remote: true } : { success: true };
 }
 
 export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
