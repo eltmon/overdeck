@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T22:58:48.334Z"
+    "updated": "2026-05-25T23:01:13.898Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 4,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T22:58:48.334Z",
+    "updated": "2026-05-25T23:01:13.898Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -154,7 +154,7 @@
       {
         "id": "b3-settings-api-validation",
         "title": "Widen effort validation and matching test in src/lib/settings-api.ts and its test file",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:25:39Z",
         "metadata": {
@@ -169,7 +169,7 @@
           {
             "id": "b3-settings-api-validation.ac1",
             "title": "validateSettings accepts roles.flywheel.effort = 'xhigh' and 'max' with zero errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "b3-settings-api-validation.ac2",
             "title": "validateSettings still rejects an unrecognized value (e.g. 'extreme') with an error message that lists all five accepted tiers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "b3-settings-api-validation.ac3",
             "title": "settings-api.test.ts existing failing-path assertion is updated to match the new error string; the test file passes under `npm test -- settings-api`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
