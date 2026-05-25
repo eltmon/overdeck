@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-1455",
+  "created": "2026-05-25T08:20:28.118Z",
+  "updated": "2026-05-25T08:22:12.000Z",
+  "gitState": { "branch": "feature/pan-1455", "sha": "bfc0c1bc8", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Stick with log-tail detection (option b from the issue). Do NOT probe CLIProxy with HTTP (option a) and do NOT add a CLIProxy → dashboard push path (option c).",
+      "recordedAt": "2026-05-25T08:22:12.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Broaden the burn-line matcher in applyBurnedTokenOverride to detect BOTH 'refresh token has already been used' (existing, PAN-913 phrasing) AND 'refresh_token_reused' (the literal code-field shape documented in this issue). Never remove the original phrasing — only add.",
+      "recordedAt": "2026-05-25T08:22:12.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Adapt the issue's acceptance criterion AC3 from 'mock CLIProxy returning 401' to 'mock the log tail containing refresh_token_reused' so the test exercises the actual code path that exists.",
+      "recordedAt": "2026-05-25T08:22:12.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Place backend tests at src/lib/__tests__/codex-auth.test.ts and src/dashboard/server/routes/__tests__/codex-auth.test.ts, following the project's existing __tests__/ co-located vitest convention.",
+      "recordedAt": "2026-05-25T08:22:12.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "CodexAuthBanner already renders for status 'burned' (src/dashboard/frontend/src/components/CodexAuthBanner.tsx:13). No frontend change is required — fixing the matcher is sufficient to satisfy AC2.",
+      "recordedAt": "2026-05-25T08:22:12.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PAN-913's original case ('refresh token has already been used') MUST continue to be detected. A regression here re-opens PAN-913.",
+      "mitigation": "Keep the existing literal in the matcher. Add 'refresh_token_reused' as an additional disjunct. The lib test covers BOTH phrasings as separate cases."
+    },
+    {
+      "id": "H2",
+      "summary": "OpenAI's error-text format could change again, leaving us back where this issue started.",
+      "mitigation": "Add a comment immediately above the matcher documenting the two known phrasings and the issues that introduced each (PAN-913 and PAN-1455). Tests pin the exact literals so any future regression is loud."
+    },
+    {
+      "id": "H3",
+      "summary": "The 'burn + later success' suppression at lines 163-173 must still work after the change — a successful /v1/messages 200 line AFTER either burn phrasing should still suppress the burned override.",
+      "mitigation": "Lib test must include a case where a 'refresh_token_reused' burn line is followed by a 200 success on /v1/messages and assert status === 'valid' (not 'burned')."
+    },
+    {
+      "id": "H4",
+      "summary": "The route test should not depend on the real ~/.panopticon/cliproxy/cliproxy.log of the host running CI/tests.",
+      "mitigation": "Override getCliproxyLogPath / getCliproxyAuthDir via env vars or vitest module mocks so the test points at a temp directory with a fixture log and credentials file."
+    },
+    {
+      "id": "H5",
+      "summary": "The 60-minute burn-staleness window (BURN_STALENESS_MS) means a fixture with a stale timestamp will be suppressed. Test fixtures must use a timestamp inside the staleness window.",
+      "mitigation": "Generate fixture log lines with timestamps based on Date.now() at test time, OR vi.setSystemTime so a hard-coded timestamp is fresh."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T08:20:28.118Z",
+      "reason": "planning",
+      "note": "Initial planning session started for PAN-1455",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-25T08:22:12.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning complete: confirmed audit findings, chose log-tail matcher widening over HTTP-probe or push-event approaches, decomposed into 3 beads (matcher fix, lib test, route test).",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
