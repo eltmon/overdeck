@@ -1,0 +1,108 @@
+{
+  "version": "1",
+  "issueId": "PAN-1450",
+  "created": "2026-05-25T16:22:30.822Z",
+  "updated": "2026-05-25T16:30:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1450",
+    "sha": "102089513",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Substrate check goes in the requirements-reviewer role prompt (roles/review-requirements.md), NOT in close-out. Add a per-AC heuristic: if the AC text mentions 'test' / 'regression test' / 'unit test' AND the PR diff contains no new or modified *.test.ts files for the relevant subsystem, classify the AC as in_pr_scope Missing and emit ! (blocking).",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "PAN-1111 fix: ADD a real-corruption integration test (tests/integration/beads-real-corruption.test.ts) using the real bd binary against a tmp workspace. Leave the existing mocked test in place — it covers the wrapper's retry orchestration, which the integration test does not. Both tests serve different purposes.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "PAN-1173 follow-through is ONE bead, not nine. The change (call resolveBareNumericIdSync first, before resolveIssueIdSync / resolveProjectFromIssueSync) is mechanically identical across kill/pause/unpause/untroubled/reopen/close/inspect/open/review-restart. Sub-items track per-command coverage; one shared test file exercises bare-numeric acceptance per command.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Export classifyAgentKind from src/dashboard/server/services/system-health-service.ts so it can be unit-tested directly. Currently a local helper; exporting is an additive, zero-risk change required to satisfy PAN-1257's promised per-role unit test.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "PAN-1257 audit bead has no required code deliverable. The audit either (a) confirms specialist writers populate role and the bead closes with a verification note, or (b) finds a gap and files a separate follow-up issue. No silent code changes — any fix is its own issue.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "PAN-1256 grace-window test uses fake timers (vi.useFakeTimers + Date.now stubbing). Real wall-clock would require waiting 120 seconds, which is the exact OOM-inducing antipattern the fake-timers-for-retry-tests rule prohibits. If recoverOrphanedAgents proves too heavy to mock cleanly, extract a pure helper isStartingWithinGrace(state, now, graceMs) into a new file and test that.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Test file locations follow existing conventions: src/**/__tests__/*.test.ts for src-co-located unit tests, tests/lib/ for lib-level tests, tests/integration/ for tests that touch real binaries (bd). The PAN-1111 real-corruption test is integration-only because it needs the real bd binary.",
+      "recordedAt": "2026-05-25T16:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PAN-1111 real-corruption integration test requires the bd binary on PATH. CI runners may not have bd installed.",
+      "mitigation": "Guard the test with `test.skipIf(!commandExistsSync('bd'))` and a clear console message. Document in the test file that this test is intentionally environment-conditional. Local devs have bd; CI gains coverage when bd is installed, never errors when absent."
+    },
+    {
+      "id": "H2",
+      "summary": "PAN-1256 test must not use real wall-clock waits (WORK_LAUNCHER_GRACE_MS is 120_000 ms = 120 seconds). Real waits would violate the fake-timers-for-retry-tests rule and OOM the suite under parallel forks.",
+      "mitigation": "Use vi.useFakeTimers() and vi.setSystemTime() to control Date.now(). Stub state.startedAt to a known ISO timestamp and advance/rewind system time to cross the grace boundary."
+    },
+    {
+      "id": "H3",
+      "summary": "recoverOrphanedAgents() has a heavy mock surface (filesystem, tmux session checks, Effect-wrapped state writes, Effect-wrapped tmux ops). Direct unit testing may be more pain than value.",
+      "mitigation": "If recoverOrphanedAgents end-to-end mocking gets unwieldy, extract the grace-window decision into a pure helper (isStartingWithinGrace) in a new file. Test the helper directly. Add a thin integration-style smoke test that exercises the surrounding shell with mocked fs/tmux."
+    },
+    {
+      "id": "H4",
+      "summary": "PAN-1168 probe test uses fetch + AbortController + setTimeout. Naive tests can leak timers and break parallel runs.",
+      "mitigation": "Follow the fake-timers-for-retry-tests rule: vi.useFakeTimers() in beforeEach, vi.useRealTimers() in afterEach. Mock global.fetch and assert URL/method directly. Do NOT spin up a real HTTP server."
+    },
+    {
+      "id": "H5",
+      "summary": "classifyAgentKind currently returns 'specialist' for role: null (because null !== undefined). Live state.json files reportedly have role: null for many agents. Adding the test will expose this — work agents could be misclassified.",
+      "mitigation": "The audit bead (PAN-1257 follow-through) is the right home for diagnosing this. Document the actual production behavior in the test (don't paper over it). If null misclassification is real, file a separate issue. Keep this test honest about what classifyAgentKind does, not what we wish it did."
+    },
+    {
+      "id": "H6",
+      "summary": "PAN-1175 swarm test file is already 1786 lines. Adding more tests inflates it further. Risk of becoming unwieldy.",
+      "mitigation": "Add the resolveParentFeatureBranch tests as a focused describe() block at the bottom of the existing file. Don't introduce a new test file (splitting the swarm test suite is its own issue). Keep the new tests tight: 3-4 cases max."
+    },
+    {
+      "id": "H7",
+      "summary": "Applying resolveBareNumericIdSync to 9 commands changes their error semantics: bare-numeric inputs that previously failed at resolveProjectFromIssueSync (Unknown project) will now resolve via local agent state. A bare number with NO matching agent dir would return null and the caller must handle it.",
+      "mitigation": "Each command must guard the resolveBareNumericIdSync(id) === null case and emit a clear error: 'Could not resolve issue ID `<input>`'. Mirror the existing pattern in src/cli/commands/show.ts:55-62. Each per-command test asserts this guard."
+    },
+    {
+      "id": "H8",
+      "summary": "The PAN-1173 follow-through bead changes the public CLI surface (each affected command starts accepting bare numbers). This is additive — fully-prefixed input still works identically — but could confuse users who type a bare number expecting a project-specific match.",
+      "mitigation": "The resolveBareNumericIdSync algorithm is already deterministic: zero matches → null; multiple matches → null; single match → that ID. Multi-match returns null with the same 'Could not resolve' error. Users get the same outcome as today (failure with a clear message) when ambiguity exists; the new behavior only kicks in for the single-match success case."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<!-- panopticon:orchestration-context-start -->\n<!-- Planning template body elided; see original entry for full prompt -->\n<!-- panopticon:orchestration-context-end -->\n",
+      "note": "Planning session started for PAN-1450: Audit: 6+ recent fixes shipped without the regression tests their AC promised",
+      "timestamp": "2026-05-25T16:22:30.822Z"
+    },
+    {
+      "timestamp": "2026-05-25T16:30:00.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete. Plan covers 10 beads: 7 regression-test beads (PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111), 1 resolveBareNumericIdSync rollout across 9 commands, 1 substrate check in roles/review-requirements.md, 1 audit of state.json role population. No edges (independent beads). Chose requirements-reviewer prompt for substrate check (vs close-out); see D1.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
