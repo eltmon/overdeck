@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Eye, LayoutGrid, Bot, Server,
+  Eye, Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, History, Mic,
@@ -77,6 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
+      { id: 'home' as Tab, label: 'Home', icon: Home },
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
@@ -254,9 +255,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-border">
           {!collapsed && (
             <button
-              onClick={() => onTabChange('pipeline')}
+              onClick={() => onTabChange('home')}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
-              title="Go to Pipeline"
+              title="Go to Home"
             >
               <Eye className="w-5 h-5 text-primary shrink-0" />
               {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
@@ -270,9 +271,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
           )}
           {collapsed && (
             <button
-              onClick={() => onTabChange('pipeline')}
+              onClick={() => onTabChange('home')}
               className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
-              title="Go to Pipeline"
+              title="Go to Home"
             >
               <Eye className="w-5 h-5 text-primary" />
             </button>

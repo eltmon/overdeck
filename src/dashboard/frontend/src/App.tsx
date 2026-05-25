@@ -17,6 +17,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { PipelineView } from './components/Pipeline/PipelineView';
+import { HomePage } from './components/HomePage';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
@@ -64,7 +65,8 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
-  pipeline: '/',
+  home: '/',
+  pipeline: '/pipeline',
   kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
@@ -86,7 +88,6 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ...Object.fromEntries(
     Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
   ) as Record<string, Tab>,
-  '/pipeline': 'pipeline',
 };
 
 export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarOpen';
@@ -94,7 +95,7 @@ export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedS
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'pipeline';
+  return PATH_TO_TAB[path] || 'home';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
@@ -896,6 +897,11 @@ export default function App() {
               />
             </div>
           )}
+        {activeTab === 'home' && (
+          <div className="w-full h-full overflow-hidden">
+            <HomePage />
+          </div>
+        )}
         {activeTab === 'pipeline' && (
           <BootstrapGate fallback={<PipelineSkeleton />}>
             <div className="w-full h-full overflow-hidden">

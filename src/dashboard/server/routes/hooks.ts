@@ -25,6 +25,7 @@ import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
@@ -74,6 +75,7 @@ export interface HandleMemorySessionStartBodyOptions {
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  recordBriefingSessionStart?: typeof recordBriefingSessionStart;
 }
 
 export type HandleMemoryTurnBodyResult =
@@ -156,7 +158,6 @@ export async function handleMemorySessionStartBody(
   options: HandleMemorySessionStartBodyOptions = {},
 ): Promise<HandleMemorySessionStartBodyResult> {
   if (isSubagentHookPayload(body)) return { status: 'subagent' };
-  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const payloadResult = Schema.decodeUnknownResult(MemorySessionStartHookPayload)(body);
   if (payloadResult._tag === 'Failure') {
@@ -169,6 +170,9 @@ export async function handleMemorySessionStartBody(
   if (!sessionId || !transcriptPath) {
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
+
+  await (options.recordBriefingSessionStart ?? recordBriefingSessionStart)({ sessionId }).catch(() => {});
+  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const trustedTranscriptPath = options.resolveTranscriptPath
     ? await options.resolveTranscriptPath(body, sessionId)
@@ -201,6 +205,7 @@ export async function handleMemorySessionStartBody(
 
 export interface HandleMemoryInjectBodyOptions {
   injectMemory?: typeof injectPromptTimeMemory;
+  injectBriefing?: typeof appendFreshBriefingUpdate;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
 }
 
@@ -229,7 +234,9 @@ export async function handleMemoryInjectBody(
     return { error: 'memory identity could not be resolved', status: 202 } as const;
   }
 
-  return await (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity });
+  const result = await (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity });
+  const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)({ sessionId, context: result.context });
+  return { ...result, context: briefing.context };
 }
 
 const postMemoryInjectRoute = HttpRouter.add(
@@ -248,13 +255,11 @@ const postMemoryInjectRoute = HttpRouter.add(
     }
 
     const readModel = yield* ReadModelService;
-    // Fire-and-forget: prompt-time injection can exceed the 1 s client hook
-    // timeout (query expansion + FTS search). Return 202 immediately so the
-    // hook client doesn't abort and waste the in-flight LLM call.
-    void Effect.runPromise(Effect.promise(() => handleMemoryInjectBody(body, {
+    const result = yield* Effect.promise(() => handleMemoryInjectBody(body, {
       resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
-    })));
-    return jsonResponse({ ok: true }, { status: 202 });
+    }));
+    if ('error' in result) return jsonResponse({ ok: false, error: result.error }, { status: result.status });
+    return jsonResponse({ ok: true, ...result });
   })),
 );
 
