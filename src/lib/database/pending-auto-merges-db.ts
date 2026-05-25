@@ -89,10 +89,15 @@ function runDb<T>(operation: string, fn: () => T): T {
   );
 }
 
-export function scheduleAutoMerge(input: ScheduleAutoMergeInput): PendingAutoMerge {
-  return runDb('scheduleAutoMerge', () => {
+export interface ScheduleAutoMergeResult {
+  entry: PendingAutoMerge;
+  created: boolean;
+}
+
+export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): ScheduleAutoMergeResult {
+  return runDb('scheduleAutoMergeWithResult', () => {
     const existing = selectActiveByIssue(input.issueId);
-    if (existing) return existing;
+    if (existing) return { entry: existing, created: false };
 
     const db = getDatabase();
     const scheduledAt = input.scheduledAt ?? new Date().toISOString();
@@ -102,13 +107,17 @@ export function scheduleAutoMerge(input: ScheduleAutoMergeInput): PendingAutoMer
           issueId, prUrl, prNumber, projectKey, "status", scheduledMergeAt, scheduledAt
         ) VALUES (?, ?, ?, ?, 'pending', ?, ?)
       `).run(input.issueId, input.prUrl, input.prNumber ?? null, input.projectKey, input.scheduledMergeAt, scheduledAt);
-      return selectById(Number(result.lastInsertRowid))!;
+      return { entry: selectById(Number(result.lastInsertRowid))!, created: true };
     } catch (error) {
       const raced = selectActiveByIssue(input.issueId);
-      if (raced) return raced;
+      if (raced) return { entry: raced, created: false };
       throw error;
     }
   });
+}
+
+export function scheduleAutoMerge(input: ScheduleAutoMergeInput): PendingAutoMerge {
+  return scheduleAutoMergeWithResult(input).entry;
 }
 
 export function getPendingAutoMerge(issueId: string): PendingAutoMerge | null {

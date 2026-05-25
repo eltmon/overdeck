@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:53:51.151Z"
+    "updated": "2026-05-25T10:09:46.528Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:53:51.151Z",
+    "updated": "2026-05-25T10:09:46.528Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -697,7 +697,7 @@
       {
         "id": "b10-auto-merge-scanner",
         "title": "Add POST /api/flywheel/auto-merge/schedule + scanner that enqueues with cooldown and TTS",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -719,7 +719,7 @@
           {
             "id": "b10.ac1",
             "title": "AUTO_MERGE_COOLDOWN_MS = 300_000 exported from src/lib/cloister/auto-merge-config.ts; not duplicated elsewhere.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -727,7 +727,7 @@
           {
             "id": "b10.ac2",
             "title": "POST /api/flywheel/auto-merge/schedule with valid {issueId} when require_uat_before_merge=false, flywheel running, and PR eligible: returns 200 with the persisted entry containing scheduledMergeAt = now + 300s (±2s tolerance for test wall-clock).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -735,7 +735,7 @@
           {
             "id": "b10.ac3",
             "title": "POST when require_uat_before_merge=true returns 412 with a body explaining UAT is still required.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -743,7 +743,7 @@
           {
             "id": "b10.ac4",
             "title": "POST when flywheel paused returns 423 (Locked) with a body explaining the flywheel is paused.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -751,7 +751,7 @@
           {
             "id": "b10.ac5",
             "title": "POST when isAutoMergeEligible returns {eligible:false} returns 422 with the eligibility reason verbatim in the body.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -759,7 +759,7 @@
           {
             "id": "b10.ac6",
             "title": "POST is origin-validated; missing/wrong origin returns 403.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -767,7 +767,7 @@
           {
             "id": "b10.ac7",
             "title": "TTS announcement fires exactly once per (issueId, 'scheduled') transition; duplicate schedule calls return 200 with the existing entry and do NOT re-announce.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -775,7 +775,7 @@
           {
             "id": "b10.ac8",
             "title": "GET /api/flywheel/auto-merge/pending returns the active list sorted by scheduledMergeAt ascending; entries include {id, issueId, scheduledMergeAt, scheduledAt, status, prNumber, prUrl}.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -783,7 +783,7 @@
           {
             "id": "b10.ac9",
             "title": "Vitest route tests cover each branch above; TTS announcement is mocked and asserted exactly-once.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1235,7 +1235,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1486",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T10:09:46.505Z",
+        "work": {
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T10:09:46.505Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T10:09:46.505Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"

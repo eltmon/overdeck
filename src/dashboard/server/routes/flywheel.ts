@@ -5,12 +5,14 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
+import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
   isFlywheelRunId,
   listFlywheelRuns,
+  resolveLiveFlywheelRunId,
   writeLatestFlywheelStatus,
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
@@ -29,10 +31,22 @@ import {
 import { readFlywheelState } from '../services/flywheel-state.js';
 import {
   isFlywheelAutoPickupBacklog,
+  isFlywheelGloballyPaused,
   isFlywheelRequireUatBeforeMerge,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
 } from '../../../lib/database/app-settings.js';
+import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
+import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
+import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
+import {
+  listPendingAutoMerges,
+  scheduleAutoMergeWithResult,
+  type PendingAutoMerge,
+  type ScheduleAutoMergeInput,
+  type ScheduleAutoMergeResult,
+} from '../../../lib/database/pending-auto-merges-db.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -54,6 +68,10 @@ interface FlywheelConfigRequestBody {
 interface FlywheelConfigResponseBody {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
+}
+
+interface AutoMergeScheduleRequestBody {
+  issueId?: unknown;
 }
 
 interface ReportOpenRequestBody {
@@ -208,6 +226,91 @@ export async function postFlywheelConfigPayload(payload: unknown) {
   return { status: 200, body: getFlywheelConfigPayload() };
 }
 
+interface AutoMergeScheduleDeps {
+  now?: () => Date;
+  isRequireUatBeforeMerge?: () => boolean;
+  isFlywheelPaused?: () => boolean;
+  resolveLiveRunId?: () => Promise<string | null>;
+  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  getReviewStatus?: (issueId: string) => ReviewStatus | null;
+  resolveProject?: (issueId: string) => ResolvedProject | null;
+  schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
+  announce?: (issueId: string, entry: PendingAutoMerge) => void;
+}
+
+function parsePrNumber(prUrl: string | undefined): number | undefined {
+  const match = prUrl?.match(/\/pull\/(\d+)(?:$|[/?#])/);
+  return match ? Number.parseInt(match[1], 10) : undefined;
+}
+
+function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
+  emitActivityTtsSync({
+    utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-scheduled',
+  });
+}
+
+export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoMergeScheduleDeps = {}) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+
+  const body = payload as AutoMergeScheduleRequestBody;
+  if (typeof body.issueId !== 'string' || body.issueId.trim().length === 0) {
+    return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+  }
+  const issueId = body.issueId.trim().toUpperCase();
+
+  if ((deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
+    return { status: 412, body: { error: 'UAT is still required before merge' } };
+  }
+  if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {
+    return { status: 423, body: { error: 'Flywheel is paused' } };
+  }
+  if (!await (deps.resolveLiveRunId ?? resolveLiveFlywheelRunId)()) {
+    return { status: 412, body: { error: 'Flywheel is not running' } };
+  }
+
+  const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
+  if (!eligibility.eligible) {
+    return { status: 422, body: { error: eligibility.reason } };
+  }
+
+  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
+  if (!reviewStatus?.prUrl) {
+    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
+  }
+  const prNumber = parsePrNumber(reviewStatus.prUrl);
+  if (prNumber === undefined) {
+    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
+  }
+
+  const project = (deps.resolveProject ?? resolveProjectFromIssueSync)(issueId);
+  if (!project) return { status: 422, body: { error: `Unknown project for issue ${issueId}` } };
+
+  const scheduledAt = (deps.now ?? (() => new Date()))();
+  const scheduledMergeAt = new Date(scheduledAt.getTime() + AUTO_MERGE_COOLDOWN_MS);
+  const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
+    issueId,
+    prUrl: reviewStatus.prUrl,
+    prNumber,
+    projectKey: project.projectKey,
+    scheduledMergeAt: scheduledMergeAt.toISOString(),
+    scheduledAt: scheduledAt.toISOString(),
+  });
+  if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
+  return { status: 200, body: result.entry };
+}
+
+export function getPendingAutoMergePayload(): PendingAutoMerge[] {
+  return listPendingAutoMerges()
+    .filter((entry) => entry.status === 'pending' || entry.status === 'merging')
+    .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id);
+}
+
 export async function getFlywheelCurrentPayload() {
   return readCurrentFlywheelStatusForDashboard();
 }
@@ -333,6 +436,30 @@ const postFlywheelConfigRoute = HttpRouter.add(
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
 
     const result = yield* Effect.promise(() => postFlywheelConfigPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getPendingAutoMergeRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/auto-merge/pending',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getPendingAutoMergePayload());
+  })),
+);
+
+const postAutoMergeScheduleRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/auto-merge/schedule',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+
+    const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -559,6 +686,8 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelCurrentRoute,
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
+  getPendingAutoMergeRoute,
+  postAutoMergeScheduleRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

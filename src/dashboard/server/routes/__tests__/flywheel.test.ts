@@ -4,13 +4,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
   flywheelRouteLayer,
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  getPendingAutoMergePayload,
+  postAutoMergeSchedulePayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -22,6 +24,8 @@ import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLa
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
 import { resetDatabase } from '../../../../lib/database/index.js';
 import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
+import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
+import { scheduleAutoMerge } from '../../../../lib/database/pending-auto-merges-db.js';
 
 interface RouteResult {
   status: number;
@@ -172,6 +176,119 @@ describe('flywheel config routes', () => {
       headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
       body: JSON.stringify({ auto_pickup_backlog: 'yes' }),
     })).resolves.toEqual({ status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } });
+  });
+});
+
+describe('flywheel auto-merge routes', () => {
+  let panopticonHome: string;
+
+  const eligibleDeps = (overrides: Parameters<typeof postAutoMergeSchedulePayload>[1] = {}) => ({
+    isRequireUatBeforeMerge: () => false,
+    isFlywheelPaused: () => false,
+    resolveLiveRunId: async () => 'RUN-7',
+    isEligible: async () => ({ eligible: true as const }),
+    getReviewStatus: () => ({
+      issueId: 'PAN-1486',
+      reviewStatus: 'passed' as const,
+      testStatus: 'passed' as const,
+      mergeStatus: 'pending' as const,
+      updatedAt: '2026-05-25T10:00:00.000Z',
+      readyForMerge: true,
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+    }),
+    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Panopticon CLI' }) as never,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    panopticonHome = join(tmpdir(), `pan-flywheel-auto-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(panopticonHome, { recursive: true });
+    process.env.PANOPTICON_HOME = panopticonHome;
+  });
+
+  afterEach(() => {
+    resetDatabase();
+    delete process.env.PANOPTICON_HOME;
+    rmSync(panopticonHome, { recursive: true, force: true });
+  });
+
+  it('exports the shared auto-merge cooldown constant', () => {
+    expect(AUTO_MERGE_COOLDOWN_MS).toBe(300_000);
+  });
+
+  it('origin-validates auto-merge schedule requests', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId: 'PAN-1486' }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+  });
+
+  it('schedules eligible auto-merges after the cooldown and announces once', async () => {
+    const now = new Date('2026-05-25T10:00:00.000Z');
+    const announce = vi.fn();
+
+    const first = await postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({ now: () => now, announce }));
+    const second = await postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({ now: () => now, announce }));
+
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+      status: 'pending',
+    });
+    expect(second).toEqual(first);
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects scheduling while UAT is still required', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isRequireUatBeforeMerge: () => true,
+    }))).resolves.toEqual({ status: 412, body: { error: 'UAT is still required before merge' } });
+  });
+
+  it('rejects scheduling while flywheel is paused', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isFlywheelPaused: () => true,
+    }))).resolves.toEqual({ status: 423, body: { error: 'Flywheel is paused' } });
+  });
+
+  it('rejects ineligible PRs with the eligibility reason', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'CI checks failing on PR HEAD deadbeef' } });
+  });
+
+  it('returns active pending auto-merges sorted by scheduled merge time', async () => {
+    scheduleAutoMerge({
+      issueId: 'PAN-2',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/2',
+      prNumber: 2,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:10:00.000Z',
+    });
+    scheduleAutoMerge({
+      issueId: 'PAN-1',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
+      prNumber: 1,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+
+    expect(getPendingAutoMergePayload().map((entry) => entry.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/pending')).resolves.toMatchObject({
+      status: 200,
+      body: [
+        { issueId: 'PAN-1', scheduledMergeAt: '2026-05-25T10:05:00.000Z', status: 'pending', prNumber: 1 },
+        { issueId: 'PAN-2', scheduledMergeAt: '2026-05-25T10:10:00.000Z', status: 'pending', prNumber: 2 },
+      ],
+    });
   });
 });
 
