@@ -85,7 +85,7 @@ describe('SessionFeedSidebar', () => {
     hookSources.useGitFeed.mockImplementation(() => hookSources.git);
     hookSources.useConversationFeed.mockClear();
     hookSources.useGitFeed.mockClear();
-    useDashboardStore.setState({ observationsByIssueId: {} });
+    useDashboardStore.setState({ observationsByIssueId: {}, recentActivity: [] });
   });
 
   it('renders the six tabs in reference order and calls onClose', () => {
@@ -175,6 +175,29 @@ describe('SessionFeedSidebar', () => {
       'Newer activityfeature-pan-1389 · PAN-1389·1m ago',
       'Older activityfeature-pan-1389 · PAN-1389·3m ago',
     ]);
+  });
+
+  it('renders activity entries from recentActivity even when memory observations are empty (PAN-1507)', () => {
+    useDashboardStore.setState({
+      observationsByIssueId: {},
+      recentActivity: [
+        {
+          id: 'activity-entry-1',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'work',
+          level: 'info',
+          message: 'Work agent committed bead-3',
+          details: null,
+          issueId: 'PAN-1507',
+        },
+      ],
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+
+    expect(screen.queryByTestId('session-feed-empty-activity')).toBeNull();
+    expect(screen.getByText('Work agent committed bead-3')).toBeTruthy();
   });
 
   it('updates the Activity tab when observations change without remounting', () => {
