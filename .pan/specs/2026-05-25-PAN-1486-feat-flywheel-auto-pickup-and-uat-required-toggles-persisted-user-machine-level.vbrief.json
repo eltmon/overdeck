@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T10:37:43.470Z"
+    "updated": "2026-05-25T10:39:13.460Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T10:37:43.470Z",
+    "updated": "2026-05-25T10:39:13.460Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -883,7 +883,7 @@
       {
         "id": "b12-auto-merge-failure-surface",
         "title": "Surface failed/blocked auto-merges as 'investigate' suggestions in FlywheelStatus",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -899,7 +899,7 @@
           {
             "id": "b12.ac1",
             "title": "roles/flywheel.md Tick loop step 3 ('Emit suggestions') gains a sub-bullet describing the auto-merge surface call and the suggestion shape; references GET /api/flywheel/auto-merge/pending by name.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -907,7 +907,7 @@
           {
             "id": "b12.ac2",
             "title": "Role prompt explicitly says the failed/blocked entry remains in the table until cancelled — the orchestrator does not auto-clear them.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
