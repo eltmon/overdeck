@@ -1,160 +1,137 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-05-25T00:42:11.707Z",
+    "created": "2026-05-25T01:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1205: HTML artifacts: validated, optionally-shared browser-viewable agent work products",
-    "updated": "2026-05-25T01:02:10.591Z"
+    "description": "Plan for PAN-1204: Home tab + live session-context briefing with advisory compliance audit hook",
+    "updated": "2026-05-25T00:50:54.928Z"
   },
   "plan": {
-    "id": "pan-1205",
-    "title": "HTML artifacts: validated, optionally-shared browser-viewable agent work products",
+    "id": "pan-1204",
+    "title": "Home tab + live session-context briefing with advisory compliance audit hook",
     "status": "proposed",
-    "uid": "17877baf-a94a-4c38-a564-20cf77284a3b",
+    "uid": "d7b9f4c8-2a6e-4f01-9d3b-7c0a8e6f2b51",
     "author": "agent:gpt-5.5",
     "sequence": 2,
-    "created": "2026-05-25T00:42:11.707Z",
-    "updated": "2026-05-25T01:02:10.591Z",
+    "created": "2026-05-25T01:05:00.000Z",
+    "updated": "2026-05-25T00:50:54.928Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1205",
-        "label": "PAN-1205",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1204",
+        "label": "PAN-1204",
         "type": "issue"
       },
       {
-        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1205/docs/prds/planned/PAN-1205-html-artifacts.md",
-        "label": "PAN-1205-html-artifacts.md",
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1204/docs/prds/planned/PAN-1204-home-tab-briefing-compliance.md",
+        "label": "PAN-1204-home-tab-briefing-compliance.md",
         "type": "prd"
       },
       {
-        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/PAN-1205-html-artifacts.md",
-        "label": "PAN-1205-html-artifacts.md",
-        "type": "prd"
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1200",
+        "label": "Parent epic PAN-1200",
+        "type": "related"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
+        "label": "PAN-1052 memory observations/status rollups",
+        "type": "related"
       }
     ],
     "tags": [
-      "artifacts",
-      "html",
       "dashboard",
-      "cli",
-      "security",
-      "sharing"
+      "home",
+      "memory",
+      "briefing",
+      "hooks",
+      "registry",
+      "compliance",
+      "cli"
     ],
     "narratives": {
-      "Problem": "Panopticon agents can produce diffs and text summaries, but cannot publish visual, browser-viewable, inspectable work products with validation, provenance, stable links, or dashboard visibility.",
-      "Proposal": "Add a first-class HTML artifact subsystem: validate self-contained HTML files, publish immutable snapshots with provenance into an artifact index, expose `pan artifacts` lifecycle commands, serve wrapper and raw artifact routes across separate origins, and surface workspace artifacts in the issue drawer with thumbnails and quick actions."
+      "Problem": "Panopticon has no canonical landing surface summarizing the live system, and new conversations or agents start cold without current context about running work, recent decisions, workspace status, memory-first expectations, or feature ownership. Operators must jump between Pipeline, Command Deck, tmux sessions, and memory search to answer basic orientation questions.",
+      "Proposal": "Add a Home dashboard tab as the default / route, backed by existing PAN-1052 observation/status data and a new feature registry. Add a shared briefing assembler that writes ~/.panopticon/session-context.md from the live read model, exposes the same content through pan briefing, and injects it into Claude Code and Pi sessions at start plus on UserPromptSubmit when the file changes. Add an advisory memory-first compliance audit that detects past-tense trigger prompts, logs compliance.miss observations when pan memory search was not the first tool call, and prepends a soft warning on the next prompt without blocking tool use."
     },
     "autoDecisions": [
       {
-        "summary": "Use the configured Traefik domain instead of hardcoding the PRD's illustrative `panopticon.localhost` domain.",
-        "rationale": "The codebase defaults to `pan.localhost` through config and Traefik templates; deriving artifact URLs from that setting keeps installs consistent while preserving the separate wrapper/raw origin model."
+        "summary": "Home owns / and Pipeline moves to /pipeline while remaining visible in the Operations nav.",
+        "rationale": "The issue requires Home to become the landing route. Keeping Pipeline at an explicit path preserves the existing view and avoids deleting current operator workflow."
       },
       {
-        "summary": "Publish copied snapshots rather than serving directly from workspace source files.",
-        "rationale": "The PRD requires pending-change detection after edits. Stable published URLs need to serve the last validated/published bytes while `status` compares the current source hash to `lastPublishedHash`."
+        "summary": "Reuse existing PAN-1052 store state and components instead of creating a parallel Home data model.",
+        "rationale": "MemoryObservation, MemoryStatus, WorkspaceStatusCard, useObservationFeed, time bucket helpers, and Zustand selectors already express most Home data; a duplicate model would drift and add unnecessary pipeline surface area."
       },
       {
-        "summary": "Keep the artifact index in `~/.panopticon/artifacts/index.sqlite` rather than folding it into `panopticon.db`.",
-        "rationale": "The PRD explicitly names a separate artifact index; isolating shareable artifact metadata and files also makes retention and cleanup easier to reason about."
+        "summary": "Implement the feature registry as a small local SQLite service under ~/.panopticon/registry/features.sqlite with async access from dashboard code.",
+        "rationale": "The PRD names that location and schema. Dashboard-server rules prohibit blocking synchronous SQLite work in request paths, so the implementation needs a service/worker boundary similar in spirit to memory FTS."
       },
       {
-        "summary": "Implement tunnel sharing only as a v1 CLI stub.",
-        "rationale": "The PRD marks external tunneling as Phase 2/out of scope; exposing a clear not-supported command avoids scope creep while reserving the surface."
+        "summary": "Compose briefing freshness and advisory compliance warnings through the existing memory hook injection path.",
+        "rationale": "The workspace hook script already registers UserPromptSubmit and posts to /api/memory/inject. Extending that response keeps stdout ordering and prompt mutation centralized instead of adding competing hook scripts."
       },
       {
-        "summary": "Do not implement XSS deep scanning in v1.",
-        "rationale": "The PRD explicitly excludes XSS scanning because the false-positive rate is too high; security instead relies on validation, CSP, sandboxing, and origin isolation."
+        "summary": "Compliance v1 is advisory only even though config includes off/advisory/enforcing as a future-facing enum.",
+        "rationale": "The PRD explicitly marks enforcing mode out of scope. Recording the enum now prevents config churn, but implementation and tests must prove advisory mode never blocks tool calls."
+      },
+      {
+        "summary": "The briefing cross-workspace section should cite registry ownership and memory-search commands, not inline all sibling workspace memory.",
+        "rationale": "The PRD calls for honest framing. Inlining sibling state would be expensive, stale, and misleading; queryable pointers are safer and match the memory-first behavior this issue is trying to reinforce."
+      },
+      {
+        "summary": "Browser UAT must use an isolated Playwright/browser profile.",
+        "rationale": "The planning context explicitly requires isolated browser verification for UI work so results do not depend on another agent's Playwright session or shared browser state."
       }
     ],
     "items": [
       {
-        "id": "shared-artifact-contracts",
-        "title": "Define shared artifact contracts",
+        "id": "home-route-shell",
+        "title": "Add Home tab route and dashboard shell",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add shared artifact types to the contracts package for metadata, validation results, status, list entries, publish/create responses, and dashboard/API payloads. Re-export them through the package's public index so CLI, server, and frontend code consume the same shapes."
-        },
-        "subItems": [
-          {
-            "id": "shared-artifact-contracts.ac1",
-            "title": "Contracts include artifact provenance fields from the PRD: artifactId, slug, issueId, workspaceId, agentRole, agentHarness, runId, sessionId, filePath, hashes, supersedes, timestamps, title, description, and unshared state.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "shared-artifact-contracts.ac2",
-            "title": "Validation and status response types represent errors, warnings, size, hash, strict-mode findings, currentHash, lastPublishedHash, and pendingChanges.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "shared-artifact-contracts.ac3",
-            "title": "Existing contract package tests/typecheck pass after the new exports are added.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "artifact-index-store",
-        "title": "Implement artifact index store",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1205",
+          "issueLabel": "pan-1204",
           "requiresInspection": true,
-          "inspectionDepth": "deep",
+          "inspectionDepth": "fast",
           "foundationFor": [
-            "artifact-publish-library",
-            "artifacts-cli-read-commands",
-            "artifacts-cli-write-commands",
-            "raw-artifact-serving",
-            "wrapper-artifact-route",
-            "workspace-artifacts-api",
-            "artifact-thumbnail-cache",
-            "dashboard-artifacts-tab",
-            "artifact-e2e-verification"
+            "home-header-summary",
+            "home-activity-feed",
+            "home-workspace-list",
+            "home-registry-panel",
+            "home-route-tests"
           ]
         },
         "narrative": {
-          "Action": "Create the artifact index module under `src/lib/artifacts/` with schema initialization for `~/.panopticon/artifacts/index.sqlite`, indexes for slug/workspace/issue lookup, repository methods for insert/update/list/status/unshare, and filesystem layout helpers for the published HTML snapshot store."
+          "Action": "Introduce a Home tab/page in the dashboard frontend, make / resolve to Home, move Pipeline to an explicit /pipeline route, add Home to the Tab union and sidebar navigation, and make the sidebar logo navigate to Home. Preserve /conv/* routing to Command Deck and keep all existing tabs reachable."
         },
         "subItems": [
           {
-            "id": "artifact-index-store.ac1",
-            "title": "A fresh artifact index creates the PRD's artifacts table and workspace, issue, and slug indexes idempotently under `~/.panopticon/artifacts/index.sqlite` respecting `PANOPTICON_HOME` in tests.",
+            "id": "home-route-shell.ac1",
+            "title": "src/dashboard/frontend/src/components/Header.tsx Tab union includes home without removing any existing tab IDs",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-index-store.ac2",
-            "title": "Repository methods can create, read by slug/file path, list by workspace or issue, update published/unshared fields, and compute pendingChanges without touching dashboard route code.",
+            "id": "home-route-shell.ac2",
+            "title": "src/dashboard/frontend/src/App.tsx maps / to home, /pipeline to pipeline, and /conv/* continues to select command-deck",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-index-store.ac3",
-            "title": "Slug generation is 8 characters, URL-safe, unique under collision retries, and covered by deterministic tests.",
+            "id": "home-route-shell.ac3",
+            "title": "Sidebar navigation shows Home and Pipeline as distinct destinations, and the Panopticon logo button goes to Home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-route-shell.ac4",
+            "title": "Home page shell renders loading and empty states without relying on PAN-1052 data being present",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -163,54 +140,204 @@
         ]
       },
       {
-        "id": "artifact-validation-library",
-        "title": "Implement HTML artifact validation",
+        "id": "home-header-summary",
+        "title": "Render Home header summary cards from live read-model state",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add Home header summary cards showing running agents, paused/troubled gates, recent merges in the last 24 hours, failed verifications needing attention, and daily cost. Derive values from existing Zustand state and dashboard snapshots where available; use honest zero/empty states when no data exists."
+        },
+        "subItems": [
+          {
+            "id": "home-header-summary.ac1",
+            "title": "Running agent count is derived from AgentSnapshot rows with running/live statuses rather than a hardcoded value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header-summary.ac2",
+            "title": "Paused and troubled gate counts include AgentSnapshot.paused and AgentSnapshot.troubled/consecutive failure state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header-summary.ac3",
+            "title": "Failed verifications needing attention are derived from ReviewStatusSnapshot verification/test/UAT failure fields or blocker reasons already in the read model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-header-summary.ac4",
+            "title": "Daily cost summary reuses existing resource/cost state or an existing cost endpoint and renders a clear unavailable state when cost data is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-activity-feed",
+        "title": "Render time-bucketed Home activity feed from memory observations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Home activity feed that consumes PAN-1052 observations across workspaces, filters to actionable observations, sorts newest-first, and groups entries into Just Now / Earlier Today / Yesterday / This Week / This Month / Older buckets using the existing time bucket utility unless a more local Home helper is already present."
+        },
+        "subItems": [
+          {
+            "id": "home-activity-feed.ac1",
+            "title": "Feed reads observations from observationsByIssueId and does not fetch or parse transcript JSONL files directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-activity-feed.ac2",
+            "title": "Entries are grouped into the PRD time buckets and sorted newest-first within each bucket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-activity-feed.ac3",
+            "title": "Feed displays workspace/issue identity, actionStatus headline, summary/narrative, files, and tags when present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-activity-feed.ac4",
+            "title": "Empty feed state explains that observations will appear after PAN-1052 memory extraction creates them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-workspace-list",
+        "title": "Render Home workspace list using WorkspaceStatusCard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Home workspace section that lists active or known workspaces/issues and renders the existing WorkspaceStatusCard for each, using MemoryStatus rollups and recent observations from the store. Clicking a card should open the relevant workspace/Command Deck destination already used elsewhere in the dashboard."
+        },
+        "subItems": [
+          {
+            "id": "home-workspace-list.ac1",
+            "title": "Every workspace/issue with status or observations renders a WorkspaceStatusCard with phase, headline, recent activity, and next steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-workspace-list.ac2",
+            "title": "WorkspaceStatusCard stats are derived from existing issue/resource/memory data and render zeros when unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-workspace-list.ac3",
+            "title": "Card navigation uses existing app routing and does not introduce a new broken route for workspace details",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-workspace-list.ac4",
+            "title": "Fresh installs render a helpful empty workspace state instead of throwing on missing statusByIssueId or observationsByIssueId data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-contract-storage",
+        "title": "Add async feature registry storage service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
           "difficulty": "complex",
-          "issueLabel": "pan-1205",
+          "issueLabel": "pan-1204",
           "requiresInspection": true,
           "inspectionDepth": "deep",
           "foundationFor": [
-            "artifact-publish-library",
-            "artifacts-cli-read-commands",
-            "artifacts-cli-write-commands",
-            "artifact-e2e-verification"
+            "registry-cli",
+            "registry-classification",
+            "home-registry-panel",
+            "briefing-assembler"
           ]
         },
         "narrative": {
-          "Action": "Build `src/lib/artifacts/validator.ts` to enforce file type, 1 MB size limit, secret scanning, local/relative/non-HTTPS asset rejection, and optional strict-mode hygiene checks with structured errors and warnings."
+          "Action": "Create the feature registry contract and storage layer for ~/.panopticon/registry/features.sqlite. Implement the PRD features table with feature_id, feature_name, description, owning_workspace_id, owning_issue_id, owning_agent_id, status, created_at, updated_at, and tags. Dashboard-reachable access must be asynchronous and must not block route handlers."
         },
         "subItems": [
           {
-            "id": "artifact-validation-library.ac1",
-            "title": "Validation rejects non-HTML files, directories, files larger than 1 MB, relative or root-local asset paths, `file://`, and non-HTTPS external URLs across HTML attributes, srcset, and CSS url() references.",
+            "id": "registry-contract-storage.ac1",
+            "title": "Registry database is created at ~/.panopticon/registry/features.sqlite with the PRD features table columns and indexes needed for feature/status/issue lookups",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-validation-library.ac2",
-            "title": "Validation rejects AWS, GitHub, OpenAI, Anthropic, Slack, private-key, and .env-style secrets named in the PRD, with per-line `<!-- artifact-allow-secret -->` suppressions producing warnings rather than silent passes.",
+            "id": "registry-contract-storage.ac2",
+            "title": "Storage API supports list, show by feature, tag/upsert by issue, untag/remove, and ownership updates by workspace/agent state",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-validation-library.ac3",
-            "title": "Strict mode catches high-entropy strings, inline event handlers without CSP, and missing image alt text while non-strict mode leaves those as allowed or warning-only according to the PRD.",
+            "id": "registry-contract-storage.ac3",
+            "title": "Dashboard-server consumers use an async service/worker boundary and add no sync filesystem or blocking SQLite calls in route/service paths",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-validation-library.ac4",
-            "title": "Unit tests cover positive and negative fixtures for every secret scanner, forbidden/allowed asset path class, size boundary, and strict-mode rule.",
+            "id": "registry-contract-storage.ac4",
+            "title": "Unit tests cover creating the DB, tagging an issue, listing features, showing a feature, and updating ownership/status",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -219,48 +346,98 @@
         ]
       },
       {
-        "id": "artifact-publish-library",
-        "title": "Implement artifact publishing lifecycle",
+        "id": "registry-cli",
+        "title": "Add pan registry tag/list/show commands",
         "status": "pending",
-        "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Register a pan registry command group in the CLI with tag, list, and show subcommands backed by the feature registry service. Output should be useful in terminal-only sessions and stable enough for tests."
+        },
+        "subItems": [
+          {
+            "id": "registry-cli.ac1",
+            "title": "pan registry tag <issueId> <feature> creates or updates a feature ownership record for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-cli.ac2",
+            "title": "pan registry list displays feature name, owning issue/workspace/agent when known, status, updated time, and tags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-cli.ac3",
+            "title": "pan registry show <feature> displays the full registry record and exits nonzero with a clear error for missing features",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-cli.ac4",
+            "title": "CLI tests cover tag/list/show without requiring a real global registry database",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-classification",
+        "title": "Populate registry from issue creation and workspace transitions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
           "difficulty": "complex",
-          "issueLabel": "pan-1205",
+          "issueLabel": "pan-1204",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add lifecycle functions for create, publish, status, list, URL resolution, and unshare that combine validation, SHA-256 hashing, published snapshot copies, metadata extraction from `<title>`, provenance capture from flags/env, and stable URL generation."
+          "Action": "Wire feature registry population into issue creation/classification and workspace state transitions. The LLM classifier should extract low-cardinality feature tags from issue title/body with a cheap configurable model, while manual CLI tags remain authoritative overrides."
         },
         "subItems": [
           {
-            "id": "artifact-publish-library.ac1",
-            "title": "Create validates an HTML file, stores provenance, copies the published bytes into the artifact store, sets `lastPublishedHash`, and returns wrapper/raw URLs.",
+            "id": "registry-classification.ac1",
+            "title": "Issue creation path invokes a mockable classifier that extracts feature tags from title and body without blocking user-visible issue creation on failure",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-publish-library.ac2",
-            "title": "Status compares the current source hash with `lastPublishedHash` and reports pendingChanges true after edits and false after publish.",
+            "id": "registry-classification.ac2",
+            "title": "Classifier model/provider/cost behavior is configurable and defaults to a low-cost route consistent with the PRD",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-publish-library.ac3",
-            "title": "Publish revalidates edited files, updates the copied published snapshot and published hash, preserves the slug, and records updated timestamps without deleting prior metadata.",
+            "id": "registry-classification.ac3",
+            "title": "Workspace/agent lifecycle updates registry ownership fields and status when work starts, pauses/stops, merges, or closes out",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-publish-library.ac4",
-            "title": "Unshare sets `unsharedAt` and leaves source files, copied published bytes, and database metadata intact.",
+            "id": "registry-classification.ac4",
+            "title": "Tests use a mocked classifier and verify manual pan registry tag overrides are not overwritten by later classification output",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -269,48 +446,48 @@
         ]
       },
       {
-        "id": "artifacts-cli-read-commands",
-        "title": "Add artifact CLI read commands",
+        "id": "home-registry-panel",
+        "title": "Render Knowledge Registry section on Home",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1205",
+          "issueLabel": "pan-1204",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Register `pan artifacts` in the Commander CLI and implement `validate`, `status`, `url`, `open`, and `list` with human-readable and `--json` output."
+          "Action": "Add a Knowledge Registry section to Home that lists features and owning workspace/issue/agent/status from the registry service. The panel should make ownership discoverable without requiring a terminal command."
         },
         "subItems": [
           {
-            "id": "artifacts-cli-read-commands.ac1",
-            "title": "`pan artifacts validate <file> [--strict] [--json]` returns structured validation results and exits non-zero on hard validation failures.",
+            "id": "home-registry-panel.ac1",
+            "title": "Home loads registry entries through a safe dashboard API/RPC backed by the async registry service",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifacts-cli-read-commands.ac2",
-            "title": "`pan artifacts status <file> [--json]` prints currentHash, lastPublishedHash, and pendingChanges for known artifacts and a useful not-found error for unknown files.",
+            "id": "home-registry-panel.ac2",
+            "title": "Registry rows show feature name, owning issue/workspace/agent where known, status, updated time, and tags",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifacts-cli-read-commands.ac3",
-            "title": "`pan artifacts list [--workspace <id>] [--json]` returns all artifacts or the workspace-filtered subset with provenance and published/pending/unshared status.",
+            "id": "home-registry-panel.ac3",
+            "title": "Empty registry state points users to pan registry tag <issueId> <feature> and explains automatic classification will populate future entries",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifacts-cli-read-commands.ac4",
-            "title": "`pan artifacts url <file>` prints the wrapper URL and `pan artifacts open <file>` opens that URL through the platform opener without blocking tests.",
+            "id": "home-registry-panel.ac4",
+            "title": "Panel errors are localized to the registry card and do not prevent the rest of Home from rendering",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -319,102 +496,62 @@
         ]
       },
       {
-        "id": "artifacts-cli-write-commands",
-        "title": "Add artifact CLI write commands",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Implement `pan artifacts create`, `publish`, `unshare`, and the v1 tunnel-sharing stub using the artifact lifecycle library and provenance flags/env."
-        },
-        "subItems": [
-          {
-            "id": "artifacts-cli-write-commands.ac1",
-            "title": "`pan artifacts create <file> --issue <id> --agent-role <role> [--json]` validates and publishes in one step, capturing issue, role, harness, run, and session provenance from flags or environment.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifacts-cli-write-commands.ac2",
-            "title": "`pan artifacts publish <file> [--json]` revalidates and republishes edited artifacts, and reports no-op/not-pending cases clearly.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifacts-cli-write-commands.ac3",
-            "title": "`pan artifacts unshare <file> --yes [--json]` disables the URL without deleting the file or metadata and requires explicit confirmation outside JSON/noninteractive modes.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifacts-cli-write-commands.ac4",
-            "title": "`pan artifacts share --tunnel <file>` exists as a v1 stub that exits with a clear `tunneling not yet supported` message and does not expose anything externally.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "raw-artifact-serving",
-        "title": "Serve raw artifacts on isolated origin",
+        "id": "briefing-assembler",
+        "title": "Add shared live briefing assembler",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
-          "difficulty": "expert",
-          "issueLabel": "pan-1205",
+          "difficulty": "complex",
+          "issueLabel": "pan-1204",
           "requiresInspection": true,
           "inspectionDepth": "deep",
           "foundationFor": [
-            "wrapper-artifact-route",
-            "artifact-e2e-verification"
+            "briefing-writer",
+            "briefing-cli",
+            "harness-briefing-injection",
+            "prompt-briefing-refresh"
           ]
         },
         "narrative": {
-          "Action": "Add dashboard server routes for raw artifact HTML at `/a/<slug>` that only serve from the artifact subdomain, read published snapshot bytes, reject unshared/missing artifacts, and set the CSP and cache headers required for sandbox isolation."
+          "Action": "Create a shared briefing module that assembles the live session-context markdown from current workspace identity, PAN-1052 status/observations, registry entries, memory-first triggers, and tool references. The output should follow the PRD sections and be safe to inject as system prompt context."
         },
         "subItems": [
           {
-            "id": "raw-artifact-serving.ac1",
-            "title": "`GET /a/<slug>` returns the copied published HTML with `Content-Type: text/html; charset=utf-8` only when the Host matches `artifacts.<configured-domain>`.",
+            "id": "briefing-assembler.ac1",
+            "title": "Assembler output includes # Working Inside Panopticon, What Panopticon Gives You, How to Read What Follows, Current Workspace, Knowledge Registry, Memory-First Triggers, and Tools sections",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "raw-artifact-serving.ac2",
-            "title": "Missing slugs return 404 and unshared artifacts return 410 Gone without deleting metadata or copied bytes.",
+            "id": "briefing-assembler.ac2",
+            "title": "Current Workspace section detects when CWD is inside a workspace and includes issue/workspace status, age, trajectory, recent observations, and unfinished next steps when available",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "raw-artifact-serving.ac3",
-            "title": "Raw responses include CSP that allows self, inline artifact code, data URLs, and HTTPS assets while preventing access to dashboard-origin cookies and storage.",
+            "id": "briefing-assembler.ac3",
+            "title": "Cross-workspace/Knowledge Registry section names owning workspace/issue/agent records and honestly tells agents to query sibling state with pan memory search --all-workspaces instead of inlining all sibling memory",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "raw-artifact-serving.ac4",
-            "title": "Server route code uses async filesystem APIs and does not introduce `execSync` or synchronous file reads in dashboard request paths.",
+            "id": "briefing-assembler.ac4",
+            "title": "Tools section includes pan memory, pan docs query, pan artifacts, pan briefing, pan registry, and pan compliance command references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "briefing-assembler.ac5",
+            "title": "Unit tests snapshot representative briefing output for current-workspace, no-workspace, empty-registry, and populated-registry cases",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -423,274 +560,437 @@
         ]
       },
       {
-        "id": "wrapper-artifact-route",
-        "title": "Render artifact wrapper page",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add wrapper support for `/s/<slug>` on the dashboard origin with dashboard chrome, artifact metadata, action links, and a sandboxed iframe pointing at the raw artifact origin."
-        },
-        "subItems": [
-          {
-            "id": "wrapper-artifact-route.ac1",
-            "title": "Loading `/s/<slug>` shows artifact title, issue, role, harness, creation/publish time, pending/unshared status, and Open Raw/Copy Link actions.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wrapper-artifact-route.ac2",
-            "title": "The wrapper embeds the raw artifact in an iframe whose `src` uses the `artifacts.<domain>` origin and whose sandbox attributes match the isolation design.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wrapper-artifact-route.ac3",
-            "title": "Unshared artifacts show an unavailable state on `/s/<slug>` while `/a/<slug>` returns 410.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "artifact-traefik-origin",
-        "title": "Route artifact subdomain through Traefik",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Update the Panopticon Traefik dynamic template and generation placeholders so `artifacts.<configured-domain>` routes to the dashboard API/server and is covered by the existing wildcard certificate setup."
-        },
-        "subItems": [
-          {
-            "id": "artifact-traefik-origin.ac1",
-            "title": "Generated Traefik config includes an artifact router for `Host(`artifacts.<domain>`)` that forwards `/a/<slug>` requests to the dashboard API/server port.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifact-traefik-origin.ac2",
-            "title": "The dashboard router continues to serve normal frontend/API/WebSocket traffic unchanged after the artifact subdomain is added.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifact-traefik-origin.ac3",
-            "title": "Tests or snapshots verify the rendered template contains both dashboard and artifact hosts for the configured domain.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "workspace-artifacts-api",
-        "title": "Expose artifact dashboard APIs",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add Effect route modules for artifact metadata endpoints used by the wrapper page and workspace drawer, including workspace-filtered lists, individual metadata by slug, and unshare action support."
-        },
-        "subItems": [
-          {
-            "id": "workspace-artifacts-api.ac1",
-            "title": "`GET /api/artifacts/:slug` returns metadata, status, wrapper/raw URLs, and pendingChanges for a published artifact without including raw HTML content.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "workspace-artifacts-api.ac2",
-            "title": "`GET /api/workspaces/:issueId/artifacts` returns the artifacts for that workspace or issue with provenance and status fields needed by the drawer tab.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "workspace-artifacts-api.ac3",
-            "title": "`POST /api/artifacts/:slug/unshare` disables a shared URL using existing dashboard auth/CSRF protections and preserves metadata.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "workspace-artifacts-api.ac4",
-            "title": "Route errors use existing HTTP handler patterns and return 404/410/400 statuses for missing, unshared, or invalid requests.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "artifact-thumbnail-cache",
-        "title": "Generate and serve artifact thumbnails",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add thumbnail generation and cache support for published artifacts using isolated browser rendering, storing thumbnails under the artifact store and exposing a safe thumbnail endpoint for dashboard cards."
-        },
-        "subItems": [
-          {
-            "id": "artifact-thumbnail-cache.ac1",
-            "title": "Publishing or first dashboard access can create a thumbnail for an artifact using an isolated Playwright browser context pointed at the raw artifact URL.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifact-thumbnail-cache.ac2",
-            "title": "Thumbnail cache keys include artifact slug and published hash so edits followed by republish refresh the thumbnail while unchanged artifacts reuse the cached image.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "artifact-thumbnail-cache.ac3",
-            "title": "Dashboard-facing thumbnail endpoints never execute shell commands synchronously and return a graceful placeholder when thumbnail rendering fails.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "dashboard-artifacts-tab",
-        "title": "Add workspace artifacts drawer tab",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-25T00:42:11.707Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1205",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add an Artifacts tab to the issue drawer with a grid of artifact cards, thumbnails, status badges, provenance labels, sort/filter controls, and quick actions for opening, copying links, and unsharing."
-        },
-        "subItems": [
-          {
-            "id": "dashboard-artifacts-tab.ac1",
-            "title": "The drawer tab list includes `Artifacts`, fetches `/api/workspaces/:issueId/artifacts`, and renders empty/loading/error states consistently with existing drawer tabs.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "dashboard-artifacts-tab.ac2",
-            "title": "Each artifact card shows thumbnail, title, created date, issue/workspace, role, harness, and badges for Published, Pending Changes, or Unshared.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "dashboard-artifacts-tab.ac3",
-            "title": "Cards include working Open Wrapper, Copy Link, and Unshare actions; unshare updates the card without a full page reload.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "dashboard-artifacts-tab.ac4",
-            "title": "Frontend tests cover rendering multiple artifacts with `Made by <role> via <harness> for <issue>` labels and pending/unshared status badges.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "artifact-e2e-verification",
-        "title": "Verify full artifact lifecycle and sandboxing",
+        "id": "briefing-writer",
+        "title": "Write ~/.panopticon/session-context.md from dashboard state changes",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T00:42:11.707Z",
+        "created": "2026-05-25T01:05:00.000Z",
         "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1205",
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add integration and browser verification coverage for the complete artifact lifecycle, pending-change behavior, unshare semantics, dashboard rendering, and raw/wrapper origin isolation."
+          "Action": "Add dashboard-server lifecycle wiring that regenerates ~/.panopticon/session-context.md whenever relevant read-model state changes, debounced around 500ms. Use the shared briefing assembler and async filesystem writes."
         },
         "subItems": [
           {
-            "id": "artifact-e2e-verification.ac1",
-            "title": "Integration test covers validate → create → status false → edit → status true → publish → status false → unshare → raw URL returns 410.",
+            "id": "briefing-writer.ac1",
+            "title": "Dashboard server writes ~/.panopticon/session-context.md on startup and after relevant state changes with approximately 500ms debounce",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-e2e-verification.ac2",
-            "title": "Playwright sandbox test uses an isolated browser context, sets dashboard-origin cookies/storage, loads `/s/<slug>`, and proves iframe JavaScript at `/a/<slug>` cannot read wrapper cookies or localStorage.",
+            "id": "briefing-writer.ac2",
+            "title": "Writer uses fs/promises or Effect FileSystem and adds no writeFileSync/readFileSync/statSync in dashboard-server reachable code",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-e2e-verification.ac3",
-            "title": "Dashboard UAT or component integration test verifies the issue drawer Artifacts tab renders artifact cards with thumbnails and provenance for a seeded workspace.",
+            "id": "briefing-writer.ac3",
+            "title": "Debounce coalesces rapid event bursts into a single write while still eventually writing the latest state",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "artifact-e2e-verification.ac4",
-            "title": "Concurrent create/publish tests prove two artifacts do not collide on slug or overwrite each other's published snapshot files.",
+            "id": "briefing-writer.ac4",
+            "title": "Tests cover startup write, debounced update, and write failure logging without crashing the dashboard server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "briefing-cli",
+        "title": "Add pan briefing command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a pan briefing CLI command that prints the same markdown content produced for ~/.panopticon/session-context.md, with an option or default behavior suitable for terminal-only sessions."
+        },
+        "subItems": [
+          {
+            "id": "briefing-cli.ac1",
+            "title": "pan briefing prints briefing markdown from the shared assembler and includes the same top-level sections as session-context.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "briefing-cli.ac2",
+            "title": "Running pan briefing inside a workspace includes that workspace's current context when available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "briefing-cli.ac3",
+            "title": "CLI command is registered from src/cli/index.ts or the appropriate commands module and covered by a command test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-briefing-injection",
+        "title": "Inject briefing file into Claude Code and Pi session starts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update Claude Code and Pi harness launch/wrapper paths so new sessions append ~/.panopticon/session-context.md as system prompt context using each harness's supported mechanism. Preserve existing workspace-specific context injection and model routing."
+        },
+        "subItems": [
+          {
+            "id": "harness-briefing-injection.ac1",
+            "title": "Claude Code launches include --append-system-prompt-file ~/.panopticon/session-context.md or the current supported equivalent without removing workspace context files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-briefing-injection.ac2",
+            "title": "Pi launches receive equivalent briefing context through the Pi-supported prompt/context mechanism",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-briefing-injection.ac3",
+            "title": "Harness changes do not pass explicit --model flags unless an existing caller already does so for a documented reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-briefing-injection.ac4",
+            "title": "Tests verify launch arguments/context payloads include the briefing file for Claude Code and Pi and preserve existing context arguments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompt-briefing-refresh",
+        "title": "Reinject fresh briefing through UserPromptSubmit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend the existing UserPromptSubmit memory injection path so the next prompt receives a <panopticon-briefing-update> block when ~/.panopticon/session-context.md is newer than the session start or last injected briefing mtime. Avoid repeated injection until the file changes again."
+        },
+        "subItems": [
+          {
+            "id": "prompt-briefing-refresh.ac1",
+            "title": "SessionStart records enough per-session freshness state to compare briefing mtime against session start and last briefing injection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompt-briefing-refresh.ac2",
+            "title": "UserPromptSubmit output preserves the user's prompt and appends exactly one <panopticon-briefing-update> block when the briefing file is newer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompt-briefing-refresh.ac3",
+            "title": "After reinjection, the session marker is updated so repeated prompts do not receive the same briefing again unless the file mtime advances",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompt-briefing-refresh.ac4",
+            "title": "Freshness tests use fake timers or controlled file mtimes and do not rely on real multi-second sleeps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compliance-config-triggers",
+        "title": "Add compliance config and trigger matcher",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "compliance-stop-audit",
+            "compliance-advisory-warning",
+            "compliance-cli"
+          ]
+        },
+        "narrative": {
+          "Action": "Add normalized compliance configuration with mode off/advisory/enforcing and default advisory, plus a pure trigger-matching module for memory-first phrases such as 'we recently', 'last session', 'we decided', 'the X fix', and 'remember when'. Enforcing remains out of scope for behavior."
+        },
+        "subItems": [
+          {
+            "id": "compliance-config-triggers.ac1",
+            "title": "config-yaml normalization exposes compliance.mode with allowed values off, advisory, enforcing and defaults to advisory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-config-triggers.ac2",
+            "title": "Trigger matcher returns matched phrases for past-tense/project-memory prompts and returns empty for unrelated prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-config-triggers.ac3",
+            "title": "Matcher tests cover the PRD examples: 'we recently', 'last session', 'we decided', 'the X fix', and 'remember when'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-config-triggers.ac4",
+            "title": "Setting mode to enforcing does not block tool calls in PAN-1204; it is treated as advisory or reported as not-yet-enforced according to the chosen implementation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compliance-stop-audit",
+        "title": "Log advisory compliance misses from Stop hook turns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend Stop-hook turn handling so a last user prompt that matches memory-first triggers is audited against the first tool call. If the first tool call is not pan memory search and compliance mode is advisory, write a compliance.miss observation to the PAN-1052 memory store with trigger phrases, first tool call, role, harness, session, and timestamp."
+        },
+        "subItems": [
+          {
+            "id": "compliance-stop-audit.ac1",
+            "title": "Stop-hook audit detects first tool call from the same turn and recognizes Bash commands beginning with pan memory search as compliant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-stop-audit.ac2",
+            "title": "When trigger phrases match and first tool call is absent or not pan memory search, writeObservation records a compliance.miss observation with triggerPhrase(s), firstToolCall, agentRole, agentHarness, sessionId, and timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-stop-audit.ac3",
+            "title": "Compliance miss logging is skipped when compliance.mode is off and never blocks or fails the original Stop hook processing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-stop-audit.ac4",
+            "title": "Tests cover compliant first search, missed search, no trigger, mode off, and no-tool-call turns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compliance-advisory-warning",
+        "title": "Prepend next-prompt advisory warning after recent compliance miss",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend prompt-time injection so a recent compliance.miss for the current session causes a soft warning to be prepended on the next prompt, then marks that miss as warned so the same warning is not repeated indefinitely."
+        },
+        "subItems": [
+          {
+            "id": "compliance-advisory-warning.ac1",
+            "title": "Next UserPromptSubmit after a current-session compliance.miss prepends: Last turn included a memory-first trigger but the search wasn't called. Try pan memory search first next time.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-advisory-warning.ac2",
+            "title": "Warning appears before the original prompt and before appended memory/briefing context blocks so the agent sees it immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-advisory-warning.ac3",
+            "title": "The same miss is not warned more than once, but a later distinct miss can trigger a new warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-advisory-warning.ac4",
+            "title": "Mode off suppresses advisory warnings even if miss records exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compliance-cli",
+        "title": "Add pan compliance status command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a pan compliance command group with a status subcommand that reports current compliance mode and recent compliance.miss count from memory observations or the compliance marker store."
+        },
+        "subItems": [
+          {
+            "id": "compliance-cli.ac1",
+            "title": "pan compliance status displays the normalized compliance mode and a count of recent compliance.miss observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-cli.ac2",
+            "title": "pan compliance status supports filtering to current project/workspace/session where existing memory CLI filters make that practical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compliance-cli.ac3",
+            "title": "CLI tests cover advisory default, off mode, and nonzero miss count output with mocked observation data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-route-tests",
+        "title": "Add route, unit, and isolated browser verification for Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T01:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1204",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add final verification coverage that exercises Home as the default landing page, Pipeline at /pipeline, Home sections with stubbed data, and isolated-browser UI behavior. This bead closes the end-to-end acceptance criteria after all functional pieces exist."
+        },
+        "subItems": [
+          {
+            "id": "home-route-tests.ac1",
+            "title": "Frontend route tests verify / renders Home, /pipeline renders Pipeline, /board still renders Board, and /conv/<name> still selects Command Deck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-route-tests.ac2",
+            "title": "Component tests render Home with stubbed agents, review statuses, observations, workspace statuses, registry rows, and empty states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-route-tests.ac3",
+            "title": "Automated verification includes npm run typecheck, npm run lint, npm test, and dashboard build when dashboard server code changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-route-tests.ac4",
+            "title": "Browser UAT uses an isolated Playwright/browser profile and verifies Home loads as the landing route with summary, activity, workspace, and registry sections visible",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -701,93 +1001,123 @@
     ],
     "edges": [
       {
-        "from": "shared-artifact-contracts",
-        "to": "artifact-index-store",
+        "from": "home-route-shell",
+        "to": "home-header-summary",
         "type": "blocks"
       },
       {
-        "from": "shared-artifact-contracts",
-        "to": "artifact-validation-library",
+        "from": "home-route-shell",
+        "to": "home-activity-feed",
         "type": "blocks"
       },
       {
-        "from": "artifact-index-store",
-        "to": "artifact-publish-library",
+        "from": "home-route-shell",
+        "to": "home-workspace-list",
         "type": "blocks"
       },
       {
-        "from": "artifact-validation-library",
-        "to": "artifact-publish-library",
+        "from": "home-route-shell",
+        "to": "home-registry-panel",
         "type": "blocks"
       },
       {
-        "from": "artifact-publish-library",
-        "to": "artifacts-cli-read-commands",
+        "from": "registry-contract-storage",
+        "to": "registry-cli",
         "type": "blocks"
       },
       {
-        "from": "artifact-publish-library",
-        "to": "artifacts-cli-write-commands",
+        "from": "registry-contract-storage",
+        "to": "registry-classification",
         "type": "blocks"
       },
       {
-        "from": "artifact-publish-library",
-        "to": "raw-artifact-serving",
+        "from": "registry-contract-storage",
+        "to": "home-registry-panel",
         "type": "blocks"
       },
       {
-        "from": "raw-artifact-serving",
-        "to": "wrapper-artifact-route",
+        "from": "registry-contract-storage",
+        "to": "briefing-assembler",
         "type": "blocks"
       },
       {
-        "from": "artifact-traefik-origin",
-        "to": "wrapper-artifact-route",
+        "from": "briefing-assembler",
+        "to": "briefing-writer",
         "type": "blocks"
       },
       {
-        "from": "artifact-publish-library",
-        "to": "workspace-artifacts-api",
+        "from": "briefing-assembler",
+        "to": "briefing-cli",
         "type": "blocks"
       },
       {
-        "from": "workspace-artifacts-api",
-        "to": "artifact-thumbnail-cache",
+        "from": "briefing-assembler",
+        "to": "harness-briefing-injection",
         "type": "blocks"
       },
       {
-        "from": "workspace-artifacts-api",
-        "to": "dashboard-artifacts-tab",
+        "from": "briefing-assembler",
+        "to": "prompt-briefing-refresh",
         "type": "blocks"
       },
       {
-        "from": "artifact-thumbnail-cache",
-        "to": "dashboard-artifacts-tab",
+        "from": "compliance-config-triggers",
+        "to": "compliance-stop-audit",
         "type": "blocks"
       },
       {
-        "from": "artifacts-cli-read-commands",
-        "to": "artifact-e2e-verification",
+        "from": "compliance-config-triggers",
+        "to": "compliance-advisory-warning",
         "type": "blocks"
       },
       {
-        "from": "artifacts-cli-write-commands",
-        "to": "artifact-e2e-verification",
+        "from": "compliance-config-triggers",
+        "to": "compliance-cli",
         "type": "blocks"
       },
       {
-        "from": "wrapper-artifact-route",
-        "to": "artifact-e2e-verification",
+        "from": "compliance-stop-audit",
+        "to": "compliance-advisory-warning",
         "type": "blocks"
       },
       {
-        "from": "dashboard-artifacts-tab",
-        "to": "artifact-e2e-verification",
+        "from": "home-header-summary",
+        "to": "home-route-tests",
         "type": "blocks"
+      },
+      {
+        "from": "home-activity-feed",
+        "to": "home-route-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "home-workspace-list",
+        "to": "home-route-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "home-registry-panel",
+        "to": "home-route-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "briefing-writer",
+        "to": "home-route-tests",
+        "type": "informs"
+      },
+      {
+        "from": "prompt-briefing-refresh",
+        "to": "home-route-tests",
+        "type": "informs"
+      },
+      {
+        "from": "compliance-advisory-warning",
+        "to": "home-route-tests",
+        "type": "informs"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1205-html-artifacts-validated-optionally-shared-browser-viewable-agent-work-products.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1204-home-tab-live-session-context-briefing-with-advisory-compliance-audit-hook.vbrief.json"
     }
   }
 }

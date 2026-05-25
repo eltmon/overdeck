@@ -1,6 +1,6 @@
-# PAN-1203 — Panopticon-docs RAG
+# PAN-1204 — Home Tab + Live Session-Context Briefing + Compliance Audit Hook
 
-**Issue:** [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203)
+**Issue:** [PAN-1204](https://github.com/eltmon/panopticon-cli/issues/1204)
 **Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
@@ -9,521 +9,331 @@
 
 ## Problem
 
-Panopticon has substantial documentation in `docs/` and ~60 skills with detailed `SKILL.md` files. Today, when a user asks any agent (Claude Code, Pi, future) "how do I do X in Panopticon?", the agent has to:
+The Panopticon dashboard has no canonical landing page. Users land on whatever route happens to be default (Mission Control / Workspaces depending on session). There's no at-a-glance view of "what's happening across the system right now."
 
-1. Guess based on training data (rarely correct for Panopticon-specific verbs)
-2. Browse the docs from scratch using Read/grep
-3. Ask the user to paste relevant docs
-
-This causes users to repeatedly re-explain Panopticon mechanics to agents. Workflow knowledge that *exists* in our repo never reaches the agent at the right moment.
+Worse: every agent and every user conversation starts cold. The agent has no idea what's running in adjacent workspaces, what was decided in past sessions, what Panopticon-specific behaviors apply, or how to use the memory system effectively. PAN-1052 captures observations but they only inject if the agent thinks to search. The user re-explains the project on every fresh session.
 
 ## Goal
 
-Make every harness able to surface Panopticon's own documentation just-in-time, via a `UserPromptSubmit` hook that retrieves and injects relevant doc snippets when the user's prompt mentions Panopticon concepts.
+Three connected mechanisms:
+
+1. **Home tab** as the dashboard's landing route, summarizing system-wide state with workspace cards
+2. **Live `session-context.md`** that mirrors the Home tab content, written by the dashboard server on every state change, and injected into every harness session via the wrapper's system-prompt-append flag
+3. **Compliance audit hook** (advisory mode in v1) that observes when agents skip the memory-first mandate for past-tense user prompts and logs misses, then softly nudges on the next prompt
 
 ## Design Goals
 
-- **Harness-portable** — the retrieval CLI is shell-callable, not MCP-only
-- **Zero first-run cost** — the index ships prebuilt with the package (no install-time embedding)
-- **Token-cheap** — per-conversation budget caps prevent runaway injection
-- **Trivial to update** — release pipeline rebuilds the index automatically
-- **Off-able** — both global config and session-scope escape hatches
+- **Live, not snapshot** — Subspace writes their briefing once at session start; ours updates on state change and re-injects on prompt if newer
+- **Honest framing** — Subspace says "you can see what siblings are doing" but actually only via RAG; ours says exactly what's inlined vs queryable
+- **Aspirational without being pushy** — compliance audit logs and nudges, but never blocks tool calls in v1
+- **Dashboard-first** — Home tab and Context tab are the dogfooding play; CLI access (`pan briefing`) is the terminal-only fallback
 
 ## Architecture
 
-### Corpus
+### Home Tab
 
-| Source | Path | Notes |
-|---|---|---|
-| Project docs | `panopticon-cli/docs/**/*.md` | All markdown docs |
-| Skills | `panopticon-cli/skills/*/SKILL.md` | All ~60 skills |
-| PRDs (active + planned) | `panopticon-cli/docs/prds/{active,planned}/*.md` | Optional; toggleable in build |
-| CLAUDE.md | `panopticon-cli/CLAUDE.md` | Project-level rules |
-| Rules | `panopticon-cli/.claude/rules/*.md` | Project-level rule files |
+New route at `panopticon.localhost/` (becomes default landing).
 
-Each source file is chunked by markdown heading into sections of ≤ 500 tokens.
+Sections:
 
-### Index Format
+1. **Header summary** — single row of counts:
+   - Running agents (by role: work / review / test / etc.)
+   - Paused / troubled gates
+   - Recent merges (last 24h)
+   - Failed verifications needing attention
+   - Daily cost (today, this week)
+2. **Activity feed** — time-bucketed observations from PAN-1052's store:
+   - Just Now (last 1h)
+   - Earlier Today (>1h, same day)
+   - Yesterday
+   - This Week (last 7d)
+   - This Month
+   - Older
+3. **Workspace list** — every workspace, each with:
+   - Phase icon (from PAN-1052's status.phase)
+   - Headline (from status.headline)
+   - Summary (line-clamped to 3 lines)
+   - Up to 3 most recent observations with non-null `actionStatus`
+   - Stats footer (additions/deletions, commits, PR status)
+4. **Knowledge registry** — feature → workspace map (see below)
 
-SQLite with both FTS5 and embeddings, for hybrid retrieval:
+Click target: workspace card → workspace overview page (not a specific conversation).
 
-```sql
-CREATE TABLE docs_chunks (
-  chunk_id INTEGER PRIMARY KEY,
-  doc_path TEXT NOT NULL,
-  doc_kind TEXT NOT NULL,           -- 'docs' | 'skill' | 'prd' | 'rule' | 'claude-md'
-  section_heading TEXT,
-  section_anchor TEXT,
-  content TEXT NOT NULL,
-  token_count INTEGER NOT NULL,
-  built_at TEXT NOT NULL            -- ISO 8601 of last index build
-);
+### Live `session-context.md`
 
-CREATE VIRTUAL TABLE docs_fts USING fts5(
-  content,
-  display_content UNINDEXED,
-  doc_path UNINDEXED,
-  doc_kind,
-  section_heading,
-  tokenize = 'porter unicode61',
-  content='docs_chunks',
-  content_rowid='chunk_id'
-);
-
-CREATE TABLE docs_embeddings (
-  chunk_id INTEGER PRIMARY KEY REFERENCES docs_chunks(chunk_id),
-  embedding BLOB NOT NULL  -- 384-dim float32 (gte-small)
-);
-```
-
-Hybrid retrieval per query:
-
-1. BM25 top 20 via FTS5 (porter stemming handles "syncing" ↔ "sync")
-2. Cosine similarity top 20 via embeddings
-3. Reciprocal Rank Fusion (RRF) to merge
-4. Rerank by `doc_kind` priority (`docs` > `skill` > `rule` > `claude-md` > `prd`) and recency
-5. Truncate to top-N
-
-### Build Pipeline
-
-`npm run build:docs-index` runs during release:
-
-```bash
-# scripts/build-docs-index.ts
-1. Walk docs/, skills/, CLAUDE.md, .claude/rules/, docs/prds/{active,planned}/
-2. Chunk by H1/H2/H3 boundaries, max 500 tokens per chunk
-3. Insert into docs_chunks + docs_fts
-4. Generate embeddings via local gte-small (or configured model)
-5. Write to dist/docs-index.sqlite
-```
-
-Embedding model choice for v1: **local gte-small** (~30MB ONNX, 384-dim, ~50ms per chunk). Zero runtime cost, ships once at build. If quality is insufficient, swap to OpenAI text-embedding-3-small via `EMBEDDINGS_PROVIDER=openai` env at build time.
-
-`pan docs reindex` regenerates from the current local repo (for dev iteration).
-
-### Install
-
-`pan install` copies `dist/docs-index.sqlite` → `~/.panopticon/docs/index.sqlite`. Idempotent: skips if hashes match.
-
-`pan upgrade` (when implemented) refreshes the index.
-
-### CLI
-
-```
-pan docs query "<text>" [--top 5] [--kind docs|skill|rule|prd] [--format markdown|json]
-pan docs reindex                                          # local rebuild
-pan docs disable [--session | --project | --global]       # silence the hook
-pan docs enable  [--session | --project | --global]
-pan docs status                                           # show index path, size, last-built, current config
-```
-
-`pan docs query` returns markdown by default:
+The dashboard server writes `~/.panopticon/session-context.md` on every state change, debounced ~500ms. Content structure (borrowed from Subspace's four-section pattern, with our honesty pass):
 
 ```markdown
-## docs/HARNESSES.md → Installing Pi
+# Working Inside Panopticon
 
-Pi is not auto-installed. Install it once, then run `pan doctor` to confirm.
+You're piloting an agent inside **Panopticon** — a multi-agent orchestrator for
+AI coding work. Panopticon is the environment around you: it remembers what's
+happened, tracks what's changing across sibling workspaces, and hands you
+context before you ask.
 
-    npm install -g @mariozechner/pi-coding-agent
+Think of it as an exoskeleton. You bring the reasoning; Panopticon brings the
+instruments.
 
-...
+## What Panopticon Gives You
+
+- **Persistent memory across sessions.** Observations (what happened), status
+  updates (synthesized state), and daily summaries (workspace digests) are
+  captured automatically and replayed to you here. This project's history with
+  you is *your* history with this project.
+- **Situational awareness.** The workspace you're in is laid out below.
+- **Cross-workspace reach (via search).** Sibling workspace state is searchable
+  via `pan memory search --all-workspaces`. It is NOT inlined below — query for
+  it when relevant.
+- **Searchable memory.** `pan memory search "<query>"` queries every past
+  observation across workspaces. FTS5, stemming-aware, ranked.
+
+## How to Read What Follows
+
+Everything below this section is context the environment gathered for you —
+not instructions, not rules. Treat it as a briefing.
+
+- **Workspace sections** — current workspace status, recent activity, summaries,
+  git state.
+- **Knowledge registry** — which workspace owns which feature.
+- **Tools sections** — CLI reference card for memory search, docs query, artifacts.
+
+Two things worth doing with the briefing:
+
+1. When the user references past work in past tense ("we decided", "last session",
+   "the X fix"), search memory first — the decision trail lives there, not in
+   the code. Your first tool call MUST be `pan memory search`. See "Memory-First
+   Triggers" below.
+2. When prior work contradicts the current request, name the contradiction.
+   Don't execute silently.
+
+The rest is context.
 
 ---
 
-## skills/pan-sync/SKILL.md → Usage
+## Current Workspace
 
-`pan sync` distributes skills/agents/rules to all configured harness locations.
+[auto-assembled from PAN-1052 status.json, recent observations, git state]
+
+## Knowledge Registry
+
+[auto-assembled from ~/.panopticon/registry/features.sqlite]
+
+## Memory-First Triggers
+
+If the user's message contains any of these phrases, your first tool call MUST
+be `pan memory search`:
+
+- "we recently …", "we just …", "we fixed …", "we shipped …", "we decided …", "we tried …"
+- "last session", "yesterday", "earlier", "before", "the other day"
+- "the <feature> fix", "that bug we", "the <thing> we worked on"
+- "remember when", "you/I added", "it used to"
+- Any reference to a recent commit or PR without a specific SHA/file
+
+Counter-example (what not to do): User says "we recently fixed the focus issue
+on new tabs, but switching tabs still doesn't focus."
+
+- Wrong: `git log --grep="focus"` → `git show <sha>` → grep codebase
+- Right: `pan memory search "tab focus switch"` first, THEN targeted reads.
+
+## Tools
+
+[CLI reference card: pan memory, pan docs query, pan artifacts]
 ```
 
-### Injection: UserPromptSubmit Hook
+### Wrapper Injection
 
-Registered once during `pan install` for each detected harness:
+**Claude Code:**
 
-**Claude Code:** `~/.claude/settings.json`:
+`pan workspace create` generates a launcher that includes:
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": "panopticon-cli/dist/hooks/docs-rag.sh"
+```bash
+claude --append-system-prompt-file "$HOME/.panopticon/session-context.md" \
+       --append-system-prompt-file "$WORKSPACE/.panopticon/context/workspace.md" \
+       "$@"
+```
+
+Both files are passed; Claude concatenates them in order.
+
+**Pi:**
+
+Pi extension reads both files at `session_start` and appends to system prompt.
+
+**Live re-injection (the key differentiator vs Subspace):**
+
+A UserPromptSubmit hook checks if `~/.panopticon/session-context.md` has a newer mtime than the session start time. If so, it prepends the latest file content as a system-level note:
+
+```bash
+# dist/hooks/briefing-refresh.sh
+prompt=$(cat)
+briefing_mtime=$(stat -c %Y "$HOME/.panopticon/session-context.md")
+session_start_mtime=$(cat "$HOME/.panopticon/sessions/$SESSION_ID/started.txt")
+if [ "$briefing_mtime" -gt "$session_start_mtime" ]; then
+  echo "$prompt"
+  echo ""
+  echo "<panopticon-briefing-update>"
+  echo "Briefing was updated since session start. Latest state below."
+  cat "$HOME/.panopticon/session-context.md"
+  echo "</panopticon-briefing-update>"
+  # Mark refreshed to avoid re-injection until next file change
+  touch "$HOME/.panopticon/sessions/$SESSION_ID/briefing-refreshed.txt"
+else
+  echo "$prompt"
+fi
+```
+
+(This shares the hook runner with PAN-1203's docs-RAG hook — both compose into a single chain.)
+
+### Knowledge Registry
+
+`~/.panopticon/registry/features.sqlite`:
+
+```sql
+CREATE TABLE features (
+  feature_id TEXT PRIMARY KEY,         -- ULID
+  feature_name TEXT NOT NULL,          -- 'context-distribution', 'memory-search', etc.
+  description TEXT,
+  owning_workspace_id TEXT,
+  owning_issue_id TEXT,                -- 'PAN-1201'
+  owning_agent_id TEXT,                -- current agent (nullable)
+  status TEXT NOT NULL,                -- 'active' | 'archived' | 'merged' | 'deferred'
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  tags TEXT                            -- JSON array
+);
+```
+
+Populated by:
+
+1. **LLM classification on issue creation** — fires when `pan issue create` runs or when a new GH issue is detected. One Haiku call extracts feature tags from title + body. Cost: ~$0.001 per issue.
+2. **Manual tagging** — `pan registry tag <issueId> <feature>` for overrides
+3. **State transitions** — on `pan done`, `pan close`, `pan pause`: update `status` field
+
+Surfaces in the briefing's cross-workspace section:
+
+```markdown
+## Knowledge Registry
+
+| Feature | Workspace | Issue | Status |
+|---|---|---|---|
+| context-distribution | feature-pan-1201 | PAN-1201 | active |
+| docs-rag | feature-pan-1203 | PAN-1203 | active |
+| activity-feed | feature-pan-1052 | PAN-1052 | active |
+```
+
+Cap at 20 entries (most recent + most relevant to current workspace).
+
+### Compliance Audit Hook (Advisory)
+
+The briefing's "Memory-First Triggers" section is text — without enforcement, models comply unevenly (Subspace's agent confirmed this).
+
+**Stop-hook chain addition:**
+
+```typescript
+// src/lib/hooks/compliance-audit.ts
+async function onStopHook(turn: TurnRecord) {
+  const userMessage = turn.lastUserMessage
+  const triggers = matchTriggerPhrases(userMessage)
+  if (triggers.length === 0) return
+
+  const firstToolCall = turn.toolCalls[0]
+  const usedMemorySearch = firstToolCall?.tool === 'Bash' &&
+                           firstToolCall.command?.startsWith('pan memory search')
+
+  if (!usedMemorySearch) {
+    await logComplianceMiss({
+      sessionId: turn.sessionId,
+      agentRole: turn.agentRole,
+      agentHarness: turn.agentHarness,
+      triggerPhrases: triggers,
+      firstToolCall: firstToolCall?.tool ?? null,
+      firstToolCallCommand: firstToolCall?.command ?? null,
+      timestamp: new Date().toISOString(),
+    })
   }
 }
 ```
 
-**Pi:** registered via Pi's hook mechanism (extension API; pattern matches Claude Code's).
+`compliance.miss` is written as a special observation type to PAN-1052's memory store. The UserPromptSubmit hook on the *next* prompt checks for recent misses (last 1 prompt) and prepends a soft warning:
 
-The hook script:
-
-```bash
-#!/usr/bin/env bash
-# panopticon-cli/dist/hooks/docs-rag.sh
-# Receives prompt via stdin; outputs augmented prompt or original.
-
-prompt=$(cat)
-
-# Trigger check: regex or classifier
-if echo "$prompt" | rg -i "(pan|panopticon|cloister|deacon|workspace|specialist|harness|bd|beads|vbrief|workhorse)" > /dev/null; then
-  # Budget check
-  budget=$(pan docs budget-check)  # returns "ok" or "exceeded"
-  if [ "$budget" = "ok" ]; then
-    snippets=$(pan docs query "$prompt" --top 3 --format markdown)
-    if [ -n "$snippets" ]; then
-      echo "$prompt"
-      echo ""
-      echo "<panopticon-docs>"
-      echo "$snippets"
-      echo "</panopticon-docs>"
-      pan docs budget-bump
-      exit 0
-    fi
-  fi
-fi
-
-echo "$prompt"
+```markdown
+[Panopticon nudge] Last turn included a memory-first trigger phrase ("we recently fixed the focus issue") but `pan memory search` wasn't called. Consider searching memory first next time — it has the decision trail and reasoning that git doesn't.
 ```
 
-Detection has two layers:
+**Modes** (configurable in `~/.panopticon/config.yaml`):
 
-1. **Regex trigger** — fast, configurable in `~/.panopticon/config.yaml` under `docs.triggers`
-2. **Optional classifier fallback** — if regex doesn't match but prompt looks Panopticon-adjacent (e.g., asks about agents, workflows), a cheap Haiku call rates relevance. Off by default; enable via `docs.classifier.enabled = true`.
-
-### Budget Controls
-
-Per-conversation cap to avoid token blowout:
-
-| Limit | Default | Config Key |
-|---|---|---|
-| Max injections per conversation | 1 per 10 turns | `docs.budget.injectionRate` |
-| Max retrieved tokens per injection | 3000 | `docs.budget.maxTokensPerInjection` |
-| Max retrieved chunks per injection | 5 | `docs.budget.maxChunksPerInjection` |
-| Override threshold (high-confidence prompts skip rate limit) | classifier ≥ 0.85 | `docs.budget.bypassClassifierThreshold` |
-
-State tracked in `~/.panopticon/docs/budget-state.json` keyed by conversation/session ID.
-
-### Telemetry
-
-Every injection writes a JSONL entry to `~/.panopticon/docs/telemetry.jsonl`:
-
-```json
-{"ts":"...","conversationId":"...","trigger":"regex","matched":["pan","sync"],"retrievedChunks":[{"path":"docs/HARNESSES.md","heading":"Installing Pi","score":0.83}],"tokens":847,"truncated":false}
-```
-
-Used for tuning trigger regex + measuring effectiveness.
-
-## Acceptance Criteria
-
-- `npm run build:docs-index` produces `dist/docs-index.sqlite` < 50MB
-- `pan install` materializes index to `~/.panopticon/docs/index.sqlite`
-- `pan docs query "how do I run pan sync"` returns relevant snippets in < 200ms (cold), < 50ms (warm)
-- `pan docs reindex` regenerates from current local docs/skills in < 60s
-- UserPromptSubmit hook is registered for both Claude Code and Pi during `pan install`
-- A prompt containing "how do I use pan sync" triggers injection of relevant `docs/SYNC.md` or `skills/pan-sync/SKILL.md` snippets
-- `pan docs disable` silences the hook for the current session
-- Budget caps respected; conversation that already hit injection limit does not re-inject within rate window
-- Telemetry written to `~/.panopticon/docs/telemetry.jsonl`
-- `pan docs status` shows index path, size, last-built timestamp, enabled/disabled state
-- New tests: chunking correctness, hybrid retrieval ranking, budget state, regex trigger matching, hook integration
-
-## Test Plan
-
-Unit:
-- Markdown chunking: H1/H2/H3 boundaries, code block preservation, token counting accuracy
-- BM25 + embeddings RRF merge correctness
-- Trigger regex matching against fixture prompts
-- Budget state advancement and reset
-
-Integration:
-- Build a fixture index from `tests/fixtures/docs/`, query, assert ranking
-- Run hook script with fixture prompts; assert output contains `<panopticon-docs>` block iff trigger matches
-- End-to-end: install, query, disable, query (no injection), enable, query (injection resumes)
-
-## Out of Scope (Phase 2)
-
-- Cross-repo RAG (e.g., indexing arbitrary user docs)
-- Embedding model swaps without rebuild (today, swap requires rebuild + ship)
-- Inline citation rendering ("from docs/SYNC.md, section Installing Pi: …")
-- Per-skill RAG (current model is single global index across all docs)
-- Vector store backends other than SQLite (sufficient for our scale)
-
-## Files Likely Touched
-
-- `scripts/build-docs-index.ts` (new) — build pipeline
-- `src/lib/docs/` (new) — chunking, retrieval, budget, telemetry
-- `src/cli/commands/docs.ts` (new) — `pan docs query/reindex/disable/enable/status/budget-check/budget-bump`
-- `dist/hooks/docs-rag.sh` (new) — UserPromptSubmit hook script (shipped in package)
-- `src/cli/commands/install.ts` — register hook in both harnesses' settings
-- `packages/contracts/src/types.ts` — `DocsChunk`, `RetrievalResult`, `BudgetState`
-- `src/lib/config-yaml.ts` — `docs.*` config schema
-- `tests/lib/docs/*.test.ts` (new)
-- `docs/DOCS-RAG.md` (new) — operator guide
-- `package.json` — `build:docs-index` script + native module deps for embeddings
-
----
-
-# PAN-1205 — HTML Artifacts
-
-**Issue:** [PAN-1205](https://github.com/eltmon/panopticon-cli/issues/1205)
-**Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
-**Status:** Planned
-**Date:** 2026-05-18
-
----
-
-## Problem
-
-Panopticon agents today produce only text — diffs, markdown summaries, CLI output. Sometimes the best work product is visual and interactive:
-
-- Side-by-side comparison of three options
-- A dashboard showing test coverage trends
-- A PR review page with embedded screenshots and annotations
-- A timeline of a multi-week refactor
-- A presentation that a non-technical stakeholder can click through
-- A decision matrix
-
-There's no way for an agent to produce, validate, share, or attach such an artifact to its workspace's record. The competing product Subspace has this capability, and it's effective; we should have it, and we should do it better.
-
-## Goal
-
-Add a first-class HTML artifacts capability:
-
-1. `pan artifacts` CLI with `validate / create / publish / status / url / open / list / unshare`
-2. **Real validation** (not just metadata): secret scanning, size enforcement, asset-path linting
-3. **Isolated origins** for the wrapper page vs raw artifact (XSS/CSP boundary)
-4. **Full provenance metadata** linking each artifact to its issue, agent, run, harness
-5. Dashboard workspace inspector tab listing artifacts with thumbnails
-
-## Design Goals
-
-- **Self-contained files** — no external deps, no relative paths, no local assets
-- **Tamper-evident** — content hash tracks edits; `pendingChanges` is automatic
-- **Stakeholder-shareable** — `panopticon.localhost/s/<slug>` (with dashboard chrome) and `panopticon.localhost/a/<slug>` (raw, sandboxed) are first-class
-- **Provenance-rich** — every artifact knows who made it, when, for which issue
-- **Safe by default** — secret scanner catches accidental leaks; size cap enforced; assets locked down
-
-## Architecture
-
-### File Format Rules
-
-Validated at `pan artifacts validate`:
-
-| Rule | Enforcement |
+| Mode | Behavior |
 |---|---|
-| Single `.html` or `.htm` file | Hard (reject directory or non-HTML) |
-| All CSS inline (`<style>` blocks) or in `style=` attrs | Hard (reject `<link rel="stylesheet" href="…">` with non-data: URL) |
-| All JS inline (`<script>` blocks) | Hard (reject `<script src="…">` with non-data: URL) |
-| Images: embedded SVG, data URLs, or HTTPS URLs | Hard (reject `./`, `../`, `/local/`, `file://`, `http://`) |
-| Total file size ≤ 1 MB | Hard |
-| No secrets in file body | Hard (regex match → reject) |
-| Optional: strict mode | Soft (`--strict` flag enables additional checks) |
+| `off` | Disabled entirely |
+| `advisory` (v1 default) | Log misses, prepend soft warning next prompt |
+| `enforcing` (Phase 2) | Block git/grep/Read tool calls until memory search runs |
 
-### Secret Scanner (Subspace has none)
+Telemetry written to `~/.panopticon/compliance/telemetry.jsonl` for tuning trigger phrases.
 
-Regex set:
-
-| Pattern | Matches |
-|---|---|
-| `AKIA[0-9A-Z]{16}` | AWS access key ID |
-| `ghp_[A-Za-z0-9]{36}` | GitHub PAT |
-| `gho_[A-Za-z0-9]{36}` | GitHub OAuth token |
-| `github_pat_[A-Za-z0-9_]{82}` | GitHub fine-grained PAT |
-| `sk-ant-(api03|admin01)-[A-Za-z0-9_-]{86,}` | Anthropic API key |
-| `sk-(proj-)?[A-Za-z0-9]{20,}` | OpenAI key |
-| `xox[baprs]-[A-Za-z0-9-]{10,}` | Slack tokens |
-| `-----BEGIN (RSA |OPENSSH |DSA |EC )?PRIVATE KEY-----` | SSH/TLS private keys |
-| `(password|passwd|secret|api[_-]?key|token)\s*[:=]\s*['"][^'"]{8,}['"]` | Common .env-style assignments |
-| High-entropy detector | Optional with `--strict`: Shannon entropy > 4.5 on 20+ char strings |
-
-False positives are accepted; user can suppress per-line with `<!-- artifact-allow-secret -->` comment (and a warning is logged).
-
-### CLI
+## CLI Surface
 
 ```
-pan artifacts validate <file>              # validate, no publish
-pan artifacts validate <file> --strict     # additional checks (entropy, DOM hygiene)
-pan artifacts create <file>                # validate + publish in one step
-pan artifacts status <file>                # currentHash vs lastPublishedHash; pendingChanges
-pan artifacts publish <file>               # re-publish after edits (require pendingChanges)
-pan artifacts url <file>                   # print public URL
-pan artifacts open <file>                  # open in browser via xdg-open
-pan artifacts list                         # all artifacts visible to user
-pan artifacts list --workspace <id>        # filtered to a workspace
-pan artifacts unshare <file> --yes         # disable URL (keeps file + metadata)
-pan artifacts diff <file>                  # show what differs from last published
-```
+pan briefing                        # Output current session-context.md to stdout
+pan briefing refresh                # Force a rewrite (idempotent; debug)
+pan briefing edit                   # Edit the global header template
 
-All commands emit JSON when `--json` is passed (machine-readable for agents).
+pan registry list                   # All features
+pan registry list --workspace <id>  # Features owned by a workspace
+pan registry tag <issueId> <feature> [--description "…"]
+pan registry untag <issueId> <feature>
+pan registry show <feature>
 
-### Provenance Metadata
-
-Every artifact entry in `~/.panopticon/artifacts/index.sqlite`:
-
-```sql
-CREATE TABLE artifacts (
-  artifact_id TEXT PRIMARY KEY,         -- ULID
-  slug TEXT NOT NULL UNIQUE,            -- 8-char URL-safe, base32
-  issue_id TEXT,                         -- 'PAN-1052' (nullable for user-authored)
-  workspace_id TEXT,                     -- (nullable for user-authored)
-  agent_role TEXT,                       -- 'work' | 'review' | etc.
-  agent_harness TEXT,                    -- 'claude-code' | 'pi' | 'user'
-  run_id TEXT,                           -- from PAN-1052's identity model
-  session_id TEXT,
-  file_path TEXT NOT NULL,
-  current_hash TEXT NOT NULL,            -- SHA-256 of file contents
-  last_published_hash TEXT,              -- nullable until first publish
-  supersedes TEXT,                       -- previous artifact_id for the same logical thing
-  title TEXT,                            -- extracted from <title> tag
-  description TEXT,                      -- agent or user supplied
-  created_at TEXT NOT NULL,
-  published_at TEXT,
-  unshared_at TEXT
-);
-
-CREATE INDEX artifacts_workspace ON artifacts(workspace_id);
-CREATE INDEX artifacts_issue ON artifacts(issue_id);
-CREATE INDEX artifacts_slug ON artifacts(slug);
-```
-
-Agents creating artifacts pass `--issue <id> --agent-role <role>` (or environment variables `PAN_ISSUE_ID`, `PAN_AGENT_ROLE` set by the spawn wrapper).
-
-### Publishing Architecture
-
-Dashboard serves two routes via Traefik:
-
-| Route | Origin | Purpose | Auth |
-|---|---|---|---|
-| `panopticon.localhost/s/<slug>` | `panopticon.localhost` | Wrapper page: dashboard chrome, "Made by Bender for PAN-1052", comment thread, Open Artifact button | Inherits dashboard auth |
-| `panopticon.localhost/a/<slug>` | `artifacts.panopticon.localhost` (separate Traefik route on a separate subdomain) | Raw artifact HTML, served in sandbox iframe via the wrapper | No auth; CSP `default-src 'self' 'unsafe-inline' data: https:` |
-
-The separate origin prevents the artifact's JavaScript from accessing wrapper-domain cookies or localStorage. Traefik dynamic config:
-
-```yaml
-http:
-  routers:
-    panopticon-artifacts:
-      rule: "Host(`artifacts.panopticon.localhost`)"
-      service: panopticon-dashboard
-      tls:
-        certResolver: mkcert
-    panopticon-dashboard:
-      rule: "Host(`panopticon.localhost`)"
-      service: panopticon-dashboard
-      tls:
-        certResolver: mkcert
-```
-
-The dashboard server serves both: `/a/<slug>` returns raw artifact HTML with strong CSP; `/s/<slug>` returns the wrapper page (React component embedding the iframe).
-
-### Wrapper Page Content
-
-`/s/<slug>` shows:
-
-- **Header:** "Artifact: \<title>" + "Made by \<agent-role> via \<harness> for \<issue\> on \<date>"
-- **Action row:** Open in new tab, Copy link, Share via tunnel (Phase 2), Unshare
-- **Embed:** iframe `<iframe src="/a/<slug>" sandbox="allow-scripts allow-same-origin" />` (same-origin only allowed because the iframe is loading from a *different* origin already, so "same-origin" within the iframe doesn't grant access to the wrapper)
-- **Comments:** simple thread (workspace context preserved); optional
-- **Related artifacts:** other artifacts from the same workspace or issue
-
-### Sandbox Isolation Verification
-
-Test: create an artifact with JavaScript that does `try { document.cookie } catch (e) { … }` and `try { localStorage.getItem('x') } catch (e) { … }`. Embedding it in the wrapper page, the artifact's JS sees no cookies or storage from `panopticon.localhost`. Verified by Playwright assertion in integration test.
-
-### Sharing Beyond localhost (Phase 2 placeholder)
-
-`pan artifacts share --tunnel <file>` stub in v1 — prints "tunneling not yet supported in v1; see PAN-XXXX for Phase 2." Designed but not implemented to avoid scope creep.
-
-## Dashboard Integration
-
-New tab on the workspace inspector: **Artifacts**.
-
-- Grid of cards, each showing:
-  - Thumbnail (rendered server-side via Playwright headless screenshot, cached)
-  - Title
-  - Created date + agent role + harness
-  - Status badges: Published / Pending / Unshared
-  - Quick actions: Open `/s/<slug>`, Copy link, Unshare
-- Sort by: most recent, title alpha
-- Filter by: agent role, status, has-pending-changes
-
-## CLI Examples
-
-Agent flow:
-
-```bash
-# Agent writes the file
-$ cat > comparison.html <<'EOF'
-<!DOCTYPE html>
-<html>
-<head><title>RAG Approach Comparison</title>...</head>
-<body>...</body>
-</html>
-EOF
-
-# Validate
-$ pan artifacts validate comparison.html --json
-{"ok":true,"warnings":[],"size":48231,"hash":"sha256:abc123…"}
-
-# Publish (validate + create in one)
-$ pan artifacts create comparison.html --issue PAN-1052 --agent-role work
-{"artifactId":"01HXYZ…","slug":"k3p9m2qr","url":"https://panopticon.localhost/s/k3p9m2qr","published":true}
-
-# Later: edit file, check status
-$ pan artifacts status comparison.html
-pendingChanges: true
-  currentHash:        sha256:def456…
-  lastPublishedHash:  sha256:abc123…
-
-# Republish
-$ pan artifacts publish comparison.html
-{"published":true,"url":"https://panopticon.localhost/s/k3p9m2qr"}
+pan compliance status               # Mode, recent misses, telemetry summary
+pan compliance set-mode <mode>      # off | advisory | enforcing
+pan compliance triggers list        # Show current trigger phrase set
+pan compliance triggers add "<phrase>"
 ```
 
 ## Acceptance Criteria
 
-- `pan artifacts validate` rejects: files with AWS/GitHub/OpenAI/Anthropic secrets, files > 1MB, files with `<img src="./…">`, files with `<script src="../…">`, files with `<link href="http://…">` (non-HTTPS)
-- `pan artifacts create` publishes successfully to `panopticon.localhost/s/<slug>`
-- The wrapper page shows correct provenance metadata
-- The raw page at `/a/<slug>` is served from a different origin (`artifacts.panopticon.localhost`)
-- `pendingChanges: true` correctly detected when file hash differs from last published; `false` otherwise
-- `pan artifacts publish` updates the published hash on success
-- `pan artifacts unshare` disables the URL (returns 410 Gone) but preserves file + DB record
-- `pan artifacts list --workspace <id>` shows correct subset
-- Dashboard workspace inspector renders Artifacts tab with thumbnails and quick actions
-- Sandbox isolation: artifact's JS cannot access `panopticon.localhost` cookies (Playwright assertion passes)
-- `--strict` mode catches: high-entropy strings, inline event handlers (`onclick="…"` without CSP), missing alt text on images
-- New tests: validator regex coverage, hash comparison, slug uniqueness, sandbox isolation, provenance metadata, `pendingChanges` detection
+- Home tab is the dashboard landing route; header summary, activity feed, workspace cards, knowledge registry all render
+- `~/.panopticon/session-context.md` is written by dashboard server on state change (debounced ~500ms)
+- Both Claude Code and Pi wrapper scripts inject the file as a system-prompt-append at session start
+- UserPromptSubmit hook re-injects (as `<panopticon-briefing-update>`) if file is newer than session start
+- Knowledge registry: LLM classification fires on issue creation; section appears in briefing; `pan registry list` shows entries; `pan registry tag` writes manually
+- Compliance audit hook logs `compliance.miss` observations correctly when trigger matches and memory search wasn't first
+- Next-prompt soft-warning prepend works for advisory mode
+- `pan briefing` outputs the same content for terminal-only sessions
+- `pan compliance status` shows current mode and miss count
+- New tests: briefing freshness detection, trigger phrase matching, advisory warning prepend, knowledge-registry classification (with mock LLM)
 
 ## Test Plan
 
 Unit:
-- Validator: each regex pattern with positive + negative fixtures
-- Asset path linter: each forbidden pattern + accepted patterns (data URLs, HTTPS)
-- Hash comparison + `pendingChanges` logic
-- Slug generation: uniqueness, URL-safety, length
+- `matchTriggerPhrases(message)` — exhaustive trigger list + edge cases (contractions, capitalization)
+- `assembleBriefing(state)` — section assembly correctness
+- `detectBriefingStaleness(briefingPath, sessionStartTime)` — mtime comparison
+- `classifyIssueFeature(title, body)` — fixture title/body → expected feature tag (mock LLM)
 
 Integration:
-- Full lifecycle: validate → create → status (no changes) → edit file → status (pending) → publish → status (no changes) → unshare → URL returns 410
-- Sandbox isolation: Playwright loads `/s/<slug>`, asserts iframe at `/a/<slug>` cannot read wrapper cookies
-- Dashboard inspector: workspace with N artifacts renders N cards with correct thumbnails
-- Concurrent publish race: two agents publishing different files don't collide on slug
+- Spawn an agent; verify session-context.md is injected at start
+- Update workspace state; verify file rewrite happens within 1s; verify next UserPromptSubmit re-injects
+- User message with trigger phrase + agent calls git first → compliance.miss logged → next prompt has soft warning
+- Knowledge registry: create issue → classifier fires → entry visible in briefing within next state-change cycle
 
 ## Out of Scope (Phase 2)
 
-- Tunnel sharing (Tailscale Funnel / ngrok) — CLI flag stubbed, implementation deferred
-- XSS deep scanning — high false-positive rate; defer
-- Artifact templating helpers (`pan artifacts new --template comparison`)
-- In-dashboard artifact editor
-- Artifact version history UI (the `supersedes` chain is in the schema; UI to navigate it defers)
-- Public registry / artifact marketplace
+- Enforcing compliance mode (blocks tool calls)
+- Dashboard inline-editing of the briefing template
+- Per-user briefing personalization (today, briefing is per-machine)
+- Daily summary scheduled job (Subspace's runSummarize equivalent; we can add later if useful)
+- Compliance gamification ("X turns since last miss")
 
 ## Files Likely Touched
 
-- `src/lib/artifacts/` (new) — validation, publish, sandbox config
-- `src/cli/commands/artifacts.ts` (new) — full CLI surface
-- `src/dashboard/server/routes/artifacts.ts` (new) — `/api/artifacts/*`, `/s/<slug>`, `/a/<slug>`
-- `src/dashboard/frontend/src/components/ArtifactsTab.tsx` (new)
-- `src/dashboard/frontend/src/components/ArtifactWrapper.tsx` (new) — the `/s/<slug>` React component
-- `packages/contracts/src/types.ts` — `Artifact`, `ArtifactValidationResult`, `ArtifactStatus`
-- `infra/traefik/dynamic/artifacts.toml` (new) — `artifacts.panopticon.localhost` route
-- `dist/scripts/render-thumbnail.ts` (new) — Playwright headless thumbnail generator
-- `tests/lib/artifacts/*.test.ts` (new) — validator, publish, sandbox
-- `tests/integration/artifacts-lifecycle.test.ts` (new)
-- `docs/ARTIFACTS.md` (new) — operator + agent guide
+- `src/lib/briefing/` (new) — assembly, write, freshness detection
+- `src/lib/registry/` (new) — features.sqlite schema, classifier, CRUD
+- `src/lib/hooks/compliance-audit.ts` (new) — Stop-hook + UserPromptSubmit additions
+- `src/cli/commands/briefing.ts`, `src/cli/commands/registry.ts`, `src/cli/commands/compliance.ts` (new)
+- `src/dashboard/server/routes/home.ts` (new), `src/dashboard/server/routes/registry.ts` (new)
+- `src/dashboard/server/services/briefing-writer.ts` (new) — debounced file writer
+- `src/dashboard/frontend/src/pages/HomePage.tsx` (new)
+- `src/dashboard/frontend/src/router.tsx` — set HomePage as default route
+- `dist/hooks/briefing-refresh.sh` (new)
+- `packages/contracts/src/types.ts` — `RegistryEntry`, `ComplianceMiss`, `BriefingContent`
+- `tests/lib/briefing/*.test.ts`, `tests/lib/compliance/*.test.ts`, `tests/lib/registry/*.test.ts` (new)
+- `docs/HOME-TAB.md`, `docs/COMPLIANCE.md`, `docs/KNOWLEDGE-REGISTRY.md` (new)
