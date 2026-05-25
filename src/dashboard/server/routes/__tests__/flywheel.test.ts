@@ -1,9 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
+  flywheelRouteLayer,
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
@@ -16,6 +20,27 @@ import {
 } from '../flywheel.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
+import { resetDatabase } from '../../../../lib/database/index.js';
+import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
+
+interface RouteResult {
+  status: number;
+  body: unknown;
+}
+
+async function requestFlywheelRoute(path: string, init: RequestInit = {}): Promise<RouteResult> {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(flywheelRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      ),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) };
+}
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -84,6 +109,69 @@ describe('resolveFlywheelBriefPath', () => {
     } finally {
       await rm(outsideDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('flywheel config routes', () => {
+  let panopticonHome: string;
+
+  beforeEach(() => {
+    panopticonHome = join(tmpdir(), `pan-flywheel-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(panopticonHome, { recursive: true });
+    process.env.PANOPTICON_HOME = panopticonHome;
+  });
+
+  afterEach(() => {
+    resetDatabase();
+    delete process.env.PANOPTICON_HOME;
+    rmSync(panopticonHome, { recursive: true, force: true });
+  });
+
+  it('returns both flywheel config defaults without requiring origin headers', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config')).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: false, require_uat_before_merge: true },
+    });
+  });
+
+  it('origin-validates flywheel config updates', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_pickup_backlog: true }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+  });
+
+  it('updates auto-pickup backlog and returns both values', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ auto_pickup_backlog: true }),
+    })).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: true, require_uat_before_merge: true },
+    });
+  });
+
+  it('updates require-UAT and leaves auto-pickup unchanged on partial update', async () => {
+    setFlywheelAutoPickupBacklog(true);
+
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ require_uat_before_merge: false }),
+    })).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: true, require_uat_before_merge: false },
+    });
+  });
+
+  it('rejects non-boolean flywheel config values', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ auto_pickup_backlog: 'yes' }),
+    })).resolves.toEqual({ status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } });
   });
 });
 

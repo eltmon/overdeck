@@ -27,6 +27,12 @@ import {
   startFlywheelRunForDashboard,
 } from '../services/flywheel-actions.js';
 import { readFlywheelState } from '../services/flywheel-state.js';
+import {
+  isFlywheelAutoPickupBacklog,
+  isFlywheelRequireUatBeforeMerge,
+  setFlywheelAutoPickupBacklog,
+  setFlywheelRequireUatBeforeMerge,
+} from '../../../lib/database/app-settings.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -38,6 +44,16 @@ interface BriefRequestBody {
 
 interface StartRequestBody {
   brief?: unknown;
+}
+
+interface FlywheelConfigRequestBody {
+  auto_pickup_backlog?: unknown;
+  require_uat_before_merge?: unknown;
+}
+
+interface FlywheelConfigResponseBody {
+  auto_pickup_backlog: boolean;
+  require_uat_before_merge: boolean;
 }
 
 interface ReportOpenRequestBody {
@@ -166,6 +182,32 @@ export async function getFlywheelRunPayload(runId: string, options: FlywheelRunS
   return getFlywheelRunDetail(runId, options);
 }
 
+export function getFlywheelConfigPayload(): FlywheelConfigResponseBody {
+  return {
+    auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
+    require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
+  };
+}
+
+export async function postFlywheelConfigPayload(payload: unknown) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+
+  const body = payload as FlywheelConfigRequestBody;
+  if (body.auto_pickup_backlog !== undefined && typeof body.auto_pickup_backlog !== 'boolean') {
+    return { status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } };
+  }
+  if (body.require_uat_before_merge !== undefined && typeof body.require_uat_before_merge !== 'boolean') {
+    return { status: 400, body: { error: 'require_uat_before_merge must be a boolean' } };
+  }
+
+  if (body.auto_pickup_backlog !== undefined) setFlywheelAutoPickupBacklog(body.auto_pickup_backlog);
+  if (body.require_uat_before_merge !== undefined) setFlywheelRequireUatBeforeMerge(body.require_uat_before_merge);
+
+  return { status: 200, body: getFlywheelConfigPayload() };
+}
+
 export async function getFlywheelCurrentPayload() {
   return readCurrentFlywheelStatusForDashboard();
 }
@@ -268,6 +310,30 @@ const getFlywheelCurrentRoute = HttpRouter.add(
   '/api/flywheel/current',
   httpHandler(Effect.gen(function* () {
     return yield* Effect.promise(async () => jsonResponse(await getFlywheelCurrentPayload()));
+  })),
+);
+
+const getFlywheelConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/config',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getFlywheelConfigPayload());
+  })),
+);
+
+const postFlywheelConfigRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/config',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+
+    const result = yield* Effect.promise(() => postFlywheelConfigPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -491,6 +557,8 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunRoute,
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
+  getFlywheelConfigRoute,
+  postFlywheelConfigRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

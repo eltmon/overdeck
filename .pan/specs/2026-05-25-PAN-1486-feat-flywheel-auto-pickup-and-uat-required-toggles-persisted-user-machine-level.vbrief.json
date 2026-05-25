@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:22:27.826Z"
+    "updated": "2026-05-25T09:26:08.674Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:22:27.826Z",
+    "updated": "2026-05-25T09:26:08.674Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -302,7 +302,7 @@
       {
         "id": "b05-config-http-routes",
         "title": "Add GET/POST /api/flywheel/config routes for the two toggles",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -318,7 +318,7 @@
           {
             "id": "b05.ac1",
             "title": "GET /api/flywheel/config returns the two toggles and their current values without authentication required (read-only).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -326,7 +326,7 @@
           {
             "id": "b05.ac2",
             "title": "POST /api/flywheel/config is origin-validated; missing-origin returns 403 with the same error shape as other flywheel POST routes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -334,7 +334,7 @@
           {
             "id": "b05.ac3",
             "title": "POST with {auto_pickup_backlog: 'yes'} or any non-boolean value returns 400 with a clear error naming the offending key.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -342,7 +342,7 @@
           {
             "id": "b05.ac4",
             "title": "POST with a partial body updates only the named key; the other key is untouched.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -350,7 +350,7 @@
           {
             "id": "b05.ac5",
             "title": "Vitest route tests in src/dashboard/server/routes/__tests__/flywheel.test.ts cover GET, POST happy path (each key), 403 on missing origin, 400 on invalid body, partial update.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
