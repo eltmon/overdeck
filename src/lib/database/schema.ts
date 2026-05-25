@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -349,6 +349,28 @@ export function initSchema(db: Database.Database): void {
       window_start TEXT NOT NULL,
       limit_per_window INTEGER NOT NULL DEFAULT 1000
     );
+
+    CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+      issue_id               TEXT PRIMARY KEY,
+      filed_at               TEXT NOT NULL,
+      run_id                 TEXT,
+      filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+      discovered_in_issue_id TEXT,
+      severity               TEXT NOT NULL DEFAULT 'P2',
+      status                 TEXT NOT NULL DEFAULT 'open',
+      fix_merged_at          TEXT,
+      fix_commit_sha         TEXT,
+      updated_at             TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+      ON flywheel_substrate_bugs(filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+      ON flywheel_substrate_bugs(filed_by, filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+      ON flywheel_substrate_bugs(status, fix_merged_at);
 
     -- ===== Domain Events (PAN-428: push-first architecture) =====
     CREATE TABLE IF NOT EXISTS events (
@@ -1215,6 +1237,32 @@ export function runMigrations(db: Database.Database): void {
       db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
                  ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
     } catch { /* already exists */ }
+  }
+
+  if (currentVersion < 44) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+        issue_id               TEXT PRIMARY KEY,
+        filed_at               TEXT NOT NULL,
+        run_id                 TEXT,
+        filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+        discovered_in_issue_id TEXT,
+        severity               TEXT NOT NULL DEFAULT 'P2',
+        status                 TEXT NOT NULL DEFAULT 'open',
+        fix_merged_at          TEXT,
+        fix_commit_sha         TEXT,
+        updated_at             TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+        ON flywheel_substrate_bugs(filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+        ON flywheel_substrate_bugs(filed_by, filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+        ON flywheel_substrate_bugs(status, fix_merged_at);
+    `);
   }
 
   // After all migrations, set the version

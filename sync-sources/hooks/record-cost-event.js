@@ -4036,6 +4036,28 @@ function initSchema(db) {
       limit_per_window INTEGER NOT NULL DEFAULT 1000
     );
 
+    CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+      issue_id               TEXT PRIMARY KEY,
+      filed_at               TEXT NOT NULL,
+      run_id                 TEXT,
+      filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+      discovered_in_issue_id TEXT,
+      severity               TEXT NOT NULL DEFAULT 'P2',
+      status                 TEXT NOT NULL DEFAULT 'open',
+      fix_merged_at          TEXT,
+      fix_commit_sha         TEXT,
+      updated_at             TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+      ON flywheel_substrate_bugs(filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+      ON flywheel_substrate_bugs(filed_by, filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+      ON flywheel_substrate_bugs(status, fix_merged_at);
+
     -- ===== Domain Events (PAN-428: push-first architecture) =====
     CREATE TABLE IF NOT EXISTS events (
       sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4263,7 +4285,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 43`);
+	db.pragma(`user_version = 44`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4271,7 +4293,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 43) return;
+	if (currentVersion === 44) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4760,7 +4782,30 @@ function runMigrations(db) {
                  ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
 		} catch {}
 	}
-	db.pragma(`user_version = 43`);
+	if (currentVersion < 44) db.exec(`
+      CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+        issue_id               TEXT PRIMARY KEY,
+        filed_at               TEXT NOT NULL,
+        run_id                 TEXT,
+        filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+        discovered_in_issue_id TEXT,
+        severity               TEXT NOT NULL DEFAULT 'P2',
+        status                 TEXT NOT NULL DEFAULT 'open',
+        fix_merged_at          TEXT,
+        fix_commit_sha         TEXT,
+        updated_at             TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+        ON flywheel_substrate_bugs(filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+        ON flywheel_substrate_bugs(filed_by, filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+        ON flywheel_substrate_bugs(status, fix_merged_at);
+    `);
+	db.pragma(`user_version = 44`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
