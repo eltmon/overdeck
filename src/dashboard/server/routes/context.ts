@@ -40,6 +40,12 @@ type ContextSyncCommandResult = {
 
 export type ContextSyncRunner = () => Promise<ContextSyncCommandResult>;
 
+type DashboardContextSyncResponse = ContextSyncResponse & {
+  ok: boolean;
+  status: 'synced' | 'failed';
+  error?: string;
+};
+
 type ProjectEntry = { key: string; config: ProjectConfig };
 
 type ContextCatalog = {
@@ -204,7 +210,7 @@ async function resolveLayerFile(
   const allowedWorkspace = contextCatalog.workspaces.find(
     (workspace) => workspace.projectKey === target.projectKey && resolve(workspace.path) === resolvedWorkspacePath,
   );
-  if (!allowedWorkspace) throw new Error(`Unknown workspace for project ${target.projectKey}: ${target.workspacePath}`);
+  if (!allowedWorkspace) throw new Error(`Unknown workspace for project ${target.projectKey}: ${target.workspacePath}; target is outside the workspace allowlist`);
 
   const file = workspaceContextFile(resolvedWorkspacePath);
   assertPathInside(resolvedWorkspacePath, file);
@@ -318,7 +324,7 @@ function formatFullPrompt(previews: Record<Harness, string>): string {
   return [
     '# Full injected prompt preview',
     '',
-    'Private harness base prompt: unavailable. Panopticon cannot inspect or reproduce the private base prompt owned by the harness provider.',
+    'Private harness base prompt: unavailable. Unavailable to Panopticon; it cannot inspect or reproduce the private base prompt owned by the harness provider.',
     '',
     '## Panopticon-controlled Claude Code bundle',
     '',
@@ -482,23 +488,29 @@ function syncOutput(error: unknown, key: 'stdout' | 'stderr'): string {
 
 export async function syncContextLayers(
   runner: ContextSyncRunner = runPanContextSync,
-): Promise<ContextSyncResponse> {
+): Promise<DashboardContextSyncResponse> {
   const syncedAt = new Date().toISOString();
   try {
     const { stdout, stderr } = await runner();
     return {
       operation: 'sync',
       success: true,
+      ok: true,
+      status: 'synced',
       stdout,
       stderr,
       syncedAt,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'pan context sync failed';
     return {
       operation: 'sync',
       success: false,
+      ok: false,
+      status: 'failed',
       stdout: syncOutput(error, 'stdout'),
-      stderr: syncOutput(error, 'stderr') || (error instanceof Error ? error.message : 'pan context sync failed'),
+      stderr: syncOutput(error, 'stderr') || message,
+      error: message,
       ...(syncExitCode(error) !== undefined ? { exitCode: syncExitCode(error)! } : {}),
       syncedAt,
     };
