@@ -15,6 +15,7 @@ export interface FlywheelOrchestrator {
 }
 
 export const FlywheelEffort = Schema.Literals(["low", "medium", "high", "xhigh", "max"])
+export type FlywheelEffortValue = typeof FlywheelEffort.Type
 export const FlywheelOrchestrator = Schema.Struct({
   harness: FlywheelHarness,
   model: Schema.String,
