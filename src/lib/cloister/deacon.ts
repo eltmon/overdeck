@@ -153,6 +153,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 
 // ============================================================================
 // Configuration
@@ -4487,6 +4488,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const resumeActions = await autoResumeStoppedWorkAgents();
   actions.push(...resumeActions);
   for (const a of resumeActions) addLog('action', a, state.patrolCycle);
+
+  const orphanProposedActions = await reconcileOrphanProposedSpecs();
+  actions.push(...orphanProposedActions);
+  for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop

@@ -1458,11 +1458,20 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
         ...(existing?.sub ?? {}),
         ...(roleConfig.sub ?? {}),
       };
-      result.roles[role] = {
+      const mergedRoleConfig = {
         ...existing,
         ...roleConfig,
         sub: Object.keys(sub).length > 0 ? sub : undefined,
       };
+      if (
+        roleConfig.maxAgents !== undefined &&
+        roleConfig.minAgents === undefined &&
+        mergedRoleConfig.minAgents !== undefined &&
+        mergedRoleConfig.minAgents > roleConfig.maxAgents
+      ) {
+        mergedRoleConfig.minAgents = roleConfig.maxAgents;
+      }
+      result.roles[role] = mergedRoleConfig;
     }
   }
 }

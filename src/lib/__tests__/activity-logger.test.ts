@@ -1,17 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const store = vi.hoisted(() => ({
-  append: vi.fn(),
-  appendAsync: vi.fn(async () => undefined),
-}));
+import {
+  emitActivityEntrySync,
+  emitActivityTtsSync,
+  setActivityEventStoreProvider,
+} from '../activity-logger.js';
 
-vi.mock('../../dashboard/server/event-store.js', () => ({
-  getEventStore: () => store,
-}));
-
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+const store = {
+  append: vi.fn(() => 1),
+  appendAsync: vi.fn(async () => 1),
+};
 
 describe('activity logger', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setActivityEventStoreProvider(() => store);
+  });
+
+  afterEach(() => {
+    setActivityEventStoreProvider(null);
+  });
+
   it('persists activity events asynchronously', () => {
     emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'review started', issueId: 'PAN-829' });
     emitActivityTtsSync({ utterance: 'PAN-829 review started', issueId: 'PAN-829' });

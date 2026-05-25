@@ -29,7 +29,7 @@ import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
@@ -47,6 +47,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus, getReviewStatusSync } from '../review-status.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
@@ -97,6 +98,33 @@ export async function removeCompletionMarker(markerPath: string): Promise<void> 
   if (existsSync(markerPath)) await rm(markerPath);
 }
 
+export interface CompletePlanningAutoSpawnResult {
+  workAgentSpawned: boolean;
+  workAgentSession?: string;
+  workAgentError?: string;
+  workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'spawn-failed';
+}
+
+type CompletePlanningPhase = 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+function emitCompletePlanningPhase(
+  issueId: string,
+  phase: CompletePlanningPhase,
+  status: CompletePlanningPhaseStatus,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  const timestamp = new Date().toISOString();
+  emitActivityEntrySync({
+    source: 'complete-planning',
+    level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
+    message: `complete-planning.phase=${phase}`,
+    issueId: issueId.toUpperCase(),
+    details: JSON.stringify({ issueId: issueId.toUpperCase(), timestamp, phase, status, reason, ...details }),
+  });
+}
+
 export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
@@ -119,19 +147,34 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
-  const proposed = existingSpec
-    ? await (async () => {
-        const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
-        return { path: existingSpec.path, filename: existingSpec.filename };
-      })()
-    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
-
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
   });
+
+  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
+  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
+  const previousSpecContents = existingSpec ? await readFile(existingSpec.path, 'utf-8').catch(() => null) : null;
+  let proposed: { path: string; filename: string };
+  try {
+    proposed = existingSpec
+      ? await (async () => {
+          const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+          await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
+          return { path: existingSpec.path, filename: existingSpec.filename };
+        })()
+      : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed vBRIEF spec written', {
+      path: proposed.path,
+      filename: proposed.filename,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath });
+    throw error;
+  }
+
+  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from proposed vBRIEF', { workspacePath });
   const rawBeadsResult = createBeads(workspacePath);
   const beadsResult = Effect.isEffect(rawBeadsResult)
     ? await Effect.runPromise(rawBeadsResult)
@@ -140,13 +183,145 @@ export async function completePlanningArtifacts(options: {
   const errors = beadsResult.errors ?? [];
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0 || !beadsResult.success || created.length !== planItemCount) {
+    if (existingSpec && previousSpecContents !== null) {
+      await writeFile(existingSpec.path, previousSpecContents, 'utf-8');
+    } else if (!existingSpec) {
+      await rm(proposed.path, { force: true });
+      await rm(dirname(proposed.path), { force: true }).catch(() => undefined);
+    }
     const detail = errors.length > 0
       ? errors.join('; ')
       : `created ${created.length} beads for ${planItemCount} plan items`;
+    emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'failure', detail, {
+      workspacePath,
+      beadCount: created.length,
+      planItemCount,
+    });
     throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
   }
+  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'success', 'beads materialized', {
+    workspacePath,
+    beadCount: created.length,
+    planItemCount,
+  });
 
   return { proposed, beadCount: created.length, beadsWarning: null };
+}
+
+function getInternalDashboardOrigin(): string {
+  const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  return process.env['PANOPTICON_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
+}
+
+function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): CompletePlanningAutoSpawnResult['workAgentSkipReason'] {
+  const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
+  if (body['paused'] === true) return 'paused';
+  if (body['troubled'] === true) return 'troubled';
+  if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';
+  return 'spawn-failed';
+}
+
+export async function completePlanningAutoSpawn(options: {
+  issueId: string;
+  autoSpawn?: boolean;
+  fetchImpl?: typeof fetch;
+  dashboardOrigin?: string;
+}): Promise<CompletePlanningAutoSpawnResult | null> {
+  if (options.autoSpawn !== true) {
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', 'autoSpawn not requested');
+    return null;
+  }
+
+  const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
+  emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
+  try {
+    const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: dashboardOrigin,
+      },
+      body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
+    });
+
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const agentId = typeof body['agentId'] === 'string'
+      ? body['agentId']
+      : `agent-${options.issueId.toLowerCase()}`;
+
+    if (response.ok && body['success'] !== false) {
+      emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'work agent spawn requested', { agentId });
+      return { workAgentSpawned: true, workAgentSession: agentId };
+    }
+
+    const error = typeof body['error'] === 'string'
+      ? body['error']
+      : typeof body['message'] === 'string'
+        ? body['message']
+        : `Work agent spawn returned HTTP ${response.status}`;
+    const skipReason = classifyAutoSpawnSkip(response.status, body);
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', skipReason, {
+      httpStatus: response.status,
+      error,
+    });
+
+    return {
+      workAgentSpawned: false,
+      workAgentError: error,
+      workAgentSkipReason: skipReason,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'failure', reason, { dashboardOrigin });
+    throw error;
+  }
+}
+
+export async function completePlanningAutoSpawnAndKill(options: {
+  issueId: string;
+  autoSpawn: boolean;
+  skipKill: boolean;
+  sessionName: string;
+  fetchImpl?: typeof fetch;
+  dashboardOrigin?: string;
+  killSessionImpl?: (sessionName: string) => Promise<void>;
+  scheduleKill?: (callback: () => void, delayMs: number) => unknown;
+  logError?: (message?: unknown, ...optionalParams: unknown[]) => void;
+}): Promise<CompletePlanningAutoSpawnResult | null> {
+  const autoSpawnResult = await completePlanningAutoSpawn({
+    issueId: options.issueId,
+    autoSpawn: options.autoSpawn,
+    fetchImpl: options.fetchImpl,
+    dashboardOrigin: options.dashboardOrigin,
+  }).catch((error: unknown): CompletePlanningAutoSpawnResult => ({
+    workAgentSpawned: false,
+    workAgentError: error instanceof Error ? error.message : String(error),
+    workAgentSkipReason: 'spawn-failed',
+  }));
+
+  if (options.skipKill) return autoSpawnResult;
+
+  const killSessionImpl = options.killSessionImpl ?? ((target: string) => Effect.runPromise(killSession(target)));
+  const logError = options.logError ?? console.error;
+  const runKill = async (): Promise<void> => {
+    try {
+      await killSessionImpl(options.sessionName);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!/can't find session|session not found|no session found/i.test(msg)) {
+        logError(`[complete-planning] deferred kill-session failed for ${options.sessionName}:`, msg);
+      }
+    }
+  };
+
+  if (options.autoSpawn) {
+    await runKill();
+  } else {
+    (options.scheduleKill ?? setTimeout)(() => { void runKill(); }, 1500);
+  }
+
+  return autoSpawnResult;
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -1036,6 +1211,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/complete-planning',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!parseIssueIdSync(id)) {
@@ -1047,10 +1223,17 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     const skipKill = (body as any)?.skipKill === true;
+    const autoSpawn = (body as any)?.autoSpawn === true;
+    if (autoSpawn) {
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const sessionName = `planning-${id.toLowerCase()}`;
     const issueLower = id.toLowerCase();
 
-    console.log(`[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
+    console.log(autoSpawn
+      ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
+      : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
     // Detect remote planning session (non-fatal reads)
     const { isRemotePlanning, remoteVmName } = yield* Effect.promise(async (): Promise<{ isRemotePlanning: boolean; remoteVmName: string | null }> => {
@@ -1268,20 +1451,17 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
-    // Deferred session kill: schedule after the response is flushed so a chained
-    // `pan plan finalize` call from inside the planning session can read its own
-    // success response before its tmux pane is destroyed. ~1.5s is enough for the
-    // body to leave the kernel buffer and for plan-finalize to print.
-    if (!skipKill) {
-      setTimeout(() => {
-        Effect.runPromise(killSession(sessionName)).catch((error: unknown) => {
-          const msg = error instanceof Error ? error.message : String(error);
-          if (!/can't find session|session not found|no session found/i.test(msg)) {
-            console.error(`[complete-planning] deferred kill-session failed for ${sessionName}:`, msg);
-          }
-        });
-      }, 1500);
-    }
+    const autoSpawnResult = yield* Effect.promise(() => completePlanningAutoSpawnAndKill({
+      issueId: id,
+      autoSpawn,
+      skipKill,
+      sessionName,
+    }));
+    emitCompletePlanningPhase(id, 'terminal', 'success', autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
+      autoSpawn,
+      workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
+      workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
+    });
 
     return jsonResponse({
       success: true,
@@ -1289,9 +1469,12 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       newState,
       gitPushed,
       ...(beadsWarning ? { beadsWarning } : {}),
-      message: gitPushed
-        ? 'Planning complete and pushed to git - ready for execution'
-        : 'Planning complete - ready for execution',
+      ...(autoSpawnResult ?? {}),
+      message: autoSpawnResult?.workAgentSpawned
+        ? 'Planning complete and work agent spawn requested'
+        : gitPushed
+          ? 'Planning complete and pushed to git - ready for execution'
+          : 'Planning complete - ready for execution',
     });
   })),
 );
