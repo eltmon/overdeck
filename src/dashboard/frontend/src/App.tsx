@@ -17,7 +17,6 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { PipelineView } from './components/Pipeline/PipelineView';
-import { HomePage } from './components/HomePage';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
@@ -893,7 +892,9 @@ export default function App() {
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
           {activeTab === 'home' && (
-            <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
+            <div className="w-full h-full overflow-hidden">
+              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
+            </div>
           )}
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
@@ -906,11 +907,6 @@ export default function App() {
               />
             </div>
           )}
-        {activeTab === 'home' && (
-          <div className="w-full h-full overflow-hidden">
-            <HomePage />
-          </div>
-        )}
         {activeTab === 'pipeline' && (
           <BootstrapGate fallback={<PipelineSkeleton />}>
             <div className="w-full h-full overflow-hidden">

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@panctl/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { useDashboardStore } from '../lib/store';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
+import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { Issue } from '../types';
 
 interface FeatureRegistryResponse {
@@ -50,6 +52,24 @@ interface HomeWorkspaceCard {
   stats: WorkspaceStatusStats;
 }
 
+const BUCKET_LABELS: Record<TimeBucketKey, string> = {
+  justNow: 'Just Now',
+  earlierToday: 'Earlier Today',
+  yesterday: 'Yesterday',
+  thisWeek: 'This Week',
+  thisMonth: 'This Month',
+  older: 'Older',
+};
+
+const BUCKET_ORDER: readonly TimeBucketKey[] = [
+  'justNow',
+  'earlierToday',
+  'yesterday',
+  'thisWeek',
+  'thisMonth',
+  'older',
+];
+
 async function fetchFeatureRegistry(): Promise<FeatureRegistryEntry[]> {
   const response = await fetch('/api/registry/features');
   if (!response.ok) throw new Error(`Registry request failed (${response.status})`);
@@ -89,6 +109,7 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
     agentsById,
     reviewStatusByIssueId,
   }), [agentsById, issuesRaw, observationsByIssueId, reviewStatusByIssueId, statusByIssueId]);
+  const actionObservations = useMemo(() => selectActionObservations(observationsByIssueId), [observationsByIssueId]);
   const summaryCards = useMemo(() => buildSummaryCardViews(buildHomeSummaryCards({
     agentsById,
     reviewStatusByIssueId,
@@ -116,6 +137,8 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
             </div>
           ))}
         </section>
+
+        <HomeActivityFeed observations={actionObservations} now={currentTime} />
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="workspace-status-title">
           <div>
@@ -179,6 +202,75 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
         </section>
       </div>
     </div>
+  );
+}
+
+function HomeActivityFeed({ observations, now }: { observations: Array<MemoryObservation & { actionStatus: string }>; now: Date }) {
+  const buckets = useMemo(() => bucketByTime(observations, (observation) => observation.timestamp, now), [observations, now]);
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="home-activity-title" data-testid="home-activity-feed">
+      <div>
+        <h2 id="home-activity-title" className="text-lg font-semibold text-foreground">Activity Feed</h2>
+        <p className="text-sm text-muted-foreground">Recent actionable memory observations across workspaces.</p>
+      </div>
+
+      {observations.length === 0 ? (
+        <div data-testid="home-activity-empty" className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">No actionable observations yet.</p>
+          <p className="mt-1">Observations will appear after PAN-1052 memory extraction creates them.</p>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-5">
+          {BUCKET_ORDER.map((bucketKey) => {
+            const items = buckets[bucketKey];
+            if (items.length === 0) return null;
+
+            return (
+              <section key={bucketKey} data-testid={`home-activity-bucket-${bucketKey}`}>
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {BUCKET_LABELS[bucketKey]}
+                </h3>
+                <ul className="space-y-2">
+                  {items.map((observation) => <HomeActivityFeedItem key={observation.id} observation={observation} now={now} />)}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HomeActivityFeedItem({ observation, now }: { observation: MemoryObservation & { actionStatus: string }; now: Date }) {
+  return (
+    <li className="rounded-lg border border-border bg-background p-3 text-xs">
+      <p className="font-semibold text-foreground">{observation.actionStatus}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground">
+        {observation.workspaceId} · {observation.issueId} · <time dateTime={observation.timestamp}>{formatRelativeTime(observation.timestamp, now)}</time>
+      </p>
+      <p className="mt-2 text-sm text-foreground">{observation.summary}</p>
+      {observation.narrative ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{observation.narrative}</p> : null}
+      {observation.files.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1" aria-label="Files">
+          {observation.files.map((file) => (
+            <code key={file} className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {file}
+            </code>
+          ))}
+        </div>
+      ) : null}
+      {observation.tags.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1" aria-label="Tags">
+          {observation.tags.map((tag) => (
+            <span key={tag} className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -258,6 +350,13 @@ function needsVerificationAttention(status: ReviewStatusSnapshot): boolean {
     status.testStatus === 'failed' ||
     status.uatStatus === 'failed' ||
     (status.blockerReasons?.length ?? 0) > 0;
+}
+
+function selectActionObservations(observationsByIssueId: Record<string, MemoryObservation[]>): Array<MemoryObservation & { actionStatus: string }> {
+  return Object.values(observationsByIssueId)
+    .flatMap((observations) => observations)
+    .filter((observation): observation is MemoryObservation & { actionStatus: string } => observation.actionStatus !== null)
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 function buildHomeWorkspaceCards({

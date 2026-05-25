@@ -193,6 +193,76 @@ describe('HomePage', () => {
     expect(screen.getByText(/Workspace cards will appear after memory status/)).toBeInTheDocument();
   });
 
+  it('renders actionable observations in PRD time buckets newest-first', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    useDashboardStore.setState({
+      observationsByIssueId: {
+        'PAN-1204': [
+          makeObservation({ id: 'ignored', timestamp: '2026-05-25T11:59:00.000Z', actionStatus: null }),
+          makeObservation({ id: 'just-now-old', timestamp: '2026-05-25T11:10:00.000Z', actionStatus: 'Older just now', summary: 'Old summary' }),
+          makeObservation({ id: 'just-now-new', timestamp: '2026-05-25T11:55:00.000Z', actionStatus: 'Newer just now', summary: 'New summary' }),
+          makeObservation({ id: 'today', timestamp: '2026-05-25T09:00:00.000Z', actionStatus: 'Earlier today' }),
+          makeObservation({ id: 'yesterday', timestamp: '2026-05-24T09:00:00.000Z', actionStatus: 'Yesterday work' }),
+          makeObservation({ id: 'week', timestamp: '2026-05-21T09:00:00.000Z', actionStatus: 'This week work' }),
+          makeObservation({ id: 'month', timestamp: '2026-05-10T09:00:00.000Z', actionStatus: 'This month work' }),
+          makeObservation({ id: 'older', timestamp: '2026-04-10T09:00:00.000Z', actionStatus: 'Older work' }),
+        ],
+      },
+    });
+
+    renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
+
+    expect(await screen.findByTestId('home-activity-bucket-justNow')).toHaveTextContent('Just Now');
+    expect(screen.getByTestId('home-activity-bucket-earlierToday')).toHaveTextContent('Earlier Today');
+    expect(screen.getByTestId('home-activity-bucket-yesterday')).toHaveTextContent('Yesterday');
+    expect(screen.getByTestId('home-activity-bucket-thisWeek')).toHaveTextContent('This Week');
+    expect(screen.getByTestId('home-activity-bucket-thisMonth')).toHaveTextContent('This Month');
+    expect(screen.getByTestId('home-activity-bucket-older')).toHaveTextContent('Older');
+    expect(screen.queryByText('ignored')).not.toBeInTheDocument();
+
+    const entries = within(screen.getByTestId('home-activity-bucket-justNow')).getAllByRole('listitem');
+    expect(entries[0]).toHaveTextContent('Newer just now');
+    expect(entries[1]).toHaveTextContent('Older just now');
+  });
+
+  it('renders activity observation identity, summary, narrative, files, and tags', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    useDashboardStore.setState({
+      observationsByIssueId: {
+        'PAN-1204': [makeObservation({
+          id: 'rich-activity',
+          issueId: 'PAN-1204',
+          workspaceId: 'workspace-3k8n',
+          actionStatus: 'Verified Home route',
+          summary: 'Rendered Home verification coverage',
+          narrative: 'Read observationsByIssueId without parsing JSONL transcripts.',
+          files: ['src/dashboard/frontend/src/pages/HomePage.tsx'],
+          tags: ['home', 'memory'],
+        })],
+      },
+    });
+
+    renderHomePage({ now: new Date('2026-05-25T00:20:00.000Z') });
+
+    const feed = await screen.findByTestId('home-activity-feed');
+    expect(feed).toHaveTextContent('workspace-3k8n · PAN-1204');
+    expect(feed).toHaveTextContent('Verified Home route');
+    expect(feed).toHaveTextContent('Rendered Home verification coverage');
+    expect(feed).toHaveTextContent('Read observationsByIssueId without parsing JSONL transcripts.');
+    expect(feed).toHaveTextContent('src/dashboard/frontend/src/pages/HomePage.tsx');
+    expect(feed).toHaveTextContent('home');
+    expect(feed).toHaveTextContent('memory');
+  });
+
+  it('shows an activity empty state when no actionable observations exist', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+
+    renderHomePage();
+
+    expect(await screen.findByText('No actionable observations yet.')).toBeInTheDocument();
+    expect(screen.getByText('Observations will appear after PAN-1052 memory extraction creates them.')).toBeInTheDocument();
+  });
+
   it('renders Knowledge Registry rows from the dashboard API', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [makeEntry()] })));
 
