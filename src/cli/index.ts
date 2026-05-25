@@ -109,6 +109,7 @@ import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
 import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
+import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
@@ -557,6 +558,7 @@ registerInspectCommand(program);
 registerCavemanCommands(program);
 registerScopeCommands(program);
 registerFlywheelCommands(program);
+registerMergeCommands(program);
 registerArtifactCommands(program);
 
 // Shorthand: pan status = pan status

@@ -1,12 +1,20 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import {
+  flywheelRouteLayer,
+  getAutoMergeProblemPayload,
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  deleteAutoMergePayload,
+  getPendingAutoMergePayload,
+  postAutoMergeSchedulePayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -16,6 +24,29 @@ import {
 } from '../flywheel.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
+import { resetDatabase } from '../../../../lib/database/index.js';
+import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
+import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
+import { markBlocked, markFailed, scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
+
+interface RouteResult {
+  status: number;
+  body: unknown;
+}
+
+async function requestFlywheelRoute(path: string, init: RequestInit = {}): Promise<RouteResult> {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(flywheelRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      ),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) };
+}
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -84,6 +115,339 @@ describe('resolveFlywheelBriefPath', () => {
     } finally {
       await rm(outsideDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('flywheel config routes', () => {
+  let panopticonHome: string;
+
+  beforeEach(() => {
+    panopticonHome = join(tmpdir(), `pan-flywheel-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(panopticonHome, { recursive: true });
+    process.env.PANOPTICON_HOME = panopticonHome;
+  });
+
+  afterEach(() => {
+    resetDatabase();
+    delete process.env.PANOPTICON_HOME;
+    rmSync(panopticonHome, { recursive: true, force: true });
+  });
+
+  it('returns both flywheel config defaults without requiring origin headers', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config')).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: false, require_uat_before_merge: true },
+    });
+  });
+
+  it('origin-validates flywheel config updates', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_pickup_backlog: true }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+  });
+
+  it('updates auto-pickup backlog and returns both values', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ auto_pickup_backlog: true }),
+    })).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: true, require_uat_before_merge: true },
+    });
+  });
+
+  it('updates require-UAT and leaves auto-pickup unchanged on partial update', async () => {
+    setFlywheelAutoPickupBacklog(true);
+
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ require_uat_before_merge: false }),
+    })).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: true, require_uat_before_merge: false },
+    });
+  });
+
+  it('rejects non-boolean flywheel config values', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ auto_pickup_backlog: 'yes' }),
+    })).resolves.toEqual({ status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } });
+  });
+});
+
+describe('flywheel auto-merge routes', () => {
+  let panopticonHome: string;
+
+  const eligibleDeps = (overrides: Parameters<typeof postAutoMergeSchedulePayload>[1] = {}) => ({
+    isRequireUatBeforeMerge: () => false,
+    isFlywheelPaused: () => false,
+    resolveLiveRunId: async () => 'RUN-7',
+    isEligible: async () => ({ eligible: true as const }),
+    getReviewStatus: () => ({
+      issueId: 'PAN-1486',
+      reviewStatus: 'passed' as const,
+      testStatus: 'passed' as const,
+      mergeStatus: 'pending' as const,
+      updatedAt: '2026-05-25T10:00:00.000Z',
+      readyForMerge: true,
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+    }),
+    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Panopticon CLI' }) as never,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    panopticonHome = join(tmpdir(), `pan-flywheel-auto-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(panopticonHome, { recursive: true });
+    process.env.PANOPTICON_HOME = panopticonHome;
+  });
+
+  afterEach(() => {
+    resetDatabase();
+    delete process.env.PANOPTICON_HOME;
+    rmSync(panopticonHome, { recursive: true, force: true });
+  });
+
+  it('exports the shared auto-merge cooldown constant', () => {
+    expect(AUTO_MERGE_COOLDOWN_MS).toBe(300_000);
+  });
+
+  it('origin-validates auto-merge schedule requests', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId: 'PAN-1486' }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'https://evil.example' },
+      body: JSON.stringify({ issueId: 'PAN-1486' }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Invalid origin' } });
+  });
+
+  it('schedules eligible auto-merges after the cooldown and announces once', async () => {
+    const now = new Date('2026-05-25T10:00:00.000Z');
+    const announce = vi.fn();
+
+    const first = await postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({ now: () => now, announce }));
+    const second = await postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({ now: () => now, announce }));
+
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+      status: 'pending',
+    });
+    expect(second).toEqual(first);
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects scheduling while UAT is still required', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isRequireUatBeforeMerge: () => true,
+    }))).resolves.toEqual({ status: 412, body: { error: 'UAT is still required before merge' } });
+  });
+
+  it('rejects scheduling while flywheel is paused', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isFlywheelPaused: () => true,
+    }))).resolves.toEqual({ status: 423, body: { error: 'Flywheel is paused' } });
+  });
+
+  it('rejects ineligible PRs with the eligibility reason', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'CI checks failing on PR HEAD deadbeef' } });
+  });
+
+  it('returns active pending auto-merges sorted by scheduled merge time', async () => {
+    scheduleAutoMerge({
+      issueId: 'PAN-2',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/2',
+      prNumber: 2,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:10:00.000Z',
+    });
+    scheduleAutoMerge({
+      issueId: 'PAN-1',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
+      prNumber: 1,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+
+    expect(getPendingAutoMergePayload().map((entry) => entry.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/pending')).resolves.toMatchObject({
+      status: 200,
+      body: [
+        { issueId: 'PAN-1', scheduledMergeAt: '2026-05-25T10:05:00.000Z', status: 'pending', prNumber: 1 },
+        { issueId: 'PAN-2', scheduledMergeAt: '2026-05-25T10:10:00.000Z', status: 'pending', prNumber: 2 },
+      ],
+    });
+  });
+
+  it('bounds the pending auto-merge polling payload', () => {
+    for (let index = 0; index < 101; index += 1) {
+      scheduleAutoMerge({
+        issueId: `PAN-${1000 + index}`,
+        prUrl: `https://github.com/eltmon/panopticon-cli/pull/${1000 + index}`,
+        prNumber: 1000 + index,
+        projectKey: 'panopticon-cli',
+        scheduledAt: '2026-05-25T10:00:00.000Z',
+        scheduledMergeAt: new Date(Date.parse('2026-05-25T10:00:00.000Z') + index * 1000).toISOString(),
+      });
+    }
+
+    expect(getPendingAutoMergePayload()).toHaveLength(100);
+    expect(getPendingAutoMergePayload().at(-1)?.issueId).toBe('PAN-1099');
+  });
+
+  it('keeps failed and blocked rows out of polling while exposing them through problems', async () => {
+    const failed = scheduleAutoMerge({
+      issueId: 'PAN-3',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
+      prNumber: 3,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const blocked = scheduleAutoMerge({
+      issueId: 'PAN-4',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
+      prNumber: 4,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:06:00.000Z',
+    });
+
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'merge failed');
+    markBlocked(blocked.id, 'CI checks failing');
+
+    expect(getPendingAutoMergePayload()).toEqual([]);
+    expect(getAutoMergeProblemPayload()).toMatchObject([
+      { issueId: 'PAN-3', status: 'failed', failureReason: 'merge failed' },
+      { issueId: 'PAN-4', status: 'blocked', failureReason: 'CI checks failing' },
+    ]);
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/problems')).resolves.toMatchObject({
+      status: 200,
+      body: [
+        { issueId: 'PAN-3', status: 'failed', failureReason: 'merge failed' },
+        { issueId: 'PAN-4', status: 'blocked', failureReason: 'CI checks failing' },
+      ],
+    });
+  });
+
+  it('origin-validates auto-merge cancellations', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+    })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+      headers: { origin: 'https://evil.example' },
+    })).resolves.toEqual({ status: 403, body: { error: 'Invalid origin' } });
+  });
+
+  it('cancels pending auto-merges, removes them from the active list, and announces once', () => {
+    scheduleAutoMerge({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const announce = vi.fn();
+
+    expect(deleteAutoMergePayload('pan-1486', {
+      now: () => new Date('2026-05-25T10:01:00.000Z'),
+      announce,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        issueId: 'PAN-1486',
+        status: 'cancelled',
+        cancelledAt: '2026-05-25T10:01:00.000Z',
+        cancelledBy: 'operator',
+      },
+    });
+    expect(getPendingAutoMergePayload()).toEqual([]);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('PAN-1486');
+  });
+
+  it('clears failed and blocked auto-merges through the cancellation route', () => {
+    const failed = scheduleAutoMerge({
+      issueId: 'PAN-3',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
+      prNumber: 3,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const blocked = scheduleAutoMerge({
+      issueId: 'PAN-4',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
+      prNumber: 4,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:06:00.000Z',
+    });
+
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'merge failed');
+    markBlocked(blocked.id, 'CI checks failing');
+
+    expect(deleteAutoMergePayload('PAN-3', { announce: vi.fn() })).toMatchObject({
+      status: 200,
+      body: { issueId: 'PAN-3', status: 'cancelled', cancelledBy: 'operator' },
+    });
+    expect(deleteAutoMergePayload('PAN-4', { announce: vi.fn() })).toMatchObject({
+      status: 200,
+      body: { issueId: 'PAN-4', status: 'cancelled', cancelledBy: 'operator' },
+    });
+    expect(getPendingAutoMergePayload()).toEqual([]);
+  });
+
+  it('returns 409 when cancellation races a merging entry', async () => {
+    const entry = scheduleAutoMerge({
+      issueId: 'PAN-1486',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prNumber: 1486,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    transitionToMerging(entry.id);
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+      headers: { origin: 'http://localhost:3011' },
+    })).resolves.toEqual({
+      status: 409,
+      body: { error: 'Auto-merge cooldown has expired for PAN-1486; merge is in progress' },
+    });
+  });
+
+  it('returns 404 for missing pending auto-merges', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-999', {
+      method: 'DELETE',
+      headers: { origin: 'http://localhost:3011' },
+    })).resolves.toEqual({ status: 404, body: { error: 'No pending auto-merge for PAN-999' } });
   });
 });
 

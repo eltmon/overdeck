@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   activeRunId: null as string | null,
   paused: false,
+  autoPickupBacklog: false,
+  requireUatBeforeMerge: true,
   spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi' }) => ({
     id: options.agentId,
     issueId,
@@ -33,6 +35,8 @@ vi.mock('../../agents.js', async () => {
 
 vi.mock('../../database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => mocks.activeRunId,
+  isFlywheelAutoPickupBacklog: () => mocks.autoPickupBacklog,
+  isFlywheelRequireUatBeforeMerge: () => mocks.requireUatBeforeMerge,
   setFlywheelActiveRunId: (runId: string | null) => {
     mocks.activeRunId = runId;
   },
@@ -56,6 +60,8 @@ describe('flywheel lifecycle', () => {
   beforeEach(() => {
     mocks.activeRunId = null;
     mocks.paused = false;
+    mocks.autoPickupBacklog = false;
+    mocks.requireUatBeforeMerge = true;
     mocks.spawnRun.mockClear();
     mocks.stopAgentProgram.mockClear();
   });
@@ -95,6 +101,34 @@ describe('flywheel lifecycle', () => {
     expect(prompt).toContain('Effort: low');
     expect(prompt).toContain('Max concurrent agents: 3');
     expect(prompt).toContain('Scope: all-tracked-projects');
+    expect(prompt).toContain('Auto-pickup backlog: false');
+    expect(prompt).toContain('Require UAT before merge: true');
+  });
+
+  it('renders the flywheel autonomy options truth table in the brief', async () => {
+    const cases = [
+      { autoPickupBacklog: false, requireUatBeforeMerge: true },
+      { autoPickupBacklog: false, requireUatBeforeMerge: false },
+      { autoPickupBacklog: true, requireUatBeforeMerge: true },
+      { autoPickupBacklog: true, requireUatBeforeMerge: false },
+    ];
+
+    for (const [index, autonomy] of cases.entries()) {
+      mocks.activeRunId = null;
+      await spawnFlywheel({
+        runId: `RUN-${index + 1}`,
+        workspace: '/repo',
+        env: cleanEnv,
+        ...autonomy,
+      });
+      const prompt = mocks.spawnRun.mock.calls[index][2].prompt;
+      const expectedConfig = [
+        'Run configuration:',
+        `Auto-pickup backlog: ${autonomy.autoPickupBacklog}`,
+        `Require UAT before merge: ${autonomy.requireUatBeforeMerge}`,
+      ].join('\n');
+      expect(prompt).toContain(expectedConfig);
+    }
   });
 
   it('rejects non-canonical run IDs before spawning', async () => {
@@ -144,6 +178,10 @@ describe('flywheel lifecycle', () => {
       workspace: '/repo',
       registerConversation: true,
     }));
+    const resumePrompt = mocks.spawnRun.mock.calls[1][2].prompt;
+    expect(resumePrompt).toContain('Run configuration:');
+    expect(resumePrompt).toContain('Auto-pickup backlog: false');
+    expect(resumePrompt).toContain('Require UAT before merge: true');
   });
 
   it('keeps the pause gate set when resume spawn fails', async () => {

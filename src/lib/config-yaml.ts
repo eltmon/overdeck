@@ -1546,6 +1546,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       daemonPort: DEFAULT_CONFIG.tts.daemonPort,
       daemonHost: DEFAULT_CONFIG.tts.daemonHost,
       daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
+      lifecycle: DEFAULT_CONFIG.tts.lifecycle,
       voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
       mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
       utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },

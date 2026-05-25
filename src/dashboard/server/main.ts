@@ -41,6 +41,7 @@ import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegist
 import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../lib/memory/reconciliation.js';
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 
 declare const Bun: unknown;
 
@@ -425,6 +426,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
+  stopAutoMergeExecutor();
   stopTranscriptPoller();
   closeMemoryFtsDatabases();
   process.exit(0);
@@ -493,6 +495,13 @@ if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
 // HTTP server from accepting connections (the "Bad Gateway after pan up"
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
+if (process.env.PANOPTICON_DISABLE_AUTO_MERGE === '1') {
+  console.log('[panopticon] Auto-merge executor SKIPPED (PANOPTICON_DISABLE_AUTO_MERGE=1)');
+} else {
+  startAutoMergeExecutor();
+  console.log('[panopticon] Auto-merge executor started');
+}
+
 if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
   console.log('[panopticon] Cloister auto-start SKIPPED (PANOPTICON_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
