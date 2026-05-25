@@ -102,7 +102,7 @@ export async function projectAddCommand(
   if (existing) {
     console.log(chalk.yellow(`Project already registered with key: ${key}`));
     console.log(chalk.dim(`Existing path: ${existing.path}`));
-    console.log(chalk.dim(`To update, first run: pan project remove ${key}`));
+    console.log(chalk.dim(`To update, first run: pan projects remove ${key}`));
     return;
   }
 
@@ -275,7 +275,7 @@ export async function projectListCommand(options: ListOptions = {}): Promise<voi
 
   if (projects.length === 0) {
     console.log(chalk.dim('No projects registered.'));
-    console.log(chalk.dim('Add one with: pan project add <path> --linear-team <TEAM>'));
+    console.log(chalk.dim('Add one with: pan projects add <path> --linear-team <TEAM>'));
     console.log(chalk.dim(`Or edit: ${PROJECTS_CONFIG_FILE}`));
     return;
   }
@@ -332,7 +332,7 @@ export async function projectRemoveCommand(nameOrPath: string): Promise<void> {
   }
 
   console.log(chalk.red(`Project not found: ${nameOrPath}`));
-  console.log(chalk.dim(`Use 'pan project list' to see registered projects.`));
+  console.log(chalk.dim(`Use 'pan projects list' to see registered projects.`));
 }
 
 export async function projectInitCommand(): Promise<void> {
@@ -350,7 +350,7 @@ export async function projectInitCommand(): Promise<void> {
   console.log(chalk.bold('Quick start:'));
   console.log(
     chalk.dim(
-      '  pan project add /path/to/project --name "My Project" --linear-team MIN'
+      '  pan projects add /path/to/project --name "My Project" --linear-team MIN'
     )
   );
 }
@@ -374,7 +374,7 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
 
   if (!found) {
     console.error(chalk.red(`Project not found: ${keyOrName}`));
-    console.log(chalk.dim(`Use 'pan project list' to see registered projects.`));
+    console.log(chalk.dim(`Use 'pan projects list' to see registered projects.`));
     process.exit(1);
   }
 

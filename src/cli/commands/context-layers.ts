@@ -247,7 +247,7 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
         ensureProjectLayer(path);
         console.log(chalk.green(`  ✓ registered ${key} → ${path}`));
       } else if (!interactive) {
-        console.log(chalk.dim(`  • ${path} — register with: pan project add ${path}`));
+        console.log(chalk.dim(`  • ${path} — register with: pan projects add ${path}`));
       }
     }
   }
