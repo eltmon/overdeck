@@ -1532,6 +1532,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
+      lifecycle: DEFAULT_CONFIG.tts.lifecycle,
       voice: DEFAULT_CONFIG.tts.voice,
       volume: DEFAULT_CONFIG.tts.volume,
       rate: DEFAULT_CONFIG.tts.rate,

@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
-    "updated": "2026-05-25T08:23:37.356Z"
+    "updated": "2026-05-25T09:21:54.951Z"
   },
   "plan": {
     "id": "pan-1495",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 10,
     "created": "2026-05-25T08:25:00.000Z",
-    "updated": "2026-05-25T08:23:37.356Z",
+    "updated": "2026-05-25T09:21:54.951Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
@@ -228,7 +228,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1495",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T09:21:54.906Z",
+        "work": {
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "history": []
+        },
+        "verification": {
+          "status": "failed",
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "notes": "Verification FAILED at typecheck (5443ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-05-25T09:21:54.906Z",
+              "notes": "Verification FAILED at typecheck (5443ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n"
+            }
+          ]
+        },
+        "review": {
+          "status": "failed",
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "notes": "Verification failed at typecheck",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-05-25T09:21:54.906Z",
+              "notes": "Verification failed at typecheck"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T09:21:54.906Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T09:21:54.906Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1502"
+        }
+      }
     }
   },
   "status": "proposed"
