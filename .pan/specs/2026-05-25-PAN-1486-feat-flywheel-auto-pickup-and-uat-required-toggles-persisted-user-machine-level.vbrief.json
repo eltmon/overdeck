@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:08:31.422Z"
+    "updated": "2026-05-25T09:14:47.974Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:08:31.422Z",
+    "updated": "2026-05-25T09:14:47.974Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -144,7 +144,7 @@
       {
         "id": "b02-lifecycle-options-and-brief",
         "title": "Plumb the two toggle values into FlywheelLifecycleOptions and render in the brief configSection",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -160,7 +160,7 @@
           {
             "id": "b02.ac1",
             "title": "FlywheelLifecycleOptions interface includes optional autoPickupBacklog and requireUatBeforeMerge booleans.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -168,7 +168,7 @@
           {
             "id": "b02.ac2",
             "title": "spawnFlywheel() and resumeFlywheel() resolve undefined values from app_settings via the new getters from b01 before calling spawnFlywheelAgent; no caller has to know the default values.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -176,7 +176,7 @@
           {
             "id": "b02.ac3",
             "title": "defaultFlywheelPrompt renders the two lines verbatim (e.g. 'Auto-pickup backlog: false') and the configSection appears in the prompt body when at least one option is set.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -184,7 +184,7 @@
           {
             "id": "b02.ac4",
             "title": "Vitest unit tests in src/lib/cloister/__tests__/flywheel.test.ts cover the 2x2 truth table at the brief-rendering level: (false,true), (false,false), (true,true), (true,false) — each expectation asserts the configSection substring exactly.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -192,7 +192,7 @@
           {
             "id": "b02.ac5",
             "title": "npm run typecheck and npm test pass; src/cli/commands/__tests__/flywheel.test.ts still passes (no regressions in CLI spawn).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
