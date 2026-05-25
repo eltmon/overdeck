@@ -195,6 +195,35 @@ Decisions taken this tick:
   depends on telemetry + 30d of data." Nothing to discuss until PAN-1487
   ships and ~30 days of data exists. Do not re-surface as a suggestion.
 
+### Substrate gap: orchestrator was suggest-only, Command Deck stayed empty
+
+Tick-2 emitted 35 ranked suggestions but launched zero agents. Operator
+called it out: "Why don't I see any work agents going in the command deck
+project item tree? Thats like your #1 job making sure agents are working."
+
+The brief and `roles/flywheel.md` both said "do not run `pan start` / `pan plan`."
+That made the Flywheel a report generator instead of an orchestrator — the
+exact opposite of the v1.0 vision in `vision.mdx`. Fixed in the commit
+landing with this state update:
+
+- `roles/flywheel.md` tick loop now includes a "Launch agents on the top
+  suggestions" step (step 5).
+- `docs/flywheel-brief.md` opener rewritten — "the #1 job is keeping agents
+  working."
+- Both files moved `pan plan --auto` and `pan start --auto` from the "never"
+  list into the "allowed" list.
+
+Tick 3 launched 5 planning agents in parallel: PAN-1487 (v1.0 telemetry),
+PAN-1486 (toggles + auto-merge), PAN-1495 (feature-registry crash),
+PAN-1455 (Codex auth false-positive), PAN-1501 (test-plan-skip substrate
+gate). All five via `pan plan <id> --auto`.
+
+**How to apply:** Every future tick that ranks `start`/`plan`/`investigate`
+suggestions must launch agents on the top N (N = maxAgents - 1) before
+emitting the snapshot, unless the run is paused or the cap is already
+reached. Emit-status with zero pending launches is acceptable; emit-status
+that leaves high-priority suggestions unstarted is a tick failure.
+
 ### Substrate gap: discretion-on-unpark rule was only in user memory
 
 The original "decide, don't delegate" rule was first written into
