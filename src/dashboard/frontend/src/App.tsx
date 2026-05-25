@@ -909,7 +909,7 @@ export default function App() {
               />
             </div>
           )}
-        {activeTab === 'pipeline' && (
+          {activeTab === 'pipeline' && (
           <BootstrapGate fallback={<PipelineSkeleton />}>
             <div className="w-full h-full overflow-hidden">
               <PipelineView onSearchOpen={() => setIsSearchOpen(true)} onTabChange={(tab) => setActiveTab(tab as Parameters<typeof setActiveTab>[0])} />

@@ -322,7 +322,17 @@ export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
  * the extension must not break Pi.
  */
 export async function handleWorkspaceContext(ctx: unknown, cwd: string = process.cwd()): Promise<void> {
-  const file = join(cwd, '.pan', 'context', 'workspace.md')
+  await appendSystemPromptFile(ctx, join(cwd, '.pan', 'context', 'workspace.md'))
+}
+
+export async function handleSessionBriefingContext(
+  ctx: unknown,
+  home: string = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon'),
+): Promise<void> {
+  await appendSystemPromptFile(ctx, join(home, 'session-context.md'))
+}
+
+async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void> {
   const content = await readFile(file, 'utf8').catch(() => '')
   if (!content.trim()) return
   const append = (ctx as { appendSystemPrompt?: unknown } | null | undefined)?.appendSystemPrompt
@@ -355,6 +365,7 @@ export default function panopticonPiExtension(pi: PiExtensionAPI): void {
       await handleSessionStart(env, event)
       // PAN-1201: fold the assembled workspace context layer into the prompt.
       await handleWorkspaceContext(ctx)
+      await handleSessionBriefingContext(ctx)
     } catch {
       // Filesystem / network failures must never break Pi.
     }

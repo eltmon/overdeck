@@ -418,6 +418,21 @@ describe('generateLauncherScript', () => {
   // When getAgentRuntimeBaseCommand() emits `claude --agent pan-<type>-agent`,
   // the generator must pass it through verbatim into the exec line.
 
+  it('appends workspace and briefing system prompt files without adding model flags', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      baseCommand: 'claude --agent pan-work-agent',
+      appendSystemPromptFiles: [
+        '/workspace/project/.pan/context/workspace.md',
+        '/home/u/.panopticon/session-context.md',
+      ],
+    });
+
+    expect(script).toContain("--append-system-prompt-file '/workspace/project/.pan/context/workspace.md' --append-system-prompt-file '/home/u/.panopticon/session-context.md'");
+    expect(script).not.toMatch(/--model/);
+  });
+
   it('work agent with --agent flag (Anthropic model — no --model, no permission flags)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

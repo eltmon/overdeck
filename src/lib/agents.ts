@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
+import { mkdir, readFile, readdir, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
@@ -30,6 +30,8 @@ import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } fr
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
+import { workspaceContextFile } from './context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
@@ -64,6 +66,24 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
   const tmp = `${launcherScript}.${randomUUID()}.tmp`;
   await writeFile(tmp, content, { mode: 0o755 });
   await renameAsync(tmp, launcherScript);
+}
+
+async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code' | 'pi' | undefined): Promise<string[]> {
+  if (harness === 'pi') return [];
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(workspace);
+  try {
+    await statAsync(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNodeNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNodeNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
 /**
@@ -2193,6 +2213,7 @@ export async function buildAgentLaunchConfig(opts: {
       resumeSessionId: opts.resumeSessionId,
       model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       useSupervisor: opts.useSupervisor,
       supervisorScriptPath: opts.supervisorScriptPath,
       ...piLauncherFields,
@@ -2222,6 +2243,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     useSupervisor: opts.useSupervisor,
     supervisorScriptPath: opts.supervisorScriptPath,
     ...piLauncherFields,
@@ -2548,6 +2570,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
+    appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
     resumeSessionId: options.resumeSessionId,
     reviewSignal,
@@ -3352,6 +3375,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
         resumeRole,
         fallbackHarness,
       ),
+      appendSystemPromptFiles: await claudeSystemPromptFiles(agentState.workspace, fallbackHarness),
       useSupervisor: fallbackSupervisorLaunch.useSupervisor,
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
@@ -3952,6 +3976,7 @@ export async function recoverAgent(
     setTerminalEnv: true,
     providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
+    appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
     promptInline: recoveryPrompt,
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,

@@ -10,7 +10,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +33,8 @@ import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
+import { workspaceContextFile } from '../context-layers/layers.js';
+import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -305,6 +307,24 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi'): Promise<string[]> {
+  if (harness === 'pi') return [];
+  const files: string[] = [];
+  const contextFile = workspaceContextFile(workspacePath);
+  try {
+    await access(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 export async function writeFeatureContext(workspacePath: string, issue: PlanningIssue): Promise<void> {
   if (!issue.artifactType?.includes('PortfolioItem')) return;
   const childStoriesSection = issue.childStories && issue.childStories.length > 0
@@ -552,6 +572,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         providerExports,
         promptFile,
         baseCommand: cmdWithArgs,
+        appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
         debugLog: '/tmp/pan-launcher-debug.log',
         keepAlive: true,

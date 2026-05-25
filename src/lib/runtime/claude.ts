@@ -21,6 +21,7 @@ import { CLAUDE_FEATURES } from './interface.js';
 import { FsError } from '../errors.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
+import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -108,6 +109,7 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
             setTerminalEnv: true,
             promptFile,
             baseCommand: 'claude',
+            appendSystemPromptFiles: [await ensureSessionContextBriefingFile()],
             extraArgs: args.length > 0 ? args.join(' ') : undefined,
           }),
           { mode: 0o755 },

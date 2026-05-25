@@ -29,6 +29,22 @@ export interface AppendFreshBriefingUpdateResult {
   briefingMtimeMs: number | null;
 }
 
+export function resolveSessionContextBriefingPath(): string {
+  return briefingFilePath();
+}
+
+export async function ensureSessionContextBriefingFile(): Promise<string> {
+  const path = resolveSessionContextBriefingPath();
+  try {
+    await stat(path);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, '# Panopticon Session Context\n\nNo live briefing has been generated yet.\n', 'utf8');
+  }
+  return path;
+}
+
 export async function recordBriefingSessionStart(input: RecordBriefingSessionStartInput): Promise<void> {
   const now = input.now ?? new Date();
   await writeMarker({

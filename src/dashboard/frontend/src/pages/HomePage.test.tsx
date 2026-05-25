@@ -288,7 +288,11 @@ describe('HomePage', () => {
   });
 
   it('localizes registry loading errors to the registry card', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/registry/features') return new Response(null, { status: 500 });
+      return Response.json({ today: { totalCost: 0 } });
+    }));
 
     renderHomePage();
 
