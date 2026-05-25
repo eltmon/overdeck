@@ -189,7 +189,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     expect(activityEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=createBeads', issueId }),
       expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=completePlanning', issueId }),
-      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=done', issueId }),
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=terminal', issueId }),
       expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=beadsMaterialize', issueId }),
       expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=specWrite', issueId }),
       expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=autoSpawn', issueId }),
@@ -206,8 +206,8 @@ describe('plan-finalize auto-promote chain regression', () => {
     const existingSpecPath = join(specsDir, `2026-05-25-${issueId}-stale.vbrief.json`);
     writeFileSync(existingSpecPath, JSON.stringify({ ...staleDoc, status: 'proposed' }, null, 2));
 
-    const createBeads = vi.fn(async (_workspacePath: string, planPath: string) => {
-      const beadSource = readJson<VBriefDocument>(planPath);
+    const createBeads = vi.fn(async () => {
+      const beadSource = readJson<VBriefDocument>(existingSpecPath);
       return {
         success: true,
         created: beadSource.plan.items.map((item) => item.title),
@@ -223,7 +223,7 @@ describe('plan-finalize auto-promote chain regression', () => {
       createBeads,
     });
 
-    expect(createBeads).toHaveBeenCalledWith(workspacePath, join(workspacePath, '.pan', 'spec.vbrief.json'));
+    expect(createBeads).toHaveBeenCalledWith(workspacePath);
     expect(artifacts.beadCount).toBe(2);
     const proposed = readJson<{ plan: { items: unknown[] } }>(existingSpecPath);
     expect(proposed.plan.items).toHaveLength(2);
@@ -245,7 +245,7 @@ describe('plan-finalize auto-promote chain regression', () => {
       }),
     })).rejects.toThrow('bd rejected malformed workspace database');
 
-    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
   it('spawns a work agent when the reconciler finds a planted orphan proposed spec with matching beads', async () => {

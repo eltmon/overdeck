@@ -7,7 +7,7 @@ import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { homedir } from 'os';
-import { join } from 'path';
+import { isAbsolute, join, resolve } from 'path';
 import {
   PANOPTICON_HOME,
   SKILLS_DIR,
@@ -430,9 +430,26 @@ function readJsonFile(path: string): any | null {
   }
 }
 
+function resolveBeadsIssuesPath(projectPath: string, issueId: string): string | null {
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const beadsDir = join(workspacePath, '.beads');
+  const localIssuesPath = join(beadsDir, 'issues.jsonl');
+  if (existsSync(localIssuesPath)) return localIssuesPath;
+
+  const redirectPath = join(beadsDir, 'redirect');
+  if (!existsSync(redirectPath)) return null;
+  try {
+    const redirected = readFileSync(redirectPath, 'utf-8').trim();
+    if (!redirected) return null;
+    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
+  } catch {
+    return null;
+  }
+}
+
 function countBeadsForIssue(projectPath: string, issueId: string): number {
-  const beadsPath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.beads', 'issues.jsonl');
-  if (!existsSync(beadsPath)) return 0;
+  const beadsPath = resolveBeadsIssuesPath(projectPath, issueId);
+  if (!beadsPath || !existsSync(beadsPath)) return 0;
   try {
     return readFileSync(beadsPath, 'utf-8')
       .split('\n')

@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
-import { join } from 'path';
+import { isAbsolute, join, resolve } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 
@@ -18,6 +18,7 @@ const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const TRACKER_CLOSED_CACHE_TTL_MS = 5 * 60 * 1000;
 const attemptCooldowns = new Map<string, number>();
 const trackerClosedCache = new Map<string, { closed: boolean; checkedAt: number }>();
+let scanInFlight = false;
 
 export interface OrphanProposedReconcilerConfig {
   enabled?: boolean;
@@ -79,9 +80,27 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   }
 }
 
+async function resolveBeadsIssuesPath(projectPath: string, issueId: string): Promise<string | null> {
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const beadsDir = join(workspacePath, '.beads');
+  const localIssuesPath = join(beadsDir, 'issues.jsonl');
+  if (existsSync(localIssuesPath)) return localIssuesPath;
+
+  const redirectPath = join(beadsDir, 'redirect');
+  if (!existsSync(redirectPath)) return null;
+
+  try {
+    const redirected = (await readFile(redirectPath, 'utf-8')).trim();
+    if (!redirected) return null;
+    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
+  } catch {
+    return null;
+  }
+}
+
 async function countBeadsForIssue(projectPath: string, issueId: string): Promise<number> {
-  const beadsPath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.beads', 'issues.jsonl');
-  if (!existsSync(beadsPath)) return 0;
+  const beadsPath = await resolveBeadsIssuesPath(projectPath, issueId);
+  if (!beadsPath || !existsSync(beadsPath)) return 0;
 
   try {
     const raw = await readFile(beadsPath, 'utf-8');
@@ -276,15 +295,21 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
     ),
   );
   if (loadedConfig.enabled === false) return [];
+  if (scanInFlight) {
+    emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-skipped', 'previous scan still running');
+    return [];
+  }
 
-  const now = options.now ?? new Date();
-  const minAttemptIntervalMs = Math.max(loadedConfig.minAttemptIntervalMs ?? DEFAULT_ATTEMPT_INTERVAL_MS, DEFAULT_ATTEMPT_INTERVAL_MS);
-  const actions: string[] = [];
+  scanInFlight = true;
+  try {
+    const now = options.now ?? new Date();
+    const minAttemptIntervalMs = Math.max(loadedConfig.minAttemptIntervalMs ?? DEFAULT_ATTEMPT_INTERVAL_MS, DEFAULT_ATTEMPT_INTERVAL_MS);
+    const actions: string[] = [];
 
-  emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-start', 'scanning proposed specs for missing work agents', { scanAt: now.toISOString() });
-  const candidates = await findOrphanProposedSpecsForReconciler(options);
+    emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-start', 'scanning proposed specs for missing work agents', { scanAt: now.toISOString() });
+    const candidates = await findOrphanProposedSpecsForReconciler(options);
 
-  for (const candidate of candidates) {
+    for (const candidate of candidates) {
     emitReconcilerEvent(
       'warn',
       'orphan-proposed-reconciler.orphan-detected',
@@ -337,10 +362,14 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
     }
   }
 
-  return actions;
+    return actions;
+  } finally {
+    scanInFlight = false;
+  }
 }
 
 export function clearOrphanProposedAttemptCooldowns(): void {
   attemptCooldowns.clear();
   trackerClosedCache.clear();
+  scanInFlight = false;
 }

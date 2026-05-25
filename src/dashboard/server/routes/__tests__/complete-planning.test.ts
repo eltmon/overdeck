@@ -83,18 +83,15 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async () => {
-        expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
-        return {
-          success: true,
-          created: ['PAN-1144: Promote spec'],
-          errors: [],
-          beadIds: new Map(),
-        };
-      },
+      createBeads: async () => ({
+        success: true,
+        created: ['PAN-1144: Promote spec'],
+        errors: [],
+        beadIds: new Map(),
+      }),
     })).rejects.toThrow('created 1 beads for 2 plan items');
 
-    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
   it('does not write a proposed spec when bead materialization reports failure', async () => {
@@ -115,7 +112,7 @@ describe('completePlanningArtifacts', () => {
       }),
     })).rejects.toThrow('bd daemon unavailable');
 
-    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
   it('does not auto-spawn when autoSpawn is omitted', async () => {

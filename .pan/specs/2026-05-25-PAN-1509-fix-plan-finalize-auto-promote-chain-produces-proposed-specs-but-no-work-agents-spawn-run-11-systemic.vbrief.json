@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:11:35.232Z",
+    "updated": "2026-05-25T21:23:41.031Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8d4f1509-1509-4a2b-8c3d-f9e0f1a2b3c4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 35,
+    "sequence": 39,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:11:35.232Z",
+    "updated": "2026-05-25T21:23:41.031Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -697,58 +697,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1509-fix-plan-finalize-auto-promote-chain-produces-proposed-specs-but-no-work-agents-spawn-run-11-systemic.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1509",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T21:11:35.158Z",
+        "updatedAt": "2026-05-25T21:23:41.026Z",
         "work": {
-          "updatedAt": "2026-05-25T21:11:35.158Z",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-05-25T21:11:35.158Z",
+          "status": "failed",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
+          "notes": "Verification FAILED at build (93898ms):\n\n5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249mu\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m  │\u001b[0m                                               ─────────┬─────────  \n \u001b[38;5;240m  │\u001b[0m                                                        ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m───╯\u001b[0m\n\nsrc/dashboard/server/read-model.ts (24:7) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve '@panctl/contracts' in src/dashboard/server/read-model.ts\n    \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/read-model.ts:24:8 \u001b[38;5;246m]\u001b[0m\n    \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m24 │\u001b[0m \u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m   │\u001b[0m        ─────────┬─────────  \n \u001b[38;5;240m   │\u001b[0m                 ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (34%)\n  - rolldown-plugin-dts:resolver (31%)\n  - rolldown-plugin-dts:generate (30%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nattempt to write a readonly database\n",
           "history": [
             {
-              "status": "running",
-              "at": "2026-05-25T21:11:35.158Z"
+              "status": "failed",
+              "at": "2026-05-25T21:23:41.026Z",
+              "notes": "Verification FAILED at build (93898ms):\n\n5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249mu\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m  │\u001b[0m                                               ─────────┬─────────  \n \u001b[38;5;240m  │\u001b[0m                                                        ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m───╯\u001b[0m\n\nsrc/dashboard/server/read-model.ts (24:7) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve '@panctl/contracts' in src/dashboard/server/read-model.ts\n    \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/read-model.ts:24:8 \u001b[38;5;246m]\u001b[0m\n    \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m24 │\u001b[0m \u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m   │\u001b[0m        ─────────┬─────────  \n \u001b[38;5;240m   │\u001b[0m                 ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (34%)\n  - rolldown-plugin-dts:resolver (31%)\n  - rolldown-plugin-dts:generate (30%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nattempt to write a readonly database\n"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T21:11:35.158Z",
-          "notes": "Existing proposed specs materialize beads from stale spec before update",
+          "status": "blocked",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
+          "notes": "Security blocker: complete-planning autoSpawn bypasses start-agent origin gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T21:11:35.158Z",
-              "notes": "Existing proposed specs materialize beads from stale spec before update"
+              "status": "blocked",
+              "at": "2026-05-25T21:23:41.026Z",
+              "notes": "Security blocker: complete-planning autoSpawn bypasses start-agent origin gate"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T21:11:35.158Z",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T21:11:35.158Z"
+              "at": "2026-05-25T21:23:41.026Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T21:11:35.158Z",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T21:11:35.158Z",
+          "updatedAt": "2026-05-25T21:23:41.026Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T21:11:35.158Z"
+              "at": "2026-05-25T21:23:41.026Z"
             }
           ],
           "readyForMerge": false,

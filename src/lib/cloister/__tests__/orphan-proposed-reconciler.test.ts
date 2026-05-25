@@ -47,6 +47,22 @@ function writeBeads(projectPath: string, issueId: string, beadCount = 2): void {
   writeFileSync(join(beadsDir, 'issues.jsonl'), lines.join('\n'));
 }
 
+function writeRedirectBeads(projectPath: string, issueId: string, beadCount = 2): void {
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const workspaceBeadsDir = join(workspacePath, '.beads');
+  const sharedBeadsDir = join(projectPath, '.beads');
+  mkdirSync(workspaceBeadsDir, { recursive: true });
+  mkdirSync(sharedBeadsDir, { recursive: true });
+  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+    _type: 'issue',
+    id: `shared-${issueId.toLowerCase()}-${index + 1}`,
+    title: `${issueId} bead ${index + 1}`,
+    labels: [issueId.toLowerCase()],
+  }));
+  writeFileSync(join(workspaceBeadsDir, 'redirect'), '../../.beads');
+  writeFileSync(join(sharedBeadsDir, 'issues.jsonl'), lines.join('\n'));
+}
+
 describe('orphan proposed spec reconciler', () => {
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), 'orphan-proposed-reconciler-'));
@@ -84,6 +100,26 @@ describe('orphan proposed spec reconciler', () => {
         projectKey: 'panopticon',
         projectName: 'Panopticon CLI',
         issueId: 'PAN-3001',
+        beadCount: 2,
+        planItemCount: 2,
+      }),
+    ]);
+  });
+
+  it('detects proposed orphan specs with redirect-backed beads stores', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3005', 'proposed');
+    writeRedirectBeads(projectPath, 'PAN-3005');
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-3005',
         beadCount: 2,
         planItemCount: 2,
       }),

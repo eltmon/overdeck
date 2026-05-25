@@ -26,7 +26,7 @@ interface PromotePlanningResult {
   workAgentSkipReason: string | null;
 }
 
-type AutoPromotePhase = 'createBeads' | 'completePlanning' | 'done';
+type AutoPromotePhase = 'createBeads' | 'completePlanning' | 'terminal';
 type AutoPromotePhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 function emitAutoPromotePhase(
@@ -98,7 +98,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       workspacePath,
       createdCount: result.created.length,
     });
-    emitAutoPromotePhase(issueId, 'done', 'failure', 'beads creation failed', { workspacePath });
+    emitAutoPromotePhase(issueId, 'terminal', 'failure', 'beads creation failed', { workspacePath });
     if (options.json) {
       console.log(JSON.stringify({ success: false, created: result.created, errors }));
     } else {
@@ -153,7 +153,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     emitAutoPromotePhase(issueId, 'completePlanning', 'skipped', 'promotion skipped by --no-promote');
   }
 
-  emitAutoPromotePhase(issueId, 'done', promoted || options.noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : options.noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
+  emitAutoPromotePhase(issueId, 'terminal', promoted || options.noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : options.noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
     workAgentSpawned,
     workAgentSkipReason,
   });
@@ -217,7 +217,7 @@ export async function promotePlanning(issueId: string): Promise<PromotePlanningR
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
         body: JSON.stringify({ autoSpawn: true }),
         signal: controller.signal,
       });

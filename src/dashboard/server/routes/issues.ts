@@ -29,7 +29,7 @@ import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
@@ -47,6 +47,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus, getReviewStatusSync } from '../review-status.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
@@ -128,7 +129,7 @@ export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
   issueId: string;
-  createBeads?: (workspacePath: string, planPath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
+  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
 }): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
@@ -146,12 +147,35 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const createBeads = options.createBeads ?? (async (path: string, planPath: string) => {
+  const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
-    return (await Effect.runPromise(mod.createBeadsFromVBrief(path, planPath)));
+    return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
   });
-  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from workspace vBRIEF', { workspacePath });
-  const rawBeadsResult = createBeads(workspacePath, workspacePlanPath);
+
+  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
+  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
+  const previousSpecContents = existingSpec ? await readFile(existingSpec.path, 'utf-8').catch(() => null) : null;
+  let proposed: { path: string; filename: string };
+  try {
+    proposed = existingSpec
+      ? await (async () => {
+          const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+          await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
+          return { path: existingSpec.path, filename: existingSpec.filename };
+        })()
+      : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed vBRIEF spec written', {
+      path: proposed.path,
+      filename: proposed.filename,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath });
+    throw error;
+  }
+
+  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from proposed vBRIEF', { workspacePath });
+  const rawBeadsResult = createBeads(workspacePath);
   const beadsResult = Effect.isEffect(rawBeadsResult)
     ? await Effect.runPromise(rawBeadsResult)
     : await rawBeadsResult;
@@ -159,6 +183,12 @@ export async function completePlanningArtifacts(options: {
   const errors = beadsResult.errors ?? [];
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0 || !beadsResult.success || created.length !== planItemCount) {
+    if (existingSpec && previousSpecContents !== null) {
+      await writeFile(existingSpec.path, previousSpecContents, 'utf-8');
+    } else if (!existingSpec) {
+      await rm(proposed.path, { force: true });
+      await rm(dirname(proposed.path), { force: true }).catch(() => undefined);
+    }
     const detail = errors.length > 0
       ? errors.join('; ')
       : `created ${created.length} beads for ${planItemCount} plan items`;
@@ -175,26 +205,7 @@ export async function completePlanningArtifacts(options: {
     planItemCount,
   });
 
-  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
-  try {
-    const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
-    const proposed = existingSpec
-      ? await (async () => {
-          const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-          await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
-          return { path: existingSpec.path, filename: existingSpec.filename };
-        })()
-      : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
-    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed vBRIEF spec written', {
-      path: proposed.path,
-      filename: proposed.filename,
-    });
-    return { proposed, beadCount: created.length, beadsWarning: null };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath });
-    throw error;
-  }
+  return { proposed, beadCount: created.length, beadsWarning: null };
 }
 
 function getInternalDashboardOrigin(): string {
@@ -1200,6 +1211,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/complete-planning',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!parseIssueIdSync(id)) {
@@ -1212,6 +1224,10 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     const skipKill = (body as any)?.skipKill === true;
     const autoSpawn = (body as any)?.autoSpawn === true;
+    if (autoSpawn) {
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const sessionName = `planning-${id.toLowerCase()}`;
     const issueLower = id.toLowerCase();
 

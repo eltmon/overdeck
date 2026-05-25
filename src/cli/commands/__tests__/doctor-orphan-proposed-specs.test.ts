@@ -34,6 +34,22 @@ function writeBeads(projectPath: string, issueId: string, beadCount: number): vo
   writeFileSync(join(beadsDir, 'issues.jsonl'), lines.join('\n'));
 }
 
+function writeRedirectBeads(projectPath: string, issueId: string, beadCount: number): void {
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const workspaceBeadsDir = join(workspacePath, '.beads');
+  const sharedBeadsDir = join(projectPath, '.beads');
+  mkdirSync(workspaceBeadsDir, { recursive: true });
+  mkdirSync(sharedBeadsDir, { recursive: true });
+  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+    _type: 'issue',
+    id: `shared-${issueId.toLowerCase()}-${index + 1}`,
+    title: `${issueId} bead ${index + 1}`,
+    labels: [issueId.toLowerCase()],
+  }));
+  writeFileSync(join(workspaceBeadsDir, 'redirect'), '../../.beads');
+  writeFileSync(join(sharedBeadsDir, 'issues.jsonl'), lines.join('\n'));
+}
+
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'doctor-orphan-proposed-'));
 });
@@ -68,5 +84,17 @@ describe('orphan proposed specs doctor check', () => {
     expect(result.fix).toContain('free disk');
     expect(result.fix).toContain('spec items and bead tasks diverged');
     expect(result.fix).toContain('pan start <id>');
+  });
+
+  it('counts redirect-backed beads stores', () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-2004', 2);
+    writeRedirectBeads(projectPath, 'PAN-2004', 2);
+
+    const projects = [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }];
+    expect(findOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') })).toEqual([
+      expect.objectContaining({ issueId: 'PAN-2004', reason: 'no-agent-no-reason', beadCount: 2, planItemCount: 2 }),
+    ]);
   });
 });
