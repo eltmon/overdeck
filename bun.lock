@@ -37,7 +37,6 @@
       "devDependencies": {
         "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^20.5.0",
-        "@effect/vitest": "4.0.0-beta.45",
         "@effect/vitest": "catalog:",
         "@napi-rs/canvas": "^1.0.0",
         "@panctl/contracts": "workspace:*",
@@ -64,7 +63,7 @@
     },
     "apps/desktop": {
       "name": "@panctl/desktop",
-      "version": "0.10.2",
+      "version": "0.11.0",
       "bin": {
         "panctl": "./bin/panctl.mjs",
       },
@@ -85,7 +84,7 @@
     },
     "packages/contracts": {
       "name": "@panctl/contracts",
-      "version": "0.10.2",
+      "version": "0.11.0",
       "dependencies": {
         "effect": "4.0.0-beta.45",
       },
