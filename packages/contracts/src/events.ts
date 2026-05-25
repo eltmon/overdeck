@@ -459,6 +459,32 @@ export const PipelineTestCompletedEvent = Schema.Struct({
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
 
+export const OperatorInterventionEvent = Schema.Struct({
+  type: Schema.Literal("operator.intervention"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    kind: Schema.Literals(["tell", "pause", "restart", "manual_edit", "deep_wipe", "unpause", "untroubled"]),
+    source: Schema.String,
+  }),
+})
+export type OperatorInterventionEvent = typeof OperatorInterventionEvent.Type
+
+export const SubstrateBugFiledEvent = Schema.Struct({
+  type: Schema.Literal("substrate.bug_filed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    runId: Schema.optional(Schema.String),
+    filedBy: Schema.Literals(["agent", "operator"]),
+    discoveredIn: Schema.optional(IssueId),
+    severity: Schema.Literals(["P0", "P1", "P2"]),
+  }),
+})
+export type SubstrateBugFiledEvent = typeof SubstrateBugFiledEvent.Type
+
 /**
  * PAN-915 — reviewer session received a new prompt (spawn or resume of a
  * canonical PAN-830 session). Drives event-driven `reviewSubStatuses[role] =
@@ -1041,6 +1067,8 @@ export const DomainEvent = Schema.Union([
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
+  OperatorInterventionEvent,
+  SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,
   ReviewReviewerCompletedEvent,
   ReviewSpecialistTimedOutEvent,

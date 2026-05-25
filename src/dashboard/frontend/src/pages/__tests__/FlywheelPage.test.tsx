@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   statusDetails: vi.fn(),
   conversationPane: vi.fn(),
   statePane: vi.fn(),
+  statsPanel: vi.fn(),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -36,6 +37,13 @@ vi.mock('../../components/flywheel/FlywheelStatePane', () => ({
   FlywheelStatePane: () => {
     mocks.statePane();
     return <div data-testid="state-pane">state</div>;
+  },
+}));
+
+vi.mock('../../components/flywheel/FlywheelStatsPanel', () => ({
+  FlywheelStatsPanel: () => {
+    mocks.statsPanel();
+    return <div data-testid="stats-panel">stats</div>;
   },
 }));
 
@@ -90,6 +98,7 @@ describe('FlywheelPage', () => {
     mocks.statusDetails.mockReset();
     mocks.conversationPane.mockReset();
     mocks.statePane.mockReset();
+    mocks.statsPanel.mockReset();
     mocks.subscribeFlywheelStatus.mockReset();
     mocks.subscribeFlywheelStatus.mockImplementation((listener: (status: FlywheelStatus | null) => void) => {
       mocks.listener = listener;
@@ -315,18 +324,54 @@ describe('FlywheelPage', () => {
   it('defaults to the Status tab and switches to State on tab click', () => {
     renderFlywheelPage(<FlywheelPage />);
 
+    const tabs = screen.getAllByRole('tab');
     const stateTab = screen.getByRole('tab', { name: 'State' });
     const statusTab = screen.getByRole('tab', { name: 'Status' });
+    const statsTab = screen.getByRole('tab', { name: 'Stats' });
 
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Status', 'State', 'Stats']);
     expect(statusTab).toHaveAttribute('aria-selected', 'true');
     expect(stateTab).toHaveAttribute('aria-selected', 'false');
+    expect(statsTab).toHaveAttribute('aria-selected', 'false');
     expect(screen.queryByTestId('state-pane')).not.toBeInTheDocument();
 
     fireEvent.click(stateTab);
 
     expect(stateTab).toHaveAttribute('aria-selected', 'true');
     expect(statusTab).toHaveAttribute('aria-selected', 'false');
+    expect(statsTab).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByTestId('state-pane')).toBeInTheDocument();
     expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
+  });
+
+  it('renders the Stats tab and switches back to existing panes without losing status data', () => {
+    render(<FlywheelPage />);
+
+    act(() => {
+      mocks.listener?.(status);
+    });
+
+    const statsTab = screen.getByRole('tab', { name: 'Stats' });
+    const stateTab = screen.getByRole('tab', { name: 'State' });
+    const statusTab = screen.getByRole('tab', { name: 'Status' });
+
+    fireEvent.click(statsTab);
+
+    expect(statsTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Flywheel stats' })).toBeInTheDocument();
+    expect(screen.getByTestId('stats-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
+
+    fireEvent.click(stateTab);
+
+    expect(stateTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Flywheel state' })).toBeInTheDocument();
+    expect(screen.getByTestId('state-pane')).toBeInTheDocument();
+
+    fireEvent.click(statusTab);
+
+    expect(statusTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Flywheel status' })).toBeInTheDocument();
+    expect(screen.getByTestId('status-details')).toHaveTextContent('RUN-7');
   });
 });

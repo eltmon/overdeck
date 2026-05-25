@@ -48,6 +48,47 @@ To extend the contract:
 
 Do not add dashboard-only or CLI-only status fields. A status change starts in the shared contract, then moves outward.
 
+## Reading the Stats panel
+
+The dashboard's **Stats** tab and `pan flywheel stats` interpret the seven v1.0 readiness criteria from [`vision.mdx`](../vision.mdx#v10-readiness-criteria-draft). The default window is the most recent 30 days; CLI callers may override it with `--window <duration>`, but the v1.0 call is always based on 30 consecutive days. In-flight pipeline runs are excluded from denominators until they finish as merged, parked, or cancelled. Before at least three completed pipeline runs exist in the window, the panel reports insufficient data instead of classifying readiness.
+
+| # | Criterion | Formula | Ready threshold |
+| --- | --- | --- | --- |
+| 1 | Substrate-bug discovery rate | `substrate bugs filed in window / completed pipeline runs in window` | `< 2%` (at most one substrate bug per 50 runs) |
+| 2 | Critical/P0 substrate bugs | Count of substrate bugs with `P0` severity filed in the window | `0` |
+| 3 | Pipeline pass success rate, substrate-attributable only | `1 - (substrate-attributable failed passes / total pipeline passes)` | `≥ 99%` |
+| 4 | MTTR for filed substrate bugs | Median and p95 duration from substrate bug `filed_at` to `fix_merged_at` | Median `< 24h` and p95 `< 1 week` |
+| 5 | Operator intervention rate per pipeline run | `operator intervention events / completed pipeline runs in window` | `< 5%` |
+| 6 | Time-in-pipeline consistency by complexity bucket | For each bucket, `p95 completed-run duration / median completed-run duration` | Every populated bucket is `≤ 2×` |
+| 7 | Flake rate on substrate-attributable failures | `substrate-attributable flakes / substrate-attributable review-or-test failures` | `< 5%` |
+
+Criterion 3 and criterion 7 use the D13 substrate-attributable heuristic: a review or test failure counts as substrate-attributable only when a substrate bug is filed within 24 hours and its `Flywheel-Discovered-In` trailer points at the same issue. This is intentionally conservative; unfiled substrate failures are not inferred.
+
+Criterion 6 uses the D12 complexity buckets captured at planning completion: `simple` is 1-3 beads, `medium` is 4-8 beads, and `complex` is 9 or more beads. Runs without a bead count are placed in `unbucketed` and excluded from criterion 6 while still counting for the other criteria.
+
+Criterion 7 uses the H9 flake definition: a review or test check that passes on one cycle and fails on the next cycle in the same pipeline run with no intervening code commit, meaning the head SHA is unchanged. Failures after a new commit are treated as ordinary pass/fail outcomes, not flakes.
+
+## Substrate-bug provenance
+
+Substrate bug issues filed during a Flywheel run carry a trailer block at the bottom of the GitHub issue body:
+
+```text
+---
+Flywheel-Run-Id: RUN-123
+Flywheel-Filed-By: agent
+Flywheel-Discovered-In: PAN-1487
+```
+
+`Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
+
+`Flywheel-Filed-By` is `agent` only when the singleton `flywheel-orchestrator` files the issue itself. Work, plan, review, test, ship, and operator-requested issue creation are recorded as `operator` because a human or non-Flywheel role decided to file the record.
+
+`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Panopticon state at `${PANOPTICON_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
+
+The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
+
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
+
 ## Lifecycle
 
 The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by dashboard routes.
@@ -121,8 +162,9 @@ Do not put secrets, machine-local paths, or one-time session state in a brief. P
 | API | `GET /api/flywheel/runs` | Lists run summaries for the sidebar live badge and Flywheel page. |
 | API | `GET /api/flywheel/runs/:id` | Returns a run detail plus its latest validated status snapshot. |
 | API | `GET /api/flywheel/brief` / `POST /api/flywheel/brief` | Reads and updates the markdown brief, constrained to paths inside the project root. |
-| UI | `/flywheel` | Two-pane layout. Left pane has **Status** and **State** tabs. Right pane is the orchestrator conversation. |
+| UI | `/flywheel` | Two-pane layout. Left pane has **Status**, **Stats**, and **State** tabs. Right pane is the orchestrator conversation. |
 | UI | `/flywheel` → Status tab | Renders the live `FlywheelStatus` snapshot via `subscribeFlywheelStatus`. Default tab. |
+| UI | `/flywheel` → Stats tab | Renders the rolling-window readiness metrics for the seven v1.0 criteria. |
 | UI | `/flywheel` → State tab | Renders `docs/FLYWHEEL-STATE.md` as markdown. |
 | UI | Sidebar Flywheel item | Opens `/flywheel` and shows a live badge when a run summary reports `status: running`. |
 | UI | Settings → Roles → Flywheel | Edits the orchestrator model, harness, effort, max-agent budget, and scope for future starts. |

@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { clearAgentPausedSync, getAgentStateSync } from '../../lib/agents.js';
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 export async function unpauseCommand(id: string): Promise<void> {
   const issueId = resolveIssueIdSync(id);
@@ -17,6 +18,7 @@ export async function unpauseCommand(id: string): Promise<void> {
     clearAgentPausedSync(agentId);
 
     if (wasPaused) {
+      await appendOperatorInterventionEvent({ issueId, kind: 'unpause', source: 'pan unpause' });
       console.log(chalk.green(`Unpaused agent: ${agentId}`));
     } else {
       console.log(chalk.dim(`Agent ${agentId} is already unpaused.`));

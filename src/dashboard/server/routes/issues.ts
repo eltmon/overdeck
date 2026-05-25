@@ -67,6 +67,7 @@ import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -2080,6 +2081,11 @@ const postIssueDeepWipeRoute = HttpRouter.add(
         });
 
         if (result.success) {
+          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({
+            issueId: id.toUpperCase(),
+            kind: 'deep_wipe',
+            source: 'dashboard',
+          })));
           for (const agentId of [`agent-${id.toLowerCase()}`, `planning-${id.toLowerCase()}`]) {
             try {
               await Effect.runPromise(eventStore.append({

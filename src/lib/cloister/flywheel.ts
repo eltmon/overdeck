@@ -126,6 +126,7 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
     allowHost: true,
     registerConversation: true,
     resumeSessionId: options.resumeSessionId,
+    flywheelRunId: runId,
   });
 }
 

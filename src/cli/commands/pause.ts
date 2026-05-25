@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { getAgentStateSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 interface PauseOptions {
   reason?: string;
@@ -24,6 +25,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
     if (shouldStop) {
       stopAgentSync(agentId);
     }
+    await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 
     const reason = options.reason ? ` (${options.reason})` : '';
     const stopped = shouldStop ? ' and stopped' : '';

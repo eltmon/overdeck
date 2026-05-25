@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FlywheelStatus } from '@panctl/contracts';
+import { decodeFlywheelStats, type FlywheelStats, type FlywheelStatus } from '@panctl/contracts';
 import {
   flywheelRouteLayer,
   getAutoMergeProblemPayload,
@@ -13,6 +13,7 @@ import {
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
   deleteAutoMergePayload,
+  getFlywheelStatsPayload,
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelPausePayload,
@@ -22,6 +23,7 @@ import {
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
+import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
 import { resetDatabase } from '../../../../lib/database/index.js';
@@ -46,6 +48,71 @@ async function requestFlywheelRoute(path: string, init: RequestInit = {}): Promi
   const responseBody = response.body as { body?: Uint8Array } | null;
   const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
   return { status: response.status, body: JSON.parse(text) };
+}
+
+function makeStats(window: string): FlywheelStats {
+  return {
+    window,
+    generatedAt: '2026-05-25T10:00:00.000Z',
+    criteria: {
+      c1_bugRate: {
+        label: 'Substrate-bug discovery rate',
+        value: 0,
+        target: 0.02,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c2_p0Bugs: {
+        label: 'Critical/P0 substrate bugs',
+        value: 0,
+        target: 0,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c3_passRate: {
+        label: 'Pipeline pass success rate',
+        value: 0,
+        target: 0.99,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c4_mttr: {
+        label: 'MTTR for filed substrate bugs',
+        value: { medianMs: 0, p95Ms: 0 },
+        target: { medianMs: 86400000, p95Ms: 604800000 },
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c5_intervention: {
+        label: 'Operator intervention rate',
+        value: 0,
+        target: 0.05,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c6_timeConsistency: {
+        label: 'Time-in-pipeline consistency',
+        value: { simple: 0, medium: 0, complex: 0 },
+        target: { maxRatio: 2 },
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+      c7_flake: {
+        label: 'Substrate-attributable flake rate',
+        value: 0,
+        target: 0.05,
+        status: 'insufficient_data',
+        sampleSize: 0,
+        dataSufficient: false,
+      },
+    },
+  };
 }
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
@@ -114,6 +181,85 @@ describe('resolveFlywheelBriefPath', () => {
       await expect(requireDashboardFlywheelBrief(projectRoot, './brief-link.md')).rejects.toThrow('Brief path must stay inside the project root');
     } finally {
       await rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('flywheel stats payload helper', () => {
+  it('defaults missing window to 30d and validates the response shape', async () => {
+    const seenWindows: string[] = [];
+    const result = await getFlywheelStatsPayload(undefined, {
+      compute: async (window) => {
+        seenWindows.push(window);
+        return makeStats(window);
+      },
+    });
+
+    expect(result.status).toBe(200);
+    expect(seenWindows).toEqual(['30d']);
+    expect(decodeFlywheelStats(result.body)).toEqual(makeStats('30d'));
+  });
+
+  it('passes explicit 7d windows through to telemetry', async () => {
+    const result = await getFlywheelStatsPayload('7d', {
+      compute: async (window) => makeStats(window),
+    });
+
+    expect(result.status).toBe(200);
+    expect(decodeFlywheelStats(result.body).window).toBe('7d');
+  });
+
+  it('returns 400 for invalid windows', async () => {
+    const result = await getFlywheelStatsPayload('abc');
+
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({ error: 'Invalid Flywheel stats window or payload' });
+  });
+
+  it('feeds persisted pipeline events into production stats criteria', async () => {
+    const panopticonHome = join(tmpdir(), `pan-flywheel-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(panopticonHome, { recursive: true });
+    process.env.PANOPTICON_HOME = panopticonHome;
+    resetDatabase();
+    try {
+      const store = await initEventStore();
+      const appendRun = (issueId: string, minute: number, failedReview = false) => {
+        const at = (offset: number) => `2026-05-25T09:${String(minute + offset).padStart(2, '0')}:00.000Z`;
+        store.append({ type: 'plan.item_status_changed', timestamp: at(0), payload: { issueId, itemId: `${issueId}-1`, status: 'done' } } as never);
+        store.append({ type: 'plan.item_status_changed', timestamp: at(0), payload: { issueId, itemId: `${issueId}-2`, status: 'done' } } as never);
+        store.append({ type: 'pipeline.review-started', timestamp: at(1), payload: { issueId } } as never);
+        store.append({
+          type: 'pipeline.review-completed',
+          timestamp: at(2),
+          payload: { issueId, passed: !failedReview, substrateAttributable: failedReview, headSha: `${issueId}-sha` },
+        } as never);
+        store.append({ type: 'pipeline.test-started', timestamp: at(3), payload: { issueId } } as never);
+        store.append({ type: 'pipeline.test-completed', timestamp: at(4), payload: { issueId, passed: true, headSha: `${issueId}-sha` } } as never);
+        store.append({ type: 'issue.statusChanged', timestamp: at(5), payload: { issueId, canonicalStatus: 'verifying_on_main' } } as never);
+      };
+
+      appendRun('PAN-201', 0, true);
+      appendRun('PAN-202', 10);
+      appendRun('PAN-203', 20);
+      store.append({
+        type: 'operator.intervention',
+        timestamp: '2026-05-25T09:06:00.000Z',
+        payload: { issueId: 'PAN-201', kind: 'tell', source: 'dashboard' },
+      } as never);
+
+      const result = await getFlywheelStatsPayload('30d', { now: () => new Date('2026-05-25T10:00:00.000Z') });
+
+      expect(result.status).toBe(200);
+      const stats = decodeFlywheelStats(result.body);
+      expect(stats.criteria.c1_bugRate.sampleSize).toBe(3);
+      expect(stats.criteria.c3_passRate).toMatchObject({ sampleSize: 6, value: 5 / 6, dataSufficient: true });
+      expect(stats.criteria.c5_intervention).toMatchObject({ sampleSize: 3, value: 1 / 3, dataSufficient: true });
+      expect(stats.criteria.c6_timeConsistency).toMatchObject({ sampleSize: 3, dataSufficient: true });
+      expect(stats.criteria.c7_flake).toMatchObject({ sampleSize: 1, value: 0, dataSufficient: true });
+    } finally {
+      resetDatabase();
+      delete process.env.PANOPTICON_HOME;
+      rmSync(panopticonHome, { recursive: true, force: true });
     }
   });
 });

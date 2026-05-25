@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   paused: false,
   autoPickupBacklog: false,
   requireUatBeforeMerge: true,
-  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi' }) => ({
+  spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi'; flywheelRunId?: string }) => ({
     id: options.agentId,
     issueId,
     workspace: options.workspace,
@@ -77,6 +77,7 @@ describe('flywheel lifecycle', () => {
       workspace: '/repo',
       allowHost: true,
       registerConversation: true,
+      flywheelRunId: 'RUN-1',
     }));
   });
 

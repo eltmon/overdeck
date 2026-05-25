@@ -4036,6 +4036,28 @@ function initSchema(db) {
       limit_per_window INTEGER NOT NULL DEFAULT 1000
     );
 
+    CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+      issue_id               TEXT PRIMARY KEY,
+      filed_at               TEXT NOT NULL,
+      run_id                 TEXT,
+      filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+      discovered_in_issue_id TEXT,
+      severity               TEXT NOT NULL DEFAULT 'P2',
+      status                 TEXT NOT NULL DEFAULT 'open',
+      fix_merged_at          TEXT,
+      fix_commit_sha         TEXT,
+      updated_at             TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+      ON flywheel_substrate_bugs(filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+      ON flywheel_substrate_bugs(filed_by, filed_at);
+
+    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+      ON flywheel_substrate_bugs(status, fix_merged_at);
+
     -- ===== Domain Events (PAN-428: push-first architecture) =====
     CREATE TABLE IF NOT EXISTS events (
       sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4049,6 +4071,14 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_events_timestamp
       ON events(timestamp);
+
+    CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+      ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+      WHERE json_type(payload, '$.issueId') = 'text';
+
+    CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+      ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+      WHERE json_type(payload, '$.issueId') = 'text';
 
     -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
     CREATE TABLE IF NOT EXISTS projection_cache (
@@ -4291,7 +4321,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 45`);
+	db.pragma(`user_version = 47`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4299,7 +4329,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 45) return;
+	if (currentVersion === 47) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4808,6 +4838,24 @@ function runMigrations(db) {
         ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
     `);
 	if (currentVersion < 45) db.exec(`
+      CREATE TABLE IF NOT EXISTS pending_auto_merges (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        issueId          TEXT NOT NULL,
+        prUrl            TEXT NOT NULL,
+        prNumber         INTEGER,
+        projectKey       TEXT NOT NULL,
+        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+        scheduledMergeAt TEXT NOT NULL,
+        scheduledAt      TEXT NOT NULL,
+        mergedAt         TEXT,
+        failureReason    TEXT,
+        cancelledAt      TEXT,
+        cancelledBy      TEXT
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
+        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+
       CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
         ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
 
@@ -4817,7 +4865,52 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
         ON pending_auto_merges("status", scheduledMergeAt, id);
     `);
-	db.pragma(`user_version = 45`);
+	if (currentVersion < 46) db.exec(`
+      CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
+        issue_id               TEXT PRIMARY KEY,
+        filed_at               TEXT NOT NULL,
+        run_id                 TEXT,
+        filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
+        discovered_in_issue_id TEXT,
+        severity               TEXT NOT NULL DEFAULT 'P2',
+        status                 TEXT NOT NULL DEFAULT 'open',
+        fix_merged_at          TEXT,
+        fix_commit_sha         TEXT,
+        updated_at             TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
+        ON flywheel_substrate_bugs(filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
+        ON flywheel_substrate_bugs(filed_by, filed_at);
+
+      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
+        ON flywheel_substrate_bugs(status, fix_merged_at);
+    `);
+	if (currentVersion < 47) db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT    NOT NULL,
+        timestamp TEXT    NOT NULL,
+        payload   TEXT    NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_events_type
+        ON events(type);
+
+      CREATE INDEX IF NOT EXISTS idx_events_timestamp
+        ON events(timestamp);
+
+      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+        WHERE json_type(payload, '$.issueId') = 'text';
+
+      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+        WHERE json_type(payload, '$.issueId') = 'text';
+    `);
+	db.pragma(`user_version = 47`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

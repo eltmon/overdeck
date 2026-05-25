@@ -114,6 +114,7 @@ import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
+import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import { getClosedIssueIdsForReadSource, ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
@@ -1017,26 +1018,16 @@ async function sendAgentMessage(id: string, message: string) {
   const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
   const remoteStateFile = join(agentStateDir, 'remote-state.json');
   let isRemote = false;
-  let vmName = '';
 
   if (existsSync(remoteStateFile)) {
     try {
       const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-      if (state.location === 'remote' && state.vmName) {
-        isRemote = true;
-        vmName = state.vmName;
-      }
+      isRemote = state.location === 'remote' && Boolean(state.vmName);
     } catch {}
   }
 
-  if (isRemote && vmName) {
-    const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
-    await sendToRemoteAgent(id, vmName, message);
-    return { success: true, remote: true };
-  }
-
-  await messageAgent(id, message);
-  return { success: true };
+  await messageAgent(id, message, 'dashboard:user-message');
+  return isRemote ? { success: true, remote: true } : { success: true };
 }
 
 export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
@@ -1707,6 +1698,11 @@ const postAgentPauseRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
+    yield* eventStore.appendAsync(operatorInterventionEvent({
+      issueId: updatedState.issueId || stateBeforePause.issueId || id.replace(/^agent-/, '').toUpperCase(),
+      kind: 'pause',
+      source: 'dashboard',
+    }));
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -1745,6 +1741,13 @@ const postAgentUnpauseRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.unpause_requested'));
+    if (stateBeforeUnpause.paused === true) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState.issueId || stateBeforeUnpause.issueId || id.replace(/^agent-/, '').toUpperCase(),
+        kind: 'unpause',
+        source: 'dashboard:agent-unpause',
+      }));
+    }
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -1783,6 +1786,13 @@ const postAgentUntroubledRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.untroubled_requested'));
+    if (stateBeforeClear.troubled === true || (stateBeforeClear.consecutiveFailures ?? 0) > 0) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState.issueId || stateBeforeClear.issueId || id.replace(/^agent-/, '').toUpperCase(),
+        kind: 'untroubled',
+        source: 'dashboard:agent-untroubled',
+      }));
+    }
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
@@ -1979,6 +1989,11 @@ const postAgentRestartRoute = HttpRouter.add(
     }));
 
     if (graceful) {
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: agentState.issueId,
+        kind: 'restart',
+        source: 'dashboard',
+      }));
       // Kick off async restart — don't block the HTTP response for 30s
       (async () => {
         try {
@@ -2036,6 +2051,11 @@ const postAgentRestartRoute = HttpRouter.add(
 
     if (result.success) {
       const updatedState = yield* getAgentState(id);
+      yield* eventStore.appendAsync(operatorInterventionEvent({
+        issueId: updatedState?.issueId || agentState.issueId,
+        kind: 'restart',
+        source: 'dashboard',
+      }));
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),

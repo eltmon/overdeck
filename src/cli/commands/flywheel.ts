@@ -6,7 +6,15 @@ import { promisify } from 'node:util';
 import { Effect, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { Command } from 'commander';
-import { FlywheelStatus } from '@panctl/contracts';
+import {
+  FlywheelStats,
+  FlywheelStatus,
+  type FlywheelStats as FlywheelStatsPayload,
+  type FlywheelStatsCriteria,
+  type FlywheelStatsCriterion,
+  type FlywheelStatsCriterionStatus,
+  type FlywheelStatsTrend,
+} from '@panctl/contracts';
 import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
@@ -33,6 +41,15 @@ interface EmitStatusOptions {
 
 interface StatusOptions {
   json?: boolean;
+}
+
+interface StatsOptions {
+  window?: string;
+  json?: boolean;
+}
+
+interface FormatStatsOptions {
+  color?: boolean;
 }
 
 interface ConfigOptions {
@@ -77,7 +94,9 @@ interface ResolvedFlywheelRoleConfig {
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
+const decodeFlywheelStats = Schema.decodeUnknownSync(FlywheelStats);
 const execAsync = promisify(exec);
+const DEFAULT_STATS_WINDOW = '30d';
 
 function dashboardBaseUrl(): string {
   return (process.env.PANOPTICON_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
@@ -421,6 +440,119 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
     }
 
     console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+const STATS_CRITERION_KEYS = [
+  'c1_bugRate',
+  'c2_p0Bugs',
+  'c3_passRate',
+  'c4_mttr',
+  'c5_intervention',
+  'c6_timeConsistency',
+  'c7_flake',
+] as const satisfies readonly (keyof FlywheelStatsCriteria)[];
+
+const STATUS_GLYPH: Record<FlywheelStatsCriterionStatus, string> = {
+  green: '● green',
+  yellow: '● yellow',
+  red: '● red',
+  insufficient_data: '○ insufficient_data',
+};
+
+const STATUS_COLOR: Record<FlywheelStatsCriterionStatus, string> = {
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  insufficient_data: '\x1b[90m',
+};
+
+const TREND_LABEL: Record<FlywheelStatsTrend, string> = {
+  up: '↗ up',
+  down: '↘ down',
+  flat: '→ flat',
+};
+
+export async function fetchFlywheelStats(window: string, fetchImpl: typeof fetch = fetch): Promise<FlywheelStatsPayload> {
+  const internalToken = ensureInternalTokenSync();
+  const url = new URL(`${dashboardBaseUrl()}/api/flywheel/stats`);
+  url.searchParams.set('window', window);
+  const res = await fetchImpl(url.toString(), {
+    headers: {
+      [INTERNAL_TOKEN_HEADER]: internalToken,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Dashboard rejected Flywheel stats request (${res.status})${body ? `: ${body}` : ''}`);
+  }
+
+  return decodeFlywheelStats(await res.json());
+}
+
+function formatScalar(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value > 0 && Math.abs(value) < 1) return `${(value * 100).toFixed(1)}%`;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatDuration(ms: number): string {
+  const abs = Math.abs(ms);
+  if (abs >= 24 * 60 * 60 * 1000) return `${(ms / (24 * 60 * 60 * 1000)).toFixed(1)}d`;
+  if (abs >= 60 * 60 * 1000) return `${(ms / (60 * 60 * 1000)).toFixed(1)}h`;
+  if (abs >= 60 * 1000) return `${(ms / (60 * 1000)).toFixed(1)}m`;
+  return `${Math.round(ms)}ms`;
+}
+
+function formatObjectValue(value: Record<string, unknown>): string {
+  return Object.entries(value)
+    .map(([key, entry]) => {
+      if (typeof entry === 'number' && key.toLowerCase().endsWith('ms')) return `${key}: ${formatDuration(entry)}`;
+      if (typeof entry === 'number') return `${key}: ${formatScalar(entry)}`;
+      if (typeof entry === 'string' || typeof entry === 'boolean' || entry === null) return `${key}: ${String(entry)}`;
+      return `${key}: ${JSON.stringify(entry)}`;
+    })
+    .join(', ');
+}
+
+function formatCriterionValue(value: FlywheelStatsCriterion['value']): string {
+  return typeof value === 'number' ? formatScalar(value) : formatObjectValue(value as Record<string, unknown>);
+}
+
+function colorStatus(status: FlywheelStatsCriterionStatus, color: boolean): string {
+  if (!color) return STATUS_GLYPH[status];
+  const [glyph, label] = STATUS_GLYPH[status].split(' ');
+  return `${STATUS_COLOR[status]}${glyph}\x1b[0m ${label}`;
+}
+
+function tableStatsCell(value: string | number | undefined): string {
+  return String(value ?? '—').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+export function formatFlywheelStats(stats: FlywheelStatsPayload, options: FormatStatsOptions = {}): string {
+  const color = options.color ?? process.stdout.isTTY === true;
+  const rows = STATS_CRITERION_KEYS.map((key) => {
+    const criterion = stats.criteria[key];
+    return `| ${tableStatsCell(criterion.label)} | ${tableStatsCell(formatCriterionValue(criterion.value))} | ${tableStatsCell(formatCriterionValue(criterion.target))} | ${tableStatsCell(colorStatus(criterion.status, color))} | ${tableStatsCell(criterion.trend ? TREND_LABEL[criterion.trend] : '—')} | ${criterion.sampleSize} |`;
+  });
+  return [
+    `Flywheel stats (${stats.window})`,
+    `Generated: ${stats.generatedAt}`,
+    '',
+    '| Criterion | Value | Target | Status | Trend | Sample |',
+    '|---|---:|---:|---|---|---:|',
+    ...rows,
+  ].join('\n');
+}
+
+export async function flywheelStatsCommand(options: StatsOptions = {}): Promise<void> {
+  try {
+    const stats = await fetchFlywheelStats(options.window ?? DEFAULT_STATS_WINDOW);
+    console.log(options.json ? JSON.stringify(stats, null, 2) : formatFlywheelStats(stats));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -797,6 +929,13 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Show the active Flywheel run status')
     .option('--json', 'Emit the raw FlywheelStatus JSON')
     .action(flywheelStatusCommand);
+
+  flywheel
+    .command('stats')
+    .description('Show Flywheel v1.0 readiness stats')
+    .option('--window <duration>', 'Stats window duration', DEFAULT_STATS_WINDOW)
+    .option('--json', 'Emit the raw FlywheelStats JSON')
+    .action(flywheelStatsCommand);
 
   flywheel
     .command('pause')
