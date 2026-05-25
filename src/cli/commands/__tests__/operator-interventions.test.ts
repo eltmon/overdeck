@@ -178,6 +178,56 @@ describe('operator intervention CLI emission', () => {
     });
   });
 
+  it('tears down the issue workspace when pan kill stops a ship specialist (PAN-1326)', async () => {
+    agentMocks.getAgentStateSync.mockReturnValue({
+      issueId: 'PAN-1326',
+      status: 'running',
+      role: 'ship',
+      workspace: '/tmp/wrong-specialist-workspace',
+    });
+    tmuxMocks.sessionExistsSync.mockReturnValue(true);
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/panopticon-cli' });
+    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/panopticon-cli/workspaces/feature-pan-1326');
+    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+      containersFound: true,
+      steps: ['docker compose down', 'docker network prune'],
+    }));
+
+    const { killCommand } = await import('../kill.js');
+    await killCommand('agent-pan-1326-ship', {});
+
+    expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-1326');
+    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/panopticon-cli', 'pan-1326');
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/panopticon-cli/workspaces/feature-pan-1326', 'pan-1326');
+    expect(logSpy.mock.calls.some(([message]) => String(message).includes('Stopped Docker stack: docker compose down; docker network prune'))).toBe(true);
+  });
+
+  it('tears down the issue workspace when pan kill stops a work agent (PAN-1326)', async () => {
+    agentMocks.getAgentStateSync.mockReturnValue({
+      issueId: 'PAN-1316',
+      status: 'running',
+      role: 'work',
+      workspace: '/tmp/wrong-workspace',
+    });
+    tmuxMocks.sessionExistsSync.mockReturnValue(true);
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/panopticon-cli' });
+    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/panopticon-cli/workspaces/feature-pan-1316');
+    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+      containersFound: true,
+      steps: ['docker compose down', 'docker network prune'],
+    }));
+
+    const { killCommand } = await import('../kill.js');
+    await killCommand('agent-pan-1316', {});
+
+    expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-1316');
+    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/panopticon-cli', 'pan-1316');
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/panopticon-cli/workspaces/feature-pan-1316', 'pan-1316');
+    expect(logSpy.mock.calls.some(([message]) => String(message).includes('Stopped Docker stack: docker compose down; docker network prune'))).toBe(true);
+  });
+
   it('emits a deep-wipe intervention when pan wipe succeeds', async () => {
     fsMocks.existsSync.mockImplementation((path: string) => path.endsWith('projects.yaml'));
     fsMocks.readFileSync.mockReturnValue('projects: {}');
