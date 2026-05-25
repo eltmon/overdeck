@@ -88,8 +88,32 @@ export interface NormalizedComplianceConfig {
   mode: ComplianceMode;
 }
 
+export interface FeatureRegistryClassificationConfig {
+  enabled?: boolean;
+  provider?: 'anthropic' | 'cliproxy';
+  model?: string;
+  per_day_cost_cap_usd?: number;
+}
+
+export interface FeatureRegistryConfig {
+  classification?: FeatureRegistryClassificationConfig;
+}
+
+export interface NormalizedFeatureRegistryConfig {
+  classification: {
+    enabled: boolean;
+    provider: 'anthropic' | 'cliproxy';
+    model: string;
+    perDayCostCapUsd: number;
+  };
+}
+
 function isComplianceMode(value: unknown): value is ComplianceMode {
   return typeof value === 'string' && (COMPLIANCE_MODES as readonly string[]).includes(value);
+}
+
+function isFeatureRegistryClassificationProvider(value: unknown): value is NormalizedFeatureRegistryConfig['classification']['provider'] {
+  return value === 'anthropic' || value === 'cliproxy';
 }
 
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
@@ -335,6 +359,9 @@ export interface YamlConfig {
   /** Memory-first compliance audit configuration */
   compliance?: ComplianceConfig;
 
+  /** Knowledge registry population configuration */
+  registry?: FeatureRegistryConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -557,6 +584,9 @@ export interface NormalizedConfig {
   /** Memory-first compliance audit configuration */
   compliance: NormalizedComplianceConfig;
 
+  /** Knowledge registry population configuration */
+  registry: NormalizedFeatureRegistryConfig;
+
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
 
@@ -726,6 +756,14 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   compliance: {
     mode: 'advisory',
+  },
+  registry: {
+    classification: {
+      enabled: true,
+      provider: 'cliproxy',
+      model: 'gpt-4.1-nano',
+      perDayCostCapUsd: 1,
+    },
   },
   shadow: {
     enabled: false,
@@ -1246,6 +1284,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     compliance: {
       mode: DEFAULT_CONFIG.compliance.mode,
     },
+    registry: {
+      classification: { ...DEFAULT_CONFIG.registry.classification },
+    },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -1504,6 +1545,24 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(', ')}`);
       }
       result.compliance.mode = config.compliance.mode;
+    }
+
+    if (config.registry?.classification) {
+      const classification = config.registry.classification;
+      if (classification.enabled !== undefined) result.registry.classification.enabled = classification.enabled;
+      if (classification.provider !== undefined) {
+        if (!isFeatureRegistryClassificationProvider(classification.provider)) {
+          throw new Error('config.yaml: registry.classification.provider must be anthropic or cliproxy');
+        }
+        result.registry.classification.provider = classification.provider;
+      }
+      if (classification.model !== undefined) result.registry.classification.model = classification.model;
+      if (classification.per_day_cost_cap_usd !== undefined) {
+        if (typeof classification.per_day_cost_cap_usd !== 'number' || classification.per_day_cost_cap_usd < 0) {
+          throw new Error('config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number');
+        }
+        result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
+      }
     }
 
     // Merge OpenRouter favorites

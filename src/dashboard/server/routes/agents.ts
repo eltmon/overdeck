@@ -109,6 +109,7 @@ import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
 import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
+import { recordFeatureRegistryLifecycle } from '../../../lib/registry/feature-registry-population.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
@@ -154,6 +155,15 @@ async function appendAgentLifecycleLog(agentId: string, event: string, details: 
     ...details,
   });
   await appendFile(join(agentDir, 'lifecycle.log'), logLine + '\n');
+}
+
+function updateRegistryForAgentStart(issueId: string, workspacePath: string, agentId: string): void {
+  void recordFeatureRegistryLifecycle({
+    issueId,
+    workspacePath,
+    agentId,
+    status: 'active',
+  });
 }
 
 async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
@@ -2775,6 +2785,7 @@ const postAgentsRoute = HttpRouter.add(
         startedAt: state.startedAt,
         harness: 'claude-code',
       });
+      updateRegistryForAgentStart(state.issueId, workspacePath, state.id);
 
       // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
       // The redundant issue.statusChanged emit was racing with reactive Cloister:
@@ -3086,6 +3097,7 @@ const postAgentsRoute = HttpRouter.add(
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
             ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
+          updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
             featureName,
@@ -3307,6 +3319,7 @@ const postAgentsRoute = HttpRouter.add(
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
       ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
+    updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
       role,

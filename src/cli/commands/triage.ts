@@ -12,6 +12,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { loadConfigSync } from '../../lib/config.js';
 import type { Issue, TrackerType } from '../../lib/tracker/index.js';
+import { recordIssueFeatureClassification } from '../../lib/registry/feature-registry-population.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
 
 interface TriageOptions {
@@ -164,6 +165,11 @@ repo = "your-repo"
           description: `${sourceIssue.description}\n\n---\n\n**From ${secondaryType}:** ${sourceIssue.url}`,
           team: primaryConfig.team,
         }));
+        void recordIssueFeatureClassification({
+          issueId: newIssue.ref,
+          title: newIssue.title,
+          body: newIssue.description,
+        });
 
         // Add comment to secondary issue linking to primary
         try {
