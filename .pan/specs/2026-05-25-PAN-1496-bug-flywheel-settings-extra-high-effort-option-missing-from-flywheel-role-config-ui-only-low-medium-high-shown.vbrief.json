@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:35:28.952Z"
+    "updated": "2026-05-25T23:58:03.650Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 20,
+    "sequence": 24,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:35:28.952Z",
+    "updated": "2026-05-25T23:58:03.650Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -501,61 +501,65 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "merge",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T23:35:28.951Z",
+        "updatedAt": "2026-05-25T23:58:03.632Z",
         "work": {
-          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T23:35:28.951Z"
+              "at": "2026-05-25T23:58:03.632Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-25T23:35:28.951Z",
-          "notes": "Agent re-review request (1/25): Fixed review issues",
+          "status": "passed",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
+          "notes": "Review approved: all convoy reviewers reported no blocking findings for the reviewed effort-tier widening changes.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-25T23:35:28.951Z",
-              "notes": "Agent re-review request (1/25): Fixed review issues"
+              "status": "passed",
+              "at": "2026-05-25T23:58:03.632Z",
+              "notes": "Review approved: all convoy reviewers reported no blocking findings for the reviewed effort-tier widening changes."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "status": "passed",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
+          "notes": "Quality gates verified: npm run typecheck (passed), npm run lint (passed), npm test (487 test files, 5179 tests passed). All code changes verified in RolesPanel.tsx and Effort type. Contract and config validations include new xhigh/max effort tiers. All 9 beads completed.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T23:35:28.951Z"
+              "status": "passed",
+              "at": "2026-05-25T23:58:03.632Z",
+              "notes": "Quality gates verified: npm run typecheck (passed), npm run lint (passed), npm test (487 test files, 5179 tests passed). All code changes verified in RolesPanel.tsx and Effort type. Contract and config validations include new xhigh/max effort tiers. All 9 beads completed."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "updatedAt": "2026-05-25T23:58:03.632Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T23:35:28.951Z"
+              "at": "2026-05-25T23:58:03.632Z"
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1514"
         }
       }
