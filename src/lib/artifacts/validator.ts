@@ -146,10 +146,17 @@ function scanAssetReferences(content: string, errors: ArtifactValidationFinding[
     const attrs = parseAttributes(attrSource);
     const tagOffset = tagMatch.index ?? 0;
 
+    const isStylesheetLink = tagName === 'link' && attrs.some((attr) => (
+      attr.name.toLowerCase() === 'rel' && attr.value.toLowerCase().split(/\s+/).includes('stylesheet')
+    ));
+
     for (const attr of attrs) {
       const name = attr.name.toLowerCase();
-      const isHref = name === 'href' && tagName === 'link';
-      if (ASSET_ATTRS.has(name) || isHref) {
+      if (tagName === 'script' && name === 'src') {
+        addForbiddenScriptOrStylesheetIfNeeded(content, errors, attr.value, tagOffset + attr.index, 'script.src');
+      } else if (isStylesheetLink && name === 'href') {
+        addForbiddenScriptOrStylesheetIfNeeded(content, errors, attr.value, tagOffset + attr.index, 'link.href');
+      } else if (ASSET_ATTRS.has(name) || (name === 'href' && tagName === 'link')) {
         addForbiddenAssetIfNeeded(content, errors, attr.value, tagOffset + attr.index, `${tagName}.${name}`);
       }
       if (name === 'srcset') {
@@ -196,6 +203,23 @@ function addForbiddenAssetIfNeeded(
   errors.push(locatedFinding(content, {
     code: 'forbidden_asset_url',
     message: `Artifact asset URL must be data: or HTTPS: ${url}`,
+    index,
+    rule,
+  }));
+}
+
+function addForbiddenScriptOrStylesheetIfNeeded(
+  content: string,
+  errors: ArtifactValidationFinding[],
+  rawUrl: string,
+  index: number | undefined,
+  rule: string,
+): void {
+  const url = rawUrl.trim();
+  if (url.length === 0 || url.toLowerCase().startsWith('data:')) return;
+  errors.push(locatedFinding(content, {
+    code: 'forbidden_asset_url',
+    message: `Artifact stylesheet and script URLs must be data: URLs: ${url}`,
     index,
     rule,
   }));

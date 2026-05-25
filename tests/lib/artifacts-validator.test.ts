@@ -25,19 +25,18 @@ describe('artifact HTML validation', () => {
   });
 
   it('accepts self-contained HTML with data and HTTPS assets', () => {
-    const result = validateArtifactHtmlContent(html([
+    const content = html([
       '<img src="https://example.test/chart.png" alt="Chart">',
       '<img src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E" alt="Icon">',
+      '<script src="data:text/javascript,console.log(1)"></script>',
+      '<link rel="stylesheet" href="data:text/css,.card%7Bcolor:red%7D">',
       '<style>.card{background-image:url(data:image/png;base64,AAAA)}</style>',
-    ].join('')));
+    ].join(''));
+    const result = validateArtifactHtmlContent(content);
 
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(result.hash).toBe(hashArtifactContent(html([
-      '<img src="https://example.test/chart.png" alt="Chart">',
-      '<img src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E" alt="Icon">',
-      '<style>.card{background-image:url(data:image/png;base64,AAAA)}</style>',
-    ].join(''))));
+    expect(result.hash).toBe(hashArtifactContent(content));
   });
 
   it('rejects non-HTML files and directories', async () => {
@@ -76,6 +75,8 @@ describe('artifact HTML validation', () => {
     ['root-local image src', '<img src="/local/chart.png" alt="Chart">'],
     ['file URL', '<img src="file:///tmp/chart.png" alt="Chart">'],
     ['non-HTTPS stylesheet', '<link rel="stylesheet" href="http://example.test/app.css">'],
+    ['HTTPS stylesheet', '<link rel="stylesheet" href="https://example.test/app.css">'],
+    ['HTTPS script', '<script src="https://example.test/app.js"></script>'],
     ['relative srcset entry', '<img srcset="https://example.test/a.png 1x, ./b.png 2x" alt="Chart">'],
     ['root-local CSS URL', '<style>.card{background:url(/local/chart.png)}</style>'],
   ])('rejects forbidden asset references: %s', (_name, body) => {
