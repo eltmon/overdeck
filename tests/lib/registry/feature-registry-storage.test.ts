@@ -16,15 +16,18 @@ import {
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
+let originalCwd: string;
 
 beforeEach(async () => {
   originalHome = process.env.PANOPTICON_HOME;
+  originalCwd = process.cwd();
   tempDir = await mkdtemp(join(tmpdir(), 'pan-feature-registry-'));
   process.env.PANOPTICON_HOME = tempDir;
 });
 
 afterEach(async () => {
   await closeFeatureRegistryStorage();
+  process.chdir(originalCwd);
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -32,6 +35,14 @@ afterEach(async () => {
 });
 
 describe('feature registry storage', () => {
+  it('runs the worker when process cwd is outside the repository', async () => {
+    process.chdir(tempDir!);
+
+    await initializeFeatureRegistryStorage();
+
+    await expect(listFeatureRegistryEntries({})).resolves.toEqual([]);
+  });
+
   it('creates the registry database with feature lookup columns and indexes', async () => {
     await initializeFeatureRegistryStorage();
 

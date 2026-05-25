@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { Worker } from 'node:worker_threads';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
 import { getPanopticonHome } from '../paths.js';
 import type {
   FeatureRegistryEntry,
@@ -35,6 +37,20 @@ interface FeatureRegistryWorkerResponse {
 
 let worker: Worker | null = null;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const betterSqlite3Path = resolveBetterSqlite3Path();
+
+function resolveBetterSqlite3Path(): string {
+  const requireFromModule = createRequire(import.meta.url);
+  try {
+    return requireFromModule.resolve('better-sqlite3');
+  } catch (cause) {
+    const error = new Error(
+      `Cannot find better-sqlite3 from ${fileURLToPath(import.meta.url)}; run bun install in the workspace before starting Panopticon.`,
+    );
+    error.cause = cause;
+    throw error;
+  }
+}
 
 export function resolveFeatureRegistryDbPath(): string {
   return join(getPanopticonHome(), 'registry', 'features.sqlite');
@@ -84,7 +100,7 @@ function runFeatureRegistryJob<T>(operation: FeatureRegistryOperation, payload: 
 function getFeatureRegistryWorker(): Worker {
   if (worker) return worker;
 
-  worker = new Worker(featureRegistryWorkerSource(), { eval: true });
+  worker = new Worker(featureRegistryWorkerSource(), { eval: true, workerData: { betterSqlite3Path } });
   const activeWorker = worker;
 
   worker.on('message', (message: FeatureRegistryWorkerResponse) => {
@@ -122,13 +138,11 @@ function getFeatureRegistryWorker(): Worker {
 
 function featureRegistryWorkerSource(): string {
   return String.raw`
-const { parentPort } = require('node:worker_threads');
-const { createRequire } = require('node:module');
+const { parentPort, workerData } = require('node:worker_threads');
 const { dirname } = require('node:path');
 const { mkdirSync } = require('node:fs');
 const { randomUUID } = require('node:crypto');
-const requireFromMain = createRequire(process.cwd() + '/package.json');
-const BetterSqlite3 = requireFromMain('better-sqlite3');
+const BetterSqlite3 = require(workerData.betterSqlite3Path);
 
 const databases = new Map();
 const STATUSES = new Set(['active', 'archived', 'merged', 'deferred']);

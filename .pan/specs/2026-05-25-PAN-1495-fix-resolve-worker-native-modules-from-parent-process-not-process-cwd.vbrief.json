@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
-    "updated": "2026-05-25T08:23:37.356Z"
+    "updated": "2026-05-25T10:26:47.556Z"
   },
   "plan": {
     "id": "pan-1495",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 61,
     "created": "2026-05-25T08:25:00.000Z",
-    "updated": "2026-05-25T08:23:37.356Z",
+    "updated": "2026-05-25T10:26:47.556Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
@@ -59,7 +59,7 @@
       {
         "id": "fix-feature-registry-worker",
         "title": "Fix feature-registry worker to resolve better-sqlite3 from parent process",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:25:00.000Z",
         "metadata": {
@@ -75,7 +75,7 @@
           {
             "id": "fix-feature-registry-worker.ac1",
             "title": "Worker source no longer references process.cwd() — grep `process\\.cwd` in feature-registry-storage.ts returns no matches",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -83,7 +83,7 @@
           {
             "id": "fix-feature-registry-worker.ac2",
             "title": "Starting the dashboard server with cwd outside the repo (e.g. `cd /tmp && node /abs/path/to/dist/dashboard/server.js`) produces no '[session-context] Failed to load feature registry entries' log line and no MODULE_NOT_FOUND error in stderr",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -91,7 +91,7 @@
           {
             "id": "fix-feature-registry-worker.ac3",
             "title": "Calling `listFeatureRegistryEntries({})` returns successfully (empty array or populated rows — does not throw) regardless of the dashboard's launch cwd",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "fix-feature-registry-worker.ac4",
             "title": "If better-sqlite3 is genuinely missing from node_modules, the parent-side require.resolve throws a clear error message naming the missing module BEFORE the worker is spawned (not a cryptic MODULE_NOT_FOUND from inside the worker)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "fix-feature-registry-worker.ac5",
             "title": "`npm run typecheck` and `npm run lint` pass with no new warnings; `npm run build` produces a dist that still boots successfully under Node 22",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -117,7 +117,7 @@
       {
         "id": "fix-fts-db-worker",
         "title": "Fix memory FTS worker (fts-db.ts) to resolve better-sqlite3 from parent process",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:25:00.000Z",
         "metadata": {
@@ -133,7 +133,7 @@
           {
             "id": "fix-fts-db-worker.ac1",
             "title": "Worker source no longer references process.cwd() — grep `process\\.cwd` in src/lib/memory/fts-db.ts returns no matches",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -141,7 +141,7 @@
           {
             "id": "fix-fts-db-worker.ac2",
             "title": "Calling `pan memory search <query>` (or the underlying worker entrypoint) completes successfully when invoked from a process whose cwd is outside the repo",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -149,7 +149,7 @@
           {
             "id": "fix-fts-db-worker.ac3",
             "title": "Existing memory FTS unit tests still pass (`npm test -- fts-db` or the closest equivalent); no behavioral change to query results",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -157,7 +157,7 @@
           {
             "id": "fix-fts-db-worker.ac4",
             "title": "`npm run typecheck`, `npm run lint`, and `npm run build` all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
       {
         "id": "add-cwd-regression-test",
         "title": "Add regression test: workers must operate regardless of parent process cwd",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:25:00.000Z",
         "metadata": {
@@ -183,7 +183,7 @@
           {
             "id": "add-cwd-regression-test.ac1",
             "title": "Test file exists, runs under `npm test`, and exercises BOTH workers (feature-registry and memory FTS) with a mutated process.cwd",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -191,7 +191,7 @@
           {
             "id": "add-cwd-regression-test.ac2",
             "title": "Test PASSES on this branch (proving the fix works) and would FAIL on main pre-fix (proving the test actually exercises the regression — verifiable by temporarily reverting the storage-file changes and re-running)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -199,7 +199,7 @@
           {
             "id": "add-cwd-regression-test.ac3",
             "title": "Test cleans up its temporary PANOPTICON_HOME directory and restores process.cwd in afterEach — no leaked state between test runs",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -207,7 +207,7 @@
           {
             "id": "add-cwd-regression-test.ac4",
             "title": "Test does NOT mock better-sqlite3 — it uses the real native module to ensure the resolution path is genuinely exercised",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -228,7 +228,66 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1495",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T10:26:47.469Z",
+        "work": {
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "history": []
+        },
+        "verification": {
+          "status": "running",
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-05-25T10:26:47.469Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "notes": "Review approved: all convoy reviewers ready; no blocking findings.",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T10:26:47.469Z",
+              "notes": "Review approved: all convoy reviewers ready; no blocking findings."
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T10:26:47.469Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T10:26:47.469Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T10:26:47.469Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1502"
+        }
+      }
     }
   },
   "status": "proposed"

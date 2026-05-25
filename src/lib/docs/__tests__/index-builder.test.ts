@@ -135,6 +135,33 @@ describe('docs index builder', () => {
     }
   });
 
+  it('survives output directory cleanup while embeddings are being generated', async () => {
+    const outputPath = join(rootDir, 'dist', 'docs-index.sqlite');
+    await writeFixture('docs/guide.md', '# First\n\nAlpha docs.\n\n## Second\n\nBeta docs.\n');
+    let cleaned = false;
+
+    await buildDocsIndex({
+      outputPath,
+      rootDir,
+      syncSourcesRoot,
+      config: docsConfig(),
+      embeddingFn: async (input) => {
+        if (!cleaned) {
+          cleaned = true;
+          await rm(dirname(outputPath), { recursive: true, force: true });
+        }
+        return deterministicDocsTestEmbedding(input);
+      },
+    });
+
+    const db = openIndex(outputPath);
+    try {
+      expect(validateDocsIndex(db)).toMatchObject({ chunkCount: 2, embeddingCount: 2 });
+    } finally {
+      db.close();
+    }
+  });
+
   it('uses the configured production embedding provider when no test embedding is injected', async () => {
     const outputPath = join(rootDir, 'dist', 'docs-index.sqlite');
     await writeFixture('docs/guide.md', '# First\n\nAlpha docs.\n');
