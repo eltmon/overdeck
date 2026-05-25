@@ -1,7 +1,7 @@
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { isFlywheelGloballyPaused } from '../../../lib/database/app-settings.js';
 import {
-  listPendingAutoMerges,
+  listDuePendingAutoMerges,
   markBlocked,
   markFailed,
   markMerged,
@@ -17,6 +17,7 @@ interface MergeResult {
   error?: string;
   message?: string;
   statusCode?: number;
+  mergeStatus?: string;
 }
 
 export interface AutoMergeExecutorDeps {
@@ -35,14 +36,6 @@ export interface AutoMergeExecutorDeps {
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
-
-function dueTime(entry: PendingAutoMerge): number {
-  return new Date(entry.scheduledMergeAt).getTime();
-}
-
-function isDuePending(entry: PendingAutoMerge, nowMs: number): boolean {
-  return entry.status === 'pending' && dueTime(entry) <= nowMs;
-}
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -69,10 +62,13 @@ function defaultAnnounceFailure(issueId: string, reason: string): void {
 }
 
 export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): Promise<void> {
-  const now = (deps.now ?? (() => new Date()))().getTime();
-  const entries = (deps.listEntries ?? listPendingAutoMerges)()
-    .filter((entry) => isDuePending(entry, now))
-    .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id);
+  const now = deps.now ?? (() => new Date());
+  const nowDate = now();
+  const entries = deps.listEntries
+    ? deps.listEntries()
+      .filter((entry) => entry.status === 'pending' && Date.parse(entry.scheduledMergeAt) <= nowDate.getTime())
+      .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id)
+    : listDuePendingAutoMerges(nowDate.toISOString());
 
   if (entries.length === 0) return;
 
@@ -91,7 +87,9 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
-      (deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason);
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
       continue;
     }
 
@@ -102,12 +100,14 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
     try {
       const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId);
-      if (result.success) {
+      if (result.success && result.mergeStatus === 'merged') {
         (deps.markMerged ?? markMerged)(entry.id);
         continue;
       }
 
-      const reason = failureReason(result);
+      const reason = result.success
+        ? `merge accepted but did not complete: ${result.message ?? result.mergeStatus ?? 'unknown status'}`
+        : failureReason(result);
       (deps.markFailed ?? markFailed)(entry.id, reason);
       (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
     } catch (error) {

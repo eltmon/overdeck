@@ -179,9 +179,10 @@ function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issue
   const pendingEntries = Array.isArray(data) ? data.filter((entry) => entry.status === 'pending') : [];
 
   useEffect(() => {
+    if (pendingEntries.length === 0) return;
     const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [pendingEntries.length]);
 
   const cancel = (issueId: string) => {
     setCancellingIssueId(issueId);

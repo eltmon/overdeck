@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T11:22:06.443Z"
+    "updated": "2026-05-25T11:31:47.887Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 32,
+    "sequence": 35,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T11:22:06.443Z",
+    "updated": "2026-05-25T11:31:47.887Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -598,7 +598,7 @@
       },
       {
         "id": "b09-pending-auto-merges-table",
-        "title": "Add pending_auto_merges SQLite table (schema v28) + CRUD module",
+        "title": "Add pending_auto_merges SQLite table (schema v45) + CRUD module",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
@@ -617,12 +617,12 @@
           ]
         },
         "narrative": {
-          "Action": "Bump src/lib/database/schema.ts CURRENT_SCHEMA_VERSION from 27 to 28; add a v27→v28 migration block CREATE TABLE IF NOT EXISTS pending_auto_merges (id INTEGER PK AUTOINCREMENT, issueId TEXT NOT NULL, prUrl TEXT NOT NULL, prNumber INTEGER, projectKey TEXT NOT NULL, status TEXT NOT NULL CHECK status IN ('pending','merging','blocked','failed'), scheduledMergeAt TEXT NOT NULL, scheduledAt TEXT NOT NULL, mergedAt TEXT, failureReason TEXT, cancelledAt TEXT, cancelledBy TEXT). Add CREATE UNIQUE INDEX idx_pending_auto_merges_active_issue ON pending_auto_merges(issueId) WHERE status IN ('pending','merging'). Create src/lib/database/pending-auto-merges-db.ts with scheduleAutoMerge, getPendingAutoMerge(issueId), listPendingAutoMerges, transitionToMerging(id), markFailed(id, reason), markBlocked(id, reason), markMerged(id), cancelPending(id, cancelledBy), clearAllPending() — all sync and wrapped in Effect.try with DatabaseError tag like app-settings.ts."
+          "Action": "Bump src/lib/database/schema.ts SCHEMA_VERSION to 45; add the pending_auto_merges table through the live migration chain with status CHECK covering pending, merging, blocked, failed, merged, and cancelled. Add the active unique issue index plus SQL-filtered due/actionable indexes for executor and dashboard polling. Create src/lib/database/pending-auto-merges-db.ts with scheduleAutoMerge, getPendingAutoMerge(issueId), getActionableAutoMerge(issueId), listPendingAutoMerges, listActionableAutoMerges, listDuePendingAutoMerges(nowIso), transitionToMerging(id), markFailed(id, reason), markBlocked(id, reason), markMerged(id), cancelPending(id, cancelledBy), clearAllPending() — all sync and wrapped in Effect.try with DatabaseError tag like app-settings.ts."
         },
         "subItems": [
           {
             "id": "b09.ac1",
-            "title": "CURRENT_SCHEMA_VERSION is 28 and a fresh-DB init creates the pending_auto_merges table with the schema described in the Action.",
+            "title": "SCHEMA_VERSION is 45 and a fresh-DB init creates the pending_auto_merges table with the schema and indexes described in the Action.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -630,7 +630,7 @@
           },
           {
             "id": "b09.ac2",
-            "title": "v27→v28 migration block runs on an existing v27 DB without dropping any existing data; the table appears after migration.",
+            "title": "The migration chain runs on an existing pre-auto-merge DB without dropping any existing data; the table appears after migration.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -686,7 +686,7 @@
           },
           {
             "id": "b09.ac9",
-            "title": "Vitest schema test in src/lib/database/__tests__/stuck-schema.test.ts (or sibling) asserts CURRENT_SCHEMA_VERSION === 28 and that the table is present after migrate-from-v27.",
+            "title": "Vitest schema test in src/lib/database/__tests__/pending-auto-merges-schema.test.ts asserts SCHEMA_VERSION === 45, table creation on fresh init, and indexed migration from prior schema versions.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1239,58 +1239,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1486",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T11:22:06.394Z",
+        "updatedAt": "2026-05-25T11:31:47.881Z",
         "work": {
-          "updatedAt": "2026-05-25T11:22:06.394Z",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T11:22:06.394Z",
+          "status": "passed",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T11:22:06.394Z"
+              "status": "passed",
+              "at": "2026-05-25T11:31:47.881Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T11:22:06.394Z",
-          "notes": "Verification failed at lint",
+          "status": "blocked",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
+          "notes": "Auto-merge rows can be marked merged while only queued",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T11:22:06.394Z",
-              "notes": "Verification failed at lint"
+              "status": "blocked",
+              "at": "2026-05-25T11:31:47.881Z",
+              "notes": "Auto-merge rows can be marked merged while only queued"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:22:06.394Z",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:22:06.394Z"
+              "at": "2026-05-25T11:31:47.881Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T11:22:06.394Z",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T11:22:06.394Z",
+          "updatedAt": "2026-05-25T11:31:47.881Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T11:22:06.394Z"
+              "at": "2026-05-25T11:31:47.881Z"
             }
           ],
           "readyForMerge": false,

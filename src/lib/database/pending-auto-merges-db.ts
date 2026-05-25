@@ -80,6 +80,13 @@ const selectActiveByIssue = (issueId: string): PendingAutoMerge | null => {
   return row ? toPendingAutoMerge(row) : null;
 };
 
+const selectActionableByIssue = (issueId: string): PendingAutoMerge | null => {
+  const row = getDatabase()
+    .prepare("SELECT * FROM pending_auto_merges WHERE issueId = ? AND \"status\" IN ('pending','merging','blocked','failed') ORDER BY id DESC LIMIT 1")
+    .get(issueId) as PendingAutoMergeRow | undefined;
+  return row ? toPendingAutoMerge(row) : null;
+};
+
 function runDb<T>(operation: string, fn: () => T): T {
   return Effect.runSync(
     Effect.try({
@@ -124,11 +131,33 @@ export function getPendingAutoMerge(issueId: string): PendingAutoMerge | null {
   return runDb('getPendingAutoMerge', () => selectActiveByIssue(issueId));
 }
 
+export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null {
+  return runDb('getActionableAutoMerge', () => selectActionableByIssue(issueId));
+}
+
 export function listPendingAutoMerges(): PendingAutoMerge[] {
   return runDb('listPendingAutoMerges', () => {
     const rows = getDatabase()
       .prepare('SELECT * FROM pending_auto_merges ORDER BY scheduledMergeAt ASC, id ASC')
       .all() as PendingAutoMergeRow[];
+    return rows.map(toPendingAutoMerge);
+  });
+}
+
+export function listActionableAutoMerges(): PendingAutoMerge[] {
+  return runDb('listActionableAutoMerges', () => {
+    const rows = getDatabase()
+      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" IN ('pending','merging','blocked','failed') ORDER BY scheduledMergeAt ASC, id ASC")
+      .all() as PendingAutoMergeRow[];
+    return rows.map(toPendingAutoMerge);
+  });
+}
+
+export function listDuePendingAutoMerges(nowIso: string): PendingAutoMerge[] {
+  return runDb('listDuePendingAutoMerges', () => {
+    const rows = getDatabase()
+      .prepare("SELECT * FROM pending_auto_merges WHERE \"status\" = 'pending' AND scheduledMergeAt <= ? ORDER BY scheduledMergeAt ASC, id ASC")
+      .all(nowIso) as PendingAutoMergeRow[];
     return rows.map(toPendingAutoMerge);
   });
 }
@@ -145,7 +174,7 @@ export function transitionToMerging(id: number): boolean {
 export function markFailed(id: number, reason: string): boolean {
   return runDb('markFailed', () => {
     const result = getDatabase()
-      .prepare('UPDATE pending_auto_merges SET "status" = \'failed\', failureReason = ? WHERE id = ?')
+      .prepare('UPDATE pending_auto_merges SET "status" = \'failed\', failureReason = ? WHERE id = ? AND "status" = \'merging\'')
       .run(truncateReason(reason), id);
     return result.changes === 1;
   });
@@ -154,7 +183,7 @@ export function markFailed(id: number, reason: string): boolean {
 export function markBlocked(id: number, reason: string): boolean {
   return runDb('markBlocked', () => {
     const result = getDatabase()
-      .prepare('UPDATE pending_auto_merges SET "status" = \'blocked\', failureReason = ? WHERE id = ?')
+      .prepare('UPDATE pending_auto_merges SET "status" = \'blocked\', failureReason = ? WHERE id = ? AND "status" = \'pending\'')
       .run(truncateReason(reason), id);
     return result.changes === 1;
   });
@@ -163,7 +192,7 @@ export function markBlocked(id: number, reason: string): boolean {
 export function markMerged(id: number): boolean {
   return runDb('markMerged', () => {
     const result = getDatabase()
-      .prepare('UPDATE pending_auto_merges SET "status" = \'merged\', mergedAt = ? WHERE id = ?')
+      .prepare('UPDATE pending_auto_merges SET "status" = \'merged\', mergedAt = ? WHERE id = ? AND "status" = \'merging\'')
       .run(new Date().toISOString(), id);
     return result.changes === 1;
   });
@@ -172,7 +201,7 @@ export function markMerged(id: number): boolean {
 export function cancelPending(id: number, cancelledBy: string): boolean {
   return runDb('cancelPending', () => {
     const result = getDatabase()
-      .prepare('UPDATE pending_auto_merges SET "status" = \'cancelled\', cancelledAt = ?, cancelledBy = ? WHERE id = ? AND "status" = \'pending\'')
+      .prepare('UPDATE pending_auto_merges SET "status" = \'cancelled\', cancelledAt = ?, cancelledBy = ? WHERE id = ? AND "status" IN (\'pending\',\'blocked\',\'failed\')')
       .run(new Date().toISOString(), cancelledBy, id);
     return result.changes === 1;
   });

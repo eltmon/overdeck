@@ -52,7 +52,7 @@ function defaultFlywheelRunId(): FlywheelRunId {
   return parseRunId(`RUN-${Date.now()}`);
 }
 
-function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {
+function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): string {
   const configLines = [
     options.harness ? `Harness: ${options.harness}` : undefined,
     options.effort ? `Effort: ${options.effort}` : undefined,
@@ -65,7 +65,11 @@ function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions,
       ? `Require UAT before merge: ${options.requireUatBeforeMerge}`
       : undefined,
   ].filter(Boolean).join('\n');
-  const configSection = configLines ? `\n\nRun configuration:\n${configLines}` : '';
+  return configLines ? `\n\nRun configuration:\n${configLines}` : '';
+}
+
+function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {
+  const configSection = flywheelRunConfigurationSection(options);
   const briefSection = options.briefPath
     ? `\n\nBrief path: ${options.briefPath}\n\n${briefContent ?? ''}`
     : '';
@@ -110,7 +114,7 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
 export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
   const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
   const prompt = options.resumeSessionId
-    ? 'FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior state. Check `docs/FLYWHEEL-STATE.md` and the latest status snapshot for context.'
+    ? `FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior state. Check \`docs/FLYWHEEL-STATE.md\` and the latest status snapshot for context.${flywheelRunConfigurationSection(options)}`
     : (options.prompt ?? defaultFlywheelPrompt(runId, options, briefContent));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,

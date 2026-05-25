@@ -26,7 +26,7 @@ import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../ser
 import { resetDatabase } from '../../../../lib/database/index.js';
 import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
-import { scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
+import { markBlocked, markFailed, scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
 
 interface RouteResult {
   status: number;
@@ -223,6 +223,12 @@ describe('flywheel auto-merge routes', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ issueId: 'PAN-1486' }),
     })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'https://evil.example' },
+      body: JSON.stringify({ issueId: 'PAN-1486' }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Invalid origin' } });
   });
 
   it('schedules eligible auto-merges after the cooldown and announces once', async () => {
@@ -292,10 +298,43 @@ describe('flywheel auto-merge routes', () => {
     });
   });
 
+  it('surfaces failed and blocked rows through the pending payload', () => {
+    const failed = scheduleAutoMerge({
+      issueId: 'PAN-3',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
+      prNumber: 3,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const blocked = scheduleAutoMerge({
+      issueId: 'PAN-4',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
+      prNumber: 4,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:06:00.000Z',
+    });
+
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'merge failed');
+    markBlocked(blocked.id, 'CI checks failing');
+
+    expect(getPendingAutoMergePayload()).toMatchObject([
+      { issueId: 'PAN-3', status: 'failed', failureReason: 'merge failed' },
+      { issueId: 'PAN-4', status: 'blocked', failureReason: 'CI checks failing' },
+    ]);
+  });
+
   it('origin-validates auto-merge cancellations', async () => {
     await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
       method: 'DELETE',
     })).resolves.toEqual({ status: 403, body: { error: 'Missing origin' } });
+
+    await expect(requestFlywheelRoute('/api/flywheel/auto-merge/PAN-1486', {
+      method: 'DELETE',
+      headers: { origin: 'https://evil.example' },
+    })).resolves.toEqual({ status: 403, body: { error: 'Invalid origin' } });
   });
 
   it('cancels pending auto-merges, removes them from the active list, and announces once', () => {
@@ -324,6 +363,39 @@ describe('flywheel auto-merge routes', () => {
     expect(getPendingAutoMergePayload()).toEqual([]);
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith('PAN-1486');
+  });
+
+  it('clears failed and blocked auto-merges through the cancellation route', () => {
+    const failed = scheduleAutoMerge({
+      issueId: 'PAN-3',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
+      prNumber: 3,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:05:00.000Z',
+    });
+    const blocked = scheduleAutoMerge({
+      issueId: 'PAN-4',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
+      prNumber: 4,
+      projectKey: 'panopticon-cli',
+      scheduledAt: '2026-05-25T10:00:00.000Z',
+      scheduledMergeAt: '2026-05-25T10:06:00.000Z',
+    });
+
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'merge failed');
+    markBlocked(blocked.id, 'CI checks failing');
+
+    expect(deleteAutoMergePayload('PAN-3', { announce: vi.fn() })).toMatchObject({
+      status: 200,
+      body: { issueId: 'PAN-3', status: 'cancelled', cancelledBy: 'operator' },
+    });
+    expect(deleteAutoMergePayload('PAN-4', { announce: vi.fn() })).toMatchObject({
+      status: 200,
+      body: { issueId: 'PAN-4', status: 'cancelled', cancelledBy: 'operator' },
+    });
+    expect(getPendingAutoMergePayload()).toEqual([]);
   });
 
   it('returns 409 when cancellation races a merging entry', async () => {

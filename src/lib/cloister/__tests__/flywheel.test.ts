@@ -178,6 +178,10 @@ describe('flywheel lifecycle', () => {
       workspace: '/repo',
       registerConversation: true,
     }));
+    const resumePrompt = mocks.spawnRun.mock.calls[1][2].prompt;
+    expect(resumePrompt).toContain('Run configuration:');
+    expect(resumePrompt).toContain('Auto-pickup backlog: false');
+    expect(resumePrompt).toContain('Require UAT before merge: true');
   });
 
   it('keeps the pause gate set when resume spawn fails', async () => {

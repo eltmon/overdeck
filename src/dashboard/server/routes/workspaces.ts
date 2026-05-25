@@ -4683,6 +4683,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       success: true,
       statusCode: 200,
       message: `Queued for merge (position ${position}, waiting for ${currentlyMerging})`,
+      mergeStatus: 'queued',
     };
   }
   // Mark as processing IMMEDIATELY — before any async work — to prevent race conditions.
@@ -4757,6 +4758,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           success: true,
           statusCode: 200,
           message: `Successfully merged PR #${remotePrNumber} for ${issueId}`,
+          mergeStatus: 'merged',
           prUrl: prResult.prUrl,
           remote: true,
         };
@@ -5009,6 +5011,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         success: true,
         statusCode: 200,
         message: `Polyrepo merge complete for ${issueId}`,
+        mergeStatus: 'merged',
         repos: mergeResults,
       };
     }
@@ -5082,6 +5085,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
               success: true,
               statusCode: 200,
               message: `PR #${githubPrRef.number} for ${issueId} was already merged`,
+              mergeStatus: 'merged',
               prUrl: prResult.prUrl,
             };
           }
@@ -5346,6 +5350,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       success: true,
       statusCode: 200,
       message: `Successfully merged ${primaryForge} review artifact for ${issueId}`,
+      mergeStatus: 'merged',
       prUrl: prResult.prUrl,
     };
   } catch (error: any) {

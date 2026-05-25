@@ -42,8 +42,8 @@ import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-stat
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
-  getPendingAutoMerge,
-  listPendingAutoMerges,
+  getActionableAutoMerge,
+  listActionableAutoMerges,
   scheduleAutoMergeWithResult,
   type PendingAutoMerge,
   type ScheduleAutoMergeInput,
@@ -325,16 +325,14 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
 }
 
 export function getPendingAutoMergePayload(): PendingAutoMerge[] {
-  return listPendingAutoMerges()
-    .filter((entry) => entry.status === 'pending' || entry.status === 'merging')
-    .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id);
+  return listActionableAutoMerges();
 }
 
 export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
   const issueId = issueIdParam.trim().toUpperCase();
   if (!issueId) return { status: 400, body: { error: 'issueId must be a non-empty string' } };
 
-  const entry = (deps.getPending ?? getPendingAutoMerge)(issueId);
+  const entry = (deps.getPending ?? getActionableAutoMerge)(issueId);
   if (!entry) return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
   if (entry.status === 'merging') {
     return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
@@ -343,7 +341,7 @@ export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCanc
   const cancelledAt = (deps.now ?? (() => new Date()))().toISOString();
   const cancelled = (deps.cancel ?? cancelPending)(entry.id, 'operator');
   if (!cancelled) {
-    const raced = (deps.getPending ?? getPendingAutoMerge)(issueId);
+    const raced = (deps.getPending ?? getActionableAutoMerge)(issueId);
     if (raced?.status === 'merging') {
       return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
     }

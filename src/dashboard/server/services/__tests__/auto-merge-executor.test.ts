@@ -109,7 +109,7 @@ describe('auto-merge executor', () => {
   });
 
   it('marks successful merges as merged after invoking the dashboard merge path', async () => {
-    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged' });
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', mergeStatus: 'merged' });
     const markMerged = vi.fn();
     const markFailed = vi.fn();
 
@@ -127,6 +127,28 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
+  });
+
+  it('does not mark queued merge results as merged', async () => {
+    const markMerged = vi.fn();
+    const markFailed = vi.fn();
+    const announceFailure = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', mergeStatus: 'queued' }),
+      markMerged,
+      markFailed,
+      announceFailure,
+    });
+
+    expect(markMerged).not.toHaveBeenCalled();
+    expect(markFailed).toHaveBeenCalledWith(1, 'merge accepted but did not complete: Queued for merge');
+    expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge accepted but did not complete: Queued for merge');
   });
 
   it('marks failed merges as failed and announces the failure', async () => {

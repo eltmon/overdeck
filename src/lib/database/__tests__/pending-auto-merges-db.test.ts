@@ -5,7 +5,10 @@ import { join } from 'node:path';
 import {
   cancelPending,
   clearAllPending,
+  getActionableAutoMerge,
   getPendingAutoMerge,
+  listActionableAutoMerges,
+  listDuePendingAutoMerges,
   listPendingAutoMerges,
   markBlocked,
   markFailed,
@@ -91,6 +94,31 @@ describe('pending auto-merges db', () => {
     expect(getPendingAutoMerge('PAN-1486')?.status).toBe('merging');
   });
 
+  it('keeps failed and blocked rows visible and clearable without treating them as active schedule conflicts', () => {
+    const failed = schedule('PAN-3');
+    const blocked = schedule('PAN-4');
+
+    expect(transitionToMerging(failed.id)).toBe(true);
+    expect(markFailed(failed.id, 'x'.repeat(1100))).toBe(true);
+    expect(markBlocked(blocked.id, 'blocked by label')).toBe(true);
+
+    expect(getPendingAutoMerge('PAN-3')).toBeNull();
+    expect(getActionableAutoMerge('PAN-3')?.status).toBe('failed');
+    expect(listActionableAutoMerges().map((row) => row.issueId)).toEqual(['PAN-3', 'PAN-4']);
+    expect(cancelPending(failed.id, 'operator')).toBe(true);
+    expect(cancelPending(blocked.id, 'operator')).toBe(true);
+    expect(listActionableAutoMerges()).toEqual([]);
+  });
+
+  it('lists only due pending rows from SQL-filtered hot-path reads', () => {
+    schedule('PAN-1', '2026-05-25T09:59:59.000Z');
+    schedule('PAN-2', '2026-05-25T10:10:00.000Z');
+    const merging = schedule('PAN-3', '2026-05-25T09:58:00.000Z');
+    transitionToMerging(merging.id);
+
+    expect(listDuePendingAutoMerges('2026-05-25T10:00:00.000Z').map((row) => row.issueId)).toEqual(['PAN-1']);
+  });
+
   it('clears pending entries and leaves non-pending history intact', () => {
     schedule('PAN-1');
     const merging = schedule('PAN-2');
@@ -98,6 +126,7 @@ describe('pending auto-merges db', () => {
     const blocked = schedule('PAN-4');
 
     transitionToMerging(merging.id);
+    transitionToMerging(failed.id);
     markFailed(failed.id, 'x'.repeat(1100));
     markBlocked(blocked.id, 'blocked by label');
 
@@ -106,5 +135,13 @@ describe('pending auto-merges db', () => {
     const rows = listPendingAutoMerges();
     expect(rows.map((row) => row.issueId).sort()).toEqual(['PAN-2', 'PAN-3', 'PAN-4']);
     expect(rows.find((row) => row.issueId === 'PAN-3')?.failureReason).toHaveLength(1024);
+  });
+
+  it('does not let delayed eligibility blocking overwrite a cancelled row', () => {
+    const entry = schedule('PAN-1486');
+
+    expect(cancelPending(entry.id, 'operator')).toBe(true);
+    expect(markBlocked(entry.id, 'CI checks failing')).toBe(false);
+    expect(listPendingAutoMerges()[0]).toMatchObject({ status: 'cancelled', cancelledBy: 'operator' });
   });
 });

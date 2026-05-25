@@ -108,7 +108,7 @@ describe('auto-merge schedule/cancel/executor integration', () => {
   });
 
   it('fires one merge after the cooldown expires and records merged state', async () => {
-    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged' });
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', mergeStatus: 'merged' });
 
     await scheduleAutoMerge();
     await advanceFakeTimersQuickly(5 * 60_000);

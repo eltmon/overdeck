@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 45;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -458,6 +458,15 @@ export function initSchema(db: Database.Database): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
       ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
+      ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
+      ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
+
+    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
+      ON pending_auto_merges("status", scheduledMergeAt, id);
 
     -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
     CREATE TABLE IF NOT EXISTS merge_sets (
@@ -1256,6 +1265,20 @@ export function runMigrations(db: Database.Database): void {
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
         ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+    `);
+  }
+
+  // v44 → v45: add SQL-filtered indexes for auto-merge hot paths (PAN-1486)
+  if (currentVersion < 45) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
+        ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
+
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
+        ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
+
+      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
+        ON pending_auto_merges("status", scheduledMergeAt, id);
     `);
   }
 
