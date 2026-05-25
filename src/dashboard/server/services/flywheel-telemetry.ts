@@ -1,9 +1,11 @@
 import type { FlywheelStats, FlywheelStatsCriterion } from '@panctl/contracts';
+import { listInWindow } from '../../../lib/database/flywheel-substrate-bugs-db.js';
 import type { PipelineRunMetrics } from './pipeline-run-metrics.js';
 
 export interface FlywheelStatsOptions {
   generatedAt?: Date;
   completedPipelineRuns?: number;
+  substrateBugs?: readonly SubstrateBugStatsInput[];
 }
 
 export interface FiledSubstrateBug {
@@ -23,6 +25,8 @@ export interface Criterion4SubstrateBug {
   status: 'open' | 'fixed';
   fixMergedAt: string | null;
 }
+
+export type SubstrateBugStatsInput = Criterion1SubstrateBug & Criterion2SubstrateBug & Criterion4SubstrateBug;
 
 export interface Criterion5PipelineRun {
   metrics: PipelineRunMetrics;
@@ -492,17 +496,20 @@ export async function computeFlywheelStats(
   options: FlywheelStatsOptions = {},
 ): Promise<FlywheelStats> {
   const parsedWindow = parseFlywheelStatsWindow(window);
-  const generatedAt = (options.generatedAt ?? new Date()).toISOString();
+  const generatedAtDate = options.generatedAt ?? new Date();
+  const generatedAt = generatedAtDate.toISOString();
+  const since = new Date(generatedAtDate.getTime() - parsedWindow.ms).toISOString();
   const completedPipelineRuns = options.completedPipelineRuns ?? 0;
+  const substrateBugs = options.substrateBugs ?? (completedPipelineRuns >= 3 ? listInWindow(since, generatedAt) : []);
 
   return {
     window: parsedWindow.input,
     generatedAt,
     criteria: {
-      c1_bugRate: computeBugRateCriterion(completedPipelineRuns),
-      c2_p0Bugs: computeP0BugsCriterion(completedPipelineRuns),
+      c1_bugRate: computeBugRateCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
+      c2_p0Bugs: computeP0BugsCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
       c3_passRate: computePassRateCriterion(completedPipelineRuns),
-      c4_mttr: computeMttrCriterion(completedPipelineRuns),
+      c4_mttr: computeMttrCriterion(completedPipelineRuns, substrateBugs, since, generatedAt),
       c5_intervention: computeInterventionCriterion(completedPipelineRuns),
       c6_timeConsistency: computeTimeConsistencyCriterion(completedPipelineRuns),
       c7_flake: computeFlakeCriterion(completedPipelineRuns),
