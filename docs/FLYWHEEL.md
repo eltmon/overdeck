@@ -68,6 +68,27 @@ Criterion 6 uses the D12 complexity buckets captured at planning completion: `si
 
 Criterion 7 uses the H9 flake definition: a review or test check that passes on one cycle and fails on the next cycle in the same pipeline run with no intervening code commit, meaning the head SHA is unchanged. Failures after a new commit are treated as ordinary pass/fail outcomes, not flakes.
 
+## Substrate-bug provenance
+
+Substrate bug issues filed during a Flywheel run carry a trailer block at the bottom of the GitHub issue body:
+
+```text
+---
+Flywheel-Run-Id: RUN-123
+Flywheel-Filed-By: agent
+Flywheel-Discovered-In: PAN-1487
+```
+
+`Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
+
+`Flywheel-Filed-By` is `agent` only when the singleton `flywheel-orchestrator` files the issue itself. Work, plan, review, test, ship, and operator-requested issue creation are recorded as `operator` because a human or non-Flywheel role decided to file the record.
+
+`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Panopticon state at `${PANOPTICON_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
+
+The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
+
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
+
 ## Lifecycle
 
 The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by dashboard routes.
