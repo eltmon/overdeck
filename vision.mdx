@@ -1,3 +1,8 @@
+---
+title: Flywheel Vision
+description: "Why the Flywheel exists today (dev-loop for building Panopticon itself) and what v1.0 looks like (a user-facing pipeline that delivers work with only human UAT and merge in the loop). Seven readiness criteria anchored to industry benchmarks, the substrate-bug-discovery-rate metric, and the live tracker of v1.0-required issues."
+---
+
 # Flywheel Vision — Dev-Loop Today, User Pipeline at v1.0
 
 **Status:** Living document. Adopted 2026-05-25. Targets in this doc are **draft** until validated against ~1 month of real Flywheel telemetry.
@@ -187,6 +192,8 @@ These caveats are why the criteria are explicitly **DRAFT** and why we plan to r
 
 These are the issues that get us to "tracking the vision fully." Issues marked **MUST** are the minimum bar — without them, we cannot honestly measure whether we're approaching v1.0.
 
+> **Live tracker (source of truth):** [open `v1.0-required` issues](https://github.com/eltmon/panopticon-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22v1.0-required%22) — kept up to date by the `v1.0-required` GitHub label. The table below is a snapshot at adoption time; the linked filter is canonical going forward as issues are added, closed, or re-scoped.
+
 | Issue | Title | MUST? | Why |
 |---|---|---|---|
 | (this doc) | Codify Flywheel vision: dev-loop today → v1.0 user pipeline | — | The vision doc itself; merges via this PR |
@@ -215,8 +222,8 @@ These are decisions we haven't made and don't need to make today, but should rev
 
 ## Appendix: where this fits in the docs
 
-- [`docs/flywheel-brief.md`](./flywheel-brief.md) — the operational contract the Flywheel orchestrator reads at the start of every run. This vision doc explains *why* the brief looks the way it does; the brief itself does not need to change to reflect this doc.
-- [`docs/FLYWHEEL.md`](./FLYWHEEL.md) — technical reference for the Flywheel contract, lifecycle, and dashboard surfaces.
-- [`docs/FLYWHEEL-STATE.md`](./FLYWHEEL-STATE.md) — durable cumulative memory authored by the orchestrator across runs.
-- [`packages/contracts/src/flywheel.ts`](../packages/contracts/src/flywheel.ts) — the `FlywheelStatus` schema the orchestrator emits each tick.
-- [`roles/flywheel.md`](../roles/flywheel.md) — the role prompt that hardcodes the constraints this doc proposes to make config-driven.
+- [`docs/flywheel-brief.md`](./docs/flywheel-brief.md) — the operational contract the Flywheel orchestrator reads at the start of every run. This vision doc explains *why* the brief looks the way it does.
+- [`docs/FLYWHEEL.md`](./docs/FLYWHEEL.md) — technical reference for the Flywheel contract, lifecycle, and dashboard surfaces.
+- [`docs/FLYWHEEL-STATE.md`](./docs/FLYWHEEL-STATE.md) — durable cumulative memory authored by the orchestrator across runs.
+- [`packages/contracts/src/flywheel.ts`](./packages/contracts/src/flywheel.ts) — the `FlywheelStatus` schema the orchestrator emits each tick.
+- [`roles/flywheel.md`](./roles/flywheel.md) — the role prompt that hardcodes the constraints this doc proposes to make config-driven.

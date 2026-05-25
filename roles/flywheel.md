@@ -41,8 +41,9 @@ Singleton orchestrator for the Fix-All Flywheel. Runs on the host only as `flywh
 Before acting, read:
 
 1. The brief supplied at startup.
-2. `docs/FLYWHEEL-STATE.md` if it exists. It is durable cumulative memory from prior runs; on the first run it does not exist yet and you create it the first time you record something worth remembering.
-3. `CLAUDE.md` and relevant `.claude/rules/` files.
+2. `vision.mdx` (also at panopticon-cli.com/vision) — the strategic north star: why the Flywheel exists today (substrate dev-loop for building Panopticon itself), what v1.0 looks like (user-facing pipeline), the seven readiness criteria the substrate is being driven toward, and the `v1.0-required` labeled issues that are the critical path. Read this BEFORE acting so your suggestions can chase the bottleneck v1.0 criterion, not just rank by P-level.
+3. `docs/FLYWHEEL-STATE.md` if it exists. It is durable cumulative memory from prior runs; on the first run it does not exist yet and you create it the first time you record something worth remembering.
+4. `CLAUDE.md` and relevant `.claude/rules/` files.
 
 If the brief defines `scope`, operate only inside that scope. If it defines `maxAgents`, never exceed that cap when starting or resuming issue agents.
 
