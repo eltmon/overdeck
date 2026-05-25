@@ -1,0 +1,118 @@
+{
+  "version": "1",
+  "issueId": "PAN-1501",
+  "created": "2026-05-25T08:20:28.118Z",
+  "updated": "2026-05-25T08:30:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1501",
+    "sha": "bfc0c1bc8",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Place the two pure helpers (detectTestRequirements, countTestDeltaInDiff) and the orchestrator (runTestRequirementCheck) in a new module src/lib/work/test-requirement-gate.ts, sibling to done-preflight.ts. Preflight composes the orchestrator as Check 4.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Scan the RAW issue body (gh issue view / Linear description) for test keywords, not the vBRIEF AC list. The vBRIEF only carries items with metadata.kind=acceptance_criterion; freeform sections like '## Test plan' are not preserved through synthesis. Issue body is authoritative.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Test detection keywords (case-insensitive, word-boundary regex): \\btest\\b, regression test, unit test, Test:, ## Test plan, vitest, playwright. Spec mandates the exact keyword 'test' — false positives on phrases like 'we tested this in prod' are accepted; --test-waived is the documented escape hatch.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Test file glob: **/*.{test,spec}.{ts,tsx}. Includes .tsx because the project has frontend tests written in TSX (src/dashboard/frontend); the spec listed .ts as a minimum, not an exhaustive set.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Diff base for counting test-line additions: git merge-base origin/main HEAD, then git diff --numstat <base>..HEAD. Mirrors the pattern in src/lib/cloister/review-context.ts. Falls back to origin/main..HEAD three-dot if merge-base fails; if both fail, the gate skips with a warning (does not block).",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Tracker fetch failure (gh down, Linear unreachable, auth missing) ABORTS pan done unless --force or --test-waived is provided. Mirrors the existing closed-issue guard in doneCommand which already aborts on tracker fetch failure for safety. The waiver flag is the operator's signed escape hatch.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Waiver reason is persisted in BOTH continue.json decisions[] (work-agent audit) AND the tracker comment passed to updateLinearToInReview / updateGitHubToInReview (human-reviewer audit). Reviewer never reads continue.json; agent never reads tracker comments.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Corpus regression test uses static captured fixtures at src/lib/work/__tests__/fixtures/test-gate-corpus/<ISSUE>/{body.md,diff.numstat}. Tests must be deterministic, offline-runnable, and free of gh/git/network dependency. A fixture-capture script (or doc) lets a future maintainer refresh fixtures from gh issue view + git diff --numstat.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "All ten beads set requiresInspection: false. The work is mechanically additive: pure helpers with well-defined contracts, a one-line CLI option, a four-line preflight Check 4 call. No bead lays a foundation that downstream beads would have to redo on a wrong choice. Inspection criteria (foundation, architectural decision, spec ambiguity, security surface, cross-cutting protocol) are not met.",
+      "recordedAt": "2026-05-25T08:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "False-positive keyword 'test' matching unrelated prose (e.g., 'tested in production', 'latest fix'). The word-boundary regex \\btest\\b prevents matching 'tested' or 'latest', but a body that says 'we will test this in prod' still trips the gate.",
+      "mitigation": "Document the false-positive risk in the failure message and direct the operator to --test-waived with a justification. The spec explicitly lists 'test' as a keyword so this is by design, not a bug."
+    },
+    {
+      "id": "H2",
+      "summary": "Edits to an existing test file count as 'new test lines added' (numstat additions > 0). A PR that only deletes lines from a *.test.ts file would have additions == 0 and trip the gate.",
+      "mitigation": "Intended behavior: editing an existing test to cover the new requirement IS adding test lines. A pure deletion PR (e.g., removing a stale test) is the kind of case --test-waived is for."
+    },
+    {
+      "id": "H3",
+      "summary": "Diff base must be git merge-base origin/main HEAD (the fork point), NOT HEAD~1. Using HEAD~1 (as merge-agent.ts does for squashed merges) would miss any test lines added in earlier commits on the feature branch.",
+      "mitigation": "Use git merge-base origin/main HEAD and the three-dot diff syntax. Tested explicitly via a multi-commit fixture in the corpus."
+    },
+    {
+      "id": "H4",
+      "summary": "Workspace may lack origin/main (fresh clone, fetch failure, polyrepo with missing remote). merge-base would fail; numstat would fail.",
+      "mitigation": "On either failure, the gate logs a warning and skips the check (does not block). Treated as a soft-fail because pan done already has other gates (open beads, AC status) that would block independently if the workspace is misconfigured."
+    },
+    {
+      "id": "H5",
+      "summary": "gh CLI not authenticated or Linear API key missing — issue body fetch fails.",
+      "mitigation": "Abort with a clear error unless --force or --test-waived is provided. Mirrors the existing closed-issue guard at done.ts:204."
+    },
+    {
+      "id": "H6",
+      "summary": "Corpus regression fixtures will go stale if a historical issue body is edited on GitHub after capture, or if the merged branch's diff changes (unlikely once squashed).",
+      "mitigation": "Fixtures are snapshots at capture time. Include a comment in each fixture dir noting the capture date. The test asserts the snapshot's gate behavior, not the live tracker state."
+    },
+    {
+      "id": "H7",
+      "summary": "Test file pattern includes .tsx variants that the issue spec did not enumerate explicitly. A reviewer comparing the PR against the issue body might flag this as scope creep.",
+      "mitigation": "Recorded as autoDecision A1 with rationale (frontend tests are .tsx; uniform 'test file' interpretation). Easy to revert to .ts-only if challenged in review by tightening the regex."
+    },
+    {
+      "id": "H8",
+      "summary": "The CLI lint script scripts/lint-skills.sh cross-checks every flag mentioned in skills/pan-done/SKILL.md against the actual `pan done --help` output. If the skill is updated before the flag lands (or vice versa), lint fails in CI.",
+      "mitigation": "Bead 9 (skill-pan-done-sync) blocks on bead 6 (cli-flag-test-waived). Both must ship in the same submit; the lint script will catch drift before merge."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<!-- panopticon:orchestration-context-start -->\n<!-- (orchestration context elided in continue.json — see original entry in workspace) -->\n<!-- panopticon:orchestration-context-end -->\n",
+      "note": "Planning session started for PAN-1501: Substrate fix (PAN-1454 pattern 8): block pan done if AC requires tests and zero new test lines were added",
+      "timestamp": "2026-05-25T08:20:28.118Z"
+    },
+    {
+      "timestamp": "2026-05-25T08:30:00.000Z",
+      "reason": "planning",
+      "note": "Planning complete in --auto mode. 10 beads, 9 decisions, 8 hazards. No inspection-required beads — work is mechanically additive. See plan.autoDecisions[] for inferred defaults.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}

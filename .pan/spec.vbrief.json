@@ -1,0 +1,649 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T08:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1501: Substrate fix (PAN-1454 pattern 8): block pan done if AC requires tests and zero new test lines were added",
+    "updated": "2026-05-25T08:27:19.580Z"
+  },
+  "plan": {
+    "id": "pan-1501",
+    "title": "Substrate fix (PAN-1454 pattern 8): block pan done if AC requires tests and zero new test lines were added",
+    "status": "proposed",
+    "uid": "a5e3c70f-4a90-4b6b-9145-4c0de1501f8a",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T08:30:00.000Z",
+    "updated": "2026-05-25T08:27:19.580Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1501",
+        "label": "PAN-1501",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1454",
+        "label": "PAN-1454 (parent META)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "substrate",
+      "pan-done",
+      "preflight",
+      "tests",
+      "gate"
+    ],
+    "narratives": {
+      "Problem": "Pattern 8 from the PAN-1454 substrate audit: an issue's acceptance criteria explicitly call for tests (e.g. '- [ ] Regression test for X', '## Test plan', 'add a vitest spec for Y'), but the merged PR adds zero new lines under *.test.ts / *.spec.ts. Seven of the 80 audited closures had this exact shape (PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111). Review and verification gates have not been catching this consistently — the asymmetry between 'AC says test' and 'diff has no new test lines' is structural and substrate-fixable.",
+      "Proposal": "Add a fourth check to pan done's preflight pipeline. Scan the issue body for test-shaped keywords (\\btest\\b, regression test, unit test, Test:, ## Test plan, vitest, playwright) and the rebased branch diff for new lines under *.test.ts / *.spec.ts / *.test.tsx / *.spec.tsx. If keywords > 0 and new-test-line additions == 0, refuse to close with a clear actionable message. Provide --test-waived \"<reason and sha of existing test that covers this>\" as the documented escape hatch for legitimate cases (e.g. existing regression test already covers the requirement). Waivers are recorded in continue.json decisions[] for agent audit AND appended to the in-review tracker comment for human-reviewer audit. Helpers are pure and unit-tested; a corpus regression test asserts the gate fires on snapshots of the seven audit-listed historical issues."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Test file pattern includes .test.tsx and .spec.tsx in addition to the spec-listed .test.ts / .spec.ts.",
+        "rationale": "The project has frontend tests written in TSX (src/dashboard/frontend/**/*.test.tsx). A 'test file' interpretation should be uniform across the project; the issue spec listed .ts as a minimum, not an exhaustive set. Easy to tighten to .ts-only if challenged."
+      },
+      {
+        "summary": "Keyword 'test' uses word-boundary regex \\btest\\b (case-insensitive).",
+        "rationale": "Avoids matching 'latest', 'contested', 'tested' while still catching the exact bare keyword the spec lists. Other keywords (regression test, ## Test plan, vitest, playwright) are matched as literal substrings case-insensitively."
+      },
+      {
+        "summary": "Pure helpers and orchestrator placed in a new module src/lib/work/test-requirement-gate.ts, not appended to done-preflight.ts.",
+        "rationale": "Pure functions are easier to unit-test in isolation. Preflight remains a thin composer. Mirrors the structure of vbrief/acceptance-criteria.ts which is consumed by done-preflight."
+      },
+      {
+        "summary": "Tracker fetch failure aborts pan done unless --force or --test-waived is provided.",
+        "rationale": "Mirrors the existing closed-issue guard in doneCommand (src/cli/commands/done.ts:204) which already aborts on tracker fetch failure for safety. The --test-waived flag IS the operator's signed escape hatch, so it qualifies."
+      },
+      {
+        "summary": "Waiver reason is recorded in BOTH continue.json decisions[] and the in-review tracker comment.",
+        "rationale": "continue.json is the work-agent audit trail; reviewers never read it. The tracker comment is what reviewers and humans see. Both surfaces matter — one for the autonomous pipeline, one for human oversight."
+      },
+      {
+        "summary": "Test detection scans the raw issue body (gh issue view --json body / Linear .description), not the vBRIEF AC subItems.",
+        "rationale": "The vBRIEF only carries items with metadata.kind='acceptance_criterion'. Freeform sections like '## Test plan' or inline 'Test:' lines are lost when synthesizing the vBRIEF from the issue body. The body is authoritative for what the user actually asked for."
+      },
+      {
+        "summary": "Corpus regression test uses static fixture files at src/lib/work/__tests__/fixtures/test-gate-corpus/<ISSUE>/{body.md,diff.numstat}, not live gh/git calls.",
+        "rationale": "Tests must be deterministic, offline-runnable, and free of network/auth dependency. Fixtures are snapshots; a fixture-capture comment documents how to refresh them (`gh issue view <num> --json body --jq .body` + `git diff --numstat <merge-base>..<merged-sha>`)."
+      },
+      {
+        "summary": "Diff base for counting test-line additions is `git merge-base origin/main HEAD` with three-dot diff (`<base>...HEAD`).",
+        "rationale": "Mirrors the pattern in src/lib/cloister/review-context.ts (the review convoy's diff source). Counts all additions across the feature branch's history, not just the last commit. Falls back to `origin/main...HEAD` if merge-base fails; if both fail, the gate skips with a warning rather than blocking."
+      }
+    ],
+    "items": [
+      {
+        "id": "detect-test-requirements",
+        "title": "Pure helper: detectTestRequirements(text) → matched keywords with line numbers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/work/test-requirement-gate.ts exporting `detectTestRequirements(text: string): TestRequirement[]`. Match the keyword set from the issue spec — `\\btest\\b`, `regression test`, `unit test`, `Test:`, `## Test plan`, `vitest`, `playwright` — case-insensitive. Each result carries { keyword, line, context }. Empty/null input returns []. Add unit tests at src/lib/work/__tests__/test-requirement-gate.test.ts covering each keyword variant, multiple matches per line, line numbering, case-insensitivity, and the negative cases 'contested' / 'latest' / 'tested' (must NOT match the bare-word `test` pattern). Export the keyword regex set so the orchestrator and tests share one source of truth."
+        },
+        "subItems": [
+          {
+            "id": "detect-test-requirements.ac1",
+            "title": "Module src/lib/work/test-requirement-gate.ts exists and exports `detectTestRequirements(text: string): TestRequirement[]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-test-requirements.ac2",
+            "title": "Each spec-listed keyword (\\btest\\b, regression test, unit test, Test:, ## Test plan, vitest, playwright) has at least one passing positive-match test case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-test-requirements.ac3",
+            "title": "Negative test cases assert that 'latest', 'contested', and 'tested' do NOT match the bare-word `test` pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-test-requirements.ac4",
+            "title": "Returns [] for empty string and null/undefined input without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-test-requirements.ac5",
+            "title": "Each TestRequirement carries an accurate `line` number (1-indexed) matching the line in the input text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "count-test-delta",
+        "title": "Pure helper: countTestDeltaInDiff(numstat) → sum of new lines added to test files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `countTestDeltaInDiff(numstatOutput: string): number` to src/lib/work/test-requirement-gate.ts. Parse `git diff --numstat` output (tab-separated `<additions>\\t<deletions>\\t<path>`). Sum additions for paths matching `**/*.{test,spec}.{ts,tsx}`. Skip binary entries (`-\\t-\\t<path>`). Unit tests cover: empty input, single test file, multiple test files, non-test files ignored, .test.tsx variants included, binary entries skipped, malformed lines tolerated."
+        },
+        "subItems": [
+          {
+            "id": "count-test-delta.ac1",
+            "title": "`countTestDeltaInDiff(numstatOutput: string): number` exported from src/lib/work/test-requirement-gate.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-test-delta.ac2",
+            "title": "Sums additions for files matching **/*.test.ts, **/*.spec.ts, **/*.test.tsx, **/*.spec.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-test-delta.ac3",
+            "title": "Non-test files (e.g. src/lib/foo.ts) contribute 0 to the sum even if they have additions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-test-delta.ac4",
+            "title": "Binary diff entries (`-\\t-\\tpath`) are skipped without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-test-delta.ac5",
+            "title": "Empty input returns 0; malformed lines do not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fetch-issue-body",
+        "title": "Issue-body fetcher Effect: pulls body from GitHub (gh) or Linear (SDK)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `fetchIssueBodyForGate(issueId: string): Effect<string | null, TrackerFetchError>` to src/lib/work/test-requirement-gate.ts. Resolve tracker via existing `resolveGitHubIssueSync` from src/lib/tracker-utils. For GitHub: `gh issue view <num> --repo <owner>/<repo> --json body --jq '.body'`. For Linear: use the existing LinearClient pattern from doneCommand (filter by team key + number, read .description). Returns null only when the tracker is unreachable / unauthenticated; otherwise throws a TrackerFetchError that the orchestrator translates to an abort message. Unit tests stub child_process.exec and the Linear SDK to exercise both paths and the failure modes."
+        },
+        "subItems": [
+          {
+            "id": "fetch-issue-body.ac1",
+            "title": "`fetchIssueBodyForGate(issueId)` returns an Effect that resolves to the raw issue body string for GitHub issues via `gh issue view --json body --jq .body`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fetch-issue-body.ac2",
+            "title": "For Linear issues, the same function returns the LinearClient `.description` of the matching issue (resolved by team key + number)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fetch-issue-body.ac3",
+            "title": "Returns null (not throws) when the tracker is GitHub but `gh` is unauthenticated or the issue is missing — orchestrator decides whether to abort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fetch-issue-body.ac4",
+            "title": "Unit tests stub child_process.exec (gh path) and @linear/sdk (Linear path) and exercise success + failure for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-orchestrator",
+        "title": "Orchestrator: runTestRequirementCheck composes detector + counter + fetcher and returns failure lines",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `runTestRequirementCheck(workspacePath: string, issueId: string, waivedReason?: string): Effect<string[], ProcessSpawnError>` to src/lib/work/test-requirement-gate.ts. Flow: (1) if waivedReason is non-empty, return [] immediately (waiver is the escape hatch). (2) Call fetchIssueBodyForGate(issueId); if it returns null, return a failure line directing the operator to --force or --test-waived. (3) Run detectTestRequirements on the body; if empty, return []. (4) Compute diff base via `git merge-base origin/main HEAD` (fall back to `origin/main...HEAD` three-dot syntax) and run `git diff --numstat <base>...HEAD`. (5) Run countTestDeltaInDiff on the numstat output. (6) If requirements > 0 && delta === 0, return failure lines listing the matched keywords (with line numbers) and the two escape hatches (add tests / use --test-waived). On `git merge-base` failure with no usable fallback, log a warning and return [] (soft-fail; do not block on infrastructure issues)."
+        },
+        "subItems": [
+          {
+            "id": "gate-orchestrator.ac1",
+            "title": "When waivedReason is a non-empty string, `runTestRequirementCheck` returns [] without making any tracker or git call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orchestrator.ac2",
+            "title": "When the issue body has zero test-keyword matches, returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orchestrator.ac3",
+            "title": "When the issue body has ≥1 match AND `countTestDeltaInDiff` returns 0, returns failure lines that (a) enumerate matched keywords with line numbers and (b) name both escape hatches: 'add tests covering …' and '--test-waived \"<reason + sha>\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orchestrator.ac4",
+            "title": "When `fetchIssueBodyForGate` returns null (tracker fetch failed), returns failure lines directing the operator to --force or --test-waived rather than silently passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orchestrator.ac5",
+            "title": "When `git merge-base origin/main HEAD` fails AND the three-dot fallback also fails, logs a warning and returns [] (soft-fail rather than block on workspace misconfiguration)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orchestrator.ac6",
+            "title": "Unit tests cover all five branches (waived, no matches, matches+zero-delta, tracker-fetch-failure, merge-base-failure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preflight-wire",
+        "title": "Wire the orchestrator into runPreflightChecksPromise as Check 4",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/work/done-preflight.ts, extend `runPreflightChecksPromise(workspacePath, issueId)` to accept an optional `testWaived?: string` parameter and add Check 4 after the existing vBRIEF AC check: `failures.push(...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)))`. Update the Effect wrapper `runPreflightChecks` to thread the new parameter. Update the call site in src/cli/commands/done.ts to pass `options.testWaived` through. Inline comment references PAN-1501 / PAN-1454 pattern 8."
+        },
+        "subItems": [
+          {
+            "id": "preflight-wire.ac1",
+            "title": "`runPreflightChecksPromise` (and its Effect wrapper `runPreflightChecks`) accept a `testWaived?: string` parameter and forward it to `runTestRequirementCheck`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-wire.ac2",
+            "title": "Check 4 runs AFTER the existing AC-status check (so AC sync runs first) and its failure lines appear in the same `failures[]` aggregation the user sees from `pan done`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-wire.ac3",
+            "title": "src/cli/commands/done.ts call site at done.ts:258 passes `options.testWaived` into `runPreflightChecks`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-wire.ac4",
+            "title": "Inline comment in done-preflight.ts cross-references PAN-1501 and PAN-1454 pattern 8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-flag-test-waived",
+        "title": "Add --test-waived <reason> flag to `pan done` CLI registration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts at the `program.command('done <id>')` block (around line 455), add `.option('--test-waived <reason>', 'Skip the test-requirement gate; reason must include rationale and SHA of an existing test that covers the requirement')`. Add `testWaived?: string` to the `DoneOptions` interface in src/cli/commands/done.ts. The flag is independent of `--force`: `--force` skips ALL preflight checks; `--test-waived` skips ONLY the test-requirement gate while leaving open beads, uncommitted changes, and AC-status checks active."
+        },
+        "subItems": [
+          {
+            "id": "cli-flag-test-waived.ac1",
+            "title": "`pan done --help` lists `--test-waived <reason>` with a clear description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flag-test-waived.ac2",
+            "title": "`DoneOptions.testWaived?: string` defined in src/cli/commands/done.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flag-test-waived.ac3",
+            "title": "`--test-waived` is documented as a TARGETED skip (only the test-requirement gate), distinct from `--force` which skips ALL preflight checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flag-test-waived.ac4",
+            "title": "Passing `--test-waived` without a reason fails Commander's option-parsing (the flag is `<reason>` required, not `[reason]` optional)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "waiver-audit-trail",
+        "title": "Persist --test-waived reason to continue.json decisions[] and tracker comment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "When `options.testWaived` is provided AND a gate would otherwise have fired (or proactively whenever the flag is set — simpler), in doneCommand: (1) append `{ id: \"D-test-waived\", summary: \"Test gate waived: <reason>\", recordedAt: <iso> }` to the workspace's continue.json `decisions[]` via writeWorkspaceContinue. (2) If `options.comment` is set, append `\\n\\nTest gate waived: <reason>` to it; if unset, set it to `Test gate waived: <reason>`. The augmented comment is then passed to updateLinearToInReview / updateGitHubToInReview so the in-review tracker comment carries the waiver text for human reviewers."
+        },
+        "subItems": [
+          {
+            "id": "waiver-audit-trail.ac1",
+            "title": "When `--test-waived <reason>` is passed, a new decision `{ id: 'D-test-waived', summary: 'Test gate waived: <reason>', recordedAt: <iso> }` is appended to .pan/continue.json `decisions[]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-audit-trail.ac2",
+            "title": "The waiver reason is appended to the in-review tracker comment (Linear addComment / GitHub label-flow comment), so reviewers see it without reading continue.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-audit-trail.ac3",
+            "title": "When `-c <comment>` and `--test-waived <reason>` are both provided, both texts appear in the tracker comment (waiver appended with a blank line separator)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-audit-trail.ac4",
+            "title": "An integration-style test verifies the continue.json mutation by reading the file after a stubbed doneCommand run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "corpus-regression-test",
+        "title": "Corpus regression test: gate must fire for each of PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create fixture directories at src/lib/work/__tests__/fixtures/test-gate-corpus/<ISSUE>/ for each of PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111. Each contains body.md (captured from `gh issue view <num> --repo eltmon/panopticon-cli --json body --jq .body`) and diff.numstat (captured from `git diff --numstat <merge-base>..<merged-sha>` for the merged feature branch). Add src/lib/work/__tests__/test-requirement-gate-corpus.test.ts that parameterizes over the seven fixtures and asserts: `detectTestRequirements(body).length > 0 && countTestDeltaInDiff(numstat) === 0` (i.e. the gate would fire). Include a small README.md in the fixtures dir documenting the capture commands and the snapshot date."
+        },
+        "subItems": [
+          {
+            "id": "corpus-regression-test.ac1",
+            "title": "Fixture directory exists for each of the seven issues (PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111) and contains both body.md and diff.numstat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corpus-regression-test.ac2",
+            "title": "A parameterized vitest spec runs for each fixture and asserts the gate would fire (detector matches > 0 AND counter == 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corpus-regression-test.ac3",
+            "title": "The corpus test runs as part of the default `npm test` suite (not behind a tag) — it is offline and fast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corpus-regression-test.ac4",
+            "title": "Fixtures README.md documents the exact capture commands (`gh issue view ...`, `git diff --numstat ...`) and the snapshot date so future maintainers can refresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-pan-done-sync",
+        "title": "Update sync-sources/skills/pan-done/SKILL.md to document the test-requirement gate and --test-waived",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update sync-sources/skills/pan-done/SKILL.md (the source of truth that `pan sync` distributes) to (a) add a 'Test-requirement gate' subsection under 'What It Does' describing the keyword-vs-delta check and (b) document the `--test-waived \"<reason>\"` flag with at least one example. The skill is the agent-facing reference; it must be in lockstep with `pan done --help` because scripts/lint-skills.sh cross-checks every flag mentioned in the skill against the CLI's `--help` output. CI fails on drift."
+        },
+        "subItems": [
+          {
+            "id": "skill-pan-done-sync.ac1",
+            "title": "sync-sources/skills/pan-done/SKILL.md contains a 'Test-requirement gate' section explaining the keyword detection and the diff-counting behavior in 2-4 sentences",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-done-sync.ac2",
+            "title": "The skill documents `--test-waived \"<reason>\"` with at least one realistic example string (reason + commit SHA pointing at the existing test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-pan-done-sync.ac3",
+            "title": "`npm run lint` (which invokes scripts/lint-skills.sh) passes — no drift between the skill's documented flags and `pan done --help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pan-done-gate",
+        "title": "Document the four pan-done preflight gates (including the new test-requirement gate) in docs",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a short section to docs/PANOPTICON_DEV_SOP.md (or wherever pan done is documented today — locate via `grep -rn 'pan done' docs/`) listing the four preflight gates (open beads / uncommitted changes / vBRIEF AC status / test-requirement) with one sentence each. Include the `--test-waived` escape hatch and its semantic distinction from `--force`. Cross-reference PAN-1501 and PAN-1454 pattern 8."
+        },
+        "subItems": [
+          {
+            "id": "docs-pan-done-gate.ac1",
+            "title": "Docs section lists all four current pan-done preflight gates with one-sentence summaries each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pan-done-gate.ac2",
+            "title": "Docs explain the difference between `--force` (skip all gates) and `--test-waived` (skip only the test gate, must include a reason)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pan-done-gate.ac3",
+            "title": "Docs cross-reference PAN-1501 (this issue) and PAN-1454 pattern 8 (the substrate audit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "detect-test-requirements",
+        "to": "gate-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "count-test-delta",
+        "to": "gate-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "fetch-issue-body",
+        "to": "gate-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-orchestrator",
+        "to": "preflight-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flag-test-waived",
+        "to": "preflight-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flag-test-waived",
+        "to": "waiver-audit-trail",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flag-test-waived",
+        "to": "skill-pan-done-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "detect-test-requirements",
+        "to": "corpus-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "count-test-delta",
+        "to": "corpus-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "preflight-wire",
+        "to": "docs-pan-done-gate",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1501-substrate-fix-pan-1454-pattern-8-block-pan-done-if-ac-requires-tests-and-zero-new-test-lines-were-added.vbrief.json"
+    }
+  }
+}
