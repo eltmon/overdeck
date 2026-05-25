@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Settings,
   Terminal,
+  FileText,
   FolderOpen,
   User,
   Zap,
@@ -331,6 +332,15 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       group: 'Navigation',
       keywords: ['preferences', 'config', 'configure'],
       onSelect: () => onNavigate('settings'),
+    },
+    {
+      id: 'open-context',
+      label: 'Open Context',
+      description: 'Edit layered context and preview harness output',
+      icon: FileText,
+      group: 'Navigation',
+      keywords: ['context', 'claude', 'pi', 'prompt', 'sync'],
+      onSelect: () => onNavigate('context'),
     },
     {
       id: 'open-kanban',

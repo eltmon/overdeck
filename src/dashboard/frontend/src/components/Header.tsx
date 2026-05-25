@@ -9,6 +9,7 @@ export type Tab =
   | 'flywheel'
   | 'resources'
   | 'skills'
+  | 'context'
   | 'health'
   | 'activity'
   | 'metrics'

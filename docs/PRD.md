@@ -1890,9 +1890,10 @@ auto_sync = false       # Manual triage
 | Command | Description |
 |---------|-------------|
 | `pan init` | Initialize Panopticon globally (`~/.panopticon/`) |
-| `pan project add <path>` | Register a project with Panopticon |
-| `pan project list` | List all managed projects |
-| `pan sync` | Sync skills/commands to `~/.claude/` |
+| `pan projects add <path>` | Register a project with Panopticon |
+| `pan projects list` | List all managed projects |
+| `pan project <subcommand>` | Compatibility alias for `pan projects <subcommand>` |
+| `pan sync` | Render layered context and install bundled skills and agents |
 | `pan up` | Start the dashboard |
 | `pan down` | Stop dashboard and optionally agents |
 | `pan update` | Update Panopticon itself |
@@ -2631,7 +2632,7 @@ type CanonicalState =
 When a project is first configured, Panopticon checks tracker compatibility:
 
 ```
-$ pan project add ~/projects/myn --tracker linear --team MIN
+$ pan projects add ~/projects/myn --tracker linear --team MIN
 
 Checking Linear team "MIN" for required states...
 
@@ -2770,8 +2771,8 @@ npm install -g panopticon-dashboard
 pan init
 
 # 3. Register projects
-pan project add ~/projects/myn
-pan project add ~/projects/househunt
+pan projects add ~/projects/myn
+pan projects add ~/projects/househunt
 
 # 4. Sync to Claude Code
 pan sync
@@ -4433,7 +4434,7 @@ When planning starts for an issue, Panopticon creates a feature PRD in the works
 
 ### Project Initialization Flow
 
-When registering a new project with `pan project add`, Panopticon performs PRD discovery:
+When registering a new project with `pan projects add`, Panopticon performs PRD discovery. The singular `pan project add` form remains a compatibility alias:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

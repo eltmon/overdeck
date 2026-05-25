@@ -1,37 +1,49 @@
 import { execFile } from 'node:child_process';
-import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
-import type {
-  ContextEditableLayerRecord,
-  ContextLayerDraft,
+import {
   ContextLayerSaveRequest,
-  ContextLayerSaveResponse,
-  ContextLayerTarget,
-  ContextLayersResponse,
-  ContextPreviewDiagnostic,
   ContextPreviewRequest,
-  ContextPreviewResponse,
-  ContextProjectSummary,
-  ContextSyncResponse,
-  ContextWorkspaceSummary,
-  Harness,
+  type ContextEditableLayerRecord,
+  type ContextLayerDraft,
+  type ContextLayerSaveResponse,
+  type ContextLayerTarget,
+  type ContextLayersResponse,
+  type ContextPreviewDiagnostic,
+  type ContextPreviewResponse,
+  type ContextProjectSummary,
+  type ContextSyncResponse,
+  type ContextWorkspaceSummary,
+  type Harness,
 } from '@panctl/contracts';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { renderForHarness, validateTemplate } from '../../../lib/context-layers/harness.js';
 import {
-  globalContextFile,
+  globalContextFile as defaultGlobalContextFile,
   projectContextFile,
   workspaceContextFile,
-  type ContextLayerKind,
 } from '../../../lib/context-layers/layers.js';
+import { getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
-import { isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+
+type ProjectEntry = { key: string; config: ProjectConfig };
+type ResolvedLayer = ContextEditableLayerRecord & { dir: string };
+
+type ContextCatalog = {
+  projects: ProjectEntry[];
+  summaries: ContextProjectSummary[];
+  workspaces: ContextWorkspaceSummary[];
+};
+
+type ContextLayerState = ContextLayersResponse & {
+  resolvedLayers: ResolvedLayer[];
+};
 
 type ContextSyncCommandResult = {
   stdout: string;
@@ -46,43 +58,42 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
   error?: string;
 };
 
-type ProjectEntry = { key: string; config: ProjectConfig };
-
-type ContextCatalog = {
-  projects: ProjectEntry[];
-  summaries: ContextProjectSummary[];
-  workspaces: ContextWorkspaceSummary[];
-};
+type RuleScope = 'universal' | 'dev';
 
 const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
+const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
+const decodeSaveRequest = Schema.decodeUnknownSync(ContextLayerSaveRequest);
 
-type RuleScope = 'universal' | 'dev';
+function globalContextFile(panopticonHome = getPanopticonHome()): string {
+  return panopticonHome === getPanopticonHome()
+    ? defaultGlobalContextFile()
+    : join(panopticonHome, 'context', 'global.md');
+}
 
-async function pathExists(path: string): Promise<boolean> {
-  return access(path).then(() => true, () => false);
+function contextDirForFile(file: string): string {
+  return dirname(file);
+}
+
+function pathWithin(root: string, candidate: string): boolean {
+  const rel = relative(resolve(root), resolve(candidate));
+  return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function assertPathInside(root: string, candidate: string): void {
+  if (!pathWithin(root, candidate)) {
+    throw new Error(`Path escapes allowed root: ${candidate}`);
+  }
 }
 
 async function readOptionalFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     return { exists: true, content: await readFile(path, 'utf-8') };
   } catch (error) {
-    if (isMissingFileError(error)) return { exists: false, content: '' };
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { exists: false, content: '' };
     throw error;
   }
-}
-
-function isMissingFileError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-
-function assertPathInside(root: string, candidate: string): void {
-  const resolvedRoot = resolve(root);
-  const resolvedCandidate = resolve(candidate);
-  const rel = relative(resolvedRoot, resolvedCandidate);
-  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.includes(`..${sep}`))) return;
-  throw new Error(`Path escapes allowed root: ${candidate}`);
 }
 
 function workspaceRootForProject(project: ProjectConfig): string {
@@ -112,9 +123,11 @@ function workspaceBranch(name: string): string | undefined {
 
 async function discoverWorkspacesForProject(projectKey: string, config: ProjectConfig): Promise<ContextWorkspaceSummary[]> {
   const root = workspaceRootForProject(config);
-  if (!(await pathExists(root))) return [];
+  const entries = await readdir(root, { withFileTypes: true }).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  });
 
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   return entries
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     .map((entry) => {
@@ -128,151 +141,150 @@ async function discoverWorkspacesForProject(projectKey: string, config: ProjectC
         ...(workspaceBranch(entry.name) ? { branch: workspaceBranch(entry.name)! } : {}),
       } satisfies ContextWorkspaceSummary;
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.path.localeCompare(b.path));
 }
 
 export async function buildContextCatalog(projects: ProjectEntry[]): Promise<ContextCatalog> {
-  const summaries = projects.map(summarizeProject).sort((a, b) => a.projectKey.localeCompare(b.projectKey));
+  const normalizedProjects = projects
+    .map((project) => ({
+      key: project.key,
+      config: { ...project.config, path: resolve(project.config.path) },
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
   const workspaceGroups = await Promise.all(
-    projects.map((project) => discoverWorkspacesForProject(project.key, project.config)),
+    normalizedProjects.map((project) => discoverWorkspacesForProject(project.key, project.config)),
   );
   return {
-    projects,
-    summaries,
+    projects: normalizedProjects,
+    summaries: normalizedProjects.map(summarizeProject).sort((a, b) => a.projectKey.localeCompare(b.projectKey)),
     workspaces: workspaceGroups.flat().sort((a, b) => a.path.localeCompare(b.path)),
   };
 }
 
-async function layerRecord(
-  kind: ContextLayerKind,
-  file: string,
-  extras: { projectKey?: string; workspacePath?: string } = {},
-): Promise<ContextEditableLayerRecord> {
-  const { exists, content } = await readOptionalFile(file);
-  if (kind === 'global') return { kind, file, exists, content, editable: true };
-  if (kind === 'project') return { kind, projectKey: extras.projectKey!, file, exists, content, editable: true };
-  return { kind, projectKey: extras.projectKey!, workspacePath: extras.workspacePath!, file, exists, content, editable: true };
+function targetKey(target: ContextLayerTarget): string {
+  switch (target.kind) {
+    case 'global':
+      return 'global';
+    case 'project':
+      return `project:${target.projectKey}`;
+    case 'workspace':
+      return `workspace:${target.projectKey}:${resolve(target.workspacePath)}`;
+  }
 }
 
-export async function buildContextLayersResponse(projects: ProjectEntry[]): Promise<ContextLayersResponse> {
+function targetForLayer(layer: ContextEditableLayerRecord): ContextLayerTarget {
+  switch (layer.kind) {
+    case 'global':
+      return { kind: 'global' };
+    case 'project':
+      return { kind: 'project', projectKey: layer.projectKey };
+    case 'workspace':
+      return { kind: 'workspace', projectKey: layer.projectKey, workspacePath: resolve(layer.workspacePath) };
+  }
+}
+
+function sameTarget(a: ContextLayerTarget, b: ContextLayerTarget): boolean {
+  return targetKey(a) === targetKey(b);
+}
+
+function selectedProjectKey(target: ContextLayerTarget): string | undefined {
+  if (target.kind === 'project' || target.kind === 'workspace') return target.projectKey;
+  return undefined;
+}
+
+function selectedWorkspacePath(target: ContextLayerTarget): string | undefined {
+  return target.kind === 'workspace' ? resolve(target.workspacePath) : undefined;
+}
+
+function applicableLayers(state: ContextLayerState, selectedLayer: ContextLayerTarget): ResolvedLayer[] {
+  const projectKey = selectedProjectKey(selectedLayer);
+  const workspacePath = selectedWorkspacePath(selectedLayer);
+  return state.resolvedLayers.filter((layer) => {
+    if (layer.kind === 'global') return true;
+    if (layer.kind === 'project') return layer.projectKey === projectKey;
+    return layer.projectKey === projectKey && resolve(layer.workspacePath) === workspacePath;
+  });
+}
+
+async function layerRecord(
+  file: string,
+  base: Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
+): Promise<ResolvedLayer> {
+  const { exists, content } = await readOptionalFile(file);
+  return {
+    ...base,
+    file,
+    exists,
+    content,
+    editable: true,
+    dir: contextDirForFile(file),
+  } as ResolvedLayer;
+}
+
+export async function buildContextLayerState(
+  projects: ProjectEntry[],
+  panopticonHome = getPanopticonHome(),
+): Promise<ContextLayerState> {
   const catalog = await buildContextCatalog(projects);
-  const layers: ContextEditableLayerRecord[] = [
-    await layerRecord('global', globalContextFile()),
+  const resolvedLayers: ResolvedLayer[] = [
+    await layerRecord(globalContextFile(panopticonHome), { kind: 'global' }),
   ];
 
-  layers.push(...await Promise.all(
-    catalog.projects.map((project) => layerRecord('project', projectContextFile(project.config.path), { projectKey: project.key })),
-  ));
+  for (const project of catalog.projects) {
+    resolvedLayers.push(await layerRecord(projectContextFile(project.config.path), {
+      kind: 'project',
+      projectKey: project.key,
+    }));
+  }
 
-  layers.push(...await Promise.all(
-    catalog.workspaces.map((workspace) => layerRecord('workspace', workspaceContextFile(workspace.path), {
+  for (const workspace of catalog.workspaces) {
+    resolvedLayers.push(await layerRecord(workspaceContextFile(workspace.path), {
+      kind: 'workspace',
       projectKey: workspace.projectKey,
       workspacePath: workspace.path,
-    })),
-  ));
+    }));
+  }
 
   return {
     operation: 'load',
     projects: catalog.summaries,
     workspaces: catalog.workspaces,
-    layers,
+    layers: resolvedLayers.map(({ dir: _dir, ...layer }) => layer),
+    resolvedLayers,
   };
 }
 
-export const loadContextLayers = buildContextLayersResponse;
-
-function findProject(projects: ProjectEntry[], projectKey: string): ProjectEntry {
-  const project = projects.find((entry) => entry.key === projectKey);
-  if (!project) throw new Error(`Unknown project: ${projectKey}`);
-  return project;
-}
-
-async function resolveLayerFile(
-  target: ContextLayerTarget,
+export async function loadContextLayers(
   projects: ProjectEntry[],
-  catalog?: ContextCatalog,
-): Promise<{ file: string; kind: ContextLayerKind; projectKey?: string; workspacePath?: string }> {
-  if (target.kind === 'global') {
-    return { kind: 'global', file: globalContextFile() };
+  panopticonHome = getPanopticonHome(),
+): Promise<ContextLayersResponse> {
+  const { resolvedLayers: _resolvedLayers, ...response } = await buildContextLayerState(projects, panopticonHome);
+  return response;
+}
+
+export const buildContextLayersResponse = loadContextLayers;
+
+function findLayer(state: ContextLayerState, target: ContextLayerTarget): ResolvedLayer | null {
+  return state.resolvedLayers.find((layer) => sameTarget(targetForLayer(layer), target)) ?? null;
+}
+
+function requireLayer(state: ContextLayerState, target: ContextLayerTarget): ResolvedLayer {
+  const layer = findLayer(state, target);
+  if (!layer) throw new Error(`Context layer is not registered: ${targetKey(target)}`);
+  return layer;
+}
+
+function draftContentByTarget(state: ContextLayerState, drafts: readonly ContextLayerDraft[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const draft of drafts) {
+    requireLayer(state, draft.target);
+    map.set(targetKey(draft.target), draft.content);
   }
-
-  const project = findProject(projects, target.projectKey);
-  const projectRoot = resolve(project.config.path);
-
-  if (target.kind === 'project') {
-    const file = projectContextFile(projectRoot);
-    assertPathInside(projectRoot, file);
-    return { kind: 'project', file, projectKey: target.projectKey };
-  }
-
-  const resolvedWorkspacePath = resolve(target.workspacePath);
-  const contextCatalog = catalog ?? await buildContextCatalog(projects);
-  const allowedWorkspace = contextCatalog.workspaces.find(
-    (workspace) => workspace.projectKey === target.projectKey && resolve(workspace.path) === resolvedWorkspacePath,
-  );
-  if (!allowedWorkspace) throw new Error(`Unknown workspace for project ${target.projectKey}: ${target.workspacePath}; target is outside the workspace allowlist`);
-
-  const file = workspaceContextFile(resolvedWorkspacePath);
-  assertPathInside(resolvedWorkspacePath, file);
-  return { kind: 'workspace', file, projectKey: target.projectKey, workspacePath: resolvedWorkspacePath };
+  return map;
 }
 
-function parseTarget(value: unknown): ContextLayerTarget {
-  if (!value || typeof value !== 'object') throw new Error('target must be an object');
-  const source = value as Record<string, unknown>;
-  if (source['kind'] === 'global') return { kind: 'global' };
-  if (source['kind'] === 'project' && typeof source['projectKey'] === 'string') {
-    return { kind: 'project', projectKey: source['projectKey'] };
-  }
-  if (
-    source['kind'] === 'workspace' &&
-    typeof source['projectKey'] === 'string' &&
-    typeof source['workspacePath'] === 'string'
-  ) {
-    return { kind: 'workspace', projectKey: source['projectKey'], workspacePath: source['workspacePath'] };
-  }
-  throw new Error('target must specify a valid global, project, or workspace layer');
-}
-
-function parseDrafts(value: unknown): ContextLayerDraft[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((draft) => {
-    if (!draft || typeof draft !== 'object') throw new Error('drafts must contain objects');
-    const source = draft as Record<string, unknown>;
-    if (typeof source['content'] !== 'string') throw new Error('draft content must be a string');
-    return { target: parseTarget(source['target']), content: source['content'] };
-  });
-}
-
-function parseJsonBody(text: string): Record<string, unknown> {
-  if (!text) return {};
-  const parsed = JSON.parse(text) as unknown;
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON body must be an object');
-  return parsed as Record<string, unknown>;
-}
-
-function layerKey(target: ContextLayerTarget): string {
-  if (target.kind === 'global') return 'global';
-  if (target.kind === 'project') return `project:${target.projectKey}`;
-  return `workspace:${target.projectKey}:${resolve(target.workspacePath)}`;
-}
-
-async function resolveLayerContent(
-  target: ContextLayerTarget,
-  projects: ProjectEntry[],
-  catalog: ContextCatalog,
-  draftByKey: ReadonlyMap<string, string>,
-): Promise<{ target: ContextLayerTarget; file: string; content: string; exists: boolean }> {
-  const resolved = await resolveLayerFile(target, projects, catalog);
-  const normalizedTarget = resolved.kind === 'workspace'
-    ? { kind: 'workspace' as const, projectKey: resolved.projectKey!, workspacePath: resolved.workspacePath! }
-    : resolved.kind === 'project'
-      ? { kind: 'project' as const, projectKey: resolved.projectKey! }
-      : { kind: 'global' as const };
-  const draft = draftByKey.get(layerKey(normalizedTarget));
-  if (draft !== undefined) return { target: normalizedTarget, file: resolved.file, content: draft, exists: await pathExists(resolved.file) };
-  const { exists, content } = await readOptionalFile(resolved.file);
-  return { target: normalizedTarget, file: resolved.file, content, exists };
+function contentForLayer(layer: ResolvedLayer, drafts: ReadonlyMap<string, string>): string {
+  return drafts.get(targetKey(targetForLayer(layer))) ?? layer.content;
 }
 
 function parseRule(raw: string): { scope: RuleScope; body: string } {
@@ -305,26 +317,34 @@ async function renderBundledRulesAsync(harness: Harness): Promise<string> {
   return rendered.length > 0 ? `## Panopticon Engineering Rules\n\n${rendered.join('\n\n')}` : '';
 }
 
-function formatRenderedLayers(
-  harness: Harness,
-  layers: Array<{ title: string; content: string }>,
-  bundledRules: string,
-): string {
-  const renderedLayers = layers
+function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): string {
+  return layers
     .map((layer) => {
-      const rendered = renderForHarness(layer.content, harness).trim();
-      return rendered ? `## ${layer.title}\n\n${rendered}` : '';
+      const rendered = renderForHarness(contentForLayer(layer, drafts), harness).trim();
+      const label = layer.kind === 'global'
+        ? 'Global layer'
+        : layer.kind === 'project'
+          ? `Project layer: ${layer.projectKey}`
+          : `Workspace layer: ${layer.workspacePath}`;
+      return `## ${label}\n\n${rendered || '_No context in this layer._'}`;
     })
-    .filter((section) => section.length > 0);
-
-  return [...renderedLayers, bundledRules].filter((section) => section.trim().length > 0).join('\n\n---\n\n');
+    .join('\n\n---\n\n');
 }
 
-function formatFullPrompt(previews: Record<Harness, string>): string {
+async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
+  const title = harness === 'claude-code' ? 'Claude Code' : 'Pi';
+  return [
+    `# Panopticon injected context preview (${title})`,
+    renderLayerSections(layers, drafts, harness),
+    await renderBundledRulesAsync(harness),
+  ].filter((section) => section.trim().length > 0).join('\n\n---\n\n');
+}
+
+function fullPromptPreview(previews: Record<Harness, string>): string {
   return [
     '# Full injected prompt preview',
     '',
-    'Private harness base prompt: unavailable. Unavailable to Panopticon; it cannot inspect or reproduce the private base prompt owned by the harness provider.',
+    'Private harness base prompt: Unavailable. Panopticon cannot inspect or reproduce the private base prompt owned by the harness provider.',
     '',
     '## Panopticon-controlled Claude Code bundle',
     '',
@@ -342,127 +362,109 @@ function formatFullPrompt(previews: Record<Harness, string>): string {
   ].join('\n');
 }
 
-function normalizePreviewArgs(
-  requestOrTarget: ContextPreviewRequest | ContextLayerTarget,
-  drafts: ContextLayerDraft[] = [],
-): { selectedLayer: ContextLayerTarget; drafts: ContextLayerDraft[] } {
-  if ('operation' in requestOrTarget) {
-    return { selectedLayer: requestOrTarget.selectedLayer, drafts: requestOrTarget.drafts };
+function diagnosticsForLayers(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>): ContextPreviewDiagnostic[] {
+  const diagnostics: ContextPreviewDiagnostic[] = [];
+  for (const layer of layers) {
+    const target = targetForLayer(layer);
+    for (const issue of validateTemplate(contentForLayer(layer, drafts)).issues) {
+      diagnostics.push({
+        level: issue.severity,
+        message: issue.message,
+        layer: target,
+      });
+    }
   }
-  return { selectedLayer: requestOrTarget, drafts };
+  return diagnostics;
 }
 
 export async function previewContextLayers(
   projects: ProjectEntry[],
   request: ContextPreviewRequest,
+  panopticonHome?: string,
 ): Promise<ContextPreviewResponse>;
 export async function previewContextLayers(
   projects: ProjectEntry[],
   selectedLayer: ContextLayerTarget,
-  drafts: ContextLayerDraft[],
+  drafts: readonly ContextLayerDraft[],
+  panopticonHome?: string,
 ): Promise<ContextPreviewResponse>;
 export async function previewContextLayers(
   projects: ProjectEntry[],
-  requestOrTarget: ContextPreviewRequest | ContextLayerTarget,
-  draftArg: ContextLayerDraft[] = [],
+  requestOrSelectedLayer: ContextPreviewRequest | ContextLayerTarget,
+  maybeDraftsOrPanopticonHome?: readonly ContextLayerDraft[] | string,
+  maybePanopticonHome = getPanopticonHome(),
 ): Promise<ContextPreviewResponse> {
-  const { selectedLayer, drafts } = normalizePreviewArgs(requestOrTarget, draftArg);
-  const catalog = await buildContextCatalog(projects);
-  const draftByKey = new Map<string, string>();
-  for (const draft of drafts) {
-    const resolved = await resolveLayerFile(draft.target, projects, catalog);
-    const normalizedTarget = resolved.kind === 'workspace'
-      ? { kind: 'workspace' as const, projectKey: resolved.projectKey!, workspacePath: resolved.workspacePath! }
-      : resolved.kind === 'project'
-        ? { kind: 'project' as const, projectKey: resolved.projectKey! }
-        : { kind: 'global' as const };
-    draftByKey.set(layerKey(normalizedTarget), draft.content);
-  }
-
-  const resolvedSelected = await resolveLayerFile(selectedLayer, projects, catalog);
-  const selectedTarget = resolvedSelected.kind === 'workspace'
-    ? { kind: 'workspace' as const, projectKey: resolvedSelected.projectKey!, workspacePath: resolvedSelected.workspacePath! }
-    : resolvedSelected.kind === 'project'
-      ? { kind: 'project' as const, projectKey: resolvedSelected.projectKey! }
-      : { kind: 'global' as const };
-
-  const targets: Array<{ title: string; target: ContextLayerTarget }> = [{ title: 'Global context layer', target: { kind: 'global' } }];
-  if (selectedTarget.kind === 'project') {
-    targets.push({ title: `Project context layer (${selectedTarget.projectKey})`, target: selectedTarget });
-  } else if (selectedTarget.kind === 'workspace') {
-    targets.push({ title: `Project context layer (${selectedTarget.projectKey})`, target: { kind: 'project', projectKey: selectedTarget.projectKey } });
-    targets.push({ title: `Workspace context layer (${selectedTarget.workspacePath})`, target: selectedTarget });
-  }
-
-  const layerContents = await Promise.all(
-    targets.map(async ({ title, target }) => ({ title, ...(await resolveLayerContent(target, projects, catalog, draftByKey)) })),
-  );
-
-  const diagnostics: ContextPreviewDiagnostic[] = [];
-  for (const layer of layerContents) {
-    const validation = validateTemplate(layer.content);
-    diagnostics.push(...validation.issues.map((issue) => ({
-      level: issue.severity,
-      message: issue.message,
-      layer: layer.target,
-    })));
-  }
-
+  const request = 'operation' in requestOrSelectedLayer
+    ? requestOrSelectedLayer
+    : {
+        operation: 'preview' as const,
+        selectedLayer: requestOrSelectedLayer,
+        drafts: Array.isArray(maybeDraftsOrPanopticonHome) ? maybeDraftsOrPanopticonHome : [],
+      };
+  const panopticonHome = typeof maybeDraftsOrPanopticonHome === 'string'
+    ? maybeDraftsOrPanopticonHome
+    : maybePanopticonHome;
+  const state = await buildContextLayerState(projects, panopticonHome);
+  requireLayer(state, request.selectedLayer);
+  const drafts = draftContentByTarget(state, request.drafts);
+  const layers = applicableLayers(state, request.selectedLayer);
   const previews = {} as Record<Harness, string>;
   for (const harness of PREVIEW_HARNESSES) {
-    previews[harness] = formatRenderedLayers(
-      harness,
-      layerContents.map((layer) => ({ title: layer.title, content: layer.content })),
-      await renderBundledRulesAsync(harness),
-    );
+    previews[harness] = await previewForHarness(layers, drafts, harness);
   }
-
   return {
     operation: 'preview',
     previews: {
       'claude-code': previews['claude-code'],
       pi: previews.pi,
-      fullPrompt: formatFullPrompt(previews),
+      fullPrompt: fullPromptPreview(previews),
     },
-    diagnostics,
+    diagnostics: diagnosticsForLayers(layers, drafts),
   };
-}
-
-function normalizeSaveArgs(
-  requestOrTarget: ContextLayerSaveRequest | ContextLayerTarget,
-  content?: string,
-): { target: ContextLayerTarget; content: string } {
-  if ('operation' in requestOrTarget) {
-    return { target: requestOrTarget.target, content: requestOrTarget.content };
-  }
-  if (typeof content !== 'string') throw new Error('content must be a string');
-  return { target: requestOrTarget, content };
 }
 
 export async function saveContextLayer(
   projects: ProjectEntry[],
   request: ContextLayerSaveRequest,
+  panopticonHome?: string,
 ): Promise<ContextLayerSaveResponse>;
 export async function saveContextLayer(
   projects: ProjectEntry[],
   target: ContextLayerTarget,
   content: string,
+  panopticonHome?: string,
 ): Promise<ContextLayerSaveResponse>;
 export async function saveContextLayer(
   projects: ProjectEntry[],
   requestOrTarget: ContextLayerSaveRequest | ContextLayerTarget,
-  contentArg?: string,
+  maybeContentOrPanopticonHome?: string,
+  maybePanopticonHome = getPanopticonHome(),
 ): Promise<ContextLayerSaveResponse> {
-  const { target, content } = normalizeSaveArgs(requestOrTarget, contentArg);
-  const resolved = await resolveLayerFile(target, projects);
-  await mkdir(dirname(resolved.file), { recursive: true });
-  await writeFile(resolved.file, content, 'utf-8');
+  const request = 'operation' in requestOrTarget
+    ? requestOrTarget
+    : {
+        operation: 'save' as const,
+        target: requestOrTarget,
+        content: maybeContentOrPanopticonHome ?? '',
+      };
+  const panopticonHome = 'operation' in requestOrTarget
+    ? maybeContentOrPanopticonHome ?? maybePanopticonHome
+    : maybePanopticonHome;
+  const state = await buildContextLayerState(projects, panopticonHome);
+  const layer = requireLayer(state, request.target);
+  if (!pathWithin(layer.dir, layer.file)) {
+    throw new Error(`Context layer path escapes its directory: ${layer.file}`);
+  }
+  await mkdir(layer.dir, { recursive: true });
+  await writeFile(layer.file, request.content, 'utf-8');
+  const savedLayer = await layerRecord(
+    layer.file,
+    targetForLayer(layer) as Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
+  );
+  const { dir: _dir, ...responseLayer } = savedLayer;
   return {
     operation: 'save',
-    layer: await layerRecord(resolved.kind, resolved.file, {
-      projectKey: resolved.projectKey,
-      workspacePath: resolved.workspacePath,
-    }),
+    layer: responseLayer,
     savedAt: new Date().toISOString(),
   };
 }
@@ -502,33 +504,40 @@ export async function syncContextLayers(
       syncedAt,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'pan context sync failed';
     return {
       operation: 'sync',
       success: false,
       ok: false,
       status: 'failed',
       stdout: syncOutput(error, 'stdout'),
-      stderr: syncOutput(error, 'stderr') || message,
-      error: message,
-      ...(syncExitCode(error) !== undefined ? { exitCode: syncExitCode(error)! } : {}),
+      stderr: syncOutput(error, 'stderr'),
+      error: error instanceof Error ? error.message : 'pan context sync failed',
+      exitCode: syncExitCode(error),
       syncedAt,
     };
   }
 }
 
-function readJsonBody(request: HttpServerRequest.HttpServerRequest): Effect.Effect<Record<string, unknown>> {
+function readJsonBody() {
   return Effect.gen(function* () {
-    return parseJsonBody(yield* request.text);
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const text = yield* request.text;
+    return text ? JSON.parse(text) as unknown : {};
   });
+}
+
+function loadProjectsForRoute() {
+  return listProjects().pipe(
+    Effect.mapError((error) => new Error(error instanceof Error ? error.message : String(error))),
+  );
 }
 
 const getContextLayersRoute = HttpRouter.add(
   'GET',
   '/api/context/layers',
   httpHandler(Effect.gen(function* () {
-    const projects = yield* listProjects();
-    return jsonResponse(yield* Effect.promise(() => buildContextLayersResponse(projects)));
+    const projects = yield* loadProjectsForRoute();
+    return jsonResponse(yield* Effect.promise(() => loadContextLayers(projects)));
   })),
 );
 
@@ -536,17 +545,13 @@ const postContextPreviewRoute = HttpRouter.add(
   'POST',
   '/api/context/preview',
   httpHandler(Effect.gen(function* () {
-    try {
-      const projects = yield* listProjects();
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const body = yield* readJsonBody(request);
-      const selectedLayer = parseTarget(body['selectedLayer']);
-      const drafts = parseDrafts(body['drafts']);
-      return jsonResponse(yield* Effect.promise(() => previewContextLayers(projects, selectedLayer, drafts)));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return jsonResponse({ error: message }, { status: 400 });
-    }
+    const body = yield* readJsonBody();
+    const parsed = yield* Effect.try({
+      try: () => decodePreviewRequest(body),
+      catch: (error) => new Error(error instanceof Error ? error.message : String(error)),
+    });
+    const projects = yield* loadProjectsForRoute();
+    return jsonResponse(yield* Effect.promise(() => previewContextLayers(projects, parsed)));
   })),
 );
 
@@ -554,18 +559,13 @@ const putContextLayerRoute = HttpRouter.add(
   'PUT',
   '/api/context/layers',
   httpHandler(Effect.gen(function* () {
-    try {
-      const projects = yield* listProjects();
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const body = yield* readJsonBody(request);
-      const target = parseTarget(body['target']);
-      const content = body['content'];
-      if (typeof content !== 'string') throw new Error('content must be a string');
-      return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, target, content)));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return jsonResponse({ error: message }, { status: 400 });
-    }
+    const body = yield* readJsonBody();
+    const parsed = yield* Effect.try({
+      try: () => decodeSaveRequest(body),
+      catch: (error) => new Error(error instanceof Error ? error.message : String(error)),
+    });
+    const projects = yield* loadProjectsForRoute();
+    return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, parsed)));
   })),
 );
 
@@ -574,7 +574,7 @@ const postContextSyncRoute = HttpRouter.add(
   '/api/context/sync',
   httpHandler(Effect.gen(function* () {
     const response = yield* Effect.promise(() => syncContextLayers());
-    return jsonResponse(response, { status: response.success ? 200 : 500 });
+    return jsonResponse(response, { status: response.ok ? 200 : 500 });
   })),
 );
 
@@ -584,5 +584,3 @@ export const contextRouteLayer = Layer.mergeAll(
   putContextLayerRoute,
   postContextSyncRoute,
 );
-
-export default contextRouteLayer;

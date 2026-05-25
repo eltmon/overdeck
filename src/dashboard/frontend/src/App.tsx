@@ -21,6 +21,7 @@ import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
+import { ContextPage } from './components/context/ContextPage';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
@@ -75,6 +76,7 @@ const TAB_PATHS: Record<Tab, string> = {
   metrics: '/metrics',
   costs: '/costs',
   skills: '/skills',
+  context: '/context',
   health: '/health',
   settings: '/settings',
   'god-view': '/god-view',
@@ -948,6 +950,11 @@ export default function App() {
         {activeTab === 'skills' && (
           <div className="p-6 w-full overflow-auto">
             <SkillsList />
+          </div>
+        )}
+        {activeTab === 'context' && (
+          <div className="w-full h-full overflow-hidden">
+            <ContextPage />
           </div>
         )}
         {activeTab === 'health' && (
