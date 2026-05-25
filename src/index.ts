@@ -7,3 +7,5 @@ export * from './lib/sync.js';
 export * from './lib/tracker/index.js';
 export * from './lib/providers.js';
 export * from './lib/settings.js';
+export * from './lib/docs/corpus.js';
+export * from './lib/docs/index-builder.js';

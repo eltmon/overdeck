@@ -67,9 +67,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
-    "build": "npm run build:contracts && npm run build:pi-extension && npm run build:cli && npm run build:scripts && npm run build:dashboard",
+    "build": "npm run build:contracts && npm run build:pi-extension && npm run build:cli && npm run build:docs-index && npm run build:scripts && npm run build:dashboard",
     "build:pi-extension": "npm --prefix ./packages/pi-extension run build",
     "build:cli": "node scripts/build-cli.mjs",
+    "build:docs-index": "node scripts/build-docs-index.mjs",
     "build:contracts": "node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build",
     "build:scripts": "cd sync-sources/hooks && tsdown",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
