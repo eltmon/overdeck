@@ -1,0 +1,170 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:24:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1256: Swarm: deacon orphan recovery races work-agent spawn; no startup grace window for status:starting",
+    "updated": "2026-05-25T16:25:30.713Z"
+  },
+  "plan": {
+    "id": "pan-1256",
+    "title": "Swarm: deacon orphan recovery races work-agent spawn; no startup grace window for status:starting",
+    "status": "proposed",
+    "uid": "39cac9cc-27d3-45d0-85e4-3c376d3a7023",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:24:00.000Z",
+    "updated": "2026-05-25T16:25:30.713Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1256",
+        "label": "PAN-1256",
+        "type": "issue"
+      },
+      {
+        "uri": "src/lib/cloister/deacon.ts#L5073-L5088",
+        "label": "WORK_LAUNCHER_GRACE_MS implementation (already shipped)",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+        "label": "Canonical deacon-test mocking pattern",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "tests",
+      "regression",
+      "swarm",
+      "spawn-race"
+    ],
+    "narratives": {
+      "Problem": "PAN-1256 was reopened on 2026-05-24 because the shipped fix (120s WORK_LAUNCHER_GRACE_MS gate in recoverOrphanedAgentsOnce) lacks the unit-test coverage called out in the original acceptance criteria. Without tests there is no guard against regression — a future refactor of the orphan-recovery loop could silently re-introduce the wave-0 race that aborts swarm dispatches.",
+      "Proposal": "Add a single new test file `src/lib/cloister/__tests__/deacon-orphan-grace.test.ts` that exercises `recoverOrphanedAgents` against four mocked agent-state scenarios: (1) starting + recent startedAt → not stopped, (2) starting + expired startedAt → stopped, (3) running + no tmux → still stopped (regression for non-starting agents), (4) reviewSubRole + recent startedAt + no launcher pid → not stopped (reviewer 90s grace preserved). The test file uses fake timers to control Date.now() arithmetic and mirrors the mock scaffolding from pan-871-auto-resume.test.ts. The PAN-1122 swarm-smoke acceptance criterion is satisfied by test (1), which deterministically recreates the original failing scenario (29s into spawn). NO production code changes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "All four tests land in one new file rather than splitting across files or extending an existing file.",
+        "rationale": "The tests share mock scaffolding (~80 lines of vi.mock setup), exercise one focused function, and are mechanically identical to author. Splitting would duplicate the scaffolding without aiding reviewability."
+      },
+      {
+        "summary": "The PAN-1122 swarm smoke-test AC is satisfied by a deterministic unit test that recreates the t=29s race, rather than by an end-to-end swarm run.",
+        "rationale": "Running an actual swarm against a benchmark issue is non-deterministic, depends on harness availability, and would not catch a regression any more reliably than a focused unit test that reproduces the exact failure timing. The unit test pinpoints the race condition the smoke test was meant to detect."
+      },
+      {
+        "summary": "Use literal time offsets (30_000 inside grace, 200_000 outside) rather than importing the constant.",
+        "rationale": "WORK_LAUNCHER_GRACE_MS is a function-local const that cannot be imported without refactoring. Literal offsets that are clearly inside and clearly outside the 120s window keep tests robust to future tuning of the constant."
+      },
+      {
+        "summary": "No production code changes in this issue.",
+        "rationale": "The fix is already on main (deacon.ts:5073-5088). The reopener explicitly scoped remaining work to tests/smoke evidence and 'keep reviewer grace behavior unchanged'. Touching the production code would risk re-opening a settled fix."
+      }
+    ],
+    "items": [
+      {
+        "id": "deacon-orphan-grace-tests",
+        "title": "Add unit tests for WORK_LAUNCHER_GRACE_MS grace window in recoverOrphanedAgents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:24:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/lib/cloister/__tests__/deacon-orphan-grace.test.ts` covering the WORK_LAUNCHER_GRACE_MS startup grace window in `recoverOrphanedAgents`. Mirror the mock scaffolding from `pan-871-auto-resume.test.ts` (fs mock, agents.js Effect mocks, tmux.js sessionExistsSync mock returning false, paths.js mock pointing AGENTS_DIR at a fake path). Use `vi.useFakeTimers()` + `vi.setSystemTime()` to control `Date.now()` against each agent's `startedAt`. Write four test cases — three from the issue ACs plus one reviewer-pattern regression. Run `npm test -- deacon-orphan-grace` and ensure all four pass. Then run the full test suite (`npm test`) to confirm no regressions. NO production code changes. Verify by reading `src/lib/cloister/deacon.ts:5073-5088` that the WORK_LAUNCHER_GRACE_MS branch is untouched after your work."
+        },
+        "subItems": [
+          {
+            "id": "deacon-orphan-grace-tests.ac1",
+            "title": "New test file exists at `src/lib/cloister/__tests__/deacon-orphan-grace.test.ts` and uses `vi.useFakeTimers()` in beforeEach / `vi.useRealTimers()` in afterEach",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac2",
+            "title": "Test: a work agent in `status: 'starting'` with `startedAt` 30s in the past (inside the 120s grace) is NOT marked stopped — assert `recoverOrphanedAgents()` returns `[]` AND `saveAgentState` is never called with `status: 'stopped'` for that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac3",
+            "title": "Test: a work agent in `status: 'starting'` with `startedAt` 200s in the past (outside the 120s grace) IS marked stopped — assert returned actions array contains the agent dir AND `saveAgentState` is called with `status: 'stopped'`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac4",
+            "title": "Test: a work agent in `status: 'running'` with no tmux session IS still marked stopped (no regression for the existing confirmed-dead path — `sessionExistsSync` returns false, no grace branch entered because status is 'running' not 'starting')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac5",
+            "title": "Test: a reviewSubRole agent in `status: 'starting'` with `startedAt` 30s in the past and NO `reviewer-launcher.pid` file is NOT marked stopped (preserves the existing 90s REVIEWER_LAUNCHER_GRACE_MS branch — `existsSync` returns false for the pid file, falls into grace check, grace holds)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac6",
+            "title": "PAN-1122 swarm-race regression: a swarm slot in `status: 'starting'` with `startedAt` 29s in the past (the exact failure timing from the original 2026-05-21 reproduction) is NOT marked stopped. This is the deterministic stand-in for the PAN-1122 swarm smoke evidence — it reproduces the original failing scenario and proves the fix holds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac7",
+            "title": "All four+ new tests pass under `npm test -- deacon-orphan-grace`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac8",
+            "title": "Full test suite passes: `npm test` shows no new failures introduced by the new file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac9",
+            "title": "Quality gates pass: `npm run typecheck` and `npm run lint` are clean",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-orphan-grace-tests.ac10",
+            "title": "Production code at `src/lib/cloister/deacon.ts:5073-5088` (the WORK_LAUNCHER_GRACE_MS branch) is unchanged by this issue — verify with `git diff main -- src/lib/cloister/deacon.ts` showing no edits in that region",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1256-swarm-deacon-orphan-recovery-races-work-agent-spawn-no-startup-grace-window-for-status-starting.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
