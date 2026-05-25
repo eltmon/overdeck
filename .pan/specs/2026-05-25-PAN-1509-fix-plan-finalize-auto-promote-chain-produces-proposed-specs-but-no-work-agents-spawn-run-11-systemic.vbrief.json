@@ -441,7 +441,7 @@
       {
         "id": "doctor-check-orphans",
         "title": "feat(pan-doctor): detect orphan proposed specs and surface remediation",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -456,7 +456,7 @@
           {
             "id": "doctor-check-orphans.ac1",
             "title": "pan doctor includes a new 'orphan-proposed-specs' check that scans .pan/specs/ across all configured projects",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -464,7 +464,7 @@
           {
             "id": "doctor-check-orphans.ac2",
             "title": "Each orphan is classified by reason: beads-zero, beads-mismatch, no-agent-no-reason; each category has its own actionable hint",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -472,7 +472,7 @@
           {
             "id": "doctor-check-orphans.ac3",
             "title": "Check is informational (warn-level) and does not change pan doctor's exit code in the default invocation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -480,7 +480,7 @@
           {
             "id": "doctor-check-orphans.ac4",
             "title": "Output groups orphans by project so operators can target remediation per repo",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -488,7 +488,7 @@
           {
             "id": "doctor-check-orphans.ac5",
             "title": "Unit test exercises the classification logic with a tmp fixture containing one orphan of each type",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -496,7 +496,7 @@
           {
             "id": "doctor-check-orphans.ac6",
             "title": "Wrapper skill at skills/pan-doctor/SKILL.md mentions the new check (per the SKILLS-CONVENTION rule)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -504,7 +504,7 @@
           {
             "id": "doctor-check-orphans.ac7",
             "title": "npm run typecheck && npm run lint pass (including scripts/lint-skills.sh)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
