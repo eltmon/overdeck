@@ -1,20 +1,20 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-05-25T16:35:00.000Z",
+    "created": "2026-05-25T23:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1257: Health classifier: classifyAgentKind misclassifies review/test/ship specialists as 'work', breaking workAgentCount cap",
-    "updated": "2026-05-25T16:26:46.173Z"
+    "updated": "2026-05-25T23:37:18.578Z"
   },
   "plan": {
     "id": "pan-1257",
     "title": "Health classifier: classifyAgentKind misclassifies review/test/ship specialists as 'work', breaking workAgentCount cap",
     "status": "proposed",
-    "uid": "39f06931-b9c6-403d-b7de-2ee7c2a0663d",
+    "uid": "11e7296c-f954-410e-afa9-9d97f9660946",
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
-    "created": "2026-05-25T16:35:00.000Z",
-    "updated": "2026-05-25T16:26:46.173Z",
+    "created": "2026-05-25T23:45:00.000Z",
+    "updated": "2026-05-25T23:37:18.578Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1257",
@@ -23,54 +23,49 @@
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1249",
-        "label": "PAN-1249",
-        "type": "issue"
+        "label": "PAN-1249 (original implementation)",
+        "type": "related"
       }
     ],
     "tags": [
-      "bug",
-      "tests",
+      "test-coverage",
       "health",
       "swarm",
-      "regression-coverage"
+      "regression"
     ],
     "narratives": {
-      "Problem": "PAN-1257 was closed in PAN-1249 with the production fix to classifyAgentKind (taking an optional `role` argument so agent-prefixed specialists are no longer counted as 'work' agents). The issue was reopened on 2026-05-24 because the original acceptance criteria required unit tests covering review/ship/work/slot role values, proof that health.summary.workAgentCount excludes specialists, and a swarm-capacity regression test — none of which exist. Without that test coverage, a future refactor can silently regress the classifier and re-introduce the dispatch-blocking bug.",
-      "Proposal": "Test-only work: (1) export classifyAgentKind and add a focused unit test covering every Role value plus legacy prefixes and slot agent IDs; (2) add a summary-level integration test that drives getSystemHealthSnapshot with a mixed mock agent list and asserts workAgentCount, specialistSessionCount, and planningAgentCount; (3) extend src/dashboard/server/routes/__tests__/swarm.test.ts with a regression case proving dispatch is not blocked when only specialists are running for other issues."
+      "Problem": "PAN-1249 fixed the runtime behavior of classifyAgentKind by adding an optional `role` parameter and routing agent-prefixed IDs through role-based discrimination. The reviewer reopened PAN-1257 on 2026-05-24 because the original acceptance criteria required (a) unit tests for the classifier covering each role value, (b) proof that health.summary.workAgentCount excludes specialists, and (c) regression coverage proving swarm dispatch succeeds when only other-issue specialists are running. None of those tests were added with PAN-1249. The implementation at src/dashboard/server/services/system-health-service.ts:169-187 is correct; the test coverage gap is the only remaining work.",
+      "Proposal": "Two independently-mergeable beads. Bead 1 exports classifyAgentKind and adds a focused unit-test file covering every AC-cited agent ID (agent-pan-1228-review, agent-pan-1228-review-correctness, agent-pan-1228-ship, agent-pan-1190, agent-pan-1122-1), every role value (work, review, test, ship, undefined), and the legacy prefix branches (planning-*, specialist-*, *-agent). Bead 2 extends src/dashboard/server/routes/__tests__/swarm.test.ts with a regression test demonstrating the symptom is gone: with workAgentCount below cap (because specialists for other issues no longer inflate it), a swarm dispatch succeeds. Together these satisfy all eight AC checkboxes from the original issue."
     },
     "autoDecisions": [
       {
-        "summary": "Export classifyAgentKind directly from system-health-service.ts (matching the file's existing `export function readGlobalResourceConfig` / `export function getResourceConfig` style) rather than introducing a __testInternals barrel.",
-        "rationale": "Single helper, no need for a barrel; the existing file already exports several utility functions the same way. JSDoc note flags it as test-internal."
+        "summary": "Scope is test-only. Do not modify the classifier implementation.",
+        "rationale": "PAN-1249 already shipped the runtime fix per the issue history and the live code at system-health-service.ts:169-187. The reopen comment from 2026-05-24 names test coverage as the sole remaining work. Touching the implementation would risk re-introducing the original bug."
       },
       {
-        "summary": "Place classifier tests at src/dashboard/server/services/__tests__/system-health-classifier.test.ts.",
-        "rationale": "Matches the existing __tests__ layout next to other service tests (agent-output-service.test.ts, config.test.ts)."
+        "summary": "Export classifyAgentKind for direct unit testing.",
+        "rationale": "The alternative (driving the classifier via getSystemHealthSnapshot) requires mocking /proc reads, tmux pane queries, docker stats, and the process table. That scaffolding cost is unjustified for a pure 18-line function. A named export is a one-keyword change with no runtime impact."
       },
       {
-        "summary": "Use a parameterized it.each table for the classifier role matrix.",
-        "rationale": "Maps cleanly to the issue's enumerated acceptance criteria and stays readable as cases are added (review subroles, slot IDs, legacy prefixes)."
+        "summary": "Split into two beads (classifier unit + swarm regression).",
+        "rationale": "Each bead is independently reviewable and independently mergeable. Bead 1 proves the function is correct in isolation; bead 2 proves the symptom-level AC ('swarm dispatch succeeds when only specialists are running for other issues'). Folding them together would make the diff harder to review and lose the symmetry between the two layers."
       },
       {
-        "summary": "For the summary-level test, mock the I/O dependencies (listRunningAgents, getAgentRuntimeState, listPaneValues, readProcessTable, DockerStatsCollector) rather than spin up the full environment.",
-        "rationale": "collectAgentProcesses cannot be exercised against the real OS in a unit test; following the mock-the-edges pattern from agent-output-service.test.ts is the project standard."
+        "summary": "Use the parent Role value ('review'/'test'/'ship') in role= test args, not subRole suffixes.",
+        "rationale": "Role is defined in src/lib/agents.ts:58 as 'plan'|'work'|'review'|'test'|'ship'|'flywheel'|'strike'. Review convoys use a separate subRole field; the role field itself is always the parent. agent-pan-1228-review-correctness has role: 'review', not role: 'review-correctness'."
       },
       {
-        "summary": "Extend the existing src/dashboard/server/routes/__tests__/swarm.test.ts with the new regression case rather than create a new file.",
-        "rationale": "All required mocks (getSystemHealthSnapshot, getResourceConfig, vbrief, agents, tmux, projects, tracker-utils, child_process) are already wired up in that file; a separate file would duplicate ~200 lines of scaffolding."
-      },
-      {
-        "summary": "Do not modify production code in this issue. classifyAgentKind already implements the correct behavior and the caller already passes agent.role.",
-        "rationale": "The reopen comment is explicit that 'the implementation now passes agent.role into the classifier' — only tests are missing."
+        "summary": "Place the unit test at src/dashboard/server/services/__tests__/classify-agent-kind.test.ts (sibling of the existing __tests__ directory for system-health services).",
+        "rationale": "Matches the established colocation pattern (every other service test lives in this folder per `ls __tests__`). No new directories needed."
       }
     ],
     "items": [
       {
-        "id": "export-classifier-and-unit-tests",
-        "title": "Export classifyAgentKind and add direct unit tests for the role matrix",
+        "id": "classifier-unit-tests",
+        "title": "Export classifyAgentKind and add unit tests covering all role values and AC-cited agent IDs",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T16:35:00.000Z",
+        "created": "2026-05-25T23:45:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1257",
@@ -78,158 +73,92 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/services/system-health-service.ts, change `function classifyAgentKind` to `export function classifyAgentKind` and add a JSDoc comment marking it `@internal — exported for unit tests`. Create src/dashboard/server/services/__tests__/system-health-classifier.test.ts with a parameterized table covering every role value the function must handle.\n\nRequired test cases (use it.each):\n- ('agent-pan-1228-review', 'review') → 'specialist'\n- ('agent-pan-1228-review-correctness', 'review') → 'specialist'\n- ('agent-pan-1228-review-performance', 'review') → 'specialist'\n- ('agent-pan-1228-review-requirements', 'review') → 'specialist'\n- ('agent-pan-1228-review-security', 'review') → 'specialist'\n- ('agent-pan-1228-ship', 'ship') → 'specialist'\n- ('agent-pan-1190-test', 'test') → 'specialist'\n- ('agent-pan-1190', 'work') → 'work'\n- ('agent-pan-1122-1', 'work') → 'work'  // slot agent\n- ('agent-pan-1228', undefined) → 'work'  // legacy state file with no role field\n- ('planning-abc123', undefined) → 'planning'\n- ('specialist-foo', undefined) → 'specialist'\n- ('foo-agent', undefined) → 'specialist'  // *-agent fallback\n- ('random-thing', undefined) → 'other'\n\nFor each case, assert the return value with `expect(classifyAgentKind(id, role)).toBe(expectedKind)`. No mocking required — this is a pure function."
+          "Action": "1) In src/dashboard/server/services/system-health-service.ts, add the `export` keyword to the existing `function classifyAgentKind(...)` at line 169 (no other changes — preserve the function body, signature, and the PAN-1257 comment block). 2) Create src/dashboard/server/services/__tests__/classify-agent-kind.test.ts that imports the now-exported classifier and asserts every case below. The file should use describe/it from vitest, no mocks needed (the function is pure), and follow the file-style of the other __tests__ entries. Each acceptance criterion below must correspond to at least one explicit test assertion using the literal agent ID from the AC."
         },
         "subItems": [
           {
-            "id": "export-classifier-and-unit-tests.ac1",
-            "title": "classifyAgentKind is exported from src/dashboard/server/services/system-health-service.ts with a JSDoc `@internal` note",
+            "id": "classifier-unit-tests.ac1",
+            "title": "Test asserts classifyAgentKind('agent-pan-1228-review', 'review') === 'specialist'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac2",
-            "title": "system-health-classifier.test.ts exists at src/dashboard/server/services/__tests__/ and runs under the existing vitest configuration",
+            "id": "classifier-unit-tests.ac2",
+            "title": "Test asserts classifyAgentKind('agent-pan-1228-review-correctness', 'review') === 'specialist' (subRole-suffixed ID, parent role 'review')",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac3",
-            "title": "Test covers role values: 'work', 'review', 'review-correctness', 'review-performance', 'review-requirements', 'review-security', 'test', 'ship', and undefined",
+            "id": "classifier-unit-tests.ac3",
+            "title": "Test asserts classifyAgentKind('agent-pan-1228-ship', 'ship') === 'specialist'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac4",
-            "title": "`agent-pan-1228-review` with role='review' classifies as 'specialist'",
+            "id": "classifier-unit-tests.ac4",
+            "title": "Test asserts classifyAgentKind('agent-pan-1190-test', 'test') === 'specialist'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac5",
-            "title": "`agent-pan-1228-ship` with role='ship' classifies as 'specialist'",
+            "id": "classifier-unit-tests.ac5",
+            "title": "Test asserts classifyAgentKind('agent-pan-1190', 'work') === 'work'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac6",
-            "title": "`agent-pan-1190` with role='work' classifies as 'work'",
+            "id": "classifier-unit-tests.ac6",
+            "title": "Test asserts classifyAgentKind('agent-pan-1122-1', 'work') === 'work' (slot agent under modern naming)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac7",
-            "title": "`agent-pan-1122-1` (slot agent) with role='work' classifies as 'work'",
+            "id": "classifier-unit-tests.ac7",
+            "title": "Test asserts classifyAgentKind('agent-pan-1257', undefined) === 'work' (legacy state file with no role field still treated as work)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac8",
-            "title": "`agent-pan-1228` with role=undefined (legacy state file) classifies as 'work'",
+            "id": "classifier-unit-tests.ac8",
+            "title": "Test asserts legacy prefixes still classify correctly: 'planning-pan-1' -> 'planning', 'specialist-foo' -> 'specialist', 'merge-agent' -> 'specialist', 'unknown-id' -> 'other'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac9",
-            "title": "Legacy prefixes `planning-*` → 'planning', `specialist-*` → 'specialist', `*-agent` suffix → 'specialist', unrecognized IDs → 'other'",
+            "id": "classifier-unit-tests.ac9",
+            "title": "Test verifies summary count math from a mixed fixture: given 1 work + 5 review-variant + 1 ship + 1 test agents, agents.filter(a => a.kind === 'work').length === 1 and agents.filter(a => a.kind === 'specialist').length === 7",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "export-classifier-and-unit-tests.ac10",
-            "title": "npm run typecheck, npm run lint, and npm test pass for the new file",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "summary-counts-integration-test",
-        "title": "Add summary-level test proving workAgentCount excludes specialists in getSystemHealthSnapshot",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-05-25T16:35:00.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1257",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Add src/dashboard/server/services/__tests__/system-health-summary-counts.test.ts that drives getSystemHealthSnapshot end-to-end with mocked I/O and asserts the snapshot's summary counts.\n\nMock surface (follow the pattern in src/dashboard/server/services/__tests__/agent-output-service.test.ts):\n- vi.mock('../../../../lib/agents.js', ...) with listRunningAgents returning Effect.succeed(mixedAgents)\n- Mock getAgentRuntimeState to return Effect.succeed(null) for all agents\n- Mock listPaneValues to return Effect.succeed(['0']) so panePid resolves to 0 and descendant lookup short-circuits\n- Mock readProcessTable (the helper used by collectAgentProcesses) to return an empty Map\n- Mock DockerStatsCollector or stub the docker stats path to return zero containers\n\nMixed agent fixture (each with `status: 'running'` so the filter at line 495 keeps them):\n- { id: 'agent-pan-1190', role: 'work', issueId: 'PAN-1190', tmuxActive: true, ... }\n- { id: 'agent-pan-1122-1', role: 'work', issueId: 'PAN-1122', tmuxActive: true, ... }  // slot\n- { id: 'agent-pan-1228-review', role: 'review', issueId: 'PAN-1228', tmuxActive: true, ... }\n- { id: 'agent-pan-1228-review-correctness', role: 'review', issueId: 'PAN-1228', tmuxActive: true, ... }\n- { id: 'agent-pan-1228-ship', role: 'ship', issueId: 'PAN-1228', tmuxActive: true, ... }\n- { id: 'agent-pan-1190-test', role: 'test', issueId: 'PAN-1190', tmuxActive: true, ... }\n- { id: 'planning-abc', role: 'plan' as any, issueId: 'PAN-9999', tmuxActive: true, ... }  // legacy prefix\n\nAssertions:\n- snapshot.summary.workAgentCount === 2 (the two work agents only)\n- snapshot.summary.specialistSessionCount === 4 (two reviews, one ship, one test)\n- snapshot.summary.planningAgentCount === 1 (the legacy planning-* agent)\n- snapshot.summary.agentCount === 7\n\nReset module state between tests with vi.resetModules() + dynamic import, or call any test-only reset helper if one is added. If module-level memoization (cachedHealth, previousSeverity) interferes, document and address it (see Hazard H2)."
-        },
-        "subItems": [
-          {
-            "id": "summary-counts-integration-test.ac1",
-            "title": "New test file exists at src/dashboard/server/services/__tests__/system-health-summary-counts.test.ts",
+            "id": "classifier-unit-tests.ac10",
+            "title": "classifyAgentKind is exported as a named export from src/dashboard/server/services/system-health-service.ts (verifiable via the import in the new test file)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "summary-counts-integration-test.ac2",
-            "title": "Test drives getSystemHealthSnapshot() (not just the private classifier) so it exercises the full collectAgentProcesses → summary derivation path",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "summary-counts-integration-test.ac3",
-            "title": "With a mocked listRunningAgents returning a mix of role='work' (including a slot agent), role='review', role='ship', role='test', plus a legacy `planning-*` ID, the snapshot's summary.workAgentCount equals exactly the number of role='work' agents",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "summary-counts-integration-test.ac4",
-            "title": "Under the same fixture, summary.specialistSessionCount equals the number of review/ship/test agents (i.e. > 0 — confirming the inverse of the original PAN-1257 bug where specialistSessionCount was always 0)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "summary-counts-integration-test.ac5",
-            "title": "summary.planningAgentCount counts only legacy `planning-*`-prefixed agents",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "summary-counts-integration-test.ac6",
-            "title": "Module-level memoization (cachedHealth, previousSeverity, candidateSeverity) does not cause cross-test bleed — test passes both alone and in the full suite",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "summary-counts-integration-test.ac7",
-            "title": "npm run typecheck, npm run lint, and npm test pass for the new file",
+            "id": "classifier-unit-tests.ac11",
+            "title": "The new test file passes under `npm test` and adds zero new failures to the suite",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -239,10 +168,10 @@
       },
       {
         "id": "swarm-capacity-regression-test",
-        "title": "Add swarm dispatch regression: dispatch succeeds when specialists run for other issues",
+        "title": "Add swarm-dispatch regression test demonstrating capacity gate respects classifier fix",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-25T16:35:00.000Z",
+        "created": "2026-05-25T23:45:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1257",
@@ -250,12 +179,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Extend src/dashboard/server/routes/__tests__/swarm.test.ts with a new `it(...)` case proving that a swarm dispatch is NOT rejected with 429 'No agent capacity available' when only specialists are running for other issues.\n\nThe existing test file already mocks getSystemHealthSnapshot and getResourceConfig (see lines 24-27 and 196-201). Add a new case that:\n- Sets getResourceConfig to return { agentBlockCount: 4 } (the existing default in this file)\n- Sets getSystemHealthSnapshot to return summary.workAgentCount = 1 (i.e. 1 active work agent, leaving 3 slots free — modelling the PAN-1257 repro state where 7 specialists were running and the original bug reported 8/10 work agents)\n- Calls the swarm dispatch handler and asserts the response status is NOT 429 and the body does not include 'No agent capacity available'\n\nThe assertion deliberately does NOT depend on swarm fully succeeding — only that the workAgentCount-based capacity check at swarm.ts:988-999 lets the request through. If the call would have to traverse much more swarm code than is mocked, prefer an assertion on the dispatch outcome that proves the early-return at the capacity gate did not fire (for instance, that mocks downstream of the capacity gate were called, or that the response is one of the later success/validation responses).\n\nDocument the test with a comment referencing PAN-1257 and the original repro line: 'Failed: No agent capacity available (10/10 agents running)' with 7 of those being specialists."
+          "Action": "Add a new `it(...)` block to src/dashboard/server/routes/__tests__/swarm.test.ts (alongside the existing `honors PAN_AGENT_BLOCK_COUNT=0 as an explicit hard stop` test at line 1772) that exercises the PAN-1257 symptom scenario: hardLimit=10, workAgentCount=1 (because the 7 specialists running for other issues correctly classify as 'specialist' and don't inflate workAgentCount). Use vi.mocked(systemHealthService.getSystemHealthSnapshot).mockResolvedValueOnce({ summary: { workAgentCount: 1 } } as any) to override the global beforeEach stub. Assert that dispatchSwarmWave returns status 200 (or whatever the existing non-blocked path returns) and NOT 429 with 'No agent capacity available'. Comment the test header with 'Regression: PAN-1257 — specialists for other issues must not consume work-agent capacity slots.'"
         },
         "subItems": [
           {
             "id": "swarm-capacity-regression-test.ac1",
-            "title": "New `it(...)` case exists in src/dashboard/server/routes/__tests__/swarm.test.ts referencing PAN-1257 in the test name or a comment",
+            "title": "Test in swarm.test.ts asserts swarm dispatch returns status !== 429 when workAgentCount=1 and hardLimit=10",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -263,7 +192,7 @@
           },
           {
             "id": "swarm-capacity-regression-test.ac2",
-            "title": "Test mocks getSystemHealthSnapshot to return a summary with workAgentCount strictly less than agentBlockCount (e.g. workAgentCount=1, agentBlockCount=4)",
+            "title": "Test body includes a comment referencing PAN-1257 so future grep-able regression context is preserved",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -271,7 +200,7 @@
           },
           {
             "id": "swarm-capacity-regression-test.ac3",
-            "title": "Test asserts the swarm dispatch handler does NOT return HTTP 429 with 'No agent capacity available'",
+            "title": "Test does not regress the existing 'honors PAN_AGENT_BLOCK_COUNT=0' test — both still pass under `npm test -- swarm.test.ts`",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -279,15 +208,7 @@
           },
           {
             "id": "swarm-capacity-regression-test.ac4",
-            "title": "Test passes consistently (no flakes) under npm test",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-capacity-regression-test.ac5",
-            "title": "npm run typecheck, npm run lint, and npm test pass for the modified file",
+            "title": "Test cleans up any env var or mock-resolved-value-once side effects (no global state leakage into sibling tests)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -298,12 +219,7 @@
     ],
     "edges": [
       {
-        "from": "export-classifier-and-unit-tests",
-        "to": "summary-counts-integration-test",
-        "type": "informs"
-      },
-      {
-        "from": "export-classifier-and-unit-tests",
+        "from": "classifier-unit-tests",
         "to": "swarm-capacity-regression-test",
         "type": "informs"
       }
