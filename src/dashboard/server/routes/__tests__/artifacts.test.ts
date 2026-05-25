@@ -3,6 +3,7 @@ import type { ArtifactIndexEntry } from '../../../../lib/artifacts/index-store.j
 import {
   getArtifactDetailPayload,
   getArtifactThumbnailPayload,
+  getRawArtifactPayload,
   getWorkspaceArtifactsPayload,
   postArtifactUnsharePayload,
 } from '../artifacts.js';
@@ -98,6 +99,58 @@ describe('artifact route payloads', () => {
 
   it('rejects invalid workspace artifact selectors', async () => {
     await expect(getWorkspaceArtifactsPayload('../PAN-1205')).resolves.toMatchObject({ status: 400 });
+  });
+
+  it('serves raw artifact HTML only from the artifact host with sandbox headers', async () => {
+    const result = await getRawArtifactPayload('AbCd123_', { host: 'artifacts.pan.test' }, {
+      baseDomain: 'pan.test',
+      getBySlug: async () => artifactEntry(),
+      readSnapshot: async () => '<html><body>artifact</body></html>',
+    });
+
+    expect(result).toMatchObject({
+      kind: 'html',
+      status: 200,
+      body: '<html><body>artifact</body></html>',
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+    const csp = result.kind === 'html' ? result.headers['Content-Security-Policy'] : '';
+    expect(csp).toContain("default-src 'self' 'unsafe-inline' data: https:");
+    expect(csp).toContain("connect-src 'none'");
+  });
+
+  it('rejects raw artifact requests from the dashboard host', async () => {
+    await expect(getRawArtifactPayload('AbCd123_', { host: 'pan.test' }, { baseDomain: 'pan.test' })).resolves.toMatchObject({
+      kind: 'json',
+      status: 404,
+    });
+  });
+
+  it('maps invalid, missing, unshared, and missing-snapshot raw artifact requests to statuses', async () => {
+    const artifactHost = { host: 'artifacts.pan.test' };
+    await expect(getRawArtifactPayload('bad', artifactHost, { baseDomain: 'pan.test' })).resolves.toMatchObject({ kind: 'json', status: 400 });
+    await expect(getRawArtifactPayload('AbCd123_', artifactHost, {
+      baseDomain: 'pan.test',
+      getBySlug: async () => null,
+    })).resolves.toMatchObject({ kind: 'json', status: 404 });
+    await expect(getRawArtifactPayload('AbCd123_', artifactHost, {
+      baseDomain: 'pan.test',
+      getBySlug: async () => artifactEntry({}, 'unshared'),
+    })).resolves.toMatchObject({ kind: 'json', status: 410 });
+    await expect(getRawArtifactPayload('AbCd123_', artifactHost, {
+      baseDomain: 'pan.test',
+      getBySlug: async () => artifactEntry({ lastPublishedHash: null }),
+    })).resolves.toMatchObject({ kind: 'json', status: 404 });
+    await expect(getRawArtifactPayload('AbCd123_', artifactHost, {
+      baseDomain: 'pan.test',
+      getBySlug: async () => artifactEntry(),
+      readSnapshot: async () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      },
+    })).resolves.toMatchObject({ kind: 'json', status: 404 });
   });
 
   it('returns a thumbnail placeholder for artifacts without a published hash', async () => {
