@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:35:49.235Z",
+    "updated": "2026-05-25T21:42:28.231Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8d4f1509-1509-4a2b-8c3d-f9e0f1a2b3c4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 41,
+    "sequence": 43,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:35:49.235Z",
+    "updated": "2026-05-25T21:42:28.231Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -700,55 +700,55 @@
         "phase": "review",
         "issueId": "PAN-1509",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T21:35:49.232Z",
+        "updatedAt": "2026-05-25T21:42:28.231Z",
         "work": {
-          "updatedAt": "2026-05-25T21:35:49.232Z",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T21:35:49.232Z",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T21:35:49.232Z"
+              "at": "2026-05-25T21:42:28.231Z"
             }
           ]
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-05-25T21:35:49.232Z",
-          "notes": "Agent re-review request (1/25): Fixed verification failure",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
+          "notes": "Agent re-review request (2/25): Fixed verification failure",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-05-25T21:35:49.232Z",
-              "notes": "Agent re-review request (1/25): Fixed verification failure"
+              "at": "2026-05-25T21:42:28.231Z",
+              "notes": "Agent re-review request (2/25): Fixed verification failure"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T21:35:49.232Z",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T21:35:49.232Z"
+              "at": "2026-05-25T21:42:28.231Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T21:35:49.232Z",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T21:35:49.232Z",
+          "updatedAt": "2026-05-25T21:42:28.231Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T21:35:49.232Z"
+              "at": "2026-05-25T21:42:28.231Z"
             }
           ],
           "readyForMerge": false,
