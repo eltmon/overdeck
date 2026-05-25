@@ -57,6 +57,12 @@ function realElapsedMs(started: number): number {
   return vi.getRealSystemTime() - started;
 }
 
+async function advanceFakeTimersQuickly(ms: number): Promise<void> {
+  const started = vi.getRealSystemTime();
+  await vi.advanceTimersByTimeAsync(ms);
+  expect(realElapsedMs(started)).toBeLessThan(100);
+}
+
 describe('auto-merge schedule/cancel/executor integration', () => {
   const originalHome = process.env.PANOPTICON_HOME;
   let testHome: string;
@@ -82,11 +88,10 @@ describe('auto-merge schedule/cancel/executor integration', () => {
   });
 
   it('cancels during cooldown and never invokes merge after expiry', async () => {
-    const started = vi.getRealSystemTime();
     const mergeIssue = vi.fn();
 
     await scheduleAutoMerge();
-    await vi.advanceTimersByTimeAsync(4 * 60_000);
+    await advanceFakeTimersQuickly(4 * 60_000);
 
     expect(deleteAutoMergePayload('PAN-1486', { now: () => new Date(Date.now()), announce: vi.fn() })).toMatchObject({
       status: 200,
@@ -94,36 +99,32 @@ describe('auto-merge schedule/cancel/executor integration', () => {
     });
     expect(getPendingAutoMergePayload()).toEqual([]);
 
-    await vi.advanceTimersByTimeAsync(60_000);
+    await advanceFakeTimersQuickly(60_000);
     await tickWith({ mergeIssue });
 
     expect(mergeIssue).not.toHaveBeenCalled();
     expect(listPendingAutoMerges()).toHaveLength(1);
     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1486', status: 'cancelled' });
-    expect(realElapsedMs(started)).toBeLessThan(100);
   });
 
   it('fires one merge after the cooldown expires and records merged state', async () => {
-    const started = vi.getRealSystemTime();
     const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged' });
 
     await scheduleAutoMerge();
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await advanceFakeTimersQuickly(5 * 60_000);
     await tickWith({ isEligible: async () => ({ eligible: true }), mergeIssue });
 
     expect(mergeIssue).toHaveBeenCalledTimes(1);
     expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
     expect(listPendingAutoMerges()).toHaveLength(1);
     expect(listPendingAutoMerges()[0]).toMatchObject({ issueId: 'PAN-1486', status: 'merged' });
-    expect(realElapsedMs(started)).toBeLessThan(100);
   });
 
   it('blocks instead of merging when eligibility flips red during cooldown', async () => {
-    const started = vi.getRealSystemTime();
     const mergeIssue = vi.fn();
 
     await scheduleAutoMerge();
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await advanceFakeTimersQuickly(5 * 60_000);
     await tickWith({
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
       mergeIssue,
@@ -136,6 +137,5 @@ describe('auto-merge schedule/cancel/executor integration', () => {
       status: 'blocked',
       failureReason: 'CI checks failing on PR HEAD deadbeef',
     });
-    expect(realElapsedMs(started)).toBeLessThan(100);
   });
 });
