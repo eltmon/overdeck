@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, XCircle, ScrollText, Pause } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, XCircle, ScrollText, Pause, Plus } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -42,6 +42,7 @@ import { IssueActionMenu, useIssueActions } from './IssueActionMenu';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
+import { NewIssueDialog, type NewIssueTargetStatus } from './NewIssueDialog';
 
 
 // Difficulty badge colors
@@ -1107,6 +1108,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
+  const selectedProjectDefaultKey = useMemo(() => {
+    if (selectedProjects.size !== 1) return undefined;
+    const selected = Array.from(selectedProjects)[0];
+    return selected.startsWith('registered:') ? selected.slice('registered:'.length) : selected;
+  }, [selectedProjects]);
+  const [newIssueDialog, setNewIssueDialog] = useState<{ targetStatus: NewIssueTargetStatus; defaultProjectKey?: string } | null>(null);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
   const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
   const openPlanDialog = useCallback((issue: Issue, autoStart = false) => {
@@ -1925,7 +1932,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
                   />
-                  {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
+                  {(status === 'backlog' || status === 'todo') && (
+                    <button
+                      type="button"
+                      data-testid={`new-issue-button-${status}`}
+                      onClick={() => setNewIssueDialog({ targetStatus: status, defaultProjectKey: selectedProjectDefaultKey })}
+                      className="mx-4 mb-4 mt-3 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Plus className="w-4 h-4" />
+                      New issue
+                    </button>
+                  )}
                   </div>
                 </div>
               </DroppableColumn>
@@ -1960,6 +1977,18 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onSync={handleSyncPrompt}
         issue={syncPromptDialog.issue}
       />
+
+      {newIssueDialog && (
+        <NewIssueDialog
+          isOpen={true}
+          onClose={() => setNewIssueDialog(null)}
+          defaultProjectKey={newIssueDialog.defaultProjectKey}
+          targetStatus={newIssueDialog.targetStatus}
+          onCreated={() => {
+            void refreshDashboardState(queryClient);
+          }}
+        />
+      )}
 
       {/* Plan Dialog - lifted to survive IssueCard re-renders */}
       {planDialogIssue && (

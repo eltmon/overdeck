@@ -31,7 +31,7 @@ type RegisteredProject = {
 interface NewIssueDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultProjectKey: string;
+  defaultProjectKey?: string;
   targetStatus: NewIssueTargetStatus;
   onCreated: (issue: CreatedIssue) => void;
 }
@@ -57,7 +57,7 @@ async function responseErrorMessage(response: Response): Promise<string> {
 
 export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatus, onCreated }: NewIssueDialogProps) {
   const queryClient = useQueryClient();
-  const [selectedProjectKey, setSelectedProjectKey] = useState(defaultProjectKey);
+  const [selectedProjectKey, setSelectedProjectKey] = useState(defaultProjectKey ?? '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,9 +87,9 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
     if (!isOpen) return;
     setSelectedProjectKey((current) => {
       const keys = new Set(availableProjects.map((project) => project.key));
-      if (keys.has(defaultProjectKey)) return defaultProjectKey;
+      if (defaultProjectKey && keys.has(defaultProjectKey)) return defaultProjectKey;
       if (keys.has(current)) return current;
-      return availableProjects[0]?.key ?? defaultProjectKey;
+      return availableProjects[0]?.key ?? defaultProjectKey ?? '';
     });
   }, [availableProjects, defaultProjectKey, isOpen]);
 
