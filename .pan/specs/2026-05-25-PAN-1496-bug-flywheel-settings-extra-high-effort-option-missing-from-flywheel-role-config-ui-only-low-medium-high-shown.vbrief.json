@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-05-25T23:23:25.756Z"
+    "updated": "2026-05-25T23:35:28.952Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 18,
+    "sequence": 20,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-05-25T23:23:25.756Z",
+    "updated": "2026-05-25T23:35:28.952Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -504,55 +504,55 @@
         "phase": "review",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T23:23:25.751Z",
+        "updatedAt": "2026-05-25T23:35:28.951Z",
         "work": {
-          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T23:23:25.751Z"
+              "at": "2026-05-25T23:35:28.951Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-25T23:23:25.751Z",
-          "notes": "Planning xhigh/max is accepted but rendered as low effort",
+          "status": "reviewing",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-25T23:23:25.751Z",
-              "notes": "Planning xhigh/max is accepted but rendered as low effort"
+              "status": "reviewing",
+              "at": "2026-05-25T23:35:28.951Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T23:23:25.751Z"
+              "at": "2026-05-25T23:35:28.951Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T23:23:25.751Z",
+          "updatedAt": "2026-05-25T23:35:28.951Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T23:23:25.751Z"
+              "at": "2026-05-25T23:35:28.951Z"
             }
           ],
           "readyForMerge": false,
