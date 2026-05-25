@@ -999,10 +999,10 @@ const getPlanningStatusRoute = HttpRouter.add(
           }
         } catch {}
 
-        let sessionExists = false;
+        let tmuxSessionAlive = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExists(sessionName));
+            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
@@ -1023,7 +1023,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           : false;
 
         return jsonResponse({
-          active: sessionExists || agentStarting,
+          active: tmuxSessionAlive || agentStarting,
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
@@ -1132,14 +1132,14 @@ const postPlanningMessageRoute = HttpRouter.add(
         } catch {}
 
         // Check if local session exists (skip remote for now)
-        let sessionExists = false;
+        let tmuxSessionAlive = false;
         if (!isRemote) {
           try {
-            sessionExists = await Effect.runPromise(sessionExists(sessionName));
+            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
           } catch {}
         }
 
-        if (sessionExists) {
+        if (tmuxSessionAlive) {
           await Effect.runPromise(sendKeys(sessionName, message, 'planning user message'));
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',

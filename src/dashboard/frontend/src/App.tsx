@@ -26,6 +26,7 @@ import { ConversationsPage } from './components/conversations/ConversationsPage'
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
+import { FlywheelConversationPane } from './components/flywheel/FlywheelConversationPane';
 import { HomePage } from './pages/HomePage';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -287,6 +288,16 @@ function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; 
   );
 }
 
+function StandaloneFlywheelPopoutRoute() {
+  useCodexAutoRetry();
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      <EventRouter />
+      <FlywheelConversationPane />
+    </div>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
@@ -299,6 +310,10 @@ export default function App() {
       : terminalSession!;
     const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
     return <StandaloneTerminalRoute sessionName={sessionName} token={token} />;
+  }
+
+  if (terminalPath === '/popout/flywheel-conversation') {
+    return <StandaloneFlywheelPopoutRoute />;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
