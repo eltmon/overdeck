@@ -471,6 +471,20 @@ export const OperatorInterventionEvent = Schema.Struct({
 })
 export type OperatorInterventionEvent = typeof OperatorInterventionEvent.Type
 
+export const SubstrateBugFiledEvent = Schema.Struct({
+  type: Schema.Literal("substrate.bug_filed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    runId: Schema.optional(Schema.String),
+    filedBy: Schema.Literals(["agent", "operator"]),
+    discoveredIn: Schema.optional(IssueId),
+    severity: Schema.Literals(["P0", "P1", "P2"]),
+  }),
+})
+export type SubstrateBugFiledEvent = typeof SubstrateBugFiledEvent.Type
+
 /**
  * PAN-915 — reviewer session received a new prompt (spawn or resume of a
  * canonical PAN-830 session). Drives event-driven `reviewSubStatuses[role] =
@@ -1054,6 +1068,7 @@ export const DomainEvent = Schema.Union([
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
   OperatorInterventionEvent,
+  SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,
   ReviewReviewerCompletedEvent,
   ReviewSpecialistTimedOutEvent,

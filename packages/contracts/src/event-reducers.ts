@@ -740,6 +740,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.subitem_status_changed':
     case 'plan.items_unblocked':
     case 'operator.intervention':
+    case 'substrate.bug_filed':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 

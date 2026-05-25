@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { DomainEvent, OperatorInterventionEvent } from "./events"
+import { DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent } from "./events"
 
 const decodeOperatorInterventionEvent = Schema.decodeUnknownSync(OperatorInterventionEvent)
+const decodeSubstrateBugFiledEvent = Schema.decodeUnknownSync(SubstrateBugFiledEvent)
+const encodeSubstrateBugFiledEvent = Schema.encodeSync(SubstrateBugFiledEvent)
 const decodeDomainEvent = Schema.decodeUnknownSync(DomainEvent)
 
 const operatorInterventionKinds = [
@@ -44,5 +46,44 @@ describe("OperatorInterventionEvent", () => {
         kind: "poke",
       },
     })).toThrow()
+  })
+})
+
+describe("SubstrateBugFiledEvent", () => {
+  it("decodes, encodes, and decodes through DomainEvent", () => {
+    const event = {
+      type: "substrate.bug_filed",
+      sequence: 2,
+      timestamp: "2026-05-25T12:30:00.000Z",
+      payload: {
+        issueId: "PAN-1487",
+        runId: "RUN-123",
+        filedBy: "agent",
+        discoveredIn: "PAN-1486",
+        severity: "P1",
+      },
+    }
+
+    const decoded = decodeSubstrateBugFiledEvent(event)
+
+    expect(decoded).toEqual(event)
+    expect(encodeSubstrateBugFiledEvent(decoded)).toEqual(event)
+    expect(decodeDomainEvent(event)).toEqual(event)
+  })
+
+  it("decodes when optional fields are missing", () => {
+    const event = {
+      type: "substrate.bug_filed",
+      sequence: 3,
+      timestamp: "2026-05-25T12:31:00.000Z",
+      payload: {
+        issueId: "PAN-1487",
+        filedBy: "operator",
+        severity: "P2",
+      },
+    }
+
+    expect(decodeSubstrateBugFiledEvent(event)).toEqual(event)
+    expect(decodeDomainEvent(event)).toEqual(event)
   })
 })
