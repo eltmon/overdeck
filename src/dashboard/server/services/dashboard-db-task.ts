@@ -33,7 +33,10 @@ export type DashboardDbOperation =
   | 'embedSessions'
   | 'getConversationByName'
   | 'getSetting'
-  | 'setSetting';
+  | 'setSetting'
+  | 'getArtifactBySlug'
+  | 'listArtifactsForWorkspaceOrIssue'
+  | 'unshareArtifactBySlug';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 type WorkerLane = 'read' | 'long' | 'semantic';
@@ -230,6 +233,18 @@ async function runInline(
       const input = payload as { key: string; value: string };
       setSetting(input.key, input.value);
       return null;
+    }
+    case 'getArtifactBySlug': {
+      const { getArtifactBySlugJob } = await import('./artifact-index-jobs.js');
+      return getArtifactBySlugJob(payload as string);
+    }
+    case 'listArtifactsForWorkspaceOrIssue': {
+      const { listArtifactsForWorkspaceOrIssueJob } = await import('./artifact-index-jobs.js');
+      return listArtifactsForWorkspaceOrIssueJob(payload as string);
+    }
+    case 'unshareArtifactBySlug': {
+      const { unshareArtifactBySlugJob } = await import('./artifact-index-jobs.js');
+      return unshareArtifactBySlugJob(payload as string);
     }
   }
 }

@@ -54,6 +54,7 @@ function mockFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     const currentIssue = useDashboardStore.getState().issuesRaw.find((candidate) => candidate.identifier === 'PAN-1');
+    if (url.endsWith('/artifacts')) return Response.json({ artifacts: [] });
     if (url.endsWith('/plan')) return Response.json(null);
     if (url.includes('/planning-state')) return Response.json({
       hasPlan: currentIssue?.hasPlan ?? false,
@@ -164,6 +165,138 @@ describe('IssueDrawer', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=files');
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+  });
+
+  it('renders the artifacts tab with artifact cards and quick actions', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    const firstArtifact = {
+      artifact: {
+        artifactId: 'artifact-1',
+        slug: 'slugone1',
+        issueId: 'PAN-1',
+        workspaceId: 'workspace-pan-1',
+        agentRole: 'work',
+        agentHarness: 'claude-code',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        filePath: '/tmp/pan-1/comparison.html',
+        currentHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        lastPublishedHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        updatedAt: '2026-05-18T00:10:00.000Z',
+        publishedAt: '2026-05-18T00:10:00.000Z',
+        title: 'Comparison Matrix',
+        description: 'Options side by side',
+      },
+      status: 'pending_changes',
+      pendingChanges: true,
+      urls: {
+        wrapperUrl: 'https://pan.localhost/s/slugone1',
+        rawUrl: 'https://artifacts.pan.localhost/a/slugone1',
+      },
+      thumbnailUrl: '/api/artifacts/slugone1/thumbnail',
+    };
+    const secondArtifact = {
+      artifact: {
+        ...firstArtifact.artifact,
+        artifactId: 'artifact-2',
+        slug: 'slugtwo2',
+        agentRole: 'review',
+        agentHarness: 'pi',
+        filePath: '/tmp/pan-1/review.html',
+        title: 'Review Timeline',
+        publishedAt: '2026-05-18T00:05:00.000Z',
+        unsharedAt: '2026-05-18T00:20:00.000Z',
+      },
+      status: 'unshared',
+      pendingChanges: false,
+      urls: {
+        wrapperUrl: 'https://pan.localhost/s/slugtwo2',
+        rawUrl: 'https://artifacts.pan.localhost/a/slugtwo2',
+      },
+    };
+
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/workspaces/PAN-1/artifacts') {
+        return Response.json({ artifacts: [firstArtifact, secondArtifact] });
+      }
+      if (url === '/api/artifacts/slugone1/unshare' && init?.method === 'POST') {
+        return Response.json({
+          artifact: { ...firstArtifact.artifact, unsharedAt: '2026-05-18T00:25:00.000Z' },
+          unshared: true,
+        });
+      }
+      return Response.json({ success: true });
+    });
+
+    useDashboardStore.getState().openIssue('PAN-1', 'artifacts');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-tab-artifacts')).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByTestId('drawer-tab-panel-artifacts')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1/artifacts');
+
+    const firstCard = await screen.findByTestId('drawer-artifact-card-slugone1');
+    const secondCard = await screen.findByTestId('drawer-artifact-card-slugtwo2');
+
+    expect(within(firstCard).getByText('Comparison Matrix')).toBeInTheDocument();
+    expect(within(firstCard).getByText('Made by work via claude-code for PAN-1')).toBeInTheDocument();
+    expect(within(firstCard).getByText('workspace-pan-1')).toBeInTheDocument();
+    expect(within(firstCard).getByTestId('artifact-badge-pending')).toHaveTextContent('Pending Changes');
+    expect(within(secondCard).getByText('Made by review via pi for PAN-1')).toBeInTheDocument();
+    expect(within(secondCard).getByTestId('artifact-badge-unshared')).toHaveTextContent('Unshared');
+
+    expect(within(firstCard).getByRole('link', { name: 'Open Wrapper' })).toHaveAttribute(
+      'href',
+      'https://pan.localhost/s/slugone1',
+    );
+
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Copy Link' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://pan.localhost/s/slugone1'));
+    expect(within(firstCard).getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Unshare' }));
+    await waitFor(() => {
+      expect(within(firstCard).getByTestId('artifact-badge-unshared')).toHaveTextContent('Unshared');
+    });
+  });
+
+  it('renders artifact loading, empty, and error states', async () => {
+    let resolveArtifacts: (response: Response) => void = () => undefined;
+    vi.spyOn(window, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/PAN-1/artifacts') {
+        return new Promise<Response>((resolve) => { resolveArtifacts = resolve; });
+      }
+      return Promise.resolve(Response.json({ success: true }));
+    });
+    useDashboardStore.getState().openIssue('PAN-1', 'artifacts');
+
+    const { queryClient, rerender } = renderDrawer();
+
+    expect(screen.getByText('Loading artifacts…')).toBeInTheDocument();
+    resolveArtifacts(Response.json({ artifacts: [] }));
+    expect(await screen.findByText('No artifacts published for this issue yet.')).toBeInTheDocument();
+
+    queryClient.clear();
+    vi.spyOn(window, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/PAN-1/artifacts') {
+        return Promise.resolve(new Response('nope', { status: 500 }));
+      }
+      return Promise.resolve(Response.json({ success: true }));
+    });
+
+    rerender(drawerUi(queryClient));
+
+    expect(await screen.findByText('Failed to load artifacts')).toBeInTheDocument();
   });
 
   it('subscribes to issue-filtered drawer events and applies them to the store', () => {

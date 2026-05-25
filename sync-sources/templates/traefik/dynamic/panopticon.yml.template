@@ -30,6 +30,18 @@ http:
       service: panopticon-api
       tls: {}
 
+    # Published HTML artifacts
+    panopticon-artifacts:
+      rule: "Host(`artifacts.{{TRAEFIK_DOMAIN}}`) && PathPrefix(`/a/`)"
+      entryPoints:
+        - websecure
+      service: panopticon-api
+      tls:
+        domains:
+          - main: "{{TRAEFIK_DOMAIN}}"
+            sans:
+              - "*.{{TRAEFIK_DOMAIN}}"
+
   services:
     # Frontend port differs between production and dev mode — see header comment.
     panopticon-frontend:
