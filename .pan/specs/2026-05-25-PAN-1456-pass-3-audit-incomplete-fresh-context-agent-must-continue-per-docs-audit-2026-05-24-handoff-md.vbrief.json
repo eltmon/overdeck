@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:26:07Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1456: Pass-3 audit incomplete — fresh-context agent must continue per docs/audit-2026-05-24/HANDOFF.md",
-    "updated": "2026-05-25T16:28:48.754Z"
+    "updated": "2026-05-25T23:41:36.446Z"
   },
   "plan": {
     "id": "pan-1456",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a9066b60-91c3-4c07-89d6-04a5fad68798",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T16:26:07Z",
-    "updated": "2026-05-25T16:28:48.754Z",
+    "updated": "2026-05-25T23:41:36.446Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1456",
