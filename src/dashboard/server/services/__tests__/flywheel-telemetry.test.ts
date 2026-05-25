@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
+  computeCriterion3,
   computeCriterion5,
   computeCriterion6,
   computeCriterion7,
@@ -181,6 +182,54 @@ describe('flywheel telemetry', () => {
 
     expect(Object.values(stats.criteria).every((criterion) => criterion.dataSufficient === false)).toBe(true);
     expect(Object.values(stats.criteria).every((criterion) => criterion.status === 'insufficient_data')).toBe(true);
+  });
+
+  it('computes criterion 3 from substrate-attributable failures over all verification attempts', () => {
+    const attempts = [
+      { issueId: 'PAN-1', stage: 'review' as const, passed: false, substrateAttributable: true },
+      ...Array.from({ length: 99 }, (_, index) => ({ issueId: `PAN-${index + 2}`, stage: 'test' as const, passed: true })),
+    ];
+
+    const criterion = computeCriterion3(attempts);
+
+    expect(criterion.value).toBe(0.99);
+    expect(criterion.target).toBe(0.99);
+    expect(criterion.status).toBe('green');
+    expect(criterion.sampleSize).toBe(100);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it('excludes legitimate code-defect failures from criterion 3 numerator but not denominator', () => {
+    const criterion = computeCriterion3([
+      { issueId: 'PAN-1', stage: 'review', passed: false, substrateAttributable: false },
+      { issueId: 'PAN-2', stage: 'test', passed: false },
+      { issueId: 'PAN-3', stage: 'review', passed: true },
+      { issueId: 'PAN-4', stage: 'test', passed: false, substrateAttributable: true },
+    ]);
+
+    expect(criterion.value).toBe(0.75);
+    expect(criterion.sampleSize).toBe(4);
+    expect(criterion.status).toBe('red');
+  });
+
+  it.each([
+    [0, 100, 'green'],
+    [1, 100, 'green'],
+    [2, 100, 'yellow'],
+    [5, 100, 'yellow'],
+    [6, 100, 'red'],
+  ] as const)('maps criterion 3 thresholds for %d substrate failures over %d attempts', (failures, attempts, status) => {
+    const verificationAttempts = Array.from({ length: attempts }, (_, index) => ({
+      issueId: `PAN-${index}`,
+      stage: index % 2 === 0 ? 'review' as const : 'test' as const,
+      passed: index >= failures,
+      substrateAttributable: index < failures,
+    }));
+
+    const criterion = computeCriterion3(verificationAttempts);
+
+    expect(criterion.value).toBe(1 - (failures / attempts));
+    expect(criterion.status).toBe(status);
   });
 
   it('computes criterion 5 as operator interventions per completed run', () => {

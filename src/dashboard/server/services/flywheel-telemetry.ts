@@ -87,13 +87,37 @@ export function computeP0BugsCriterion(completedPipelineRuns: number): FlywheelS
   );
 }
 
-export function computePassRateCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'Pipeline pass success rate',
-    0,
-    0.99,
-    completedPipelineRuns,
-  );
+function passRateStatus(rate: number): FlywheelStatsCriterion['status'] {
+  if (rate >= 0.99) return 'green';
+  if (rate >= 0.95) return 'yellow';
+  return 'red';
+}
+
+export function computeCriterion3(attempts: readonly Criterion7VerificationAttempt[]): FlywheelStatsCriterion {
+  const substrateFailures = attempts.filter((attempt) => !attempt.passed && attempt.substrateAttributable === true).length;
+  const passRate = attempts.length === 0 ? 0 : 1 - (substrateFailures / attempts.length);
+
+  return {
+    label: 'Pipeline pass success rate',
+    value: passRate,
+    target: 0.99,
+    status: attempts.length === 0 ? 'insufficient_data' : passRateStatus(passRate),
+    sampleSize: attempts.length,
+    dataSufficient: attempts.length > 0,
+  };
+}
+
+export function computePassRateCriterion(completedPipelineRuns: number, attempts: readonly Criterion7VerificationAttempt[] = []): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'Pipeline pass success rate',
+      0,
+      0.99,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion3(attempts);
 }
 
 export function computeMttrCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
