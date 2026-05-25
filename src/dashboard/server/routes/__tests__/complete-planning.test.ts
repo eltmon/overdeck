@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -73,7 +73,7 @@ describe('completePlanningArtifacts', () => {
     expect(promoted.plan.status).toBe('proposed');
   });
 
-  it('fails when bead materialization does not match the plan item count', async () => {
+  it('does not write a proposed spec when bead materialization does not match the plan item count', async () => {
     const issueId = 'PAN-1144';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -83,12 +83,38 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
+      createBeads: async () => {
+        expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+        return {
+          success: true,
+          created: ['PAN-1144: Promote spec'],
+          errors: [],
+          beadIds: new Map(),
+        };
+      },
+    })).rejects.toThrow('created 1 beads for 2 plan items');
+
+    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+  });
+
+  it('does not write a proposed spec when bead materialization reports failure', async () => {
+    const issueId = 'PAN-1145';
+    const { projectPath, workspacePath } = makeProject(issueId);
+    await mkdir(join(workspacePath, '.pan'), { recursive: true });
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
+
+    await expect(completePlanningArtifacts({
+      projectPath,
+      workspacePath,
+      issueId,
       createBeads: async () => ({
-        success: true,
-        created: ['PAN-1144: Promote spec'],
-        errors: [],
+        success: false,
+        created: ['PAN-1145: Promote spec', 'PAN-1145: Create beads'],
+        errors: ['bd daemon unavailable'],
         beadIds: new Map(),
       }),
-    })).rejects.toThrow('created 1 beads for 2 plan items');
+    })).rejects.toThrow('bd daemon unavailable');
+
+    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
   });
 });

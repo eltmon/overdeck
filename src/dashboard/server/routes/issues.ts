@@ -119,15 +119,6 @@ export async function completePlanningArtifacts(options: {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
 
-  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
-  const proposed = existingSpec
-    ? await (async () => {
-        const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
-        return { path: existingSpec.path, filename: existingSpec.filename };
-      })()
-    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
-
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
     return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
@@ -145,6 +136,15 @@ export async function completePlanningArtifacts(options: {
       : `created ${created.length} beads for ${planItemCount} plan items`;
     throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
   }
+
+  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
+  const proposed = existingSpec
+    ? await (async () => {
+        const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+        await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
+        return { path: existingSpec.path, filename: existingSpec.filename };
+      })()
+    : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
 
   return { proposed, beadCount: created.length, beadsWarning: null };
 }

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T17:41:30.469Z",
+    "updated": "2026-05-25T19:24:26.195Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T17:41:30.469Z",
+    "updated": "2026-05-25T19:24:26.195Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -67,7 +67,7 @@
       {
         "id": "atomicity-fix",
         "title": "fix(complete-planning): materialize beads before writing proposed spec",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -88,7 +88,7 @@
           {
             "id": "atomicity-fix.ac1",
             "title": "Bead creation runs before spec write in completePlanningArtifacts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -96,7 +96,7 @@
           {
             "id": "atomicity-fix.ac2",
             "title": "If createBeadsFromVBrief returns success=false OR created.length !== planItemCount, the proposed spec is NOT written/updated on disk",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -104,7 +104,7 @@
           {
             "id": "atomicity-fix.ac3",
             "title": "Existing successful path (beads count matches plan items) still writes the proposed spec at the same .pan/specs/ path as before",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -112,7 +112,7 @@
           {
             "id": "atomicity-fix.ac4",
             "title": "Test in __tests__/complete-planning.test.ts asserts the failure case leaves no proposed spec on disk",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -120,7 +120,7 @@
           {
             "id": "atomicity-fix.ac5",
             "title": "bd-doctor retry logic inside createBeadsFromVBrief is unchanged (no edits to src/lib/vbrief/beads.ts)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -128,7 +128,7 @@
           {
             "id": "atomicity-fix.ac6",
             "title": "npm run typecheck && npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
