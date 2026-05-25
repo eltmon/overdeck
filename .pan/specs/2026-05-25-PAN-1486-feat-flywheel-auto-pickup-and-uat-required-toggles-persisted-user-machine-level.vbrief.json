@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T10:09:46.528Z"
+    "updated": "2026-05-25T10:29:58.792Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 7,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T10:09:46.528Z",
+    "updated": "2026-05-25T10:29:58.792Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -793,7 +793,7 @@
       {
         "id": "b11-auto-merge-executor",
         "title": "Add server-side executor that fires pending auto-merges after cooldown via the existing merge code path",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -809,7 +809,7 @@
           {
             "id": "b11.ac1",
             "title": "Executor starts when the dashboard server boots and is registered alongside the existing Deacon patrol so dev-mode and prod both pick it up; it can be disabled via env (PANOPTICON_DISABLE_AUTO_MERGE=1) for tests.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -817,7 +817,7 @@
           {
             "id": "b11.ac2",
             "title": "Tick processes only entries whose scheduledMergeAt <= Date.now(); future-scheduled entries remain pending.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -825,7 +825,7 @@
           {
             "id": "b11.ac3",
             "title": "If isFlywheelGloballyPaused() is true at tick time, the executor logs '[auto-merge] flywheel paused, skipping tick' and does NOT fire any merge; entries remain pending.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -833,7 +833,7 @@
           {
             "id": "b11.ac4",
             "title": "If isAutoMergeEligible returns false at fire-time (e.g. CI flipped red during cooldown), the entry is marked status='blocked' with the eligibility reason and the executor moves on without firing.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -841,7 +841,7 @@
           {
             "id": "b11.ac5",
             "title": "transitionToMerging is called and only the winning concurrent call proceeds; the loser logs and continues.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -849,7 +849,7 @@
           {
             "id": "b11.ac6",
             "title": "Successful merge: status set to 'merging' then 'merged' with mergedAt timestamp; the existing dashboard merge function (the one wired to the MERGE button) is invoked unchanged — no second merge path is added.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -857,7 +857,7 @@
           {
             "id": "b11.ac7",
             "title": "Failed merge: status set to 'failed' with failureReason; TTS announces 'PAN-XXX auto-merge failed: <reason>'; entry persists for the orchestrator to surface.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -865,7 +865,7 @@
           {
             "id": "b11.ac8",
             "title": "Vitest tests with mocked merge function cover: future-scheduled-skipped, paused-skipped, eligibility-recheck-blocked, transition-race-loser-skips, successful-merge happy path, failed-merge marks failed and announces.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -873,7 +873,7 @@
           {
             "id": "b11.ac9",
             "title": "Tests use vi.useFakeTimers() — no real interval delays per the CLAUDE.md retry/delay rule.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1240,42 +1240,42 @@
         "phase": "work",
         "issueId": "PAN-1486",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T10:09:46.505Z",
+        "updatedAt": "2026-05-25T10:19:40.127Z",
         "work": {
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": []
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T10:09:46.505Z"
+              "at": "2026-05-25T10:19:40.127Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T10:09:46.505Z"
+              "at": "2026-05-25T10:19:40.127Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-25T10:09:46.505Z",
+          "updatedAt": "2026-05-25T10:19:40.127Z",
           "history": [],
           "readyForMerge": false
         }

@@ -4570,7 +4570,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
 // ─── Shared triggerMerge logic ────────────────────────────────────────────────
 
-interface TriggerMergeResult {
+export interface TriggerMergeResult {
   success: boolean;
   statusCode: number;
   error?: string;
@@ -4607,7 +4607,7 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
   }
 }
 
-async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
+export async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
   if (!reviewStatus?.readyForMerge) {
     return {
