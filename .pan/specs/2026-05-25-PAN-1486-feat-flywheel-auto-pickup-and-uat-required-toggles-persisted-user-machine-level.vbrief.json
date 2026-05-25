@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:26:08.674Z"
+    "updated": "2026-05-25T09:43:13.472Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:26:08.674Z",
+    "updated": "2026-05-25T09:43:13.472Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -360,7 +360,7 @@
       {
         "id": "b06-flywheel-page-checkboxes",
         "title": "Add two toggle checkboxes to FlywheelPage header wired to /api/flywheel/config",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -376,52 +376,59 @@
           {
             "id": "b06.ac1",
             "title": "Two checkboxes labeled 'Auto-pickup backlog' and 'Require UAT before merge' render in the FlywheelPage header.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac2",
             "title": "Initial values are fetched from /api/flywheel/config; toggling either sends POST /api/flywheel/config with the new partial value and updates the cached query data optimistically.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac3",
             "title": "While the mutation is in flight the checkbox is disabled; on error it reverts and surfaces a small inline error (red text under the checkbox).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac4",
             "title": "Each checkbox has a title= tooltip describing the off/on behavior verbatim (matches the descriptions in the issue body).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac5",
             "title": "Verified manually in a browser via npm run dev: toggling each checkbox round-trips through the server and persists across page reload.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac6",
             "title": "Vitest component test in src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx covers: initial render reads /api/flywheel/config, click sends POST, optimistic update.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:43:13.472Z"
       },
       {
         "id": "b07-pan-flywheel-config-cli",

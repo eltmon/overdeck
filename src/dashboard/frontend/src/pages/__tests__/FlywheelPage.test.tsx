@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelPage } from '../FlywheelPage';
@@ -36,6 +38,13 @@ vi.mock('../../components/flywheel/FlywheelStatePane', () => ({
     return <div data-testid="state-pane">state</div>;
   },
 }));
+
+function renderFlywheelPage(element: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
+}
 
 const status: FlywheelStatus = {
   runId: 'RUN-7',
@@ -94,7 +103,7 @@ describe('FlywheelPage', () => {
   });
 
   it('mounts the Flywheel status subscription and renders the two-pane shell', () => {
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     expect(mocks.subscribeFlywheelStatus).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Flywheel page')).toHaveClass('flex', 'overflow-hidden');
@@ -106,11 +115,74 @@ describe('FlywheelPage', () => {
   });
 
   it('shows the empty state when no run is active', () => {
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     expect(screen.getByText(/No active run/)).toBeInTheDocument();
     expect(screen.getByText('pan flywheel start')).toBeInTheDocument();
     expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
+  });
+
+  it('loads Flywheel config, posts partial updates, and updates optimistically', async () => {
+    let resolvePost: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/flywheel/current') return Response.json(null);
+      if (url === '/api/flywheel/config' && init?.method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolvePost = resolve;
+        });
+      }
+      if (url === '/api/flywheel/config') {
+        return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: true });
+      }
+      return Response.json(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderFlywheelPage(<FlywheelPage />);
+
+    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup backlog' });
+    const requireUat = screen.getByRole('checkbox', { name: 'Require UAT before merge' });
+    expect(autoPickup).not.toBeChecked();
+    expect(requireUat).toBeChecked();
+    expect(autoPickup.closest('label')).toHaveAttribute('title', expect.stringContaining('Off: inventory is restricted'));
+    expect(requireUat.closest('label')).toHaveAttribute('title', expect.stringContaining('On: UAT remains required'));
+
+    fireEvent.click(autoPickup);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/config', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ auto_pickup_backlog: true }),
+    })));
+    await waitFor(() => expect(autoPickup).toBeChecked());
+    expect(autoPickup).toBeDisabled();
+    expect(requireUat).toBeDisabled();
+
+    resolvePost?.(Response.json({ auto_pickup_backlog: true, require_uat_before_merge: true }));
+    await waitFor(() => expect(autoPickup).not.toBeDisabled());
+  });
+
+  it('reverts Flywheel config toggles and shows an inline error when saving fails', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/flywheel/current') return Response.json(null);
+      if (url === '/api/flywheel/config' && init?.method === 'POST') {
+        return new Response('save failed', { status: 500 });
+      }
+      if (url === '/api/flywheel/config') {
+        return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: true });
+      }
+      return Response.json(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderFlywheelPage(<FlywheelPage />);
+
+    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup backlog' });
+    fireEvent.click(autoPickup);
+
+    await waitFor(() => expect(autoPickup).not.toBeChecked());
+    expect(screen.getByText('save failed')).toHaveClass('text-destructive');
   });
 
   it('renders a real FlywheelStatus payload from the subscription without console errors', () => {
@@ -118,7 +190,7 @@ describe('FlywheelPage', () => {
     const onNavigateAgent = vi.fn();
     const onNavigateIssue = vi.fn();
 
-    render(<FlywheelPage onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />);
+    renderFlywheelPage(<FlywheelPage onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />);
 
     act(() => {
       mocks.listener?.(status);
@@ -135,7 +207,7 @@ describe('FlywheelPage', () => {
     vi.setSystemTime(new Date('2026-05-18T12:03:20.000Z'));
     vi.mocked(fetch).mockImplementation(async () => Response.json(status));
 
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     act(() => {
       mocks.listener?.(status);
@@ -154,7 +226,7 @@ describe('FlywheelPage', () => {
   });
 
   it('clears stale live status when the subscription emits null', () => {
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     act(() => {
       mocks.listener?.(status);
@@ -169,7 +241,7 @@ describe('FlywheelPage', () => {
   });
 
   it('unsubscribes on unmount', () => {
-    const { unmount } = render(<FlywheelPage />);
+    const { unmount } = renderFlywheelPage(<FlywheelPage />);
 
     unmount();
 
@@ -177,7 +249,7 @@ describe('FlywheelPage', () => {
   });
 
   it('defaults to the Status tab and switches to State on tab click', () => {
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     const stateTab = screen.getByRole('tab', { name: 'State' });
     const statusTab = screen.getByRole('tab', { name: 'Status' });
