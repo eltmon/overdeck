@@ -19,21 +19,26 @@ export interface TrackerConfig {
 
   // Linear-specific
   apiKeyEnv?: string;
+  api_key_env?: string;
   team?: string;
 
   // GitHub-specific
   tokenEnv?: string;
+  token_env?: string;
   owner?: string;
   repo?: string;
 
   // GitLab-specific
   projectId?: string;
+  project_id?: string;
 
   // Rally-specific
   server?: string;
   workspace?: string;
   project?: string;
 }
+
+export type TrackerKeyOverrides = Partial<Record<TrackerType, string>>;
 
 // Multi-tracker configuration (re-exported from config.ts)
 // Note: Use TrackersConfig from config.ts for full type with nested configs
@@ -51,16 +56,21 @@ function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
   }
 }
 
+function getTrackerKey(trackerType: TrackerType, overrides?: TrackerKeyOverrides): string | undefined {
+  return overrides ? overrides[trackerType] : getTrackerKeyFromConfig(trackerType);
+}
+
 /**
  * Create a tracker instance from configuration.
  * Priority: config.yaml (Settings) > environment variable > custom env var name
  */
-export function createTracker(config: TrackerConfig): IssueTracker {
+export function createTracker(config: TrackerConfig, trackerKeys?: TrackerKeyOverrides): IssueTracker {
   switch (config.type) {
     case 'linear': {
-      const configKey = getTrackerKeyFromConfig('linear');
-      const envKey = config.apiKeyEnv
-        ? process.env[config.apiKeyEnv]
+      const configKey = getTrackerKey('linear', trackerKeys);
+      const apiKeyEnv = config.apiKeyEnv ?? config.api_key_env;
+      const envKey = apiKeyEnv
+        ? process.env[apiKeyEnv]
         : process.env.LINEAR_API_KEY;
       const apiKey = configKey || envKey;
 
@@ -75,9 +85,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
     }
 
     case 'github': {
-      const configKey = getTrackerKeyFromConfig('github');
-      const envToken = config.tokenEnv
-        ? process.env[config.tokenEnv]
+      const configKey = getTrackerKey('github', trackerKeys);
+      const tokenEnv = config.tokenEnv ?? config.token_env;
+      const envToken = tokenEnv
+        ? process.env[tokenEnv]
         : process.env.GITHUB_TOKEN;
       const token = configKey || envToken;
 
@@ -98,9 +109,10 @@ export function createTracker(config: TrackerConfig): IssueTracker {
     }
 
     case 'gitlab': {
-      const configKey = getTrackerKeyFromConfig('gitlab');
-      const envToken = config.tokenEnv
-        ? process.env[config.tokenEnv]
+      const configKey = getTrackerKey('gitlab', trackerKeys);
+      const tokenEnv = config.tokenEnv ?? config.token_env;
+      const envToken = tokenEnv
+        ? process.env[tokenEnv]
         : process.env.GITLAB_TOKEN;
       const token = configKey || envToken;
 
@@ -111,17 +123,19 @@ export function createTracker(config: TrackerConfig): IssueTracker {
         });
       }
 
-      if (!config.projectId) {
+      const projectId = config.projectId ?? config.project_id;
+      if (!projectId) {
         throw new Error('GitLab tracker requires projectId configuration');
       }
 
-      return new GitLabTracker(token, config.projectId);
+      return new GitLabTracker(token, projectId);
     }
 
     case 'rally': {
-      const configKey = getTrackerKeyFromConfig('rally');
-      const envKey = config.apiKeyEnv
-        ? process.env[config.apiKeyEnv]
+      const configKey = getTrackerKey('rally', trackerKeys);
+      const apiKeyEnv = config.apiKeyEnv ?? config.api_key_env;
+      const envKey = apiKeyEnv
+        ? process.env[apiKeyEnv]
         : process.env.RALLY_API_KEY;
       const apiKey = configKey || envKey;
 
@@ -150,7 +164,8 @@ export function createTracker(config: TrackerConfig): IssueTracker {
  */
 export function createTrackerFromConfig(
   trackersConfig: TrackersConfig,
-  trackerType: TrackerType
+  trackerType: TrackerType,
+  trackerKeys?: TrackerKeyOverrides
 ): IssueTracker {
   const config = trackersConfig[trackerType];
 
@@ -160,7 +175,7 @@ export function createTrackerFromConfig(
     );
   }
 
-  return createTracker({ ...config, type: trackerType });
+  return createTracker({ ...config, type: trackerType }, trackerKeys);
 }
 
 /**

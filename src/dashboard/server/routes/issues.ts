@@ -37,8 +37,11 @@ import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeamSync, getIssuePrefix, loadProjectsConfig, resolveProjectFromIssueSync, type ProjectConfig } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
+import { createTracker } from '../../../lib/tracker/factory.js';
+import type { Issue, NewIssue, TrackerType } from '../../../lib/tracker/interface.js';
+import { loadConfigNoMigration } from '../../../lib/config-yaml.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
 import { appendContinueSessionEntryForIssue, promoteContinueToProject } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
@@ -613,6 +616,73 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+type NewIssueTargetStatus = 'backlog' | 'todo';
+
+type NewIssueRequestBody = {
+  projectKey: string;
+  targetStatus: NewIssueTargetStatus;
+  title: string;
+  description?: string;
+};
+
+const newIssueTargetStatuses = new Set<string>(['backlog', 'todo']);
+
+function validateNewIssueBody(body: unknown): { ok: true; value: NewIssueRequestBody } | { ok: false; errors: Record<string, string> } {
+  const errors: Record<string, string> = {};
+  const record = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+
+  const projectKey = typeof record.projectKey === 'string' ? record.projectKey.trim() : '';
+  const targetStatus = typeof record.targetStatus === 'string' ? record.targetStatus : '';
+  const title = typeof record.title === 'string' ? record.title.trim() : '';
+  const description = typeof record.description === 'string' ? record.description.trim() : undefined;
+
+  if (!projectKey) errors.projectKey = 'projectKey is required';
+  if (!title) errors.title = 'title is required';
+  if (!newIssueTargetStatuses.has(targetStatus)) errors.targetStatus = 'targetStatus must be one of: backlog, todo';
+  if (record.description !== undefined && typeof record.description !== 'string') errors.description = 'description must be a string';
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: {
+      projectKey,
+      targetStatus: targetStatus as NewIssueTargetStatus,
+      title,
+      ...(description ? { description } : {}),
+    },
+  };
+}
+
+function inferProjectTrackerType(project: ProjectConfig): TrackerType | null {
+  if (project.tracker) return project.tracker;
+  if (project.github_repo) return 'github';
+  if (project.rally_project) return 'rally';
+  if (getIssuePrefix(project) || project.issue_prefixes?.length) return 'linear';
+  if (project.gitlab_repo) return 'gitlab';
+  return null;
+}
+
+function getProjectTeam(project: ProjectConfig, projectKey: string): string | undefined {
+  return getIssuePrefix(project) ?? project.issue_prefixes?.[0] ?? projectKey.toUpperCase().replace(/-/g, '');
+}
+
+function getCreatedIssueIdentifier(projectKey: string, project: ProjectConfig, issue: Issue): string {
+  if (issue.tracker === 'github') {
+    const number = issue.ref.match(/(\d+)$/)?.[1];
+    const prefix = getIssuePrefix(project) ?? projectKey.toUpperCase().replace(/-/g, '');
+    return number ? `${prefix}-${number}` : issue.ref || issue.id;
+  }
+  return issue.ref || issue.id;
+}
+
+function trackerErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+}
+
 async function pathIsDirectory(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
@@ -639,6 +709,115 @@ const getIssuesRoute = HttpRouter.add(
     const issueDataService = getIssueDataService();
     const issues = issueDataService.getIssues({ cycle, includeCompleted });
     return jsonResponse(issues);
+  })),
+);
+
+// ─── Route: POST /api/issues ──────────────────────────────────────────────────
+
+const postIssuesRoute = HttpRouter.add(
+  'POST',
+  '/api/issues',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const validation = validateNewIssueBody(body);
+    if (!validation.ok) {
+      return jsonResponse({ error: 'Invalid request body', details: validation.errors }, { status: 400 });
+    }
+
+    const projectsConfig = yield* loadProjectsConfig().pipe(
+      Effect.catchAll((error) => Effect.succeed({ error } as const)),
+    );
+    if ('error' in projectsConfig) {
+      return jsonResponse({ error: `Failed to load projects config: ${trackerErrorMessage(projectsConfig.error)}` }, { status: 500 });
+    }
+
+    const project = projectsConfig.projects[validation.value.projectKey];
+    if (!project) {
+      return jsonResponse({ error: `Unknown projectKey: ${validation.value.projectKey}` }, { status: 404 });
+    }
+
+    const trackerType = inferProjectTrackerType(project);
+    if (!trackerType) {
+      return jsonResponse({ error: `Project ${validation.value.projectKey} has no issue tracker configured` }, { status: 400 });
+    }
+    if (trackerType === 'gitlab') {
+      return jsonResponse({ error: 'GitLab issue creation is not yet supported' }, { status: 501 });
+    }
+
+    const configResult = yield* loadConfigNoMigration().pipe(
+      Effect.catchAll((error) => Effect.succeed({ error } as const)),
+    );
+    if ('error' in configResult) {
+      return jsonResponse({ error: `Failed to load tracker config: ${trackerErrorMessage(configResult.error)}` }, { status: 500 });
+    }
+
+    const trackersConfig = configResult.config.trackers;
+    const trackerKeys = configResult.config.trackerKeys;
+    const projectTeam = getProjectTeam(project, validation.value.projectKey);
+
+    let tracker;
+    try {
+      if (trackerType === 'github') {
+        const [owner, repo] = project.github_repo?.split('/') ?? [];
+        if (!owner || !repo) {
+          return jsonResponse({ error: `Project ${validation.value.projectKey} is missing github_repo` }, { status: 400 });
+        }
+        tracker = createTracker({ ...(trackersConfig.github ?? { type: 'github' as const }), type: 'github', owner, repo }, trackerKeys);
+      } else if (trackerType === 'rally') {
+        tracker = createTracker({ ...(trackersConfig.rally ?? { type: 'rally' as const }), type: 'rally', project: project.rally_project ?? trackersConfig.rally?.project }, trackerKeys);
+      } else {
+        tracker = createTracker({ ...(trackersConfig.linear ?? { type: 'linear' as const }), type: 'linear', team: projectTeam }, trackerKeys);
+      }
+    } catch (error) {
+      return jsonResponse({ error: trackerErrorMessage(error) }, { status: 503 });
+    }
+
+    const createPayload: NewIssue = {
+      title: validation.value.title,
+      ...(validation.value.description ? { description: validation.value.description } : {}),
+      ...(trackerType === 'linear' ? { team: projectTeam } : {}),
+      ...(trackerType === 'rally' && project.rally_project ? { team: project.rally_project } : {}),
+    };
+
+    const createResult = yield* tracker.createIssue(createPayload).pipe(
+      Effect.map((issue) => ({ ok: true as const, issue })),
+      Effect.catchAll((error) => Effect.succeed({ ok: false as const, error })),
+    );
+    if (!createResult.ok) {
+      const tag = createResult.error && typeof createResult.error === 'object' && '_tag' in createResult.error
+        ? String((createResult.error as { _tag?: unknown })._tag)
+        : '';
+      return jsonResponse(
+        { error: tag === 'NotImplementedError' ? 'GitLab issue creation is not yet supported' : trackerErrorMessage(createResult.error) },
+        { status: tag === 'NotImplementedError' ? 501 : 502 },
+      );
+    }
+
+    const createdIssue = createResult.issue;
+    const identifier = getCreatedIssueIdentifier(validation.value.projectKey, project, createdIssue);
+    const { updateShadowState } = yield* Effect.promise(() => import('../../../lib/shadow-state.js'));
+    yield* Effect.promise(() => updateShadowState(identifier, 'open', 'dashboard-new-issue', validation.value.targetStatus));
+
+    const issueDataService = getIssueDataService();
+    yield* Effect.promise(() => issueDataService.refreshShadowStatesCache());
+    yield* Effect.promise(() => issueDataService.invalidateTracker(trackerType));
+
+    const eventStore = yield* EventStoreService;
+    const displayStatus = validation.value.targetStatus === 'backlog' ? 'Backlog' : 'Todo';
+    yield* eventStore.append({
+      type: 'issue.statusChanged',
+      timestamp: new Date().toISOString(),
+      payload: {
+        issueId: identifier,
+        status: displayStatus,
+        canonicalStatus: validation.value.targetStatus,
+        projectKey: validation.value.projectKey,
+        tracker: trackerType,
+        source: 'dashboard-new-issue',
+      },
+    });
+
+    return jsonResponse({ ...createdIssue, identifier });
   })),
 );
 
@@ -3937,6 +4116,7 @@ const getIssueResourceDetailsRoute = HttpRouter.add(
 
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
+  postIssuesRoute,
   getIssueAnalyzeRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,

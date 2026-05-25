@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-05-25T16:28:28.731Z"
+    "updated": "2026-05-25T23:36:55.928Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-05-25T16:28:28.731Z",
+    "updated": "2026-05-25T23:36:55.928Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -74,7 +74,7 @@
       {
         "id": "new-issue-api",
         "title": "Add `POST /api/issues` endpoint",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -95,7 +95,7 @@
           {
             "id": "new-issue-api.ac1",
             "title": "POST `/api/issues` with valid `{projectKey,'todo',title}` returns 200 and the created `Issue` JSON; the issue appears on the next `GET /api/issues` call in the `todo` column.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -103,7 +103,7 @@
           {
             "id": "new-issue-api.ac2",
             "title": "POST with missing `title`, missing `projectKey`, or invalid `targetStatus` (anything other than `backlog`/`todo`) returns 400 with a structured error.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -111,7 +111,7 @@
           {
             "id": "new-issue-api.ac3",
             "title": "POST with an unknown `projectKey` returns 404; POST against a project whose `tracker` is `gitlab` returns 501 with an explanatory message and does not call `createIssue`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -119,7 +119,7 @@
           {
             "id": "new-issue-api.ac4",
             "title": "On success, `issueDataService.invalidateTracker(<projectTrackerType>)` is invoked and an `issue.statusChanged` (or `issue.created`) event is appended to `EventStoreService` so live dashboards refresh.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -127,7 +127,7 @@
           {
             "id": "new-issue-api.ac5",
             "title": "Endpoint uses `execAsync` / Effect / promise-based I/O only — no `execSync`, `readFileSync`, `writeFileSync`, or other event-loop-blocking calls (per CLAUDE.md no-blocking-calls rule).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
