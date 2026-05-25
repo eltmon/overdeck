@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
-    "updated": "2026-05-25T09:35:08.130Z"
+    "updated": "2026-05-25T09:35:50.002Z"
   },
   "plan": {
     "id": "pan-1495",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
     "author": "agent:claude-opus-4-7",
-    "sequence": 23,
+    "sequence": 30,
     "created": "2026-05-25T08:25:00.000Z",
-    "updated": "2026-05-25T09:35:08.130Z",
+    "updated": "2026-05-25T09:35:50.002Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
@@ -230,58 +230,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1495-fix-resolve-worker-native-modules-from-parent-process-not-process-cwd.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1495",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T09:35:08.052Z",
+        "updatedAt": "2026-05-25T09:35:49.984Z",
         "work": {
-          "updatedAt": "2026-05-25T09:35:08.052Z",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-05-25T09:35:08.052Z",
+          "status": "passed",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
-              "status": "running",
-              "at": "2026-05-25T09:35:08.052Z"
+              "status": "passed",
+              "at": "2026-05-25T09:35:49.984Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-25T09:35:08.052Z",
-          "notes": "Verification failed at lint",
+          "status": "passed",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
+          "notes": "Approved: all four convoy reviewers reported no findings",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-25T09:35:08.052Z",
-              "notes": "Verification failed at lint"
+              "status": "passed",
+              "at": "2026-05-25T09:35:49.984Z",
+              "notes": "Approved: all four convoy reviewers reported no findings"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:35:08.052Z",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:35:08.052Z"
+              "at": "2026-05-25T09:35:49.984Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T09:35:08.052Z",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:35:08.052Z",
+          "updatedAt": "2026-05-25T09:35:49.984Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:35:08.052Z"
+              "at": "2026-05-25T09:35:49.984Z"
             }
           ],
           "readyForMerge": false,
