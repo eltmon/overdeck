@@ -193,19 +193,8 @@ describe('IssueDrawer', () => {
         title: 'Comparison Matrix',
         description: 'Options side by side',
       },
-      status: {
-        artifactId: 'artifact-1',
-        slug: 'slugone1',
-        filePath: '/tmp/pan-1/comparison.html',
-        currentHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        lastPublishedHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        pendingChanges: true,
-        size: 48231,
-        unshared: false,
-        errors: [],
-        warnings: [],
-        strictModeFindings: [],
-      },
+      status: 'pending_changes',
+      pendingChanges: true,
       urls: {
         wrapperUrl: 'https://pan.localhost/s/slugone1',
         rawUrl: 'https://artifacts.pan.localhost/a/slugone1',
@@ -224,15 +213,8 @@ describe('IssueDrawer', () => {
         publishedAt: '2026-05-18T00:05:00.000Z',
         unsharedAt: '2026-05-18T00:20:00.000Z',
       },
-      status: {
-        ...firstArtifact.status,
-        artifactId: 'artifact-2',
-        slug: 'slugtwo2',
-        filePath: '/tmp/pan-1/review.html',
-        pendingChanges: false,
-        unshared: true,
-        unsharedAt: '2026-05-18T00:20:00.000Z',
-      },
+      status: 'unshared',
+      pendingChanges: false,
       urls: {
         wrapperUrl: 'https://pan.localhost/s/slugtwo2',
         rawUrl: 'https://artifacts.pan.localhost/a/slugtwo2',
@@ -247,7 +229,7 @@ describe('IssueDrawer', () => {
       if (url === '/api/artifacts/slugone1/unshare' && init?.method === 'POST') {
         return Response.json({
           artifact: { ...firstArtifact.artifact, unsharedAt: '2026-05-18T00:25:00.000Z' },
-          status: { ...firstArtifact.status, unshared: true, unsharedAt: '2026-05-18T00:25:00.000Z' },
+          unshared: true,
         });
       }
       return Response.json({ success: true });
@@ -267,7 +249,6 @@ describe('IssueDrawer', () => {
     expect(within(firstCard).getByText('Comparison Matrix')).toBeInTheDocument();
     expect(within(firstCard).getByText('Made by work via claude-code for PAN-1')).toBeInTheDocument();
     expect(within(firstCard).getByText('workspace-pan-1')).toBeInTheDocument();
-    expect(within(firstCard).getByTestId('artifact-badge-published')).toHaveTextContent('Published');
     expect(within(firstCard).getByTestId('artifact-badge-pending')).toHaveTextContent('Pending Changes');
     expect(within(secondCard).getByText('Made by review via pi for PAN-1')).toBeInTheDocument();
     expect(within(secondCard).getByTestId('artifact-badge-unshared')).toHaveTextContent('Unshared');

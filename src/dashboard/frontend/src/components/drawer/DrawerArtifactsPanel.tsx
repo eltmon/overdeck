@@ -20,14 +20,16 @@ function formatArtifactDate(value?: string | undefined) {
 }
 
 function makerLabel(entry: ArtifactListEntry) {
+  const role = entry.artifact.agentRole ?? 'user';
+  const harness = entry.artifact.agentHarness ?? 'user';
   const target = entry.artifact.issueId ?? entry.artifact.workspaceId ?? 'unscoped work';
-  return `Made by ${entry.artifact.agentRole} via ${entry.artifact.agentHarness} for ${target}`;
+  return `Made by ${role} via ${harness} for ${target}`;
 }
 
 function filterArtifact(entry: ArtifactListEntry, filter: ArtifactFilter) {
-  if (filter === 'pending') return entry.status.pendingChanges;
-  if (filter === 'unshared') return entry.status.unshared;
-  if (filter === 'published') return Boolean(entry.artifact.publishedAt || entry.status.lastPublishedHash) && !entry.status.unshared;
+  if (filter === 'pending') return entry.pendingChanges;
+  if (filter === 'unshared') return entry.status === 'unshared';
+  if (filter === 'published') return entry.status === 'published';
   return true;
 }
 
@@ -66,7 +68,7 @@ function updateUnsharedArtifact(
       return {
         ...entry,
         artifact: response.artifact,
-        status: response.status,
+        status: 'unshared',
       };
     }),
   };
@@ -204,9 +206,9 @@ export default function DrawerArtifactsPanel({ issueId }: { issueId: string }) {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-[6px]">
-                  {entry.artifact.publishedAt || entry.status.lastPublishedHash ? <ArtifactBadge tone="published">Published</ArtifactBadge> : null}
-                  {entry.status.pendingChanges ? <ArtifactBadge tone="pending">Pending Changes</ArtifactBadge> : null}
-                  {entry.status.unshared ? <ArtifactBadge tone="unshared">Unshared</ArtifactBadge> : null}
+                  {entry.status === 'published' ? <ArtifactBadge tone="published">Published</ArtifactBadge> : null}
+                  {entry.pendingChanges ? <ArtifactBadge tone="pending">Pending Changes</ArtifactBadge> : null}
+                  {entry.status === 'unshared' ? <ArtifactBadge tone="unshared">Unshared</ArtifactBadge> : null}
                 </div>
                 <div className="flex flex-wrap gap-[8px] pt-[2px]">
                   <a
@@ -227,7 +229,7 @@ export default function DrawerArtifactsPanel({ issueId }: { issueId: string }) {
                   <button
                     type="button"
                     className="rounded-[var(--radius-sm)] border border-border px-[9px] py-[5px] text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={entry.status.unshared || unshare.isPending}
+                    disabled={entry.status === 'unshared' || unshare.isPending}
                     onClick={() => unshare.mutate(entry.artifact.slug)}
                   >
                     Unshare

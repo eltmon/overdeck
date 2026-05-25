@@ -1,137 +1,147 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import {
+  ArtifactCreateResponse,
   ArtifactListResponse,
-  ArtifactMetadataResponse,
-  ArtifactPublishResponse,
+  ArtifactMetadata,
+  ArtifactStatusResponse,
   ArtifactValidationResult,
-} from "./index"
+  WorkspaceArtifactsResponse,
+} from "./artifacts"
 
-const currentHash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-const lastPublishedHash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+const decodeArtifactMetadata = Schema.decodeUnknownSync(ArtifactMetadata)
+const decodeArtifactValidationResult = Schema.decodeUnknownSync(ArtifactValidationResult)
+const decodeArtifactStatusResponse = Schema.decodeUnknownSync(ArtifactStatusResponse)
+const decodeArtifactCreateResponse = Schema.decodeUnknownSync(ArtifactCreateResponse)
+const decodeArtifactListResponse = Schema.decodeUnknownSync(ArtifactListResponse)
+const decodeWorkspaceArtifactsResponse = Schema.decodeUnknownSync(WorkspaceArtifactsResponse)
 
-const finding = {
-  code: "asset.relative_path",
-  message: "Relative asset paths are not allowed in artifacts.",
-  severity: "error",
-  line: 12,
-  column: 8,
-} as const
-
-const validationPayload = {
-  ok: false,
-  errors: [finding],
-  warnings: [{ ...finding, code: "secret.suppressed", severity: "warning" as const }],
-  strictModeFindings: [{ ...finding, code: "strict.image_alt", severity: "warning" as const }],
-  size: 48231,
-  hash: currentHash,
-} satisfies typeof ArtifactValidationResult.Encoded
-
-const artifactPayload = {
-  artifactId: "01HXYZARTIFACT000000000000",
+const metadata = {
+  artifactId: "01JZ0000000000000000000000",
   slug: "k3p9m2qr",
   issueId: "PAN-1205",
-  workspaceId: "workspace-pan-1205",
+  workspaceId: "feature-pan-1205-slot-2",
   agentRole: "work",
   agentHarness: "claude-code",
-  runId: "run-pan-1205-slot-1",
+  runId: "RUN-42",
   sessionId: "session-123",
-  filePath: "/tmp/workspace/comparison.html",
-  currentHash,
-  lastPublishedHash,
-  supersedes: "01HXYZPREVIOUS0000000000",
-  createdAt: "2026-05-25T00:00:00.000Z",
-  updatedAt: "2026-05-25T00:10:00.000Z",
-  publishedAt: "2026-05-25T00:10:00.000Z",
+  filePath: "/tmp/comparison.html",
+  currentHash: "sha256:def456",
+  lastPublishedHash: "sha256:abc123",
+  supersedes: "01JY0000000000000000000000",
   title: "RAG Approach Comparison",
-  description: "Side-by-side comparison of three approaches.",
-} as const
+  description: "Compares three implementation options.",
+  createdAt: "2026-05-25T00:00:00.000Z",
+  publishedAt: "2026-05-25T00:01:00.000Z",
+  unsharedAt: null,
+} satisfies typeof ArtifactMetadata.Encoded
 
-const statusPayload = {
-  artifactId: artifactPayload.artifactId,
-  slug: artifactPayload.slug,
-  filePath: artifactPayload.filePath,
-  currentHash,
-  lastPublishedHash,
-  pendingChanges: true,
+const validation = {
+  ok: false,
+  filePath: "/tmp/comparison.html",
   size: 48231,
-  unshared: false,
-  errors: validationPayload.errors,
-  warnings: validationPayload.warnings,
-  strictModeFindings: validationPayload.strictModeFindings,
-} as const
+  hash: "sha256:def456",
+  strict: true,
+  errors: [
+    {
+      code: "secret_detected",
+      message: "GitHub token detected",
+      line: 18,
+      column: 5,
+      rule: "github_pat",
+    },
+  ],
+  warnings: [
+    {
+      code: "high_entropy_string",
+      message: "High-entropy string detected",
+      line: 22,
+      strict: true,
+    },
+  ],
+} satisfies typeof ArtifactValidationResult.Encoded
 
-const urlsPayload = {
+const urls = {
   wrapperUrl: "https://pan.localhost/s/k3p9m2qr",
   rawUrl: "https://artifacts.pan.localhost/a/k3p9m2qr",
-} as const
+}
 
 describe("artifact contracts", () => {
-  it("decodes validation results with errors, warnings, size, hash, and strict-mode findings", () => {
-    const parsed = Schema.decodeUnknownSync(ArtifactValidationResult)(validationPayload)
+  it("decodes provenance metadata with publish and unshare state", () => {
+    const parsed = decodeArtifactMetadata(metadata)
 
-    expect(parsed.errors).toHaveLength(1)
-    expect(parsed.warnings).toHaveLength(1)
-    expect(parsed.strictModeFindings[0]?.code).toBe("strict.image_alt")
-    expect(parsed.size).toBe(48231)
-    expect(parsed.hash).toBe(currentHash)
+    expect(parsed.artifactId).toBe("01JZ0000000000000000000000")
+    expect(parsed.slug).toBe("k3p9m2qr")
+    expect(parsed.issueId).toBe("PAN-1205")
+    expect(parsed.workspaceId).toBe("feature-pan-1205-slot-2")
+    expect(parsed.agentRole).toBe("work")
+    expect(parsed.agentHarness).toBe("claude-code")
+    expect(parsed.runId).toBe("RUN-42")
+    expect(parsed.sessionId).toBe("session-123")
+    expect(parsed.filePath).toBe("/tmp/comparison.html")
+    expect(parsed.currentHash).toBe("sha256:def456")
+    expect(parsed.lastPublishedHash).toBe("sha256:abc123")
+    expect(parsed.supersedes).toBe("01JY0000000000000000000000")
+    expect(parsed.title).toBe("RAG Approach Comparison")
+    expect(parsed.description).toBe("Compares three implementation options.")
+    expect(parsed.createdAt).toBe("2026-05-25T00:00:00.000Z")
+    expect(parsed.publishedAt).toBe("2026-05-25T00:01:00.000Z")
+    expect(parsed.unsharedAt).toBeNull()
   })
 
-  it("decodes metadata with full provenance and unshared state", () => {
-    const parsed = Schema.decodeUnknownSync(ArtifactMetadataResponse)({
-      artifact: { ...artifactPayload, unsharedAt: "2026-05-25T00:20:00.000Z" },
-      status: { ...statusPayload, unshared: true, unsharedAt: "2026-05-25T00:20:00.000Z" },
-      urls: urlsPayload,
+  it("decodes validation and status responses with strict findings and pending changes", () => {
+    const parsedValidation = decodeArtifactValidationResult(validation)
+    const parsedStatus = decodeArtifactStatusResponse({
+      artifact: metadata,
+      filePath: metadata.filePath,
+      currentHash: metadata.currentHash,
+      lastPublishedHash: metadata.lastPublishedHash,
+      pendingChanges: true,
+      validation,
     })
 
-    expect(parsed.artifact).toMatchObject({
-      artifactId: artifactPayload.artifactId,
-      slug: artifactPayload.slug,
-      issueId: "PAN-1205",
-      workspaceId: "workspace-pan-1205",
-      agentRole: "work",
-      agentHarness: "claude-code",
-      runId: "run-pan-1205-slot-1",
-      sessionId: "session-123",
-      filePath: "/tmp/workspace/comparison.html",
-      currentHash,
-      lastPublishedHash,
-      supersedes: "01HXYZPREVIOUS0000000000",
-      title: "RAG Approach Comparison",
-      description: "Side-by-side comparison of three approaches.",
-      unsharedAt: "2026-05-25T00:20:00.000Z",
-    })
-    expect(parsed.status.unshared).toBe(true)
-    expect(parsed.status.pendingChanges).toBe(true)
+    expect(parsedValidation.errors[0].code).toBe("secret_detected")
+    expect(parsedValidation.warnings[0].strict).toBe(true)
+    expect(parsedStatus.currentHash).toBe("sha256:def456")
+    expect(parsedStatus.lastPublishedHash).toBe("sha256:abc123")
+    expect(parsedStatus.pendingChanges).toBe(true)
   })
 
-  it("decodes publish and list responses used by CLI and dashboard APIs", () => {
-    const publish = Schema.decodeUnknownSync(ArtifactPublishResponse)({
-      artifact: artifactPayload,
-      status: statusPayload,
-      urls: urlsPayload,
-      validation: validationPayload,
+  it("decodes create responses and dashboard artifact payloads", () => {
+    const createResponse = decodeArtifactCreateResponse({
+      artifact: metadata,
+      urls,
+      validation: { ...validation, ok: true, errors: [] },
       published: true,
     })
-    const list = Schema.decodeUnknownSync(ArtifactListResponse)({
-      artifacts: [{ artifact: artifactPayload, status: statusPayload, urls: urlsPayload, thumbnailUrl: "/api/artifacts/k3p9m2qr/thumbnail" }],
+    const listResponse = decodeArtifactListResponse({
+      artifacts: [
+        {
+          artifact: metadata,
+          urls,
+          status: "pending_changes",
+          pendingChanges: true,
+          thumbnailUrl: "https://pan.localhost/api/artifacts/k3p9m2qr/thumbnail",
+        },
+      ],
+    })
+    const workspaceResponse = decodeWorkspaceArtifactsResponse({
+      issueId: "PAN-1205",
+      workspaceId: "feature-pan-1205-slot-2",
+      artifacts: listResponse.artifacts,
     })
 
-    expect(publish.published).toBe(true)
-    expect(list.artifacts[0]?.status.currentHash).toBe(currentHash)
-    expect(list.artifacts[0]?.status.lastPublishedHash).toBe(lastPublishedHash)
-    expect(list.artifacts[0]?.status.pendingChanges).toBe(true)
+    expect(createResponse.urls.rawUrl).toBe("https://artifacts.pan.localhost/a/k3p9m2qr")
+    expect(listResponse.artifacts[0].status).toBe("pending_changes")
+    expect(workspaceResponse.artifacts).toHaveLength(1)
   })
 
-  it("rejects invalid hashes and unknown harness values", () => {
-    expect(() => Schema.decodeUnknownSync(ArtifactValidationResult)({
-      ...validationPayload,
-      hash: "sha256:not-a-real-hash",
-    })).toThrow()
-    expect(() => Schema.decodeUnknownSync(ArtifactMetadataResponse)({
-      artifact: { ...artifactPayload, agentHarness: "unknown" },
-      status: statusPayload,
-      urls: urlsPayload,
+  it("rejects unknown roles, harnesses, and validation codes", () => {
+    expect(() => decodeArtifactMetadata({ ...metadata, agentRole: "developer" })).toThrow()
+    expect(() => decodeArtifactMetadata({ ...metadata, agentHarness: "unknown" })).toThrow()
+    expect(() => decodeArtifactValidationResult({
+      ...validation,
+      errors: [{ ...validation.errors[0], code: "xss_detected" }],
     })).toThrow()
   })
 })
