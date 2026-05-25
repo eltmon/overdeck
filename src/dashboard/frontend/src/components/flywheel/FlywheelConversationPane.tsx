@@ -252,6 +252,14 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
         variant: 'destructive',
       });
       if (!ok) return;
+    } else if (runState === 'running') {
+      const ok = await confirm({
+        title: 'Start New Run',
+        message: `${run?.id ?? 'The current run'} is RUNNING. Starting a new run will abort the active orchestrator session and discard its in-flight work. Continue?`,
+        confirmLabel: 'Abort & Start New',
+        variant: 'destructive',
+      });
+      if (!ok) return;
     }
     newRunMutation.mutate();
   };
@@ -297,74 +305,67 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
                 Terminal
               </button>
             </div>
-            {runState === 'none' && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={() => startMutation.mutate()}
-                disabled={actionPending}
-              >
-                <Play className="h-3.5 w-3.5" />
-                New Run
-              </button>
-            )}
-            {runState === 'running' && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={() => pauseMutation.mutate()}
-                disabled={actionPending}
-              >
-                <Pause className="h-3.5 w-3.5" />
-                Pause
-              </button>
-            )}
-            {runState === 'paused' && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={() => resumeMutation.mutate()}
-                disabled={actionPending}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Resume
-              </button>
-            )}
-            {runState === 'paused' && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={handleNewRun}
-                disabled={actionPending}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New Run
-              </button>
-            )}
-            {(runState === 'paused' || runState === 'running') && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={handleReport}
-                disabled={actionPending}
-                title="Finalize the run report and close out (orchestrator must be paused/stopped)"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Write Report
-              </button>
-            )}
-            {(runState === 'paused' || runState === 'running') && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/10 disabled:opacity-50"
-                onClick={handleAbort}
-                disabled={actionPending}
-                title="Discard this run without writing a report"
-              >
-                <StopCircle className="h-3.5 w-3.5" />
-                Abort
-              </button>
-            )}
+            {/* Action buttons are always visible and self-explanatory via disabled state.
+                Removed runState gating that was introduced in a67ee20a9 (PAN-RUN-11
+                regression report). Original toolbar (commit e8e6f977e) showed all
+                actions unconditionally; gating hid the buttons operators expect to
+                see at all times. handleNewRun guards the destructive case via confirm. */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              onClick={() => pauseMutation.mutate()}
+              disabled={actionPending || runState !== 'running'}
+              title={runState !== 'running' ? 'No active run to pause' : 'Pause the orchestrator'}
+            >
+              <Pause className="h-3.5 w-3.5" />
+              Pause
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              onClick={() => resumeMutation.mutate()}
+              disabled={actionPending || runState !== 'paused'}
+              title={runState !== 'paused' ? 'Run is not paused' : 'Resume the orchestrator'}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Resume
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              onClick={handleNewRun}
+              disabled={actionPending}
+              title={runState === 'running'
+                ? 'Abort the active run and start a new one'
+                : runState === 'paused'
+                  ? 'Report the paused run and start a new one'
+                  : 'Start a new Flywheel run'}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Run
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              onClick={handleReport}
+              disabled={actionPending || runState === 'none'}
+              title={runState === 'none'
+                ? 'No active run to report'
+                : 'Finalize the run report and close out (orchestrator must be paused/stopped)'}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Write Report
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/10 disabled:opacity-50"
+              onClick={handleAbort}
+              disabled={actionPending || runState === 'none'}
+              title={runState === 'none' ? 'No active run to abort' : 'Discard this run without writing a report'}
+            >
+              <StopCircle className="h-3.5 w-3.5" />
+              Abort
+            </button>
             {!isPopoutWindow && (
               <button
                 type="button"
