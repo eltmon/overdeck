@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T12:31:41.888Z"
+    "updated": "2026-05-25T12:41:18.851Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 42,
+    "sequence": 44,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T12:31:41.888Z",
+    "updated": "2026-05-25T12:41:18.851Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -1242,55 +1242,55 @@
         "phase": "review",
         "issueId": "PAN-1486",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T12:31:41.884Z",
+        "updatedAt": "2026-05-25T12:41:18.850Z",
         "work": {
-          "updatedAt": "2026-05-25T12:31:41.884Z",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-25T12:31:41.884Z",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-25T12:31:41.884Z"
+              "at": "2026-05-25T12:41:18.850Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-25T12:31:41.884Z",
-          "notes": "Queued auto-merges are marked failed and pending polling is unbounded",
+          "status": "reviewing",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "notes": "Agent re-review request (4/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-25T12:31:41.884Z",
-              "notes": "Queued auto-merges are marked failed and pending polling is unbounded"
+              "status": "reviewing",
+              "at": "2026-05-25T12:41:18.850Z",
+              "notes": "Agent re-review request (4/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T12:31:41.884Z",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T12:31:41.884Z"
+              "at": "2026-05-25T12:41:18.850Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T12:31:41.884Z",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T12:31:41.884Z",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T12:31:41.884Z"
+              "at": "2026-05-25T12:41:18.850Z"
             }
           ],
           "readyForMerge": false,
