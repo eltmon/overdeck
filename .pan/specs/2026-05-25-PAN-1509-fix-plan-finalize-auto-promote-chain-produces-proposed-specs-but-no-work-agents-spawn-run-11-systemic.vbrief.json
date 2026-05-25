@@ -282,7 +282,7 @@
       {
         "id": "plan-finalize-uses-autospawn",
         "title": "fix(plan-finalize): use server-side autoSpawn; remove second POST to /api/agents",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -297,7 +297,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac1",
             "title": "plan-finalize.ts no longer contains a spawnWorkAgent function or a fetch to /api/agents",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -305,7 +305,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac2",
             "title": "promotePlanning POSTs body { autoSpawn: true } (or equivalent), and the fetch timeout is 90000ms",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -313,7 +313,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac3",
             "title": "Console output surfaces workAgentSpawned / workAgentSkipReason / workAgentError with actionable hints",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -321,7 +321,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac4",
             "title": "--no-promote still skips both promotion and spawn (preserved opt-out)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -329,7 +329,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac5",
             "title": "JSON output mode preserves the workAgentSpawned / workAgentMessage / workAgentError shape so any consumer code is unaffected",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -337,7 +337,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac6",
             "title": "__tests__/plan-finalize.test.ts asserts only one POST is made (no fetch to /api/agents) and the body includes autoSpawn",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -345,7 +345,7 @@
           {
             "id": "plan-finalize-uses-autospawn.ac7",
             "title": "npm run typecheck && npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { stampPlanForFinalization } from '../plan-finalize.js';
+import { promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 
 let TEST_DIR: string;
+let OLD_DASHBOARD_URL: string | undefined;
 
 function makePlanDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
   return {
@@ -34,12 +35,70 @@ function readDoc(path: string): VBriefDocument {
 
 beforeEach(() => {
   TEST_DIR = mkdtempSync(join(tmpdir(), 'plan-finalize-'));
+  OLD_DASHBOARD_URL = process.env.DASHBOARD_URL;
+  process.env.DASHBOARD_URL = 'http://dashboard.test';
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  if (OLD_DASHBOARD_URL === undefined) delete process.env.DASHBOARD_URL;
+  else process.env.DASHBOARD_URL = OLD_DASHBOARD_URL;
   if (existsSync(TEST_DIR)) {
     rmSync(TEST_DIR, { recursive: true, force: true });
   }
+});
+
+describe('promotePlanning', () => {
+  it('posts complete-planning with autoSpawn and no separate agents request', async () => {
+    vi.useFakeTimers();
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      message: 'Planning complete and work agent spawn requested',
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1509',
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(promotePlanning('PAN-1509')).resolves.toEqual({
+      success: true,
+      message: 'Planning complete and work agent spawn requested',
+      error: null,
+      workAgentSpawned: true,
+      workAgentMessage: 'Session: agent-pan-1509',
+      workAgentError: null,
+      workAgentSkipReason: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://dashboard.test/api/issues/PAN-1509/complete-planning');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ autoSpawn: true });
+    expect(String(url)).not.toContain('/api/agents');
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 90_000);
+  });
+
+  it('surfaces autoSpawn skip reasons from complete-planning', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      message: 'Planning complete and pushed to git - ready for execution',
+      workAgentSpawned: false,
+      workAgentError: 'Workspace docker stack for PAN-1509 is not healthy: api unhealthy',
+      workAgentSkipReason: 'stack-unhealthy',
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(promotePlanning('PAN-1509')).resolves.toMatchObject({
+      success: true,
+      workAgentSpawned: false,
+      workAgentMessage: 'Skip reason: stack-unhealthy',
+      workAgentError: 'Workspace docker stack for PAN-1509 is not healthy: api unhealthy',
+      workAgentSkipReason: 'stack-unhealthy',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('stampPlanForFinalization', () => {
