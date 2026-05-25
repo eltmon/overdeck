@@ -1,0 +1,138 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:24:38Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1175: SWARM dispatch fails with 'non-feature parent branch main' — checks wrong cwd",
+    "updated": "2026-05-25T16:25:51.789Z"
+  },
+  "plan": {
+    "id": "pan-1175",
+    "title": "SWARM dispatch fails with 'non-feature parent branch main' — checks wrong cwd",
+    "status": "proposed",
+    "uid": "544483b6-9c0b-49bc-9829-06a9f0f95b7c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:24:38Z",
+    "updated": "2026-05-25T16:25:51.789Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1175",
+        "label": "PAN-1175",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "regression-test",
+      "bug-already-fixed"
+    ],
+    "narratives": {
+      "Problem": "PAN-1175 originally reported that `pan swarm` failed from the main host repo because `resolveParentFeatureBranch` ran `git branch --show-current` against the main repo's cwd and rejected anything that did not start with `feature/`. Feature branches in this project live in worktrees, so the main repo can never have the feature branch checked out — the check was structurally impossible to satisfy. The fix has already landed on main (src/dashboard/server/routes/swarm.ts:2016-2042 looks the feature branch up directly in the local/remote branch lists the caller already computed, and the PAN-1175 banner comment documents the rationale). The 2026-05-24 audit comment on the issue confirms this. What is still missing is an explicit unit test that pins the new contract: future refactors of `resolveParentFeatureBranch` could re-introduce a cwd-dependent check without any existing test failing, because the swarm.test.ts setup still mocks `git branch --show-current` returning `feature/971` (line 69), masking any regression. The stale mock is itself misleading — it implies the function under test still cares about that command.",
+      "Proposal": "Add a focused regression test for `resolveParentFeatureBranch` that exercises the new list-based lookup contract and asserts the function does NOT depend on the current branch of the project path. Concretely: (1) cover the legacy `feature/<lowercase-id>` hit in localList, (2) cover the numeric `feature/<n>` hit when only the legacy form is absent, (3) cover the remote-only `origin/feature/<id>` fallback, (4) cover the no-branch-found error path with its actionable message, (5) prove independence from cwd by passing a projectPath whose `git branch --show-current` (if it were called) would return `main` — the test passes through the in-process function with `localList`/`remoteList` directly, so the assertion is structural rather than mocked. As part of the same diff, remove or scope the stale `git branch --show-current` mock so it does not silently re-stub a re-introduced cwd call. No production code changes — the fix is already in place; this bead is regression armor only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat PAN-1175 as already-fixed; plan a regression-test-only bead instead of re-fixing the bug.",
+        "rationale": "src/dashboard/server/routes/swarm.ts:2016-2042 already implements the proposed fix (list-based lookup, no `git branch --show-current` against projectPath), and the 2026-05-24 audit comment on the issue confirms it. Re-implementing the fix would create churn without value; pinning the new contract with a regression test is the highest-value defensible action."
+      },
+      {
+        "summary": "Single bead, not multiple.",
+        "rationale": "All work lives in one test file (src/dashboard/server/routes/__tests__/swarm.test.ts). Adding the regression test and removing/scoping the stale `git branch --show-current` mock are tightly coupled in the same file and same edit. Splitting would be ceremony, not reviewability."
+      },
+      {
+        "summary": "`requiresInspection: false` for the single bead.",
+        "rationale": "The bead is a test-only addition — no downstream beads depend on its internal structure, no API or schema is being introduced, and a wrong implementation surfaces immediately at typecheck/test run. It is a leaf change."
+      }
+    ],
+    "items": [
+      {
+        "id": "regression-test-resolve-parent-feature-branch",
+        "title": "Add regression test pinning the PAN-1175 fix in resolveParentFeatureBranch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:24:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1175",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add unit-test coverage for `resolveParentFeatureBranch` in src/dashboard/server/routes/__tests__/swarm.test.ts that exercises the new list-based lookup contract and proves the function does not depend on the current branch of the project path. Remove or tighten the stale `git branch --show-current` mock at the top of the file so it cannot mask a re-introduced cwd-dependent check. Do NOT change production code — the fix is already on main; this bead exists to prevent regression."
+        },
+        "subItems": [
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac1",
+            "title": "Test asserts `resolveParentFeatureBranch` returns `feature/pan-1175` when `localList` contains it (legacy lowercase form match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac2",
+            "title": "Test asserts `resolveParentFeatureBranch` returns `feature/1175` when the lowercase form is absent but `localList` contains the numeric form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac3",
+            "title": "Test asserts `resolveParentFeatureBranch` returns the candidate when only `remoteList` contains `origin/feature/<candidate>` (no local branch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac4",
+            "title": "Test asserts `resolveParentFeatureBranch` throws an error whose message contains `No feature branch found for PAN-1175` and the actionable `pan start PAN-1175` hint when neither list contains a candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac5",
+            "title": "Test proves cwd independence: passing `projectPath` whose `git branch --show-current` would return `main` (i.e., NOT a feature branch) still succeeds when the localList/remoteList contain a candidate. The test must not pre-stub `git branch --show-current` to return a feature branch — that masks the original PAN-1175 defect.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac6",
+            "title": "Stale `git branch --show-current` mock in swarm.test.ts (line 69 in current main) is removed, or constrained so it does NOT pre-supply a feature branch — confirm `npx vitest run src/dashboard/server/routes/__tests__/swarm.test.ts` still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac7",
+            "title": "Full test suite for the file passes: `npx vitest run src/dashboard/server/routes/__tests__/swarm.test.ts` reports 47+ passing tests with no regressions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resolve-parent-feature-branch.ac8",
+            "title": "Project quality gates pass: `npm run typecheck` and `npm run lint` complete with no new errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1175-swarm-dispatch-fails-with-non-feature-parent-branch-main-checks-wrong-cwd.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
