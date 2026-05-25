@@ -129,6 +129,9 @@ function installFetchHandler() {
     }
     if (path === '/api/context/sync' && method === 'POST') {
       syncCount += 1;
+      if (layersResponse.layers[0]?.content === 'fail-sync') {
+        return jsonResponse({ error: 'Sync failed' }, { status: 500 });
+      }
       return jsonResponse({ operation: 'sync', success: true, stdout: 'synced', stderr: '', syncedAt: '2026-05-25T00:00:00.000Z' });
     }
     return jsonResponse({ error: `Unexpected ${method} ${path}` }, { status: 404 });
@@ -211,6 +214,20 @@ describe('ContextPage', () => {
     expect(await screen.findByText(/Malformed harness block/)).toBeTruthy();
   });
 
+  it('marks changed content dirty until it is saved', async () => {
+    renderWithQuery(<ContextPage />);
+    const editor = await screen.findByLabelText('Context markdown editor');
+
+    expect(screen.getByText('Loaded')).toBeTruthy();
+    expect(screen.getByText('No unsaved changes')).toBeTruthy();
+
+    fireEvent.change(editor, { target: { value: 'updated global context' } });
+
+    expect(screen.getByText('Edited')).toBeTruthy();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Save$/ })).toBeEnabled();
+  });
+
   it('saves dirty content through PUT without syncing', async () => {
     renderWithQuery(<ContextPage />);
     const editor = await screen.findByLabelText('Context markdown editor');
@@ -234,6 +251,18 @@ describe('ContextPage', () => {
       .filter(([input, init]) => init?.method === 'PUT' || String(input) === '/api/context/sync')
       .map(([input]) => String(input));
     expect(writePaths).toEqual(['/api/context/layers', '/api/context/sync']);
+  });
+
+  it('keeps unsaved content visible when sync fails after saving', async () => {
+    renderWithQuery(<ContextPage />);
+    const editor = await screen.findByLabelText('Context markdown editor');
+
+    fireEvent.change(editor, { target: { value: 'fail-sync' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save & Sync' }));
+
+    expect(await screen.findByText('Sync failed')).toBeTruthy();
+    expect(screen.getByDisplayValue('fail-sync')).toBeTruthy();
+    expect(syncCount).toBe(1);
   });
 
   it('keeps unsaved content visible when save fails', async () => {
