@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:46:47.974Z"
+    "updated": "2026-05-25T09:53:51.151Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:46:47.974Z",
+    "updated": "2026-05-25T09:53:51.151Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -517,7 +517,7 @@
       {
         "id": "b08-auto-merge-eligibility",
         "title": "Add isAutoMergeEligible(issueId) predicate + BLOCKER_LABELS constant",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -533,60 +533,68 @@
           {
             "id": "b08.ac1",
             "title": "BLOCKER_LABELS is exported as a readonly tuple from the new module; the role prompt and any future surface should import this constant rather than hard-coding the strings.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac2",
             "title": "isAutoMergeEligible returns {eligible:false, reason: 'review status is not readyForMerge'} when readyForMerge is false.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac3",
             "title": "Returns {eligible:false, reason: 'CI checks failing on PR HEAD <sha>'} when checksFailed===true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac4",
             "title": "Returns {eligible:false, reason: 'PR is already merged'} when prState.merged===true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac5",
             "title": "Returns {eligible:false, reason: 'issue carries blocker label: <label>'} when any BLOCKER_LABELS member is on the issue.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac6",
             "title": "Returns {eligible:true} only when all checks pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac7",
             "title": "Vitest unit tests in src/lib/cloister/__tests__/auto-merge-eligibility.test.ts cover all five branches with mocked review-status + getPullRequestState + label-fetch.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:53:51.151Z"
       },
       {
         "id": "b09-pending-auto-merges-table",
