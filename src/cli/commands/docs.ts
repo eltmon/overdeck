@@ -109,7 +109,7 @@ function printDocsQueryResult(result: DocsQueryResult, format: string): void {
   }
   for (const item of result.results) {
     console.log(`--- ${item.docPath} (${item.docKind})`);
-    console.log(item.content);
+    console.log(item.displayContent);
     console.log('');
   }
 }
