@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T09:43:13.472Z"
+    "updated": "2026-05-25T09:45:21.974Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T09:43:13.472Z",
+    "updated": "2026-05-25T09:45:21.974Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -202,7 +202,7 @@
       {
         "id": "b03-role-prompt-inventory-conditional",
         "title": "Update roles/flywheel.md Inventory step to conditionally include backlog when auto_pickup_backlog=true",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -218,36 +218,41 @@
           {
             "id": "b03.ac1",
             "title": "Inventory step explicitly references the 'Auto-pickup backlog: <bool>' line in the brief and describes both behaviors (true/false) in a single conditional paragraph.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac2",
             "title": "Backlog-inclusion mode preserves all existing inventory filters (eltmon author/assignee gate; exclude needs-design / needs-discussion) — these are not relaxed when auto_pickup_backlog=true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac3",
             "title": "Backlog-inclusion mode caps total active agents at maxAgents from the brief; the orchestrator must not exceed it.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac4",
             "title": "No other section of roles/flywheel.md is changed by this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:45:21.974Z"
       },
       {
         "id": "b04-role-prompt-forbidden-conditional",
