@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-1242",
+  "created": "2026-05-25T16:22:30.504Z",
+  "updated": "2026-05-25T16:22:30.504Z",
+  "gitState": { "branch": "feature/pan-1242", "dirty": false },
+  "agentModel": "agent:claude-opus-4-7",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Button renders only on `backlog` and `todo` columns. `in_progress`, `in_review`, `verifying_on_main`, `done` do NOT get the button.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D2",
+      "summary": "New endpoint: `POST /api/issues` with body `{ projectKey, targetStatus, title, description? }`. Validates targetStatus ∈ {backlog, todo}. Returns the normalized `Issue` on success, 400/404/501 on failure.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Initial column placement uses `updateShadowState(id, 'open', 'dashboard-new-issue', targetStatus)` — identical mechanism to drag-drop in `/api/issues/:id/move-status`. No new column-pinning machinery.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Project picker source = the `issue.project` data already on every existing Issue, filtered to exclude GitLab-only projects. No new `/api/projects` endpoint is added in this issue.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Dialog uses existing Radix-based dialog primitives (same pattern as `ConfirmationDialog` / `PlanDialog`). Fields: title (required), description (optional textarea), project picker (auto-selected when board is filtered to one project).",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D6",
+      "summary": "No advanced fields (labels, assignee, priority, team) in v1 — minimal surface, matches mockup. Team/rally_project come from project config server-side.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D7",
+      "summary": "GitLab projects are unsupported (NotImplementedError). Server returns 501; frontend hides/disables the button when the only visible project is GitLab.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    },
+    {
+      "id": "D8",
+      "summary": "After creation: server invalidates the relevant tracker cache + appends an `issue.statusChanged` (or `issue.created`) event to EventStoreService; frontend calls `refreshDashboardState(queryClient)`. No optimistic UI in v1 — the round-trip is fast enough.",
+      "recordedAt": "2026-05-25T16:22:30.504Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Multi-project boards: when the board shows issues from multiple projects (default 'all'), the new-issue button has no obvious target project.",
+      "mitigation": "Dialog shows a project picker when `selectedProjects.size !== 1`; pre-selects when exactly one is filtered. Tested in `new-issue-button-test`."
+    },
+    {
+      "id": "H2",
+      "summary": "Tracker-state vs dashboard-column drift: a brand-new issue is created in canonical `open` upstream, then pinned to `todo`/`backlog` via shadow-state. If someone later changes the tracker state externally, the shadow can lag.",
+      "mitigation": "Identical to today's drag-drop overlay risk — no new exposure. `updateShadowState` is the existing mechanism; cache invalidation runs on every move, so divergence is bounded by the next refresh."
+    },
+    {
+      "id": "H3",
+      "summary": "GitLab projects: `GitLabTracker.createIssue` throws `NotImplementedError`. Submitting against a GitLab project would 500 without explicit handling.",
+      "mitigation": "Server returns 501 with `{ error: 'GitLab issue creation is not yet supported' }` before calling the tracker. Frontend hides/disables the button for GitLab-only contexts."
+    },
+    {
+      "id": "H4",
+      "summary": "Empty title or whitespace-only title would create a useless issue.",
+      "mitigation": "Frontend disables Submit until trimmed title is non-empty; server returns 400 if title is missing/empty/whitespace. Both checks in tests."
+    },
+    {
+      "id": "H5",
+      "summary": "Race between create + refresh: the user could click Create twice if the response is slow.",
+      "mitigation": "Dialog disables Submit and shows a loading state while the POST is in-flight. Cancel still works to dismiss; closing dismisses without waiting for the response (acceptable — server-side dedup is not in scope)."
+    },
+    {
+      "id": "H6",
+      "summary": "Issue ID format varies by tracker: GitHub returns `123`, Linear returns `PAN-1500`, Rally returns artifact-formatted IDs. The frontend must accept whatever the server returns and the new card must render correctly.",
+      "mitigation": "Server returns the normalized `Issue` object from `tracker.createIssue` — same shape `GET /api/issues` already returns. No frontend ID-shape assumptions added."
+    },
+    {
+      "id": "H7",
+      "summary": "The TODO comment at KanbanBoard.tsx:1928 must be removed when the button ships, or future audits will keep flagging this as deferred work.",
+      "mitigation": "`column-footer-button.ac6` explicitly requires the TODO to be deleted as part of the bead."
+    },
+    {
+      "id": "H8",
+      "summary": "Backend endpoint must follow no-blocking-calls rule (CLAUDE.md): no `execSync`/`readFileSync`/`writeFileSync` reachable from the handler. The existing `loadProjectsConfig` flow needs verification — if it uses sync FS, switch to the async variant.",
+      "mitigation": "`new-issue-api.ac5` makes the rule explicit. Reviewer convoy (review.correctness) should verify."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-25T16:22:30.504Z",
+      "reason": "planning",
+      "note": "Auto planning session for PAN-1242 — produced vBRIEF with 6 beads (backend endpoint foundation + frontend dialog + column-footer button + GitLab-unsupported handling + backend and frontend tests). Backend endpoint is the inspection foundation; downstream beads consume its contract.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
