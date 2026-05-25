@@ -201,10 +201,12 @@ describe('pipeline run metrics', () => {
     expect(inputs.verificationAttempts).toEqual([{ issueId: 'PAN-10', stage: 'review', passed: true, headSha: 'sha' }]);
     expect(statements[0]).toContain('timestamp >= ?');
     expect(statements[0]).toContain('timestamp <= ?');
-    expect(statements[2]).toContain("json_extract(payload, '$.issueId') IN (?)");
-    expect(statements[2]).toContain('timestamp <= ?');
-    expect(statements[2]).not.toMatch(/FROM events\s+WHERE type IN \([^)]*\)\s+AND timestamp <= \?\s+ORDER BY/s);
+    expect(statements[2]).toContain("WHERE json_extract(payload, '$.issueId') IN (?)");
+    expect(statements[2]).toContain('AND type IN');
+    expect(statements[2]).toContain('AND timestamp <= ?');
+    expect(statements[2]).toContain("AND json_type(payload, '$.issueId') = 'text'");
     expect(calls[0].slice(-2)).toEqual(['2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z']);
-    expect(calls[2].at(-1)).toBe('PAN-10');
+    expect(calls[2][0]).toBe('PAN-10');
+    expect(calls[2].at(-1)).toBe('2026-05-31T00:00:00.000Z');
   });
 });

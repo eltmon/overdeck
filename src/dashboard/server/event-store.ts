@@ -138,6 +138,16 @@ export async function openEventDb(): Promise<DbAdapter> {
     `);
     db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
     db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
+    db.exec(`
       CREATE TABLE IF NOT EXISTS projection_cache (
         key        TEXT PRIMARY KEY,
         data       TEXT NOT NULL,

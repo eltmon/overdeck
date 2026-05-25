@@ -26,9 +26,9 @@ describe('pending auto-merges schema', () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
-    expect(SCHEMA_VERSION).toBe(46);
+    expect(SCHEMA_VERSION).toBe(47);
     const db = getDatabase();
-    expect(db.pragma('user_version', { simple: true })).toBe(46);
+    expect(db.pragma('user_version', { simple: true })).toBe(47);
 
     const columns = db.prepare('PRAGMA table_info(pending_auto_merges)').all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toEqual([
@@ -58,6 +58,53 @@ describe('pending auto-merges schema', () => {
     ]));
   });
 
+  it('creates indexed event access paths for flywheel stats', () => {
+    makeTestHome('pan-events-stats-indexes-fresh');
+
+    const db = getDatabase();
+    const indexes = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events'").all() as Array<{ name: string; sql: string }>;
+
+    expect(indexes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'idx_events_issue_type_timestamp_sequence',
+        sql: expect.stringContaining("json_extract(payload, '$.issueId'), type, timestamp, sequence"),
+      }),
+      expect.objectContaining({
+        name: 'idx_events_type_timestamp_issue_sequence',
+        sql: expect.stringContaining("type, timestamp, json_extract(payload, '$.issueId'), sequence"),
+      }),
+    ]));
+  });
+
+  it('migrates an existing v46 database by adding flywheel stats event indexes', () => {
+    const home = makeTestHome('pan-events-stats-indexes-migrate');
+    const db = new Database(join(home, 'panopticon.db'));
+    try {
+      db.exec(`
+        CREATE TABLE events (
+          sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+          type      TEXT    NOT NULL,
+          timestamp TEXT    NOT NULL,
+          payload   TEXT    NOT NULL
+        );
+        CREATE INDEX idx_events_type ON events(type);
+        CREATE INDEX idx_events_timestamp ON events(timestamp);
+        PRAGMA user_version = 46;
+      `);
+
+      runMigrations(db);
+
+      expect(db.pragma('user_version', { simple: true })).toBe(47);
+      const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events'").all() as Array<{ name: string }>;
+      expect(indexes).toEqual(expect.arrayContaining([
+        { name: 'idx_events_issue_type_timestamp_sequence' },
+        { name: 'idx_events_type_timestamp_issue_sequence' },
+      ]));
+    } finally {
+      db.close();
+    }
+  });
+
   it('migrates an existing v44 database by adding auto-merge hot-path indexes', () => {
     const home = makeTestHome('pan-pending-auto-merges-v44-indexes');
     const db = new Database(join(home, 'panopticon.db'));
@@ -84,7 +131,7 @@ describe('pending auto-merges schema', () => {
 
       runMigrations(db);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(46);
+      expect(db.pragma('user_version', { simple: true })).toBe(47);
       const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pending_auto_merges'").all() as Array<{ name: string }>;
       expect(indexes).toEqual(expect.arrayContaining([
         { name: 'idx_pending_auto_merges_due_pending' },
@@ -113,7 +160,7 @@ describe('pending auto-merges schema', () => {
 
       runMigrations(db);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(46);
+      expect(db.pragma('user_version', { simple: true })).toBe(47);
       expect(db.prepare("SELECT value FROM app_settings WHERE key = 'sentinel'").get()).toEqual({ value: 'kept' });
       const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_auto_merges'").get();
       expect(table).toEqual({ name: 'pending_auto_merges' });

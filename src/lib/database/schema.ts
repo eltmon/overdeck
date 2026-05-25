@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 46;
+export const SCHEMA_VERSION = 47;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -385,6 +385,14 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_events_timestamp
       ON events(timestamp);
+
+    CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+      ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+      WHERE json_type(payload, '$.issueId') = 'text';
+
+    CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+      ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+      WHERE json_type(payload, '$.issueId') = 'text';
 
     -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
     CREATE TABLE IF NOT EXISTS projection_cache (
@@ -1346,6 +1354,32 @@ export function runMigrations(db: Database.Database): void {
 
       CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
         ON flywheel_substrate_bugs(status, fix_merged_at);
+    `);
+  }
+
+  // v46 → v47: add indexed Flywheel stats event access paths (PAN-1487)
+  if (currentVersion < 47) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT    NOT NULL,
+        timestamp TEXT    NOT NULL,
+        payload   TEXT    NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_events_type
+        ON events(type);
+
+      CREATE INDEX IF NOT EXISTS idx_events_timestamp
+        ON events(timestamp);
+
+      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+        WHERE json_type(payload, '$.issueId') = 'text';
+
+      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+        WHERE json_type(payload, '$.issueId') = 'text';
     `);
   }
 

@@ -374,12 +374,13 @@ export function createPipelineRunStatsInputsReader(db: DbAdapter) {
       const issueHistoryStmt = db.prepare<EventRow>(
         `SELECT sequence, type, timestamp, payload
          FROM events
-         WHERE type IN (${eventTypePlaceholders})
+         WHERE json_extract(payload, '$.issueId') IN (${issuePlaceholders})
+           AND type IN (${eventTypePlaceholders})
            AND timestamp <= ?
-           AND json_extract(payload, '$.issueId') IN (${issuePlaceholders})
+           AND json_type(payload, '$.issueId') = 'text'
          ORDER BY sequence ASC`,
       );
-      const issueHistoryRows = issueHistoryStmt.all([...relevantEventTypes, until, ...issueIds]);
+      const issueHistoryRows = issueHistoryStmt.all([...issueIds, ...relevantEventTypes, until]);
       const rowsBySequence = new Map<number, EventRow>();
       for (const row of issueHistoryRows) rowsBySequence.set(row.sequence, row);
       for (const row of verificationRows) rowsBySequence.set(row.sequence, row);
