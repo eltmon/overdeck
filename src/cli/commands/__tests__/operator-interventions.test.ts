@@ -29,6 +29,7 @@ const projectMocks = vi.hoisted(() => ({
 }));
 
 const issueIdMocks = vi.hoisted(() => ({
+  resolveBareNumericIdSync: vi.fn((id: string) => id.replace(/^agent-/i, '').toUpperCase()),
   resolveIssueIdSync: vi.fn((id: string) => id),
   extractPrefixSync: vi.fn((id: string) => id.split('-')[0]?.toUpperCase()),
 }));
@@ -84,6 +85,7 @@ vi.mock('../../../lib/projects.js', () => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
+  resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
   resolveIssueIdSync: issueIdMocks.resolveIssueIdSync,
   extractPrefixSync: issueIdMocks.extractPrefixSync,
 }));
@@ -123,6 +125,8 @@ describe('operator intervention CLI emission', () => {
     workspaceMocks.findWorkspacePath.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
     projectMocks.getIssuePrefix.mockReset();
+    issueIdMocks.resolveBareNumericIdSync.mockReset();
+    issueIdMocks.resolveBareNumericIdSync.mockImplementation((id: string) => id.replace(/^agent-/i, '').toUpperCase());
     issueIdMocks.resolveIssueIdSync.mockReset();
     issueIdMocks.resolveIssueIdSync.mockImplementation((id: string) => id);
     issueIdMocks.extractPrefixSync.mockReset();

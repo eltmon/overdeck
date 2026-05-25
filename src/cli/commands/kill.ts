@@ -5,7 +5,7 @@ import { stopAgentSync, getAgentStateSync } from '../../lib/agents.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
-import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
@@ -48,7 +48,14 @@ function findAgentIdsForIssue(issueLower: string): string[] {
 }
 
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
-  const issueId = resolveIssueIdSync(id);
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    return;
+  }
   const issueLower = issueId.toLowerCase();
 
   // Discover every agent tied to this issue (work + plan + pipeline specialists
