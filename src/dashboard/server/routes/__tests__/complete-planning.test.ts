@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts } from '../issues.js';
+import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
 let projectRoot: string | null = null;
@@ -116,5 +116,58 @@ describe('completePlanningArtifacts', () => {
     })).rejects.toThrow('bd daemon unavailable');
 
     expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
+  });
+
+  it('does not auto-spawn when autoSpawn is omitted', async () => {
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error('fetch should not be called');
+    };
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+    })).resolves.toBeNull();
+  });
+
+  it('auto-spawns a work agent through the existing agents endpoint', async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+      expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-1146', role: 'work' });
+      return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
+    };
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1146',
+    });
+  });
+
+  it('maps stack-health spawn rejection to a non-fatal autoSpawn skip', async () => {
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
+      stackHealth: { healthy: false, reasons: ['api unhealthy'] },
+    }), { status: 422 });
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1147',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+    })).resolves.toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
+      workAgentSkipReason: 'stack-unhealthy',
+    });
   });
 });

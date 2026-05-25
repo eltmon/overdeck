@@ -138,7 +138,7 @@
       {
         "id": "server-side-autospawn",
         "title": "feat(complete-planning): autoSpawn=true spawns work agent server-side after spec+beads succeed",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T17:30:00.000Z",
         "metadata": {
@@ -159,7 +159,7 @@
           {
             "id": "server-side-autospawn.ac1",
             "title": "Request body accepts optional autoSpawn boolean; default false; field omitted from existing callers does not change behavior",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "server-side-autospawn.ac2",
             "title": "When autoSpawn=true and spec+beads succeed, work agent is spawned in the same Effect; response includes workAgentSpawned=true and workAgentSession",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "server-side-autospawn.ac3",
             "title": "When autoSpawn=true and stack-health rejects the spawn, response returns 200 with workAgentSpawned=false and workAgentSkipReason='stack-unhealthy' (NOT a 4xx/5xx)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -183,7 +183,7 @@
           {
             "id": "server-side-autospawn.ac4",
             "title": "When autoSpawn=true and spec+beads fail (e.g. bead mismatch), the route returns 5xx as today; no spawn attempted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -191,7 +191,7 @@
           {
             "id": "server-side-autospawn.ac5",
             "title": "When autoSpawn=false (kanban Done button), behavior is byte-for-byte identical to current main branch (regression test covers this)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -199,7 +199,7 @@
           {
             "id": "server-side-autospawn.ac6",
             "title": "Spawn reuses the same evaluateAgentStartGate + spawnGuardrails + stack-health checks as POST /api/agents — does NOT bypass any gate",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -207,7 +207,7 @@
           {
             "id": "server-side-autospawn.ac7",
             "title": "New unit test in __tests__/complete-planning.test.ts asserts autoSpawn=true happy path and stack-health-rejection path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -215,7 +215,7 @@
           {
             "id": "server-side-autospawn.ac8",
             "title": "npm run typecheck && npm run lint pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

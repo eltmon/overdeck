@@ -97,6 +97,13 @@ export async function removeCompletionMarker(markerPath: string): Promise<void> 
   if (existsSync(markerPath)) await rm(markerPath);
 }
 
+export interface CompletePlanningAutoSpawnResult {
+  workAgentSpawned: boolean;
+  workAgentSession?: string;
+  workAgentError?: string;
+  workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'spawn-failed';
+}
+
 export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
@@ -147,6 +154,60 @@ export async function completePlanningArtifacts(options: {
     : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
 
   return { proposed, beadCount: created.length, beadsWarning: null };
+}
+
+function getInternalDashboardOrigin(): string {
+  const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  return process.env['PANOPTICON_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
+}
+
+function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): CompletePlanningAutoSpawnResult['workAgentSkipReason'] {
+  const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
+  if (body['paused'] === true) return 'paused';
+  if (body['troubled'] === true) return 'troubled';
+  if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';
+  return 'spawn-failed';
+}
+
+export async function completePlanningAutoSpawn(options: {
+  issueId: string;
+  autoSpawn?: boolean;
+  fetchImpl?: typeof fetch;
+  dashboardOrigin?: string;
+}): Promise<CompletePlanningAutoSpawnResult | null> {
+  if (options.autoSpawn !== true) return null;
+
+  const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
+  const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      origin: dashboardOrigin,
+    },
+    body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
+  });
+
+  const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+  const agentId = typeof body['agentId'] === 'string'
+    ? body['agentId']
+    : `agent-${options.issueId.toLowerCase()}`;
+
+  if (response.ok && body['success'] !== false) {
+    return { workAgentSpawned: true, workAgentSession: agentId };
+  }
+
+  const error = typeof body['error'] === 'string'
+    ? body['error']
+    : typeof body['message'] === 'string'
+      ? body['message']
+      : `Work agent spawn returned HTTP ${response.status}`;
+
+  return {
+    workAgentSpawned: false,
+    workAgentError: error,
+    workAgentSkipReason: classifyAutoSpawnSkip(response.status, body),
+  };
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -1047,10 +1108,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     const skipKill = (body as any)?.skipKill === true;
+    const autoSpawn = (body as any)?.autoSpawn === true;
     const sessionName = `planning-${id.toLowerCase()}`;
     const issueLower = id.toLowerCase();
 
-    console.log(`[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
+    console.log(autoSpawn
+      ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
+      : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
     // Detect remote planning session (non-fatal reads)
     const { isRemotePlanning, remoteVmName } = yield* Effect.promise(async (): Promise<{ isRemotePlanning: boolean; remoteVmName: string | null }> => {
@@ -1268,6 +1332,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
+    const autoSpawnResult = yield* Effect.promise(() => completePlanningAutoSpawn({ issueId: id, autoSpawn })
+      .catch((error: unknown): CompletePlanningAutoSpawnResult => ({
+        workAgentSpawned: false,
+        workAgentError: error instanceof Error ? error.message : String(error),
+        workAgentSkipReason: 'spawn-failed',
+      })));
+
     // Deferred session kill: schedule after the response is flushed so a chained
     // `pan plan finalize` call from inside the planning session can read its own
     // success response before its tmux pane is destroyed. ~1.5s is enough for the
@@ -1289,9 +1360,12 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       newState,
       gitPushed,
       ...(beadsWarning ? { beadsWarning } : {}),
-      message: gitPushed
-        ? 'Planning complete and pushed to git - ready for execution'
-        : 'Planning complete - ready for execution',
+      ...(autoSpawnResult ?? {}),
+      message: autoSpawnResult?.workAgentSpawned
+        ? 'Planning complete and work agent spawn requested'
+        : gitPushed
+          ? 'Planning complete and pushed to git - ready for execution'
+          : 'Planning complete - ready for execution',
     });
   })),
 );
