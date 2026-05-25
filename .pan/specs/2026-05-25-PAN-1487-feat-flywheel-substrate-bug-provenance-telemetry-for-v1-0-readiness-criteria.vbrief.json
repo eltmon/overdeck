@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.11.1",
     "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "updated": "2026-05-25T13:03:03.813Z"
+    "updated": "2026-05-25T13:12:15.197Z"
   },
   "plan": {
     "id": "pan-1487",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 18,
+    "sequence": 32,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T13:03:03.813Z",
+    "updated": "2026-05-25T13:12:15.197Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
@@ -1783,57 +1783,57 @@
         "phase": "review",
         "issueId": "PAN-1487",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T13:03:03.670Z",
+        "updatedAt": "2026-05-25T13:12:15.196Z",
         "work": {
-          "updatedAt": "2026-05-25T13:03:03.670Z",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-05-25T13:03:03.670Z",
-          "notes": "Verification FAILED at build (106156ms):\n\nT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:125:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m125 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:resolver (34%)\n  - rolldown-plugin-dts:generate (31%)\n  - tsdown:deps (30%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nattempt to write a readonly database\n",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "notes": "Verification FAILED at test (25548ms):\n\nes, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > returns daemon defaults when config omits the tts section\nAssertionError: expected { enabled: false, …(13) } to deeply equal { enabled: false, voice: '', …(11) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": false,\n    \"daemonHost\": \"127.0.0.1\",\n    \"daemonPort\": 8787,\n    \"dropInfoWhenFull\": true,\n    \"enabled\": false,\n+   \"lifecycle\": true,\n    \"maxChars\": 140,\n    \"mutedIssues\": [],\n    \"mutedSources\": [],\n    \"rate\": 1,\n    \"utteranceTemplates\": {},\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:209:24\n    207|     const { config } = mergeConfigs({});\n    208|\n    209|     expect(config.tts).toEqual({\n       |                        ^\n    210|       enabled: false,\n    211|       voice: '',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-25T13:03:03.670Z",
-              "notes": "Verification FAILED at build (106156ms):\n\nT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:125:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m125 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:resolver (34%)\n  - rolldown-plugin-dts:generate (31%)\n  - tsdown:deps (30%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nattempt to write a readonly database\n"
+              "at": "2026-05-25T13:12:15.196Z",
+              "notes": "Verification FAILED at test (25548ms):\n\nes, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > returns daemon defaults when config omits the tts section\nAssertionError: expected { enabled: false, …(13) } to deeply equal { enabled: false, voice: '', …(11) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": false,\n    \"daemonHost\": \"127.0.0.1\",\n    \"daemonPort\": 8787,\n    \"dropInfoWhenFull\": true,\n    \"enabled\": false,\n+   \"lifecycle\": true,\n    \"maxChars\": 140,\n    \"mutedIssues\": [],\n    \"mutedSources\": [],\n    \"rate\": 1,\n    \"utteranceTemplates\": {},\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:209:24\n    207|     const { config } = mergeConfigs({});\n    208|\n    209|     expect(config.tts).toEqual({\n       |                        ^\n    210|       enabled: false,\n    211|       voice: '',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > tts daemon configuration > merges daemon tts fields over defaults\nAssertionError: expected { enabled: true, …(14) } to deeply equal { enabled: true, …(13) }\n\n- Expected\n+ Received\n\n@@ -2,10 +2,11 @@\n    \"daemonAutoStart\": true,\n    \"daemonHost\": \"localhost\",\n    \"daemonPort\": 8788,\n    \"dropInfoWhenFull\": false,\n    \"enabled\": true,\n+   \"lifecycle\": true,\n    \"maxChars\": 220,\n    \"mutedIssues\": [\n      \"PAN-123\",\n    ],\n    \"mutedSources\": [\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:246:24\n    244|     });\n    245|\n    246|     expect(config.tts).toEqual({\n       |                        ^\n    247|       enabled: true,\n    248|       voice: 'voice-system',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n"
             }
           ]
         },
         "review": {
           "status": "failed",
-          "updatedAt": "2026-05-25T13:03:03.670Z",
-          "notes": "Verification failed at build",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
+          "notes": "Verification failed at test",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-25T13:03:03.670Z",
-              "notes": "Verification failed at build"
+              "at": "2026-05-25T13:12:15.196Z",
+              "notes": "Verification failed at test"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:03:03.670Z",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:03:03.670Z"
+              "at": "2026-05-25T13:12:15.196Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T13:03:03.670Z",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T13:03:03.670Z",
+          "updatedAt": "2026-05-25T13:12:15.196Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T13:03:03.670Z"
+              "at": "2026-05-25T13:12:15.196Z"
             }
           ],
           "readyForMerge": false,
