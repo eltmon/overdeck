@@ -642,7 +642,7 @@ export function getAgentDir(agentId: string): string {
 }
 
 function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel';
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike';
 }
 
 function cleanAgentState(raw: AgentState): AgentState {
