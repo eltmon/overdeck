@@ -73,7 +73,7 @@ describe('dashboard context routes helpers', () => {
       kind: 'workspace',
       projectKey: 'pan',
       workspacePath: outsideWorkspace,
-    }, 'escape')).rejects.toThrow('Unknown workspace');
+    }, 'escape')).rejects.toThrow('Context layer is not registered');
     await expect(exists(join(outsideWorkspace, '.pan', 'context', 'workspace.md'))).resolves.toBe(false);
   });
 
@@ -121,7 +121,7 @@ describe('dashboard context routes helpers', () => {
     expect(response.previews.pi).toContain('Shared guidance.');
     expect(response.previews.pi).toContain('Pi guidance.');
     expect(response.previews.pi).not.toContain('Claude guidance.');
-    expect(response.previews.fullPrompt).toContain('Private harness base prompt: unavailable');
+    expect(response.previews.fullPrompt).toContain('Private harness base prompt: Unavailable');
     expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);
   });

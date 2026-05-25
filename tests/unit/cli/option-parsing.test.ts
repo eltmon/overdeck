@@ -108,7 +108,7 @@ describe('pan project(s) add — option parsing', () => {
   it('supports the preferred plural projects alias', () => {
     const { stdout, status } = runCli(['projects', 'add', '--help']);
     expect(status).toBe(0);
-    expect(stdout).toMatch(/Usage: pan project add \[options\] <path>/);
+    expect(stdout).toMatch(/Usage: pan projects add \[options\] <path>/);
     expect(stdout).toMatch(/Register a project with Panopticon/);
   });
 
