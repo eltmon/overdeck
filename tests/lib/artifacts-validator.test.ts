@@ -102,6 +102,23 @@ describe('artifact HTML validation', () => {
     expect(result.errors.map((finding) => finding.code)).toContain('secret_detected');
   });
 
+  it.each([
+    ['AWS access key near miss', `AKIA${'A'.repeat(15)}`],
+    ['GitHub PAT near miss', `ghp_${'A'.repeat(35)}`],
+    ['GitHub OAuth token near miss', `gho_${'A'.repeat(35)}`],
+    ['GitHub fine-grained PAT near miss', `github_pat_${'A'.repeat(81)}`],
+    ['Anthropic API key near miss', `sk-ant-api03-${'A'.repeat(85)}`],
+    ['OpenAI API key near miss', `sk-${'A'.repeat(19)}`],
+    ['Slack token near miss', 'xoxb-123456789'],
+    ['public key marker', '-----BEGIN PUBLIC KEY-----'],
+    ['short env assignment', 'api_key="1234567"'],
+  ])('allows benign %s content', (_name, value) => {
+    const result = validateArtifactHtmlContent(html(`<pre>${value}</pre>`));
+
+    expect(result.ok).toBe(true);
+    expect(result.errors.map((finding) => finding.code)).not.toContain('secret_detected');
+  });
+
   it('downgrades per-line allowed secret matches to warnings', () => {
     const result = validateArtifactHtmlContent(html([
       '<!-- artifact-allow-secret -->',
