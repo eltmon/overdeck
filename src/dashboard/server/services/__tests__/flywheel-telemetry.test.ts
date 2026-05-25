@@ -3,6 +3,7 @@ import { decodeFlywheelStats } from '@panctl/contracts';
 import {
   computeBugRateCriterion,
   computeCriterion3,
+  computeCriterion4,
   computeCriterion5,
   computeCriterion6,
   computeCriterion7,
@@ -57,6 +58,21 @@ function criterion6Run(totalMs: number, counts: { beadsCount?: number; planItems
 
 function criterion6Value(criterion: ReturnType<typeof computeCriterion6>) {
   return criterion.value as Record<'simple' | 'medium' | 'complex', Criterion6BucketValue>;
+}
+
+function criterion4Bug(issueId: string, filedAt: string, fixMergedAt: string | null, status: 'open' | 'fixed' = 'fixed') {
+  return {
+    issueId,
+    filedAt,
+    runId: null,
+    filedBy: 'agent' as const,
+    discoveredInIssueId: null,
+    severity: 'P2',
+    status,
+    fixMergedAt,
+    fixCommitSha: fixMergedAt ? 'abc123' : null,
+    updatedAt: fixMergedAt ?? filedAt,
+  };
 }
 
 describe('flywheel telemetry', () => {
@@ -230,6 +246,52 @@ describe('flywheel telemetry', () => {
 
     expect(criterion.value).toBe(1 - (failures / attempts));
     expect(criterion.status).toBe(status);
+  });
+
+  it('computes criterion 4 median and p95 MTTR from fixed bugs in the merge window', () => {
+    const criterion = computeCriterion4([
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', '2026-05-01T01:00:00.000Z'),
+      criterion4Bug('PAN-2', '2026-05-02T00:00:00.000Z', '2026-05-02T02:00:00.000Z'),
+      criterion4Bug('PAN-3', '2026-05-03T00:00:00.000Z', '2026-05-03T06:00:00.000Z'),
+      criterion4Bug('PAN-4', '2026-05-04T00:00:00.000Z', '2026-05-04T12:00:00.000Z'),
+      criterion4Bug('PAN-5', '2026-05-05T00:00:00.000Z', '2026-05-11T00:00:00.000Z'),
+      criterion4Bug('PAN-6', '2026-04-01T00:00:00.000Z', '2026-04-02T00:00:00.000Z'),
+      criterion4Bug('PAN-7', '2026-05-01T00:00:00.000Z', null, 'open'),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toEqual({ medianMs: 6 * 60 * 60 * 1000, p95Ms: 6 * 24 * 60 * 60 * 1000 });
+    expect(criterion.target).toEqual({ medianMs: 86_400_000, p95Ms: 604_800_000 });
+    expect(criterion.status).toBe('green');
+    expect(criterion.sampleSize).toBe(5);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it.each([
+    [[1, 2, 6], 'green'],
+    [[1, 2, 10 * 24], 'yellow'],
+    [[1, 2, 15 * 24], 'red'],
+    [[25, 26, 27], 'red'],
+  ] as const)('maps criterion 4 status for hour durations %j', (durationsHours, status) => {
+    const criterion = computeCriterion4(durationsHours.map((hours, index) => criterion4Bug(
+      `PAN-${index}`,
+      '2026-05-01T00:00:00.000Z',
+      new Date(Date.parse('2026-05-01T00:00:00.000Z') + hours * 60 * 60 * 1000).toISOString(),
+    )), '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.status).toBe(status);
+    expect(criterion.dataSufficient).toBe(true);
+  });
+
+  it('marks criterion 4 insufficient with fewer than three fixed bugs in the window', () => {
+    const criterion = computeCriterion4([
+      criterion4Bug('PAN-1', '2026-05-01T00:00:00.000Z', '2026-05-01T01:00:00.000Z'),
+      criterion4Bug('PAN-2', '2026-05-02T00:00:00.000Z', '2026-05-02T02:00:00.000Z'),
+    ], '2026-05-01T00:00:00.000Z', '2026-05-31T00:00:00.000Z');
+
+    expect(criterion.value).toEqual({ medianMs: 5_400_000, p95Ms: 7_200_000 });
+    expect(criterion.status).toBe('insufficient_data');
+    expect(criterion.sampleSize).toBe(2);
+    expect(criterion.dataSufficient).toBe(false);
   });
 
   it('computes criterion 5 as operator interventions per completed run', () => {

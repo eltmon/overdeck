@@ -6,6 +6,12 @@ export interface FlywheelStatsOptions {
   completedPipelineRuns?: number;
 }
 
+export interface Criterion4SubstrateBug {
+  filedAt: string;
+  status: 'open' | 'fixed';
+  fixMergedAt: string | null;
+}
+
 export interface Criterion5PipelineRun {
   metrics: PipelineRunMetrics;
   uatActionCount?: number;
@@ -120,13 +126,70 @@ export function computePassRateCriterion(completedPipelineRuns: number, attempts
   return computeCriterion3(attempts);
 }
 
-export function computeMttrCriterion(completedPipelineRuns: number): FlywheelStatsCriterion {
-  return placeholderCriterion(
-    'MTTR for filed substrate bugs',
-    { medianMs: 0, p95Ms: 0 },
-    { medianMs: 24 * 60 * 60 * 1000, p95Ms: 7 * 24 * 60 * 60 * 1000 },
-    completedPipelineRuns,
-  );
+const mttrTarget = { medianMs: 24 * 60 * 60 * 1000, p95Ms: 7 * 24 * 60 * 60 * 1000 };
+const mttrYellowP95Ms = 14 * 24 * 60 * 60 * 1000;
+
+function mttrStatus(medianMs: number, p95Ms: number): FlywheelStatsCriterion['status'] {
+  if (medianMs < mttrTarget.medianMs && p95Ms < mttrTarget.p95Ms) return 'green';
+  if (medianMs < mttrTarget.medianMs && p95Ms < mttrYellowP95Ms) return 'yellow';
+  return 'red';
+}
+
+function fixedBugDurationsInWindow(
+  bugs: readonly Criterion4SubstrateBug[],
+  since: string,
+  until: string,
+): number[] {
+  const sinceMs = Date.parse(since);
+  const untilMs = Date.parse(until);
+  return bugs.flatMap((bug) => {
+    if (bug.status !== 'fixed' || !bug.fixMergedAt) return [];
+
+    const filedAtMs = Date.parse(bug.filedAt);
+    const fixedAtMs = Date.parse(bug.fixMergedAt);
+    if (!Number.isFinite(filedAtMs) || !Number.isFinite(fixedAtMs)) return [];
+    if (fixedAtMs < sinceMs || fixedAtMs > untilMs) return [];
+
+    const durationMs = fixedAtMs - filedAtMs;
+    return durationMs >= 0 ? [durationMs] : [];
+  });
+}
+
+export function computeCriterion4(
+  bugs: readonly Criterion4SubstrateBug[],
+  since: string,
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  const durations = fixedBugDurationsInWindow(bugs, since, until);
+  const medianMs = median(durations);
+  const p95Ms = percentile(durations, 95);
+
+  return {
+    label: 'MTTR for filed substrate bugs',
+    value: { medianMs, p95Ms },
+    target: mttrTarget,
+    status: durations.length < 3 ? 'insufficient_data' : mttrStatus(medianMs, p95Ms),
+    sampleSize: durations.length,
+    dataSufficient: durations.length >= 3,
+  };
+}
+
+export function computeMttrCriterion(
+  completedPipelineRuns: number,
+  bugs: readonly Criterion4SubstrateBug[] = [],
+  since = '1970-01-01T00:00:00.000Z',
+  until = new Date().toISOString(),
+): FlywheelStatsCriterion {
+  if (completedPipelineRuns < 3) {
+    return placeholderCriterion(
+      'MTTR for filed substrate bugs',
+      { medianMs: 0, p95Ms: 0 },
+      mttrTarget,
+      completedPipelineRuns,
+    );
+  }
+
+  return computeCriterion4(bugs, since, until);
 }
 
 function interventionStatus(rate: number): FlywheelStatsCriterion['status'] {
