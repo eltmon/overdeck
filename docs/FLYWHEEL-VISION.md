@@ -92,7 +92,24 @@ Why 30 consecutive days: gives statistical signal (dozens of pipeline runs at cu
 
 ## Immediate behavioral changes
 
-Two changes need to land on the Flywheel before the v1.0 telemetry is meaningful. Both convert current hardcoded role-prompt constraints into config-driven toggles.
+Three changes need to land on the Flywheel. The first is security-critical and load-bearing for everything else; the next two convert hardcoded role-prompt constraints into config-driven toggles.
+
+### Author + assignee invariant (security-critical, applies always)
+
+The Flywheel currently restricts inventory and suggestions to issues authored by `eltmon` or `panopticon-agent[bot]`. **This expands to** include third-party-authored issues *only when the operator has personally assigned them*, preserving the default-deny posture against unsolicited issues while letting the operator deliberately pull legitimate third-party work into the Flywheel's purview.
+
+**Rule (replaces the existing author allowlist in `docs/flywheel-brief.md` and `roles/flywheel.md`):**
+
+> Include an issue in inventory and suggestions **only if at least one of**:
+> - `author.login` is `eltmon` (project owner), **OR**
+> - `author.login` is `panopticon-agent[bot]` (Panopticon GitHub App), **OR**
+> - `assignees[].login` contains `eltmon` (operator has personally assigned the issue).
+>
+> Verify with `gh issue view <num> --json author,assignees`. Any other state — third-party author and `eltmon` not among assignees — is out of scope.
+
+**Why this is the first item.** When auto-pickup (below) is enabled, this filter is the only safeguard between an attacker filing a malicious issue and the Flywheel autonomously running an agent against it — planning, implementing, and pushing code in a workspace before the operator sees the issue. The author/assignee invariant is load-bearing for the security of every other behavioral change in this section. Never weaken the default-deny without thinking about what an adversary could craft.
+
+This change applies *always*, regardless of any toggle. It does not get a config flag — the rule cannot be relaxed at runtime.
 
 ### Auto-pickup from backlog (default OFF)
 
