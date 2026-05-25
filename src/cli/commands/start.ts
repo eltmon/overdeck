@@ -1014,7 +1014,23 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    const beadCoverage = validateBeadsMatchPlan(workspace, id);
+    let beadCoverage = validateBeadsMatchPlan(workspace, id);
+    if (!beadCoverage.valid) {
+      // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
+      // existing beads for the issue before recreating from spec, so it's safe to
+      // call when some beads exist but the count mismatches the spec — typical
+      // when planning was killed mid-materialization or hit a transient bd error.
+      spinner.text = `Beads count off (${beadCoverage.beadCount}/${beadCoverage.planItemCount}) — rematerializing from vBRIEF...`;
+      try {
+        const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
+        if (recovery.success && recovery.created.length > 0) {
+          spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
+          beadCoverage = validateBeadsMatchPlan(workspace, id);
+        }
+      } catch (recoveryErr) {
+        // Fall through to the existing failure path below
+      }
+    }
     if (!beadCoverage.valid) {
       await failPostCreateValidation({
         spinner,
